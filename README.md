@@ -1,10 +1,10 @@
 ![Golang](https://img.shields.io/badge/Go-1.23-informational)
 
-# crossplane-provider-btp-account
+# Crossplane Provider for SAP BTP
 
 ## About this project
 
-`crossplane-provider-btp-account` is a [Crossplane](https://crossplane.io/) Provider that handles the orchestration of Account related resources on [SAP Business Technology Platform](https://www.sap.com/products/technology-platform.html):
+`crossplane-provider-btp` is a [Crossplane](https://crossplane.io/) Provider that handles the orchestration of Account related resources on [SAP Business Technology Platform](https://www.sap.com/products/technology-platform.html):
 
 - Subaccount
 - User Management
@@ -24,7 +24,7 @@ To install this provider in a kubernetes cluster running crossplane, you can use
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-btp-account
+  name: provider-btp
 spec:
   package: TODO REGISTRY URL/crossplane-provider-btp:<VERSION>
 ```
@@ -55,33 +55,33 @@ To run the end2end tests, a technical user within the BTP is necessary for creat
 BTP_TECHNICAL_USER
 ```
 {
-      "email": "email",
-      "username": "PuserId",
-      "password": "mypass"
-    }
+  "email": "email",
+  "username": "PuserId",
+  "password": "mypass"
+}
 ```
 
 CIS_CENTRAL_BINDING
 Contents from the service binding of a `cis-central` service, like
 ```
 {
-      "endpoints": {
-        "accounts_service_url": "...",
-        "cloud_automation_url": "...",
-        "entitlements_service_url": "...",
-        "events_service_url": "...",
-        "external_provider_registry_url": "...",
-        "metadata_service_url": "...",
-        "order_processing_url": "...",
-        "provisioning_service_url": "...",
-        "saas_registry_service_url": "..."
-      },
-      "grant_type": "client_credentials",
-      "sap.cloud.service": "com.sap.core.commercial.service.central",
-      "uaa": {
-            …
-      }
-    }
+  "endpoints": {
+    "accounts_service_url": "...",
+    "cloud_automation_url": "...",
+    "entitlements_service_url": "...",
+    "events_service_url": "...",
+    "external_provider_registry_url": "...",
+    "metadata_service_url": "...",
+    "order_processing_url": "...",
+    "provisioning_service_url": "...",
+    "saas_registry_service_url": "..."
+  },
+  "grant_type": "client_credentials",
+  "sap.cloud.service": "com.sap.core.commercial.service.central",
+  "uaa": {
+      …
+  }
+}
 ```
 Contains the CLI server URL, for example:
 ```
