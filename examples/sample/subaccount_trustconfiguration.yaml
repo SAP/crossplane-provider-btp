@@ -8,5 +8,5 @@ spec:
     description: "my-descriptions"
     subaccountRef:
       name: stephan-trust-test
-    identityProvider: "aedxvzfuh.accounts400.ondemand.com"
+    identityProvider: "<IDP_URL>"
 
