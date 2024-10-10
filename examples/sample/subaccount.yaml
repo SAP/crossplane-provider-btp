@@ -6,7 +6,7 @@ metadata:
 spec:
   forProvider:
     displayName: test-12345
-    region: eu12
+    region: eu10
     subdomain: test-1234q342645asd
     subaccountAdmins:
       - <EMAIL>

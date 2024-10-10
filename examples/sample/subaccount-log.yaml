@@ -8,7 +8,7 @@ spec:
     name: account-provider-config
   forProvider:
     displayName: e2e-test-sa-entx
-    region: eu12
+    region: eu10
     subdomain: e2e-test-sa-entx
     labels:
       safe-to-delete: [ "yes" ]
