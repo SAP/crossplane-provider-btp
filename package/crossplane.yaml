@@ -13,5 +13,5 @@ metadata:
 
 spec:
   controller:
-    image: DOCKER_REGISTRY/crossplane/provider-btp-controller-amd64:VERSION
+    image: DOCKER_REGISTRY/crossplane/provider-btp-controller:VERSION
 
