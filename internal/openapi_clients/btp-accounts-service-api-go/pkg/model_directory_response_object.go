@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -56,6 +55,7 @@ type DirectoryResponseObject struct {
 	Subaccounts []SubaccountResponseObject `json:"subaccounts,omitempty"`
 	// Applies only to directories that have the user authorization management feature enabled. The subdomain becomes part of the path used to access the authorization tenant of the directory. Unique within the defined region.
 	Subdomain *string `json:"subdomain,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _DirectoryResponseObject DirectoryResponseObject
@@ -654,6 +654,11 @@ func (o DirectoryResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Subdomain) {
 		toSerialize["subdomain"] = o.Subdomain
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -687,15 +692,37 @@ func (o *DirectoryResponseObject) UnmarshalJSON(data []byte) (err error) {
 
 	varDirectoryResponseObject := _DirectoryResponseObject{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varDirectoryResponseObject)
+	err = json.Unmarshal(data, &varDirectoryResponseObject)
 
 	if err != nil {
 		return err
 	}
 
 	*o = DirectoryResponseObject(varDirectoryResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "children")
+		delete(additionalProperties, "contractStatus")
+		delete(additionalProperties, "createdBy")
+		delete(additionalProperties, "createdDate")
+		delete(additionalProperties, "customProperties")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "directoryFeatures")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "entityState")
+		delete(additionalProperties, "globalAccountGUID")
+		delete(additionalProperties, "guid")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "legalLinks")
+		delete(additionalProperties, "modifiedDate")
+		delete(additionalProperties, "parentGUID")
+		delete(additionalProperties, "stateMessage")
+		delete(additionalProperties, "subaccounts")
+		delete(additionalProperties, "subdomain")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

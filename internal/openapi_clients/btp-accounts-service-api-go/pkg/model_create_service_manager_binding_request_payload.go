@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -25,6 +24,7 @@ type CreateServiceManagerBindingRequestPayload struct {
 	Name string `json:"name"`
 	// Service-specific configuration parameters. For example, mTLS authentication-type parameters.
 	Parameters map[string]map[string]interface{} `json:"parameters,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _CreateServiceManagerBindingRequestPayload CreateServiceManagerBindingRequestPayload
@@ -117,6 +117,11 @@ func (o CreateServiceManagerBindingRequestPayload) ToMap() (map[string]interface
 	if !IsNil(o.Parameters) {
 		toSerialize["parameters"] = o.Parameters
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -144,15 +149,21 @@ func (o *CreateServiceManagerBindingRequestPayload) UnmarshalJSON(data []byte) (
 
 	varCreateServiceManagerBindingRequestPayload := _CreateServiceManagerBindingRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varCreateServiceManagerBindingRequestPayload)
+	err = json.Unmarshal(data, &varCreateServiceManagerBindingRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = CreateServiceManagerBindingRequestPayload(varCreateServiceManagerBindingRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "parameters")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

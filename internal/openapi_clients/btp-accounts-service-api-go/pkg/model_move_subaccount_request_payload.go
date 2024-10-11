@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -23,6 +22,7 @@ var _ MappedNullable = &MoveSubaccountRequestPayload{}
 type MoveSubaccountRequestPayload struct {
 	// The GUID of the new location of the subaccount. To move to a directory, enter the GUID of the directory. To move out of a directory to the root global account, enter the GUID of the global account.
 	TargetAccountGUID string `json:"targetAccountGUID"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _MoveSubaccountRequestPayload MoveSubaccountRequestPayload
@@ -80,6 +80,11 @@ func (o MoveSubaccountRequestPayload) MarshalJSON() ([]byte, error) {
 func (o MoveSubaccountRequestPayload) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["targetAccountGUID"] = o.TargetAccountGUID
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -107,15 +112,20 @@ func (o *MoveSubaccountRequestPayload) UnmarshalJSON(data []byte) (err error) {
 
 	varMoveSubaccountRequestPayload := _MoveSubaccountRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varMoveSubaccountRequestPayload)
+	err = json.Unmarshal(data, &varMoveSubaccountRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = MoveSubaccountRequestPayload(varMoveSubaccountRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "targetAccountGUID")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

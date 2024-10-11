@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -23,6 +22,7 @@ var _ MappedNullable = &EntitySettingsRequestPayload{}
 type EntitySettingsRequestPayload struct {
 	// Additional properties for the settings.
 	EntitySettings []UpdateEntitySettingsRequestPayload `json:"entitySettings"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _EntitySettingsRequestPayload EntitySettingsRequestPayload
@@ -80,6 +80,11 @@ func (o EntitySettingsRequestPayload) MarshalJSON() ([]byte, error) {
 func (o EntitySettingsRequestPayload) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["entitySettings"] = o.EntitySettings
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -107,15 +112,20 @@ func (o *EntitySettingsRequestPayload) UnmarshalJSON(data []byte) (err error) {
 
 	varEntitySettingsRequestPayload := _EntitySettingsRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varEntitySettingsRequestPayload)
+	err = json.Unmarshal(data, &varEntitySettingsRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = EntitySettingsRequestPayload(varEntitySettingsRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "entitySettings")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

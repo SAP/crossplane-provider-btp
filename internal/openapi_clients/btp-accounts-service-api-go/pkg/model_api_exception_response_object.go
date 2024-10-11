@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -22,6 +21,7 @@ var _ MappedNullable = &ApiExceptionResponseObject{}
 // ApiExceptionResponseObject struct for ApiExceptionResponseObject
 type ApiExceptionResponseObject struct {
 	Error ApiExceptionResponseObjectError `json:"error"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _ApiExceptionResponseObject ApiExceptionResponseObject
@@ -79,6 +79,11 @@ func (o ApiExceptionResponseObject) MarshalJSON() ([]byte, error) {
 func (o ApiExceptionResponseObject) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["error"] = o.Error
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -106,15 +111,20 @@ func (o *ApiExceptionResponseObject) UnmarshalJSON(data []byte) (err error) {
 
 	varApiExceptionResponseObject := _ApiExceptionResponseObject{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varApiExceptionResponseObject)
+	err = json.Unmarshal(data, &varApiExceptionResponseObject)
 
 	if err != nil {
 		return err
 	}
 
 	*o = ApiExceptionResponseObject(varApiExceptionResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "error")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

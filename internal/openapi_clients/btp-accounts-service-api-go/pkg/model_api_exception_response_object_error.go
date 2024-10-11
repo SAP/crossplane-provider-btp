@@ -27,7 +27,10 @@ type ApiExceptionResponseObjectError struct {
 	Message *string `json:"message,omitempty"`
 	// The susppect.
 	Target *string `json:"target,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ApiExceptionResponseObjectError ApiExceptionResponseObjectError
 
 // NewApiExceptionResponseObjectError instantiates a new ApiExceptionResponseObjectError object
 // This constructor will assign default values to properties that have it defined,
@@ -196,7 +199,36 @@ func (o ApiExceptionResponseObjectError) ToMap() (map[string]interface{}, error)
 	if !IsNil(o.Target) {
 		toSerialize["target"] = o.Target
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ApiExceptionResponseObjectError) UnmarshalJSON(data []byte) (err error) {
+	varApiExceptionResponseObjectError := _ApiExceptionResponseObjectError{}
+
+	err = json.Unmarshal(data, &varApiExceptionResponseObjectError)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ApiExceptionResponseObjectError(varApiExceptionResponseObjectError)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "code")
+		delete(additionalProperties, "correlationID")
+		delete(additionalProperties, "message")
+		delete(additionalProperties, "target")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableApiExceptionResponseObjectError struct {

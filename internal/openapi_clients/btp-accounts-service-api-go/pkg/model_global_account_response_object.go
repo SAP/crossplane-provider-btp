@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -89,6 +88,7 @@ type GlobalAccountResponseObject struct {
 	TerminationNotificationStatus *string `json:"terminationNotificationStatus,omitempty"`
 	// For internal accounts, the intended purpose of the global account. Possible purposes: * <b>Development:</b> For development of a service. * <b>Testing:</b> For testing development. * <b>Demo:</b> For creating demos. * <b>Production:</b> For delivering a service in a production landscape.
 	UseFor *string `json:"useFor,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _GlobalAccountResponseObject GlobalAccountResponseObject
@@ -1214,6 +1214,11 @@ func (o GlobalAccountResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.UseFor) {
 		toSerialize["useFor"] = o.UseFor
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -1251,15 +1256,53 @@ func (o *GlobalAccountResponseObject) UnmarshalJSON(data []byte) (err error) {
 
 	varGlobalAccountResponseObject := _GlobalAccountResponseObject{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varGlobalAccountResponseObject)
+	err = json.Unmarshal(data, &varGlobalAccountResponseObject)
 
 	if err != nil {
 		return err
 	}
 
 	*o = GlobalAccountResponseObject(varGlobalAccountResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "backwardCompliantEU")
+		delete(additionalProperties, "bpoCustomerId")
+		delete(additionalProperties, "children")
+		delete(additionalProperties, "commercialModel")
+		delete(additionalProperties, "consumptionBased")
+		delete(additionalProperties, "contractStatus")
+		delete(additionalProperties, "costCenter")
+		delete(additionalProperties, "costObjectId")
+		delete(additionalProperties, "costObjectType")
+		delete(additionalProperties, "createdDate")
+		delete(additionalProperties, "crmCustomerId")
+		delete(additionalProperties, "crmTenantId")
+		delete(additionalProperties, "customProperties")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "entityState")
+		delete(additionalProperties, "expiryDate")
+		delete(additionalProperties, "geoAccess")
+		delete(additionalProperties, "globalAccountGUID")
+		delete(additionalProperties, "guid")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "legalLinks")
+		delete(additionalProperties, "licenseType")
+		delete(additionalProperties, "modifiedDate")
+		delete(additionalProperties, "origin")
+		delete(additionalProperties, "parentGUID")
+		delete(additionalProperties, "parentType")
+		delete(additionalProperties, "renewalDate")
+		delete(additionalProperties, "serviceId")
+		delete(additionalProperties, "stateMessage")
+		delete(additionalProperties, "subaccounts")
+		delete(additionalProperties, "subdomain")
+		delete(additionalProperties, "terminationNotificationStatus")
+		delete(additionalProperties, "useFor")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

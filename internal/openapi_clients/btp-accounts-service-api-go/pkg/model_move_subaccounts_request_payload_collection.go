@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -23,6 +22,7 @@ var _ MappedNullable = &MoveSubaccountsRequestPayloadCollection{}
 type MoveSubaccountsRequestPayloadCollection struct {
 	// Provide the parameters necessary to obtain information about the source and the target locations.
 	SubaccountsToMoveCollection []MoveSubaccountsRequestPayload `json:"subaccountsToMoveCollection"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _MoveSubaccountsRequestPayloadCollection MoveSubaccountsRequestPayloadCollection
@@ -80,6 +80,11 @@ func (o MoveSubaccountsRequestPayloadCollection) MarshalJSON() ([]byte, error) {
 func (o MoveSubaccountsRequestPayloadCollection) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["subaccountsToMoveCollection"] = o.SubaccountsToMoveCollection
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -107,15 +112,20 @@ func (o *MoveSubaccountsRequestPayloadCollection) UnmarshalJSON(data []byte) (er
 
 	varMoveSubaccountsRequestPayloadCollection := _MoveSubaccountsRequestPayloadCollection{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varMoveSubaccountsRequestPayloadCollection)
+	err = json.Unmarshal(data, &varMoveSubaccountsRequestPayloadCollection)
 
 	if err != nil {
 		return err
 	}
 
 	*o = MoveSubaccountsRequestPayloadCollection(varMoveSubaccountsRequestPayloadCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "subaccountsToMoveCollection")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

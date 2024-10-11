@@ -20,7 +20,10 @@ var _ MappedNullable = &ResponseCollection{}
 // ResponseCollection struct for ResponseCollection
 type ResponseCollection struct {
 	Value []SubaccountResponseObject `json:"value,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ResponseCollection ResponseCollection
 
 // NewResponseCollection instantiates a new ResponseCollection object
 // This constructor will assign default values to properties that have it defined,
@@ -84,7 +87,33 @@ func (o ResponseCollection) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Value) {
 		toSerialize["value"] = o.Value
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ResponseCollection) UnmarshalJSON(data []byte) (err error) {
+	varResponseCollection := _ResponseCollection{}
+
+	err = json.Unmarshal(data, &varResponseCollection)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ResponseCollection(varResponseCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "value")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableResponseCollection struct {
