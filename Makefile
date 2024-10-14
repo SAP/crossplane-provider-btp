@@ -274,3 +274,16 @@ generate-test-crs:
     		envsubst < "$$template" > "$${template}.tmp" && mv "$${template}.tmp" "$$template"; \
     	done' sh {} +
 	@echo crs generated
+
+
+PUBLISH_IMAGES ?= crossplane/provider-btp crossplane/provider-btp-controller
+
+.PONY: publish
+publish:
+	@$(INFO) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
+	@for image in $(PUBLISH_IMAGES); do \
+		echo "Publishing image $(DOCKER_REGISTRY)/$${image}:$(VERSION)"; \
+		docker push $(DOCKER_REGISTRY)/$${image}:$(VERSION); \
+	done
+	@$(OK) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
+
