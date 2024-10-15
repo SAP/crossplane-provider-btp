@@ -26,7 +26,7 @@ kind: Provider
 metadata:
   name: provider-btp
 spec:
-  package: TODO REGISTRY URL/crossplane-provider-btp:<VERSION>
+  package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<VERSION>
 ```
 
 You should then see the crossplane controller create a deployment for this provider. Once it becomes healthy, you can connect the provider to you BTP global account following the documentation.
