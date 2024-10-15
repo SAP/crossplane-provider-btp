@@ -19,6 +19,7 @@ on:
 # GitHub considers creating releases and uploading assets as writing contents.
 permissions:
   contents: write
+  packages: write
 
 jobs:
     run-go-license-check:
@@ -110,8 +111,8 @@ jobs:
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
         with:
           registry: ${{ vars.REGISTRY_URL }}
-          username: ${{ secrets.TEST_REGISTRY_USER }}
-          password: ${{ secrets.TEST_REGISTRY_PASSWORD }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish Artifacts to DockerHub
         run: make publish BRANCH_NAME=${GITHUB_REF##*/}
