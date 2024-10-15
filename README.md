@@ -92,13 +92,13 @@ GLOBAL_ACCOUNT
 Contains the subdomain of the global account.
 
 IDP_URL
-Contains the URL of an IDP that can be connected to the global account, for example:
+Contains the URL of an IDP that can be connected to the global account.
 
 SECOND_DIRECTORY_ADMIN_EMAIL
-Contains a second email (different from the technical user's email) for the directory admin field, for example:
+Contains a second email (different from the technical user's email) for the directory admin field.
 
 TECHNICAL_USER_EMAIL
-Contains the email of the BTP_TECHNICAL_USER
+Contains the email of the BTP_TECHNICAL_USER.
 
 ## Support, Feedback, Contributing
 
