@@ -3,7 +3,6 @@
 name: REUSE Compliance Check
 
 on: 
-  workflow_dispatch:
   workflow_call:
       
 
