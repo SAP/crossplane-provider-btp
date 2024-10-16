@@ -23,7 +23,7 @@ jobs:
   run-e2e-test:
     uses: ./.github/workflows/e2e_test.yaml
     with:
-      checkout-ref: ${{ github.event.pull_request.merge_commit_sha }}
+      checkout-ref: ${{ github.event.pull_request.head.sha }}
       environment: ${{ github.event_name == 'pull_request_target' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) && 'pr-e2e-no-approval' || 'pr-e2e-approval' }}
     secrets:
       CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
