@@ -118,7 +118,7 @@ spec:
   providerConfigRef:
     name: default
 ---
-apiVersion: oidc.orchestrate.cloud.sap/v1alpha1
+apiVersion: oidc.btp.sap.crossplane.io/v1alpha1
 kind: CertBasedOIDCLogin
 metadata:
   name: kyma-oidc
@@ -142,7 +142,7 @@ spec:
         name: example-login-pass-secret
         namespace: default
 ---
-apiVersion: oidc.orchestrate.cloud.sap/v1alpha1
+apiVersion: oidc.btp.sap.crossplane.io/v1alpha1
 kind: KubeConfigGenerator
 metadata:
   name: kyma-oidc

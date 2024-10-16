@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: kubeconfiggenerators.oidc.orchestrate.cloud.sap
+  name: certbasedoidclogins.oidc.btp.sap.crossplane.io
 spec:
-  group: oidc.orchestrate.cloud.sap
+  group: oidc.btp.sap.crossplane.io
   names:
     categories:
     - crossplane
     - managed
     - btp-account
-    kind: KubeConfigGenerator
-    listKind: KubeConfigGeneratorList
-    plural: kubeconfiggenerators
-    singular: kubeconfiggenerator
+    kind: CertBasedOIDCLogin
+    listKind: CertBasedOIDCLoginList
+    plural: certbasedoidclogins
+    singular: certbasedoidclogin
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -34,8 +34,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A KubeConfigGenerator is a managed resource that controls the
-          generation of a kubeconfig file
+        description: A CertBasedOIDCLogin is a managed resource that represents a
+          OIDC login flow using a certificate for authentication
         properties:
           apiVersion:
             description: |-
@@ -55,8 +55,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: A KubeConfigGeneratorSpec defines the desired state of a
-              KubeConfigGenerator.
+            description: A CertBasedOIDCLoginSpec defines the desired state of a CertBasedOIDCLogin.
             properties:
               deletionPolicy:
                 default: Delete
@@ -73,76 +72,11 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: KubeConfigGeneratorParameters are the configurable fields
-                  of a KubeConfigGenerator.
+                description: CertBasedOIDCLoginParameters are the configurable fields
+                  of a CertBasedOIDCLogin.
                 properties:
-                  kubeconfigTemplate:
-                    properties:
-                      env:
-                        description: |-
-                          Env is a reference to an environment variable that contains credentials
-                          that must be used to connect to the provider.
-                        properties:
-                          name:
-                            description: Name is the name of an environment variable.
-                            type: string
-                        required:
-                        - name
-                        type: object
-                      fs:
-                        description: |-
-                          Fs is a reference to a filesystem location that contains credentials that
-                          must be used to connect to the provider.
-                        properties:
-                          path:
-                            description: Path is a filesystem path.
-                            type: string
-                        required:
-                        - path
-                        type: object
-                      injectInline:
-                        description: If not set to true it will clean the user entry
-                          and leave only the token, otherwise the token will just
-                          be added
-                        type: boolean
-                      secretRef:
-                        description: |-
-                          A SecretRef is a reference to a secret key that contains the credentials
-                          that must be used to connect to the provider.
-                        properties:
-                          key:
-                            description: The key to select.
-                            type: string
-                          name:
-                            description: Name of the secret.
-                            type: string
-                          namespace:
-                            description: Namespace of the secret.
-                            type: string
-                        required:
-                        - key
-                        - name
-                        - namespace
-                        type: object
-                      source:
-                        description: |-
-                          A CredentialsSource is a source from which provider credentials may be
-                          acquired.
-                        enum:
-                        - None
-                        - Secret
-                        - InjectedIdentity
-                        - Environment
-                        - Filesystem
-                        type: string
-                      userIndex:
-                        description: ID of the entry in users of kubeconfig to inject
-                          the token to
-                        type: integer
-                    required:
-                    - source
-                    type: object
-                  oidcToken:
+                  certificate:
+                    description: Reference to p12 certificate, encoded as secret
                     properties:
                       env:
                         description: |-
@@ -196,12 +130,75 @@ spec:
                         - Environment
                         - Filesystem
                         type: string
+                      type:
+                        description: Type of certificate, currently just used for
+                          manual bookkepping
+                        type: string
                     required:
                     - source
                     type: object
-                required:
-                - kubeconfigTemplate
-                - oidcToken
+                  clientId:
+                    type: string
+                  issuer:
+                    type: string
+                  password:
+                    description: Certificate Password used in the auth process
+                    properties:
+                      env:
+                        description: |-
+                          Env is a reference to an environment variable that contains credentials
+                          that must be used to connect to the provider.
+                        properties:
+                          name:
+                            description: Name is the name of an environment variable.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      fs:
+                        description: |-
+                          Fs is a reference to a filesystem location that contains credentials that
+                          must be used to connect to the provider.
+                        properties:
+                          path:
+                            description: Path is a filesystem path.
+                            type: string
+                        required:
+                        - path
+                        type: object
+                      secretRef:
+                        description: |-
+                          A SecretRef is a reference to a secret key that contains the credentials
+                          that must be used to connect to the provider.
+                        properties:
+                          key:
+                            description: The key to select.
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                          namespace:
+                            description: Namespace of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        - namespace
+                        type: object
+                      source:
+                        description: |-
+                          A CredentialsSource is a source from which provider credentials may be
+                          acquired.
+                        enum:
+                        - None
+                        - Secret
+                        - InjectedIdentity
+                        - Environment
+                        - Filesystem
+                        type: string
+                    required:
+                    - source
+                    type: object
                 type: object
               managementPolicies:
                 default:
@@ -371,36 +368,40 @@ spec:
             - forProvider
             type: object
           status:
-            description: A KubeConfigGeneratorStatus represents the observed state
-              of a KubeConfigGenerator.
+            description: A CertBasedOIDCLoginStatus represents the observed state
+              of a CertBasedOIDCLogin.
             properties:
               atProvider:
+                description: CertBasedOIDCLoginObservation are the observable fields
+                  of a CertBasedOIDCLogin.
                 properties:
-                  kubeConfigHash:
-                    description: Hash of kubeconfig that has been used in the last
-                      generation process (referenced from the secret under kubeconfigTemplate)
-                    format: byte
+                  expiresAt:
+                    description: expiresAt timestamp when JWT will expire
+                    format: date-time
                     type: string
-                  lastUpdatedAt:
-                    description: Time of the last generation process, just for manual
-                      lookup right now
+                  issuedAt:
+                    description: IssuedAt timestamp of creation of the JWT
+                    format: date-time
                     type: string
-                  serverUrl:
-                    description: ServerUrl parsed from generated Kubeconfig
+                  issuer:
+                    description: Issuer is the IDP which issued the JWT
                     type: string
-                  tokenHash:
-                    description: Hash of token that has been used in the last generation
-                      process (referenced from the secret under oidcToken)
-                    format: byte
+                  rotationDuration:
+                    description: RotationDuration threshold value (depending on RotationStrategy)
+                      used to calculate RotationNotBefore
                     type: string
-                  updatedGeneration:
-                    description: Generation (from object metadata) of the CR used
-                      for the last generation process, used to detect changes in the
-                      CR itself
-                    format: int64
-                    type: integer
-                required:
-                - serverUrl
+                  rotationNotBefore:
+                    description: RotationNotBefore timestamp after which rotation
+                      will be started
+                    format: date-time
+                    type: string
+                  rotationStrategy:
+                    description: RotationStrategy returns which strategy the controller
+                      chose to rotate the secret. Currently not configurable. Dynamic
+                      refers to rotate the jwt at 2/3 of its duration.
+                    enum:
+                    - Dynamic
+                    type: string
                 type: object
               conditions:
                 description: Conditions of the resource.
