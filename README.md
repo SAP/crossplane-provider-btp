@@ -1,4 +1,5 @@
 ![Golang](https://img.shields.io/badge/Go-1.23-informational)
+[![REUSE status](https://api.reuse.software/badge/github.com/SAP/crossplane-provider-btp)](https://api.reuse.software/info/github.com/SAP/crossplane-provider-btp)
 
 # Crossplane Provider for SAP BTP
 
