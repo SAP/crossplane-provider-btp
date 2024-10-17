@@ -63,7 +63,7 @@ BTP_TECHNICAL_USER
 
 CIS_CENTRAL_BINDING
 Contents from the service binding of a `cis-central` service, like
-```
+```json
 {
   "endpoints": {
     "accounts_service_url": "...",
