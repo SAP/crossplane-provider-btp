@@ -4,7 +4,7 @@
 
 ## About this project
 
-`crossplane-provider-btp` is a [Crossplane](https://crossplane.io/) Provider that handles the orchestration of Account related resources on [SAP Business Technology Platform](https://www.sap.com/products/technology-platform.html):
+`crossplane-provider-btp` is a [Crossplane](https://crossplane.io/) Provider that handles the orchestration of account related resources on [SAP Business Technology Platform](https://www.sap.com/products/technology-platform.html):
 
 - Subaccount
 - User Management
