@@ -53,7 +53,7 @@ The [Crossplane Provider Development][provider-dev] guide may be of use to add n
 To run the end2end tests, a technical user within the BTP is necessary for creation of environments (Kyma & CF). `.username` & `.password` is necessary for futher actions on `CloudFoundryEnvironment`.
 
 BTP_TECHNICAL_USER
-```
+```json
 {
   "email": "email",
   "username": "PuserId",
