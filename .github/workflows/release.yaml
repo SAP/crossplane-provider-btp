@@ -34,23 +34,23 @@ jobs:
     run-make-reviewable-and-check-diff:
       uses: ./.github/workflows/reviewable_check_diff.yaml
 
-    # run-e2e-test:
-    #   uses: ./.github/workflows/e2e_test.yaml
-    #   needs:
-    #   - run-go-license-check
-    #   - run-reuse-license-check
-    #   - run-unit-test
-    #   - run-make-reviewable-and-check-diff
-    #   with:
-    #     environment: pr-e2e-no-approval
-    #   secrets:
-    #     CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
-    #     GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
-    #     IDP_URL: ${{ secrets.IDP_URL }}
-    #     SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
-    #     CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
-    #     BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
-    #     TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
+    run-e2e-test:
+      uses: ./.github/workflows/e2e_test.yaml
+      needs:
+      - run-go-license-check
+      - run-reuse-license-check
+      - run-unit-test
+      - run-make-reviewable-and-check-diff
+      with:
+        environment: pr-e2e-no-approval
+      secrets:
+        CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
+        GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
+        IDP_URL: ${{ secrets.IDP_URL }}
+        SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
+        CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
+        BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
+        TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
 
     release:
       runs-on: ubuntu-latest
@@ -58,7 +58,7 @@ jobs:
       - run-go-license-check
       - run-unit-test
       - run-make-reviewable-and-check-diff
-      # - run-e2e-test
+      - run-e2e-test
 
       steps:
       - name: Print Version Number
