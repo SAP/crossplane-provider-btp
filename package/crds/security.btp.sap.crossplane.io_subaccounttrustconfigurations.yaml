@@ -36,7 +36,8 @@ spec:
       openAPIV3Schema:
         description: 'SubaccountTrustConfiguration is the Schema for the SubaccountTrustConfigurations
           API. Establishes trust from a subaccount to an Identity Authentication tenant.
-          Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/trust-and-federation-with-identity-providers'
+          Tip: You must be assigned to the admin role of the subaccount. Further documentation:
+          https://help.sap.com/docs/btp/sap-business-technology-platform/trust-and-federation-with-identity-providers'
         properties:
           apiVersion:
             description: |-

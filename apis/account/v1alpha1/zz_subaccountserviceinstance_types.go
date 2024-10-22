@@ -50,7 +50,7 @@ type SubaccountServiceInstanceInitParameters struct {
 
 type SubaccountServiceInstanceObservation struct {
 
-	// (Map of String) Contextual data for the resource.
+	// (String) Contextual data for the resource.
 	// Contextual data for the resource.
 	// +mapType=granular
 	Context map[string]*string `json:"context,omitempty" tf:"context,omitempty"`
@@ -93,7 +93,7 @@ type SubaccountServiceInstanceObservation struct {
 	// The ID of the service plan.
 	ServiceplanID *string `json:"serviceplanId,omitempty" tf:"serviceplan_id,omitempty"`
 
-	// (Boolean) Shows whether the service instance is shared.
+	// (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
 	// Shows whether the service instance is shared.
 	Shared *bool `json:"shared,omitempty" tf:"shared,omitempty"`
 
@@ -165,7 +165,7 @@ type SubaccountServiceInstanceStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 
-// SubaccountServiceInstance is the Schema for the SubaccountServiceInstances API. Creates a service instance in a subaccount.
+// SubaccountServiceInstance is the Schema for the SubaccountServiceInstances API. Creates a service instance in a subaccount. Tip: You must be assigned to the admin or the service administrator role of the subaccount.
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

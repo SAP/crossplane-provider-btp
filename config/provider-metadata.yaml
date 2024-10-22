@@ -2,7 +2,7 @@ name: SAP/btp
 resources:
     btp_directory:
         subCategory: ""
-        description: 'Directories allow you to organize and manage your subaccounts according to your technical and business needs. The use of directories is optional. You can create up to five levels of directories in your account hierarchy. If you have directories, you can still create subaccounts directly under your global account. Tips:'
+        description: 'Directories allow you to organize and manage your subaccounts according to your technical and business needs. The use of directories is optional. You can create up to five levels of directories in your account hierarchy. If you have directories, you can still create subaccounts directly under your global account. Tips: You must be assigned to the global account admin role, or the directory admin if the directory is configured to manage its authorizations.A directory path in the account hierarchy can have only one directory that is enabled with the ENTITLEMENTS or AUTHORIZATIONS features. If such a directory exists, other directories in that path can only be enabled with the DEFAULT features. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/account-model'
         name: btp_directory
         title: btp_directory Resource - terraform-provider-btp
         examples:
@@ -66,9 +66,52 @@ resources:
             state: '(String) The current state of the directory. Possible values are:'
             subdomain: (String) Applies only to directories that have the user authorization management feature enabled. The subdomain becomes part of the path used to access the authorization tenant of the directory. It has to be unique within the defined region.
         importStatements: []
+    btp_directory_api_credential:
+        subCategory: ""
+        description: 'Manage API Credentials at the Directory level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted directory. Tip: You must be assigned to directory admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
+        name: btp_directory_api_credential
+        title: btp_directory_api_credential Resource - terraform-provider-btp
+        examples:
+            - name: with-secret
+              manifest: |-
+                {
+                  "directory_id": "d1298936-ddaf-4a82-b1d7-3ad29a732b61",
+                  "name": "directory-api-credential-with-secret",
+                  "read_only": false
+                }
+            - name: with-certificate
+              manifest: |-
+                {
+                  "certificate_passed": "${data.external.values.result[\"certificate\"]}",
+                  "directory_id": "d1298936-ddaf-4a82-b1d7-3ad29a732b61",
+                  "name": "directory-api-credential-with-certificate",
+                  "read_only": false
+                }
+              references:
+                certificate_passed: data.external.values.result["certificate"]
+            - name: read-only
+              manifest: |-
+                {
+                  "directory_id": "d1298936-ddaf-4a82-b1d7-3ad29a732b61",
+                  "name": "read-only-directory-api-credential",
+                  "read_only": true
+                }
+        argumentDocs:
+            api_url: (String) The URL to be used to make the API calls.
+            certificate_passed: (String) If the user prefers to use a certificate, they must provide the certificate value in PEM format "----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----".
+            certificate_received: (String) The certificate that is computed based on the one passed by the user.
+            client_id: (String) A unique ID associated with the API credential.
+            client_secret: (String) If the certificate is omitted, then a unique secret is generated for the API credential.
+            credential_type: (String) The supported credential types are Secrets (Default) or Certificates.
+            directory_id: (String) The ID of the directory.
+            key: (String) RSA key generated if the API credential is created with a certificate.
+            name: (String) The name for the API credential.
+            read_only: (Boolean) Access restriction placed on the API credential. If set to true, the resource has only read-only access.
+            token_url: (String) The URL to be used to fetch the access token to make use of the XSUAA REST APIs.
+        importStatements: []
     btp_directory_entitlement:
         subCategory: ""
-        description: 'Assigns the entitlement plan of a service, multitenant application, or environment, to a directory. Note that some environments, such as Cloud Foundry, are available by default to all global accounts and their directorys, and therefore are not made available as entitlements. Tip: You must be assigned to the global account admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
+        description: 'Assigns the entitlement plan of a service, multitenant application, or environment, to a directory. Note that some environments, such as Cloud Foundry, are available by default to all global accounts and their directorys, and therefore are not made available as entitlements. Tip: You must be assigned to the admin role of the global account or the directory. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
         name: btp_directory_entitlement
         title: btp_directory_entitlement Resource - terraform-provider-btp
         examples:
@@ -116,9 +159,37 @@ resources:
             plan_name: (String) The name of the entitled service plan.
             service_name: (String) The name of the entitled service.
         importStatements: []
+    btp_directory_role:
+        subCategory: ""
+        description: 'Creates a role in a directory. Tip: You must be assigned to the admin role of the global account or the directory. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts'
+        name: btp_directory_role
+        title: btp_directory_role Resource - terraform-provider-btp
+        examples:
+            - name: dirrole
+              manifest: |-
+                {
+                  "app_id": "uas!b36585",
+                  "directory_id": "ddfc2206-5f11-48ed-a1ec-29010af70050",
+                  "name": "DirUsageRepViewTest",
+                  "role_template_name": "Directory_Usage_Reporting_Viewer"
+                }
+        argumentDocs:
+            app_id: (String) The ID of the xsuaa application.
+            custom_grant_as_authority_to_apps: (Set of String)
+            custom_granted_apps: (Set of String)
+            description: (String) The role description.
+            directory_id: (String) The ID of the directory.
+            grant_as_authority_to_apps: (Set of String)
+            granted_apps: (Set of String)
+            id: (String, Deprecated) The combined unique ID of the role.
+            name: (String) The name of the role.
+            read_only: (Boolean) Shows whether the role can be modified or not.
+            role_template_name: (String) The name of the role template.
+            scopes: (Attributes List) Scopes available with this role. (see below for nested schema)
+        importStatements: []
     btp_directory_role_collection:
         subCategory: ""
-        description: 'Creates a role collection in a directory. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts'
+        description: 'Creates a role collection in a directory. Tip: You must be assigned to the admin role of the global account or the directory. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts'
         name: btp_directory_role_collection
         title: btp_directory_role_collection Resource - terraform-provider-btp
         examples:
@@ -147,7 +218,7 @@ resources:
         importStatements: []
     btp_directory_role_collection_assignment:
         subCategory: ""
-        description: Assigns a user to a role collection on a directory level.
+        description: 'Assigns a user to a role collection on a directory level. Tip: You must be assigned to the admin role of the global account or the directory.'
         name: btp_directory_role_collection_assignment
         title: btp_directory_role_collection_assignment Resource - terraform-provider-btp
         examples:
@@ -175,9 +246,49 @@ resources:
             role_collection_name: (String) The name of the role collection.
             user_name: (String) The username of the user to assign.
         importStatements: []
+    btp_globalaccount_api_credential:
+        subCategory: ""
+        description: 'Manage API Credentials at the Global Account level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted global account. Tip: You must be assigned to the global account admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
+        name: btp_globalaccount_api_credential
+        title: btp_globalaccount_api_credential Resource - terraform-provider-btp
+        examples:
+            - name: with-secret
+              manifest: |-
+                {
+                  "name": "globalaccount-api-credential-with-secret",
+                  "read_only": false
+                }
+            - name: with-certificate
+              manifest: |-
+                {
+                  "certificate_passed": "${data.external.values.result[\"certificate\"]}",
+                  "name": "globalaccount-api-credential-with-certificate",
+                  "read_only": false
+                }
+              references:
+                certificate_passed: data.external.values.result["certificate"]
+            - name: read-only
+              manifest: |-
+                {
+                  "name": "read-only-globalaccount-api-credential",
+                  "read_only": true
+                }
+        argumentDocs:
+            api_url: (String) The URL to be used to make the API calls.
+            certificate_passed: (String) If the user prefers to use a certificate, they must provide the certificate value in PEM format "----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----".
+            certificate_received: (String) The certificate that is computed based on the one passed by the user.
+            client_id: (String) A unique ID associated with the API credential.
+            client_secret: (String) If the certificate is omitted, then a unique secret is generated for the API credential.
+            credential_type: (String) The supported credential types are Secrets (Default) or Certificates.
+            globalaccount_id: (String) The ID of the globalaccount.
+            key: (String) RSA key generated if the API credential is created with a certificate.
+            name: (String) The name for the API credential.
+            read_only: (Boolean) Access restriction placed on the API credential. If set to true, the resource has only read-only access. Note that if a read-only credential is deleted, it will take a while to reflect in the global account.
+            token_url: (String) The URL to be used to fetch the access token to make use of the XSUAA REST APIs.
+        importStatements: []
     btp_globalaccount_resource_provider:
         subCategory: ""
-        description: 'Creates a resource provider instance to allow your global account to connect to your provider account on a non-SAP cloud vendor. Through this channel, you can consume remote service resources that you already own and are supported by SAP BTP. For example, if you are subscribed to Amazon Web Services (AWS) and have already purchased services, such as PostgreSQL, you can register the vendor as a resource provider in SAP BTP and consume this service across your subaccounts together with other services offered by SAP. The use of this functionality is subject to the availability of the supported non-SAP cloud vendors in your country/region. Tips:'
+        description: 'Creates a resource provider instance to allow your global account to connect to your provider account on a non-SAP cloud vendor. Through this channel, you can consume remote service resources that you already own and are supported by SAP BTP. For example, if you are subscribed to Amazon Web Services (AWS) and have already purchased services, such as PostgreSQL, you can register the vendor as a resource provider in SAP BTP and consume this service across your subaccounts together with other services offered by SAP. The use of this functionality is subject to the availability of the supported non-SAP cloud vendors in your country/region. Tips: You must be assigned to the global account admin role.You can create more than one instance of a given resource provider, each with its unique configuration properties. In such cases, the display name and technical name should be descriptive enough so that you and developers can easily differentiate between each instance.After you configure a new resource provider instance, its supported services are added as entitlements in your global account. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/managing-resource-providers'
         name: btp_globalaccount_resource_provider
         title: btp_globalaccount_resource_provider Resource - terraform-provider-btp
         examples:
@@ -206,9 +317,29 @@ resources:
             provider_type: '(String) The cloud vendor from which to consume services through your subscribed account. Possible values are:'
             technical_name: (String) The unique technical name of the resource provider.
         importStatements: []
+    btp_globalaccount_role:
+        subCategory: ""
+        description: 'Creates a role in a global account. Tip: You must be assigned to the admin role of the global account. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts'
+        name: btp_globalaccount_role
+        title: btp_globalaccount_role Resource - terraform-provider-btp
+        examples:
+            - name: xsuaa_admin
+              manifest: |-
+                {
+                  "app_id": "xsuaa!t1",
+                  "name": "My Role",
+                  "role_template_name": "xsuaa_admin"
+                }
+        argumentDocs:
+            app_id: (String) The ID of the xsuaa application.
+            description: (String) The role description.
+            name: (String) The name of the role.
+            read_only: (Boolean) Shows whether the role can be modified or not.
+            role_template_name: (String) The name of the role template.
+        importStatements: []
     btp_globalaccount_role_collection:
         subCategory: ""
-        description: 'Creates a role collection in a global account. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts'
+        description: 'Creates a role collection in a global account. Tip: You must be assigned to the admin role of the global account. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts'
         name: btp_globalaccount_role_collection
         title: btp_globalaccount_role_collection Resource - terraform-provider-btp
         examples:
@@ -235,7 +366,7 @@ resources:
         importStatements: []
     btp_globalaccount_role_collection_assignment:
         subCategory: ""
-        description: Assigns a user or a group to a role collection on global account level.
+        description: 'Assigns a user or a group to a role collection on global account level. Tip: You must be assigned to the admin role of the global account.'
         name: btp_globalaccount_role_collection_assignment
         title: btp_globalaccount_role_collection_assignment Resource - terraform-provider-btp
         examples:
@@ -262,7 +393,7 @@ resources:
         importStatements: []
     btp_globalaccount_security_settings:
         subCategory: ""
-        description: 'Sets the security settings of a global account. Tip: You must be administrator of the global account. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/configure-trusted-domains-for-sap-authorization-and-trust-management-service https://help.sap.com/docs/btp/sap-business-technology-platform/configure-token-policy-for-sap-authorization-and-trust-management-service'
+        description: 'Sets the security settings of a global account. Tip: You must be assigned to the admin role of the global account. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/configure-trusted-domains-for-sap-authorization-and-trust-management-service https://help.sap.com/docs/btp/sap-business-technology-platform/configure-token-policy-for-sap-authorization-and-trust-management-service'
         name: btp_globalaccount_security_settings
         title: btp_globalaccount_security_settings Resource - terraform-provider-btp
         examples:
@@ -274,6 +405,9 @@ resources:
                     "yourdomain.test"
                   ],
                   "default_identity_provider": "sap.custom",
+                  "iframe_domains": [
+                    "https://yourdomain.test"
+                  ],
                   "refresh_token_validity": 3600,
                   "treat_users_with_same_email_as_same_user": true
                 }
@@ -281,12 +415,14 @@ resources:
             access_token_validity: (Number) The validity of the access token.
             custom_email_domains: (Set of String) Set of domains that are allowed to be used for user authentication.
             default_identity_provider: (String) The global account's default identity provider for platform users. Used to log on to platform tools such as SAP BTP cockpit or the btp CLI.
+            id: (String, Deprecated) The ID of the security settings used for import operations.
+            iframe_domains: (String) The new domains of the iframe. Enter as string. To provide multiple domains, separate them by spaces.
             refresh_token_validity: (Number) The validity of the refresh token.
             treat_users_with_same_email_as_same_user: (Boolean) If set to true, users with the same email are treated as same users.
         importStatements: []
     btp_globalaccount_trust_configuration:
         subCategory: ""
-        description: 'Establishes trust from a global account to an Identity Authentication tenant. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/trust-and-federation-with-identity-providers'
+        description: 'Establishes trust from a global account to an Identity Authentication tenant. Tip: You must be assigned to the admin role of the global account. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/trust-and-federation-with-identity-providers'
         name: btp_globalaccount_trust_configuration
         title: btp_globalaccount_trust_configuration Resource - terraform-provider-btp
         examples:
@@ -317,7 +453,7 @@ resources:
         importStatements: []
     btp_subaccount:
         subCategory: ""
-        description: 'Creates a subaccount in a global account or directory. Tip: You must be assigned to the global account or directory admin role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/account-model'
+        description: 'Creates a subaccount in a global account or directory. Tip: You must be assigned admin role of the global account or directory. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/account-model'
         name: btp_subaccount
         title: btp_subaccount Resource - terraform-provider-btp
         examples:
@@ -382,9 +518,52 @@ resources:
             subdomain: (String) The subdomain that becomes part of the path used to access the authorization tenant of the subaccount. Must be unique within the defined region and cannot be changed after the subaccount has been created.
             usage: '(String) Shows whether the subaccount is used for production purposes. This flag can help your cloud operator to take appropriate action when handling incidents that are related to mission-critical accounts in production systems. Do not apply for subaccounts that are used for nonproduction purposes, such as development, testing, and demos. Applying this setting this does not modify the subaccount. Possible values are:'
         importStatements: []
+    btp_subaccount_api_credential:
+        subCategory: ""
+        description: 'Manage API Credentials at the Subaccount level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted subaccount. Tip: You must be assigned to the subaccount admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
+        name: btp_subaccount_api_credential
+        title: btp_subaccount_api_credential Resource - terraform-provider-btp
+        examples:
+            - name: with-secret
+              manifest: |-
+                {
+                  "name": "subaccount-api-credential-with-secret",
+                  "read_only": false,
+                  "subaccount_id": "77395f6a-a601-4c9e-8cd0-c1fcefc7f60f"
+                }
+            - name: with-certificate
+              manifest: |-
+                {
+                  "certificate_passed": "${data.external.values.result[\"certificate\"]}",
+                  "name": "subaccount-api-credential-with-certificate",
+                  "read_only": false,
+                  "subaccount_id": "77395f6a-a601-4c9e-8cd0-c1fcefc7f60f"
+                }
+              references:
+                certificate_passed: data.external.values.result["certificate"]
+            - name: read-only
+              manifest: |-
+                {
+                  "name": "read-only-subaccount-api-credential",
+                  "read_only": true,
+                  "subaccount_id": "77395f6a-a601-4c9e-8cd0-c1fcefc7f60f"
+                }
+        argumentDocs:
+            api_url: (String) The URL to be used to make the API calls.
+            certificate_passed: (String) If the user prefers to use a certificate, they must provide the certificate value in PEM format "----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----".
+            certificate_received: (String) The certificate that is computed based on the one passed by the user.
+            client_id: (String) A unique ID associated with the API credential.
+            client_secret: (String) If the certificate is omitted, then a unique secret is generated for the API credential.
+            credential_type: (String) The supported credential types are Secrets (Default) or Certificates.
+            key: (String) RSA key generated if the API credential is created with a certificate.
+            name: (String) The name for the API credential.
+            read_only: (Boolean) Access restriction placed on the API credential. If set to true, the resource has only read-only access.
+            subaccount_id: (String) The ID of the subaccount.
+            token_url: (String) The URL to be used to fetch the access token to make use of the XSUAA REST APIs.
+        importStatements: []
     btp_subaccount_entitlement:
         subCategory: ""
-        description: 'Assigns the entitlement plan of a service, multitenant application, or environment, to a subaccount. Note that some environments, such as Cloud Foundry, are available by default to all global accounts and their subaccounts, and therefore are not made available as entitlements. Tip: You must be assigned to the global account admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
+        description: 'Assigns the entitlement plan of a service, multitenant application, or environment, to a subaccount. Note that some environments, such as Cloud Foundry, are available by default to all global accounts and their subaccounts, and therefore are not made available as entitlements. Tip: You must be assigned to the admin role of the global account. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
         name: btp_subaccount_entitlement
         title: btp_subaccount_entitlement Resource - terraform-provider-btp
         examples:
@@ -430,7 +609,7 @@ resources:
         importStatements: []
     btp_subaccount_environment_instance:
         subCategory: ""
-        description: 'Creates an environment instance, such as a Cloud Foundry org, in a subaccount. Tips:'
+        description: 'Creates an environment instance, such as a Cloud Foundry org, in a subaccount. Tips: You must be assigned to the admin role of the subaccount.Quota-based environments, such as Kyma, must first be assigned as entitlements to the subaccount. Further documentation: Cloud Foundry: https://help.sap.com/docs/btp/sap-business-technology-platform/org-management-using-sap-btp-command-line-interface-btp-cliKyma: https://help.sap.com/docs/btp/sap-business-technology-platform/available-plans-in-kyma-environmentConcept: https://help.sap.com/docs/btp/sap-business-technology-platform/environments'
         name: btp_subaccount_environment_instance
         title: btp_subaccount_environment_instance Resource - terraform-provider-btp
         examples:
@@ -459,12 +638,23 @@ resources:
                     "update": "35m"
                   }
                 }
+            - name: cloudfoundry
+              manifest: |-
+                {
+                  "environment_type": "cloudfoundry",
+                  "landscape_label": "cf-us10",
+                  "name": "my-cf-environment",
+                  "parameters": "${jsonencode({\n    instance_name = \"my-cf-org-name\"\n  })}",
+                  "plan_name": "standard",
+                  "service_name": "cloudfoundry",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
+                }
             - name: kyma
               manifest: |-
                 {
                   "environment_type": "kyma",
                   "name": "my-kyma-environment",
-                  "parameters": "${jsonencode({\n    name            = \"my-kyma-environment\"\n    region          = \"us-east-1\"\n    machine_type    = \"mx5.xlarge\" #smallest option\n    auto_scaler_min = 3\n    auto_scaler_max = 20\n  })}",
+                  "parameters": "${jsonencode({\n    name          = \"my-kyma-environment\"\n    region        = \"us-east-1\"\n    machineType   = \"mx5.xlarge\" #smallest option\n    autoScalerMin = 3\n    autoScalerMax = 20\n  })}",
                   "plan_name": "aws",
                   "service_name": "kymaruntime",
                   "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
@@ -514,9 +704,32 @@ resources:
             type: '(String) The last provisioning operation on the environment instance. Possible values are:'
             update: (String) Timeout for updating the environment instance.
         importStatements: []
+    btp_subaccount_role:
+        subCategory: ""
+        description: 'Creates a role in a subaccount. Tip: You must be assigned to the admin role of the subaccount. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts'
+        name: btp_subaccount_role
+        title: btp_subaccount_role Resource - terraform-provider-btp
+        examples:
+            - name: xsuaa_auditor
+              manifest: |-
+                {
+                  "app_id": "xsuaa!t1",
+                  "name": "XSUAA Auditor",
+                  "role_template_name": "xsuaa_auditor",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
+                }
+        argumentDocs:
+            app_id: (String) The ID of the xsuaa application.
+            description: (String) The role description.
+            id: (String, Deprecated) The combined unique ID of the role.
+            name: (String) The name of the role.
+            read_only: (Boolean) Shows whether the role can be modified or not.
+            role_template_name: (String) The name of the role template.
+            subaccount_id: (String) The ID of the subaccount.
+        importStatements: []
     btp_subaccount_role_collection:
         subCategory: ""
-        description: 'Creates a role collection in a subaccount. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts'
+        description: 'Creates a role collection in a subaccount. Tip You must be assigned to the admin role of the subaccount. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts'
         name: btp_subaccount_role_collection
         title: btp_subaccount_role_collection Resource - terraform-provider-btp
         examples:
@@ -545,7 +758,7 @@ resources:
         importStatements: []
     btp_subaccount_role_collection_assignment:
         subCategory: ""
-        description: Assigns a user to a role collection on a subaccount level.
+        description: 'Assigns a user to a role collection on a subaccount level. Tip: You must be assigned to the admin role of the subaccount.'
         name: btp_subaccount_role_collection_assignment
         title: btp_subaccount_role_collection_assignment Resource - terraform-provider-btp
         examples:
@@ -575,11 +788,11 @@ resources:
         importStatements: []
     btp_subaccount_security_settings:
         subCategory: ""
-        description: 'Sets the security settings of a subaccount. Tip: You must be administrator of the subaccount. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/configure-trusted-domains-for-sap-authorization-and-trust-management-service https://help.sap.com/docs/btp/sap-business-technology-platform/configure-token-policy-for-sap-authorization-and-trust-management-service'
+        description: 'Sets the security settings of a subaccount. Tip: You must be assigned to the admin role of the subaccount. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/configure-trusted-domains-for-sap-authorization-and-trust-management-service https://help.sap.com/docs/btp/sap-business-technology-platform/configure-token-policy-for-sap-authorization-and-trust-management-service'
         name: btp_subaccount_security_settings
         title: btp_subaccount_security_settings Resource - terraform-provider-btp
         examples:
-            - name: subaccount
+            - name: sec_setting
               manifest: |-
                 {
                   "access_token_validity": 3600,
@@ -587,6 +800,7 @@ resources:
                     "yourdomain.test"
                   ],
                   "default_identity_provider": "sap.custom",
+                  "iframe_domains": "https://yourdomain.test",
                   "refresh_token_validity": 3600,
                   "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
                   "treat_users_with_same_email_as_same_user": true
@@ -595,13 +809,15 @@ resources:
             access_token_validity: (Number) The validity of the access token.
             custom_email_domains: (Set of String) Set of domains that are allowed to be used for user authentication.
             default_identity_provider: (String) The subaccount's default identity provider for business application users.
+            id: (String, Deprecated) The ID of the security settings used for import operations.
+            iframe_domains: (String) The new domains of the iframe. Enter as string. To provide multiple domains, separate them by spaces.
             refresh_token_validity: (Number) The validity of the refresh token.
             subaccount_id: (String) The ID of the subaccount.
             treat_users_with_same_email_as_same_user: (Boolean) If set to true, users with the same email are treated as same users.
         importStatements: []
     btp_subaccount_service_binding:
         subCategory: ""
-        description: Creates a service binding, i.e. generates access details to consume a service.
+        description: 'Creates a service binding, i.e. generates access details to consume a service. Tip: You must be assigned to the admin or the service administrator role of the subaccount.'
         name: btp_subaccount_service_binding
         title: btp_subaccount_service_binding Resource - terraform-provider-btp
         examples:
@@ -622,7 +838,7 @@ resources:
                 }
         argumentDocs:
             bind_resource: (Map of String) Contains the resources associated with the binding.
-            context: (Map of String) The contextual data for the resource.
+            context: (String) The contextual data for the resource.
             created_date: (String) The date and time when the resource was created in RFC3339 format.
             credentials: (String, Sensitive) The credentials to access the binding.
             id: (String) The ID of the service binding.
@@ -639,9 +855,37 @@ resources:
             state: '(String) The current state of the service binding. Possible values are:'
             subaccount_id: (String) The ID of the subaccount.
         importStatements: []
+    btp_subaccount_service_broker:
+        subCategory: ""
+        description: 'Registers a service service broker in a subaccount. Tip: You must be assigned to the admin role of the subaccount.'
+        name: btp_subaccount_service_broker
+        title: btp_subaccount_service_broker Resource - terraform-provider-btp
+        examples:
+            - name: my_broker
+              manifest: |-
+                {
+                  "description": "Service broker for provisioning example services.",
+                  "name": "my-broker",
+                  "password": "platform_password",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
+                  "url": "https://my.broker.com",
+                  "username": "platform_user"
+                }
+        argumentDocs:
+            created_date: (String) The date and time when the resource was created in RFC3339 format.
+            description: (String) The description of the service broker.
+            id: (String) The ID of the service broker.
+            last_modified: (String) The date and time when the resource was last modified in RFC3339 format.
+            name: (String) The name of the service broker.
+            password: (String, Sensitive) The password for basic authentication against the service broker.
+            ready: (Boolean) Shows whether the service broker is ready.
+            subaccount_id: (String) The ID of the subaccount.
+            url: (String) The URL of the service broker.
+            username: (String) The username for basic authentication against the service broker.
+        importStatements: []
     btp_subaccount_service_instance:
         subCategory: ""
-        description: Creates a service instance in a subaccount.
+        description: 'Creates a service instance in a subaccount. Tip: You must be assigned to the admin or the service administrator role of the subaccount.'
         name: btp_subaccount_service_instance
         title: btp_subaccount_service_instance Resource - terraform-provider-btp
         examples:
@@ -672,10 +916,19 @@ resources:
                     "update": "15m"
                   }
                 }
+            - name: xsuaa_application
+              manifest: |-
+                {
+                  "name": "my-application",
+                  "serviceplan_id": "bd5e893f-81dd-4d10-8343-e02975e8ecd8",
+                  "shared": true,
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
+                }
         argumentDocs:
-            context: (Map of String) Contextual data for the resource.
+            context: (String) Contextual data for the resource.
             create: (String) Timeout for creating the service instance.
             created_date: (String) The date and time when the resource was created in RFC3339 format.
+            dashboard_url: (String) The URL of the web-based management UI for the service instance.
             delete: (String) Timeout for deleting the service instance.
             id: (String) The ID of the service instance.
             labels: (Map of Set of String) The set of words or phrases assigned to the service instance.
@@ -686,7 +939,7 @@ resources:
             ready: (Boolean)
             referenced_instance_id: (String) The ID of the instance to which the service instance refers.
             serviceplan_id: (String) The ID of the service plan.
-            shared: (Boolean) Shows whether the service instance is shared.
+            shared: (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
             state: (String) The current state of the service instance.
             subaccount_id: (String) The ID of the subaccount.
             timeouts: (Attributes) (see below for nested schema)
@@ -695,7 +948,7 @@ resources:
         importStatements: []
     btp_subaccount_subscription:
         subCategory: ""
-        description: 'Subscribes a subaccount to a multitenant application. Custom or partner-developed applications are currently not supported. Tip: You must be assigned to the subaccount admin role.'
+        description: 'Subscribes a subaccount to a multitenant application. Custom or partner-developed applications are currently not supported. Tip: You must be assigned to the admin role of the subaccount.'
         name: btp_subaccount_subscription
         title: btp_subaccount_subscription Resource - terraform-provider-btp
         examples:
@@ -706,6 +959,17 @@ resources:
                   "plan_name": "free",
                   "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
                 }
+            - name: workzone
+              manifest: |-
+                {
+                  "app_name": "SAPLaunchpad",
+                  "plan_name": "free",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
+                  "timeouts": {
+                    "create": "25m",
+                    "delete": "15m"
+                  }
+                }
         argumentDocs:
             additional_plan_features: (Set of String) The list of features specific to this plan.
             app_id: (String) The ID returned by XSUAA after the app provider has performed a bind of the multitenant application to an XSUAA service instance.
@@ -713,8 +977,10 @@ resources:
             authentication_provider: (String) The authentication provider of the multitenant application. * XSUAA is the SAP Authorization and Trust Management service that defines scopes and permissions for users as tenants at the global account level. * IAS is Identity Authentication Service that defines scopes and permissions for users in zones (common data isolation systems across systems, SaaS tenants, and services).
             category: (String) The technical name of the category defined by the app developer to which the multitenant application is grouped in customer-facing UIs.
             commercial_app_name: (String) The commercial name of the deployed multitenant application as defined by the app developer.
+            create: (String) Timeout for creating the subscription.
             created_date: (String) The date and time when the resource was created in RFC3339 format.
             customer_developed: (Boolean) Shows whether the application was developed by a customer. If not, then the application is developed by the cloud operator, such as SAP.
+            delete: (String) Timeout for deleting the subscription.
             description: (String) The description of the multitenant application for customer-facing UIs.
             display_name: (String) The display name of the application for customer-facing UIs.
             formation_solution_name: (String) The name of the formations solution associated with the multitenant application.
@@ -734,10 +1000,11 @@ resources:
             supports_parameters_updates: (Boolean) Specifies whether a consumer, whose subaccount is subscribed to the application, can change its subscriptions parameters.
             supports_plan_updates: (Boolean) Specifies whether a consumer, whose subaccount is subscribed to the application, can change the subscription to a different plan that is available for this application and subaccount.
             tenant_id: (String) The tenant ID of the application provider.
+            timeouts: (Attributes) (see below for nested schema)
         importStatements: []
     btp_subaccount_trust_configuration:
         subCategory: ""
-        description: 'Establishes trust from a subaccount to an Identity Authentication tenant. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/trust-and-federation-with-identity-providers'
+        description: 'Establishes trust from a subaccount to an Identity Authentication tenant. Tip: You must be assigned to the admin role of the subaccount. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/trust-and-federation-with-identity-providers'
         name: btp_subaccount_trust_configuration
         title: btp_subaccount_trust_configuration Resource - terraform-provider-btp
         examples:
