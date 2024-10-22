@@ -1,0 +1,76 @@
+# Workflow to run the long E2E test every night to detect api changes.
+
+name: Long E2E Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '10 1 * * 1-5'  # every weekday at 1:10 AM
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-test:
+    runs-on: ubuntu-latest
+    env:
+      # hardcoded BTP CLI version
+      btp_cli_version: 2.64.0
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          submodules: true 
+
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version: '1.21'
+      - run: go version
+
+      - name: Install Helm
+        run: |
+          curl https://baltocdn.com/helm/signing.asc | sudo gpg --dearmor -o /usr/share/keyrings/helm.gpg
+          sudo apt-get install apt-transport-https --yes
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+          sudo apt-get update
+          sudo apt-get install -y helm
+
+      - name: Install BTP CLI
+      #hardcoded version
+        run: |
+          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+          cd linux-amd64
+          mv btp /usr/local/bin
+
+      - name: Set BUILD_ID
+        run: |
+          echo "BUILD_ID=${{github.run_number}}" >> $GITHUB_ENV
+
+      - name: Install gettext for envsubst
+        run: sudo apt-get update && sudo apt-get install -y gettext
+
+      - name: Run long e2e test
+        timeout-minutes: 120
+        run: |
+          make e2e-long
+        env:
+          BUILD_ID: ${{ env.BUILD_ID }}
+          CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
+          BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
+          CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
+          GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
+          TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
+          SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
+          IDP_URL: ${{ secrets.IDP_URL }}
+
+      - name: clean up cluster
+        if: always()
+        run: |
+          go run .github/workflows/cleanup.go
+        env:
+          BUILD_ID: ${{ env.BUILD_ID }}
+          CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
+          BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
+          CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
+          GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
