@@ -57,8 +57,7 @@ type SubaccountServiceBindingObservation struct {
 
 	// (String) The contextual data for the resource.
 	// The contextual data for the resource.
-	// +mapType=granular
-	Context map[string]*string `json:"context,omitempty" tf:"context,omitempty"`
+	Context *string `json:"context,omitempty" tf:"context,omitempty"`
 
 	// (String) The date and time when the resource was created in RFC3339 format.
 	// The date and time when the resource was created in [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format.

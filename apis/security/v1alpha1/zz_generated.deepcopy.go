@@ -76,6 +76,11 @@ func (in *GlobalaccountTrustConfigurationInitParameters) DeepCopyInto(out *Globa
 		*out = new(string)
 		**out = **in
 	}
+	if in.Domain != nil {
+		in, out := &in.Domain, &out.Domain
+		*out = new(string)
+		**out = **in
+	}
 	if in.IdentityProvider != nil {
 		in, out := &in.IdentityProvider, &out.IdentityProvider
 		*out = new(string)
@@ -143,6 +148,11 @@ func (in *GlobalaccountTrustConfigurationObservation) DeepCopyInto(out *Globalac
 		*out = new(string)
 		**out = **in
 	}
+	if in.Domain != nil {
+		in, out := &in.Domain, &out.Domain
+		*out = new(string)
+		**out = **in
+	}
 	if in.ID != nil {
 		in, out := &in.ID, &out.ID
 		*out = new(string)
@@ -200,6 +210,11 @@ func (in *GlobalaccountTrustConfigurationParameters) DeepCopyInto(out *Globalacc
 	*out = *in
 	if in.Description != nil {
 		in, out := &in.Description, &out.Description
+		*out = new(string)
+		**out = **in
+	}
+	if in.Domain != nil {
+		in, out := &in.Domain, &out.Domain
 		*out = new(string)
 		**out = **in
 	}

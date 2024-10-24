@@ -28,15 +28,19 @@ import (
 type GlobalaccountTrustConfigurationInitParameters struct {
 
 	// (String) Description of the trust configuration.
-	// A description for the identity provider.
+	// Description of the trust configuration.
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
 
+	// (String) The tenant's domain which should be used for user logon.
+	// The tenant's domain which should be used for user logon.
+	Domain *string `json:"domain,omitempty" tf:"domain,omitempty"`
+
 	// (String) The name of the Identity Authentication tenant that you want to connect to the global account.
-	// The name of the Identity Authentication tenant that you want the global account to connect.
+	// The name of the Identity Authentication tenant that you want to connect to the global account.
 	IdentityProvider *string `json:"identityProvider,omitempty" tf:"identity_provider,omitempty"`
 
 	// (String) The display name of the trust configuration.
-	// The name of the identity provider.
+	// The display name of the trust configuration.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
 
 	// (String) The origin of the identity provider.
@@ -47,18 +51,22 @@ type GlobalaccountTrustConfigurationInitParameters struct {
 type GlobalaccountTrustConfigurationObservation struct {
 
 	// (String) Description of the trust configuration.
-	// A description for the identity provider.
+	// Description of the trust configuration.
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
+
+	// (String) The tenant's domain which should be used for user logon.
+	// The tenant's domain which should be used for user logon.
+	Domain *string `json:"domain,omitempty" tf:"domain,omitempty"`
 
 	// (String, Deprecated) The origin of the identity provider.
 	ID *string `json:"id,omitempty" tf:"id,omitempty"`
 
 	// (String) The name of the Identity Authentication tenant that you want to connect to the global account.
-	// The name of the Identity Authentication tenant that you want the global account to connect.
+	// The name of the Identity Authentication tenant that you want to connect to the global account.
 	IdentityProvider *string `json:"identityProvider,omitempty" tf:"identity_provider,omitempty"`
 
 	// (String) The display name of the trust configuration.
-	// The name of the identity provider.
+	// The display name of the trust configuration.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
 
 	// (String) The origin of the identity provider.
@@ -74,7 +82,7 @@ type GlobalaccountTrustConfigurationObservation struct {
 	ReadOnly *bool `json:"readOnly,omitempty" tf:"read_only,omitempty"`
 
 	// (String) Determines whether the identity provider is currently 'active' or 'inactive'.
-	// Shows whether the identity provider is currently active or not.
+	// Determines whether the identity provider is currently 'active' or 'inactive'.
 	Status *string `json:"status,omitempty" tf:"status,omitempty"`
 
 	// (String) The trust type.
@@ -85,17 +93,22 @@ type GlobalaccountTrustConfigurationObservation struct {
 type GlobalaccountTrustConfigurationParameters struct {
 
 	// (String) Description of the trust configuration.
-	// A description for the identity provider.
+	// Description of the trust configuration.
 	// +kubebuilder:validation:Optional
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
 
+	// (String) The tenant's domain which should be used for user logon.
+	// The tenant's domain which should be used for user logon.
+	// +kubebuilder:validation:Optional
+	Domain *string `json:"domain,omitempty" tf:"domain,omitempty"`
+
 	// (String) The name of the Identity Authentication tenant that you want to connect to the global account.
-	// The name of the Identity Authentication tenant that you want the global account to connect.
+	// The name of the Identity Authentication tenant that you want to connect to the global account.
 	// +kubebuilder:validation:Optional
 	IdentityProvider *string `json:"identityProvider,omitempty" tf:"identity_provider,omitempty"`
 
 	// (String) The display name of the trust configuration.
-	// The name of the identity provider.
+	// The display name of the trust configuration.
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
 

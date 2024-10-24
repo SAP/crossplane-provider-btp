@@ -43,6 +43,10 @@ type SubaccountServiceInstanceInitParameters struct {
 	// The ID of the service plan.
 	ServiceplanID *string `json:"serviceplanId,omitempty" tf:"serviceplan_id,omitempty"`
 
+	// (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+	// The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+	Shared *bool `json:"shared,omitempty" tf:"shared,omitempty"`
+
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
 	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
@@ -52,12 +56,15 @@ type SubaccountServiceInstanceObservation struct {
 
 	// (String) Contextual data for the resource.
 	// Contextual data for the resource.
-	// +mapType=granular
-	Context map[string]*string `json:"context,omitempty" tf:"context,omitempty"`
+	Context *string `json:"context,omitempty" tf:"context,omitempty"`
 
 	// (String) The date and time when the resource was created in RFC3339 format.
 	// The date and time when the resource was created in [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format.
 	CreatedDate *string `json:"createdDate,omitempty" tf:"created_date,omitempty"`
+
+	// based management UI for the service instance.
+	// The URL of the web-based management UI for the service instance.
+	DashboardURL *string `json:"dashboardUrl,omitempty" tf:"dashboard_url,omitempty"`
 
 	// (String) The ID of the service instance.
 	ID *string `json:"id,omitempty" tf:"id,omitempty"`
@@ -94,7 +101,7 @@ type SubaccountServiceInstanceObservation struct {
 	ServiceplanID *string `json:"serviceplanId,omitempty" tf:"serviceplan_id,omitempty"`
 
 	// (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
-	// Shows whether the service instance is shared.
+	// The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
 	Shared *bool `json:"shared,omitempty" tf:"shared,omitempty"`
 
 	// (String) The current state of the service instance.
@@ -131,6 +138,11 @@ type SubaccountServiceInstanceParameters struct {
 	// The ID of the service plan.
 	// +kubebuilder:validation:Optional
 	ServiceplanID *string `json:"serviceplanId,omitempty" tf:"serviceplan_id,omitempty"`
+
+	// (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+	// The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+	// +kubebuilder:validation:Optional
+	Shared *bool `json:"shared,omitempty" tf:"shared,omitempty"`
 
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
