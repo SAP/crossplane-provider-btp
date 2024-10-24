@@ -55,10 +55,9 @@ type SubaccountServiceBindingObservation struct {
 	// +mapType=granular
 	BindResource map[string]*string `json:"bindResource,omitempty" tf:"bind_resource,omitempty"`
 
-	// (Map of String) The contextual data for the resource.
+	// (String) The contextual data for the resource.
 	// The contextual data for the resource.
-	// +mapType=granular
-	Context map[string]*string `json:"context,omitempty" tf:"context,omitempty"`
+	Context *string `json:"context,omitempty" tf:"context,omitempty"`
 
 	// (String) The date and time when the resource was created in RFC3339 format.
 	// The date and time when the resource was created in [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format.
@@ -161,7 +160,7 @@ type SubaccountServiceBindingStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 
-// SubaccountServiceBinding is the Schema for the SubaccountServiceBindings API. Creates a service binding, i.e. generates access details to consume a service.
+// SubaccountServiceBinding is the Schema for the SubaccountServiceBindings API. Creates a service binding, i.e. generates access details to consume a service. Tip: You must be assigned to the admin or the service administrator role of the subaccount.
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

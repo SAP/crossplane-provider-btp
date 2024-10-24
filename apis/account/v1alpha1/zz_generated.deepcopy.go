@@ -1759,19 +1759,8 @@ func (in *SubaccountServiceBindingObservation) DeepCopyInto(out *SubaccountServi
 	}
 	if in.Context != nil {
 		in, out := &in.Context, &out.Context
-		*out = make(map[string]*string, len(*in))
-		for key, val := range *in {
-			var outVal *string
-			if val == nil {
-				(*out)[key] = nil
-			} else {
-				inVal := (*in)[key]
-				in, out := &inVal, &outVal
-				*out = new(string)
-				**out = **in
-			}
-			(*out)[key] = outVal
-		}
+		*out = new(string)
+		**out = **in
 	}
 	if in.CreatedDate != nil {
 		in, out := &in.CreatedDate, &out.CreatedDate
@@ -2011,6 +2000,11 @@ func (in *SubaccountServiceInstanceInitParameters) DeepCopyInto(out *SubaccountS
 		*out = new(string)
 		**out = **in
 	}
+	if in.Shared != nil {
+		in, out := &in.Shared, &out.Shared
+		*out = new(bool)
+		**out = **in
+	}
 	if in.SubaccountID != nil {
 		in, out := &in.SubaccountID, &out.SubaccountID
 		*out = new(string)
@@ -2065,22 +2059,16 @@ func (in *SubaccountServiceInstanceObservation) DeepCopyInto(out *SubaccountServ
 	*out = *in
 	if in.Context != nil {
 		in, out := &in.Context, &out.Context
-		*out = make(map[string]*string, len(*in))
-		for key, val := range *in {
-			var outVal *string
-			if val == nil {
-				(*out)[key] = nil
-			} else {
-				inVal := (*in)[key]
-				in, out := &inVal, &outVal
-				*out = new(string)
-				**out = **in
-			}
-			(*out)[key] = outVal
-		}
+		*out = new(string)
+		**out = **in
 	}
 	if in.CreatedDate != nil {
 		in, out := &in.CreatedDate, &out.CreatedDate
+		*out = new(string)
+		**out = **in
+	}
+	if in.DashboardURL != nil {
+		in, out := &in.DashboardURL, &out.DashboardURL
 		*out = new(string)
 		**out = **in
 	}
@@ -2216,6 +2204,11 @@ func (in *SubaccountServiceInstanceParameters) DeepCopyInto(out *SubaccountServi
 	if in.ServiceplanID != nil {
 		in, out := &in.ServiceplanID, &out.ServiceplanID
 		*out = new(string)
+		**out = **in
+	}
+	if in.Shared != nil {
+		in, out := &in.Shared, &out.Shared
+		*out = new(bool)
 		**out = **in
 	}
 	if in.SubaccountID != nil {

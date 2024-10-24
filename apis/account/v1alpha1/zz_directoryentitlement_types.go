@@ -197,7 +197,7 @@ type DirectoryEntitlementStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 
-// DirectoryEntitlement is the Schema for the DirectoryEntitlements API. Assigns the entitlement plan of a service, multitenant application, or environment, to a directory. Note that some environments, such as Cloud Foundry, are available by default to all global accounts and their directorys, and therefore are not made available as entitlements. Tip: You must be assigned to the global account admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas
+// DirectoryEntitlement is the Schema for the DirectoryEntitlements API. Assigns the entitlement plan of a service, multitenant application, or environment, to a directory. Note that some environments, such as Cloud Foundry, are available by default to all global accounts and their directorys, and therefore are not made available as entitlements. Tip: You must be assigned to the admin role of the global account or the directory. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
