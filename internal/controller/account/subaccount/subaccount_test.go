@@ -519,6 +519,61 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
+		"NeedsUpdateLabel": {
+			reason: "Adding label to an existing subaacount should require Update",
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+					Description:       "someDesc",
+					Subdomain:         "sub1",
+					Region:            "eu12",
+					DisplayName:       "unittest-sa",
+					Labels:            map[string][]string{"somekey": {"somevalue"}},
+					UsedForProduction: "",
+					BetaEnabled:       false,
+				}), WithProviderConfig(xpv1.Reference{
+					Name: "unittest-pc",
+				})),
+				mockAPIClient: &MockSubaccountClient{
+					returnSubaccounts: &accountclient.ResponseCollection{
+						Value: []accountclient.SubaccountResponseObject{
+							{
+								Guid:              "123",
+								Description:       "someDesc",
+								Subdomain:         "sub1",
+								Region:            "eu12",
+								State:             "OK",
+								Labels:            nil,
+								StateMessage:      internal.Ptr("OK"),
+								DisplayName:       "unittest-sa",
+								UsedForProduction: "",
+								BetaEnabled:       false,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  false,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				crChanges: func(cr *v1alpha1.Subaccount) {
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.Status = internal.Ptr("OK")
+					cr.Status.AtProvider.Region = internal.Ptr("eu12")
+					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
+					cr.Status.AtProvider.Labels = nil
+					cr.Status.AtProvider.Description = internal.Ptr("someDesc")
+					cr.Status.AtProvider.StatusMessage = internal.Ptr("OK")
+					cr.Status.AtProvider.DisplayName = internal.Ptr("unittest-sa")
+					cr.Status.AtProvider.UsedForProduction = internal.Ptr("")
+					cr.Status.AtProvider.BetaEnabled = internal.Ptr(false)
+					cr.Status.AtProvider.ParentGuid = internal.Ptr("")
+					cr.Status.AtProvider.GlobalAccountGUID = internal.Ptr("")
+				},
+			},
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -847,6 +902,31 @@ func TestUpdate(t *testing.T) {
 					})),
 				o:               managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{}},
 				moveTargetParam: "global-123",
+			},
+		},
+		"LabelUpdateSuccess": {
+			reason: "Removing label from subaccount should succeed in API",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithData(v1alpha1.SubaccountParameters{
+						Labels: nil,
+					}),
+					WithStatus(v1alpha1.SubaccountObservation{
+						Labels: &map[string][]string{"somekey": {"somevalue"}},
+					}),
+				),
+				mockClient:   &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{}},
+				mockAccessor: &MockAccountsApiAccessor{},
+			},
+			want: want{
+				cr: NewSubaccount("unittest-sa",
+					WithData(v1alpha1.SubaccountParameters{
+						Labels: nil,
+					}),
+					WithStatus(v1alpha1.SubaccountObservation{
+						Labels: &map[string][]string{"somekey": {"somevalue"}},
+					})),
+				o: managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{}},
 			},
 		},
 	}
