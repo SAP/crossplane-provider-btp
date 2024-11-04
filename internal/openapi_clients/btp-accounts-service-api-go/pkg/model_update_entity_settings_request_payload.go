@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -25,6 +24,7 @@ type UpdateEntitySettingsRequestPayload struct {
 	Key string `json:"key"`
 	// A value for the corresponding key. Limited to 2000 characters.
 	Value map[string]interface{} `json:"value"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _UpdateEntitySettingsRequestPayload UpdateEntitySettingsRequestPayload
@@ -108,6 +108,11 @@ func (o UpdateEntitySettingsRequestPayload) ToMap() (map[string]interface{}, err
 	toSerialize := map[string]interface{}{}
 	toSerialize["key"] = o.Key
 	toSerialize["value"] = o.Value
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -136,15 +141,21 @@ func (o *UpdateEntitySettingsRequestPayload) UnmarshalJSON(data []byte) (err err
 
 	varUpdateEntitySettingsRequestPayload := _UpdateEntitySettingsRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varUpdateEntitySettingsRequestPayload)
+	err = json.Unmarshal(data, &varUpdateEntitySettingsRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = UpdateEntitySettingsRequestPayload(varUpdateEntitySettingsRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "key")
+		delete(additionalProperties, "value")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

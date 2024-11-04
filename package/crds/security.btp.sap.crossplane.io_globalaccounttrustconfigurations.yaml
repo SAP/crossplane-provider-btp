@@ -36,7 +36,8 @@ spec:
       openAPIV3Schema:
         description: 'GlobalaccountTrustConfiguration is the Schema for the GlobalaccountTrustConfigurations
           API. Establishes trust from a global account to an Identity Authentication
-          tenant. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/trust-and-federation-with-identity-providers'
+          tenant. Tip: You must be assigned to the admin role of the global account.
+          Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/trust-and-federation-with-identity-providers'
         properties:
           apiVersion:
             description: |-
@@ -78,17 +79,22 @@ spec:
                   description:
                     description: |-
                       (String) Description of the trust configuration.
-                      A description for the identity provider.
+                      Description of the trust configuration.
+                    type: string
+                  domain:
+                    description: |-
+                      (String) The tenant's domain which should be used for user logon.
+                      The tenant's domain which should be used for user logon.
                     type: string
                   identityProvider:
                     description: |-
                       (String) The name of the Identity Authentication tenant that you want to connect to the global account.
-                      The name of the Identity Authentication tenant that you want the global account to connect.
+                      The name of the Identity Authentication tenant that you want to connect to the global account.
                     type: string
                   name:
                     description: |-
                       (String) The display name of the trust configuration.
-                      The name of the identity provider.
+                      The display name of the trust configuration.
                     type: string
                   origin:
                     description: |-
@@ -112,17 +118,22 @@ spec:
                   description:
                     description: |-
                       (String) Description of the trust configuration.
-                      A description for the identity provider.
+                      Description of the trust configuration.
+                    type: string
+                  domain:
+                    description: |-
+                      (String) The tenant's domain which should be used for user logon.
+                      The tenant's domain which should be used for user logon.
                     type: string
                   identityProvider:
                     description: |-
                       (String) The name of the Identity Authentication tenant that you want to connect to the global account.
-                      The name of the Identity Authentication tenant that you want the global account to connect.
+                      The name of the Identity Authentication tenant that you want to connect to the global account.
                     type: string
                   name:
                     description: |-
                       (String) The display name of the trust configuration.
-                      The name of the identity provider.
+                      The display name of the trust configuration.
                     type: string
                   origin:
                     description: |-
@@ -311,7 +322,12 @@ spec:
                   description:
                     description: |-
                       (String) Description of the trust configuration.
-                      A description for the identity provider.
+                      Description of the trust configuration.
+                    type: string
+                  domain:
+                    description: |-
+                      (String) The tenant's domain which should be used for user logon.
+                      The tenant's domain which should be used for user logon.
                     type: string
                   id:
                     description: (String, Deprecated) The origin of the identity provider.
@@ -319,12 +335,12 @@ spec:
                   identityProvider:
                     description: |-
                       (String) The name of the Identity Authentication tenant that you want to connect to the global account.
-                      The name of the Identity Authentication tenant that you want the global account to connect.
+                      The name of the Identity Authentication tenant that you want to connect to the global account.
                     type: string
                   name:
                     description: |-
                       (String) The display name of the trust configuration.
-                      The name of the identity provider.
+                      The display name of the trust configuration.
                     type: string
                   origin:
                     description: |-
@@ -344,7 +360,7 @@ spec:
                   status:
                     description: |-
                       (String) Determines whether the identity provider is currently 'active' or 'inactive'.
-                      Shows whether the identity provider is currently active or not.
+                      Determines whether the identity provider is currently 'active' or 'inactive'.
                     type: string
                   type:
                     description: |-

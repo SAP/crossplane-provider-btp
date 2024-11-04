@@ -101,7 +101,7 @@ spec:
     globalAccountRef:
       name:  co-ga-canary
     displayName: test-max-kyma-oidc
-    region: eu12
+    region: eu10
     subdomain: test-max-kyma-oidc
     subaccountAdmins:
       - <EMAIL>
@@ -118,7 +118,7 @@ spec:
   providerConfigRef:
     name: default
 ---
-apiVersion: oidc.orchestrate.cloud.sap/v1alpha1
+apiVersion: oidc.btp.sap.crossplane.io/v1alpha1
 kind: CertBasedOIDCLogin
 metadata:
   name: kyma-oidc
@@ -142,7 +142,7 @@ spec:
         name: example-login-pass-secret
         namespace: default
 ---
-apiVersion: oidc.orchestrate.cloud.sap/v1alpha1
+apiVersion: oidc.btp.sap.crossplane.io/v1alpha1
 kind: KubeConfigGenerator
 metadata:
   name: kyma-oidc

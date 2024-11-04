@@ -28,7 +28,10 @@ type UpdateDirectoryRequestPayload struct {
 	DisplayName *string `json:"displayName,omitempty" validate:"regexp=^((?![\\/]).)*$"`
 	// JSON array of up to 10 user-defined labels to assign as key-value pairs to the directory. Each label has a name (key) that you specify, and to which you can assign up to 10 corresponding values or leave empty. Keys and values are each limited to 63 characters.  Label keys and values are case-sensitive. Try to avoid creating duplicate variants of the same keys or values with a different casing (example: \"myValue\" and \"MyValue\").  Example:  {   \"Cost Center\": [\"19700626\"],   \"Department\": [\"Sales\"],   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],   \"EMEA\":[] }  IMPORTANT: The JSON array overwrites any labels that are currently assigned to the subaccount. In the request, you must include not only new and updated key-value pairs, but also existing ones that you do not want changed. Omit keys/values that you want removed as labels from the subaccount.   Any labels previously set using the deprecated \"customProperties\" field are also overwritten. 
 	Labels *map[string][]string `json:"labels,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _UpdateDirectoryRequestPayload UpdateDirectoryRequestPayload
 
 // NewUpdateDirectoryRequestPayload instantiates a new UpdateDirectoryRequestPayload object
 // This constructor will assign default values to properties that have it defined,
@@ -200,7 +203,36 @@ func (o UpdateDirectoryRequestPayload) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Labels) {
 		toSerialize["labels"] = o.Labels
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *UpdateDirectoryRequestPayload) UnmarshalJSON(data []byte) (err error) {
+	varUpdateDirectoryRequestPayload := _UpdateDirectoryRequestPayload{}
+
+	err = json.Unmarshal(data, &varUpdateDirectoryRequestPayload)
+
+	if err != nil {
+		return err
+	}
+
+	*o = UpdateDirectoryRequestPayload(varUpdateDirectoryRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "customProperties")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "labels")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableUpdateDirectoryRequestPayload struct {

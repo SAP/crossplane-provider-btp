@@ -1,6 +1,6 @@
 // Package v1alpha1 contains the v1alpha1 group Sample resources of the btp-account provider.
 // +kubebuilder:object:generate=true
-// +groupName=oidc.orchestrate.cloud.sap
+// +groupName=oidc.btp.sap.crossplane.io
 // +versionName=v1alpha1
 package v1alpha1
 
@@ -11,7 +11,7 @@ import (
 
 // Package type metadata.
 const (
-	Group   = "oidc.orchestrate.cloud.sap"
+	Group   = "oidc.btp.sap.crossplane.io"
 	Version = "v1alpha1"
 )
 

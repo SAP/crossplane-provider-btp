@@ -8,7 +8,7 @@ spec:
     globalAccountRef:
       name: my-global-account
     displayName: $BUILD_ID-e2e-test-sa-cis-import
-    region: eu12
+    region: eu10
     subdomain: $BUILD_ID-e2e-test-sa-cis-sub-import
     labels:
       safe-to-delete: [ "yes" ]

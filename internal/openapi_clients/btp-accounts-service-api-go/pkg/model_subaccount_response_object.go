@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -43,7 +42,7 @@ type SubaccountResponseObject struct {
 	// The date the subaccount was last modified. Dates and times are in UTC format.
 	ModifiedDate *int64 `json:"modifiedDate,omitempty"`
 	// The features of parent entity of the subaccount.
-	ParentFeatures []string `json:"parentFeatures"`
+	ParentFeatures []string `json:"parentFeatures,omitempty"`
 	// The GUID of the subaccount’s parent entity. If the subaccount is located directly in the global account (not in a directory), then this is the GUID of the global account.
 	ParentGUID string `json:"parentGUID"`
 	// The region in which the subaccount was created.
@@ -58,6 +57,7 @@ type SubaccountResponseObject struct {
 	TechnicalName string `json:"technicalName"`
 	// Whether the subaccount is used for production purposes. This flag can help your cloud operator to take appropriate action when handling incidents that are related to mission-critical accounts in production systems. Do not apply for subaccounts that are used for non-production purposes, such as development, testing, and demos. Applying this setting this does not modify the subaccount. * <b>UNSET:</b> Global account or subaccount admin has not set the production-relevancy flag. Default value. * <b>NOT_USED_FOR_PRODUCTION:</b> Subaccount is not used for production purposes. * <b>USED_FOR_PRODUCTION:</b> Subaccount is used for production purposes.  
 	UsedForProduction string `json:"usedForProduction"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _SubaccountResponseObject SubaccountResponseObject
@@ -66,7 +66,7 @@ type _SubaccountResponseObject SubaccountResponseObject
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSubaccountResponseObject(betaEnabled bool, createdDate int64, description string, displayName string, globalAccountGUID string, guid string, parentFeatures []string, parentGUID string, region string, state string, subdomain string, technicalName string, usedForProduction string) *SubaccountResponseObject {
+func NewSubaccountResponseObject(betaEnabled bool, createdDate int64, description string, displayName string, globalAccountGUID string, guid string, parentGUID string, region string, state string, subdomain string, technicalName string, usedForProduction string) *SubaccountResponseObject {
 	this := SubaccountResponseObject{}
 	this.BetaEnabled = betaEnabled
 	this.CreatedDate = createdDate
@@ -74,7 +74,6 @@ func NewSubaccountResponseObject(betaEnabled bool, createdDate int64, descriptio
 	this.DisplayName = displayName
 	this.GlobalAccountGUID = globalAccountGUID
 	this.Guid = guid
-	this.ParentFeatures = parentFeatures
 	this.ParentGUID = parentGUID
 	this.Region = region
 	this.State = state
@@ -367,26 +366,34 @@ func (o *SubaccountResponseObject) SetModifiedDate(v int64) {
 	o.ModifiedDate = &v
 }
 
-// GetParentFeatures returns the ParentFeatures field value
+// GetParentFeatures returns the ParentFeatures field value if set, zero value otherwise.
 func (o *SubaccountResponseObject) GetParentFeatures() []string {
-	if o == nil {
+	if o == nil || IsNil(o.ParentFeatures) {
 		var ret []string
 		return ret
 	}
-
 	return o.ParentFeatures
 }
 
-// GetParentFeaturesOk returns a tuple with the ParentFeatures field value
+// GetParentFeaturesOk returns a tuple with the ParentFeatures field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *SubaccountResponseObject) GetParentFeaturesOk() ([]string, bool) {
-	if o == nil {
+	if o == nil || IsNil(o.ParentFeatures) {
 		return nil, false
 	}
 	return o.ParentFeatures, true
 }
 
-// SetParentFeatures sets field value
+// HasParentFeatures returns a boolean if a field has been set.
+func (o *SubaccountResponseObject) HasParentFeatures() bool {
+	if o != nil && !IsNil(o.ParentFeatures) {
+		return true
+	}
+
+	return false
+}
+
+// SetParentFeatures gets a reference to the given []string and assigns it to the ParentFeatures field.
 func (o *SubaccountResponseObject) SetParentFeatures(v []string) {
 	o.ParentFeatures = v
 }
@@ -595,7 +602,9 @@ func (o SubaccountResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.ModifiedDate) {
 		toSerialize["modifiedDate"] = o.ModifiedDate
 	}
-	toSerialize["parentFeatures"] = o.ParentFeatures
+	if !IsNil(o.ParentFeatures) {
+		toSerialize["parentFeatures"] = o.ParentFeatures
+	}
 	toSerialize["parentGUID"] = o.ParentGUID
 	toSerialize["region"] = o.Region
 	toSerialize["state"] = o.State
@@ -605,6 +614,11 @@ func (o SubaccountResponseObject) ToMap() (map[string]interface{}, error) {
 	toSerialize["subdomain"] = o.Subdomain
 	toSerialize["technicalName"] = o.TechnicalName
 	toSerialize["usedForProduction"] = o.UsedForProduction
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -619,7 +633,6 @@ func (o *SubaccountResponseObject) UnmarshalJSON(data []byte) (err error) {
 		"displayName",
 		"globalAccountGUID",
 		"guid",
-		"parentFeatures",
 		"parentGUID",
 		"region",
 		"state",
@@ -644,15 +657,37 @@ func (o *SubaccountResponseObject) UnmarshalJSON(data []byte) (err error) {
 
 	varSubaccountResponseObject := _SubaccountResponseObject{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varSubaccountResponseObject)
+	err = json.Unmarshal(data, &varSubaccountResponseObject)
 
 	if err != nil {
 		return err
 	}
 
 	*o = SubaccountResponseObject(varSubaccountResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "betaEnabled")
+		delete(additionalProperties, "createdBy")
+		delete(additionalProperties, "createdDate")
+		delete(additionalProperties, "customProperties")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "globalAccountGUID")
+		delete(additionalProperties, "guid")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "modifiedDate")
+		delete(additionalProperties, "parentFeatures")
+		delete(additionalProperties, "parentGUID")
+		delete(additionalProperties, "region")
+		delete(additionalProperties, "state")
+		delete(additionalProperties, "stateMessage")
+		delete(additionalProperties, "subdomain")
+		delete(additionalProperties, "technicalName")
+		delete(additionalProperties, "usedForProduction")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

@@ -1,9 +1,0 @@
----
-name: Command Dispatch
-on:
-  issue_comment:
-    types: [ created, edited ]
-jobs:
-  slashCommandDispatch:
-    uses: cloud-orchestration/.workflows/.github/workflows/dispatch-slash-commands.yaml@v1.16.7
-    secrets: inherit

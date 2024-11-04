@@ -6,5 +6,5 @@ spec:
   forProvider:
     name: simple-global-trust
     description: "my-descriptions"
-    identityProvider: "ax1tkejxl.accounts400.ondemand.com"
+    identityProvider: "<IDP_URL>"
 

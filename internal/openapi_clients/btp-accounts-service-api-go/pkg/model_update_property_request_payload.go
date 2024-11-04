@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -27,6 +26,7 @@ type UpdatePropertyRequestPayload struct {
 	Key string `json:"key"`
 	// An optional value for the corresponding label key up to 63 characters. Attribute is case-sensitive -- try to avoid creating duplicate variants of the same keys with a different casing.
 	Value map[string]interface{} `json:"value"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _UpdatePropertyRequestPayload UpdatePropertyRequestPayload
@@ -145,6 +145,11 @@ func (o UpdatePropertyRequestPayload) ToMap() (map[string]interface{}, error) {
 	}
 	toSerialize["key"] = o.Key
 	toSerialize["value"] = o.Value
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -173,15 +178,22 @@ func (o *UpdatePropertyRequestPayload) UnmarshalJSON(data []byte) (err error) {
 
 	varUpdatePropertyRequestPayload := _UpdatePropertyRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varUpdatePropertyRequestPayload)
+	err = json.Unmarshal(data, &varUpdatePropertyRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = UpdatePropertyRequestPayload(varUpdatePropertyRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "delete")
+		delete(additionalProperties, "key")
+		delete(additionalProperties, "value")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

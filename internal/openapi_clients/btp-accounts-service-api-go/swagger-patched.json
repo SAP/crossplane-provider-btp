@@ -1139,7 +1139,6 @@
           "displayName",
           "globalAccountGUID",
           "guid",
-          "parentFeatures",
           "parentGUID",
           "region",
           "state",

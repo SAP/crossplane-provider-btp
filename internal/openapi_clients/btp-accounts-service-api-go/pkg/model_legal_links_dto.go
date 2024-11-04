@@ -20,7 +20,10 @@ var _ MappedNullable = &LegalLinksDTO{}
 // LegalLinksDTO struct for LegalLinksDTO
 type LegalLinksDTO struct {
 	Privacy *string `json:"privacy,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _LegalLinksDTO LegalLinksDTO
 
 // NewLegalLinksDTO instantiates a new LegalLinksDTO object
 // This constructor will assign default values to properties that have it defined,
@@ -84,7 +87,33 @@ func (o LegalLinksDTO) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Privacy) {
 		toSerialize["privacy"] = o.Privacy
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *LegalLinksDTO) UnmarshalJSON(data []byte) (err error) {
+	varLegalLinksDTO := _LegalLinksDTO{}
+
+	err = json.Unmarshal(data, &varLegalLinksDTO)
+
+	if err != nil {
+		return err
+	}
+
+	*o = LegalLinksDTO(varLegalLinksDTO)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "privacy")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableLegalLinksDTO struct {

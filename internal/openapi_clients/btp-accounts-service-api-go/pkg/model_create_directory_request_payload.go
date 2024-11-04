@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -36,6 +35,7 @@ type CreateDirectoryRequestPayload struct {
 	Labels *map[string][]string `json:"labels,omitempty"`
 	// Applies only to directories that have the user authorization management feature enabled. The subdomain becomes part of the path used to access the authorization tenant of the directory. Must be unique in the defined region. Use only letters (a-z), digits (0-9), and hyphens (not at start or end). Maximum length is 63 characters. Cannot be changed after the directory has been created.
 	Subdomain *string `json:"subdomain,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _CreateDirectoryRequestPayload CreateDirectoryRequestPayload
@@ -306,6 +306,11 @@ func (o CreateDirectoryRequestPayload) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Subdomain) {
 		toSerialize["subdomain"] = o.Subdomain
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -333,15 +338,26 @@ func (o *CreateDirectoryRequestPayload) UnmarshalJSON(data []byte) (err error) {
 
 	varCreateDirectoryRequestPayload := _CreateDirectoryRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varCreateDirectoryRequestPayload)
+	err = json.Unmarshal(data, &varCreateDirectoryRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = CreateDirectoryRequestPayload(varCreateDirectoryRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "customProperties")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "directoryAdmins")
+		delete(additionalProperties, "directoryFeatures")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "subdomain")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

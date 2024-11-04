@@ -8,7 +8,7 @@ spec:
     name: cf-env
     namespace: default
   forProvider:
-    landscape: cf-eu12
+    landscape: cf-eu10
   subaccountRef:
     name:  cf-test-subaccount
   cloudManagementRef:

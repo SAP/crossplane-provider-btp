@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -39,6 +38,7 @@ type PropertyDataResponseObject struct {
 	ValidationSchema map[string]map[string]interface{} `json:"validationSchema,omitempty"`
 	// The user-defined value for the corresponding key. Limited to 1024 characters.
 	Value map[string]interface{} `json:"value,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _PropertyDataResponseObject PropertyDataResponseObject
@@ -367,6 +367,11 @@ func (o PropertyDataResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Value) {
 		toSerialize["value"] = o.Value
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -395,15 +400,28 @@ func (o *PropertyDataResponseObject) UnmarshalJSON(data []byte) (err error) {
 
 	varPropertyDataResponseObject := _PropertyDataResponseObject{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varPropertyDataResponseObject)
+	err = json.Unmarshal(data, &varPropertyDataResponseObject)
 
 	if err != nil {
 		return err
 	}
 
 	*o = PropertyDataResponseObject(varPropertyDataResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "classification")
+		delete(additionalProperties, "defaultValue")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "dynamicProperty")
+		delete(additionalProperties, "entityType")
+		delete(additionalProperties, "entityTypeGuid")
+		delete(additionalProperties, "key")
+		delete(additionalProperties, "validationSchema")
+		delete(additionalProperties, "value")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

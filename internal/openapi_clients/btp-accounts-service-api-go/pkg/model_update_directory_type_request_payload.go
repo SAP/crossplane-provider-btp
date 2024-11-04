@@ -25,7 +25,10 @@ type UpdateDirectoryTypeRequestPayload struct {
 	DirectoryFeatures []string `json:"directoryFeatures,omitempty"`
 	// Applies only to directories that have the user authorization management feature enabled.  The subdomain becomes part of the path used to access the authorization tenant of the directory. Must be unique within the defined region. Use only letters (a-z), digits (0-9), and hyphens (not at start or end). Maximum length is 63 characters. Cannot be changed after the directory has been created.
 	Subdomain *string `json:"subdomain,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _UpdateDirectoryTypeRequestPayload UpdateDirectoryTypeRequestPayload
 
 // NewUpdateDirectoryTypeRequestPayload instantiates a new UpdateDirectoryTypeRequestPayload object
 // This constructor will assign default values to properties that have it defined,
@@ -159,7 +162,35 @@ func (o UpdateDirectoryTypeRequestPayload) ToMap() (map[string]interface{}, erro
 	if !IsNil(o.Subdomain) {
 		toSerialize["subdomain"] = o.Subdomain
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *UpdateDirectoryTypeRequestPayload) UnmarshalJSON(data []byte) (err error) {
+	varUpdateDirectoryTypeRequestPayload := _UpdateDirectoryTypeRequestPayload{}
+
+	err = json.Unmarshal(data, &varUpdateDirectoryTypeRequestPayload)
+
+	if err != nil {
+		return err
+	}
+
+	*o = UpdateDirectoryTypeRequestPayload(varUpdateDirectoryTypeRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "directoryAdmins")
+		delete(additionalProperties, "directoryFeatures")
+		delete(additionalProperties, "subdomain")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableUpdateDirectoryTypeRequestPayload struct {

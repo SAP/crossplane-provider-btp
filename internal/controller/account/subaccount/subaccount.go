@@ -409,7 +409,7 @@ func toCreateApiPayload(subaccount *apisv1alpha1.Subaccount) accountclient.Creat
 
 func addOperatorLabel(subaccount *apisv1alpha1.Subaccount) map[string][]string {
 	if subaccount.Spec.ForProvider.Labels == nil {
-		return nil
+		return map[string][]string{}
 	}
 	labels := map[string][]string{}
 	internal.CopyMaps(labels, subaccount.Spec.ForProvider.Labels)
@@ -444,8 +444,8 @@ func specifyAPIError(err error) error {
 
 func changedLabels(specLabels map[string][]string, statusLabels *map[string][]string) bool {
 	// pointer to maps can be pointer to nil values, which won't deep equal as expected here, so we need to treat this case manually
-	if statusLabels == nil && len(specLabels) == 0 {
-		return false
+	if statusLabels == nil {
+		return len(specLabels) != 0
 	}
 	if len(*statusLabels) == 0 && len(specLabels) == 0 {
 		return false

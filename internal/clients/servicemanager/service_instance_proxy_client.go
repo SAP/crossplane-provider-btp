@@ -84,7 +84,7 @@ func (t ServiceManagerInstanceProxyClient) describeAdminBinding(ctx context.Cont
 		return nil, nil
 	}
 
-	return (*BindingCredentials)(response), err
+	return mapBindingCredentialTypes(response), err
 }
 
 func (t ServiceManagerInstanceProxyClient) createAdminBinding(ctx context.Context, subaccountGuid string) (*BindingCredentials, error) {
@@ -92,10 +92,24 @@ func (t ServiceManagerInstanceProxyClient) createAdminBinding(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
-	return (*BindingCredentials)(result), err
+	return mapBindingCredentialTypes(result), err
 }
 
 func (t ServiceManagerInstanceProxyClient) deleteAdminBinding(ctx context.Context, subaccountGuid string) error {
 	_, err := t.DeleteServiceManagementBindingOfSubaccount(ctx, subaccountGuid).Execute()
 	return err
+}
+
+// mapBindingCredentialTypes is a helper function to convert ServiceManagerBindingResponseObject to BindingCredentials by mapping each value individually
+func mapBindingCredentialTypes(in *accountsserviceclient.ServiceManagerBindingResponseObject) *BindingCredentials {
+	if in == nil {
+		return nil
+	}
+	out := new(BindingCredentials)
+	out.Clientid = in.Clientid
+	out.Clientsecret = in.Clientsecret
+	out.Url = in.Url
+	out.SmUrl = in.SmUrl
+	out.Xsappname = in.Xsappname
+	return out
 }

@@ -9,6 +9,6 @@
 #      name: cis-local
 #    initialOrgManagers:
 #      - <EMAIL>
-#    landscape: cf-eu12
+#    landscape: cf-eu10
 #  SubaccountRef:
 #    name: test-123455

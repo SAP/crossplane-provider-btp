@@ -3,7 +3,6 @@
 name: Reviewable&Check-Diff
 
 on:
-  workflow_dispatch:
   workflow_call: 
 
 env:

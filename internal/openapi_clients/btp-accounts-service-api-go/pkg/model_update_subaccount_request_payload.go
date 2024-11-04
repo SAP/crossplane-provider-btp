@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -34,6 +33,7 @@ type UpdateSubaccountRequestPayload struct {
 	Labels *map[string][]string `json:"labels,omitempty"`
 	// Whether the subaccount is used for production purposes. This flag can help your cloud operator to take appropriate action when handling incidents that are related to mission-critical accounts in production systems. Do not apply for subaccounts that are used for non-production purposes, such as development, testing, and demos. Applying this setting this does not modify the subaccount. * <b>NOT_USED_FOR_PRODUCTION:</b> Subaccount is not used for production purposes. * <b>USED_FOR_PRODUCTION:</b> Subaccount is used for production purposes.  
 	UsedForProduction *string `json:"usedForProduction,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _UpdateSubaccountRequestPayload UpdateSubaccountRequestPayload
@@ -269,6 +269,11 @@ func (o UpdateSubaccountRequestPayload) ToMap() (map[string]interface{}, error) 
 	if !IsNil(o.UsedForProduction) {
 		toSerialize["usedForProduction"] = o.UsedForProduction
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -296,15 +301,25 @@ func (o *UpdateSubaccountRequestPayload) UnmarshalJSON(data []byte) (err error) 
 
 	varUpdateSubaccountRequestPayload := _UpdateSubaccountRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varUpdateSubaccountRequestPayload)
+	err = json.Unmarshal(data, &varUpdateSubaccountRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = UpdateSubaccountRequestPayload(varUpdateSubaccountRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "betaEnabled")
+		delete(additionalProperties, "customProperties")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "usedForProduction")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

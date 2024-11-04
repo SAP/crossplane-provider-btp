@@ -1,10 +1,11 @@
 ![Golang](https://img.shields.io/badge/Go-1.23-informational)
+[![REUSE status](https://api.reuse.software/badge/github.com/SAP/crossplane-provider-btp)](https://api.reuse.software/info/github.com/SAP/crossplane-provider-btp)
 
-# crossplane-provider-btp-account
+# Crossplane Provider for SAP BTP
 
 ## About this project
 
-`crossplane-provider-btp-account` is a [Crossplane](https://crossplane.io/) Provider that handles the orchestration of Account related resources on [SAP Business Technology Platform](https://www.sap.com/products/technology-platform.html):
+`crossplane-provider-btp` is a [Crossplane](https://crossplane.io/) Provider that handles the orchestration of account related resources on [SAP Business Technology Platform](https://www.sap.com/products/technology-platform.html):
 
 - Subaccount
 - User Management
@@ -24,9 +25,9 @@ To install this provider in a kubernetes cluster running crossplane, you can use
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-btp-account
+  name: provider-btp
 spec:
-  package: TODO REGISTRY URL/crossplane-provider-btp:<VERSION>
+  package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<VERSION>
 ```
 
 You should then see the crossplane controller create a deployment for this provider. Once it becomes healthy, you can connect the provider to you BTP global account following the documentation.
@@ -53,35 +54,35 @@ The [Crossplane Provider Development][provider-dev] guide may be of use to add n
 To run the end2end tests, a technical user within the BTP is necessary for creation of environments (Kyma & CF). `.username` & `.password` is necessary for futher actions on `CloudFoundryEnvironment`.
 
 BTP_TECHNICAL_USER
-```
+```json
 {
-      "email": "email",
-      "username": "PuserId",
-      "password": "mypass"
-    }
+  "email": "email",
+  "username": "PuserId",
+  "password": "mypass"
+}
 ```
 
 CIS_CENTRAL_BINDING
 Contents from the service binding of a `cis-central` service, like
-```
+```json
 {
-      "endpoints": {
-        "accounts_service_url": "...",
-        "cloud_automation_url": "...",
-        "entitlements_service_url": "...",
-        "events_service_url": "...",
-        "external_provider_registry_url": "...",
-        "metadata_service_url": "...",
-        "order_processing_url": "...",
-        "provisioning_service_url": "...",
-        "saas_registry_service_url": "..."
-      },
-      "grant_type": "client_credentials",
-      "sap.cloud.service": "com.sap.core.commercial.service.central",
-      "uaa": {
-            …
-      }
-    }
+  "endpoints": {
+    "accounts_service_url": "...",
+    "cloud_automation_url": "...",
+    "entitlements_service_url": "...",
+    "events_service_url": "...",
+    "external_provider_registry_url": "...",
+    "metadata_service_url": "...",
+    "order_processing_url": "...",
+    "provisioning_service_url": "...",
+    "saas_registry_service_url": "..."
+  },
+  "grant_type": "client_credentials",
+  "sap.cloud.service": "com.sap.core.commercial.service.central",
+  "uaa": {
+      …
+  }
+}
 ```
 Contains the CLI server URL, for example:
 ```
@@ -92,13 +93,13 @@ GLOBAL_ACCOUNT
 Contains the subdomain of the global account.
 
 IDP_URL
-Contains the URL of an IDP that can be connected to the global account, for example:
+Contains the URL of an IDP that can be connected to the global account.
 
 SECOND_DIRECTORY_ADMIN_EMAIL
-Contains a second email (different from the technical user's email) for the directory admin field, for example:
+Contains a second email (different from the technical user's email) for the directory admin field.
 
 TECHNICAL_USER_EMAIL
-Contains the email of the BTP_TECHNICAL_USER
+Contains the email of the BTP_TECHNICAL_USER.
 
 ## Support, Feedback, Contributing
 

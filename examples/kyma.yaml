@@ -18,7 +18,7 @@ spec:
     globalAccountRef:
       name: co-ga-canary
     displayName: kyma-test
-    region: eu12
+    region: eu10
     subdomain: test-1234q342645asd
     subaccountAdmins:
       - <EMAIL>

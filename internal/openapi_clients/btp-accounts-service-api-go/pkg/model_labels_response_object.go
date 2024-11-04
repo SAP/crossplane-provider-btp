@@ -21,7 +21,10 @@ var _ MappedNullable = &LabelsResponseObject{}
 type LabelsResponseObject struct {
 	// User-defined labels that are assigned as key-value pairs in a JSON array to the entity.  Example: {    \"Cost Center\": [\"19700626\"],    \"Department\": [\"Sales\"],    \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],    \"EMEA\":[] }
 	Labels *map[string][]string `json:"labels,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _LabelsResponseObject LabelsResponseObject
 
 // NewLabelsResponseObject instantiates a new LabelsResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -85,7 +88,33 @@ func (o LabelsResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Labels) {
 		toSerialize["labels"] = o.Labels
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *LabelsResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varLabelsResponseObject := _LabelsResponseObject{}
+
+	err = json.Unmarshal(data, &varLabelsResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = LabelsResponseObject(varLabelsResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "labels")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableLabelsResponseObject struct {

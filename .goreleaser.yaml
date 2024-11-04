@@ -1,0 +1,29 @@
+# Visit https://goreleaser.com for documentation on how to customize this
+# behavior.
+version: 2
+
+builds:
+  - id: binary-build
+    env:
+      - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    main: ./cmd/provider
+    flags:
+      - -trimpath
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: darwin
+        goarch: "386"
+    binary: "{{ .ProjectName }}_v{{ .Version }}"
+archives:
+  - format: zip
+    builds:
+      - binary-build
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+changelog:
+  use: github-native

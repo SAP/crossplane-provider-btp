@@ -39,7 +39,10 @@ type ServiceManagerBindingExtendedResponseObject struct {
 	Url *string `json:"url,omitempty"`
 	// The name of the xsapp used to get the access token.
 	Xsappname *string `json:"xsappname,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServiceManagerBindingExtendedResponseObject ServiceManagerBindingExtendedResponseObject
 
 // NewServiceManagerBindingExtendedResponseObject instantiates a new ServiceManagerBindingExtendedResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -418,7 +421,42 @@ func (o ServiceManagerBindingExtendedResponseObject) ToMap() (map[string]interfa
 	if !IsNil(o.Xsappname) {
 		toSerialize["xsappname"] = o.Xsappname
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServiceManagerBindingExtendedResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varServiceManagerBindingExtendedResponseObject := _ServiceManagerBindingExtendedResponseObject{}
+
+	err = json.Unmarshal(data, &varServiceManagerBindingExtendedResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServiceManagerBindingExtendedResponseObject(varServiceManagerBindingExtendedResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "certUrl")
+		delete(additionalProperties, "certificate")
+		delete(additionalProperties, "clientid")
+		delete(additionalProperties, "clientsecret")
+		delete(additionalProperties, "creationDate")
+		delete(additionalProperties, "key")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "sm_url")
+		delete(additionalProperties, "url")
+		delete(additionalProperties, "xsappname")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServiceManagerBindingExtendedResponseObject struct {

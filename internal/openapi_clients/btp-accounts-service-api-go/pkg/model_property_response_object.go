@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -27,6 +26,7 @@ type PropertyResponseObject struct {
 	Key string `json:"key"`
 	// The value for the corresponding label key.
 	Value string `json:"value"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _PropertyResponseObject PropertyResponseObject
@@ -136,6 +136,11 @@ func (o PropertyResponseObject) ToMap() (map[string]interface{}, error) {
 	toSerialize["accountGUID"] = o.AccountGUID
 	toSerialize["key"] = o.Key
 	toSerialize["value"] = o.Value
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -165,15 +170,22 @@ func (o *PropertyResponseObject) UnmarshalJSON(data []byte) (err error) {
 
 	varPropertyResponseObject := _PropertyResponseObject{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varPropertyResponseObject)
+	err = json.Unmarshal(data, &varPropertyResponseObject)
 
 	if err != nil {
 		return err
 	}
 
 	*o = PropertyResponseObject(varPropertyResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "accountGUID")
+		delete(additionalProperties, "key")
+		delete(additionalProperties, "value")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

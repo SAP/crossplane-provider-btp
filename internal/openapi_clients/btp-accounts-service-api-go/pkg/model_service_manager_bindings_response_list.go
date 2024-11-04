@@ -20,7 +20,10 @@ var _ MappedNullable = &ServiceManagerBindingsResponseList{}
 // ServiceManagerBindingsResponseList The list of the Service Manager bindings for the specified subaccount GUID.
 type ServiceManagerBindingsResponseList struct {
 	Items []ServiceManagerBindingExtendedResponseObject `json:"items,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServiceManagerBindingsResponseList ServiceManagerBindingsResponseList
 
 // NewServiceManagerBindingsResponseList instantiates a new ServiceManagerBindingsResponseList object
 // This constructor will assign default values to properties that have it defined,
@@ -84,7 +87,33 @@ func (o ServiceManagerBindingsResponseList) ToMap() (map[string]interface{}, err
 	if !IsNil(o.Items) {
 		toSerialize["items"] = o.Items
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServiceManagerBindingsResponseList) UnmarshalJSON(data []byte) (err error) {
+	varServiceManagerBindingsResponseList := _ServiceManagerBindingsResponseList{}
+
+	err = json.Unmarshal(data, &varServiceManagerBindingsResponseList)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServiceManagerBindingsResponseList(varServiceManagerBindingsResponseList)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "items")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServiceManagerBindingsResponseList struct {

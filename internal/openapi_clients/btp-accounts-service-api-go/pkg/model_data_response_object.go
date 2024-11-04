@@ -21,7 +21,10 @@ var _ MappedNullable = &DataResponseObject{}
 type DataResponseObject struct {
 	// The response object containing information about the data.
 	Values []PropertyDataResponseObject `json:"values,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _DataResponseObject DataResponseObject
 
 // NewDataResponseObject instantiates a new DataResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -85,7 +88,33 @@ func (o DataResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Values) {
 		toSerialize["values"] = o.Values
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *DataResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varDataResponseObject := _DataResponseObject{}
+
+	err = json.Unmarshal(data, &varDataResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = DataResponseObject(varDataResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "values")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableDataResponseObject struct {
