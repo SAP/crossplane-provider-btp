@@ -237,6 +237,8 @@ test.run: go.test.unit
 # e2e tests
 e2e.run: test-acceptance
 
+e2e-long: test-acceptance-long
+
 test-e2e: $(KIND) $(HELM3) build generate-test-crs
 	@$(INFO) running e2e tests
 	@$(INFO) Skipping long running tests
@@ -260,6 +262,22 @@ test-acceptance: $(KIND) $(HELM3) build generate-test-crs
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
 	@echo "UUT_IMAGES=$$UUT_IMAGES"
 	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
+	@echo "===========Test Summary==========="
+	@grep -E "PASS|FAIL" test-output.log
+	@case `tail -n 1 test-output.log` in \
+     		*FAIL*) echo "❌ Error: Test failed"; exit 1 ;; \
+     		*) echo "✅ All tests passed"; $(OK) integration tests passed ;; \
+     esac
+
+#run single e2e test with <make e2e-long testFilter=functionNameOfTest>
+.PHONY: test-acceptance-long
+test-acceptance-long: $(KIND) $(HELM3) build generate-test-crs
+	@$(INFO) running integration tests
+	@$(INFO) Running long running tests
+	@echo UUT_CONFIG=$$UUT_CONFIG
+	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
+	@echo "UUT_IMAGES=$$UUT_IMAGES"
+	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -count=1 -test.v -run '$(testFilter)' -timeout 160m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
