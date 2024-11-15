@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +28,8 @@ type SubscriptionParameters struct {
 	// PlanName to subscribe to, empty plannames are shown as "default" in cockpit, use "" instead
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="planName can't be updated once set"
 	PlanName string `json:"planName"`
+	// Subscription parameters allows you to add additional parameters
+	SubscriptionParameters json.RawMessage `json:",subscriptionParameters"`
 }
 
 // SubscriptionObservation are the observable fields of a Subscription.

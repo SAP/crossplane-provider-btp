@@ -2,6 +2,7 @@ package subscription
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -168,9 +169,22 @@ func (s *SubscriptionTypeMapper) ConvertToCreatePayload(cr *v1alpha1.Subscriptio
 	return SubscriptionPost{
 		appName: cr.Spec.ForProvider.AppName,
 		CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
-			PlanName: &cr.Spec.ForProvider.PlanName,
+			PlanName:           &cr.Spec.ForProvider.PlanName,
+			SubscriptionParams: s.ConvertToClientParams(cr),
 		},
 	}
+}
+
+func (s *SubscriptionTypeMapper) ConvertToClientParams(cr *v1alpha1.Subscription) map[string]map[string]interface{} {
+	type subparams map[string]map[string]interface{}
+	var sp subparams
+
+	err := json.Unmarshal(cr.Spec.ForProvider.SubscriptionParameters, &sp)
+	if err != nil {
+		return nil
+	}
+
+	return sp
 }
 
 func (s *SubscriptionTypeMapper) ConvertToUpdatePayload(cr *v1alpha1.Subscription) SubscriptionPut {

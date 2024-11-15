@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: subscriptions.account.btp.sap.crossplane.io
+  name: subaccountserviceinstances.account.btp.sap.crossplane.io
 spec:
   group: account.btp.sap.crossplane.io
   names:
     categories:
     - crossplane
     - managed
-    - btp
-    kind: Subscription
-    listKind: SubscriptionList
-    plural: subscriptions
-    singular: subscription
+    - account
+    kind: SubaccountServiceInstance
+    listKind: SubaccountServiceInstanceList
+    plural: subaccountserviceinstances
+    singular: subaccountserviceinstance
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -34,10 +34,9 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: |-
-          A Subscription encodes a subscription of a subaccount to a service
-          It requires a references CloudManagement instance of plan type "local" to authenticate and map to subaccount.
-          To import a subscription use the pattern <app name>/<plan name> as externalName annotation
+        description: 'SubaccountServiceInstance is the Schema for the SubaccountServiceInstances
+          API. Creates a service instance in a subaccount. Tip: You must be assigned
+          to the admin or the service administrator role of the subaccount.'
         properties:
           apiVersion:
             description: |-
@@ -57,87 +56,9 @@ spec:
           metadata:
             type: object
           spec:
-            description: A SubscriptionSpec defines the desired state of a Subscription.
+            description: SubaccountServiceInstanceSpec defines the desired state of
+              SubaccountServiceInstance
             properties:
-              cloudManagementRef:
-                description: Reference to CloudManagement instance of plan type "local"
-                  used for authentication
-                properties:
-                  name:
-                    description: Name of the referenced object.
-                    type: string
-                  policy:
-                    description: Policies for referencing.
-                    properties:
-                      resolution:
-                        default: Required
-                        description: |-
-                          Resolution specifies whether resolution of this reference is required.
-                          The default is 'Required', which means the reconcile will fail if the
-                          reference cannot be resolved. 'Optional' means this reference will be
-                          a no-op if it cannot be resolved.
-                        enum:
-                        - Required
-                        - Optional
-                        type: string
-                      resolve:
-                        description: |-
-                          Resolve specifies when this reference should be resolved. The default
-                          is 'IfNotPresent', which will attempt to resolve the reference only when
-                          the corresponding field is not present. Use 'Always' to resolve the
-                          reference on every reconcile.
-                        enum:
-                        - Always
-                        - IfNotPresent
-                        type: string
-                    type: object
-                required:
-                - name
-                type: object
-              cloudManagementSecret:
-                type: string
-              cloudManagementSecretNamespace:
-                type: string
-              cloudManagementSelector:
-                description: A Selector selects an object.
-                properties:
-                  matchControllerRef:
-                    description: |-
-                      MatchControllerRef ensures an object with the same controller reference
-                      as the selecting object is selected.
-                    type: boolean
-                  matchLabels:
-                    additionalProperties:
-                      type: string
-                    description: MatchLabels ensures an object with matching labels
-                      is selected.
-                    type: object
-                  policy:
-                    description: Policies for selection.
-                    properties:
-                      resolution:
-                        default: Required
-                        description: |-
-                          Resolution specifies whether resolution of this reference is required.
-                          The default is 'Required', which means the reconcile will fail if the
-                          reference cannot be resolved. 'Optional' means this reference will be
-                          a no-op if it cannot be resolved.
-                        enum:
-                        - Required
-                        - Optional
-                        type: string
-                      resolve:
-                        description: |-
-                          Resolve specifies when this reference should be resolved. The default
-                          is 'IfNotPresent', which will attempt to resolve the reference only when
-                          the corresponding field is not present. Use 'Always' to resolve the
-                          reference on every reconcile.
-                        enum:
-                        - Always
-                        - IfNotPresent
-                        type: string
-                    type: object
-                type: object
               deletionPolicy:
                 default: Delete
                 description: |-
@@ -153,27 +74,90 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: SubscriptionParameters are the configurable fields of
-                  a Subscription.
-                format: byte
                 properties:
-                  appName:
-                    description: AppName of the app to subscribe to
+                  labels:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: |-
+                      (Map of Set of String) The set of words or phrases assigned to the service instance.
+                      The set of words or phrases assigned to the service instance.
+                    type: object
+                  name:
+                    description: |-
+                      (String) The name of the service instance.
+                      The name of the service instance.
                     type: string
-                    x-kubernetes-validations:
-                    - message: appName can't be updated once set
-                      rule: self == oldSelf
-                  planName:
-                    description: PlanName to subscribe to, empty plannames are shown
-                      as "default" in cockpit, use "" instead
+                  parameters:
+                    description: |-
+                      (String, Sensitive) The configuration parameters for the service instance.
+                      The configuration parameters for the service instance.
                     type: string
-                    x-kubernetes-validations:
-                    - message: planName can't be updated once set
-                      rule: self == oldSelf
-                required:
-                - appName
-                - planName
-                type: string
+                  serviceplanId:
+                    description: |-
+                      (String) The ID of the service plan.
+                      The ID of the service plan.
+                    type: string
+                  shared:
+                    description: |-
+                      (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+                      The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+                    type: boolean
+                  subaccountId:
+                    description: |-
+                      (String) The ID of the subaccount.
+                      The ID of the subaccount.
+                    type: string
+                type: object
+              initProvider:
+                description: |-
+                  THIS IS A BETA FIELD. It will be honored
+                  unless the Management Policies feature flag is disabled.
+                  InitProvider holds the same fields as ForProvider, with the exception
+                  of Identifier and other resource reference fields. The fields that are
+                  in InitProvider are merged into ForProvider when the resource is created.
+                  The same fields are also added to the terraform ignore_changes hook, to
+                  avoid updating them after creation. This is useful for fields that are
+                  required on creation, but we do not desire to update them after creation,
+                  for example because of an external controller is managing them, like an
+                  autoscaler.
+                properties:
+                  labels:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: |-
+                      (Map of Set of String) The set of words or phrases assigned to the service instance.
+                      The set of words or phrases assigned to the service instance.
+                    type: object
+                  name:
+                    description: |-
+                      (String) The name of the service instance.
+                      The name of the service instance.
+                    type: string
+                  parameters:
+                    description: |-
+                      (String, Sensitive) The configuration parameters for the service instance.
+                      The configuration parameters for the service instance.
+                    type: string
+                  serviceplanId:
+                    description: |-
+                      (String) The ID of the service plan.
+                      The ID of the service plan.
+                    type: string
+                  shared:
+                    description: |-
+                      (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+                      The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+                    type: boolean
+                  subaccountId:
+                    description: |-
+                      (String) The ID of the subaccount.
+                      The ID of the subaccount.
+                    type: string
+                type: object
               managementPolicies:
                 default:
                 - '*'
@@ -341,16 +325,105 @@ spec:
             required:
             - forProvider
             type: object
+            x-kubernetes-validations:
+            - message: spec.forProvider.name is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.name)
+                || (has(self.initProvider) && has(self.initProvider.name))'
+            - message: spec.forProvider.serviceplanId is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.serviceplanId)
+                || (has(self.initProvider) && has(self.initProvider.serviceplanId))'
+            - message: spec.forProvider.subaccountId is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.subaccountId)
+                || (has(self.initProvider) && has(self.initProvider.subaccountId))'
           status:
-            description: A SubscriptionStatus represents the observed state of a Subscription.
+            description: SubaccountServiceInstanceStatus defines the observed state
+              of SubaccountServiceInstance.
             properties:
               atProvider:
-                description: SubscriptionObservation are the observable fields of
-                  a Subscription.
                 properties:
-                  state:
-                    description: State as received from the API instance
+                  context:
+                    description: |-
+                      (String) Contextual data for the resource.
+                      Contextual data for the resource.
                     type: string
+                  createdDate:
+                    description: |-
+                      (String) The date and time when the resource was created in RFC3339 format.
+                      The date and time when the resource was created in [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format.
+                    type: string
+                  dashboardUrl:
+                    description: |-
+                      based management UI for the service instance.
+                      The URL of the web-based management UI for the service instance.
+                    type: string
+                  id:
+                    description: (String) The ID of the service instance.
+                    type: string
+                  labels:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: |-
+                      (Map of Set of String) The set of words or phrases assigned to the service instance.
+                      The set of words or phrases assigned to the service instance.
+                    type: object
+                  lastModified:
+                    description: |-
+                      (String) The date and time when the resource was last modified in RFC3339 format.
+                      The date and time when the resource was last modified in [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format.
+                    type: string
+                  name:
+                    description: |-
+                      (String) The name of the service instance.
+                      The name of the service instance.
+                    type: string
+                  parameters:
+                    description: |-
+                      (String, Sensitive) The configuration parameters for the service instance.
+                      The configuration parameters for the service instance.
+                    type: string
+                  platformId:
+                    description: |-
+                      (String) The platform ID.
+                      The platform ID.
+                    type: string
+                  ready:
+                    description: (Boolean)
+                    type: boolean
+                  referencedInstanceId:
+                    description: |-
+                      (String) The ID of the instance to which the service instance refers.
+                      The ID of the instance to which the service instance refers.
+                    type: string
+                  serviceplanId:
+                    description: |-
+                      (String) The ID of the service plan.
+                      The ID of the service plan.
+                    type: string
+                  shared:
+                    description: |-
+                      (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+                      The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+                    type: boolean
+                  state:
+                    description: |-
+                      (String) The current state of the service instance.
+                      The current state of the service instance.
+                    type: string
+                  subaccountId:
+                    description: |-
+                      (String) The ID of the subaccount.
+                      The ID of the subaccount.
+                    type: string
+                  usable:
+                    description: |-
+                      (Boolean) Shows whether the resource can be used.
+                      Shows whether the resource can be used.
+                    type: boolean
                 type: object
               conditions:
                 description: Conditions of the resource.

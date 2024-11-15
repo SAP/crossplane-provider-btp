@@ -22,7 +22,8 @@ import (
 	"github.com/crossplane/upjet/pkg/controller"
 
 	directoryentitlement "github.com/sap/crossplane-provider-btp/internal/controller/account/directoryentitlement"
-	subaccountservicebroker "github.com/sap/crossplane-provider-btp/internal/controller/account/subaccountservicebroker"
+	subaccountservicebinding "github.com/sap/crossplane-provider-btp/internal/controller/account/subaccountservicebinding"
+	subaccountserviceinstance "github.com/sap/crossplane-provider-btp/internal/controller/account/subaccountserviceinstance"
 	providerconfig "github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	globalaccounttrustconfiguration "github.com/sap/crossplane-provider-btp/internal/controller/security/globalaccounttrustconfiguration"
 	subaccountapicredential "github.com/sap/crossplane-provider-btp/internal/controller/security/subaccountapicredential"
@@ -34,7 +35,8 @@ import (
 func Setup(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		directoryentitlement.Setup,
-		subaccountservicebroker.Setup,
+		subaccountservicebinding.Setup,
+		subaccountserviceinstance.Setup,
 		providerconfig.Setup,
 		globalaccounttrustconfiguration.Setup,
 		subaccountapicredential.Setup,
