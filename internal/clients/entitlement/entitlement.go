@@ -145,10 +145,12 @@ func filterAssignedServices(payload *entclient.EntitledAndAssignedServicesRespon
 			return nil, errPlan
 		}
 
-		errUnique := filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
+		if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
+			errUnique := filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
 
-		if errUnique != nil {
-			return nil, errUnique
+			if errUnique != nil {
+				return nil, errUnique
+			}
 		}
 
 		foundAssignment, errLook := lookupAssignmentAndAssign(servicePlan, cr)
