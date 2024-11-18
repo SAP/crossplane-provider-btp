@@ -110,6 +110,12 @@ spec:
                     type: string
                   servicePlanName:
                     type: string
+                  servicePlanUniqueIdentifier:
+                    description: The unique identifier of the service plan. This is
+                      a unique identifier for service plans that can distinguish between
+                      the same service plans with different hosting datacenters. Options
+                      Include `hana-cloud-hana` or `hana-cloud-hana-sap_eu-de-1`.
+                    type: string
                   subaccountGuid:
                     type: string
                   subaccountRef:
