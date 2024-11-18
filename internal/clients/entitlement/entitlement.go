@@ -9,6 +9,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	entclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -17,6 +18,7 @@ const (
 	errFailedSetEntitlements     = "failed to set entitlement for service %s/%s."
 	errServiceNotFoundByName     = "failed to find service with the given name %s"
 	errServicePlanNotFoundByName = "failed to find service plan with the given name %s"
+	errServiceUniqueName         = "failed to find service plan with the given unique name %s"
 	errCannotDetermineOffering   = "Could not determine offering category %s, please open a bug"
 )
 
@@ -102,6 +104,15 @@ func filterAssignedServicePlanByName(service *entclient.AssignedServiceResponseO
 	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
 }
 
+func filterAssignedServicePlanByUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanUniqueID string) error {
+	for _, servicePlan := range service.ServicePlans {
+		if servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
+			return nil
+		}
+	}
+	return errors.Errorf(errServiceUniqueName, servicePlanUniqueID)
+}
+
 func filterEntitledServiceByName(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string) (*entclient.EntitledServicesResponseObject, error) {
 	for _, service := range payload.EntitledServices {
 		if service.Name != nil && *service.Name == serviceName {
@@ -132,6 +143,12 @@ func filterAssignedServices(payload *entclient.EntitledAndAssignedServicesRespon
 
 		if errPlan != nil {
 			return nil, errPlan
+		}
+
+		errUnique := filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
+
+		if errUnique != nil {
+			return nil, errUnique
 		}
 
 		foundAssignment, errLook := lookupAssignmentAndAssign(servicePlan, cr)
@@ -202,6 +219,7 @@ func hasNumericQuota(cr *v1alpha1.Entitlement) bool {
 func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
 	serviceName := cr.Spec.ForProvider.ServiceName
 	planName := cr.Spec.ForProvider.ServicePlanName
+	servicePlanUniqueIdentifier := cr.Spec.ForProvider.ServicePlanUniqueIdentifier
 	var amount *float32
 	if cr.Status.AtProvider.Required.Amount != nil {
 		amount = internal.Ptr(float32(*cr.Status.AtProvider.Required.Amount))
@@ -218,8 +236,9 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 						SubaccountGUID: cr.Spec.ForProvider.SubaccountGuid,
 					},
 				},
-				ServiceName:     serviceName,
-				ServicePlanName: planName,
+				ServiceName:                 serviceName,
+				ServicePlanName:             planName,
+				ServicePlanUniqueIdentifier: ptr.Deref(servicePlanUniqueIdentifier, ""),
 			},
 		},
 	)

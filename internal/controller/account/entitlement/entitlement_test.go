@@ -90,6 +90,43 @@ func TestObserve(t *testing.T) {
 				err: errors.New(errKubeAPI),
 			},
 		},
+		"Simple Case, no unique identifier passed, api error for ambigous names": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate, MockList: test.NewMockListFn(nil, ListEntitlements(entitlement(withServiceName("hana-cloud"), withUniqueServicePlanIdentifier("a")), entitlement(withServiceName("hana-cloud"), withUniqueServicePlanIdentifier("b")))),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return nil, errors.New(errClientAPI)
+				},
+				},
+				cr: entitlement(withServiceName("hana-cloud")),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.New(errClientAPI),
+			},
+		},
+		"Simple Case, unique identifier passed": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList:         test.NewMockListFn(nil, ListEntitlements(entitlement(withServiceName("hana-cloud"), withUniqueServicePlanIdentifier("a")), entitlement(withServiceName("hana-cloud"), withUniqueServicePlanIdentifier("b")))),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount: internal.Ptr(float32(1)),
+						},
+					}, nil
+				}},
+				cr: entitlement(withServiceName("hana-cloud"), withUniqueServicePlanIdentifier("a")),
+			},
+			want: want{
+				o:   managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+			},
+		},
 		"Simple Case, no additional additional Entitlements, resource does not exist": {
 			args: args{
 				kube: &test.MockClient{
@@ -456,6 +493,10 @@ func withServiceName(name string) entitlementModifier {
 
 func withServicePlan(plan string) entitlementModifier {
 	return func(r *v1alpha1.Entitlement) { r.Spec.ForProvider.ServicePlanName = plan }
+}
+
+func withUniqueServicePlanIdentifier(plan string) entitlementModifier {
+	return func(r *v1alpha1.Entitlement) { r.Spec.ForProvider.ServicePlanUniqueIdentifier = &plan }
 }
 
 func withSubaccountGuid(guid string) entitlementModifier {

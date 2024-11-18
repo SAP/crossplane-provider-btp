@@ -27,6 +27,8 @@ type ServicePlanAssignmentRequestPayload struct {
 	ServiceName string `json:"serviceName"`
 	// The technical name of the entitlement's plan.
 	ServicePlanName string `json:"servicePlanName"`
+	// The unique identifier of a plan. Only needed on canary due to ambigious naming.
+	ServicePlanUniqueIdentifier string `json:"servicePlanUniqueIdentifier,omitempty"`
 }
 
 type _ServicePlanAssignmentRequestPayload ServicePlanAssignmentRequestPayload
@@ -136,6 +138,7 @@ func (o ServicePlanAssignmentRequestPayload) ToMap() (map[string]interface{}, er
 	toSerialize["assignmentInfo"] = o.AssignmentInfo
 	toSerialize["serviceName"] = o.ServiceName
 	toSerialize["servicePlanName"] = o.ServicePlanName
+	toSerialize["servicePlanUniqueIdentifier"] = o.ServicePlanUniqueIdentifier
 	return toSerialize, nil
 }
 
@@ -147,6 +150,7 @@ func (o *ServicePlanAssignmentRequestPayload) UnmarshalJSON(data []byte) (err er
 		"assignmentInfo",
 		"serviceName",
 		"servicePlanName",
+		"servicePlanUniqueIdentifier",
 	}
 
 	allProperties := make(map[string]interface{})
