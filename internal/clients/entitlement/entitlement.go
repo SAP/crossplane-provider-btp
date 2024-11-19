@@ -9,7 +9,6 @@ import (
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	entclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -240,7 +239,7 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 				},
 				ServiceName:                 serviceName,
 				ServicePlanName:             planName,
-				ServicePlanUniqueIdentifier: ptr.Deref(servicePlanUniqueIdentifier, ""),
+				ServicePlanUniqueIdentifier: servicePlanUniqueIdentifier,
 			},
 		},
 	)
