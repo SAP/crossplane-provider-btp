@@ -21,14 +21,15 @@ We have a lot of exciting new features and improvements in our backlogs for you 
 
 Until then here are the top 3 features we are working on:
 
-**1. Serviceinstances and ServiceBindings**
-
+#### 1. Serviceinstances and ServiceBindings
 We are working on the implementation of the ServiceInstance and ServiceBinding resources. This will allow you to create and manage service instances and bindings in your BTP account without requiring another tool for that.
 
-**2. Automation of xsuaa credential management**
+#### 2. Automation of xsuaa credential management
+
 While it already is possible today to orchestrate your role collections and assignments using the provider, usage up to this point, still requires you to manually create and inject API credentials for the xsuaa API. This is subject to change. We will add new CRDs for managing the API credentials using the newly added https://registry.terraform.io/providers/SAP/btp/latest/docs/resources/subaccount_api_credential.
 
-**3. More complex resource imports**
+#### 3. More complex resource imports
+
 We know a lot of you would like to use crossplane for observation of (previously unmanaged) landscapes. Importing resources for observation is already possible, but requires manual process for importing each resource individually. We are working on a more automated way to import resources in bulk.
 
 ## Requirements and Setup
