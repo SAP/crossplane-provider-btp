@@ -2,6 +2,7 @@ package subscription
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -103,6 +104,14 @@ func TestSubscriptionApiHandler_CreateSubscription(t *testing.T) {
 				appName: "name1",
 				CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
 					PlanName: internal.Ptr("plan2"),
+					SubscriptionParams: map[string]map[string]interface{}{
+						"param1": {
+							"key1": "value1",
+						},
+						"param2": {
+							"key2": "value2",
+						},
+					},
 				},
 			},
 			mockSubscriptionApi: apiMockPOST(
@@ -117,6 +126,13 @@ func TestSubscriptionApiHandler_CreateSubscription(t *testing.T) {
 				appName: "name1",
 				CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
 					PlanName: internal.Ptr("plan2"),
+					SubscriptionParams: map[string]map[string]interface{}{
+						"param1": {
+							"key1": "value1",
+						},
+						"param2": {
+							"key2": "value2",
+						},
 				},
 			},
 			mockSubscriptionApi: apiMockPOST(
@@ -247,7 +263,8 @@ func TestSubscriptionApiHandler_UpdateSubscription(t *testing.T) {
 }
 
 func TestSubscriptionTypeMapper_ConvertToCreatePayload(t *testing.T) {
-	cr := NewSubscription("someName", "name1", "plan2")
+	raw := json.RawMessage(`{"name": "John", "age": 30}`)
+	cr := NewSubscription("someName", "name1", "plan2", raw)
 
 	uut := NewSubscriptionTypeMapper()
 	mapped := uut.ConvertToCreatePayload(cr)
@@ -258,8 +275,27 @@ func TestSubscriptionTypeMapper_ConvertToCreatePayload(t *testing.T) {
 
 }
 
+func TestSubscriptionTypeMapper_ConvertToClientParams(t *testing.T) {
+	raw := json.RawMessage(`{"param1": {"key1": "value1"}, "param2": {"key2": "value2"}}`)
+	cr := &v1alpha1.Subscription{
+		Spec: v1alpha1.SubscriptionSpec{
+			ForProvider: v1alpha1.SubscriptionParameters{
+				SubscriptionParameters: raw,
+			},
+		},
+	}
+
+	uut := NewSubscriptionTypeMapper()
+	params := uut.ConvertToClientParams(cr)
+
+	assert.NotNil(t, params)
+	assert.Equal(t, "value1", params["param1"]["key1"])
+	assert.Equal(t, "value2", params["param2"]["key2"])
+}
+
 func TestSubscriptionTypeMapper_IsSynced(t *testing.T) {
-	cr := NewSubscription("someName", "name1", "plan2")
+	raw := json.RawMessage(`{"name": "John", "age": 30}`)
+	cr := NewSubscription("someName", "name1", "plan2", raw)
 	get := &SubscriptionGet{
 		AppName:  internal.Ptr("anotherName"),
 		PlanName: internal.Ptr("anotherPlan"),
@@ -310,6 +346,7 @@ func TestSubscriptionTypeMapper_IsAvailable(t *testing.T) {
 }
 
 func TestSubscriptionTypeMapper_SyncStatus(t *testing.T) {
+	raw := json.RawMessage(`{"name": "John", "age": 30}`)
 	tests := map[string]struct {
 		cr     *v1alpha1.Subscription
 		apiRes *SubscriptionGet
@@ -317,7 +354,7 @@ func TestSubscriptionTypeMapper_SyncStatus(t *testing.T) {
 		expectedCr *v1alpha1.Subscription
 	}{
 		"SetState": {
-			cr: NewSubscription("someName", "name1", "plan2"),
+			cr: NewSubscription("someName", "name1", "plan2", raw),
 			apiRes: &SubscriptionGet{
 				AppName:  internal.Ptr("name1"),
 				PlanName: internal.Ptr("plan2"),
@@ -374,13 +411,14 @@ func apiMockDELETE(statusCode int, apiError error) *MockSubscriptionOperationsCo
 	return apiMock
 }
 
-func NewSubscription(crName string, appName string, planName string) *v1alpha1.Subscription {
+func NewSubscription(crName string, appName string, planName string, subscriptionParameters json.RawMessage) *v1alpha1.Subscription {
 	cr := &v1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{Name: crName},
 		Spec: v1alpha1.SubscriptionSpec{
 			ForProvider: v1alpha1.SubscriptionParameters{
-				AppName:  appName,
-				PlanName: planName,
+				AppName:                appName,
+				PlanName:               planName,
+				SubscriptionParameters: subscriptionParameters,
 			},
 		},
 	}
