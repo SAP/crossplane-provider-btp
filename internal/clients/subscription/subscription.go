@@ -177,14 +177,14 @@ func (s *SubscriptionTypeMapper) ConvertToCreatePayload(cr *v1alpha1.Subscriptio
 
 func (s *SubscriptionTypeMapper) ConvertToClientParams(cr *v1alpha1.Subscription) map[string]map[string]interface{} {
 	type subparams map[string]map[string]interface{}
-	var sp subparams
+	var subscriptionParams subparams
 
-	err := json.Unmarshal(cr.Spec.ForProvider.SubscriptionParameters, &sp)
+	err := json.Unmarshal(cr.Spec.ForProvider.SubscriptionParameters, &subscriptionParams)
 	if err != nil {
 		return nil
 	}
 
-	return sp
+	return subscriptionParams
 }
 
 func (s *SubscriptionTypeMapper) ConvertToUpdatePayload(cr *v1alpha1.Subscription) SubscriptionPut {
