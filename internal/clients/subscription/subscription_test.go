@@ -133,6 +133,7 @@ func TestSubscriptionApiHandler_CreateSubscription(t *testing.T) {
 						"param2": {
 							"key2": "value2",
 						},
+					},
 				},
 			},
 			mockSubscriptionApi: apiMockPOST(
