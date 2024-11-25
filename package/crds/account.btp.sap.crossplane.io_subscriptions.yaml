@@ -155,7 +155,6 @@ spec:
               forProvider:
                 description: SubscriptionParameters are the configurable fields of
                   a Subscription.
-                format: byte
                 properties:
                   appName:
                     description: AppName of the app to subscribe to
@@ -170,10 +169,16 @@ spec:
                     x-kubernetes-validations:
                     - message: planName can't be updated once set
                       rule: self == oldSelf
+                  subscriptionParameters:
+                    description: Subscription parameters allows you to add additional
+                      parameters
+                    format: byte
+                    type: string
                 required:
                 - appName
                 - planName
-                type: string
+                - subscriptionParameters
+                type: object
               managementPolicies:
                 default:
                 - '*'
