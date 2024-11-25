@@ -16,6 +16,21 @@
 
 Check the documentation for more detailed information on available capabilities for different kinds.
 
+## Roadmap
+We have a lot of exciting new features and improvements in our backlogs for you to expect and even contribute yourself! The major part of this roadmap will be publicly managed in github very soon.
+
+Until then here are the top 3 features we are working on:
+
+#### 1. Serviceinstances and ServiceBindings
+We are working on the implementation of the ServiceInstance and ServiceBinding resources. This will allow you to create and manage service instances and bindings in your BTP account without requiring another tool for that.
+
+#### 2. Automation of xsuaa credential management
+
+While it already is possible today to orchestrate your role collections and assignments using the provider, usage up to this point, still requires you to manually create and inject API credentials for the xsuaa API. This is subject to change. We will add new CRDs for managing the API credentials using the newly added https://registry.terraform.io/providers/SAP/btp/latest/docs/resources/subaccount_api_credential.
+
+#### 3. More complex resource imports
+
+We know a lot of you would like to use crossplane for observation of (previously unmanaged) landscapes. Importing resources for observation is already possible, but requires manual process for importing each resource individually. We are working on a more automated way to import resources in bulk.
 
 ## Requirements and Setup
 
@@ -102,8 +117,13 @@ TECHNICAL_USER_EMAIL
 Contains the email of the BTP_TECHNICAL_USER.
 
 ## Support, Feedback, Contributing
+If you have a question always feel free to reach out on our official crossplane slack channel: 
 
-This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/crossplane-provider-btp/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
+:rocket: [**#provider-sap-btp**](https://crossplane.slack.com/archives/C07UZ3UJY7Q).
+
+This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/crossplane-provider-btp/issues). Contribution and feedback are encouraged and always welcome.
+
+For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 
 ## Security / Disclosure
 If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/SAP/crossplane-provider-btp/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
