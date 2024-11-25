@@ -1,6 +1,7 @@
 module github.com/sap/crossplane-provider-btp
 
 go 1.21
+toolchain go1.23.3
 
 require (
 	dario.cat/mergo v1.0.1
@@ -20,7 +21,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.47.0
 	github.com/stretchr/testify v1.9.0
-	github.com/vladimirvivien/gexe v0.2.0
+	github.com/vladimirvivien/gexe v0.4.1
 	golang.org/x/net v0.31.0
 	golang.org/x/oauth2 v0.23.0
 	golang.org/x/sync v0.9.0
