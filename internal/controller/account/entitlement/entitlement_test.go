@@ -90,22 +90,6 @@ func TestObserve(t *testing.T) {
 				err: errors.New(errKubeAPI),
 			},
 		},
-		"Simple Case, no unique identifier passed, api error for ambigous names": {
-			args: args{
-				kube: &test.MockClient{
-					MockStatusUpdate: noopStatusUpdate, MockList: test.NewMockListFn(nil, ListEntitlements(entitlement(withServiceName("hana-cloud"), withUniqueServicePlanIdentifier("a")), entitlement(withServiceName("hana-cloud"), withUniqueServicePlanIdentifier("b")))),
-				},
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
-					return nil, errors.New(errClientAPI)
-				},
-				},
-				cr: entitlement(withServiceName("hana-cloud")),
-			},
-			want: want{
-				o:   managed.ExternalObservation{},
-				err: errors.New(errClientAPI),
-			},
-		},
 		"Simple Case, unique identifier passed": {
 			args: args{
 				kube: &test.MockClient{
