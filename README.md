@@ -59,10 +59,23 @@ make dev-clean
 ```
 
 ### E2E Tests
+The provider comes with a set of end-to-end tests that can be run locally. To run them, you can use the following command:
+```bash
+make test-acceptance
+```
+This will spin up a specific kind cluster which runs the provider as docker container in it. The e2e tests will run kubectl commands against that cluster to test the provider's functionality.
 
-To run the end2end tests, a technical user within the BTP is necessary for creation of environments (Kyma & CF). `.username` & `.password` is necessary for futher actions on `CloudFoundryEnvironment`.
+Please note that when running multiple times you might want to delete the kind cluster again to avoid conflicts:
+```bash
+kind delete cluster <cluster-name>
+```
 
-BTP_TECHNICAL_USER
+#### Required Configuration
+In order for the tests to perform successfully some configuration need to be present as environment variables:
+
+**BTP_TECHNICAL_USER**
+
+User credentials for a user that is Global Account Administrator in the configured globalaccount, structure: 
 ```json
 {
   "email": "email",
@@ -71,8 +84,9 @@ BTP_TECHNICAL_USER
 }
 ```
 
-CIS_CENTRAL_BINDING
-Contents from the service binding of a `cis-central` service, like
+**CIS_CENTRAL_BINDING**
+
+Contents from the service binding of a `cis-central` service in the same globalaccount, structure:
 ```json
 {
   "endpoints": {
@@ -93,22 +107,39 @@ Contents from the service binding of a `cis-central` service, like
   }
 }
 ```
+**CLI_SERVER_URL**
+
 Contains the CLI server URL, for example:
 ```
-https://cli.btp.cloud.sap/
+https://canary.cli.btp.int.sap/
 ```
 
-GLOBAL_ACCOUNT
+**GLOBAL_ACCOUNT**
+
 Contains the subdomain of the global account.
 
-IDP_URL
-Contains the URL of an IDP that can be connected to the global account.
+**IDP_URL**
 
-SECOND_DIRECTORY_ADMIN_EMAIL
+Contains the URL of an IDP that can be connected to the global account as trustconfiguration.
+
+**SECOND_DIRECTORY_ADMIN_EMAIL**
+
 Contains a second email (different from the technical user's email) for the directory admin field.
 
-TECHNICAL_USER_EMAIL
+**TECHNICAL_USER_EMAIL**
+
 Contains the email of the BTP_TECHNICAL_USER.
+
+
+#### Optional Configuration
+
+**BUILD_ID**
+
+ID that is injected in resource names to relate them to a specific test run.
+
+
+
+TODO: script replacing placeholders
 
 ## Support, Feedback, Contributing
 
