@@ -17,7 +17,7 @@
 Check the documentation for more detailed information on available capabilities for different kinds.
 
 
-## Requirements and Setup
+## Installation
 
 To install this provider in a kubernetes cluster running crossplane, you can use the provider custom resource, replacing the `<version>`placeholder with the current version of this provider:
 
@@ -30,24 +30,33 @@ spec:
   package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<VERSION>
 ```
 
-You should then see the crossplane controller create a deployment for this provider. Once it becomes healthy, you can connect the provider to you BTP global account following the documentation.
+Crossplane will take care to create a deployment for this provider. Once it becomes healthy, you can configure your provider using proper credentials and start orchestrating :rocket:. 
 
 ## Developing
+TODO: LINK TO PROVIDER DEV GUIDE
+### Initial Setup 
+The provider comes with some tooling to ease a local setup for development. As initial setup you can follow these steps:
+1. Clone the repository
+2. Run `make submodules` to initialize the "build" submodule provided by crossplane
+3. Run `make dev-debug` to create a kind cluster and install the CRDs
 
-For local development, clone this repo and run `make` to initialize the "build" Make submodule we use for running, building and testing first.
+:warning: Please note that you are required to have [kind](https://kind.sigs.k8s.io) and [docker](https://www.docker.com/get-started/) installed on your local machine in order to run dev debug.
 
-Running the provider locally requires kind and docker to be installed on the system.
+Those steps will leave you with a local cluster and your KUBECONFIG being configured to connect to it via e.g. [kubectl](https://kubernetes.io/docs/reference/kubectl/) or [k9s](https://k9scli.io). You can already apply manifests to that cluster at this point.
 
-There are two different make commands for local development:
-1. `make dev` creates a kind cluster, installs the CRDs and runs the provider directly.
-1. `make dev-debug` only creates a kind cluster and installs the CRDs. You then run/debug the provider with any tool by using the `KUBECONFIG` environment variable set to the kind clusters kubeconfig.
+### Running the Controller
+To run the controller locally, you can use the following command:
+```bash
+make run
+```
+This will compile your controller as executable and run it locally (outside of your cluster). 
+It will connect to your cluster using your KUBECONFIG configuration and start watching for resources. 
 
-For deleting the cluster again, run `make dev-clean`.
-
-The [Crossplane Provider Development][provider-dev] guide may be of use to add new types to the controller.
-
-[provider-dev]: https://github.com/crossplane/crossplane/blob/master/docs/contributing/provider_development_guide.md
-
+### Cleaning up
+For deleting the cluster again, run 
+```bash
+make dev-clean
+```
 
 ### E2E Tests
 
