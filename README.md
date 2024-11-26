@@ -17,7 +17,7 @@
 Check the documentation for more detailed information on available capabilities for different kinds.
 
 
-## Installation
+## 📊 Installation
 
 To install this provider in a kubernetes cluster running crossplane, you can use the provider custom resource, replacing the `<version>`placeholder with the current version of this provider:
 
@@ -30,11 +30,10 @@ spec:
   package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<VERSION>
 ```
 
-Crossplane will take care to create a deployment for this provider. Once it becomes healthy, you can configure your provider using proper credentials and start orchestrating :rocket:. 
+Crossplane will take care to create a deployment for this provider. Once it becomes healthy, you can configure your provider using proper credentials and start orchestrating :rocket:.
 
-## Developing
-TODO: LINK TO PROVIDER DEV GUIDE
-### Initial Setup 
+## 🔬 Developing
+### Initial Setup
 The provider comes with some tooling to ease a local setup for development. As initial setup you can follow these steps:
 1. Clone the repository
 2. Run `make submodules` to initialize the "build" submodule provided by crossplane
@@ -49,11 +48,11 @@ To run the controller locally, you can use the following command:
 ```bash
 make run
 ```
-This will compile your controller as executable and run it locally (outside of your cluster). 
-It will connect to your cluster using your KUBECONFIG configuration and start watching for resources. 
+This will compile your controller as executable and run it locally (outside of your cluster).
+It will connect to your cluster using your KUBECONFIG configuration and start watching for resources.
 
 ### Cleaning up
-For deleting the cluster again, run 
+For deleting the cluster again, run
 ```bash
 make dev-clean
 ```
@@ -65,6 +64,9 @@ make test-acceptance
 ```
 This will spin up a specific kind cluster which runs the provider as docker container in it. The e2e tests will run kubectl commands against that cluster to test the provider's functionality.
 
+:warning:
+Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
+
 Please note that when running multiple times you might want to delete the kind cluster again to avoid conflicts:
 ```bash
 kind delete cluster <cluster-name>
@@ -75,7 +77,7 @@ In order for the tests to perform successfully some configuration need to be pre
 
 **BTP_TECHNICAL_USER**
 
-User credentials for a user that is Global Account Administrator in the configured globalaccount, structure: 
+User credentials for a user that is Global Account Administrator in the configured globalaccount, structure:
 ```json
 {
   "email": "email",
@@ -137,21 +139,25 @@ Contains the email of the BTP_TECHNICAL_USER.
 
 ID that is injected in resource names to relate them to a specific test run.
 
+**CLUSTER_NAME**
 
+Name of created kind cluster, if not set will be randomly generated
 
-TODO: script replacing placeholders
+**TEST_REUSE_CLUSTER**
 
-## Support, Feedback, Contributing
+0 or 1, default is 0
+
+## 👐 Support, Feedback, Contributing
 
 This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/crossplane-provider-btp/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 
-## Security / Disclosure
+## 🔒 Security / Disclosure
 If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/SAP/crossplane-provider-btp/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
 
-## Code of Conduct
+## 🙆‍♀️ Code of Conduct
 
 We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone. By participating in this project, you agree to abide by its [Code of Conduct](https://github.com/SAP/.github/blob/main/CODE_OF_CONDUCT.md) at all times.
 
-## Licensing
+## 📋 Licensing
 
 Copyright 2024 SAP SE or an SAP affiliate company and crossplane-provider-btp contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/SAP/crossplane-provider-btp).
