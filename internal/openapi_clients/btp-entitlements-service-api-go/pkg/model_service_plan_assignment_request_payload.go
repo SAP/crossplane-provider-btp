@@ -27,6 +27,8 @@ type ServicePlanAssignmentRequestPayload struct {
 	ServiceName string `json:"serviceName"`
 	// The technical name of the entitlement's plan.
 	ServicePlanName string `json:"servicePlanName"`
+	// The unique identifier of the entitlement's plan. As obtained in the GET assignments endpoint.
+	ServicePlanUniqueIdentifier *string `json:"servicePlanUniqueIdentifier,omitempty"`
 }
 
 type _ServicePlanAssignmentRequestPayload ServicePlanAssignmentRequestPayload
@@ -123,6 +125,38 @@ func (o *ServicePlanAssignmentRequestPayload) SetServicePlanName(v string) {
 	o.ServicePlanName = v
 }
 
+// GetServicePlanUniqueIdentifier returns the ServicePlanUniqueIdentifier field value if set, zero value otherwise.
+func (o *ServicePlanAssignmentRequestPayload) GetServicePlanUniqueIdentifier() string {
+	if o == nil || IsNil(o.ServicePlanUniqueIdentifier) {
+		var ret string
+		return ret
+	}
+	return *o.ServicePlanUniqueIdentifier
+}
+
+// GetServicePlanUniqueIdentifierOk returns a tuple with the ServicePlanUniqueIdentifier field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ServicePlanAssignmentRequestPayload) GetServicePlanUniqueIdentifierOk() (*string, bool) {
+	if o == nil || IsNil(o.ServicePlanUniqueIdentifier) {
+		return nil, false
+	}
+	return o.ServicePlanUniqueIdentifier, true
+}
+
+// HasServicePlanUniqueIdentifier returns a boolean if a field has been set.
+func (o *ServicePlanAssignmentRequestPayload) HasServicePlanUniqueIdentifier() bool {
+	if o != nil && !IsNil(o.ServicePlanUniqueIdentifier) {
+		return true
+	}
+
+	return false
+}
+
+// SetServicePlanUniqueIdentifier gets a reference to the given string and assigns it to the ServicePlanUniqueIdentifier field.
+func (o *ServicePlanAssignmentRequestPayload) SetServicePlanUniqueIdentifier(v string) {
+	o.ServicePlanUniqueIdentifier = &v
+}
+
 func (o ServicePlanAssignmentRequestPayload) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -136,6 +170,9 @@ func (o ServicePlanAssignmentRequestPayload) ToMap() (map[string]interface{}, er
 	toSerialize["assignmentInfo"] = o.AssignmentInfo
 	toSerialize["serviceName"] = o.ServiceName
 	toSerialize["servicePlanName"] = o.ServicePlanName
+	if !IsNil(o.ServicePlanUniqueIdentifier) {
+		toSerialize["servicePlanUniqueIdentifier"] = o.ServicePlanUniqueIdentifier
+	}
 	return toSerialize, nil
 }
 

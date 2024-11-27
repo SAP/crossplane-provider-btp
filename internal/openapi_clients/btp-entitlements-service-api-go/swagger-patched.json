@@ -588,6 +588,10 @@
           "servicePlanName": {
             "description": "The technical name of the entitlement's plan.",
             "type": "string"
+          },
+          "servicePlanUniqueIdentifier": {
+            "description": "The unique identifier of the entitlement's plan. As obtained in the GET assignments endpoint.",
+            "type": "string"
           }
         },
         "required": [

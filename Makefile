@@ -156,8 +156,6 @@ dev-debug: $(KIND) $(KUBECTL)
 	@$(INFO) Creating kind cluster
 	@$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 	@$(KUBECTL) cluster-info --context kind-$(PROJECT_NAME)-dev
-	@$(INFO) Installing Crossplane CRDs
-	@$(KUBECTL) create -k https://github.com/crossplane/crossplane//cluster?ref=master
 	@$(INFO) Installing Provider Template CRDs
 	@$(KUBECTL) apply -R -f package/crds
 	@$(INFO) Creating crossplane-system namespace
@@ -166,12 +164,10 @@ dev-debug: $(KIND) $(KUBECTL)
 	@$(KUBECTL) apply -R -f examples/provider
 	@$(INFO) Now you can debug the provider with the IDE...
 
-dev: $(KIND) $(KUBECTL)
+dev: $(KIND) $(KUBECTL) 
 	@$(INFO) Creating kind cluster
 	@$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 	@$(KUBECTL) cluster-info --context kind-$(PROJECT_NAME)-dev
-	@$(INFO) Installing Crossplane CRDs
-	@$(KUBECTL) create -k https://github.com/crossplane/crossplane//cluster?ref=master
 	@$(INFO) Installing Provider Template CRDs
 	@$(KUBECTL) apply -R -f package/crds
 	@$(INFO) Starting Provider Template controllers
