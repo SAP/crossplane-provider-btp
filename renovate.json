@@ -5,10 +5,8 @@
   ],
   "customManagers": [
     {
-      "fileMatch": ["(^|/)Makefile$", "(^|/)Dockerfile$"],
-      "matchStrings": ["(export|ARG) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "fileMatch": ["(^|/)Makefile$", "(^|/)Dockerfile$", "(^|/)config.yml$"],
-      "matchStrings": ["(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *:?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "matchStrings": ["(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "datasourceTemplate": "terraform-provider",
       "versioningTemplate": "hashicorp",
       "depNameTemplate": "SAP/btp"
