@@ -14,6 +14,7 @@
 - Cloud Management
 - Environments
 
+Have a look on all available CRDs in the [API reference](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp@v1.0.0).
 Check the documentation for more detailed information on available capabilities for different kinds.
 
 ## Roadmap
