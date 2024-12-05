@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	errInstanceDoesNotExist   = "cannot delete instance does not exist"
-	errCouldNotParseCISSecret = "CIS Secret seems malformed"
+	errInstanceDoesNotExist        = "cannot delete instance does not exist"
+	errCouldNotParseCISSecret      = "CIS Secret seems malformed"
+	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
 )
 
 type InstanceParameters = map[string]interface{}
@@ -242,7 +243,8 @@ func ServiceClientFromSecret(cisSecret []byte, userSecret []byte) (Client, error
 	var userCredential UserCredential
 
 	if err := json.Unmarshal(userSecret, &userCredential); err != nil {
-		return Client{}, err
+		return Client{}, errors.Wrap(err, errCouldNotParseUserCredential)
+
 	}
 
 	credential := &Credentials{
