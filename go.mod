@@ -7,7 +7,7 @@ require (
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.9
 	github.com/crossplane-contrib/xp-testing v1.3.4
 	github.com/crossplane/crossplane-runtime v1.15.1
-	github.com/crossplane/crossplane-tools v0.0.0-20230925130601-628280f8bf79
+	github.com/crossplane/crossplane-tools 1ad3d4c87f21
 	github.com/crossplane/upjet v1.2.4
 	github.com/go-openapi/runtime v0.28.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
