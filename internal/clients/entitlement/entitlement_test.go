@@ -312,17 +312,17 @@ func TestFilterAssignedServices(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"find service plan": {
-			reason: "found by matching name",
+		"not found service": {
+			reason: "could not match service name",
 			args: args{
 				payload: &entclient.EntitledAndAssignedServicesResponseObject{
 					AssignedServices: []entclient.AssignedServiceResponseObject{
 						{
 
-							Name: internal.Ptr("postgresql-db"),
+							Name: internal.Ptr("srv-1"),
 							ServicePlans: []entclient.AssignedServicePlanResponseObject{
 								{
-									Name: internal.Ptr("default"),
+									Name: internal.Ptr("plan-A"),
 									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
 										{
 											EntityId: internal.Ptr("0000-0000-0000-0000"),
@@ -337,108 +337,28 @@ func TestFilterAssignedServices(t *testing.T) {
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
 							SubaccountGuid:  "0000-0000-0000-0000",
-							ServicePlanName: "default",
-							ServiceName:     "postgresql-db",
-						},
-					},
-				},
-			},
-			want: want{
-				o: &entclient.AssignedServicePlanSubaccountDTO{
-					EntityId: internal.Ptr("0000-0000-0000-0000"),
-				},
-				err: nil,
-			},
-		},
-		"find service plan and unique ID": {
-			reason: "found by matching name",
-			args: args{
-				payload: &entclient.EntitledAndAssignedServicesResponseObject{
-					AssignedServices: []entclient.AssignedServiceResponseObject{
-						{
-
-							Name: internal.Ptr("postgresql-db"),
-							ServicePlans: []entclient.AssignedServicePlanResponseObject{
-								{
-									Name:             internal.Ptr("default"),
-									UniqueIdentifier: internal.Ptr("postgresql-db-aws"),
-									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
-										{
-											EntityId: internal.Ptr("0000-0000-0000-0000"),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				cr: &v1alpha1.Entitlement{
-					Spec: v1alpha1.EntitlementSpec{
-						ForProvider: v1alpha1.EntitlementParameters{
-							SubaccountGuid:              "0000-0000-0000-0000",
-							ServicePlanUniqueIdentifier: internal.Ptr("postgresql-db-aws"),
-							ServicePlanName:             "default",
-							ServiceName:                 "postgresql-db",
-						},
-					},
-				},
-			},
-			want: want{
-				o: &entclient.AssignedServicePlanSubaccountDTO{
-					EntityId: internal.Ptr("0000-0000-0000-0000"),
-				},
-				err: nil,
-			},
-		},
-		"not matching unique ID": {
-			reason: "could not find matching unique ID",
-			args: args{
-				payload: &entclient.EntitledAndAssignedServicesResponseObject{
-					AssignedServices: []entclient.AssignedServiceResponseObject{
-						{
-
-							Name: internal.Ptr("postgresql-db"),
-							ServicePlans: []entclient.AssignedServicePlanResponseObject{
-								{
-									Name:             internal.Ptr("default"),
-									UniqueIdentifier: internal.Ptr("postgresql-db-aws"),
-									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
-										{
-											EntityId: internal.Ptr("0000-0000-0000-0000"),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				cr: &v1alpha1.Entitlement{
-					Spec: v1alpha1.EntitlementSpec{
-						ForProvider: v1alpha1.EntitlementParameters{
-							SubaccountGuid:              "0000-0000-0000-0000",
-							ServicePlanUniqueIdentifier: internal.Ptr("postgresql-db-azure"),
-							ServicePlanName:             "default",
-							ServiceName:                 "postgresql-db",
+							ServicePlanName: "plan-A",
+							ServiceName:     "srv-2",
 						},
 					},
 				},
 			},
 			want: want{
 				o:   nil,
-				err: errors.Errorf(errServiceUniqueName, "postgresql-db-azure"),
+				err: nil,
 			},
 		},
-		"no unigue ID, not matching plan name": {
-			reason: "could not match plan name",
+		"not found service plan": {
+			reason: "could match name, but not plan name",
 			args: args{
 				payload: &entclient.EntitledAndAssignedServicesResponseObject{
 					AssignedServices: []entclient.AssignedServiceResponseObject{
 						{
 
-							Name: internal.Ptr("postgresql-db"),
+							Name: internal.Ptr("srv-1"),
 							ServicePlans: []entclient.AssignedServicePlanResponseObject{
 								{
-									Name: internal.Ptr("default"),
+									Name: internal.Ptr("plan-A"),
 									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
 										{
 											EntityId: internal.Ptr("0000-0000-0000-0000"),
@@ -453,15 +373,131 @@ func TestFilterAssignedServices(t *testing.T) {
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
 							SubaccountGuid:  "0000-0000-0000-0000",
-							ServicePlanName: "definetly-not-default",
-							ServiceName:     "postgresql-db",
+							ServicePlanName: "plan-B",
+							ServiceName:     "srv-1",
 						},
 					},
 				},
 			},
 			want: want{
 				o:   nil,
-				err: errors.Errorf(errServicePlanNotFoundByName, "definetly-not-default"),
+				err: errors.Errorf(errServicePlanNotFoundByName, "plan-B"),
+			},
+		},
+		"found service plan": {
+			reason: "matching name and planname",
+			args: args{
+				payload: &entclient.EntitledAndAssignedServicesResponseObject{
+					AssignedServices: []entclient.AssignedServiceResponseObject{
+						{
+
+							Name: internal.Ptr("srv-1"),
+							ServicePlans: []entclient.AssignedServicePlanResponseObject{
+								{
+									Name: internal.Ptr("plan-A"),
+									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
+										{
+											EntityId: internal.Ptr("0000-0000-0000-0000"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				cr: &v1alpha1.Entitlement{
+					Spec: v1alpha1.EntitlementSpec{
+						ForProvider: v1alpha1.EntitlementParameters{
+							SubaccountGuid:  "0000-0000-0000-0000",
+							ServicePlanName: "plan-A",
+							ServiceName:     "srv-1",
+						},
+					},
+				},
+			},
+			want: want{
+				o: &entclient.AssignedServicePlanSubaccountDTO{
+					EntityId: internal.Ptr("0000-0000-0000-0000"),
+				},
+				err: nil,
+			},
+		},
+		"not found ambiguous service plan": {
+			reason: "matched name and planname, but not unique planname ",
+			args: args{
+				payload: &entclient.EntitledAndAssignedServicesResponseObject{
+					AssignedServices: []entclient.AssignedServiceResponseObject{
+						{
+
+							Name: internal.Ptr("srv-1"),
+							ServicePlans: []entclient.AssignedServicePlanResponseObject{
+								{
+									Name:             internal.Ptr("plan-A"),
+									UniqueIdentifier: internal.Ptr("plan-A-A"),
+									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
+										{
+											EntityId: internal.Ptr("0000-0000-0000-0000"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				cr: &v1alpha1.Entitlement{
+					Spec: v1alpha1.EntitlementSpec{
+						ForProvider: v1alpha1.EntitlementParameters{
+							SubaccountGuid:              "0000-0000-0000-0000",
+							ServicePlanUniqueIdentifier: internal.Ptr("plan-A-B"),
+							ServicePlanName:             "plan-A",
+							ServiceName:                 "srv-1",
+						},
+					},
+				},
+			},
+			want: want{
+				o:   nil,
+				err: errors.Errorf(errServiceUniqueName, "plan-A-B"),
+			},
+		},
+		"found ambiguous service plan": {
+			reason: "matched name, planname and given unique name",
+			args: args{
+				payload: &entclient.EntitledAndAssignedServicesResponseObject{
+					AssignedServices: []entclient.AssignedServiceResponseObject{
+						{
+
+							Name: internal.Ptr("srv-1"),
+							ServicePlans: []entclient.AssignedServicePlanResponseObject{
+								{
+									Name:             internal.Ptr("plan-A"),
+									UniqueIdentifier: internal.Ptr("plan-A-A"),
+									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
+										{
+											EntityId: internal.Ptr("0000-0000-0000-0000"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				cr: &v1alpha1.Entitlement{
+					Spec: v1alpha1.EntitlementSpec{
+						ForProvider: v1alpha1.EntitlementParameters{
+							SubaccountGuid:              "0000-0000-0000-0000",
+							ServicePlanUniqueIdentifier: internal.Ptr("plan-A-A"),
+							ServicePlanName:             "plan-A",
+							ServiceName:                 "srv-1",
+						},
+					},
+				},
+			},
+			want: want{
+				o: &entclient.AssignedServicePlanSubaccountDTO{
+					EntityId: internal.Ptr("0000-0000-0000-0000"),
+				},
+				err: nil,
 			},
 		},
 	}
