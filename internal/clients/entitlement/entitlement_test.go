@@ -471,7 +471,8 @@ func TestFilterAssignedServices(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(
 			name, func(t *testing.T) {
-				got, err := filterAssignedServices(tc.args.payload, tc.args.serviceName, tc.args.servicePlan, tc.args.cr)
+				entClient := EntitlementsClient{}
+				got, err := entClient.filterAssignedServices(tc.args.payload, tc.args.serviceName, tc.args.servicePlan, tc.args.cr)
 
 				if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 					t.Errorf("\n%s\ne.filterAssignedServices(...): -want error, +got error:\n%s\n", tc.reason, diff)

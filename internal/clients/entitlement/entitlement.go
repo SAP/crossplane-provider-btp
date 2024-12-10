@@ -48,7 +48,7 @@ func (c EntitlementsClient) DescribeInstance(
 	servicePlanName := cr.Spec.ForProvider.ServicePlanName
 
 	// assignment can be nil, that is a valid response, as acc/dir will anot always have all assignments set
-	assignment, err := filterAssignedServices(response, serviceName, servicePlanName, cr)
+	assignment, err := c.filterAssignedServices(response, serviceName, servicePlanName, cr)
 	if err != nil {
 		return nil, err
 	}
@@ -67,6 +67,104 @@ func (c EntitlementsClient) DescribeInstance(
 		EntitledServicePlan: entitledServicePlan,
 		Assignment:          assignment,
 	}, nil
+}
+
+func (c EntitlementsClient) CreateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
+	return c.UpdateInstance(ctx, cr)
+}
+
+func (c EntitlementsClient) DeleteInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
+	// if multiple Entitlements for same plan exist and deleted at the same time, one particular
+	// Entitlement might already been cleaned up by the previous run for same plan, then assigned might be nil
+	if cr.Status.AtProvider.Assigned == nil {
+		return nil
+	}
+
+	isNumericQuota := hasNumericQuota(cr)
+
+	// if there is more then one enable entitlement without an amount we can just gracefully remove one
+	relatedEntitlements := cr.Status.AtProvider.Required.EntitlementsCount
+	if !isNumericQuota && relatedEntitlements != nil && *relatedEntitlements > 1 {
+		return nil
+	}
+
+	if isNumericQuota {
+		amount := 0
+		cr.Status.AtProvider.Required.Amount = &amount
+	} else {
+		enabled := false
+		cr.Status.AtProvider.Required.Enable = &enabled
+	}
+	return c.UpdateInstance(ctx, cr)
+}
+
+func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
+	serviceName := cr.Spec.ForProvider.ServiceName
+	planName := cr.Spec.ForProvider.ServicePlanName
+	servicePlanUniqueIdentifier := cr.Spec.ForProvider.ServicePlanUniqueIdentifier
+	var amount *float32
+	if cr.Status.AtProvider.Required.Amount != nil {
+		amount = internal.Ptr(float32(*cr.Status.AtProvider.Required.Amount))
+	}
+
+	payload := entclient.NewSubaccountServicePlansRequestPayloadCollection(
+		[]entclient.ServicePlanAssignmentRequestPayload{
+			{
+				AssignmentInfo: []entclient.SubaccountServicePlanRequestPayload{
+					{
+						Amount:         amount,
+						Enable:         cr.Status.AtProvider.Required.Enable,
+						Resources:      nil,
+						SubaccountGUID: cr.Spec.ForProvider.SubaccountGuid,
+					},
+				},
+				ServiceName:                 serviceName,
+				ServicePlanName:             planName,
+				ServicePlanUniqueIdentifier: servicePlanUniqueIdentifier,
+			},
+		},
+	)
+
+	_, _, err := c.btp.EntitlementsServiceClient.SetServicePlans(ctx).SubaccountServicePlansRequestPayloadCollection(*payload).Execute()
+
+	if err != nil {
+		return specifyAPIError(err, errors.Wrapf(err, errFailedSetEntitlements, serviceName, planName))
+	}
+
+	return nil
+}
+
+func (c EntitlementsClient) filterAssignedServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
+	var assignment *entclient.AssignedServicePlanSubaccountDTO
+
+	// can be nil, if no assignment with that service name is set in account/dir
+	assignedService := filterAssignedServiceByName(payload, serviceName)
+
+	if assignedService != nil {
+		servicePlan, errPlan := filterAssignedServicePlanByName(assignedService, servicePlanName)
+
+		if errPlan != nil {
+			return nil, errPlan
+		}
+
+		if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
+			errUnique := filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
+
+			if errUnique != nil {
+				return nil, errUnique
+			}
+		}
+
+		foundAssignment, errLook := lookupAssignmentAndAssign(servicePlan, cr)
+
+		if errLook != nil {
+			return nil, errLook
+		}
+
+		assignment = foundAssignment
+	}
+
+	return assignment, nil
 }
 
 func filterEntitledServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string) (*entclient.ServicePlanResponseObject, error) {
@@ -131,39 +229,6 @@ func filterAssignedServiceByName(payload *entclient.EntitledAndAssignedServicesR
 	return nil
 }
 
-func filterAssignedServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
-	var assignment *entclient.AssignedServicePlanSubaccountDTO
-
-	// can be nil, if no assignment with that service name is set in account/dir
-	assignedService := filterAssignedServiceByName(payload, serviceName)
-
-	if assignedService != nil {
-		servicePlan, errPlan := filterAssignedServicePlanByName(assignedService, servicePlanName)
-
-		if errPlan != nil {
-			return nil, errPlan
-		}
-
-		if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
-			errUnique := filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
-
-			if errUnique != nil {
-				return nil, errUnique
-			}
-		}
-
-		foundAssignment, errLook := lookupAssignmentAndAssign(servicePlan, cr)
-
-		if errLook != nil {
-			return nil, errLook
-		}
-
-		assignment = foundAssignment
-	}
-
-	return assignment, nil
-}
-
 func lookupAssignmentAndAssign(servicePlan *entclient.AssignedServicePlanResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
 	var assignment *entclient.AssignedServicePlanSubaccountDTO
 
@@ -179,35 +244,6 @@ func lookupAssignmentAndAssign(servicePlan *entclient.AssignedServicePlanRespons
 	return assignment, nil
 }
 
-func (c EntitlementsClient) CreateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
-	return c.UpdateInstance(ctx, cr)
-}
-
-func (c EntitlementsClient) DeleteInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
-	// if multiple Entitlements for same plan exist and deleted at the same time, one particular
-	// Entitlement might already been cleaned up by the previous run for same plan, then assigned might be nil
-	if cr.Status.AtProvider.Assigned == nil {
-		return nil
-	}
-
-	isNumericQuota := hasNumericQuota(cr)
-
-	// if there is more then one enable entitlement without an amount we can just gracefully remove one
-	relatedEntitlements := cr.Status.AtProvider.Required.EntitlementsCount
-	if !isNumericQuota && relatedEntitlements != nil && *relatedEntitlements > 1 {
-		return nil
-	}
-
-	if isNumericQuota {
-		amount := 0
-		cr.Status.AtProvider.Required.Amount = &amount
-	} else {
-		enabled := false
-		cr.Status.AtProvider.Required.Enable = &enabled
-	}
-	return c.UpdateInstance(ctx, cr)
-}
-
 // hasNumericQuota checks different factors on the entitlement to understand if it is a numeric one or not - we cannot only deduct that from the service response, since the information we get from the service might be incomplete.
 func hasNumericQuota(cr *v1alpha1.Entitlement) bool {
 	// use service information, might be incomplete
@@ -215,42 +251,6 @@ func hasNumericQuota(cr *v1alpha1.Entitlement) bool {
 		return false
 	}
 	return cr.Spec.ForProvider.Amount != nil
-}
-
-func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
-	serviceName := cr.Spec.ForProvider.ServiceName
-	planName := cr.Spec.ForProvider.ServicePlanName
-	servicePlanUniqueIdentifier := cr.Spec.ForProvider.ServicePlanUniqueIdentifier
-	var amount *float32
-	if cr.Status.AtProvider.Required.Amount != nil {
-		amount = internal.Ptr(float32(*cr.Status.AtProvider.Required.Amount))
-	}
-
-	payload := entclient.NewSubaccountServicePlansRequestPayloadCollection(
-		[]entclient.ServicePlanAssignmentRequestPayload{
-			{
-				AssignmentInfo: []entclient.SubaccountServicePlanRequestPayload{
-					{
-						Amount:         amount,
-						Enable:         cr.Status.AtProvider.Required.Enable,
-						Resources:      nil,
-						SubaccountGUID: cr.Spec.ForProvider.SubaccountGuid,
-					},
-				},
-				ServiceName:                 serviceName,
-				ServicePlanName:             planName,
-				ServicePlanUniqueIdentifier: servicePlanUniqueIdentifier,
-			},
-		},
-	)
-
-	_, _, err := c.btp.EntitlementsServiceClient.SetServicePlans(ctx).SubaccountServicePlansRequestPayloadCollection(*payload).Execute()
-
-	if err != nil {
-		return specifyAPIError(err, errors.Wrapf(err, errFailedSetEntitlements, serviceName, planName))
-	}
-
-	return nil
 }
 
 func float64Pointer(val *int) *float64 {
