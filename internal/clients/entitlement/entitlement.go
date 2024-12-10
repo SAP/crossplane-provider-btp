@@ -48,7 +48,7 @@ func (c EntitlementsClient) DescribeInstance(
 	servicePlanName := cr.Spec.ForProvider.ServicePlanName
 
 	// assignment can be nil, that is a valid response, as acc/dir will anot always have all assignments set
-	assignment, err := c.filterAssignedServices(response, serviceName, servicePlanName, cr)
+	assignment, err := c.filterAssignedServices(response, cr)
 	if err != nil {
 		return nil, err
 	}
@@ -134,14 +134,14 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 	return nil
 }
 
-func (c EntitlementsClient) filterAssignedServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
+func (c EntitlementsClient) filterAssignedServices(payload *entclient.EntitledAndAssignedServicesResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
 	var assignment *entclient.AssignedServicePlanSubaccountDTO
 
 	// can be nil, if no assignment with that service name is set in account/dir
-	assignedService := filterAssignedServiceByName(payload, serviceName)
+	assignedService := filterAssignedServiceByName(payload, cr.Spec.ForProvider.ServiceName)
 
 	if assignedService != nil {
-		servicePlan, errPlan := filterAssignedServicePlanByName(assignedService, servicePlanName)
+		servicePlan, errPlan := filterAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
 
 		if errPlan != nil {
 			return nil, errPlan

@@ -298,10 +298,8 @@ func TestFilterEntitledServicePlanByName(t *testing.T) {
 
 func TestFilterAssignedServices(t *testing.T) {
 	type args struct {
-		payload     *entclient.EntitledAndAssignedServicesResponseObject
-		serviceName string
-		servicePlan string
-		cr          *v1alpha1.Entitlement
+		payload *entclient.EntitledAndAssignedServicesResponseObject
+		cr      *v1alpha1.Entitlement
 	}
 
 	type want struct {
@@ -335,12 +333,12 @@ func TestFilterAssignedServices(t *testing.T) {
 						},
 					},
 				},
-				servicePlan: "default",
-				serviceName: "postgresql-db",
 				cr: &v1alpha1.Entitlement{
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
-							SubaccountGuid: "0000-0000-0000-0000",
+							SubaccountGuid:  "0000-0000-0000-0000",
+							ServicePlanName: "default",
+							ServiceName:     "postgresql-db",
 						},
 					},
 				},
@@ -374,13 +372,13 @@ func TestFilterAssignedServices(t *testing.T) {
 						},
 					},
 				},
-				servicePlan: "default",
-				serviceName: "postgresql-db",
 				cr: &v1alpha1.Entitlement{
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
 							SubaccountGuid:              "0000-0000-0000-0000",
 							ServicePlanUniqueIdentifier: internal.Ptr("postgresql-db-aws"),
+							ServicePlanName:             "default",
+							ServiceName:                 "postgresql-db",
 						},
 					},
 				},
@@ -414,13 +412,13 @@ func TestFilterAssignedServices(t *testing.T) {
 						},
 					},
 				},
-				servicePlan: "default",
-				serviceName: "postgresql-db",
 				cr: &v1alpha1.Entitlement{
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
 							SubaccountGuid:              "0000-0000-0000-0000",
 							ServicePlanUniqueIdentifier: internal.Ptr("postgresql-db-azure"),
+							ServicePlanName:             "default",
+							ServiceName:                 "postgresql-db",
 						},
 					},
 				},
@@ -451,12 +449,12 @@ func TestFilterAssignedServices(t *testing.T) {
 						},
 					},
 				},
-				servicePlan: "definetly-not-default",
-				serviceName: "postgresql-db",
 				cr: &v1alpha1.Entitlement{
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
-							SubaccountGuid: "0000-0000-0000-0000",
+							SubaccountGuid:  "0000-0000-0000-0000",
+							ServicePlanName: "definetly-not-default",
+							ServiceName:     "postgresql-db",
 						},
 					},
 				},
@@ -472,7 +470,7 @@ func TestFilterAssignedServices(t *testing.T) {
 		t.Run(
 			name, func(t *testing.T) {
 				entClient := EntitlementsClient{}
-				got, err := entClient.filterAssignedServices(tc.args.payload, tc.args.serviceName, tc.args.servicePlan, tc.args.cr)
+				got, err := entClient.filterAssignedServices(tc.args.payload, tc.args.cr)
 
 				if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 					t.Errorf("\n%s\ne.filterAssignedServices(...): -want error, +got error:\n%s\n", tc.reason, diff)
