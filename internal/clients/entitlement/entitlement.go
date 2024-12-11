@@ -155,7 +155,8 @@ func (c EntitlementsClient) filterAssignedServices(payload *entclient.EntitledAn
 			}
 		}
 
-		foundAssignment, errLook := lookupAssignmentAndAssign(servicePlan, cr)
+		// extract the info on subaccount assignment
+		foundAssignment, errLook := filterAssignmentInfo(servicePlan, cr)
 
 		if errLook != nil {
 			return nil, errLook
@@ -229,7 +230,9 @@ func filterAssignedServiceByName(payload *entclient.EntitledAndAssignedServicesR
 	return nil
 }
 
-func lookupAssignmentAndAssign(servicePlan *entclient.AssignedServicePlanResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
+// filterAssignmentInfo the api can have multiple assignments for the same service plan, we need to filter by subaccount guid
+// (even though having more then one entry here shouldn't be a usecase since we are looking up by subaccount guid)
+func filterAssignmentInfo(servicePlan *entclient.AssignedServicePlanResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
 	var assignment *entclient.AssignedServicePlanSubaccountDTO
 
 	for _, assignmentInfo := range servicePlan.AssignmentInfo {
