@@ -169,6 +169,34 @@ func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledA
 	return assignment, nil
 }
 
+// findAssignedService returns *AssignedServiceResponseObject if found, otherwise can also return nil as a valid response
+func findAssignedService(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string) *entclient.AssignedServiceResponseObject {
+	for _, assignedService := range payload.AssignedServices {
+		if assignedService.Name != nil && *assignedService.Name == serviceName {
+			return &assignedService
+		}
+	}
+	return nil
+}
+
+func filterAssignedServicePlanByName(service *entclient.AssignedServiceResponseObject, servicePlanName string) (*entclient.AssignedServicePlanResponseObject, error) {
+	for _, servicePlan := range service.ServicePlans {
+		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName {
+			return &servicePlan, nil
+		}
+	}
+	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
+}
+
+func filterAssignedServicePlanByUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanUniqueID string) error {
+	for _, servicePlan := range service.ServicePlans {
+		if servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
+			return nil
+		}
+	}
+	return errors.Errorf(errServiceUniqueName, servicePlanUniqueID)
+}
+
 func filterEntitledServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string) (*entclient.ServicePlanResponseObject, error) {
 	service, err := filterEntitledServiceByName(payload, serviceName)
 
@@ -194,24 +222,6 @@ func filterEntitledServicePlanByName(service *entclient.EntitledServicesResponse
 	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
 }
 
-func filterAssignedServicePlanByName(service *entclient.AssignedServiceResponseObject, servicePlanName string) (*entclient.AssignedServicePlanResponseObject, error) {
-	for _, servicePlan := range service.ServicePlans {
-		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName {
-			return &servicePlan, nil
-		}
-	}
-	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
-}
-
-func filterAssignedServicePlanByUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanUniqueID string) error {
-	for _, servicePlan := range service.ServicePlans {
-		if servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
-			return nil
-		}
-	}
-	return errors.Errorf(errServiceUniqueName, servicePlanUniqueID)
-}
-
 func filterEntitledServiceByName(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string) (*entclient.EntitledServicesResponseObject, error) {
 	for _, service := range payload.EntitledServices {
 		if service.Name != nil && *service.Name == serviceName {
@@ -219,16 +229,6 @@ func filterEntitledServiceByName(payload *entclient.EntitledAndAssignedServicesR
 		}
 	}
 	return nil, errors.Errorf(errServiceNotFoundByName, serviceName)
-}
-
-// findAssignedService returns *AssignedServiceResponseObject if found, otherwise can also return nil as a valid response
-func findAssignedService(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string) *entclient.AssignedServiceResponseObject {
-	for _, assignedService := range payload.AssignedServices {
-		if assignedService.Name != nil && *assignedService.Name == serviceName {
-			return &assignedService
-		}
-	}
-	return nil
 }
 
 // filterAssignmentInfo the api can have multiple assignments for the same service plan, we need to filter by subaccount guid
