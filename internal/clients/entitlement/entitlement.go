@@ -149,10 +149,11 @@ func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledA
 	}
 
 	if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
-		errUnique := filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
+		var errUnqiue error
+		servicePlan, errUnqiue = filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
 
-		if errUnique != nil {
-			return nil, errUnique
+		if errUnqiue != nil {
+			return nil, errUnqiue
 		}
 	}
 
@@ -185,13 +186,13 @@ func filterAssignedServicePlanByName(service *entclient.AssignedServiceResponseO
 	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
 }
 
-func filterAssignedServicePlanByUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanUniqueID string) error {
+func filterAssignedServicePlanByUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanUniqueID string) (*entclient.AssignedServicePlanResponseObject, error) {
 	for _, servicePlan := range service.ServicePlans {
 		if servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
-			return nil
+			return &servicePlan, nil
 		}
 	}
-	return errors.Errorf(errServiceUniqueName, servicePlanUniqueID)
+	return nil, errors.Errorf(errServiceUniqueName, servicePlanUniqueID)
 }
 
 func filterEntitledServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string) (*entclient.ServicePlanResponseObject, error) {

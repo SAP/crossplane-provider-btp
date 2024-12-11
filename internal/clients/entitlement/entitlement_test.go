@@ -494,7 +494,7 @@ func TestFindAssignedServicePlan(t *testing.T) {
 				cr: &v1alpha1.Entitlement{
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
-							SubaccountGuid:              "0000-0000-0000-0000",
+							SubaccountGuid:              "1111-1111-1111-1111",
 							ServicePlanUniqueIdentifier: internal.Ptr("plan-A-B"),
 							ServicePlanName:             "plan-A",
 							ServiceName:                 "srv-1",
