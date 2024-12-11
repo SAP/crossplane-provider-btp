@@ -144,11 +144,10 @@ func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledA
 
 	var servicePlan *entclient.AssignedServicePlanResponseObject
 	var err error
-
 	if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
-		servicePlan, err = filterAssignedServicePlanByUniqueID(assignedService, cr.Spec.ForProvider.ServicePlanName, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
+		servicePlan, err = findAssignedServicePlanByNameAndUniqueID(assignedService, cr.Spec.ForProvider.ServicePlanName, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
 	} else {
-		servicePlan, err = filterAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
+		servicePlan, err = findAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
 	}
 	if err != nil {
 		return nil, err
@@ -164,7 +163,7 @@ func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledA
 	return foundAssignment, nil
 }
 
-// findAssignedService returns *AssignedServiceResponseObject if found, otherwise can also return nil as a valid response
+// findAssignedService returns Service if found by name, otherwise nil
 func findAssignedService(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string) *entclient.AssignedServiceResponseObject {
 	for _, assignedService := range payload.AssignedServices {
 		if assignedService.Name != nil && *assignedService.Name == serviceName {
@@ -174,7 +173,8 @@ func findAssignedService(payload *entclient.EntitledAndAssignedServicesResponseO
 	return nil
 }
 
-func filterAssignedServicePlanByName(service *entclient.AssignedServiceResponseObject, servicePlanName string) (*entclient.AssignedServicePlanResponseObject, error) {
+// findAssignedServicePlanByName returns servicePlan within service if found by name, otherwise nil
+func findAssignedServicePlanByName(service *entclient.AssignedServiceResponseObject, servicePlanName string) (*entclient.AssignedServicePlanResponseObject, error) {
 	for _, servicePlan := range service.ServicePlans {
 		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName {
 			return &servicePlan, nil
@@ -183,7 +183,8 @@ func filterAssignedServicePlanByName(service *entclient.AssignedServiceResponseO
 	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
 }
 
-func filterAssignedServicePlanByUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanName string, servicePlanUniqueID string) (*entclient.AssignedServicePlanResponseObject, error) {
+// findAssignedServicePlanByNameAndUniqueID returns servicePlan within service if found by name and uniqueID, otherwise nil
+func findAssignedServicePlanByNameAndUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanName string, servicePlanUniqueID string) (*entclient.AssignedServicePlanResponseObject, error) {
 	for _, servicePlan := range service.ServicePlans {
 		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName && servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
 			return &servicePlan, nil

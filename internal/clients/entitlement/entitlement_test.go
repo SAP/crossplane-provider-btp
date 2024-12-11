@@ -210,14 +210,14 @@ func TestFilterAssignedServicePlanByName(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(
 			name, func(t *testing.T) {
-				got, err := filterAssignedServicePlanByName(tc.args.payload, tc.args.servicePlanName)
+				got, err := findAssignedServicePlanByName(tc.args.payload, tc.args.servicePlanName)
 
 				if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-					t.Errorf("\n%s\ne.filterAssignedServicePlanByName(...): -want error, +got error:\n%s\n", tc.reason, diff)
+					t.Errorf("\n%s\ne.findAssignedServicePlanByName(...): -want error, +got error:\n%s\n", tc.reason, diff)
 				}
 
 				if diff := cmp.Diff(tc.want.o, got); diff != "" {
-					t.Errorf("\n%s\ne.filterAssignedServicePlanByName(...): -want, +got:\n%s\n", tc.reason, diff)
+					t.Errorf("\n%s\ne.findAssignedServicePlanByName(...): -want, +got:\n%s\n", tc.reason, diff)
 				}
 			},
 		)
