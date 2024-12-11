@@ -134,6 +134,7 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 	return nil
 }
 
+// filterAssignedServices returns the assignment for the given service and service plan, if it exists
 func (c EntitlementsClient) filterAssignedServices(payload *entclient.EntitledAndAssignedServicesResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
 	var assignment *entclient.AssignedServicePlanSubaccountDTO
 
