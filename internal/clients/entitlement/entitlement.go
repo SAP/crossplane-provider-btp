@@ -136,12 +136,13 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 
 // findAssignedServicePlan returns the assignment for the given service and service plan, if it exists
 func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledAndAssignedServicesResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
-	// can be nil, if no assignment with that service name is set in account/dir
+	// first find service via name, can be nil, if no assignment with that service name is set in account/dir
 	assignedService := findAssignedService(payload, cr.Spec.ForProvider.ServiceName)
 	if assignedService == nil {
 		return nil, nil
 	}
 
+	// then find service plan within service, can be nil, if no assignment with that service plan name is set in account/dir
 	var servicePlan *entclient.AssignedServicePlanResponseObject
 	var err error
 	if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
@@ -153,7 +154,7 @@ func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledA
 		return nil, err
 	}
 
-	// extract the info on subaccount assignment
+	// lastly, extract the info on subaccount entity assignment
 	foundAssignment, errLook := filterAssignmentInfo(servicePlan, cr)
 
 	if errLook != nil {
@@ -193,6 +194,23 @@ func findAssignedServicePlanByNameAndUniqueID(service *entclient.AssignedService
 	return nil, errors.Errorf(errServiceUniqueName, servicePlanUniqueID)
 }
 
+// filterAssignmentInfo the api can have multiple assignments for the same service plan, we need to filter by subaccount guid
+// (even though having more then one entry here shouldn't be a usecase since we are looking up by subaccount guid)
+func filterAssignmentInfo(servicePlan *entclient.AssignedServicePlanResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
+	var assignment *entclient.AssignedServicePlanSubaccountDTO
+
+	for _, assignmentInfo := range servicePlan.AssignmentInfo {
+		if assignmentInfo.EntityId != nil && *assignmentInfo.EntityId == cr.Spec.ForProvider.SubaccountGuid {
+			if assignment != nil {
+				return nil, errors.New(errMultipleServicePlans)
+			}
+			assignment = &assignmentInfo
+		}
+	}
+
+	return assignment, nil
+}
+
 func filterEntitledServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string) (*entclient.ServicePlanResponseObject, error) {
 	service, err := filterEntitledServiceByName(payload, serviceName)
 
@@ -225,23 +243,6 @@ func filterEntitledServiceByName(payload *entclient.EntitledAndAssignedServicesR
 		}
 	}
 	return nil, errors.Errorf(errServiceNotFoundByName, serviceName)
-}
-
-// filterAssignmentInfo the api can have multiple assignments for the same service plan, we need to filter by subaccount guid
-// (even though having more then one entry here shouldn't be a usecase since we are looking up by subaccount guid)
-func filterAssignmentInfo(servicePlan *entclient.AssignedServicePlanResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
-	var assignment *entclient.AssignedServicePlanSubaccountDTO
-
-	for _, assignmentInfo := range servicePlan.AssignmentInfo {
-		if assignmentInfo.EntityId != nil && *assignmentInfo.EntityId == cr.Spec.ForProvider.SubaccountGuid {
-			if assignment != nil {
-				return nil, errors.New(errMultipleServicePlans)
-			}
-			assignment = &assignmentInfo
-		}
-	}
-
-	return assignment, nil
 }
 
 // hasNumericQuota checks different factors on the entitlement to understand if it is a numeric one or not - we cannot only deduct that from the service response, since the information we get from the service might be incomplete.
