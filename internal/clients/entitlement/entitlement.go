@@ -136,37 +136,34 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 
 // findAssignedServicePlan returns the assignment for the given service and service plan, if it exists
 func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledAndAssignedServicesResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
-	var assignment *entclient.AssignedServicePlanSubaccountDTO
-
 	// can be nil, if no assignment with that service name is set in account/dir
 	assignedService := findAssignedService(payload, cr.Spec.ForProvider.ServiceName)
-
-	if assignedService != nil {
-		servicePlan, errPlan := filterAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
-
-		if errPlan != nil {
-			return nil, errPlan
-		}
-
-		if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
-			errUnique := filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
-
-			if errUnique != nil {
-				return nil, errUnique
-			}
-		}
-
-		// extract the info on subaccount assignment
-		foundAssignment, errLook := filterAssignmentInfo(servicePlan, cr)
-
-		if errLook != nil {
-			return nil, errLook
-		}
-
-		assignment = foundAssignment
+	if assignedService == nil {
+		return nil, nil
 	}
 
-	return assignment, nil
+	servicePlan, errPlan := filterAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
+
+	if errPlan != nil {
+		return nil, errPlan
+	}
+
+	if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
+		errUnique := filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
+
+		if errUnique != nil {
+			return nil, errUnique
+		}
+	}
+
+	// extract the info on subaccount assignment
+	foundAssignment, errLook := filterAssignmentInfo(servicePlan, cr)
+
+	if errLook != nil {
+		return nil, errLook
+	}
+
+	return foundAssignment, nil
 }
 
 // findAssignedService returns *AssignedServiceResponseObject if found, otherwise can also return nil as a valid response
