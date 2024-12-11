@@ -70,10 +70,10 @@ func TestFilterAssignedServiceByName(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(
 			name, func(t *testing.T) {
-				got := filterAssignedServiceByName(tc.args.payload, tc.args.serviceName)
+				got := findAssignedService(tc.args.payload, tc.args.serviceName)
 
 				if diff := cmp.Diff(tc.want.o, got); diff != "" {
-					t.Errorf("\n%s\ne.filterAssignedServiceByName(...): -want, +got:\n%s\n", tc.reason, diff)
+					t.Errorf("\n%s\ne.findAssignedService(...): -want, +got:\n%s\n", tc.reason, diff)
 				}
 			},
 		)
@@ -296,7 +296,7 @@ func TestFilterEntitledServicePlanByName(t *testing.T) {
 	}
 }
 
-func TestFilterAssignedServices(t *testing.T) {
+func TestFindAssignedServicePlan(t *testing.T) {
 	type args struct {
 		payload *entclient.EntitledAndAssignedServicesResponseObject
 		cr      *v1alpha1.Entitlement
@@ -478,6 +478,15 @@ func TestFilterAssignedServices(t *testing.T) {
 										},
 									},
 								},
+								{
+									Name:             internal.Ptr("plan-A"),
+									UniqueIdentifier: internal.Ptr("plan-A-B"),
+									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
+										{
+											EntityId: internal.Ptr("1111-1111-1111-1111"),
+										},
+									},
+								},
 							},
 						},
 					},
@@ -486,7 +495,7 @@ func TestFilterAssignedServices(t *testing.T) {
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
 							SubaccountGuid:              "0000-0000-0000-0000",
-							ServicePlanUniqueIdentifier: internal.Ptr("plan-A-A"),
+							ServicePlanUniqueIdentifier: internal.Ptr("plan-A-B"),
 							ServicePlanName:             "plan-A",
 							ServiceName:                 "srv-1",
 						},
@@ -495,7 +504,7 @@ func TestFilterAssignedServices(t *testing.T) {
 			},
 			want: want{
 				o: &entclient.AssignedServicePlanSubaccountDTO{
-					EntityId: internal.Ptr("0000-0000-0000-0000"),
+					EntityId: internal.Ptr("1111-1111-1111-1111"),
 				},
 				err: nil,
 			},
@@ -506,14 +515,14 @@ func TestFilterAssignedServices(t *testing.T) {
 		t.Run(
 			name, func(t *testing.T) {
 				entClient := EntitlementsClient{}
-				got, err := entClient.filterAssignedServices(tc.args.payload, tc.args.cr)
+				got, err := entClient.findAssignedServicePlan(tc.args.payload, tc.args.cr)
 
 				if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-					t.Errorf("\n%s\ne.filterAssignedServices(...): -want error, +got error:\n%s\n", tc.reason, diff)
+					t.Errorf("\n%s\ne.findAssignedServicePlan(...): -want error, +got error:\n%s\n", tc.reason, diff)
 				}
 
 				if diff := cmp.Diff(tc.want.o, got); diff != "" {
-					t.Errorf("\n%s\ne.filterAssignedServices(...): -want, +got:\n%s\n", tc.reason, diff)
+					t.Errorf("\n%s\ne.findAssignedServicePlan(...): -want, +got:\n%s\n", tc.reason, diff)
 				}
 			},
 		)
