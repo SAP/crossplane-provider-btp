@@ -142,19 +142,16 @@ func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledA
 		return nil, nil
 	}
 
-	servicePlan, errPlan := filterAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
-
-	if errPlan != nil {
-		return nil, errPlan
-	}
+	var servicePlan *entclient.AssignedServicePlanResponseObject
+	var err error
 
 	if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
-		var errUnqiue error
-		servicePlan, errUnqiue = filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
-
-		if errUnqiue != nil {
-			return nil, errUnqiue
-		}
+		servicePlan, err = filterAssignedServicePlanByUniqueID(assignedService, cr.Spec.ForProvider.ServicePlanName, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
+	} else {
+		servicePlan, err = filterAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	// extract the info on subaccount assignment
@@ -186,9 +183,9 @@ func filterAssignedServicePlanByName(service *entclient.AssignedServiceResponseO
 	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
 }
 
-func filterAssignedServicePlanByUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanUniqueID string) (*entclient.AssignedServicePlanResponseObject, error) {
+func filterAssignedServicePlanByUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanName string, servicePlanUniqueID string) (*entclient.AssignedServicePlanResponseObject, error) {
 	for _, servicePlan := range service.ServicePlans {
-		if servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
+		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName && servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
 			return &servicePlan, nil
 		}
 	}
