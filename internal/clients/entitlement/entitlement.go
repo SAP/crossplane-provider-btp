@@ -17,8 +17,6 @@ const (
 	errFailedSetEntitlements     = "failed to set entitlement for service %s/%s."
 	errServiceNotFoundByName     = "failed to find service with the given name %s"
 	errServicePlanNotFoundByName = "failed to find service plan with the given name %s"
-	errServiceUniqueName         = "failed to find service plan with the given unique name %s"
-	errCannotDetermineOffering   = "Could not determine offering category %s, please open a bug"
 )
 
 type EntitlementsClient struct {
@@ -48,7 +46,7 @@ func (c EntitlementsClient) DescribeInstance(
 	servicePlanName := cr.Spec.ForProvider.ServicePlanName
 
 	// assignment can be nil, that is a valid response, as acc/dir will anot always have all assignments set
-	assignment, err := filterAssignedServices(response, serviceName, servicePlanName, cr)
+	assignment, err := c.findAssignedServicePlan(response, cr)
 	if err != nil {
 		return nil, err
 	}
@@ -67,116 +65,6 @@ func (c EntitlementsClient) DescribeInstance(
 		EntitledServicePlan: entitledServicePlan,
 		Assignment:          assignment,
 	}, nil
-}
-
-func filterEntitledServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string) (*entclient.ServicePlanResponseObject, error) {
-	service, err := filterEntitledServiceByName(payload, serviceName)
-
-	if err != nil {
-		return nil, err
-	}
-
-	servicePlan, errPlan := filterEntitledServicePlanByName(service, servicePlanName)
-
-	if errPlan != nil {
-		return nil, errPlan
-	}
-
-	return servicePlan, nil
-}
-
-func filterEntitledServicePlanByName(service *entclient.EntitledServicesResponseObject, servicePlanName string) (*entclient.ServicePlanResponseObject, error) {
-	for _, servicePlan := range service.ServicePlans {
-		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName {
-			return &servicePlan, nil
-		}
-	}
-	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
-}
-
-func filterAssignedServicePlanByName(service *entclient.AssignedServiceResponseObject, servicePlanName string) (*entclient.AssignedServicePlanResponseObject, error) {
-	for _, servicePlan := range service.ServicePlans {
-		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName {
-			return &servicePlan, nil
-		}
-	}
-	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
-}
-
-func filterAssignedServicePlanByUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanUniqueID string) error {
-	for _, servicePlan := range service.ServicePlans {
-		if servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
-			return nil
-		}
-	}
-	return errors.Errorf(errServiceUniqueName, servicePlanUniqueID)
-}
-
-func filterEntitledServiceByName(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string) (*entclient.EntitledServicesResponseObject, error) {
-	for _, service := range payload.EntitledServices {
-		if service.Name != nil && *service.Name == serviceName {
-			return &service, nil
-		}
-	}
-	return nil, errors.Errorf(errServiceNotFoundByName, serviceName)
-}
-
-// filterAssignedServiceByName returns *AssignedServiceResponseObject if found, otherwise can also return nil as a valid response
-func filterAssignedServiceByName(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string) *entclient.AssignedServiceResponseObject {
-	for _, assignedService := range payload.AssignedServices {
-		if assignedService.Name != nil && *assignedService.Name == serviceName {
-			return &assignedService
-		}
-	}
-	return nil
-}
-
-func filterAssignedServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
-	var assignment *entclient.AssignedServicePlanSubaccountDTO
-
-	// can be nil, if no assignment with that service name is set in account/dir
-	assignedService := filterAssignedServiceByName(payload, serviceName)
-
-	if assignedService != nil {
-		servicePlan, errPlan := filterAssignedServicePlanByName(assignedService, servicePlanName)
-
-		if errPlan != nil {
-			return nil, errPlan
-		}
-
-		if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
-			errUnique := filterAssignedServicePlanByUniqueID(assignedService, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
-
-			if errUnique != nil {
-				return nil, errUnique
-			}
-		}
-
-		foundAssignment, errLook := lookupAssignmentAndAssign(servicePlan, cr)
-
-		if errLook != nil {
-			return nil, errLook
-		}
-
-		assignment = foundAssignment
-	}
-
-	return assignment, nil
-}
-
-func lookupAssignmentAndAssign(servicePlan *entclient.AssignedServicePlanResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
-	var assignment *entclient.AssignedServicePlanSubaccountDTO
-
-	for _, assignmentInfo := range servicePlan.AssignmentInfo {
-		if assignmentInfo.EntityId != nil && *assignmentInfo.EntityId == cr.Spec.ForProvider.SubaccountGuid {
-			if assignment != nil {
-				return nil, errors.New(errMultipleServicePlans)
-			}
-			assignment = &assignmentInfo
-		}
-	}
-
-	return assignment, nil
 }
 
 func (c EntitlementsClient) CreateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
@@ -206,15 +94,6 @@ func (c EntitlementsClient) DeleteInstance(ctx context.Context, cr *v1alpha1.Ent
 		cr.Status.AtProvider.Required.Enable = &enabled
 	}
 	return c.UpdateInstance(ctx, cr)
-}
-
-// hasNumericQuota checks different factors on the entitlement to understand if it is a numeric one or not - we cannot only deduct that from the service response, since the information we get from the service might be incomplete.
-func hasNumericQuota(cr *v1alpha1.Entitlement) bool {
-	// use service information, might be incomplete
-	if cr.Status.AtProvider.Entitled.Unlimited {
-		return false
-	}
-	return cr.Spec.ForProvider.Amount != nil
 }
 
 func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
@@ -251,6 +130,125 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 	}
 
 	return nil
+}
+
+// findAssignedServicePlan returns the assignment for the given service and service plan, if it exists
+func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledAndAssignedServicesResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
+	// first find service via name, can be nil, if no assignment with that service name is set in account/dir
+	assignedService := findAssignedService(payload, cr.Spec.ForProvider.ServiceName)
+	if assignedService == nil {
+		return nil, nil
+	}
+
+	// then find service plan within service, can be nil, if no assignment with that service plan name is set in account/dir
+	var servicePlan *entclient.AssignedServicePlanResponseObject
+	if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
+		servicePlan = findAssignedServicePlanByNameAndUniqueID(assignedService, cr.Spec.ForProvider.ServicePlanName, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
+	} else {
+		servicePlan = findAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
+	}
+	if servicePlan == nil {
+		return nil, nil
+	}
+
+	// lastly, extract the info on subaccount entity assignment
+	foundAssignment, errLook := filterAssignmentInfo(servicePlan, cr)
+
+	if errLook != nil {
+		return nil, errLook
+	}
+
+	return foundAssignment, nil
+}
+
+// findAssignedService returns Service if found by name, otherwise nil
+func findAssignedService(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string) *entclient.AssignedServiceResponseObject {
+	for _, assignedService := range payload.AssignedServices {
+		if assignedService.Name != nil && *assignedService.Name == serviceName {
+			return &assignedService
+		}
+	}
+	return nil
+}
+
+// findAssignedServicePlanByName returns servicePlan within service if found by name, otherwise nil
+func findAssignedServicePlanByName(service *entclient.AssignedServiceResponseObject, servicePlanName string) *entclient.AssignedServicePlanResponseObject {
+	for _, servicePlan := range service.ServicePlans {
+		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName {
+			return &servicePlan
+		}
+	}
+	return nil
+}
+
+// findAssignedServicePlanByNameAndUniqueID returns servicePlan within service if found by name and uniqueID, otherwise nil
+func findAssignedServicePlanByNameAndUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanName string, servicePlanUniqueID string) *entclient.AssignedServicePlanResponseObject {
+	for _, servicePlan := range service.ServicePlans {
+		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName && servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
+			return &servicePlan
+		}
+	}
+	return nil
+}
+
+// filterAssignmentInfo the api can have multiple assignments for the same service plan, we need to filter by subaccount guid
+// (even though having more then one entry here shouldn't be a usecase since we are looking up by subaccount guid)
+func filterAssignmentInfo(servicePlan *entclient.AssignedServicePlanResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
+	var assignment *entclient.AssignedServicePlanSubaccountDTO
+
+	for _, assignmentInfo := range servicePlan.AssignmentInfo {
+		if assignmentInfo.EntityId != nil && *assignmentInfo.EntityId == cr.Spec.ForProvider.SubaccountGuid {
+			if assignment != nil {
+				return nil, errors.New(errMultipleServicePlans)
+			}
+			assignment = &assignmentInfo
+		}
+	}
+
+	return assignment, nil
+}
+
+func filterEntitledServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string) (*entclient.ServicePlanResponseObject, error) {
+	service, err := filterEntitledServiceByName(payload, serviceName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	servicePlan, errPlan := filterEntitledServicePlanByName(service, servicePlanName)
+
+	if errPlan != nil {
+		return nil, errPlan
+	}
+
+	return servicePlan, nil
+}
+
+func filterEntitledServicePlanByName(service *entclient.EntitledServicesResponseObject, servicePlanName string) (*entclient.ServicePlanResponseObject, error) {
+	for _, servicePlan := range service.ServicePlans {
+		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName {
+			return &servicePlan, nil
+		}
+	}
+	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
+}
+
+func filterEntitledServiceByName(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string) (*entclient.EntitledServicesResponseObject, error) {
+	for _, service := range payload.EntitledServices {
+		if service.Name != nil && *service.Name == serviceName {
+			return &service, nil
+		}
+	}
+	return nil, errors.Errorf(errServiceNotFoundByName, serviceName)
+}
+
+// hasNumericQuota checks different factors on the entitlement to understand if it is a numeric one or not - we cannot only deduct that from the service response, since the information we get from the service might be incomplete.
+func hasNumericQuota(cr *v1alpha1.Entitlement) bool {
+	// use service information, might be incomplete
+	if cr.Status.AtProvider.Entitled.Unlimited {
+		return false
+	}
+	return cr.Spec.ForProvider.Amount != nil
 }
 
 func float64Pointer(val *int) *float64 {
