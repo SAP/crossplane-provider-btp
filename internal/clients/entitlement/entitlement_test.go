@@ -210,11 +210,7 @@ func TestFilterAssignedServicePlanByName(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(
 			name, func(t *testing.T) {
-				got, err := findAssignedServicePlanByName(tc.args.payload, tc.args.servicePlanName)
-
-				if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-					t.Errorf("\n%s\ne.findAssignedServicePlanByName(...): -want error, +got error:\n%s\n", tc.reason, diff)
-				}
+				got := findAssignedServicePlanByName(tc.args.payload, tc.args.servicePlanName)
 
 				if diff := cmp.Diff(tc.want.o, got); diff != "" {
 					t.Errorf("\n%s\ne.findAssignedServicePlanByName(...): -want, +got:\n%s\n", tc.reason, diff)
@@ -381,7 +377,7 @@ func TestFindAssignedServicePlan(t *testing.T) {
 			},
 			want: want{
 				o:   nil,
-				err: errors.Errorf(errServicePlanNotFoundByName, "plan-B"),
+				err: nil,
 			},
 		},
 		"found service plan": {
@@ -457,7 +453,7 @@ func TestFindAssignedServicePlan(t *testing.T) {
 			},
 			want: want{
 				o:   nil,
-				err: errors.Errorf(errServiceUniqueName, "plan-A-B"),
+				err: nil,
 			},
 		},
 		"found ambiguous service plan": {

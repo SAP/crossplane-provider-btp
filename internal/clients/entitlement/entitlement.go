@@ -17,8 +17,6 @@ const (
 	errFailedSetEntitlements     = "failed to set entitlement for service %s/%s."
 	errServiceNotFoundByName     = "failed to find service with the given name %s"
 	errServicePlanNotFoundByName = "failed to find service plan with the given name %s"
-	errServiceUniqueName         = "failed to find service plan with the given unique name %s"
-	errCannotDetermineOffering   = "Could not determine offering category %s, please open a bug"
 )
 
 type EntitlementsClient struct {
@@ -144,14 +142,13 @@ func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledA
 
 	// then find service plan within service, can be nil, if no assignment with that service plan name is set in account/dir
 	var servicePlan *entclient.AssignedServicePlanResponseObject
-	var err error
 	if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
-		servicePlan, err = findAssignedServicePlanByNameAndUniqueID(assignedService, cr.Spec.ForProvider.ServicePlanName, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
+		servicePlan = findAssignedServicePlanByNameAndUniqueID(assignedService, cr.Spec.ForProvider.ServicePlanName, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
 	} else {
-		servicePlan, err = findAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
+		servicePlan = findAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
 	}
-	if err != nil {
-		return nil, err
+	if servicePlan == nil {
+		return nil, nil
 	}
 
 	// lastly, extract the info on subaccount entity assignment
@@ -175,23 +172,23 @@ func findAssignedService(payload *entclient.EntitledAndAssignedServicesResponseO
 }
 
 // findAssignedServicePlanByName returns servicePlan within service if found by name, otherwise nil
-func findAssignedServicePlanByName(service *entclient.AssignedServiceResponseObject, servicePlanName string) (*entclient.AssignedServicePlanResponseObject, error) {
+func findAssignedServicePlanByName(service *entclient.AssignedServiceResponseObject, servicePlanName string) *entclient.AssignedServicePlanResponseObject {
 	for _, servicePlan := range service.ServicePlans {
 		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName {
-			return &servicePlan, nil
+			return &servicePlan
 		}
 	}
-	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
+	return nil
 }
 
 // findAssignedServicePlanByNameAndUniqueID returns servicePlan within service if found by name and uniqueID, otherwise nil
-func findAssignedServicePlanByNameAndUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanName string, servicePlanUniqueID string) (*entclient.AssignedServicePlanResponseObject, error) {
+func findAssignedServicePlanByNameAndUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanName string, servicePlanUniqueID string) *entclient.AssignedServicePlanResponseObject {
 	for _, servicePlan := range service.ServicePlans {
 		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName && servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
-			return &servicePlan, nil
+			return &servicePlan
 		}
 	}
-	return nil, errors.Errorf(errServiceUniqueName, servicePlanUniqueID)
+	return nil
 }
 
 // filterAssignmentInfo the api can have multiple assignments for the same service plan, we need to filter by subaccount guid
