@@ -92,7 +92,7 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 
 		var userCredential btp.UserCredential
 		if err := json.Unmarshal(ServiceAccountSecretData, &userCredential); err != nil {
-			return ps, err
+			return ps, errors.Wrap(err, errCouldNotParseUserCredential)
 		}
 
 		ps.Configuration = map[string]any{
