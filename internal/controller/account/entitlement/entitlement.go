@@ -76,41 +76,26 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotEntitlement)
 	}
+
 	err := c.updateObservation(ctx, cr)
 	cr.SetConditions(c.softValidation(cr))
-	_ = c.kube.Status().Update(ctx, cr)
-
+	c.tracker.SetConditions(ctx, cr)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
 
-	c.tracker.SetConditions(ctx, cr)
-
-	if cr.GetCondition(xpv1.TypeReady).Reason == xpv1.Deleting().Reason {
-		if c.needsCreate(cr) {
-			return managed.ExternalObservation{
-				ResourceExists: false,
-			}, nil
-		}
-		if c.needsUpdate(cr) {
-			return managed.ExternalObservation{
-				ResourceExists: true,
-			}, nil
-		}
-	}
-
 	// Needs create?
-	if needsCreate := c.needsCreate(cr); needsCreate {
+	if c.needsCreate(cr) {
 		return managed.ExternalObservation{
-			ResourceExists: !needsCreate,
+			ResourceExists: false,
 		}, nil
 	}
 
 	// Needs Update?
-	if needsUpdate := c.needsUpdate(cr); needsUpdate {
+	if c.needsUpdate(cr) {
 		return managed.ExternalObservation{
 			ResourceExists:   true,
-			ResourceUpToDate: !needsUpdate,
+			ResourceUpToDate: false,
 		}, nil
 	}
 	switch cr.Status.AtProvider.Assigned.EntityState { //nolint:exhaustive
