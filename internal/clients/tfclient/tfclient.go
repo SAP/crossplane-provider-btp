@@ -47,7 +47,7 @@ var (
 // // TerraformSetupBuilder builds Terraform a terraform.SetupFn function which
 // // returns Terraform provider setup configuration
 
-func TerraformSetupBuilderCombined(version, providerSource, providerVersion string, nativeControllerExists bool) terraform.SetupFn {
+func TerraformSetupBuilder(version, providerSource, providerVersion string, disableTracking bool) terraform.SetupFn {
 	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
 		ps := terraform.Setup{
 			Version: version,
@@ -56,7 +56,7 @@ func TerraformSetupBuilderCombined(version, providerSource, providerVersion stri
 				Version: providerVersion,
 			},
 		}
-		if !nativeControllerExists {
+		if !disableTracking {
 			configRef := mg.GetProviderConfigReference()
 			if configRef == nil {
 				return ps, errors.New(errNoProviderConfig)
@@ -68,7 +68,7 @@ func TerraformSetupBuilderCombined(version, providerSource, providerVersion stri
 			return ps, errors.Wrap(err, errGetProviderConfig)
 		}
 
-		if !nativeControllerExists {
+		if !disableTracking {
 			t := resource.NewProviderConfigUsageTracker(client, &v1alpha1.ProviderConfigUsage{})
 			if err := t.Track(ctx, mg); err != nil {
 				return ps, errors.Wrap(err, errTrackUsage)
@@ -113,7 +113,7 @@ func TerraformSetupBuilderCombined(version, providerSource, providerVersion stri
 func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind) *tjcontroller.Connector {
 	tfVersion := TF_VERSION_CALLBACK()
 	zl := zap.New(zap.UseDevMode(tfVersion.DebugLogs))
-	setupFn := TerraformSetupBuilderCombined(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion, true)
+	setupFn := TerraformSetupBuilder(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion, true)
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	ws := terraform.NewWorkspaceStore(log)
 	provider := config.GetProvider()
