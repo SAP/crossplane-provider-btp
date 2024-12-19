@@ -5,11 +5,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
-	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/internal"
 	servicemanager "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-service-manager-api-go/pkg"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewServiceManagerClient(t *testing.T) {
@@ -174,17 +173,57 @@ func TestNewCredsFromOperatorSecret(t *testing.T) {
 		err    error
 	}{
 		{
-			name: "MissingAttributeError",
+			name: "Missing Attribute Error Client ID",
+			secret: map[string][]byte{
+				"clientsecret": []byte("someSecret"),
+				"sm_url":       []byte("https://valid.url"),
+				"tokenurl":     []byte("https://valid.url"),
+				"xsappname":    []byte("someXsAppName"),
+			},
+			err: errors.New(ErrMissingClientId),
+		},
+		{
+			name: "Missing Attribute Error Client Secret",
+			secret: map[string][]byte{
+				"clientid":  []byte("someClientId"),
+				"sm_url":    []byte("https://valid.url"),
+				"tokenurl":  []byte("https://valid.url"),
+				"xsappname": []byte("someXsAppName"),
+			},
+			err: errors.New(ErrMissingClientSecret),
+		},
+		{
+			name: "Missing Attribute Error token URL",
+			secret: map[string][]byte{
+				"clientid":     []byte("someClientId"),
+				"clientsecret": []byte("someSecret"),
+				"sm_url":       []byte("https://valid.url"),
+				"xsappname":    []byte("someXsAppName"),
+			},
+			err: errors.New(ErrMissingUrl),
+		},
+		{
+			name: "Missing Attribute Error SmUrl",
 			secret: map[string][]byte{
 				"clientid":     []byte("someClientId"),
 				"clientsecret": []byte("someSecret"),
 				"tokenurl":     []byte("https://valid.url"),
 				"xsappname":    []byte("someXsAppName"),
 			},
-			err: errors.New(ErrInvalidSecretData),
+			err: errors.New(ErrMissingSmUrl),
 		},
 		{
-			name: "SuccessfulMapping",
+			name: "Missing Attribute Error Xsappname",
+			secret: map[string][]byte{
+				"clientid":     []byte("someClientId"),
+				"clientsecret": []byte("someSecret"),
+				"sm_url":       []byte("https://valid.url"),
+				"tokenurl":     []byte("https://valid.url"),
+			},
+			err: errors.New(ErrMissingXsappname),
+		},
+		{
+			name: "Successful Mapping",
 			secret: map[string][]byte{
 				"clientid":     []byte("someClientId"),
 				"clientsecret": []byte("someSecret"),
@@ -204,11 +243,9 @@ func TestNewCredsFromOperatorSecret(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			o, err := NewCredsFromOperatorSecret(tc.secret)
-			if diff := cmp.Diff(tc.o, o); diff != "" {
-				t.Errorf("\nNewBindingCredentialsFromSecretData(): -want, +got:\n%s\n", diff)
-			}
-			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\nNewBindingCredentialsFromSecretData(): -want error, +got error:\n%s\n", diff)
+			assert.Equal(t, tc.o, o)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
 			}
 
 		})

@@ -21,13 +21,14 @@ import (
 )
 
 const (
-	errNoProviderConfig       = "no providerConfigRef provided"
-	errGetProviderConfig      = "cannot get referenced ProviderConfig"
-	errTrackUsage             = "cannot track ProviderConfig usage"
-	errExtractCredentials     = "cannot extract credentials"
-	errUnmarshalCredentials   = "cannot unmarshal btp-account-tf credentials as JSON"
-	errTrackRUsage            = "cannot track ResourceUsage"
-	errGetServiceAccountCreds = "cannot get Service Account credentials"
+	errNoProviderConfig            = "no providerConfigRef provided"
+	errGetProviderConfig           = "cannot get referenced ProviderConfig"
+	errTrackUsage                  = "cannot track ProviderConfig usage"
+	errExtractCredentials          = "cannot extract credentials"
+	errUnmarshalCredentials        = "cannot unmarshal btp-account-tf credentials as JSON"
+	errTrackRUsage                 = "cannot track ResourceUsage"
+	errGetServiceAccountCreds      = "cannot get Service Account credentials"
+	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
 )
 
 var (
@@ -95,7 +96,7 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string, disa
 
 		var userCredential btp.UserCredential
 		if err := json.Unmarshal(ServiceAccountSecretData, &userCredential); err != nil {
-			return ps, err
+			return ps, errors.Wrap(err, errCouldNotParseUserCredential)
 		}
 
 		ps.Configuration = map[string]any{
@@ -105,7 +106,6 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string, disa
 			"cli_server_url": pc.Spec.CliServerUrl,
 		}
 		return ps, nil
-
 	}
 }
 
