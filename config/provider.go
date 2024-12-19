@@ -12,6 +12,7 @@ import (
 	directoryentitlement "github.com/sap/crossplane-provider-btp/config/directory_entitlement"
 	global_trustconfig "github.com/sap/crossplane-provider-btp/config/globalaccount_trust_configuration"
 	servicebinding "github.com/sap/crossplane-provider-btp/config/subaccount_service_binding"
+	servicebroker "github.com/sap/crossplane-provider-btp/config/subaccount_service_broker"
 	serviceinstance "github.com/sap/crossplane-provider-btp/config/subaccount_service_instance"
 	trustconfig "github.com/sap/crossplane-provider-btp/config/subaccount_trust_configuration"
 )
@@ -44,6 +45,7 @@ func GetProvider() *ujconfig.Provider {
 		directoryentitlement.Configure,
 		serviceinstance.Configure,
 		servicebinding.Configure,
+		servicebroker.Configure,
 	} {
 		configure(pc)
 	}
