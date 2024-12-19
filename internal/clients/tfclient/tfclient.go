@@ -44,9 +44,112 @@ var (
 	}
 )
 
-// TerraformSetupBuilder builds Terraform a terraform.SetupFn function which
-// returns Terraform provider setup configuration
-func TerraformSetupBuilder(version, providerSource, providerVersion string) terraform.SetupFn {
+// // TerraformSetupBuilder builds Terraform a terraform.SetupFn function which
+// // returns Terraform provider setup configuration
+// func TerraformSetupBuilder(version, providerSource, providerVersion string) terraform.SetupFn {
+// 	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
+// 		ps := terraform.Setup{
+// 			Version: version,
+// 			Requirement: terraform.ProviderRequirement{
+// 				Source:  providerSource,
+// 				Version: providerVersion,
+// 			},
+// 		}
+
+// 		configRef := mg.GetProviderConfigReference()
+// 		if configRef == nil {
+// 			return ps, errors.New(errNoProviderConfig)
+// 		}
+
+// 		pc, err := providerconfig.ResolveProviderConfig(ctx, mg, client)
+// 		if err != nil {
+// 			return ps, errors.Wrap(err, errGetProviderConfig)
+// 		}
+
+// 		t := resource.NewProviderConfigUsageTracker(client, &v1alpha1.ProviderConfigUsage{})
+// 		if err := t.Track(ctx, mg); err != nil {
+// 			return ps, errors.Wrap(err, errTrackUsage)
+// 		}
+
+// 		if err = tracking.NewDefaultReferenceResolverTracker(client).Track(ctx, mg); err != nil {
+// 			return ps, errors.Wrap(err, errTrackRUsage)
+// 		}
+
+// 		cd := pc.Spec.ServiceAccountSecret
+// 		ServiceAccountSecretData, err := resource.CommonCredentialExtractor(
+// 			ctx,
+// 			cd.Source,
+// 			client,
+// 			cd.CommonCredentialSelectors,
+// 		)
+// 		if err != nil {
+// 			return ps, errors.Wrap(err, errGetServiceAccountCreds)
+// 		}
+// 		if ServiceAccountSecretData == nil {
+// 			return ps, errors.New(errGetServiceAccountCreds)
+// 		}
+
+// 		var userCredential btp.UserCredential
+// 		if err := json.Unmarshal(ServiceAccountSecretData, &userCredential); err != nil {
+// 			return ps, err
+// 		}
+
+// 		ps.Configuration = map[string]any{
+// 			"username":       userCredential.Username,
+// 			"password":       userCredential.Password,
+// 			"globalaccount":  pc.Spec.GlobalAccount,
+// 			"cli_server_url": pc.Spec.CliServerUrl,
+// 		}
+// 		return ps, nil
+// 	}
+// }
+
+// func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion string) terraform.SetupFn {
+// 	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
+// 		ps := terraform.Setup{
+// 			Version: version,
+// 			Requirement: terraform.ProviderRequirement{
+// 				Source:  providerSource,
+// 				Version: providerVersion,
+// 			},
+// 		}
+
+// 		pc, err := providerconfig.ResolveProviderConfig(ctx, mg, client)
+// 		if err != nil {
+// 			return ps, errors.Wrap(err, errGetProviderConfig)
+// 		}
+
+// 		cd := pc.Spec.ServiceAccountSecret
+// 		ServiceAccountSecretData, err := resource.CommonCredentialExtractor(
+// 			ctx,
+// 			cd.Source,
+// 			client,
+// 			cd.CommonCredentialSelectors,
+// 		)
+// 		if err != nil {
+// 			return ps, errors.Wrap(err, errGetServiceAccountCreds)
+// 		}
+// 		if ServiceAccountSecretData == nil {
+// 			return ps, errors.New(errGetServiceAccountCreds)
+// 		}
+
+// 		var userCredential btp.UserCredential
+// 		if err := json.Unmarshal(ServiceAccountSecretData, &userCredential); err != nil {
+// 			return ps, err
+// 		}
+
+// 		ps.Configuration = map[string]any{
+// 			"username":       userCredential.Username,
+// 			"password":       userCredential.Password,
+// 			"globalaccount":  pc.Spec.GlobalAccount,
+// 			"cli_server_url": pc.Spec.CliServerUrl,
+// 		}
+// 		return ps, nil
+// 	}
+// }
+
+// combine those funktions
+func TerraformSetupBuilderCombined(version, providerSource, providerVersion string, nativeControllerExists bool) terraform.SetupFn {
 	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
 		ps := terraform.Setup{
 			Version: version,
@@ -55,10 +158,11 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 				Version: providerVersion,
 			},
 		}
-
-		configRef := mg.GetProviderConfigReference()
-		if configRef == nil {
-			return ps, errors.New(errNoProviderConfig)
+		if !nativeControllerExists {
+			configRef := mg.GetProviderConfigReference()
+			if configRef == nil {
+				return ps, errors.New(errNoProviderConfig)
+			}
 		}
 
 		pc, err := providerconfig.ResolveProviderConfig(ctx, mg, client)
@@ -66,13 +170,15 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 			return ps, errors.Wrap(err, errGetProviderConfig)
 		}
 
-		t := resource.NewProviderConfigUsageTracker(client, &v1alpha1.ProviderConfigUsage{})
-		if err := t.Track(ctx, mg); err != nil {
-			return ps, errors.Wrap(err, errTrackUsage)
-		}
+		if !nativeControllerExists {
+			t := resource.NewProviderConfigUsageTracker(client, &v1alpha1.ProviderConfigUsage{})
+			if err := t.Track(ctx, mg); err != nil {
+				return ps, errors.Wrap(err, errTrackUsage)
+			}
 
-		if err = tracking.NewDefaultReferenceResolverTracker(client).Track(ctx, mg); err != nil {
-			return ps, errors.Wrap(err, errTrackRUsage)
+			if err = tracking.NewDefaultReferenceResolverTracker(client).Track(ctx, mg); err != nil {
+				return ps, errors.Wrap(err, errTrackRUsage)
+			}
 		}
 
 		cd := pc.Spec.ServiceAccountSecret
@@ -101,50 +207,7 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 			"cli_server_url": pc.Spec.CliServerUrl,
 		}
 		return ps, nil
-	}
-}
 
-func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion string) terraform.SetupFn {
-	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
-		ps := terraform.Setup{
-			Version: version,
-			Requirement: terraform.ProviderRequirement{
-				Source:  providerSource,
-				Version: providerVersion,
-			},
-		}
-
-		pc, err := providerconfig.ResolveProviderConfig(ctx, mg, client)
-		if err != nil {
-			return ps, errors.Wrap(err, errGetProviderConfig)
-		}
-
-		cd := pc.Spec.ServiceAccountSecret
-		ServiceAccountSecretData, err := resource.CommonCredentialExtractor(
-			ctx,
-			cd.Source,
-			client,
-			cd.CommonCredentialSelectors,
-		)
-		if err != nil {
-			return ps, errors.Wrap(err, errGetServiceAccountCreds)
-		}
-		if ServiceAccountSecretData == nil {
-			return ps, errors.New(errGetServiceAccountCreds)
-		}
-
-		var userCredential btp.UserCredential
-		if err := json.Unmarshal(ServiceAccountSecretData, &userCredential); err != nil {
-			return ps, err
-		}
-
-		ps.Configuration = map[string]any{
-			"username":       userCredential.Username,
-			"password":       userCredential.Password,
-			"globalaccount":  pc.Spec.GlobalAccount,
-			"cli_server_url": pc.Spec.CliServerUrl,
-		}
-		return ps, nil
 	}
 }
 
@@ -152,7 +215,7 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind) *tjcontroller.Connector {
 	tfVersion := TF_VERSION_CALLBACK()
 	zl := zap.New(zap.UseDevMode(tfVersion.DebugLogs))
-	setupFn := TerraformSetupBuilderNoTracking(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion)
+	setupFn := TerraformSetupBuilderCombined(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion, true)
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	ws := terraform.NewWorkspaceStore(log)
 	provider := config.GetProvider()
