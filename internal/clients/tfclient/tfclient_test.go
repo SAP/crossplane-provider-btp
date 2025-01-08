@@ -96,7 +96,7 @@ func TestTerraformSetupBuilder(t *testing.T) {
 				globalAccount: "testAccount",
 				cliServerUrl:  "<https://cli.server.url>",
 			},
-			mockSecretData: []byte(`{"username":"testUser","password":"testPass"}`),
+			mockSecretData: []byte(`{"username":"testUser","password":"testPassword"}`),
 		},
 	}
 
