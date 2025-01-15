@@ -4,18 +4,92 @@ import (
 	"context"
 	"testing"
 
+	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+type MockManaged struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              v1.ResourceSpec
+	Status            v1.ResourceStatus
+}
+
+func (m *MockManaged) GetCondition(ct v1.ConditionType) v1.Condition {
+	return m.Status.GetCondition(ct)
+}
+
+func (m *MockManaged) SetConditions(c ...v1.Condition) {
+	m.Status.SetConditions(c...)
+}
+
+func (m *MockManaged) GetProviderConfigReference() *v1.Reference {
+	return m.Spec.ProviderConfigReference
+}
+
+func (m *MockManaged) SetProviderConfigReference(r *v1.Reference) {
+	m.Spec.ProviderConfigReference = r
+}
+
+func (m *MockManaged) GetWriteConnectionSecretToReference() *v1.SecretReference {
+	return m.Spec.WriteConnectionSecretToReference
+}
+
+func (m *MockManaged) SetWriteConnectionSecretToReference(r *v1.SecretReference) {
+	m.Spec.WriteConnectionSecretToReference = r
+}
+
+func (m *MockManaged) GetDeletionPolicy() v1.DeletionPolicy {
+	return m.Spec.DeletionPolicy
+}
+
+func (m *MockManaged) SetDeletionPolicy(p v1.DeletionPolicy) {
+	m.Spec.DeletionPolicy = p
+}
+
+func (m *MockManaged) GetManagementPolicies() v1.ManagementPolicies {
+	return m.Spec.ManagementPolicies
+}
+
+func (m *MockManaged) SetManagementPolicies(p v1.ManagementPolicies) {
+	m.Spec.ManagementPolicies = p
+}
+
+func (m *MockManaged) GetConditionedStatus() *v1.ConditionedStatus {
+	return &m.Status.ConditionedStatus
+}
+
+func (m *MockManaged) GetObjectKind() schema.ObjectKind {
+	return &m.TypeMeta
+}
+func (m *MockManaged) GetPublishConnectionDetailsTo() *v1.PublishConnectionDetailsTo {
+	return m.Spec.PublishConnectionDetailsTo
+}
+func (m *MockManaged) SetPublishConnectionDetailsTo(r *v1.PublishConnectionDetailsTo) {
+	m.Spec.PublishConnectionDetailsTo = r
+}
+
+func (m *MockManaged) DeepCopyObject() runtime.Object {
+	return &MockManaged{
+		TypeMeta:   m.TypeMeta,
+		ObjectMeta: *m.ObjectMeta.DeepCopy(),
+		Spec:       m.Spec,
+		Status:     m.Status,
+	}
+}
 
 func TestTerraformSetupBuilder(t *testing.T) {
 
 	kubeStub := func(err error, secretData []byte) client.Client {
 		return &test.MockClient{
 			MockGet: test.NewMockGetFn(err, func(obj client.Object) error {
-				if secret, ok := obj.(*v1.Secret); ok {
+				if secret, ok := obj.(*corev1.Secret); ok {
 					secret.Data = map[string][]byte{"service-account.json": secretData}
 				}
 				return nil
@@ -52,9 +126,14 @@ func TestTerraformSetupBuilder(t *testing.T) {
 				disableTracking: false,
 			},
 			want: want{
-				err:          nil,
-				setupCreated: true,
+				err:           nil,
+				setupCreated:  true,
+				username:      "testUser",
+				password:      "testPassword",
+				globalAccount: "testAccount",
+				cliServerUrl:  "<https://cli.server.url>",
 			},
+			mockSecretData: []byte(`{"username":"testUser","password":"testPassword"}`),
 		},
 		"connect tfclient without tracking": {
 			args: args{
@@ -64,9 +143,14 @@ func TestTerraformSetupBuilder(t *testing.T) {
 				disableTracking: true,
 			},
 			want: want{
-				err:          nil,
-				setupCreated: true,
+				err:           nil,
+				setupCreated:  true,
+				username:      "testUser",
+				password:      "testPassword",
+				globalAccount: "testAccount",
+				cliServerUrl:  "<https://cli.server.url>",
 			},
+			mockSecretData: []byte(`{"username":"testUser","password":"testPassword"}`),
 		},
 		"failed to resolve provider config reference": {
 			args: args{
@@ -76,8 +160,12 @@ func TestTerraformSetupBuilder(t *testing.T) {
 				disableTracking: false,
 			},
 			want: want{
-				err:          errors.New(errGetProviderConfig),
-				setupCreated: false,
+				err:           errors.New(errGetProviderConfig),
+				setupCreated:  false,
+				username:      "testUser",
+				password:      "testPassword",
+				globalAccount: "testAccount",
+				cliServerUrl:  "<https://cli.server.url>",
 			},
 			mockErr: errors.New(errGetProviderConfig),
 		},
@@ -105,14 +193,26 @@ func TestTerraformSetupBuilder(t *testing.T) {
 
 			mockClient := kubeStub(tc.mockErr, tc.mockSecretData)
 
+			// TO DO: mg := managed resource for testing
+			mg := &MockManaged{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "MockManaged",
+					APIVersion: "example.org/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-managed-res",
+				},
+				Spec: v1.ResourceSpec{
+					ProviderConfigReference: &v1.Reference{Name: "provider-config"},
+				},
+			}
+
 			tfSetup := TerraformSetupBuilder(tc.args.version, tc.args.providerSource, tc.args.providerVersion, tc.args.disableTracking)
 			ctx := context.Background()
 
 			if tc.want.setupCreated != (tfSetup != nil) {
 				t.Errorf("expected terraform setup to be created: %t, tfSetup %t", tc.want.setupCreated, tfSetup != nil)
 			}
-
-			//mg := TODO, managed resource zum testen
 
 			setup, err := tfSetup(ctx, mockClient, mg)
 
@@ -143,23 +243,6 @@ func TestTerraformSetupBuilder(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			if setup.Configuration["username"] != tc.want.username {
-				t.Errorf("expected username: %v, got: %v", tc.want.username, setup.Configuration["username"])
-			}
-			if setup.Configuration["password"] != tc.want.password {
-				t.Errorf("expected password: %v, got: %v", tc.want.password, setup.Configuration["password"])
-			}
-			if setup.Configuration["globalaccount"] != tc.want.globalAccount {
-				t.Errorf("expected globalaccount: %v, got: %v", tc.want.globalAccount, setup.Configuration["globalaccount"])
-			}
-			if setup.Configuration["cli_server_url"] != tc.want.cliServerUrl {
-				t.Errorf("expected cli_server_url: %v, got: %v", tc.want.cliServerUrl, setup.Configuration["cli_server_url"])
-			}
 		})
 	}
 }
-
-// GetProviderConfigReference
-// NewProviderConfigUsageTracker Fehler
-// Unmarshal Fehler
-// CommonCredentialsExtractor
