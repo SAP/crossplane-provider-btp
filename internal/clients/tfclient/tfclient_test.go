@@ -133,7 +133,7 @@ func TestTerraformSetupBuilder(t *testing.T) {
 				globalAccount: "testAccount",
 				cliServerUrl:  "<https://cli.server.url>",
 			},
-			mockSecretData: []byte(`{"username":"testUser","password":"testPassword"}`),
+			mockSecretData: []byte(`{"username":"testUser","password":"testPassword","globalAccount":"testAccount","cliServerUrl":"<https://cli.server.url>"}`),
 		},
 		"connect tfclient without tracking": {
 			args: args{
@@ -150,7 +150,7 @@ func TestTerraformSetupBuilder(t *testing.T) {
 				globalAccount: "testAccount",
 				cliServerUrl:  "<https://cli.server.url>",
 			},
-			mockSecretData: []byte(`{"username":"testUser","password":"testPassword"}`),
+			mockSecretData: []byte(`{"username":"testUser","password":"testPassword","globalAccount":"testAccount","cliServerUrl":"<https://cli.server.url>"}`),
 		},
 		"failed to resolve provider config reference": {
 			args: args{
@@ -160,12 +160,8 @@ func TestTerraformSetupBuilder(t *testing.T) {
 				disableTracking: false,
 			},
 			want: want{
-				err:           errors.New(errGetProviderConfig),
-				setupCreated:  false,
-				username:      "testUser",
-				password:      "testPassword",
-				globalAccount: "testAccount",
-				cliServerUrl:  "<https://cli.server.url>",
+				err:          errors.New(errGetProviderConfig),
+				setupCreated: false,
 			},
 			mockErr: errors.New(errGetProviderConfig),
 		},
@@ -184,7 +180,7 @@ func TestTerraformSetupBuilder(t *testing.T) {
 				globalAccount: "testAccount",
 				cliServerUrl:  "<https://cli.server.url>",
 			},
-			mockSecretData: []byte(`{"username":"testUser","password":"testPassword"}`),
+			mockSecretData: []byte(`{"username":"testUser","password":"testPassword","globalAccount":"testAccount","cliServerUrl":"<https://cli.server.url>"}`),
 		},
 	}
 
