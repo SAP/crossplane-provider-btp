@@ -2,12 +2,12 @@ package tfclient
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
-	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/testutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -86,17 +86,6 @@ func (m *MockManaged) DeepCopyObject() runtime.Object {
 
 func TestTerraformSetupBuilder(t *testing.T) {
 
-	kubeStub := func(err error, secretData []byte) client.Client {
-		return &test.MockClient{
-			MockGet: test.NewMockGetFn(err, func(obj client.Object) error {
-				if secret, ok := obj.(*corev1.Secret); ok {
-					secret.Data = map[string][]byte{"service-account.json": secretData}
-				}
-				return nil
-			}),
-		}
-	}
-
 	type args struct {
 		version         string
 		providerSource  string
@@ -104,7 +93,7 @@ func TestTerraformSetupBuilder(t *testing.T) {
 		disableTracking bool
 	}
 	type want struct {
-		err           error
+		err           *string
 		setupCreated  bool
 		username      string
 		password      string
@@ -115,26 +104,9 @@ func TestTerraformSetupBuilder(t *testing.T) {
 	cases := map[string]struct {
 		args           args
 		want           want
+		kubeObjects    []client.Object
 		mockSecretData []byte
-		mockErr        error
 	}{
-		"connect tfclient with tracking": {
-			args: args{
-				version:         "version",
-				providerSource:  "source",
-				providerVersion: "someVersion",
-				disableTracking: false,
-			},
-			want: want{
-				err:           nil,
-				setupCreated:  true,
-				username:      "testUser",
-				password:      "testPassword",
-				globalAccount: "testAccount",
-				cliServerUrl:  "<https://cli.server.url>",
-			},
-			mockSecretData: []byte(`{"username":"testUser","password":"testPassword","globalAccount":"testAccount","cliServerUrl":"<https://cli.server.url>"}`),
-		},
 		"connect tfclient without tracking": {
 			args: args{
 				version:         "version",
@@ -147,49 +119,75 @@ func TestTerraformSetupBuilder(t *testing.T) {
 				setupCreated:  true,
 				username:      "testUser",
 				password:      "testPassword",
-				globalAccount: "testAccount",
+				globalAccount: "123",
 				cliServerUrl:  "<https://cli.server.url>",
 			},
-			mockSecretData: []byte(`{"username":"testUser","password":"testPassword","globalAccount":"testAccount","cliServerUrl":"<https://cli.server.url>"}`),
+			kubeObjects: []client.Object{
+				testutils.NewProviderConfigFull("pc-reference", "cis-provider-secret", "sa-provider-secret", "123", "<https://cli.server.url>"),
+				testutils.NewSecret("cis-provider-secret", nil),
+				testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte(`{"username": "testUser", "email": "testUser@sap.com", "password": "testPassword"}`)}),
+			},
 		},
-		"failed to resolve provider config reference": {
+		"failed to resolve provider config reference without tracking": {
 			args: args{
 				version:         "version",
 				providerSource:  "source",
 				providerVersion: "someVersion",
-				disableTracking: false,
+				disableTracking: true,
 			},
 			want: want{
-				err:          errors.New(errGetProviderConfig),
+				err:          internal.Ptr(errGetProviderConfig),
 				setupCreated: false,
 			},
-			mockErr: errors.New(errGetProviderConfig),
+			kubeObjects: []client.Object{
+				testutils.NewProviderConfigFull("", "", "", "", ""),
+				testutils.NewSecret("cis-provider-secret", nil),
+				testutils.NewSecret("sa-provider-secret", nil),
+			},
 		},
-		"connect tfclient with tracking and valid secret data": {
+		"error getting service account credentials without tracking": {
 			args: args{
 				version:         "version",
 				providerSource:  "source",
 				providerVersion: "someVersion",
-				disableTracking: false,
+				disableTracking: true,
 			},
 			want: want{
-				err:           nil,
-				setupCreated:  true,
-				username:      "testUser",
-				password:      "testPassword",
-				globalAccount: "testAccount",
-				cliServerUrl:  "<https://cli.server.url>",
+				err:          internal.Ptr(errGetServiceAccountCreds),
+				setupCreated: false,
 			},
-			mockSecretData: []byte(`{"username":"testUser","password":"testPassword","globalAccount":"testAccount","cliServerUrl":"<https://cli.server.url>"}`),
+			kubeObjects: []client.Object{
+				testutils.NewProviderConfigFull("pc-reference", "cis-provider-secret", "sa-provider-secret", "123", "<https://cli.server.url>"),
+				testutils.NewSecret("cis-provider-secret", nil),
+				testutils.NewSecret("", nil),
+			},
+		},
+		"error parsing user credentials without tracking": {
+			args: args{
+				version:         "version",
+				providerSource:  "source",
+				providerVersion: "someVersion",
+				disableTracking: true,
+			},
+			want: want{
+				err:          internal.Ptr(errCouldNotParseUserCredential),
+				setupCreated: false,
+			},
+			kubeObjects: []client.Object{
+				testutils.NewProviderConfigFull("pc-reference", "cis-provider-secret", "sa-provider-secret", "123", "<https://cli.server.url>"),
+				testutils.NewSecret("cis-provider-secret", nil),
+				testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte(`{"username": "test"User", "email": "testUser@sap.com", "password": "testPassword"}`)}),
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 
-			mockClient := kubeStub(tc.mockErr, tc.mockSecretData)
+			mockClient := testutils.NewFakeKubeClientBuilder().
+				AddResources(tc.kubeObjects...).
+				Build()
 
-			// TO DO: mg := managed resource for testing
 			mg := &MockManaged{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "MockManaged",
@@ -199,18 +197,14 @@ func TestTerraformSetupBuilder(t *testing.T) {
 					Name: "test-managed-res",
 				},
 				Spec: v1.ResourceSpec{
-					ProviderConfigReference: &v1.Reference{Name: "provider-config"},
+					ProviderConfigReference: &v1.Reference{Name: "pc-reference"},
 				},
 			}
 
 			tfSetup := TerraformSetupBuilder(tc.args.version, tc.args.providerSource, tc.args.providerVersion, tc.args.disableTracking)
 			ctx := context.Background()
 
-			if tc.want.setupCreated != (tfSetup != nil) {
-				t.Errorf("expected terraform setup to be created: %t, tfSetup %t", tc.want.setupCreated, tfSetup != nil)
-			}
-
-			setup, err := tfSetup(ctx, mockClient, mg)
+			setup, err := tfSetup(ctx, &mockClient, mg)
 
 			if tc.want.setupCreated {
 				if setup.Configuration == nil {
@@ -232,7 +226,7 @@ func TestTerraformSetupBuilder(t *testing.T) {
 			}
 
 			if tc.want.err != nil {
-				if err == nil || !errors.Is(err, tc.want.err) {
+				if err == nil || !strings.Contains(err.Error(), internal.Val(tc.want.err)) {
 					t.Errorf("expected error: %v, tfSetup Error: %v", tc.want.err, err)
 				}
 			} else if err != nil {
