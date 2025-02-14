@@ -18,7 +18,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	cmclient "github.com/sap/crossplane-provider-btp/internal/clients/cis"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -44,7 +44,8 @@ type connector struct {
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*apisv1alpha1.CloudManagement)
+	cr, ok := mg.(*apisv1beta1.CloudManagement)
+
 	if !ok {
 		return nil, errors.New(errNotCloudManagement)
 	}
@@ -93,7 +94,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}, nil
 }
 
-func (c *connector) ensureCompatibility(ctx context.Context, cr *apisv1alpha1.CloudManagement) error {
+func (c *connector) ensureCompatibility(ctx context.Context, cr *apisv1beta1.CloudManagement) error {
 	if c.migrationNeeded(cr) {
 		ctrl.Log.Info(fmt.Sprintf("Migrating external-name to new format for cloudmanagement resource %v", cr.Name))
 		meta.SetExternalName(cr,
@@ -107,7 +108,7 @@ func (c *connector) ensureCompatibility(ctx context.Context, cr *apisv1alpha1.Cl
 	return nil
 }
 
-func (c *connector) migrationNeeded(cr *apisv1alpha1.CloudManagement) bool {
+func (c *connector) migrationNeeded(cr *apisv1beta1.CloudManagement) bool {
 	extName := meta.GetExternalName(cr)
 	instance := cr.Status.AtProvider.Instance
 	binding := cr.Status.AtProvider.Binding
@@ -115,12 +116,12 @@ func (c *connector) migrationNeeded(cr *apisv1alpha1.CloudManagement) bool {
 	return !strings.Contains(extName, "/") && instance != nil && binding != nil
 }
 
-func (c *connector) IsInitialized(cr *apisv1alpha1.CloudManagement) bool {
+func (c *connector) IsInitialized(cr *apisv1beta1.CloudManagement) bool {
 	return cr.Status.AtProvider.DataSourceLookup != nil
 }
 
 // InitializeServicePlanId ensures the service plan id for cis local is cached in status
-func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1alpha1.CloudManagement, secret *corev1.Secret) error {
+func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1beta1.CloudManagement, secret *corev1.Secret) error {
 	if c.IsInitialized(cr) {
 		return nil
 	}
@@ -138,8 +139,8 @@ func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1alpha
 	return c.saveId(ctx, cr, id)
 }
 
-func (c *connector) saveId(ctx context.Context, cr *apisv1alpha1.CloudManagement, id string) error {
-	cr.Status.AtProvider.DataSourceLookup = &apisv1alpha1.CloudManagementDataSourceLookup{
+func (c *connector) saveId(ctx context.Context, cr *apisv1beta1.CloudManagement, id string) error {
+	cr.Status.AtProvider.DataSourceLookup = &apisv1beta1.CloudManagementDataSourceLookup{
 		CloudManagementPlanID: id,
 	}
 	return c.kube.Status().Update(ctx, cr)
@@ -155,7 +156,7 @@ type external struct {
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*apisv1alpha1.CloudManagement)
+	cr, ok := mg.(*apisv1beta1.CloudManagement)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotCloudManagement)
 	}
@@ -171,7 +172,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*apisv1alpha1.CloudManagement)
+	cr, ok := mg.(*apisv1beta1.CloudManagement)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotCloudManagement)
 	}
@@ -188,7 +189,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*apisv1alpha1.CloudManagement)
+	cr, ok := mg.(*apisv1beta1.CloudManagement)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotCloudManagement)
 	}
@@ -197,7 +198,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	cr, ok := mg.(*apisv1alpha1.CloudManagement)
+	cr, ok := mg.(*apisv1beta1.CloudManagement)
 	if !ok {
 		return errors.New(errNotCloudManagement)
 	}
@@ -213,13 +214,13 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	return c.tfClient.DeleteResources(ctx, cr)
 }
 
-func (c *external) setStatus(ctx context.Context, status cmclient.ResourcesStatus, cr *apisv1alpha1.CloudManagement) error {
+func (c *external) setStatus(ctx context.Context, status cmclient.ResourcesStatus, cr *apisv1beta1.CloudManagement) error {
 	if status.ResourceExists {
 		cr.Status.SetConditions(xpv1.Available())
-		cr.Status.AtProvider.Status = apisv1alpha1.CisStatusBound
+		cr.Status.AtProvider.Status = apisv1beta1.CisStatusBound
 	} else {
 		cr.Status.SetConditions(xpv1.Unavailable())
-		cr.Status.AtProvider.Status = apisv1alpha1.CisStatusUnbound
+		cr.Status.AtProvider.Status = apisv1beta1.CisStatusUnbound
 	}
 	cr.Status.AtProvider.ServiceInstanceID = status.InstanceID
 	cr.Status.AtProvider.ServiceBindingID = status.BindingID

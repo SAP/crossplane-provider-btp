@@ -13,6 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +31,7 @@ func TestConnectResources(t *testing.T) {
 	}
 	tests := []struct {
 		name string
-		cr   *v1alpha1.CloudManagement
+		cr   *v1beta1.CloudManagement
 
 		instanceConnectorMock func() (managed.ExternalClient, error)
 		bindingConnectorMock  func() (managed.ExternalClient, error)
@@ -39,7 +40,7 @@ func TestConnectResources(t *testing.T) {
 	}{
 		{
 			name: "BindingError",
-			cr:   testCMCr("subaccountId", "planId", "", ""),
+			cr:   testCMCr("subaccountId", "planId", "", "", "instanceName", "bindingName"),
 			instanceConnectorMock: func() (managed.ExternalClient, error) {
 				return ExternalClientFake{}, nil
 			},
@@ -52,7 +53,7 @@ func TestConnectResources(t *testing.T) {
 		},
 		{
 			name: "Success",
-			cr:   testCMCr("subaccountId", "planId", "instanceID", "instanceID"),
+			cr:   testCMCr("subaccountId", "planId", "instanceID", "instanceID", "instanceName", "bindingName"),
 			instanceConnectorMock: func() (managed.ExternalClient, error) {
 				return ExternalClientFake{}, nil
 			},
@@ -63,14 +64,89 @@ func TestConnectResources(t *testing.T) {
 				subaccountId: "subaccountId",
 				planId:       "planId",
 				instanceSpec: v1alpha1.SubaccountServiceInstanceParameters{
-					Name:          internal.Ptr("test"),
+					Name:          internal.Ptr("instanceName"),
 					ServiceplanID: internal.Ptr("planId"),
 					SubaccountID:  internal.Ptr("subaccountId"),
 					Parameters:    internal.Ptr(`{"grantType":"clientCredentials"}`),
 				},
 				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
 					SubaccountID:      internal.Ptr("subaccountId"),
-					Name:              internal.Ptr("test"),
+					Name:              internal.Ptr("bindingName"),
+					ServiceInstanceID: internal.Ptr("instanceID"),
+				},
+			},
+		},
+		{
+			name: "Success with default instance name",
+			cr:   testCMCr("subaccountId", "planId", "instanceID", "instanceID", "", "bindingName"),
+			instanceConnectorMock: func() (managed.ExternalClient, error) {
+				return ExternalClientFake{}, nil
+			},
+			bindingConnectorMock: func() (managed.ExternalClient, error) {
+				return ExternalClientFake{}, nil
+			},
+			want: want{
+				subaccountId: "subaccountId",
+				planId:       "planId",
+				instanceSpec: v1alpha1.SubaccountServiceInstanceParameters{
+					Name:          internal.Ptr(defaultName),
+					ServiceplanID: internal.Ptr("planId"),
+					SubaccountID:  internal.Ptr("subaccountId"),
+					Parameters:    internal.Ptr(`{"grantType":"clientCredentials"}`),
+				},
+				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
+					SubaccountID:      internal.Ptr("subaccountId"),
+					Name:              internal.Ptr("bindingName"),
+					ServiceInstanceID: internal.Ptr("instanceID"),
+				},
+			},
+		},
+		{
+			name: "Success with default binding name",
+			cr:   testCMCr("subaccountId", "planId", "instanceID", "instanceID", "instanceName", ""),
+			instanceConnectorMock: func() (managed.ExternalClient, error) {
+				return ExternalClientFake{}, nil
+			},
+			bindingConnectorMock: func() (managed.ExternalClient, error) {
+				return ExternalClientFake{}, nil
+			},
+			want: want{
+				subaccountId: "subaccountId",
+				planId:       "planId",
+				instanceSpec: v1alpha1.SubaccountServiceInstanceParameters{
+					Name:          internal.Ptr("instanceName"),
+					ServiceplanID: internal.Ptr("planId"),
+					SubaccountID:  internal.Ptr("subaccountId"),
+					Parameters:    internal.Ptr(`{"grantType":"clientCredentials"}`),
+				},
+				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
+					SubaccountID:      internal.Ptr("subaccountId"),
+					Name:              internal.Ptr(defaultName),
+					ServiceInstanceID: internal.Ptr("instanceID"),
+				},
+			},
+		},
+		{
+			name: "Success with default instance and binding name",
+			cr:   testCMCr("subaccountId", "planId", "instanceID", "instanceID", "", ""),
+			instanceConnectorMock: func() (managed.ExternalClient, error) {
+				return ExternalClientFake{}, nil
+			},
+			bindingConnectorMock: func() (managed.ExternalClient, error) {
+				return ExternalClientFake{}, nil
+			},
+			want: want{
+				subaccountId: "subaccountId",
+				planId:       "planId",
+				instanceSpec: v1alpha1.SubaccountServiceInstanceParameters{
+					Name:          internal.Ptr(defaultName),
+					ServiceplanID: internal.Ptr("planId"),
+					SubaccountID:  internal.Ptr("subaccountId"),
+					Parameters:    internal.Ptr(`{"grantType":"clientCredentials"}`),
+				},
+				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
+					SubaccountID:      internal.Ptr("subaccountId"),
+					Name:              internal.Ptr(defaultName),
 					ServiceInstanceID: internal.Ptr("instanceID"),
 				},
 			},
@@ -123,7 +199,7 @@ func TestObserveResources(t *testing.T) {
 		obs ResourcesStatus
 	}
 	type args struct {
-		cr *v1alpha1.CloudManagement
+		cr *v1beta1.CloudManagement
 
 		siExternal ExternalClientFake
 		sbExternal ExternalClientFake
@@ -140,7 +216,7 @@ func TestObserveResources(t *testing.T) {
 		{
 			name: "InstanceObserveError",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID", ""),
+				cr: testCMCr("subaccountId", "planId", "someID", "", "instanceName", "bindingName"),
 				siExternal: ExternalClientFake{
 					observeFn: func() (managed.ExternalObservation, error) {
 						return managed.ExternalObservation{}, errors.New("instanceObserveError")
@@ -157,7 +233,7 @@ func TestObserveResources(t *testing.T) {
 		{
 			name: "InstanceNeedsCreation",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID", ""),
+				cr: testCMCr("subaccountId", "planId", "someID", "", "instanceName", "bindingName"),
 				siExternal: ExternalClientFake{
 					observeFn: func() (managed.ExternalObservation, error) {
 						return managed.ExternalObservation{ResourceExists: false}, nil
@@ -176,7 +252,7 @@ func TestObserveResources(t *testing.T) {
 		{
 			name: "BindingObserveError",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID/anotherID", ""),
+				cr: testCMCr("subaccountId", "planId", "someID/anotherID", "", "instanceName", "bindingName"),
 				siExternal: ExternalClientFake{
 					observeFn: func() (managed.ExternalObservation, error) {
 						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
@@ -197,7 +273,7 @@ func TestObserveResources(t *testing.T) {
 		{
 			name: "BindingNeedsCreation",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID", ""),
+				cr: testCMCr("subaccountId", "planId", "someID", "", "instanceName", "bindingName"),
 				siExternal: ExternalClientFake{
 					observeFn: func() (managed.ExternalObservation, error) {
 						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
@@ -223,7 +299,7 @@ func TestObserveResources(t *testing.T) {
 			// in case of missing binding and changed instance we expect to first create the binding and later update the instance in a second reconcilation loop
 			name: "CreationPrecedesUpdate",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID/anotherID", ""),
+				cr: testCMCr("subaccountId", "planId", "someID/anotherID", "", "instanceName", "bindingName"),
 				siExternal: ExternalClientFake{
 					observeFn: func() (managed.ExternalObservation, error) {
 						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
@@ -248,7 +324,7 @@ func TestObserveResources(t *testing.T) {
 		{
 			name: "UnexpectedFormatOfReturnedConnectionDetails",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID/anotherID", ""),
+				cr: testCMCr("subaccountId", "planId", "someID/anotherID", "", "instanceName", "bindingName"),
 				siExternal: ExternalClientFake{
 					observeFn: func() (managed.ExternalObservation, error) {
 						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
@@ -270,7 +346,7 @@ func TestObserveResources(t *testing.T) {
 		{
 			name: "AllResourcesSynced",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID/anotherID", ""),
+				cr: testCMCr("subaccountId", "planId", "someID/anotherID", "", "instanceName", "bindingName"),
 				siExternal: ExternalClientFake{
 					observeFn: func() (managed.ExternalObservation, error) {
 						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
@@ -326,7 +402,7 @@ func TestCreateResources(t *testing.T) {
 		bID string
 	}
 	type args struct {
-		cr *v1alpha1.CloudManagement
+		cr *v1beta1.CloudManagement
 
 		siExternal ExternalClientFake
 		sbExternal ExternalClientFake
@@ -343,7 +419,7 @@ func TestCreateResources(t *testing.T) {
 		{
 			name: "InstanceCreateError",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "crName", ""),
+				cr: testCMCr("subaccountId", "planId", "crName", "", "instanceName", "bindingName"),
 				siExternal: ExternalClientFake{
 					createFn: func(mg resource.Managed) (managed.ExternalCreation, error) {
 						return managed.ExternalCreation{}, errors.New("instanceCreateError")
@@ -358,7 +434,7 @@ func TestCreateResources(t *testing.T) {
 		{
 			name: "InstanceCreateSuccess",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "crName", ""),
+				cr: testCMCr("subaccountId", "planId", "crName", "", "instanceName", "bindingName"),
 				siExternal: ExternalClientFake{
 					createFn: func(mg resource.Managed) (managed.ExternalCreation, error) {
 						meta.SetExternalName(mg, "someID")
@@ -375,7 +451,7 @@ func TestCreateResources(t *testing.T) {
 			// we should return an error also even if only the binding creation fails
 			name: "BindingCreateError",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID", "someID"),
+				cr: testCMCr("subaccountId", "planId", "someID", "someID", "instanceName", "bindingName"),
 				sbExternal: ExternalClientFake{
 					createFn: func(mg resource.Managed) (managed.ExternalCreation, error) {
 						return managed.ExternalCreation{}, errors.New("bindingCreateError")
@@ -393,7 +469,7 @@ func TestCreateResources(t *testing.T) {
 		{
 			name: "BindingCreateSuccess",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID", "someID"),
+				cr: testCMCr("subaccountId", "planId", "someID", "someID", "instanceName", "bindingName"),
 				siExternal: ExternalClientFake{
 					createFn: func(mg resource.Managed) (managed.ExternalCreation, error) {
 						setExternalName(mg, "someID")
@@ -442,7 +518,7 @@ func TestDeleteResources(t *testing.T) {
 		err error
 	}
 	type args struct {
-		cr *v1alpha1.CloudManagement
+		cr *v1beta1.CloudManagement
 
 		siExternal ExternalClientFake
 		sbExternal ExternalClientFake
@@ -456,7 +532,7 @@ func TestDeleteResources(t *testing.T) {
 		{
 			name: "BindingDeleteError",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID/anotherID", ""),
+				cr: testCMCr("subaccountId", "planId", "someID/anotherID", "", "instanceName", "bindingName"),
 				sbExternal: ExternalClientFake{
 					deleteFn: func() error {
 						return errors.New("bindingDeleteError")
@@ -470,7 +546,7 @@ func TestDeleteResources(t *testing.T) {
 		{
 			name: "InstanceDeleteError",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID/anotherID", ""),
+				cr: testCMCr("subaccountId", "planId", "someID/anotherID", "", "instanceName", "bindingName"),
 				sbExternal: ExternalClientFake{
 					deleteFn: func() error {
 						return nil
@@ -489,7 +565,7 @@ func TestDeleteResources(t *testing.T) {
 		{
 			name: "DeleteSuccess",
 			args: args{
-				cr: testCMCr("subaccountId", "planId", "someID/anotherID", ""),
+				cr: testCMCr("subaccountId", "planId", "someID/anotherID", "", "instanceName", "bindingName"),
 				sbExternal: ExternalClientFake{
 					deleteFn: func() error {
 						return nil
@@ -521,15 +597,20 @@ func TestDeleteResources(t *testing.T) {
 }
 
 // Utils
-func testCMCr(saId, planId, extName, statusInstanceID string) *v1alpha1.CloudManagement {
-	sm := &v1alpha1.CloudManagement{
+
+const defaultName string = "test"
+
+func testCMCr(saId, planId, extName, statusInstanceID, siName, sbName string) *v1beta1.CloudManagement {
+	sm := &v1beta1.CloudManagement{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
+			Name: defaultName,
 		},
-		Spec: v1alpha1.CloudManagementSpec{
-			ForProvider: v1alpha1.CloudManagementParameters{
-				SubaccountGuid: saId,
+		Spec: v1beta1.CloudManagementSpec{
+			ForProvider: v1beta1.CloudManagementParameters{
+				SubaccountGuid:      saId,
+				ServiceInstanceName: siName,
+				ServiceBindingName:  sbName,
 			},
 			ResourceSpec: xpv1.ResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
@@ -537,9 +618,9 @@ func testCMCr(saId, planId, extName, statusInstanceID string) *v1alpha1.CloudMan
 				},
 			},
 		},
-		Status: v1alpha1.CloudManagementStatus{
-			AtProvider: v1alpha1.CloudManagementObservation{
-				DataSourceLookup: &v1alpha1.CloudManagementDataSourceLookup{
+		Status: v1beta1.CloudManagementStatus{
+			AtProvider: v1beta1.CloudManagementObservation{
+				DataSourceLookup: &v1beta1.CloudManagementDataSourceLookup{
 					CloudManagementPlanID: planId,
 				},
 				ServiceInstanceID: statusInstanceID,
