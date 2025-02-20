@@ -12,74 +12,6 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
 
-func TestFilterAssignedServiceByName(t *testing.T) {
-
-	type args struct {
-		payload     *entclient.EntitledAndAssignedServicesResponseObject
-		serviceName string
-	}
-
-	type want struct {
-		o   *entclient.AssignedServiceResponseObject
-		err error
-	}
-
-	cases := map[string]struct {
-		reason string
-		args   args
-		want   want
-	}{
-		"find assigned service": {
-			reason: "found by matching name",
-			args: args{
-				payload: &entclient.EntitledAndAssignedServicesResponseObject{
-					AssignedServices: []entclient.AssignedServiceResponseObject{
-						{
-							Name: internal.Ptr("postgresql-db"),
-						},
-					},
-				},
-				serviceName: "postgresql-db",
-			},
-			want: want{
-				o: &entclient.AssignedServiceResponseObject{
-					Name: internal.Ptr("postgresql-db"),
-				},
-				err: nil,
-			},
-		},
-		"unknown assigned service": {
-			reason: "assigned service with not found",
-			args: args{
-				payload: &entclient.EntitledAndAssignedServicesResponseObject{
-					AssignedServices: []entclient.AssignedServiceResponseObject{
-						{
-							Name: internal.Ptr("postgresql-db"),
-						},
-					},
-				},
-				serviceName: "postgresql-db-never-existed",
-			},
-			want: want{
-				o:   nil,
-				err: nil,
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(
-			name, func(t *testing.T) {
-				got := filterAssignedServiceByName(tc.args.payload, tc.args.serviceName)
-
-				if diff := cmp.Diff(tc.want.o, got); diff != "" {
-					t.Errorf("\n%s\ne.filterAssignedServiceByName(...): -want, +got:\n%s\n", tc.reason, diff)
-				}
-			},
-		)
-	}
-}
-
 func TestFilterEntitledServiceByName(t *testing.T) {
 
 	type args struct {
@@ -150,78 +82,6 @@ func TestFilterEntitledServiceByName(t *testing.T) {
 		)
 	}
 
-}
-
-func TestFilterAssignedServicePlanByName(t *testing.T) {
-
-	type args struct {
-		payload         *entclient.AssignedServiceResponseObject
-		servicePlanName string
-	}
-
-	type want struct {
-		o   *entclient.AssignedServicePlanResponseObject
-		err error
-	}
-
-	cases := map[string]struct {
-		reason string
-		args   args
-		want   want
-	}{
-		"find service plan": {
-			reason: "found by matching name",
-			args: args{
-				payload: &entclient.AssignedServiceResponseObject{
-					ServicePlans: []entclient.AssignedServicePlanResponseObject{
-						{
-							Name: internal.Ptr("default"),
-						},
-					},
-				},
-				servicePlanName: "default",
-			},
-			want: want{
-				o: &entclient.AssignedServicePlanResponseObject{
-					Name: internal.Ptr("default"),
-				},
-				err: nil,
-			},
-		},
-		"unknown service plan": {
-			reason: "service plan with name not found",
-			args: args{
-				payload: &entclient.AssignedServiceResponseObject{
-					ServicePlans: []entclient.AssignedServicePlanResponseObject{
-						{
-							Name: internal.Ptr("default"),
-						},
-					},
-				},
-				servicePlanName: "default-plan-never-existed",
-			},
-			want: want{
-				o:   nil,
-				err: errors.Errorf(errServicePlanNotFoundByName, "default-plan-never-existed"),
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(
-			name, func(t *testing.T) {
-				got, err := filterAssignedServicePlanByName(tc.args.payload, tc.args.servicePlanName)
-
-				if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-					t.Errorf("\n%s\ne.filterAssignedServicePlanByName(...): -want error, +got error:\n%s\n", tc.reason, diff)
-				}
-
-				if diff := cmp.Diff(tc.want.o, got); diff != "" {
-					t.Errorf("\n%s\ne.filterAssignedServicePlanByName(...): -want, +got:\n%s\n", tc.reason, diff)
-				}
-			},
-		)
-	}
 }
 
 func TestFilterEntitledServicePlanByName(t *testing.T) {
@@ -296,12 +156,10 @@ func TestFilterEntitledServicePlanByName(t *testing.T) {
 	}
 }
 
-func TestFilterAssignedServices(t *testing.T) {
+func TestFindAssignedServicePlan(t *testing.T) {
 	type args struct {
-		payload     *entclient.EntitledAndAssignedServicesResponseObject
-		serviceName string
-		servicePlan string
-		cr          *v1alpha1.Entitlement
+		payload *entclient.EntitledAndAssignedServicesResponseObject
+		cr      *v1alpha1.Entitlement
 	}
 
 	type want struct {
@@ -314,17 +172,17 @@ func TestFilterAssignedServices(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"find service plan": {
-			reason: "found by matching name",
+		"not found service": {
+			reason: "could not match service name",
 			args: args{
 				payload: &entclient.EntitledAndAssignedServicesResponseObject{
 					AssignedServices: []entclient.AssignedServiceResponseObject{
 						{
 
-							Name: internal.Ptr("postgresql-db"),
+							Name: internal.Ptr("srv-1"),
 							ServicePlans: []entclient.AssignedServicePlanResponseObject{
 								{
-									Name: internal.Ptr("default"),
+									Name: internal.Ptr("plan-A"),
 									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
 										{
 											EntityId: internal.Ptr("0000-0000-0000-0000"),
@@ -335,12 +193,84 @@ func TestFilterAssignedServices(t *testing.T) {
 						},
 					},
 				},
-				servicePlan: "default",
-				serviceName: "postgresql-db",
 				cr: &v1alpha1.Entitlement{
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
-							SubaccountGuid: "0000-0000-0000-0000",
+							SubaccountGuid:  "0000-0000-0000-0000",
+							ServicePlanName: "plan-A",
+							ServiceName:     "srv-2",
+						},
+					},
+				},
+			},
+			want: want{
+				o:   nil,
+				err: nil,
+			},
+		},
+		"not found service plan": {
+			reason: "could match name, but not plan name",
+			args: args{
+				payload: &entclient.EntitledAndAssignedServicesResponseObject{
+					AssignedServices: []entclient.AssignedServiceResponseObject{
+						{
+
+							Name: internal.Ptr("srv-1"),
+							ServicePlans: []entclient.AssignedServicePlanResponseObject{
+								{
+									Name: internal.Ptr("plan-A"),
+									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
+										{
+											EntityId: internal.Ptr("0000-0000-0000-0000"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				cr: &v1alpha1.Entitlement{
+					Spec: v1alpha1.EntitlementSpec{
+						ForProvider: v1alpha1.EntitlementParameters{
+							SubaccountGuid:  "0000-0000-0000-0000",
+							ServicePlanName: "plan-B",
+							ServiceName:     "srv-1",
+						},
+					},
+				},
+			},
+			want: want{
+				o:   nil,
+				err: nil,
+			},
+		},
+		"found service plan": {
+			reason: "matching name and planname",
+			args: args{
+				payload: &entclient.EntitledAndAssignedServicesResponseObject{
+					AssignedServices: []entclient.AssignedServiceResponseObject{
+						{
+
+							Name: internal.Ptr("srv-1"),
+							ServicePlans: []entclient.AssignedServicePlanResponseObject{
+								{
+									Name: internal.Ptr("plan-A"),
+									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
+										{
+											EntityId: internal.Ptr("0000-0000-0000-0000"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				cr: &v1alpha1.Entitlement{
+					Spec: v1alpha1.EntitlementSpec{
+						ForProvider: v1alpha1.EntitlementParameters{
+							SubaccountGuid:  "0000-0000-0000-0000",
+							ServicePlanName: "plan-A",
+							ServiceName:     "srv-1",
 						},
 					},
 				},
@@ -352,18 +282,18 @@ func TestFilterAssignedServices(t *testing.T) {
 				err: nil,
 			},
 		},
-		"find service plan and unique ID": {
-			reason: "found by matching name",
+		"not found ambiguous service plan": {
+			reason: "matched name and planname, but not unique planname ",
 			args: args{
 				payload: &entclient.EntitledAndAssignedServicesResponseObject{
 					AssignedServices: []entclient.AssignedServiceResponseObject{
 						{
 
-							Name: internal.Ptr("postgresql-db"),
+							Name: internal.Ptr("srv-1"),
 							ServicePlans: []entclient.AssignedServicePlanResponseObject{
 								{
-									Name:             internal.Ptr("default"),
-									UniqueIdentifier: internal.Ptr("postgresql-db-aws"),
+									Name:             internal.Ptr("plan-A"),
+									UniqueIdentifier: internal.Ptr("plan-A-A"),
 									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
 										{
 											EntityId: internal.Ptr("0000-0000-0000-0000"),
@@ -374,96 +304,69 @@ func TestFilterAssignedServices(t *testing.T) {
 						},
 					},
 				},
-				servicePlan: "default",
-				serviceName: "postgresql-db",
 				cr: &v1alpha1.Entitlement{
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
 							SubaccountGuid:              "0000-0000-0000-0000",
-							ServicePlanUniqueIdentifier: internal.Ptr("postgresql-db-aws"),
+							ServicePlanUniqueIdentifier: internal.Ptr("plan-A-B"),
+							ServicePlanName:             "plan-A",
+							ServiceName:                 "srv-1",
+						},
+					},
+				},
+			},
+			want: want{
+				o:   nil,
+				err: nil,
+			},
+		},
+		"found ambiguous service plan": {
+			reason: "matched name, planname and given unique name",
+			args: args{
+				payload: &entclient.EntitledAndAssignedServicesResponseObject{
+					AssignedServices: []entclient.AssignedServiceResponseObject{
+						{
+
+							Name: internal.Ptr("srv-1"),
+							ServicePlans: []entclient.AssignedServicePlanResponseObject{
+								{
+									Name:             internal.Ptr("plan-A"),
+									UniqueIdentifier: internal.Ptr("plan-A-A"),
+									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
+										{
+											EntityId: internal.Ptr("0000-0000-0000-0000"),
+										},
+									},
+								},
+								{
+									Name:             internal.Ptr("plan-A"),
+									UniqueIdentifier: internal.Ptr("plan-A-B"),
+									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
+										{
+											EntityId: internal.Ptr("1111-1111-1111-1111"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				cr: &v1alpha1.Entitlement{
+					Spec: v1alpha1.EntitlementSpec{
+						ForProvider: v1alpha1.EntitlementParameters{
+							SubaccountGuid:              "1111-1111-1111-1111",
+							ServicePlanUniqueIdentifier: internal.Ptr("plan-A-B"),
+							ServicePlanName:             "plan-A",
+							ServiceName:                 "srv-1",
 						},
 					},
 				},
 			},
 			want: want{
 				o: &entclient.AssignedServicePlanSubaccountDTO{
-					EntityId: internal.Ptr("0000-0000-0000-0000"),
+					EntityId: internal.Ptr("1111-1111-1111-1111"),
 				},
 				err: nil,
-			},
-		},
-		"not matching unique ID": {
-			reason: "could not find matching unique ID",
-			args: args{
-				payload: &entclient.EntitledAndAssignedServicesResponseObject{
-					AssignedServices: []entclient.AssignedServiceResponseObject{
-						{
-
-							Name: internal.Ptr("postgresql-db"),
-							ServicePlans: []entclient.AssignedServicePlanResponseObject{
-								{
-									Name:             internal.Ptr("default"),
-									UniqueIdentifier: internal.Ptr("postgresql-db-aws"),
-									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
-										{
-											EntityId: internal.Ptr("0000-0000-0000-0000"),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				servicePlan: "default",
-				serviceName: "postgresql-db",
-				cr: &v1alpha1.Entitlement{
-					Spec: v1alpha1.EntitlementSpec{
-						ForProvider: v1alpha1.EntitlementParameters{
-							SubaccountGuid:              "0000-0000-0000-0000",
-							ServicePlanUniqueIdentifier: internal.Ptr("postgresql-db-azure"),
-						},
-					},
-				},
-			},
-			want: want{
-				o:   nil,
-				err: errors.Errorf(errServiceUniqueName, "postgresql-db-azure"),
-			},
-		},
-		"no unigue ID, not matching plan name": {
-			reason: "could not match plan name",
-			args: args{
-				payload: &entclient.EntitledAndAssignedServicesResponseObject{
-					AssignedServices: []entclient.AssignedServiceResponseObject{
-						{
-
-							Name: internal.Ptr("postgresql-db"),
-							ServicePlans: []entclient.AssignedServicePlanResponseObject{
-								{
-									Name: internal.Ptr("default"),
-									AssignmentInfo: []entclient.AssignedServicePlanSubaccountDTO{
-										{
-											EntityId: internal.Ptr("0000-0000-0000-0000"),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				servicePlan: "definetly-not-default",
-				serviceName: "postgresql-db",
-				cr: &v1alpha1.Entitlement{
-					Spec: v1alpha1.EntitlementSpec{
-						ForProvider: v1alpha1.EntitlementParameters{
-							SubaccountGuid: "0000-0000-0000-0000",
-						},
-					},
-				},
-			},
-			want: want{
-				o:   nil,
-				err: errors.Errorf(errServicePlanNotFoundByName, "definetly-not-default"),
 			},
 		},
 	}
@@ -471,14 +374,15 @@ func TestFilterAssignedServices(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(
 			name, func(t *testing.T) {
-				got, err := filterAssignedServices(tc.args.payload, tc.args.serviceName, tc.args.servicePlan, tc.args.cr)
+				entClient := EntitlementsClient{}
+				got, err := entClient.findAssignedServicePlan(tc.args.payload, tc.args.cr)
 
 				if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-					t.Errorf("\n%s\ne.filterAssignedServices(...): -want error, +got error:\n%s\n", tc.reason, diff)
+					t.Errorf("\n%s\ne.findAssignedServicePlan(...): -want error, +got error:\n%s\n", tc.reason, diff)
 				}
 
 				if diff := cmp.Diff(tc.want.o, got); diff != "" {
-					t.Errorf("\n%s\ne.filterAssignedServices(...): -want, +got:\n%s\n", tc.reason, diff)
+					t.Errorf("\n%s\ne.findAssignedServicePlan(...): -want, +got:\n%s\n", tc.reason, diff)
 				}
 			},
 		)

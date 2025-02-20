@@ -97,7 +97,7 @@ func TestObserve(t *testing.T) {
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("}corrupted{"),
-						Parameters:   internal.Ptr("{\"orchestrate.cloud.sap/subaccount-operator\": \"1234\", \"name\":\"kyma\"}"),
+						Parameters:   internal.Ptr("{\"name\":\"kyma\"}"),
 					}, nil
 				}},
 				httpClient: mockedHttpClient("someKubeConfigContent"),
@@ -117,7 +117,7 @@ func TestObserve(t *testing.T) {
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.EnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
-						Parameters: internal.Ptr("{\"orchestrate.cloud.sap/subaccount-operator\": \"1234\", \"name\":\"kyma\"}"),
+						Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
 					}, nil
 				}},
 				cr: environment(withUID("1234")),
@@ -138,7 +138,7 @@ func TestObserve(t *testing.T) {
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
-						Parameters:   internal.Ptr("{\"orchestrate.cloud.sap/subaccount-operator\": \"1234\", \"name\":\"kyma\"}"),
+						Parameters:   internal.Ptr("{\"name\":\"kyma\"}"),
 					}, nil
 				}},
 				httpClient: mockedHttpClient(kubeConfigData),
@@ -167,7 +167,7 @@ func TestObserve(t *testing.T) {
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
-						Parameters:   internal.Ptr("{\"orchestrate.cloud.sap/subaccount-operator\": \"1234\", \"name\":\"kyma\"}"),
+						Parameters:   internal.Ptr("{\"name\":\"kyma\"}"),
 					}, nil
 				}},
 				httpClient: mockedHttpClient("someNotMatchingKubeConfigData"),

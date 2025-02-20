@@ -14,7 +14,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const ErrInvalidSecretData = "BindingCredentials can't be created from invalid secret data"
+const ErrUnmarshalToBindingCredentials = "JSON can not be unmarshalled to BindingCredentials"
+const ErrJsonMarshal = "Error marshalling secret data"
+const ErrMissingClientId = "Client ID (clientid) is missing"
+const ErrMissingClientSecret = "Client Secret (clientsecret) is missing"
+const ErrMissingSmUrl = "Service Manager URL (sm_url) is missing"
+const ErrMissingUrl = "Token URL (tokenurl) is missing"
+const ErrMissingXsappname = "Xsappname (xsappname) is missing"
 
 // PlanIdResolver used as its own resolval implementation downstream
 type PlanIdResolver interface {
@@ -31,19 +37,34 @@ func NewCredsFromOperatorSecret(secretData map[string][]byte) (BindingCredential
 		plain[k] = string(v)
 	}
 
-	var binding BindingCredentials
 	bytes, err := json.Marshal(plain)
 	if err != nil {
-		return BindingCredentials{}, errors.New(ErrInvalidSecretData)
+		return BindingCredentials{}, errors.New(ErrJsonMarshal)
 	}
+
+	var binding BindingCredentials
 	err = json.Unmarshal(bytes, &binding)
 	if err != nil {
-		return BindingCredentials{}, errors.New(ErrInvalidSecretData)
+		return BindingCredentials{}, errors.New(ErrUnmarshalToBindingCredentials)
 	}
+
+	if plain[apisv1alpha1.ResourceCredentialsXsuaaUrl] == "" {
+		return BindingCredentials{}, errors.New(ErrMissingUrl)
+	}
+
 	binding.Url = internal.Ptr(plain[apisv1alpha1.ResourceCredentialsXsuaaUrl])
 
-	if binding.Clientid == nil || binding.Clientsecret == nil || binding.SmUrl == nil || binding.Url == nil || binding.Xsappname == nil {
-		return BindingCredentials{}, errors.New(ErrInvalidSecretData)
+	if binding.Clientid == nil {
+		return BindingCredentials{}, errors.New(ErrMissingClientId)
+	}
+	if binding.Clientsecret == nil {
+		return BindingCredentials{}, errors.New(ErrMissingClientSecret)
+	}
+	if binding.SmUrl == nil {
+		return BindingCredentials{}, errors.New(ErrMissingSmUrl)
+	}
+	if binding.Xsappname == nil {
+		return BindingCredentials{}, errors.New(ErrMissingXsappname)
 	}
 
 	return binding, nil

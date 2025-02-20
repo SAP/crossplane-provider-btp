@@ -1,0 +1,21 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: SubaccountServiceBroker
+metadata:
+  annotations:
+    meta.upbound.io/example-id: account/v1alpha1/subaccountservicebroker
+  labels:
+    testing.upbound.io/example-name: my_broker
+  name: my-broker
+spec:
+  forProvider:
+    description: Service broker for provisioning example services.
+    name: my-broker
+    passwordSecretRef:
+      key: example-key
+      name: example-secret
+      namespace: upbound-system
+    subaccountSelector:
+      matchLabels:
+        testing.upbound.io/example-name: example
+    url: https://my.broker.com
+    username: platform_user
