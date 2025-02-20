@@ -156,8 +156,9 @@ spec:
                   a CloudFoundryEnvironment.
                 properties:
                   initialOrgManagers:
-                    description: A list of users (with username/email and origin)
-                      to assign as the Org Manager role
+                    description: |-
+                      A list of users (with username/email and origin) to assign as the Org Manager role
+                      Cannot be updated after creation --> initial creation only
                     items:
                       type: string
                     type: array
