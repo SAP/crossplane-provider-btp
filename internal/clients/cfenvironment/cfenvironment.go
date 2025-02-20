@@ -154,7 +154,7 @@ func (c CloudFoundryOrganization) managerDiff(cr v1alpha1.CloudFoundryEnvironmen
 	return toAdd, toRemove
 }
 
-// returns User from credentials to allow ignoring it in manager Updates (since its done on the API side)
+// returns User from credentials to allow ignoring it in manager Updates (since it's done on the API side)
 func (c CloudFoundryOrganization) createdByUser() v1alpha1.User {
 	if c.btp.Credential == nil || c.btp.Credential.UserCredential == nil {
 		return v1alpha1.User{Username: "", Origin: defaultOrigin}
@@ -307,21 +307,4 @@ func (c CloudFoundryOrganization) updateManagers(ctx context.Context,
 		}
 	}
 	return nil
-}
-
-func containsUser(s []v1alpha1.User, e v1alpha1.User) bool {
-	for _, a := range s {
-		if strings.EqualFold(a.String(), e.String()) {
-			return true
-		}
-	}
-	return false
-}
-
-func toUsers(users []string) []v1alpha1.User {
-	result := make([]v1alpha1.User, 0)
-	for _, u := range users {
-		result = append(result, v1alpha1.User{Username: u})
-	}
-	return result
 }
