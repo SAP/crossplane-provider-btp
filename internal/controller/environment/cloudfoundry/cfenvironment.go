@@ -136,13 +136,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	if needsUpdate := c.client.NeedsUpdate(*cr); needsUpdate {
-		return managed.ExternalObservation{
-			ResourceExists:   true,
-			ResourceUpToDate: !needsUpdate,
-		}, nil
-	}
-
 	details, err := env.GetConnectionDetails(instance)
 	return managed.ExternalObservation{
 		ResourceExists:    true,
