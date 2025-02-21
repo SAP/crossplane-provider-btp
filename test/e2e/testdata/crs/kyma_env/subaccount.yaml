@@ -9,7 +9,7 @@ spec:
     labels:
       safe-to-delete: ["yes"]
       BUILD_ID: [ "$BUILD_ID" ]
-    region: eu12
+    region: eu10
     subdomain: $BUILD_ID-co-e2e-test-kyma-case
     subaccountAdmins:
       - $TECHNICAL_USER_EMAIL

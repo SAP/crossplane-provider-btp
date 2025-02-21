@@ -6,7 +6,7 @@ metadata:
 spec:
   forProvider:
     displayName: $BUILD_ID-e2e-test-sub-trust
-    region: eu12
+    region: eu10
     subdomain: $BUILD_ID-e2e-test-sub-trust-sub
     labels:
       safe-to-delete: [ "yes" ]
