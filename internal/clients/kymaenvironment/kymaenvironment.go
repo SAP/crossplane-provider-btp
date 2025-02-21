@@ -10,7 +10,6 @@ import (
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 	"sigs.k8s.io/yaml"
 
-	v1alpha12 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 )
@@ -129,6 +128,5 @@ func hasPrefix(buf []byte, prefix []byte) bool {
 
 func AddKymaDefaultParameters(parameters btp.InstanceParameters, instanceName string, resourceUID string) btp.InstanceParameters {
 	parameters[btp.KymaenvironmentParameterInstanceName] = instanceName
-	parameters[v1alpha12.SubaccountOperatorLabel] = resourceUID
 	return parameters
 }
