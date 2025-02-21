@@ -146,75 +146,11 @@ type organizationClient struct {
 	orgGuid          string
 }
 
-// returns User from credentials to allow ignoring it in manager Updates (since it's done on the API side)
-func (c CloudFoundryOrganization) createdByUser() v1alpha1.User {
-	if c.btp.Credential == nil || c.btp.Credential.UserCredential == nil {
-		return v1alpha1.User{Username: "", Origin: defaultOrigin}
-	}
-	return v1alpha1.User{Username: c.btp.Credential.UserCredential.Email, Origin: defaultOrigin}
-}
-
 func (o organizationClient) addManager(ctx context.Context, username string, origin string) error {
 
 	_, err := o.c.Roles.CreateOrganizationRoleWithUsername(ctx, o.orgGuid, username, resource.OrganizationRoleManager, origin)
 
 	return err
-
-}
-
-func (o organizationClient) deleteManager(ctx context.Context, username string, origin string) error {
-	userGuid, err := o.findUserGuidByName(ctx, username, origin)
-	if err != nil {
-		return err
-	}
-
-	if userGuid == nil {
-		return errors.Errorf(errUserNotFound, username)
-	}
-
-	// find manager roles for the user and delete them
-	listOptions := cfv3.NewRoleListOptions()
-	listOptions.OrganizationGUIDs.EqualTo(o.orgGuid)
-	listOptions.WithOrganizationRoleType(resource.OrganizationRoleManager)
-	listOptions.UserGUIDs.EqualTo(*userGuid)
-	roles, err := o.c.Roles.ListAll(ctx, listOptions)
-	if err != nil {
-		return err
-	}
-
-	for _, role := range roles {
-		if _, err := o.c.Roles.Delete(ctx, role.GUID); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (o organizationClient) findUserGuidByName(ctx context.Context, username string, origin string) (*string, error) {
-	ulo := cfv3.NewUserListOptions()
-
-	ulo.UserNames = cfv3.Filter{
-		Values: append(make([]string, 0), username),
-	}
-	ulo.Origins = cfv3.Filter{
-		Values: append(make([]string, 0), origin),
-	}
-
-	users, err := o.c.Users.ListAll(ctx, ulo)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(users) == 0 {
-		return nil, nil
-	}
-
-	if len(users) > 1 {
-		return nil, errors.Errorf(errUserFoundMultipleTimes, username)
-	}
-
-	return &users[0].GUID, nil
 
 }
 
