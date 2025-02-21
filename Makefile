@@ -27,9 +27,9 @@ $(info VERSION is $(VERSION))
 # Setup Output
 -include build/makelib/output.mk
 
-# Setup Go
-
+# Setup Versions
 GO_REQUIRED_VERSION=1.23
+GOLANGCILINT_VERSION ?= 1.64.5
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
@@ -164,7 +164,7 @@ dev-debug: $(KIND) $(KUBECTL)
 	@$(KUBECTL) apply -R -f examples/provider
 	@$(INFO) Now you can debug the provider with the IDE...
 
-dev: $(KIND) $(KUBECTL) 
+dev: $(KIND) $(KUBECTL)
 	@$(INFO) Creating kind cluster
 	@$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 	@$(KUBECTL) cluster-info --context kind-$(PROJECT_NAME)-dev
