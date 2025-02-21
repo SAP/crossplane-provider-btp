@@ -44,6 +44,7 @@ func (u *User) String() string {
 // CfEnvironmentParameters are the configurable fields of a CloudFoundryEnvironment.
 type CfEnvironmentParameters struct {
 	// A list of users (with username/email and origin) to assign as the Org Manager role
+	// Cannot be updated after creation --> initial creation only
 	// +optional
 	Managers []string `json:"initialOrgManagers,omitempty"`
 
