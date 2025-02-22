@@ -35,12 +35,20 @@ type SubaccountServiceInstanceInitParameters struct {
 	// The name of the service instance.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
 
-	// (String, Sensitive) The configuration parameters for the service instance.
-	// The configuration parameters for the service instance.
-	Parameters *string `json:"parameters,omitempty" tf:"parameters,omitempty"`
+	// Reference to a ServicePlan in account to populate serviceplanId.
+	// +kubebuilder:validation:Optional
+	ServicePlanRef *v1.Reference `json:"servicePlanRef,omitempty" tf:"-"`
+
+	// Selector for a ServicePlan in account to populate serviceplanId.
+	// +kubebuilder:validation:Optional
+	ServicePlanSelector *v1.Selector `json:"servicePlanSelector,omitempty" tf:"-"`
 
 	// (String) The ID of the service plan.
 	// The ID of the service plan.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServicePlan
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServicePlanId()
+	// +crossplane:generate:reference:refFieldName=ServicePlanRef
+	// +crossplane:generate:reference:selectorFieldName=ServicePlanSelector
 	ServiceplanID *string `json:"serviceplanId,omitempty" tf:"serviceplan_id,omitempty"`
 
 	// (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
@@ -49,7 +57,19 @@ type SubaccountServiceInstanceInitParameters struct {
 
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()
+	// +crossplane:generate:reference:refFieldName=SubaccountRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
 	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
+
+	// Reference to a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+
+	// Selector for a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
 }
 
 type SubaccountServiceInstanceObservation struct {
@@ -80,10 +100,6 @@ type SubaccountServiceInstanceObservation struct {
 	// (String) The name of the service instance.
 	// The name of the service instance.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
-
-	// (String, Sensitive) The configuration parameters for the service instance.
-	// The configuration parameters for the service instance.
-	Parameters *string `json:"parameters,omitempty" tf:"parameters,omitempty"`
 
 	// (String) The platform ID.
 	// The platform ID.
@@ -132,10 +148,22 @@ type SubaccountServiceInstanceParameters struct {
 	// (String, Sensitive) The configuration parameters for the service instance.
 	// The configuration parameters for the service instance.
 	// +kubebuilder:validation:Optional
-	Parameters *string `json:"parameters,omitempty" tf:"parameters,omitempty"`
+	ParametersSecretRef *v1.SecretKeySelector `json:"parametersSecretRef,omitempty" tf:"-"`
+
+	// Reference to a ServicePlan in account to populate serviceplanId.
+	// +kubebuilder:validation:Optional
+	ServicePlanRef *v1.Reference `json:"servicePlanRef,omitempty" tf:"-"`
+
+	// Selector for a ServicePlan in account to populate serviceplanId.
+	// +kubebuilder:validation:Optional
+	ServicePlanSelector *v1.Selector `json:"servicePlanSelector,omitempty" tf:"-"`
 
 	// (String) The ID of the service plan.
 	// The ID of the service plan.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServicePlan
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServicePlanId()
+	// +crossplane:generate:reference:refFieldName=ServicePlanRef
+	// +crossplane:generate:reference:selectorFieldName=ServicePlanSelector
 	// +kubebuilder:validation:Optional
 	ServiceplanID *string `json:"serviceplanId,omitempty" tf:"serviceplan_id,omitempty"`
 
@@ -146,8 +174,20 @@ type SubaccountServiceInstanceParameters struct {
 
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()
+	// +crossplane:generate:reference:refFieldName=SubaccountRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
 	// +kubebuilder:validation:Optional
 	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
+
+	// Reference to a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+
+	// Selector for a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
 }
 
 // SubaccountServiceInstanceSpec defines the desired state of SubaccountServiceInstance
@@ -187,8 +227,6 @@ type SubaccountServiceInstance struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!('*' in self.managementPolicies || 'Create' in self.managementPolicies || 'Update' in self.managementPolicies) || has(self.forProvider.name) || (has(self.initProvider) && has(self.initProvider.name))",message="spec.forProvider.name is a required parameter"
-	// +kubebuilder:validation:XValidation:rule="!('*' in self.managementPolicies || 'Create' in self.managementPolicies || 'Update' in self.managementPolicies) || has(self.forProvider.serviceplanId) || (has(self.initProvider) && has(self.initProvider.serviceplanId))",message="spec.forProvider.serviceplanId is a required parameter"
-	// +kubebuilder:validation:XValidation:rule="!('*' in self.managementPolicies || 'Create' in self.managementPolicies || 'Update' in self.managementPolicies) || has(self.forProvider.subaccountId) || (has(self.initProvider) && has(self.initProvider.subaccountId))",message="spec.forProvider.subaccountId is a required parameter"
 	Spec   SubaccountServiceInstanceSpec   `json:"spec"`
 	Status SubaccountServiceInstanceStatus `json:"status,omitempty"`
 }
