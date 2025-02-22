@@ -18,8 +18,8 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2
 	github.com/muvaf/typewriter v0.0.0-20240614220100-70f9d4a54ea0
 	github.com/pkg/errors v0.9.1
-	github.com/samber/lo v1.47.0
-	github.com/stretchr/testify v1.9.0
+	github.com/samber/lo v1.49.1
+	github.com/stretchr/testify v1.10.0
 	github.com/vladimirvivien/gexe v0.2.0
 	golang.org/x/net v0.33.0
 	golang.org/x/oauth2 v0.23.0
