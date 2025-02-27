@@ -255,18 +255,28 @@ func splitExternalName(externalName string) (string, string) {
 
 // gets the service instance name from the cloud management CR in a retrocompatible way
 func getServiceInstanceName(cm *apisv1beta1.CloudManagement) *string {
+	defaultName := apisv1beta1.DefaultCloudManagementInstanceName
+
 	if cm.Spec.ForProvider.ServiceInstanceName != "" {
-		return &cm.Spec.ForProvider.ServiceInstanceName
+		defaultName = cm.Spec.ForProvider.ServiceInstanceName
+	} else if cm.TypeMeta.APIVersion == apisv1alpha1.CloudManagementKindAPIVersion {
+		defaultName = cm.Name
 	}
-	return &cm.Name
+
+	return &defaultName
 }
 
 // gets the service binding name from the cloud management CR in a retrocompatible way
 func getServiceBindingName(cm *apisv1beta1.CloudManagement) *string {
+	defaultName := apisv1beta1.DefaultCloudManagementBindingName
+
 	if cm.Spec.ForProvider.ServiceBindingName != "" {
-		return &cm.Spec.ForProvider.ServiceBindingName
+		defaultName = cm.Spec.ForProvider.ServiceBindingName
+	} else if cm.TypeMeta.APIVersion == apisv1alpha1.CloudManagementKindAPIVersion {
+		defaultName = cm.Name
 	}
-	return &cm.Name
+
+	return &defaultName
 }
 
 // mapTfConnectionDetails maps the connection details from the terraform output to the connection details of the CR as expected by the crossplane provider

@@ -518,6 +518,60 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestUpdate(t *testing.T) {
+	type want struct {
+		err error
+	}
+	type args struct {
+		tfClient *TfClientFake
+	}
+	tests := []struct {
+		name string
+		args args
+
+		want want
+	}{
+		{
+			name: "Update Error",
+			args: args{
+				tfClient: &TfClientFake{
+					updateFn: func() error {
+						return errors.New("updateError")
+					},
+				},
+			},
+			want: want{
+				err: errors.New("updateError"),
+			},
+		},
+		{
+			name: "Success",
+			args: args{
+				tfClient: &TfClientFake{
+					updateFn: func() error {
+						return nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			uua := &external{
+				tracker:  test2.NoOpReferenceResolverTracker{},
+				tfClient: tc.args.tfClient,
+			}
+			_, err := uua.Update(context.TODO(), NewCloudManagement("test", WithExternalName("someID/anotherID")))
+			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
+				t.Errorf("\ne.Update(): -want error, +got error:\n%s\n", diff)
+			}
+		})
+	}
+}
+
 // Utils
 func NewCloudManagement(name string, m ...CloudManagementModifier) *v1beta1.CloudManagement {
 	cr := &v1beta1.CloudManagement{

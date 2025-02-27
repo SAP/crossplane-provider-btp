@@ -11,6 +11,9 @@ import (
 const (
 	CisStatusBound   = "BOUND"
 	CisStatusUnbound = "UNBOUND"
+
+	DefaultCloudManagementInstanceName string = "managed-cloud-management"
+	DefaultCloudManagementBindingName  string = "managed-cloud-management-binding"
 )
 
 // CloudManagementParameters are the configurable fields of a CloudManagement.
@@ -42,9 +45,9 @@ type CloudManagementParameters struct {
 	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceManagerSecretNamespace()
 	ServiceManagerSecretNamespace string `json:"serviceManagerSecretNamespace,omitempty"`
 
-	// Name of created service instance, Defaults to metadata.name for backward compatibility
+	// Name of created service instance, Defaults to "managed-cloud-management"
 	ServiceInstanceName string `json:"serviceInstanceName,omitempty"`
-	// Name of created service binding, Defaults to metadata.name for backward compatibility
+	// Name of created service binding, Defaults to "managed-cloud-management-binding"
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serviceBindingName can't be updated once set"
 	ServiceBindingName string `json:"serviceBindingName,omitempty"`
 }

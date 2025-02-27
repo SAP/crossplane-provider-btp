@@ -194,7 +194,12 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotCloudManagement)
 	}
 
-	return managed.ExternalUpdate{}, errors.Errorf("%s/%s update not implemented", cr.Namespace, cr.Name)
+	err := c.tfClient.UpdateResources(ctx, cr)
+	if err != nil {
+		return managed.ExternalUpdate{}, err
+	}
+
+	return managed.ExternalUpdate{}, nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {

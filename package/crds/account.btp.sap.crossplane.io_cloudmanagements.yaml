@@ -629,15 +629,13 @@ spec:
                   of a CloudManagement.
                 properties:
                   serviceBindingName:
-                    description: Name of created service binding, Defaults to metadata.name
-                      for backward compatibility
+                    description: Name of created service binding, Defaults to "managed-cloud-management-binding"
                     type: string
                     x-kubernetes-validations:
                     - message: serviceBindingName can't be updated once set
                       rule: self == oldSelf
                   serviceInstanceName:
-                    description: Name of created service instance, Defaults to metadata.name
-                      for backward compatibility
+                    description: Name of created service instance, Defaults to "managed-cloud-management"
                     type: string
                   serviceManagerRef:
                     description: A Reference to a named object.
