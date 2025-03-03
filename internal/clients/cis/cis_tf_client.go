@@ -273,8 +273,6 @@ func getServiceInstanceName(cm *apisv1beta1.CloudManagement) *string {
 
 	if cm.Spec.ForProvider.ServiceInstanceName != "" {
 		defaultName = cm.Spec.ForProvider.ServiceInstanceName
-	} else if cm.TypeMeta.APIVersion == apisv1alpha1.CloudManagementKindAPIVersion {
-		defaultName = cm.Name
 	}
 
 	return &defaultName
@@ -286,8 +284,6 @@ func getServiceBindingName(cm *apisv1beta1.CloudManagement) *string {
 
 	if cm.Spec.ForProvider.ServiceBindingName != "" {
 		defaultName = cm.Spec.ForProvider.ServiceBindingName
-	} else if cm.TypeMeta.APIVersion == apisv1alpha1.CloudManagementKindAPIVersion {
-		defaultName = cm.Name
 	}
 
 	return &defaultName
