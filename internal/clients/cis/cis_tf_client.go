@@ -210,7 +210,7 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.CloudM
 	// the way the reconciler is implemented we need to do another observe run to actually retrieve if updates are nessecary,
 	// the first one is just used to set ready state for any reason, should be rechecked when we have the in-memory clients in place
 	// since they reimplement Observe()
-	resourceUpToDate := tf.resourcesUpToDate(ctx)
+	resourceUpToDate := tf.resourcesUpToDate(ctx, cr)
 
 	return ResourcesStatus{
 		ExternalObservation: managed.ExternalObservation{
@@ -224,9 +224,23 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.CloudM
 }
 
 // ResourcesUpToDate runs another observe on instance and returns whether they are up to date, currently updates on bindings are not supported
-func (tf *TfClient) resourcesUpToDate(ctx context.Context) bool {
+func (tf *TfClient) resourcesUpToDate(ctx context.Context, cr *apisv1beta1.CloudManagement) bool {
 	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
-	return err != nil || siObs.ResourceUpToDate
+
+	// ignore errors, since its a second Observe with no changes this should never happen
+	if err != nil {
+		return true
+	}
+	// if tf detects no changes it must be up to date
+	if siObs.ResourceUpToDate {
+		return true
+	}
+	// accounts for a behaviour change, resources created as v1alpha1 in previous provider versions
+	// use metadata.name as instance Name, we don't want to change those
+	if alphaRes := tf.createdFromV1Alpha1(cr); alphaRes {
+		return true
+	}
+	return false
 }
 
 func (tf *TfClient) createInstance(ctx context.Context) (string, error) {
@@ -292,4 +306,9 @@ func mapTfConnectionDetails(conDetails map[string][]byte) (managed.ConnectionDet
 	credentials[providerv1alpha1.RawBindingKey] = raw
 
 	return credentials, nil
+}
+
+// detects whether an instance has been created from previous provider versions, those used metadata.name as instance name
+func (tf *TfClient) createdFromV1Alpha1(cr *apisv1beta1.CloudManagement) bool {
+	return cr.Spec.ForProvider.ServiceInstanceName == "" && internal.Val(tf.sInstance.Status.AtProvider.Name) == cr.GetName()
 }
