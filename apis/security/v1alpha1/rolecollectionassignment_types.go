@@ -46,6 +46,22 @@ type RoleCollectionAssignmentSpec struct {
 
 	// xsuaa api credentials used to manage the assignment
 	APICredentials APICredentials `json:"apiCredentials"`
+
+	// +kubebuilder:validation:Optional
+	SubaccountApiCredentialSelector *xpv1.Selector `json:"subaccountApiCredentialSelector,omitempty"`
+	// +kubebuilder:validation:Optional
+	SubaccountApiCredentialRef *xpv1.Reference `json:"subaccountApiCredentialRef,omitempty" reference-group:"security.btp.sap.crossplane.io" reference-kind:"SubaccountApiCredential" reference-apiversion:"v1alpha1"`
+
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredential
+	// +crossplane:generate:reference:refFieldName=SubaccountApiCredentialRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountApiCredentialSelector
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredentialSecret()
+	SubaccountApiCredentialSecret string `json:"subaccountApiCredentialSecret,omitempty"`
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredential
+	// +crossplane:generate:reference:refFieldName=SubaccountApiCredentialRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountApiCredentialSelector
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredentialSecretSecretNamespace()
+	SubaccountApiCredentialSecretNamespace string `json:"subaccountApiCredentialSecretNamespace,omitempty"`
 }
 
 // A RoleCollectionAssignmentStatus represents the observed state of a RoleCollectionAssignment.
