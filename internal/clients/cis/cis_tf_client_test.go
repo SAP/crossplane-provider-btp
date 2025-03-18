@@ -112,14 +112,6 @@ func TestConnectResources(t *testing.T) {
 			expectedInstance:  getExpectedInstanceSpec(v1beta1.DefaultCloudManagementInstanceName),
 			expectedBinding:   getExpectedBindingSpec(v1beta1.DefaultCloudManagementBindingName, defaultExtName),
 		},
-		{
-			name:              "Success with default instance and binding name on v1alpha1",
-			cr:                testCMCr(utilCloudManagementParams{apiVersion: v1alpha1.CloudManagementKindAPIVersion, extName: defaultExtName}),
-			instanceConnector: successInstanceMock,
-			bindingConnector:  successBindingMock,
-			expectedInstance:  getExpectedInstanceSpec(defaultName),
-			expectedBinding:   getExpectedBindingSpec(defaultName, defaultExtName),
-		},
 	}
 
 	for _, tc := range tests {
@@ -170,6 +162,8 @@ func TestObserveResources(t *testing.T) {
 	type args struct {
 		siExternal ExternalClientFake
 		sbExternal ExternalClientFake
+		siName     string
+		cr         *v1beta1.CloudManagement
 	}
 	tests := []struct {
 		name string
@@ -270,6 +264,68 @@ func TestObserveResources(t *testing.T) {
 			},
 		},
 		{
+			name: "DontUpdateOnV1Alpha1",
+			args: args{
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true,
+							ConnectionDetails: map[string][]byte{"attribute.credentials": []byte(bindingData)},
+						}, nil
+					},
+				},
+				siName: "test",
+				cr:     testCMCr(utilCloudManagementParams{extName: defaultExtName, siName: "", crName: "test"}),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{
+						ResourceExists:    true,
+						ResourceUpToDate:  true,
+						ConnectionDetails: expectedConversion(bindingData),
+					},
+					InstanceID: defaultInstanceID,
+					BindingID:  defaultBindingID,
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "UpdateOnV1Beta1",
+			args: args{
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true,
+							ConnectionDetails: map[string][]byte{"attribute.credentials": []byte(bindingData)},
+						}, nil
+					},
+				},
+				siName: "test",
+				cr:     testCMCr(utilCloudManagementParams{extName: defaultExtName, siName: defaultInstanceName, crName: "test"}),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{
+						ResourceExists:    true,
+						ResourceUpToDate:  false,
+						ConnectionDetails: expectedConversion(bindingData),
+					},
+					InstanceID: defaultInstanceID,
+					BindingID:  defaultBindingID,
+				},
+				err: nil,
+			},
+		},
+		{
 			name: "UnexpectedFormatOfReturnedConnectionDetails",
 			args: args{
 				siExternal: ExternalClientFake{
@@ -320,13 +376,22 @@ func TestObserveResources(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			siName := tc.args.siName
+			if siName == "" {
+				siName = defaultInstanceName
+			}
+			cr := tc.args.cr
+			if cr == nil {
+				cr = defaultCR
+			}
+
 			uua := &TfClient{
 				siExternal: tc.args.siExternal,
 				sbExternal: tc.args.sbExternal,
-				sInstance:  testServiceInstance(defaultInstanceID),
+				sInstance:  testServiceInstance(defaultInstanceID, siName),
 				sBinding:   testServiceBinding(defaultBindingID),
 			}
-			obs, err := uua.ObserveResources(context.TODO(), defaultCR)
+			obs, err := uua.ObserveResources(context.TODO(), cr)
 			if diff := cmp.Diff(tc.want.obs, obs); diff != "" {
 				t.Errorf("\ne.ObserveResources(): -want, +got:\n%s\n", diff)
 			}
@@ -367,7 +432,7 @@ func TestCreateResources(t *testing.T) {
 						return managed.ExternalCreation{}, errors.New("instanceCreateError")
 					},
 				},
-				sInstance: testServiceInstance(defaultInstanceID),
+				sInstance: testServiceInstance(defaultInstanceID, defaultInstanceName),
 			},
 			want: want{
 				err: errors.New("instanceCreateError"),
@@ -383,7 +448,7 @@ func TestCreateResources(t *testing.T) {
 						return managed.ExternalCreation{}, nil
 					},
 				},
-				sInstance: testServiceInstance("crName"),
+				sInstance: testServiceInstance(defaultInstanceID, defaultInstanceName),
 			},
 			want: want{
 				sID: defaultInstanceID,
@@ -399,7 +464,7 @@ func TestCreateResources(t *testing.T) {
 						return managed.ExternalCreation{}, errors.New("bindingCreateError")
 					},
 				},
-				sInstance: testServiceInstance(defaultInstanceID),
+				sInstance: testServiceInstance(defaultInstanceID, defaultInstanceName),
 				sBinding:  testServiceBinding(defaultBindingID),
 			},
 			want: want{
@@ -424,7 +489,7 @@ func TestCreateResources(t *testing.T) {
 						return managed.ExternalCreation{}, nil
 					},
 				},
-				sInstance: testServiceInstance(defaultInstanceID),
+				sInstance: testServiceInstance(defaultInstanceID, defaultInstanceName),
 				sBinding:  testServiceBinding(defaultBindingID),
 			},
 			want: want{
@@ -536,25 +601,25 @@ func TestDeleteResources(t *testing.T) {
 // Utils
 
 type utilCloudManagementParams struct {
-	apiVersion       string
 	extName          string
 	siName           string
 	sbName           string
 	statusInstanceID string
+	crName           string
 }
 
 func testCMCr(params utilCloudManagementParams) *v1beta1.CloudManagement {
-
-	if params.apiVersion == "" {
-		params.apiVersion = v1beta1.CloudManagementGroupVersionKind.Version
+	crName := params.crName
+	if crName == "" {
+		crName = defaultName
 	}
 
 	sm := &v1beta1.CloudManagement{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: params.apiVersion,
+			APIVersion: v1beta1.CloudManagementGroupVersionKind.Version,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: defaultName,
+			Name: crName,
 		},
 		Spec: v1beta1.CloudManagementSpec{
 			ForProvider: v1beta1.CloudManagementParameters{
@@ -581,15 +646,19 @@ func testCMCr(params utilCloudManagementParams) *v1beta1.CloudManagement {
 	return sm
 }
 
-func testServiceInstance(extName string) *v1alpha1.SubaccountServiceInstance {
+func testServiceInstance(extName, siName string) *v1alpha1.SubaccountServiceInstance {
 
 	instance := &v1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{},
 		},
-		Spec:   v1alpha1.SubaccountServiceInstanceSpec{},
-		Status: v1alpha1.SubaccountServiceInstanceStatus{},
+		Spec: v1alpha1.SubaccountServiceInstanceSpec{},
+		Status: v1alpha1.SubaccountServiceInstanceStatus{
+			AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
+				Name: &siName,
+			},
+		},
 	}
 	meta.SetExternalName(instance, extName)
 	return instance
