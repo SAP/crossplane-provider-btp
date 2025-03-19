@@ -13,7 +13,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 )
 
-var apiError = errors.New("apiError")
+var errApi = errors.New("apiError")
 
 func TestObserve(t *testing.T) {
 	type fields struct {
@@ -38,13 +38,13 @@ func TestObserve(t *testing.T) {
 		"LookupError": {
 			reason: "error should be returned",
 			fields: fields{
-				client: &TfProxyMock{err: apiError},
+				client: &TfProxyMock{err: errApi},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
 			},
 			want: want{
-				err: apiError,
+				err: errApi,
 			},
 		},
 		"NotFound": {
@@ -110,11 +110,11 @@ func TestCreate(t *testing.T) {
 	}{
 		"ApiError": {
 			args: args{
-				client: &TfProxyMock{err: apiError},
+				client: &TfProxyMock{err: errApi},
 				mg:     &v1alpha1.ServiceInstance{},
 			},
 			want: want{
-				err: apiError,
+				err: errApi,
 			},
 		},
 	}
