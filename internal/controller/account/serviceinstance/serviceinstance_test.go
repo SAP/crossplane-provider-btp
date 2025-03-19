@@ -96,11 +96,47 @@ func TestObserve(t *testing.T) {
 	}
 }
 
+func TestCreate(t *testing.T) {
+	type want struct {
+		err error
+	}
+	type args struct {
+		client *TfProxyMock
+		mg     *v1alpha1.ServiceInstance
+	}
+	cases := map[string]struct {
+		args args
+		want want
+	}{
+		"ApiError": {
+			args: args{
+				client: &TfProxyMock{err: apiError},
+				mg:     &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: apiError,
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{tfClient: tc.args.client}
+			_, err := e.Create(context.Background(), tc.args.mg)
+			expectedErrorBehaviour(t, tc.want.err, err)
+		})
+	}
+}
+
 var _ TfProxyClient = &TfProxyMock{}
 
 type TfProxyMock struct {
 	found bool
 	err   error
+}
+
+// Create implements TfProxyClient.
+func (t *TfProxyMock) Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
+	return t.err
 }
 
 // Observe implements TfProxyClient.

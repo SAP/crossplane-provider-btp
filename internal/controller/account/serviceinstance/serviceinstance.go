@@ -25,11 +25,13 @@ const (
 	errGetPC              = "cannot get ProviderConfig"
 	errGetCreds           = "cannot get credentials"
 
-	errGetInstance = "cannot observe serviceinstnace"
+	errGetInstance    = "cannot observe serviceinstnace"
+	errCreateInstance = "cannot create serviceinstnace"
 )
 
 type TfProxyClient interface {
 	Observe(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error)
+	Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error
 }
 
 // Setup adds a controller that reconciles ServiceInstance managed resources.
@@ -98,9 +100,13 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	_, ok := mg.(*v1alpha1.ServiceInstance)
+	cr, ok := mg.(*v1alpha1.ServiceInstance)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotServiceInstance)
+	}
+	err := e.tfClient.Create(ctx, cr)
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateInstance)
 	}
 
 	return managed.ExternalCreation{
