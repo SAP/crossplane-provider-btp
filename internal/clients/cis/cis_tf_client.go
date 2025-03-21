@@ -18,11 +18,11 @@ import (
 )
 
 // ResourcesStatus contains a summary of the status of the tf resources managed by the ITfClient
-// it uses the crossplane terminology for the external observation and enhances it with IDs of the managed instances
+// it uses the crossplane terminology for the external observation and enhances it with observation data of the managed instances
 type ResourcesStatus struct {
 	managed.ExternalObservation
-	InstanceID string
-	BindingID  string
+	Instance apisv1alpha1.SubaccountServiceInstanceObservation
+	Binding  apisv1alpha1.SubaccountServiceBindingObservation
 }
 
 // ITfClientInitializer will produce the ITfClient used by external
@@ -198,7 +198,7 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.CloudM
 	if !sbObs.ResourceExists {
 		return ResourcesStatus{
 			ExternalObservation: managed.ExternalObservation{ResourceExists: false},
-			InstanceID:          meta.GetExternalName(tf.sInstance),
+			Instance:            tf.sInstance.Status.AtProvider,
 		}, nil
 	}
 
@@ -218,8 +218,8 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.CloudM
 			ResourceUpToDate:  resourceUpToDate,
 			ConnectionDetails: conDetails,
 		},
-		InstanceID: meta.GetExternalName(tf.sInstance),
-		BindingID:  meta.GetExternalName(tf.sBinding),
+		Instance: tf.sInstance.Status.AtProvider,
+		Binding:  tf.sBinding.Status.AtProvider,
 	}, nil
 }
 

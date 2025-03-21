@@ -2,6 +2,7 @@ package cloudmanagement
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -18,6 +19,9 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
+	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+
+	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	cmclient "github.com/sap/crossplane-provider-btp/internal/clients/cis"
@@ -227,8 +231,16 @@ func (c *external) setStatus(ctx context.Context, status cmclient.ResourcesStatu
 		cr.Status.SetConditions(xpv1.Unavailable())
 		cr.Status.AtProvider.Status = apisv1beta1.CisStatusUnbound
 	}
-	cr.Status.AtProvider.ServiceInstanceID = status.InstanceID
-	cr.Status.AtProvider.ServiceBindingID = status.BindingID
+
+	if status.Instance.ID != nil {
+		cr.Status.AtProvider.Instance = mapToInstance(&status.Instance)
+		cr.Status.AtProvider.ServiceInstanceID = *status.Instance.ID
+	}
+
+	if status.Binding.ID != nil {
+		cr.Status.AtProvider.Binding = mapToBinding(&status.Binding)
+		cr.Status.AtProvider.ServiceBindingID = *status.Binding.ID
+	}
 	// Unfortunately we need to update the CR status manually here, because the reconciler will drop the change otherwise
 	// (I guess because we are attempting to save something while ResourceExists remains false for another cycle)
 	return c.kube.Status().Update(ctx, cr)
@@ -240,4 +252,57 @@ func formExternalName(serviceInstanceID, serviceBindingID string) string {
 		return serviceInstanceID
 	}
 	return serviceInstanceID + "/" + serviceBindingID
+}
+
+func mapToInstance(src *apisv1alpha1.SubaccountServiceInstanceObservation) *v1beta1.Instance {
+	if src == nil {
+		return nil
+	}
+
+	return &apisv1beta1.Instance{
+		Id:                   src.ID,
+		Ready:                src.Ready,
+		Name:                 src.Name,
+		ServicePlanId:        src.ServiceplanID,
+		PlatformId:           src.PlatformID,
+		DashboardUrl:         src.DashboardURL,
+		ReferencedInstanceId: src.ReferencedInstanceID,
+		Shared:               src.Shared,
+		Context:              unmarshalContext(src.Context),
+		MaintenanceInfo:      nil,
+		Usable:               src.Usable,
+		CreatedAt:            src.CreatedDate,
+		UpdatedAt:            src.LastModified,
+		Labels:               nil,
+	}
+}
+
+func mapToBinding(src *apisv1alpha1.SubaccountServiceBindingObservation) *apisv1beta1.Binding {
+	if src == nil {
+		return nil
+	}
+
+	return &apisv1beta1.Binding{
+		Id:                src.ID,
+		Ready:             src.Ready,
+		Name:              src.Name,
+		ServiceInstanceId: src.ServiceInstanceID,
+		Context:           unmarshalContext(src.Context),
+		BindResource:      nil,
+		CreatedAt:         src.CreatedDate,
+		UpdatedAt:         src.LastModified,
+		Labels:            nil,
+	}
+}
+
+func unmarshalContext(src *string) *map[string]string {
+	if src == nil {
+		return nil
+	}
+
+	var contextData map[string]string
+	if err := json.Unmarshal([]byte(*src), &contextData); err != nil {
+		return nil
+	}
+	return &contextData
 }

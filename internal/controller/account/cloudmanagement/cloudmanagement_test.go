@@ -316,7 +316,7 @@ func TestObserve(t *testing.T) {
 						// Doesn't matter what observe is returned exactly, as long as its passed through and IDs are persisted
 						return cmclient.ResourcesStatus{
 							ExternalObservation: managed.ExternalObservation{ResourceExists: false},
-							InstanceID:          "someID",
+							Instance:            v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr("someID")},
 						}, nil
 					},
 				},
@@ -328,6 +328,7 @@ func TestObserve(t *testing.T) {
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status:            v1alpha1.CisStatusUnbound,
 						ServiceInstanceID: "someID",
+						Instance:          &v1beta1.Instance{Id: internal.Ptr("someID")},
 					}),
 					WithConditions(xpv1.Unavailable()),
 				),
@@ -346,8 +347,8 @@ func TestObserve(t *testing.T) {
 								ResourceUpToDate:  true,
 								ConnectionDetails: map[string][]byte{"key": []byte("value")},
 							},
-							InstanceID: "someID",
-							BindingID:  "anotherID",
+							Instance: v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr("someID")},
+							Binding:  v1alpha1.SubaccountServiceBindingObservation{ID: internal.Ptr("anotherID")},
 						}, nil
 
 					},
@@ -361,6 +362,42 @@ func TestObserve(t *testing.T) {
 						Status:            v1alpha1.CisStatusBound,
 						ServiceInstanceID: "someID",
 						ServiceBindingID:  "anotherID",
+						Instance:          &v1beta1.Instance{Id: internal.Ptr("someID")},
+						Binding:           &v1beta1.Binding{Id: internal.Ptr("anotherID")},
+					}),
+					WithConditions(xpv1.Available())),
+			},
+		},
+		{
+			name: "IsAvailableWithContext",
+			args: args{
+				cr: NewCloudManagement("test"),
+				tfClient: &TfClientFake{
+					observeFn: func() (cmclient.ResourcesStatus, error) {
+						// Doesn't matter if updated or not
+						return cmclient.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{
+								ResourceExists:    true,
+								ResourceUpToDate:  true,
+								ConnectionDetails: map[string][]byte{"key": []byte("value")},
+							},
+							Instance: v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr("someID"), Context: internal.Ptr(`{"key":"value"}`)},
+							Binding:  v1alpha1.SubaccountServiceBindingObservation{ID: internal.Ptr("anotherID")},
+						}, nil
+
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, ConnectionDetails: map[string][]byte{"key": []byte("value")}},
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithStatus(v1beta1.CloudManagementObservation{
+						Status:            v1alpha1.CisStatusBound,
+						ServiceInstanceID: "someID",
+						ServiceBindingID:  "anotherID",
+						Instance:          &v1beta1.Instance{Id: internal.Ptr("someID"), Context: &map[string]string{"key": "value"}},
+						Binding:           &v1beta1.Binding{Id: internal.Ptr("anotherID")},
 					}),
 					WithConditions(xpv1.Available())),
 			},

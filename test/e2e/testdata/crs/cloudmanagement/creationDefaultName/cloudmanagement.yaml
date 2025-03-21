@@ -1,14 +1,14 @@
 apiVersion: account.btp.sap.crossplane.io/v1beta1
 kind: CloudManagement
 metadata:
-  name: e2e-sub-import-cis-local
+  name: e2e-cis-created
   namespace: default
 spec:
   writeConnectionSecretToRef:
-    name: e2e-sub-import-cis-local
+    name: e2e-cis-created
     namespace: default
   forProvider:
     serviceManagerRef:
-      name: e2e-sm-sub-import
+      name: e2e-sm-cis
     subaccountRef:
-      name: sub-import-sa-test
+      name: cis-sa-test

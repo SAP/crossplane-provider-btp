@@ -235,7 +235,7 @@ func TestObserveResources(t *testing.T) {
 			want: want{
 				obs: ResourcesStatus{
 					ExternalObservation: managed.ExternalObservation{ResourceExists: false},
-					InstanceID:          defaultInstanceID,
+					Instance:            v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr(defaultInstanceID), Name: internal.Ptr(defaultInstanceName)},
 				},
 				err: nil,
 			},
@@ -258,7 +258,7 @@ func TestObserveResources(t *testing.T) {
 			want: want{
 				obs: ResourcesStatus{
 					ExternalObservation: managed.ExternalObservation{ResourceExists: false},
-					InstanceID:          defaultInstanceID,
+					Instance:            v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr(defaultInstanceID), Name: internal.Ptr(defaultInstanceName)},
 				},
 				err: nil,
 			},
@@ -288,8 +288,8 @@ func TestObserveResources(t *testing.T) {
 						ResourceUpToDate:  true,
 						ConnectionDetails: expectedConversion(bindingData),
 					},
-					InstanceID: defaultInstanceID,
-					BindingID:  defaultBindingID,
+					Instance: v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr(defaultInstanceID), Name: internal.Ptr("test")},
+					Binding:  v1alpha1.SubaccountServiceBindingObservation{ID: internal.Ptr(defaultBindingID), Name: internal.Ptr(defaultBindingName)},
 				},
 				err: nil,
 			},
@@ -319,8 +319,8 @@ func TestObserveResources(t *testing.T) {
 						ResourceUpToDate:  false,
 						ConnectionDetails: expectedConversion(bindingData),
 					},
-					InstanceID: defaultInstanceID,
-					BindingID:  defaultBindingID,
+					Instance: v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr(defaultInstanceID), Name: internal.Ptr("test")},
+					Binding:  v1alpha1.SubaccountServiceBindingObservation{ID: internal.Ptr(defaultBindingID), Name: internal.Ptr(defaultBindingName)},
 				},
 				err: nil,
 			},
@@ -367,8 +367,8 @@ func TestObserveResources(t *testing.T) {
 						ResourceUpToDate:  true,
 						ConnectionDetails: expectedConversion(bindingData),
 					},
-					InstanceID: defaultInstanceID,
-					BindingID:  defaultBindingID,
+					Instance: v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr(defaultInstanceID), Name: internal.Ptr(defaultInstanceName)},
+					Binding:  v1alpha1.SubaccountServiceBindingObservation{ID: internal.Ptr(defaultBindingID), Name: internal.Ptr(defaultBindingName)},
 				},
 				err: nil,
 			},
@@ -389,7 +389,7 @@ func TestObserveResources(t *testing.T) {
 				siExternal: tc.args.siExternal,
 				sbExternal: tc.args.sbExternal,
 				sInstance:  testServiceInstance(defaultInstanceID, siName),
-				sBinding:   testServiceBinding(defaultBindingID),
+				sBinding:   testServiceBinding(defaultBindingID, defaultBindingName),
 			}
 			obs, err := uua.ObserveResources(context.TODO(), cr)
 			if diff := cmp.Diff(tc.want.obs, obs); diff != "" {
@@ -465,7 +465,7 @@ func TestCreateResources(t *testing.T) {
 					},
 				},
 				sInstance: testServiceInstance(defaultInstanceID, defaultInstanceName),
-				sBinding:  testServiceBinding(defaultBindingID),
+				sBinding:  testServiceBinding(defaultBindingID, defaultBindingName),
 			},
 			want: want{
 				err: errors.New("bindingCreateError"),
@@ -490,7 +490,7 @@ func TestCreateResources(t *testing.T) {
 					},
 				},
 				sInstance: testServiceInstance(defaultInstanceID, defaultInstanceName),
-				sBinding:  testServiceBinding(defaultBindingID),
+				sBinding:  testServiceBinding(defaultBindingID, defaultBindingName),
 			},
 			want: want{
 				sID: defaultInstanceID,
@@ -646,7 +646,7 @@ func testCMCr(params utilCloudManagementParams) *v1beta1.CloudManagement {
 	return sm
 }
 
-func testServiceInstance(extName, siName string) *v1alpha1.SubaccountServiceInstance {
+func testServiceInstance(siId, siName string) *v1alpha1.SubaccountServiceInstance {
 
 	instance := &v1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{},
@@ -656,22 +656,28 @@ func testServiceInstance(extName, siName string) *v1alpha1.SubaccountServiceInst
 		Spec: v1alpha1.SubaccountServiceInstanceSpec{},
 		Status: v1alpha1.SubaccountServiceInstanceStatus{
 			AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
+				ID:   &siId,
 				Name: &siName,
 			},
 		},
 	}
-	meta.SetExternalName(instance, extName)
+	meta.SetExternalName(instance, siId)
 	return instance
 }
 
-func testServiceBinding(extName string) *v1alpha1.SubaccountServiceBinding {
+func testServiceBinding(sbId, sbName string) *v1alpha1.SubaccountServiceBinding {
 	binding := &v1alpha1.SubaccountServiceBinding{
 		TypeMeta:   metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{},
 		Spec:       v1alpha1.SubaccountServiceBindingSpec{},
-		Status:     v1alpha1.SubaccountServiceBindingStatus{},
+		Status: v1alpha1.SubaccountServiceBindingStatus{
+			AtProvider: v1alpha1.SubaccountServiceBindingObservation{
+				ID:   &sbId,
+				Name: &sbName,
+			},
+		},
 	}
-	meta.SetExternalName(binding, extName)
+	meta.SetExternalName(binding, sbId)
 	return binding
 }
 
