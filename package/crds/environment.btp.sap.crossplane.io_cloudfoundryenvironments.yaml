@@ -163,8 +163,8 @@ spec:
                       type: string
                     type: array
                     x-kubernetes-validations:
-                      - message: OrgManagers can't be updated once set
-                        rule: self == oldSelf
+                    - message: OrgManagers can't be updated once set
+                      rule: self == oldSelf
                   landscape:
                     description: |-
                       Landscape, region of the cloud foundry org, e.g. cf-eu12
