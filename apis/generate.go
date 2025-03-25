@@ -45,9 +45,6 @@ limitations under the License.
 // Generate crossplane-runtime methodsets (resource.Claim, etc)
 //go:generate go run -tags generate github.com/crossplane/crossplane-tools/cmd/angryjet generate-methodsets --header-file=../hack/boilerplate.go.txt ./...
 
-// disables CRD usage, by taking reference to controller folder relative to internal/controller, removing its controller and usages as well as the package file
-//go:generate ../hack/helpers/disable_crds.sh account/subaccountserviceinstance account/subaccountservicebinding
-
 package apis
 
 import (

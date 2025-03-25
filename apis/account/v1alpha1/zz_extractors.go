@@ -112,3 +112,28 @@ func CloudManagementSubaccountUuid() reference.ExtractValueFn {
 		return sg.Spec.ForProvider.SubaccountGuid
 	}
 }
+
+// ServicePlanId extracts ID of a service plan in its read-only CR
+func ServicePlanId() reference.ExtractValueFn {
+	return func(mg resource.Managed) string {
+		sp, ok := mg.(*ServicePlan)
+		if !ok {
+			return ""
+		}
+		return sp.Status.AtProvider.ServicePlanId
+	}
+}
+
+// SubaccountServiceInstanceId extracts ID of SubaccountServiceInstance
+func SubaccountServiceInstanceId() reference.ExtractValueFn {
+	return func(mg resource.Managed) string {
+		ssi, ok := mg.(*SubaccountServiceInstance)
+		if !ok {
+			return ""
+		}
+		if ssi.Status.AtProvider.ID == nil {
+			return ""
+		}
+		return *ssi.Status.AtProvider.ID
+	}
+}

@@ -41,11 +41,35 @@ type SubaccountServiceBindingInitParameters struct {
 
 	// (String) The ID of the service instance associated with the binding.
 	// The ID of the service instance associated with the binding.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountServiceInstance
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountServiceInstanceId()
+	// +crossplane:generate:reference:refFieldName=SubaccountServiceInstanceRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountServiceInstanceSelector
 	ServiceInstanceID *string `json:"serviceInstanceId,omitempty" tf:"service_instance_id,omitempty"`
 
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()
+	// +crossplane:generate:reference:refFieldName=SubaccountRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
 	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
+
+	// Reference to a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+
+	// Selector for a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+
+	// Reference to a SubaccountServiceInstance in account to populate serviceInstanceId.
+	// +kubebuilder:validation:Optional
+	SubaccountServiceInstanceRef *v1.Reference `json:"subaccountServiceInstanceRef,omitempty" tf:"-"`
+
+	// Selector for a SubaccountServiceInstance in account to populate serviceInstanceId.
+	// +kubebuilder:validation:Optional
+	SubaccountServiceInstanceSelector *v1.Selector `json:"subaccountServiceInstanceSelector,omitempty" tf:"-"`
 }
 
 type SubaccountServiceBindingObservation struct {
@@ -124,13 +148,37 @@ type SubaccountServiceBindingParameters struct {
 
 	// (String) The ID of the service instance associated with the binding.
 	// The ID of the service instance associated with the binding.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountServiceInstance
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountServiceInstanceId()
+	// +crossplane:generate:reference:refFieldName=SubaccountServiceInstanceRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountServiceInstanceSelector
 	// +kubebuilder:validation:Optional
 	ServiceInstanceID *string `json:"serviceInstanceId,omitempty" tf:"service_instance_id,omitempty"`
 
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()
+	// +crossplane:generate:reference:refFieldName=SubaccountRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
 	// +kubebuilder:validation:Optional
 	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
+
+	// Reference to a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+
+	// Selector for a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+
+	// Reference to a SubaccountServiceInstance in account to populate serviceInstanceId.
+	// +kubebuilder:validation:Optional
+	SubaccountServiceInstanceRef *v1.Reference `json:"subaccountServiceInstanceRef,omitempty" tf:"-"`
+
+	// Selector for a SubaccountServiceInstance in account to populate serviceInstanceId.
+	// +kubebuilder:validation:Optional
+	SubaccountServiceInstanceSelector *v1.Selector `json:"subaccountServiceInstanceSelector,omitempty" tf:"-"`
 }
 
 // SubaccountServiceBindingSpec defines the desired state of SubaccountServiceBinding
@@ -170,8 +218,6 @@ type SubaccountServiceBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!('*' in self.managementPolicies || 'Create' in self.managementPolicies || 'Update' in self.managementPolicies) || has(self.forProvider.name) || (has(self.initProvider) && has(self.initProvider.name))",message="spec.forProvider.name is a required parameter"
-	// +kubebuilder:validation:XValidation:rule="!('*' in self.managementPolicies || 'Create' in self.managementPolicies || 'Update' in self.managementPolicies) || has(self.forProvider.serviceInstanceId) || (has(self.initProvider) && has(self.initProvider.serviceInstanceId))",message="spec.forProvider.serviceInstanceId is a required parameter"
-	// +kubebuilder:validation:XValidation:rule="!('*' in self.managementPolicies || 'Create' in self.managementPolicies || 'Update' in self.managementPolicies) || has(self.forProvider.subaccountId) || (has(self.initProvider) && has(self.initProvider.subaccountId))",message="spec.forProvider.subaccountId is a required parameter"
 	Spec   SubaccountServiceBindingSpec   `json:"spec"`
 	Status SubaccountServiceBindingStatus `json:"status,omitempty"`
 }
