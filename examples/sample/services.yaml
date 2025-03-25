@@ -12,6 +12,22 @@ spec:
     subaccountRef:
       name: test-12345
 ---
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: ServiceManager
+metadata:
+  name: test-12345
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: service-manager
+    namespace: default
+  forProvider:
+    subaccountRef:
+      name: test-12345
+    planName: "subaccount-admin"
+    serviceInstanceName: "service-manager"
+    serviceBindingName: "service-manager-binding"
+---
 apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: CloudManagement
 metadata:
@@ -26,3 +42,20 @@ spec:
       name: test-12345
     subaccountRef:
       name: test-12345
+---
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: CloudManagement
+metadata:
+  name: cis-local
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: cis-local
+    namespace: default
+  forProvider:
+    serviceManagerRef:
+      name: test-12345
+    subaccountRef:
+      name: test-12345
+    serviceInstanceName: "cloud-management"
+    serviceBindingName: "cloud-management-binding"
