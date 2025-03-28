@@ -93,15 +93,10 @@ func (c CloudFoundryOrganization) createClient(environment *provisioningclient.E
 	return cloudFoundryClient, err
 }
 
-func (c CloudFoundryOrganization) createClientWithType(environment *v1alpha1.CloudFoundryEnvironment) (
+func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg) (
 	*organizationClient,
 	error,
 ) {
-	org, err := c.btp.NewCloudFoundryOrgByLabel(*environment.Status.AtProvider.Labels)
-	if err != nil {
-		return nil, err
-	}
-
 	cloudFoundryClient, err := newOrganizationClient(
 		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
 		c.btp.Credential.UserCredential.Password,
@@ -113,7 +108,7 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 	cloudFoundryOrgName := cr.Name
 	adminServiceAccountEmail := c.btp.Credential.UserCredential.Email
 
-	err := c.btp.CreateCloudFoundryOrgIfNotExists(
+	org, err := c.btp.CreateCloudFoundryOrgIfNotExists(
 		ctx, cloudFoundryOrgName, adminServiceAccountEmail, string(cr.UID),
 		cr.Spec.ForProvider.Landscape,
 	)
@@ -121,7 +116,7 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 		return errors.Wrap(err, instanceCreateFailed)
 	}
 
-	cloudFoundryClient, err := c.createClientWithType(&cr)
+	cloudFoundryClient, err := c.createClientWithType(org)
 	if err != nil {
 		return errors.Wrap(err, instanceCreateFailed)
 	}
@@ -132,7 +127,7 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 		}
 	}
 
-	return errors.New(instanceCreateFailed)
+	return nil
 }
 
 func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {

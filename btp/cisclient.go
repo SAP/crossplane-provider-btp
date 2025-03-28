@@ -323,12 +323,20 @@ func (c *Client) CreateCloudFoundryOrg(
 func (c *Client) CreateCloudFoundryOrgIfNotExists(
 	ctx context.Context, instanceName string, serviceAccountEmail string, resourceUID string,
 	landscape string,
-) error {
-	environmentId, err := c.getEnvironmentId(ctx, instanceName, CloudFoundryEnvironmentType())
-	if environmentId == "" {
-		err = c.CreateCloudFoundryOrg(ctx, instanceName, serviceAccountEmail, resourceUID, landscape)
+) (*CloudFoundryOrg, error) {
+	org, err := c.GetCloudFoundryOrg(ctx, instanceName)
+	if err != nil {
+		return nil, err
 	}
-	return err
+	if org == nil || org.Id == "" {
+		err = c.CreateCloudFoundryOrg(ctx, instanceName, serviceAccountEmail, resourceUID, landscape)
+		if err != nil {
+			return nil, err
+		}
+		return c.GetCloudFoundryOrg(ctx, instanceName)
+	}
+
+	return org, err
 }
 
 func (c *Client) DeleteEnvironmentById(ctx context.Context, environmentId string) error {
