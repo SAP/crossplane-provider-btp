@@ -136,13 +136,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	if needsUpdate := c.client.NeedsUpdate(*cr); needsUpdate {
-		return managed.ExternalObservation{
-			ResourceExists:   true,
-			ResourceUpToDate: !needsUpdate,
-		}, nil
-	}
-
 	details, err := env.GetConnectionDetails(instance)
 	return managed.ExternalObservation{
 		ResourceExists:    true,
@@ -170,21 +163,12 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
+	_, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotEnvironment)
 	}
 
-	instance, managers, err := c.client.DescribeInstance(ctx, *cr)
-	if err != nil {
-		return managed.ExternalUpdate{}, err
-	}
-	cr.Status.AtProvider = env.GenerateObservation(instance, managers)
-
-	if err := c.client.UpdateInstance(ctx, *cr); err != nil {
-		return managed.ExternalUpdate{}, err
-	}
-
+	// Update is not supported
 	return managed.ExternalUpdate{}, nil
 }
 
