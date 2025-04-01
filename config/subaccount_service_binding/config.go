@@ -1,4 +1,4 @@
-package subaccount_trust_configuration
+package subaccount_service_binding
 
 import (
 	"context"
@@ -19,7 +19,20 @@ func Configure(p *config.Provider) {
 			}
 			return externalName, nil
 		}
-		// this prevents a callback to the manager, which makes integration of controller calls from within another controller easier
-		r.UseAsync = false
+		r.UseAsync = true
+
+		r.References["subaccount_id"] = config.Reference{
+			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
+			Extractor:         "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()",
+			RefFieldName:      "SubaccountRef",
+			SelectorFieldName: "SubaccountSelector",
+		}
+
+		r.References["service_instance_id"] = config.Reference{
+			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountServiceInstance",
+			Extractor:         "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountServiceInstanceId()",
+			RefFieldName:      "SubaccountServiceInstanceRef",
+			SelectorFieldName: "SubaccountServiceInstanceSelector",
+		}
 	})
 }

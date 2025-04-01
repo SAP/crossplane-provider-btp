@@ -3,7 +3,6 @@ package cis
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -13,6 +12,13 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
+)
+
+const (
+	InternalParametersSecretName = "[[CO_INTERNAL_PARAMETERS_SECRET]]"
+	InternalParametersSecretNS   = "[[CO_INTERNAL_PARAMETERS_NAMESPACE]]"
+	InternalParametersSecretKey  = "[[CO_INTERNAL_PARAMETERS_KEY]]"
 )
 
 // ResourcesStatus contains a summary of the status of the tf resources managed by the ITfClient
@@ -94,7 +100,13 @@ func (tfI *TfClientInitializer) serviceInstanceCr(cm *apisv1alpha1.CloudManageme
 				Name:          &cm.Name,
 				ServiceplanID: &cm.Status.AtProvider.DataSourceLookup.CloudManagementPlanID,
 				SubaccountID:  internal.Ptr(cm.Spec.ForProvider.SubaccountGuid),
-				Parameters:    internal.Ptr(`{"grantType":"clientCredentials"}`),
+				ParametersSecretRef: &xpv1.SecretKeySelector{
+					SecretReference: xpv1.SecretReference{
+						Namespace: InternalParametersSecretNS,
+						Name:      InternalParametersSecretName,
+					},
+					Key: InternalParametersSecretKey,
+				},
 			},
 			InitProvider: apisv1alpha1.SubaccountServiceInstanceInitParameters{},
 		},

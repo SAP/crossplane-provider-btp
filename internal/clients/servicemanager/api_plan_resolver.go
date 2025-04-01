@@ -22,7 +22,9 @@ const ErrMissingSmUrl = "Service Manager URL (sm_url) is missing"
 const ErrMissingUrl = "Token URL (tokenurl) is missing"
 const ErrMissingXsappname = "Xsappname (xsappname) is missing"
 
-// PlanIdResolver used as its own resolval implementation downstream
+// PlanIdResolver is an interface for looking up serviceplanID over the service manager API
+// in this case we define the interface along with its implementation and fakes, just because this feature
+// will be used in multiple places and CRs
 type PlanIdResolver interface {
 	PlanIDByName(ctx context.Context, offeringName string, servicePlanName string) (string, error)
 }
@@ -141,4 +143,15 @@ func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, 
 
 	servicePlanID := *object.Items[0].Id
 	return servicePlanID, nil
+}
+
+// usually we want to define a fake where its used, but in this case this
+var _ PlanIdResolver = &PlanIdResolverFake{}
+
+type PlanIdResolverFake struct {
+	PlanLookupMockFn func() (string, error)
+}
+
+func (p *PlanIdResolverFake) PlanIDByName(ctx context.Context, offeringName, planName string) (string, error) {
+	return p.PlanLookupMockFn()
 }
