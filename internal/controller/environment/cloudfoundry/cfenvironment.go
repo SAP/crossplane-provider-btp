@@ -99,13 +99,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 	svc, err := c.newServiceFn(cisBinding, ServiceAccountSecretData)
 
-	return &external{client: env.NewCloudFoundryOrganization(*svc)}, err
+	return &external{client: env.NewCloudFoundryOrganization(*svc), kube: c.kube}, err
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
 // external resource to ensure it reflects the managed resource's desired state.
 type external struct {
 	client env.Client
+	kube   client.Client
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -118,18 +119,18 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
+	if instance != nil  && *instance.State == v1alpha1.InstanceStateOk && *env.ExternalName(instance) != meta.GetExternalName(cr) {
+		meta.SetExternalName(cr, *env.ExternalName(instance))
+		c.kube.Update(ctx, cr)
+	}
 	cr.Status.AtProvider = env.GenerateObservation(instance, managers)
 
 	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateOk {
-		externalName := env.ExternalName(instance)
-		if externalName != nil {
-			meta.SetExternalName(cr, *externalName)
-		}
 		cr.Status.SetConditions(xpv1.Available())
 	} else {
 		cr.Status.SetConditions(xpv1.Unavailable())
 	}
-
+	
 	if needsCreation := c.needsCreation(cr); needsCreation {
 		return managed.ExternalObservation{
 			ResourceExists: !needsCreation,
