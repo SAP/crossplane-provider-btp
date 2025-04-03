@@ -49,10 +49,7 @@ func (c CloudFoundryOrganization) DescribeInstance(
 	cr v1alpha1.CloudFoundryEnvironment,
 ) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 	name := meta.GetExternalName(&cr)
-	orgName := cr.Spec.ForProvider.OrgName
-	if orgName == "" {
-		orgName = cr.Spec.SubaccountGuid + "-" + cr.Name
-	}
+	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	environment, err := c.btp.GetCFEnvironmentByNameAndOrg(ctx, name, orgName)
 	if err != nil {
 		return nil, nil, err
@@ -135,11 +132,15 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 
 func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
 	name := meta.GetExternalName(&cr) 
-	orgName := cr.Spec.ForProvider.OrgName
-	if orgName == "" {
-		orgName = cr.Spec.SubaccountGuid + "-" + cr.Name
-	}
+	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	return c.btp.DeleteCloudFoundryEnvironment(ctx, name, orgName)
+}
+
+func formOrgName (orgName string, subaccountId string, crName string) string {
+	if orgName == "" {
+		return subaccountId + "-" + crName
+	}
+	return orgName
 }
 
 type organizationClient struct {
