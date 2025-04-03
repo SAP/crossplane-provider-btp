@@ -35,7 +35,9 @@ func TestKymaEnvironment(t *testing.T) {
 		Assess(
 			"Await resources to become synced",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.WaitForResourcesToBeSynced(ctx, cfg, manifestDir, wait.WithTimeout(time.Minute*25))
+				if err := resources.WaitForResourcesToBeSynced(ctx, cfg, manifestDir, wait.WithTimeout(time.Minute*25)); err != nil {
+					t.Fatal(err)
+				}
 				return ctx
 			},
 		).
