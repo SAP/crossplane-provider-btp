@@ -15,15 +15,17 @@ import (
 	"time"
 )
 
-// checks if the EnvironmentInstanceResponseObject type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &EnvironmentInstanceResponseObject{}
+// checks if the BusinessEnvironmentInstanceResponseObject type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &BusinessEnvironmentInstanceResponseObject{}
 
-// EnvironmentInstanceResponseObject struct for EnvironmentInstanceResponseObject
-type EnvironmentInstanceResponseObject struct {
+// BusinessEnvironmentInstanceResponseObject struct for BusinessEnvironmentInstanceResponseObject
+type BusinessEnvironmentInstanceResponseObject struct {
 	// The ID of the associated environment broker.
 	BrokerId *string `json:"brokerId,omitempty"`
 	// The commercial type of the environment broker.
 	CommercialType *string `json:"commercialType,omitempty"`
+	// Details about the user that created this environment instance.
+	CreatedBy *string `json:"createdBy,omitempty"`
 	// The date the environment instance was created. Dates and times are in UTC format.
 	CreatedDate *time.Time `json:"createdDate,omitempty"`
 	// Custom labels that are defined by a user and assigned as key-value pairs in a JSON array to the environment instance.  Example: {   \"Cost Center\": [\"19700626\"],   \"Department\": [\"Sales\"],   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],   \"EMEA\":[] } NOTE: Custom labels apply only to SAP BTP. They are not the same labels that might be defined by your environment broker (see \"labels\" field).
@@ -42,6 +44,8 @@ type EnvironmentInstanceResponseObject struct {
 	Labels *string `json:"labels,omitempty"`
 	// The name of the landscape within the logged-in region on which the environment instance is created.
 	LandscapeLabel *string `json:"landscapeLabel,omitempty"`
+	// Details about the user that last modified this environment instance.
+	ModifiedBy *string `json:"modifiedBy,omitempty"`
 	// The last date the environment instance was last modified. Dates and times are in UTC format.
 	ModifiedDate *time.Time `json:"modifiedDate,omitempty"`
 	// Name of the environment instance.
@@ -72,25 +76,25 @@ type EnvironmentInstanceResponseObject struct {
 	Type *string `json:"type,omitempty"`
 }
 
-// NewEnvironmentInstanceResponseObject instantiates a new EnvironmentInstanceResponseObject object
+// NewBusinessEnvironmentInstanceResponseObject instantiates a new BusinessEnvironmentInstanceResponseObject object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewEnvironmentInstanceResponseObject() *EnvironmentInstanceResponseObject {
-	this := EnvironmentInstanceResponseObject{}
+func NewBusinessEnvironmentInstanceResponseObject() *BusinessEnvironmentInstanceResponseObject {
+	this := BusinessEnvironmentInstanceResponseObject{}
 	return &this
 }
 
-// NewEnvironmentInstanceResponseObjectWithDefaults instantiates a new EnvironmentInstanceResponseObject object
+// NewBusinessEnvironmentInstanceResponseObjectWithDefaults instantiates a new BusinessEnvironmentInstanceResponseObject object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewEnvironmentInstanceResponseObjectWithDefaults() *EnvironmentInstanceResponseObject {
-	this := EnvironmentInstanceResponseObject{}
+func NewBusinessEnvironmentInstanceResponseObjectWithDefaults() *BusinessEnvironmentInstanceResponseObject {
+	this := BusinessEnvironmentInstanceResponseObject{}
 	return &this
 }
 
 // GetBrokerId returns the BrokerId field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetBrokerId() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetBrokerId() string {
 	if o == nil || IsNil(o.BrokerId) {
 		var ret string
 		return ret
@@ -100,7 +104,7 @@ func (o *EnvironmentInstanceResponseObject) GetBrokerId() string {
 
 // GetBrokerIdOk returns a tuple with the BrokerId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetBrokerIdOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetBrokerIdOk() (*string, bool) {
 	if o == nil || IsNil(o.BrokerId) {
 		return nil, false
 	}
@@ -108,7 +112,7 @@ func (o *EnvironmentInstanceResponseObject) GetBrokerIdOk() (*string, bool) {
 }
 
 // HasBrokerId returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasBrokerId() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasBrokerId() bool {
 	if o != nil && !IsNil(o.BrokerId) {
 		return true
 	}
@@ -117,12 +121,12 @@ func (o *EnvironmentInstanceResponseObject) HasBrokerId() bool {
 }
 
 // SetBrokerId gets a reference to the given string and assigns it to the BrokerId field.
-func (o *EnvironmentInstanceResponseObject) SetBrokerId(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetBrokerId(v string) {
 	o.BrokerId = &v
 }
 
 // GetCommercialType returns the CommercialType field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetCommercialType() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetCommercialType() string {
 	if o == nil || IsNil(o.CommercialType) {
 		var ret string
 		return ret
@@ -132,7 +136,7 @@ func (o *EnvironmentInstanceResponseObject) GetCommercialType() string {
 
 // GetCommercialTypeOk returns a tuple with the CommercialType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetCommercialTypeOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetCommercialTypeOk() (*string, bool) {
 	if o == nil || IsNil(o.CommercialType) {
 		return nil, false
 	}
@@ -140,7 +144,7 @@ func (o *EnvironmentInstanceResponseObject) GetCommercialTypeOk() (*string, bool
 }
 
 // HasCommercialType returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasCommercialType() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasCommercialType() bool {
 	if o != nil && !IsNil(o.CommercialType) {
 		return true
 	}
@@ -149,12 +153,44 @@ func (o *EnvironmentInstanceResponseObject) HasCommercialType() bool {
 }
 
 // SetCommercialType gets a reference to the given string and assigns it to the CommercialType field.
-func (o *EnvironmentInstanceResponseObject) SetCommercialType(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetCommercialType(v string) {
 	o.CommercialType = &v
 }
 
+// GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
+func (o *BusinessEnvironmentInstanceResponseObject) GetCreatedBy() string {
+	if o == nil || IsNil(o.CreatedBy) {
+		var ret string
+		return ret
+	}
+	return *o.CreatedBy
+}
+
+// GetCreatedByOk returns a tuple with the CreatedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *BusinessEnvironmentInstanceResponseObject) GetCreatedByOk() (*string, bool) {
+	if o == nil || IsNil(o.CreatedBy) {
+		return nil, false
+	}
+	return o.CreatedBy, true
+}
+
+// HasCreatedBy returns a boolean if a field has been set.
+func (o *BusinessEnvironmentInstanceResponseObject) HasCreatedBy() bool {
+	if o != nil && !IsNil(o.CreatedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetCreatedBy gets a reference to the given string and assigns it to the CreatedBy field.
+func (o *BusinessEnvironmentInstanceResponseObject) SetCreatedBy(v string) {
+	o.CreatedBy = &v
+}
+
 // GetCreatedDate returns the CreatedDate field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetCreatedDate() time.Time {
+func (o *BusinessEnvironmentInstanceResponseObject) GetCreatedDate() time.Time {
 	if o == nil || IsNil(o.CreatedDate) {
 		var ret time.Time
 		return ret
@@ -164,7 +200,7 @@ func (o *EnvironmentInstanceResponseObject) GetCreatedDate() time.Time {
 
 // GetCreatedDateOk returns a tuple with the CreatedDate field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetCreatedDateOk() (*time.Time, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetCreatedDateOk() (*time.Time, bool) {
 	if o == nil || IsNil(o.CreatedDate) {
 		return nil, false
 	}
@@ -172,7 +208,7 @@ func (o *EnvironmentInstanceResponseObject) GetCreatedDateOk() (*time.Time, bool
 }
 
 // HasCreatedDate returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasCreatedDate() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasCreatedDate() bool {
 	if o != nil && !IsNil(o.CreatedDate) {
 		return true
 	}
@@ -181,12 +217,12 @@ func (o *EnvironmentInstanceResponseObject) HasCreatedDate() bool {
 }
 
 // SetCreatedDate gets a reference to the given time.Time and assigns it to the CreatedDate field.
-func (o *EnvironmentInstanceResponseObject) SetCreatedDate(v time.Time) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetCreatedDate(v time.Time) {
 	o.CreatedDate = &v
 }
 
 // GetCustomLabels returns the CustomLabels field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetCustomLabels() map[string][]string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetCustomLabels() map[string][]string {
 	if o == nil || IsNil(o.CustomLabels) {
 		var ret map[string][]string
 		return ret
@@ -196,7 +232,7 @@ func (o *EnvironmentInstanceResponseObject) GetCustomLabels() map[string][]strin
 
 // GetCustomLabelsOk returns a tuple with the CustomLabels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetCustomLabelsOk() (*map[string][]string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetCustomLabelsOk() (*map[string][]string, bool) {
 	if o == nil || IsNil(o.CustomLabels) {
 		return nil, false
 	}
@@ -204,7 +240,7 @@ func (o *EnvironmentInstanceResponseObject) GetCustomLabelsOk() (*map[string][]s
 }
 
 // HasCustomLabels returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasCustomLabels() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasCustomLabels() bool {
 	if o != nil && !IsNil(o.CustomLabels) {
 		return true
 	}
@@ -213,12 +249,12 @@ func (o *EnvironmentInstanceResponseObject) HasCustomLabels() bool {
 }
 
 // SetCustomLabels gets a reference to the given map[string][]string and assigns it to the CustomLabels field.
-func (o *EnvironmentInstanceResponseObject) SetCustomLabels(v map[string][]string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetCustomLabels(v map[string][]string) {
 	o.CustomLabels = &v
 }
 
 // GetDashboardUrl returns the DashboardUrl field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetDashboardUrl() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetDashboardUrl() string {
 	if o == nil || IsNil(o.DashboardUrl) {
 		var ret string
 		return ret
@@ -228,7 +264,7 @@ func (o *EnvironmentInstanceResponseObject) GetDashboardUrl() string {
 
 // GetDashboardUrlOk returns a tuple with the DashboardUrl field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetDashboardUrlOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetDashboardUrlOk() (*string, bool) {
 	if o == nil || IsNil(o.DashboardUrl) {
 		return nil, false
 	}
@@ -236,7 +272,7 @@ func (o *EnvironmentInstanceResponseObject) GetDashboardUrlOk() (*string, bool) 
 }
 
 // HasDashboardUrl returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasDashboardUrl() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasDashboardUrl() bool {
 	if o != nil && !IsNil(o.DashboardUrl) {
 		return true
 	}
@@ -245,12 +281,12 @@ func (o *EnvironmentInstanceResponseObject) HasDashboardUrl() bool {
 }
 
 // SetDashboardUrl gets a reference to the given string and assigns it to the DashboardUrl field.
-func (o *EnvironmentInstanceResponseObject) SetDashboardUrl(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetDashboardUrl(v string) {
 	o.DashboardUrl = &v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetDescription() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetDescription() string {
 	if o == nil || IsNil(o.Description) {
 		var ret string
 		return ret
@@ -260,7 +296,7 @@ func (o *EnvironmentInstanceResponseObject) GetDescription() string {
 
 // GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetDescriptionOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetDescriptionOk() (*string, bool) {
 	if o == nil || IsNil(o.Description) {
 		return nil, false
 	}
@@ -268,7 +304,7 @@ func (o *EnvironmentInstanceResponseObject) GetDescriptionOk() (*string, bool) {
 }
 
 // HasDescription returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasDescription() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasDescription() bool {
 	if o != nil && !IsNil(o.Description) {
 		return true
 	}
@@ -277,12 +313,12 @@ func (o *EnvironmentInstanceResponseObject) HasDescription() bool {
 }
 
 // SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *EnvironmentInstanceResponseObject) SetDescription(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetDescription(v string) {
 	o.Description = &v
 }
 
 // GetEnvironmentType returns the EnvironmentType field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetEnvironmentType() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetEnvironmentType() string {
 	if o == nil || IsNil(o.EnvironmentType) {
 		var ret string
 		return ret
@@ -292,7 +328,7 @@ func (o *EnvironmentInstanceResponseObject) GetEnvironmentType() string {
 
 // GetEnvironmentTypeOk returns a tuple with the EnvironmentType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetEnvironmentTypeOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetEnvironmentTypeOk() (*string, bool) {
 	if o == nil || IsNil(o.EnvironmentType) {
 		return nil, false
 	}
@@ -300,7 +336,7 @@ func (o *EnvironmentInstanceResponseObject) GetEnvironmentTypeOk() (*string, boo
 }
 
 // HasEnvironmentType returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasEnvironmentType() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasEnvironmentType() bool {
 	if o != nil && !IsNil(o.EnvironmentType) {
 		return true
 	}
@@ -309,12 +345,12 @@ func (o *EnvironmentInstanceResponseObject) HasEnvironmentType() bool {
 }
 
 // SetEnvironmentType gets a reference to the given string and assigns it to the EnvironmentType field.
-func (o *EnvironmentInstanceResponseObject) SetEnvironmentType(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetEnvironmentType(v string) {
 	o.EnvironmentType = &v
 }
 
 // GetGlobalAccountGUID returns the GlobalAccountGUID field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetGlobalAccountGUID() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetGlobalAccountGUID() string {
 	if o == nil || IsNil(o.GlobalAccountGUID) {
 		var ret string
 		return ret
@@ -324,7 +360,7 @@ func (o *EnvironmentInstanceResponseObject) GetGlobalAccountGUID() string {
 
 // GetGlobalAccountGUIDOk returns a tuple with the GlobalAccountGUID field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetGlobalAccountGUIDOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetGlobalAccountGUIDOk() (*string, bool) {
 	if o == nil || IsNil(o.GlobalAccountGUID) {
 		return nil, false
 	}
@@ -332,7 +368,7 @@ func (o *EnvironmentInstanceResponseObject) GetGlobalAccountGUIDOk() (*string, b
 }
 
 // HasGlobalAccountGUID returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasGlobalAccountGUID() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasGlobalAccountGUID() bool {
 	if o != nil && !IsNil(o.GlobalAccountGUID) {
 		return true
 	}
@@ -341,12 +377,12 @@ func (o *EnvironmentInstanceResponseObject) HasGlobalAccountGUID() bool {
 }
 
 // SetGlobalAccountGUID gets a reference to the given string and assigns it to the GlobalAccountGUID field.
-func (o *EnvironmentInstanceResponseObject) SetGlobalAccountGUID(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetGlobalAccountGUID(v string) {
 	o.GlobalAccountGUID = &v
 }
 
 // GetId returns the Id field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetId() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetId() string {
 	if o == nil || IsNil(o.Id) {
 		var ret string
 		return ret
@@ -356,7 +392,7 @@ func (o *EnvironmentInstanceResponseObject) GetId() string {
 
 // GetIdOk returns a tuple with the Id field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetIdOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetIdOk() (*string, bool) {
 	if o == nil || IsNil(o.Id) {
 		return nil, false
 	}
@@ -364,7 +400,7 @@ func (o *EnvironmentInstanceResponseObject) GetIdOk() (*string, bool) {
 }
 
 // HasId returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasId() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasId() bool {
 	if o != nil && !IsNil(o.Id) {
 		return true
 	}
@@ -373,12 +409,12 @@ func (o *EnvironmentInstanceResponseObject) HasId() bool {
 }
 
 // SetId gets a reference to the given string and assigns it to the Id field.
-func (o *EnvironmentInstanceResponseObject) SetId(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetId(v string) {
 	o.Id = &v
 }
 
 // GetLabels returns the Labels field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetLabels() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetLabels() string {
 	if o == nil || IsNil(o.Labels) {
 		var ret string
 		return ret
@@ -388,7 +424,7 @@ func (o *EnvironmentInstanceResponseObject) GetLabels() string {
 
 // GetLabelsOk returns a tuple with the Labels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetLabelsOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetLabelsOk() (*string, bool) {
 	if o == nil || IsNil(o.Labels) {
 		return nil, false
 	}
@@ -396,7 +432,7 @@ func (o *EnvironmentInstanceResponseObject) GetLabelsOk() (*string, bool) {
 }
 
 // HasLabels returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasLabels() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasLabels() bool {
 	if o != nil && !IsNil(o.Labels) {
 		return true
 	}
@@ -405,12 +441,12 @@ func (o *EnvironmentInstanceResponseObject) HasLabels() bool {
 }
 
 // SetLabels gets a reference to the given string and assigns it to the Labels field.
-func (o *EnvironmentInstanceResponseObject) SetLabels(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetLabels(v string) {
 	o.Labels = &v
 }
 
 // GetLandscapeLabel returns the LandscapeLabel field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetLandscapeLabel() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetLandscapeLabel() string {
 	if o == nil || IsNil(o.LandscapeLabel) {
 		var ret string
 		return ret
@@ -420,7 +456,7 @@ func (o *EnvironmentInstanceResponseObject) GetLandscapeLabel() string {
 
 // GetLandscapeLabelOk returns a tuple with the LandscapeLabel field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetLandscapeLabelOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetLandscapeLabelOk() (*string, bool) {
 	if o == nil || IsNil(o.LandscapeLabel) {
 		return nil, false
 	}
@@ -428,7 +464,7 @@ func (o *EnvironmentInstanceResponseObject) GetLandscapeLabelOk() (*string, bool
 }
 
 // HasLandscapeLabel returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasLandscapeLabel() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasLandscapeLabel() bool {
 	if o != nil && !IsNil(o.LandscapeLabel) {
 		return true
 	}
@@ -437,12 +473,44 @@ func (o *EnvironmentInstanceResponseObject) HasLandscapeLabel() bool {
 }
 
 // SetLandscapeLabel gets a reference to the given string and assigns it to the LandscapeLabel field.
-func (o *EnvironmentInstanceResponseObject) SetLandscapeLabel(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetLandscapeLabel(v string) {
 	o.LandscapeLabel = &v
 }
 
+// GetModifiedBy returns the ModifiedBy field value if set, zero value otherwise.
+func (o *BusinessEnvironmentInstanceResponseObject) GetModifiedBy() string {
+	if o == nil || IsNil(o.ModifiedBy) {
+		var ret string
+		return ret
+	}
+	return *o.ModifiedBy
+}
+
+// GetModifiedByOk returns a tuple with the ModifiedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *BusinessEnvironmentInstanceResponseObject) GetModifiedByOk() (*string, bool) {
+	if o == nil || IsNil(o.ModifiedBy) {
+		return nil, false
+	}
+	return o.ModifiedBy, true
+}
+
+// HasModifiedBy returns a boolean if a field has been set.
+func (o *BusinessEnvironmentInstanceResponseObject) HasModifiedBy() bool {
+	if o != nil && !IsNil(o.ModifiedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetModifiedBy gets a reference to the given string and assigns it to the ModifiedBy field.
+func (o *BusinessEnvironmentInstanceResponseObject) SetModifiedBy(v string) {
+	o.ModifiedBy = &v
+}
+
 // GetModifiedDate returns the ModifiedDate field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetModifiedDate() time.Time {
+func (o *BusinessEnvironmentInstanceResponseObject) GetModifiedDate() time.Time {
 	if o == nil || IsNil(o.ModifiedDate) {
 		var ret time.Time
 		return ret
@@ -452,7 +520,7 @@ func (o *EnvironmentInstanceResponseObject) GetModifiedDate() time.Time {
 
 // GetModifiedDateOk returns a tuple with the ModifiedDate field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetModifiedDateOk() (*time.Time, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetModifiedDateOk() (*time.Time, bool) {
 	if o == nil || IsNil(o.ModifiedDate) {
 		return nil, false
 	}
@@ -460,7 +528,7 @@ func (o *EnvironmentInstanceResponseObject) GetModifiedDateOk() (*time.Time, boo
 }
 
 // HasModifiedDate returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasModifiedDate() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasModifiedDate() bool {
 	if o != nil && !IsNil(o.ModifiedDate) {
 		return true
 	}
@@ -469,12 +537,12 @@ func (o *EnvironmentInstanceResponseObject) HasModifiedDate() bool {
 }
 
 // SetModifiedDate gets a reference to the given time.Time and assigns it to the ModifiedDate field.
-func (o *EnvironmentInstanceResponseObject) SetModifiedDate(v time.Time) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetModifiedDate(v time.Time) {
 	o.ModifiedDate = &v
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetName() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -484,7 +552,7 @@ func (o *EnvironmentInstanceResponseObject) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetNameOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -492,7 +560,7 @@ func (o *EnvironmentInstanceResponseObject) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasName() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -501,12 +569,12 @@ func (o *EnvironmentInstanceResponseObject) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *EnvironmentInstanceResponseObject) SetName(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetName(v string) {
 	o.Name = &v
 }
 
 // GetOperation returns the Operation field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetOperation() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetOperation() string {
 	if o == nil || IsNil(o.Operation) {
 		var ret string
 		return ret
@@ -516,7 +584,7 @@ func (o *EnvironmentInstanceResponseObject) GetOperation() string {
 
 // GetOperationOk returns a tuple with the Operation field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetOperationOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetOperationOk() (*string, bool) {
 	if o == nil || IsNil(o.Operation) {
 		return nil, false
 	}
@@ -524,7 +592,7 @@ func (o *EnvironmentInstanceResponseObject) GetOperationOk() (*string, bool) {
 }
 
 // HasOperation returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasOperation() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasOperation() bool {
 	if o != nil && !IsNil(o.Operation) {
 		return true
 	}
@@ -533,12 +601,12 @@ func (o *EnvironmentInstanceResponseObject) HasOperation() bool {
 }
 
 // SetOperation gets a reference to the given string and assigns it to the Operation field.
-func (o *EnvironmentInstanceResponseObject) SetOperation(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetOperation(v string) {
 	o.Operation = &v
 }
 
 // GetParameters returns the Parameters field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetParameters() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetParameters() string {
 	if o == nil || IsNil(o.Parameters) {
 		var ret string
 		return ret
@@ -548,7 +616,7 @@ func (o *EnvironmentInstanceResponseObject) GetParameters() string {
 
 // GetParametersOk returns a tuple with the Parameters field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetParametersOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetParametersOk() (*string, bool) {
 	if o == nil || IsNil(o.Parameters) {
 		return nil, false
 	}
@@ -556,7 +624,7 @@ func (o *EnvironmentInstanceResponseObject) GetParametersOk() (*string, bool) {
 }
 
 // HasParameters returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasParameters() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasParameters() bool {
 	if o != nil && !IsNil(o.Parameters) {
 		return true
 	}
@@ -565,12 +633,12 @@ func (o *EnvironmentInstanceResponseObject) HasParameters() bool {
 }
 
 // SetParameters gets a reference to the given string and assigns it to the Parameters field.
-func (o *EnvironmentInstanceResponseObject) SetParameters(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetParameters(v string) {
 	o.Parameters = &v
 }
 
 // GetPlanId returns the PlanId field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetPlanId() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetPlanId() string {
 	if o == nil || IsNil(o.PlanId) {
 		var ret string
 		return ret
@@ -580,7 +648,7 @@ func (o *EnvironmentInstanceResponseObject) GetPlanId() string {
 
 // GetPlanIdOk returns a tuple with the PlanId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetPlanIdOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetPlanIdOk() (*string, bool) {
 	if o == nil || IsNil(o.PlanId) {
 		return nil, false
 	}
@@ -588,7 +656,7 @@ func (o *EnvironmentInstanceResponseObject) GetPlanIdOk() (*string, bool) {
 }
 
 // HasPlanId returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasPlanId() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasPlanId() bool {
 	if o != nil && !IsNil(o.PlanId) {
 		return true
 	}
@@ -597,12 +665,12 @@ func (o *EnvironmentInstanceResponseObject) HasPlanId() bool {
 }
 
 // SetPlanId gets a reference to the given string and assigns it to the PlanId field.
-func (o *EnvironmentInstanceResponseObject) SetPlanId(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetPlanId(v string) {
 	o.PlanId = &v
 }
 
 // GetPlanName returns the PlanName field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetPlanName() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetPlanName() string {
 	if o == nil || IsNil(o.PlanName) {
 		var ret string
 		return ret
@@ -612,7 +680,7 @@ func (o *EnvironmentInstanceResponseObject) GetPlanName() string {
 
 // GetPlanNameOk returns a tuple with the PlanName field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetPlanNameOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetPlanNameOk() (*string, bool) {
 	if o == nil || IsNil(o.PlanName) {
 		return nil, false
 	}
@@ -620,7 +688,7 @@ func (o *EnvironmentInstanceResponseObject) GetPlanNameOk() (*string, bool) {
 }
 
 // HasPlanName returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasPlanName() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasPlanName() bool {
 	if o != nil && !IsNil(o.PlanName) {
 		return true
 	}
@@ -629,12 +697,12 @@ func (o *EnvironmentInstanceResponseObject) HasPlanName() bool {
 }
 
 // SetPlanName gets a reference to the given string and assigns it to the PlanName field.
-func (o *EnvironmentInstanceResponseObject) SetPlanName(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetPlanName(v string) {
 	o.PlanName = &v
 }
 
 // GetPlatformId returns the PlatformId field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetPlatformId() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetPlatformId() string {
 	if o == nil || IsNil(o.PlatformId) {
 		var ret string
 		return ret
@@ -644,7 +712,7 @@ func (o *EnvironmentInstanceResponseObject) GetPlatformId() string {
 
 // GetPlatformIdOk returns a tuple with the PlatformId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetPlatformIdOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetPlatformIdOk() (*string, bool) {
 	if o == nil || IsNil(o.PlatformId) {
 		return nil, false
 	}
@@ -652,7 +720,7 @@ func (o *EnvironmentInstanceResponseObject) GetPlatformIdOk() (*string, bool) {
 }
 
 // HasPlatformId returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasPlatformId() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasPlatformId() bool {
 	if o != nil && !IsNil(o.PlatformId) {
 		return true
 	}
@@ -661,12 +729,12 @@ func (o *EnvironmentInstanceResponseObject) HasPlatformId() bool {
 }
 
 // SetPlatformId gets a reference to the given string and assigns it to the PlatformId field.
-func (o *EnvironmentInstanceResponseObject) SetPlatformId(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetPlatformId(v string) {
 	o.PlatformId = &v
 }
 
 // GetServiceId returns the ServiceId field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetServiceId() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetServiceId() string {
 	if o == nil || IsNil(o.ServiceId) {
 		var ret string
 		return ret
@@ -676,7 +744,7 @@ func (o *EnvironmentInstanceResponseObject) GetServiceId() string {
 
 // GetServiceIdOk returns a tuple with the ServiceId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetServiceIdOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetServiceIdOk() (*string, bool) {
 	if o == nil || IsNil(o.ServiceId) {
 		return nil, false
 	}
@@ -684,7 +752,7 @@ func (o *EnvironmentInstanceResponseObject) GetServiceIdOk() (*string, bool) {
 }
 
 // HasServiceId returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasServiceId() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasServiceId() bool {
 	if o != nil && !IsNil(o.ServiceId) {
 		return true
 	}
@@ -693,12 +761,12 @@ func (o *EnvironmentInstanceResponseObject) HasServiceId() bool {
 }
 
 // SetServiceId gets a reference to the given string and assigns it to the ServiceId field.
-func (o *EnvironmentInstanceResponseObject) SetServiceId(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetServiceId(v string) {
 	o.ServiceId = &v
 }
 
 // GetServiceName returns the ServiceName field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetServiceName() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetServiceName() string {
 	if o == nil || IsNil(o.ServiceName) {
 		var ret string
 		return ret
@@ -708,7 +776,7 @@ func (o *EnvironmentInstanceResponseObject) GetServiceName() string {
 
 // GetServiceNameOk returns a tuple with the ServiceName field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetServiceNameOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetServiceNameOk() (*string, bool) {
 	if o == nil || IsNil(o.ServiceName) {
 		return nil, false
 	}
@@ -716,7 +784,7 @@ func (o *EnvironmentInstanceResponseObject) GetServiceNameOk() (*string, bool) {
 }
 
 // HasServiceName returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasServiceName() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasServiceName() bool {
 	if o != nil && !IsNil(o.ServiceName) {
 		return true
 	}
@@ -725,12 +793,12 @@ func (o *EnvironmentInstanceResponseObject) HasServiceName() bool {
 }
 
 // SetServiceName gets a reference to the given string and assigns it to the ServiceName field.
-func (o *EnvironmentInstanceResponseObject) SetServiceName(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetServiceName(v string) {
 	o.ServiceName = &v
 }
 
 // GetState returns the State field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetState() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetState() string {
 	if o == nil || IsNil(o.State) {
 		var ret string
 		return ret
@@ -740,7 +808,7 @@ func (o *EnvironmentInstanceResponseObject) GetState() string {
 
 // GetStateOk returns a tuple with the State field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetStateOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetStateOk() (*string, bool) {
 	if o == nil || IsNil(o.State) {
 		return nil, false
 	}
@@ -748,7 +816,7 @@ func (o *EnvironmentInstanceResponseObject) GetStateOk() (*string, bool) {
 }
 
 // HasState returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasState() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasState() bool {
 	if o != nil && !IsNil(o.State) {
 		return true
 	}
@@ -757,12 +825,12 @@ func (o *EnvironmentInstanceResponseObject) HasState() bool {
 }
 
 // SetState gets a reference to the given string and assigns it to the State field.
-func (o *EnvironmentInstanceResponseObject) SetState(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetState(v string) {
 	o.State = &v
 }
 
 // GetStateMessage returns the StateMessage field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetStateMessage() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetStateMessage() string {
 	if o == nil || IsNil(o.StateMessage) {
 		var ret string
 		return ret
@@ -772,7 +840,7 @@ func (o *EnvironmentInstanceResponseObject) GetStateMessage() string {
 
 // GetStateMessageOk returns a tuple with the StateMessage field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetStateMessageOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetStateMessageOk() (*string, bool) {
 	if o == nil || IsNil(o.StateMessage) {
 		return nil, false
 	}
@@ -780,7 +848,7 @@ func (o *EnvironmentInstanceResponseObject) GetStateMessageOk() (*string, bool) 
 }
 
 // HasStateMessage returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasStateMessage() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasStateMessage() bool {
 	if o != nil && !IsNil(o.StateMessage) {
 		return true
 	}
@@ -789,12 +857,12 @@ func (o *EnvironmentInstanceResponseObject) HasStateMessage() bool {
 }
 
 // SetStateMessage gets a reference to the given string and assigns it to the StateMessage field.
-func (o *EnvironmentInstanceResponseObject) SetStateMessage(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetStateMessage(v string) {
 	o.StateMessage = &v
 }
 
 // GetSubaccountGUID returns the SubaccountGUID field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetSubaccountGUID() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetSubaccountGUID() string {
 	if o == nil || IsNil(o.SubaccountGUID) {
 		var ret string
 		return ret
@@ -804,7 +872,7 @@ func (o *EnvironmentInstanceResponseObject) GetSubaccountGUID() string {
 
 // GetSubaccountGUIDOk returns a tuple with the SubaccountGUID field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetSubaccountGUIDOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetSubaccountGUIDOk() (*string, bool) {
 	if o == nil || IsNil(o.SubaccountGUID) {
 		return nil, false
 	}
@@ -812,7 +880,7 @@ func (o *EnvironmentInstanceResponseObject) GetSubaccountGUIDOk() (*string, bool
 }
 
 // HasSubaccountGUID returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasSubaccountGUID() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasSubaccountGUID() bool {
 	if o != nil && !IsNil(o.SubaccountGUID) {
 		return true
 	}
@@ -821,12 +889,12 @@ func (o *EnvironmentInstanceResponseObject) HasSubaccountGUID() bool {
 }
 
 // SetSubaccountGUID gets a reference to the given string and assigns it to the SubaccountGUID field.
-func (o *EnvironmentInstanceResponseObject) SetSubaccountGUID(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetSubaccountGUID(v string) {
 	o.SubaccountGUID = &v
 }
 
 // GetTenantId returns the TenantId field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetTenantId() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetTenantId() string {
 	if o == nil || IsNil(o.TenantId) {
 		var ret string
 		return ret
@@ -836,7 +904,7 @@ func (o *EnvironmentInstanceResponseObject) GetTenantId() string {
 
 // GetTenantIdOk returns a tuple with the TenantId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetTenantIdOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetTenantIdOk() (*string, bool) {
 	if o == nil || IsNil(o.TenantId) {
 		return nil, false
 	}
@@ -844,7 +912,7 @@ func (o *EnvironmentInstanceResponseObject) GetTenantIdOk() (*string, bool) {
 }
 
 // HasTenantId returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasTenantId() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasTenantId() bool {
 	if o != nil && !IsNil(o.TenantId) {
 		return true
 	}
@@ -853,12 +921,12 @@ func (o *EnvironmentInstanceResponseObject) HasTenantId() bool {
 }
 
 // SetTenantId gets a reference to the given string and assigns it to the TenantId field.
-func (o *EnvironmentInstanceResponseObject) SetTenantId(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetTenantId(v string) {
 	o.TenantId = &v
 }
 
 // GetType returns the Type field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetType() string {
+func (o *BusinessEnvironmentInstanceResponseObject) GetType() string {
 	if o == nil || IsNil(o.Type) {
 		var ret string
 		return ret
@@ -868,7 +936,7 @@ func (o *EnvironmentInstanceResponseObject) GetType() string {
 
 // GetTypeOk returns a tuple with the Type field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetTypeOk() (*string, bool) {
+func (o *BusinessEnvironmentInstanceResponseObject) GetTypeOk() (*string, bool) {
 	if o == nil || IsNil(o.Type) {
 		return nil, false
 	}
@@ -876,7 +944,7 @@ func (o *EnvironmentInstanceResponseObject) GetTypeOk() (*string, bool) {
 }
 
 // HasType returns a boolean if a field has been set.
-func (o *EnvironmentInstanceResponseObject) HasType() bool {
+func (o *BusinessEnvironmentInstanceResponseObject) HasType() bool {
 	if o != nil && !IsNil(o.Type) {
 		return true
 	}
@@ -885,11 +953,11 @@ func (o *EnvironmentInstanceResponseObject) HasType() bool {
 }
 
 // SetType gets a reference to the given string and assigns it to the Type field.
-func (o *EnvironmentInstanceResponseObject) SetType(v string) {
+func (o *BusinessEnvironmentInstanceResponseObject) SetType(v string) {
 	o.Type = &v
 }
 
-func (o EnvironmentInstanceResponseObject) MarshalJSON() ([]byte, error) {
+func (o BusinessEnvironmentInstanceResponseObject) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -897,13 +965,16 @@ func (o EnvironmentInstanceResponseObject) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o EnvironmentInstanceResponseObject) ToMap() (map[string]interface{}, error) {
+func (o BusinessEnvironmentInstanceResponseObject) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.BrokerId) {
 		toSerialize["brokerId"] = o.BrokerId
 	}
 	if !IsNil(o.CommercialType) {
 		toSerialize["commercialType"] = o.CommercialType
+	}
+	if !IsNil(o.CreatedBy) {
+		toSerialize["createdBy"] = o.CreatedBy
 	}
 	if !IsNil(o.CreatedDate) {
 		toSerialize["createdDate"] = o.CreatedDate
@@ -931,6 +1002,9 @@ func (o EnvironmentInstanceResponseObject) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.LandscapeLabel) {
 		toSerialize["landscapeLabel"] = o.LandscapeLabel
+	}
+	if !IsNil(o.ModifiedBy) {
+		toSerialize["modifiedBy"] = o.ModifiedBy
 	}
 	if !IsNil(o.ModifiedDate) {
 		toSerialize["modifiedDate"] = o.ModifiedDate
@@ -977,38 +1051,38 @@ func (o EnvironmentInstanceResponseObject) ToMap() (map[string]interface{}, erro
 	return toSerialize, nil
 }
 
-type NullableEnvironmentInstanceResponseObject struct {
-	value *EnvironmentInstanceResponseObject
+type NullableBusinessEnvironmentInstanceResponseObject struct {
+	value *BusinessEnvironmentInstanceResponseObject
 	isSet bool
 }
 
-func (v NullableEnvironmentInstanceResponseObject) Get() *EnvironmentInstanceResponseObject {
+func (v NullableBusinessEnvironmentInstanceResponseObject) Get() *BusinessEnvironmentInstanceResponseObject {
 	return v.value
 }
 
-func (v *NullableEnvironmentInstanceResponseObject) Set(val *EnvironmentInstanceResponseObject) {
+func (v *NullableBusinessEnvironmentInstanceResponseObject) Set(val *BusinessEnvironmentInstanceResponseObject) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableEnvironmentInstanceResponseObject) IsSet() bool {
+func (v NullableBusinessEnvironmentInstanceResponseObject) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableEnvironmentInstanceResponseObject) Unset() {
+func (v *NullableBusinessEnvironmentInstanceResponseObject) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableEnvironmentInstanceResponseObject(val *EnvironmentInstanceResponseObject) *NullableEnvironmentInstanceResponseObject {
-	return &NullableEnvironmentInstanceResponseObject{value: val, isSet: true}
+func NewNullableBusinessEnvironmentInstanceResponseObject(val *BusinessEnvironmentInstanceResponseObject) *NullableBusinessEnvironmentInstanceResponseObject {
+	return &NullableBusinessEnvironmentInstanceResponseObject{value: val, isSet: true}
 }
 
-func (v NullableEnvironmentInstanceResponseObject) MarshalJSON() ([]byte, error) {
+func (v NullableBusinessEnvironmentInstanceResponseObject) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableEnvironmentInstanceResponseObject) UnmarshalJSON(src []byte) error {
+func (v *NullableBusinessEnvironmentInstanceResponseObject) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
