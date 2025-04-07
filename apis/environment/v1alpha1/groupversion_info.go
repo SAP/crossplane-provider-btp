@@ -1,4 +1,4 @@
-// Package v1alpha1 contains the v1alpha1 group Sample resources of the btp.sap provider.
+// Package v1alpha1 contains the v1alpha1 group Sample resources of the btp provider.
 // +kubebuilder:object:generate=true
 // +groupName=environment.btp.sap.crossplane.io
 // +versionName=v1alpha1

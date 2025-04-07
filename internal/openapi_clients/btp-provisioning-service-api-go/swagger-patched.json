@@ -103,9 +103,7 @@
             "type": "string"
           },
           "createdDate": {
-            "description": "The date the environment instance was created. Dates and times are in UTC format.",
-            "format": "date-time",
-            "type": "string"
+            "type": "number"
           },
           "customLabels": {
             "additionalProperties": {
@@ -158,9 +156,7 @@
             "type": "string"
           },
           "modifiedDate": {
-            "description": "The last date the environment instance was last modified. Dates and times are in UTC format.",
-            "format": "date-time",
-            "type": "string"
+            "type": "number"
           },
           "name": {
             "description": "Name of the environment instance.",
@@ -249,11 +245,6 @@
         "description": "JSON object with configuration parameters specific to environment instance binding as specified in the OSB API.",
         "properties": {
           "parameters": {
-            "additionalProperties": {
-              "description": "If needed, you can pass configuration parameters for the Service Binding.<br>Service Brokers must ensure that the client has provided valid configuration parameters and values for the operation.",
-              "type": "object"
-            },
-            "description": "If needed, you can pass configuration parameters for the Service Binding.<br>Service Brokers must ensure that the client has provided valid configuration parameters and values for the operation.",
             "type": "object"
           }
         },
@@ -372,9 +363,7 @@
             "type": "string"
           },
           "createdDate": {
-            "description": "The date the environment instance was created. Dates and times are in UTC format.",
-            "format": "date-time",
-            "type": "string"
+            "type": "number"
           },
           "customLabels": {
             "additionalProperties": {
@@ -423,9 +412,7 @@
             "type": "string"
           },
           "modifiedDate": {
-            "description": "The last date the environment instance was last modified. Dates and times are in UTC format.",
-            "format": "date-time",
-            "type": "string"
+            "type": "number"
           },
           "name": {
             "description": "Name of the environment instance.",

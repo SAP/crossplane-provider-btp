@@ -1207,9 +1207,9 @@ components:
         platformId: platformId
         serviceName: serviceName
         labels: labels
-        createdDate: 2000-01-23T04:56:07.000+00:00
+        createdDate: 0.8008281904610115
         createdBy: createdBy
-        modifiedDate: 2000-01-23T04:56:07.000+00:00
+        modifiedDate: 6.027456183070403
         name: name
         tenantId: tenantId
         operation: operation
@@ -1225,10 +1225,7 @@ components:
           description: Details about the user that created this environment instance.
           type: string
         createdDate:
-          description: The date the environment instance was created. Dates and times
-            are in UTC format.
-          format: date-time
-          type: string
+          type: number
         customLabels:
           additionalProperties:
             description: "Custom labels that are defined by a user and assigned as\
@@ -1292,10 +1289,7 @@ components:
             instance.
           type: string
         modifiedDate:
-          description: The last date the environment instance was last modified. Dates
-            and times are in UTC format.
-          format: date-time
-          type: string
+          type: number
         name:
           description: Name of the environment instance.
           type: string
@@ -1387,9 +1381,9 @@ components:
           platformId: platformId
           serviceName: serviceName
           labels: labels
-          createdDate: 2000-01-23T04:56:07.000+00:00
+          createdDate: 0.8008281904610115
           createdBy: createdBy
-          modifiedDate: 2000-01-23T04:56:07.000+00:00
+          modifiedDate: 6.027456183070403
           name: name
           tenantId: tenantId
           operation: operation
@@ -1417,9 +1411,9 @@ components:
           platformId: platformId
           serviceName: serviceName
           labels: labels
-          createdDate: 2000-01-23T04:56:07.000+00:00
+          createdDate: 0.8008281904610115
           createdBy: createdBy
-          modifiedDate: 2000-01-23T04:56:07.000+00:00
+          modifiedDate: 6.027456183070403
           name: name
           tenantId: tenantId
           operation: operation
@@ -1435,18 +1429,9 @@ components:
       description: JSON object with configuration parameters specific to environment
         instance binding as specified in the OSB API.
       example:
-        parameters:
-          key: "{}"
+        parameters: "{}"
       properties:
         parameters:
-          additionalProperties:
-            description: "If needed, you can pass configuration parameters for the\
-              \ Service Binding.<br>Service Brokers must ensure that the client has\
-              \ provided valid configuration parameters and values for the operation."
-            type: object
-          description: "If needed, you can pass configuration parameters for the Service\
-            \ Binding.<br>Service Brokers must ensure that the client has provided\
-            \ valid configuration parameters and values for the operation."
           type: object
       type: object
     CreateEnvironmentInstanceRequestPayload:
@@ -1591,8 +1576,8 @@ components:
         platformId: platformId
         serviceName: serviceName
         labels: labels
-        createdDate: 2000-01-23T04:56:07.000+00:00
-        modifiedDate: 2000-01-23T04:56:07.000+00:00
+        createdDate: 0.8008281904610115
+        modifiedDate: 6.027456183070403
         name: name
         tenantId: tenantId
         operation: operation
@@ -1605,10 +1590,7 @@ components:
           description: The commercial type of the environment broker.
           type: string
         createdDate:
-          description: The date the environment instance was created. Dates and times
-            are in UTC format.
-          format: date-time
-          type: string
+          type: number
         customLabels:
           additionalProperties:
             description: "Custom labels that are defined by a user and assigned as\
@@ -1668,10 +1650,7 @@ components:
             the environment instance is created.
           type: string
         modifiedDate:
-          description: The last date the environment instance was last modified. Dates
-            and times are in UTC format.
-          format: date-time
-          type: string
+          type: number
         name:
           description: Name of the environment instance.
           type: string
@@ -1762,8 +1741,8 @@ components:
           platformId: platformId
           serviceName: serviceName
           labels: labels
-          createdDate: 2000-01-23T04:56:07.000+00:00
-          modifiedDate: 2000-01-23T04:56:07.000+00:00
+          createdDate: 0.8008281904610115
+          modifiedDate: 6.027456183070403
           name: name
           tenantId: tenantId
           operation: operation
@@ -1790,8 +1769,8 @@ components:
           platformId: platformId
           serviceName: serviceName
           labels: labels
-          createdDate: 2000-01-23T04:56:07.000+00:00
-          modifiedDate: 2000-01-23T04:56:07.000+00:00
+          createdDate: 0.8008281904610115
+          modifiedDate: 6.027456183070403
           name: name
           tenantId: tenantId
           operation: operation

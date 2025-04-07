@@ -453,7 +453,7 @@ func specifyAPIError(err error) error {
 			return errors.New(fmt.Sprintf("API Error: %v, Code %v", provisionErr.Error.Message, provisionErr.Error.Code))
 		}
 		if genericErr.Body() != nil {
-			return fmt.Errorf("API Error: %s", string(genericErr.Body()))
+			return errors.Wrap(err, string(genericErr.Body()))
 		}
 	}
 	return err

@@ -19,8 +19,7 @@ var _ MappedNullable = &CreateEnvironmentInstanceBindingRequest{}
 
 // CreateEnvironmentInstanceBindingRequest JSON object with configuration parameters specific to environment instance binding as specified in the OSB API.
 type CreateEnvironmentInstanceBindingRequest struct {
-	// If needed, you can pass configuration parameters for the Service Binding.<br>Service Brokers must ensure that the client has provided valid configuration parameters and values for the operation.
-	Parameters map[string]map[string]interface{} `json:"parameters,omitempty"`
+	Parameters map[string]interface{} `json:"parameters,omitempty"`
 }
 
 // NewCreateEnvironmentInstanceBindingRequest instantiates a new CreateEnvironmentInstanceBindingRequest object
@@ -41,9 +40,9 @@ func NewCreateEnvironmentInstanceBindingRequestWithDefaults() *CreateEnvironment
 }
 
 // GetParameters returns the Parameters field value if set, zero value otherwise.
-func (o *CreateEnvironmentInstanceBindingRequest) GetParameters() map[string]map[string]interface{} {
+func (o *CreateEnvironmentInstanceBindingRequest) GetParameters() map[string]interface{} {
 	if o == nil || IsNil(o.Parameters) {
-		var ret map[string]map[string]interface{}
+		var ret map[string]interface{}
 		return ret
 	}
 	return o.Parameters
@@ -51,9 +50,9 @@ func (o *CreateEnvironmentInstanceBindingRequest) GetParameters() map[string]map
 
 // GetParametersOk returns a tuple with the Parameters field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CreateEnvironmentInstanceBindingRequest) GetParametersOk() (map[string]map[string]interface{}, bool) {
+func (o *CreateEnvironmentInstanceBindingRequest) GetParametersOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Parameters) {
-		return map[string]map[string]interface{}{}, false
+		return map[string]interface{}{}, false
 	}
 	return o.Parameters, true
 }
@@ -67,8 +66,8 @@ func (o *CreateEnvironmentInstanceBindingRequest) HasParameters() bool {
 	return false
 }
 
-// SetParameters gets a reference to the given map[string]map[string]interface{} and assigns it to the Parameters field.
-func (o *CreateEnvironmentInstanceBindingRequest) SetParameters(v map[string]map[string]interface{}) {
+// SetParameters gets a reference to the given map[string]interface{} and assigns it to the Parameters field.
+func (o *CreateEnvironmentInstanceBindingRequest) SetParameters(v map[string]interface{}) {
 	o.Parameters = v
 }
 

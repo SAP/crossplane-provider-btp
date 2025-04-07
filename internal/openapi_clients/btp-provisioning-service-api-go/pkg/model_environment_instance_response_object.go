@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"time"
 )
 
 // checks if the EnvironmentInstanceResponseObject type satisfies the MappedNullable interface at compile time
@@ -23,9 +22,8 @@ type EnvironmentInstanceResponseObject struct {
 	// The ID of the associated environment broker.
 	BrokerId *string `json:"brokerId,omitempty"`
 	// The commercial type of the environment broker.
-	CommercialType *string `json:"commercialType,omitempty"`
-	// The date the environment instance was created. Dates and times are in UTC format.
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
+	CommercialType *string  `json:"commercialType,omitempty"`
+	CreatedDate    *float32 `json:"createdDate,omitempty"`
 	// Custom labels that are defined by a user and assigned as key-value pairs in a JSON array to the environment instance.  Example: {   \"Cost Center\": [\"19700626\"],   \"Department\": [\"Sales\"],   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],   \"EMEA\":[] } NOTE: Custom labels apply only to SAP BTP. They are not the same labels that might be defined by your environment broker (see \"labels\" field).
 	CustomLabels *map[string][]string `json:"customLabels,omitempty"`
 	// The URL of the service dashboard, which is a web-based management user interface for the service instances.
@@ -41,9 +39,8 @@ type EnvironmentInstanceResponseObject struct {
 	// Broker-specified key-value pairs that specify attributes of an environment instance.
 	Labels *string `json:"labels,omitempty"`
 	// The name of the landscape within the logged-in region on which the environment instance is created.
-	LandscapeLabel *string `json:"landscapeLabel,omitempty"`
-	// The last date the environment instance was last modified. Dates and times are in UTC format.
-	ModifiedDate *time.Time `json:"modifiedDate,omitempty"`
+	LandscapeLabel *string  `json:"landscapeLabel,omitempty"`
+	ModifiedDate   *float32 `json:"modifiedDate,omitempty"`
 	// Name of the environment instance.
 	Name *string `json:"name,omitempty"`
 	// An identifier that represents the last operation. This ID is returned by the environment brokers.
@@ -154,9 +151,9 @@ func (o *EnvironmentInstanceResponseObject) SetCommercialType(v string) {
 }
 
 // GetCreatedDate returns the CreatedDate field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetCreatedDate() time.Time {
+func (o *EnvironmentInstanceResponseObject) GetCreatedDate() float32 {
 	if o == nil || IsNil(o.CreatedDate) {
-		var ret time.Time
+		var ret float32
 		return ret
 	}
 	return *o.CreatedDate
@@ -164,7 +161,7 @@ func (o *EnvironmentInstanceResponseObject) GetCreatedDate() time.Time {
 
 // GetCreatedDateOk returns a tuple with the CreatedDate field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetCreatedDateOk() (*time.Time, bool) {
+func (o *EnvironmentInstanceResponseObject) GetCreatedDateOk() (*float32, bool) {
 	if o == nil || IsNil(o.CreatedDate) {
 		return nil, false
 	}
@@ -180,8 +177,8 @@ func (o *EnvironmentInstanceResponseObject) HasCreatedDate() bool {
 	return false
 }
 
-// SetCreatedDate gets a reference to the given time.Time and assigns it to the CreatedDate field.
-func (o *EnvironmentInstanceResponseObject) SetCreatedDate(v time.Time) {
+// SetCreatedDate gets a reference to the given float32 and assigns it to the CreatedDate field.
+func (o *EnvironmentInstanceResponseObject) SetCreatedDate(v float32) {
 	o.CreatedDate = &v
 }
 
@@ -442,9 +439,9 @@ func (o *EnvironmentInstanceResponseObject) SetLandscapeLabel(v string) {
 }
 
 // GetModifiedDate returns the ModifiedDate field value if set, zero value otherwise.
-func (o *EnvironmentInstanceResponseObject) GetModifiedDate() time.Time {
+func (o *EnvironmentInstanceResponseObject) GetModifiedDate() float32 {
 	if o == nil || IsNil(o.ModifiedDate) {
-		var ret time.Time
+		var ret float32
 		return ret
 	}
 	return *o.ModifiedDate
@@ -452,7 +449,7 @@ func (o *EnvironmentInstanceResponseObject) GetModifiedDate() time.Time {
 
 // GetModifiedDateOk returns a tuple with the ModifiedDate field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EnvironmentInstanceResponseObject) GetModifiedDateOk() (*time.Time, bool) {
+func (o *EnvironmentInstanceResponseObject) GetModifiedDateOk() (*float32, bool) {
 	if o == nil || IsNil(o.ModifiedDate) {
 		return nil, false
 	}
@@ -468,8 +465,8 @@ func (o *EnvironmentInstanceResponseObject) HasModifiedDate() bool {
 	return false
 }
 
-// SetModifiedDate gets a reference to the given time.Time and assigns it to the ModifiedDate field.
-func (o *EnvironmentInstanceResponseObject) SetModifiedDate(v time.Time) {
+// SetModifiedDate gets a reference to the given float32 and assigns it to the ModifiedDate field.
+func (o *EnvironmentInstanceResponseObject) SetModifiedDate(v float32) {
 	o.ModifiedDate = &v
 }
 

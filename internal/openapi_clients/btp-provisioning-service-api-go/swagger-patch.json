@@ -1,6 +1,41 @@
 [
   {
     "op": "replace",
+    "path": "/components/schemas/CreateEnvironmentInstanceBindingRequest/properties/parameters",
+    "value": {
+      "type": "object"
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/EnvironmentInstanceResponseObject/properties/createdDate",
+    "value": {
+      "type": "number"
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/EnvironmentInstanceResponseObject/properties/modifiedDate",
+    "value": {
+      "type": "number"
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/BusinessEnvironmentInstanceResponseObject/properties/createdDate",
+    "value": {
+      "type": "number"
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/BusinessEnvironmentInstanceResponseObject/properties/modifiedDate",
+    "value": {
+      "type": "number"
+    }
+  },
+  {
+    "op": "replace",
     "path": "/components/schemas/CreateEnvironmentInstanceRequestPayload/properties/parameters",
     "value": {
       "description": "If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object.\nFor a list of supported configuration parameters, see the documentation of the particular environment offering.\nIn this example, additional configuration parameters 'id' and 'email' are specified: \n{ \n\"instance_name\": \"myOrg\" \n} ",
