@@ -293,11 +293,8 @@ func (c *Client) UpdateKymaEnvironment(ctx context.Context, environmentInstanceI
 
 func (c *Client) CreateCloudFoundryOrg(
 	ctx context.Context, instanceName string, serviceAccountEmail string, resourceUID string,
-	landscape string, orgName string, environmentName string, subaccountId string,
+	landscape string, orgName string, environmentName string, 
 ) (createdOrg string, err error) {
-	if orgName == "" {
-		orgName = subaccountId + "-"  + instanceName
-	}
 	parameters := map[string]interface{}{
 		cfenvironmentParameterInstanceName: orgName, v1alpha1.SubaccountOperatorLabel: resourceUID,
 	}
@@ -330,7 +327,7 @@ func (c *Client) CreateCloudFoundryOrg(
 
 func (c *Client) CreateCloudFoundryOrgIfNotExists(
 	ctx context.Context, instanceName string, serviceAccountEmail string, resourceUID string,
-	landscape string, orgName string, environmentName string, subaccountId string,
+	landscape string, orgName string, environmentName string, 
 ) (*CloudFoundryOrg, error) {
 	cfEnvironment, err := c.GetCFEnvironmentByNameAndOrg(ctx, instanceName, orgName)
 	if err != nil {
@@ -338,7 +335,7 @@ func (c *Client) CreateCloudFoundryOrgIfNotExists(
 	}
 	var orgId string
 	if cfEnvironment == nil {
-		orgId, err = c.CreateCloudFoundryOrg(ctx, instanceName, serviceAccountEmail, resourceUID, landscape, orgName, environmentName, subaccountId)
+		orgId, err = c.CreateCloudFoundryOrg(ctx, instanceName, serviceAccountEmail, resourceUID, landscape, orgName, environmentName,)
 		if err != nil {
 			return nil, err
 		}
