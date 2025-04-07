@@ -107,10 +107,10 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 
 func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
 	adminServiceAccountEmail := c.btp.Credential.UserCredential.Email
-
+	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	org, err := c.btp.CreateCloudFoundryOrgIfNotExists(
 		ctx, cr.Name, adminServiceAccountEmail, string(cr.UID),
-		cr.Spec.ForProvider.Landscape, cr.Spec.ForProvider.OrgName, cr.Spec.ForProvider.EnvironmentName, cr.Spec.SubaccountGuid,
+		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName, 
 	)
 	if err != nil {
 		return errors.Wrap(err, instanceCreateFailed)

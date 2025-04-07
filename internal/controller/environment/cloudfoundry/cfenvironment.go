@@ -121,7 +121,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	if instance != nil  && *instance.State == v1alpha1.InstanceStateOk && *env.ExternalName(instance) != meta.GetExternalName(cr) {
 		meta.SetExternalName(cr, *env.ExternalName(instance))
-		c.kube.Update(ctx, cr)
+		err := c.kube.Update(ctx, cr)
+		if err != nil {
+			return managed.ExternalObservation{}, err
+		}
 	}
 	cr.Status.AtProvider = env.GenerateObservation(instance, managers)
 
