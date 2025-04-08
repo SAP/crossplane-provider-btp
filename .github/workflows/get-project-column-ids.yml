@@ -1,0 +1,142 @@
+name: Fetch Project & Column IDs
+
+on:
+  workflow_dispatch:
+
+env:
+  ACTIONS_STEP_DEBUG: true
+  
+jobs:
+  fetch-ids:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # ✅ Step 1: Fetch Project IDs
+      - name: Get Project IDs
+        id: get_project_ids
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_READ_TOKEN }}
+          script: |
+            const org = context.repo.owner;
+            const projectNames = ["Refinement", "Backlog"];  // Adjust project names as needed
+
+            const query = `query($org: String!) {
+              organization(login: $org) {
+                projectsV2(first: 10) {
+                  nodes {
+                    id
+                    title
+                  }
+                }
+              }
+            }`;
+
+            const result = await github.graphql(query, { org });
+
+            console.log(result);
+
+
+            if (!result.organization || !result.organization.projectsV2.nodes.length) {
+              console.log("❌ No projects found.");
+              core.setOutput("project_ids", "{}");
+              return;
+            }
+
+            let projectIds = {};
+            result.organization.projectsV2.nodes.forEach(p => {
+              if (projectNames.includes(p.title)) {
+                projectIds[p.title] = p.id;
+              }
+            });
+
+            console.log("====== PROJECT IDs ======");
+            Object.entries(projectIds).forEach(([name, id]) => {
+              console.log(`Project "${name}" = Project ID: "${id}"`);
+            });
+
+            core.setOutput("project_ids", JSON.stringify(projectIds)); 
+
+      # ✅ Step 2: Fetch Column IDs
+      - name: Get Column IDs
+        id: get_columns
+        uses: actions/github-script@v7
+        env:
+          PROJECT_IDS: ${{ steps.get_project_ids.outputs.project_ids }}
+        with:
+          github-token: ${{ secrets.GH_READ_TOKEN }}
+          script: |
+            const projectIdsRaw = process.env.PROJECT_IDS;
+            let projectIds = {};
+
+            // ✅ Ensure it's valid JSON
+            try {
+              projectIds = JSON.parse(projectIdsRaw);
+            } catch (error) {
+              console.log("❌ Failed to parse PROJECT_IDS:", error);
+              core.setOutput("columns", "{}");
+              return;
+            }
+
+            if (Object.keys(projectIds).length === 0) {
+              console.log("❌ No valid project IDs found.");
+              core.setOutput("columns", "{}");
+              return;
+            }
+
+            // Fetch columns for each project
+            let columns = {};
+
+            for (const [projectName, projectId] of Object.entries(projectIds)) {
+              const columnsQuery = `query($projectId: ID!) {
+                node(id: $projectId) {
+                  ... on ProjectV2 {
+                    fields(first: 10) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }`
+
+              const columnsResult = await github.graphql(columnsQuery, { projectId });
+
+              if (columnsResult.node && columnsResult.node.fields.nodes.length) {
+                columns[projectName] = columnsResult.node.fields.nodes.map(field => ({
+                  id: field.id,
+                  name: field.name,
+                  options: field.options ? field.options.map(option => ({
+                    id: option.id,
+                    name: option.name                
+                  })) : []
+                }));
+              }
+
+            }; // End main loop over projectIds
+            
+            console.log("====== COLUMNS ======");
+            Object.entries(columns).forEach(([projectName, columns]) => {
+              console.log(`Project "${projectName}" Columns:`);
+              columns.forEach(column => {
+                console.log(`  Column "${column.name}" = Column ID: "${column.id}"`);
+                if (column.options.length) {
+                  console.log(`    Options:`);
+                  column.options.forEach(option => {
+                    console.log(`      Option "${option.name}" = Option ID: "${option.id}"`);
+                  });
+                }
+              });
+            });
+
+            core.setOutput("columns", JSON.stringify(columns)); 
