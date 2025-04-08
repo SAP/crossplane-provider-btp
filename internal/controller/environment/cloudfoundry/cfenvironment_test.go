@@ -10,13 +10,14 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	environments "github.com/sap/crossplane-provider-btp/internal/clients/cfenvironment"
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/cloudfoundry/fake"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // Unlike many Kubernetes projects Crossplane does not use third party testing
@@ -57,7 +58,7 @@ func TestObserve(t *testing.T) {
 		},
 		"ErrorGettingCFEnvironment": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return nil, nil, errors.New("Could not call backend")
 				}},
 				cr: environment(),
@@ -70,7 +71,7 @@ func TestObserve(t *testing.T) {
 		},
 		"NeedsCreate": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return nil, nil, nil
 				}},
 				cr: environment(),
@@ -85,8 +86,8 @@ func TestObserve(t *testing.T) {
 		},
 		"SuccessfulAvailableAndUpToDate": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:  internal.Ptr("OK"),
 						Labels: internal.Ptr("{}"),
 					}, []v1alpha1.User{aUser}, nil
@@ -124,8 +125,8 @@ func TestObserve(t *testing.T) {
 		},
 		"ExistingButNotAvailable": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:  internal.Ptr("CREATING"),
 						Labels: internal.Ptr("{}"),
 					}, []v1alpha1.User{aUser}, nil

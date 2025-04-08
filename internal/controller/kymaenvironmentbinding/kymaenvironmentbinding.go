@@ -28,8 +28,6 @@ const (
 	errGetCredentialsSecret      = "Could not get secret of local cloud management"
 	errTrackRUsage               = "cannot track ResourceUsage"
 	errNoSecretsToPublish        = "no secrets to publish, please set the write connection secret reference or publish connection details to reference"
-
-	errNewClient = "cannot create new Service"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -124,11 +122,6 @@ func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, 
 	}
 
 	return hasValidBinding, validBindings
-}
-
-func (c *external) needsRotation(cr *v1alpha1.KymaEnvironmentBinding) bool {
-	hasValidBinding, _ := c.validateBindings(cr)
-	return !hasValidBinding
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
