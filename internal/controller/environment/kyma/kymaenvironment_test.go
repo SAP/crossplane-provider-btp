@@ -72,7 +72,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.New("Could not call backend"),
+				err: errors.Wrap(errors.New("Could not call backend"), "Could not describe kyma instance"),
 				cr:  environment(),
 			},
 		},
