@@ -1,0 +1,69 @@
+name: Add new issues to Refinement Board with status "Validation"
+
+on:
+  issues:
+    types: [opened]
+
+env:
+  ACTIONS_STEP_DEBUG: true
+
+jobs:
+  add_to_refinement_as_validation:
+    if: contains(fromJson('["backlog"]'), github.event.repository.name) # filter by repository name
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Add issue to Project "Refinement" and Set Status to "Validation"
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_READ_TOKEN }}
+          script: |
+              // below are the IDs for the Project, Status Field, and "Validation" Status Option.
+              // Those IDs can all be retrieved using the GitHub Action "get-project-column-ids.yml" (in case they change of we introduce new ones)
+              const projectId = "ABC"; // Project ID for "Refinement Board" 
+              const statusFieldId = "DEF"; // "Status" Field ID of that Project
+              const statusOptionId = "GHI"; // Option ID for "Validation" Status
+              const issue = context.payload.issue;
+              const org = context.payload.repository.owner.login;
+  
+              // Step 1: Add issue to Project
+              const itemResponse = await github.graphql(`
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+                    item {
+                      id
+                    }
+                  }
+                }
+              `, {
+                projectId: projectId,
+                contentId: issue.node_id
+              });
+  
+              const itemId = itemResponse.addProjectV2ItemById.item.id;
+
+              // Step 2: Set the Status field
+              await github.graphql(`
+                mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId,
+                    itemId: $itemId,
+                    fieldId: $fieldId,
+                    value: { singleSelectOptionId: $optionId }
+                  }) {
+                    projectV2Item {
+                      id
+                    }
+                  }
+                }
+              `, {
+                projectId: projectId,
+                itemId: itemId,
+                fieldId: statusFieldId,
+                optionId: statusOptionId
+              });
+              
+              console.log(`Issue ${issue.title} added to Project "Refinement" and status set to Validation.`);

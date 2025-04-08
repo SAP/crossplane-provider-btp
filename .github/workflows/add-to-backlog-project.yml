@@ -1,0 +1,192 @@
+name: Move Issues with Status "Done" from Refinement to Backlog
+
+on:
+  schedule:
+    - cron: "0 7 * * *"  # Runs at 07:00 UTC every day
+  workflow_dispatch:  # Allows manual trigger
+
+env:
+  ACTIONS_STEP_DEBUG: true
+
+jobs:
+  move-done-issues:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Move Issues from Refinement Board (in Status "Done") to Project Backlog (with Status "ToDo")
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_READ_TOKEN }}
+          script: |
+            const org = context.repo.owner;
+            const projectP1 = "ABC";  // Project ID for "Refinement Board" 
+            const projectP2 = "DEF";  // Project ID for "Backlog Project"
+            const statusFieldIdP1 = "GGG";  // Issue Status field ID for Refinement Board
+            const statusFieldIdP2 = "HHH";  // Issue Status field ID for Project Backlog
+            const doneStatus = "6c6113eb";  // "Done" Status Option ID of Refinement Board
+            const todoStatus = "f75ad846";  // "ToDo Status Option ID of Backlog Project
+
+            // Fetch all issues in Refinement Board
+            const query = `
+              query {
+                node(id: "${projectP1}") {
+                  ... on ProjectV2 {
+                    items(first: 100) {
+                      nodes {
+                        id
+                        content {
+                          __typename
+                          ... on Issue {
+                            id
+                            number
+                            title                         
+                          }
+                        }
+                        fieldValues(first: 10) {
+                          nodes {
+                            __typename
+                            ... on ProjectV2ItemFieldSingleSelectValue {
+                              field {
+                                __typename
+                                ... on ProjectV2SingleSelectField {
+                                  id
+                                  name
+                                  options {
+                                    id
+                                    name
+                                  }
+                                }                                
+                              }
+                              optionId
+                            } 
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const result = await github.graphql(query);
+            const items = result.node.items.nodes;
+            const doneItems = [];
+
+            // log the items structure for debugging
+            // console.log("items structure: ", JSON.stringify(items, null, 2));
+
+            // log the field values structure for debugging
+            items.forEach(item => {
+              // console.log(JSON.stringify(item.fieldValues.nodes, null, 2));
+              item.fieldValues.nodes.forEach(field => {
+                if (field.__typename === "ProjectV2ItemFieldSingleSelectValue") {
+                  if (field.optionId === doneStatus) {
+                    console.log(`Issue ${item.content.title} (#${item.content.number}) is in "Done" status -> should be added to Backlog.`);
+                    doneItems.push(item);
+                  }
+                }
+              });
+            });
+
+            if (doneItems.length === 0) {
+              console.log("No issues in 'Done' status, nothing to do.");
+              return;
+            }
+
+            // Main Loop over all items in "Done" status
+            // 1. Adds issue to Project Backlog
+            // 2. Sets status to "To Do" in Project Backlog
+            // 3. Removes issue from Refinement Board
+            for (const item of doneItems) {
+              if (!item.content || !item.content.number) continue;
+
+              let issueNumber = item.content.number;
+              let issueTitle = item.content.title;
+              console.log(`**** Start Processing Issue ${issueTitle} (#${issueNumber}) ****`);
+                            
+              // 1. Add issue to Project Backlog
+              const addToProjectMutation = `
+                mutation {
+                  addProjectV2ItemById(input: {
+                    projectId: "${projectP2}",
+                    contentId: "${item.content.id}"
+                  }) {
+                    item {
+                      id
+                    }
+                  }
+                }
+              `;
+
+              let addToProjectResult;
+              try {
+                addToProjectResult = await github.graphql(addToProjectMutation);
+
+                if (addToProjectResult && addToProjectResult.addProjectV2ItemById.item.id) {
+                  console.log(`Issue ${issueTitle} (#${issueNumber}) successfully added to backlog project.`);
+                } else {
+                  console.error("Failed to add issue ${issueTitle} (#${issueNumber}) to backlog project.");
+                }
+              } catch (error) {
+                console.error("Error in add to Backlog Project GraphQL mutation:", error);
+              }
+              
+              let newProjectItemId = addToProjectResult.addProjectV2ItemById.item.id;
+
+              // 2. Set status to "To Do" in Backlog Project
+              const updateStatusMutation = `
+                mutation {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: "${projectP2}",
+                    itemId: "${newProjectItemId}",
+                    fieldId: "${statusFieldIdP2}",
+                    value: { singleSelectOptionId: "${todoStatus}" }
+                  }) {
+                    projectV2Item {
+                      id
+                    }
+                  }
+                }
+              `;
+
+              let updateStatusResult;
+              try {
+                updateStatusResult = await github.graphql(updateStatusMutation);
+                if (updateStatusResult && updateStatusResult.updateProjectV2ItemFieldValue.projectV2Item.id) {
+                  console.log(`Changed Status to TODO for Issue ${issueTitle} (#${issueNumber}).`);
+                } else {
+                  console.error("Failed to change status to TODO for Issue ${issueTitle} (#${issueNumber}).");
+                }
+              } catch (error) {
+                console.error("Error in Change Status GraphQL mutation:", error);
+              }
+
+              // 3. Remove issue from Refinement Board
+              const deleteMutation = `
+                mutation {
+                  deleteProjectV2Item(input: { 
+                    projectId: "${projectP1}",
+                    itemId: "${item.id}" 
+                  }) {
+                    deletedItemId
+                  }
+                }
+              `;
+
+              let deleteResult;
+              try {
+                deleteResult = await github.graphql(deleteMutation);
+                if (deleteResult && deleteResult.deleteProjectV2Item.deletedItemId) {
+                  console.log(`Issue ${issueTitle} (#${issueNumber}) successfully removed from refinement project.`);
+                } else {
+                  console.error("Failed to remove issue ${issueTitle} (#${issueNumber}) from refinement project.");
+                }
+              } catch (error) {
+                console.error("Error in delete from refinement project GraphQL mutation:", error);
+              }
+
+              console.log(`**** Finished processing Issue ${issueTitle} (#${issueNumber}) ****`);
+            }
