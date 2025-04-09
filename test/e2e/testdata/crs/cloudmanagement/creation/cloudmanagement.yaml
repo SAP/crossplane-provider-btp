@@ -1,4 +1,4 @@
-apiVersion: account.btp.sap.crossplane.io/v1alpha1
+apiVersion: account.btp.sap.crossplane.io/v1beta1
 kind: CloudManagement
 metadata:
   name: e2e-cis-created
@@ -12,3 +12,5 @@ spec:
       name: e2e-sm-cis
     subaccountRef:
       name: cis-sa-test
+    serviceInstanceName: "e2e-si-created"
+    serviceBindingName: "e2e-sb-created"
