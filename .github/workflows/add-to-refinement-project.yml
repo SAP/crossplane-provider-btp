@@ -9,7 +9,7 @@ env:
 
 jobs:
   add_to_refinement_as_validation:
-    if: contains(fromJson('["backlog"]'), github.event.repository.name) # filter by repository name
+    if: contains(fromJson('["crossplane-provider-btp"]'), github.event.repository.name) # filter by repository name
     runs-on: ubuntu-latest
     steps:
 
