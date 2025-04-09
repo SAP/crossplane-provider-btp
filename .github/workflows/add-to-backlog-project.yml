@@ -22,12 +22,12 @@ jobs:
           github-token: ${{ secrets.GH_READ_TOKEN }}
           script: |
             const org = context.repo.owner;
-            const projectP1 = "ABC";  // Project ID for "Refinement Board" 
-            const projectP2 = "DEF";  // Project ID for "Backlog Project"
-            const statusFieldIdP1 = "GGG";  // Issue Status field ID for Refinement Board
-            const statusFieldIdP2 = "HHH";  // Issue Status field ID for Project Backlog
-            const doneStatus = "6c6113eb";  // "Done" Status Option ID of Refinement Board
-            const todoStatus = "f75ad846";  // "ToDo Status Option ID of Backlog Project
+            const projectP1 = ${{ env.PROJECT_REFINEMENT_ID }};  // Project ID for "Refinement Board" 
+            const projectP2 = ${{ env.PROJECT_BACKLOG_ID }}";  // Project ID for "Backlog Project"
+            const statusFieldIdP1 =${{ env.ISSUE_REFINEMENT_STATUS_ID }}";  // Issue Status field ID for Refinement Board
+            const statusFieldIdP2 = ${{ env.ISSUE_BACKLOG_STATUS_ID }}";  // Issue Status field ID for Project Backlog
+            const doneStatus = ${{ env.ISSUE_REFINEMENT_DONE_STATUS_ID }}";   // "Done" Status Option ID of Refinement Board
+            const todoStatus = ${{ env.ISSUE_BACKLOG_TODO_STATUS_ID }}";   // "ToDo Status Option ID of Backlog Project
 
             // Fetch all issues in Refinement Board
             const query = `
