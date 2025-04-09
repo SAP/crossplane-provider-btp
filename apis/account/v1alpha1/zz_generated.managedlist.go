@@ -74,6 +74,15 @@ func (l *ServiceManagerList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this ServicePlanList.
+func (l *ServicePlanList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this SubaccountList.
 func (l *SubaccountList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))

@@ -203,6 +203,48 @@ func (mg *ServiceManager) ResolveReferences(ctx context.Context, c client.Reader
 	return nil
 }
 
+// ResolveReferences of this ServicePlan.
+func (mg *ServicePlan) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPIResolver(c, mg)
+
+	var rsp reference.ResolutionResponse
+	var err error
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecret,
+		Extract:      ServiceManagerSecret(),
+		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
+		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
+		To: reference.To{
+			List:    &ServiceManagerList{},
+			Managed: &ServiceManager{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ServiceManagerSecret")
+	}
+	mg.Spec.ForProvider.ServiceManagerSecret = rsp.ResolvedValue
+	mg.Spec.ForProvider.ServiceManagerRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecretNamespace,
+		Extract:      ServiceManagerSecretNamespace(),
+		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
+		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
+		To: reference.To{
+			List:    &ServiceManagerList{},
+			Managed: &ServiceManager{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ServiceManagerSecretNamespace")
+	}
+	mg.Spec.ForProvider.ServiceManagerSecretNamespace = rsp.ResolvedValue
+	mg.Spec.ForProvider.ServiceManagerRef = rsp.ResolvedReference
+
+	return nil
+}
+
 // ResolveReferences of this Subaccount.
 func (mg *Subaccount) ResolveReferences(ctx context.Context, c client.Reader) error {
 	r := reference.NewAPIResolver(c, mg)
@@ -245,6 +287,80 @@ func (mg *Subaccount) ResolveReferences(ctx context.Context, c client.Reader) er
 	return nil
 }
 
+// ResolveReferences of this SubaccountServiceBinding.
+func (mg *SubaccountServiceBinding) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPIResolver(c, mg)
+
+	var rsp reference.ResolutionResponse
+	var err error
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.ServiceInstanceID),
+		Extract:      SubaccountServiceInstanceId(),
+		Reference:    mg.Spec.ForProvider.SubaccountServiceInstanceRef,
+		Selector:     mg.Spec.ForProvider.SubaccountServiceInstanceSelector,
+		To: reference.To{
+			List:    &SubaccountServiceInstanceList{},
+			Managed: &SubaccountServiceInstance{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ServiceInstanceID")
+	}
+	mg.Spec.ForProvider.ServiceInstanceID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.ForProvider.SubaccountServiceInstanceRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountID),
+		Extract:      SubaccountUuid(),
+		Reference:    mg.Spec.ForProvider.SubaccountRef,
+		Selector:     mg.Spec.ForProvider.SubaccountSelector,
+		To: reference.To{
+			List:    &SubaccountList{},
+			Managed: &Subaccount{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.SubaccountID")
+	}
+	mg.Spec.ForProvider.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.ForProvider.SubaccountRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.ServiceInstanceID),
+		Extract:      SubaccountServiceInstanceId(),
+		Reference:    mg.Spec.InitProvider.SubaccountServiceInstanceRef,
+		Selector:     mg.Spec.InitProvider.SubaccountServiceInstanceSelector,
+		To: reference.To{
+			List:    &SubaccountServiceInstanceList{},
+			Managed: &SubaccountServiceInstance{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.InitProvider.ServiceInstanceID")
+	}
+	mg.Spec.InitProvider.ServiceInstanceID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.InitProvider.SubaccountServiceInstanceRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.SubaccountID),
+		Extract:      SubaccountUuid(),
+		Reference:    mg.Spec.InitProvider.SubaccountRef,
+		Selector:     mg.Spec.InitProvider.SubaccountSelector,
+		To: reference.To{
+			List:    &SubaccountList{},
+			Managed: &Subaccount{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.InitProvider.SubaccountID")
+	}
+	mg.Spec.InitProvider.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.InitProvider.SubaccountRef = rsp.ResolvedReference
+
+	return nil
+}
+
 // ResolveReferences of this SubaccountServiceBroker.
 func (mg *SubaccountServiceBroker) ResolveReferences(ctx context.Context, c client.Reader) error {
 	r := reference.NewAPIResolver(c, mg)
@@ -271,6 +387,80 @@ func (mg *SubaccountServiceBroker) ResolveReferences(ctx context.Context, c clie
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.SubaccountID),
 		Extract:      reference.ExternalName(),
+		Reference:    mg.Spec.InitProvider.SubaccountRef,
+		Selector:     mg.Spec.InitProvider.SubaccountSelector,
+		To: reference.To{
+			List:    &SubaccountList{},
+			Managed: &Subaccount{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.InitProvider.SubaccountID")
+	}
+	mg.Spec.InitProvider.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.InitProvider.SubaccountRef = rsp.ResolvedReference
+
+	return nil
+}
+
+// ResolveReferences of this SubaccountServiceInstance.
+func (mg *SubaccountServiceInstance) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPIResolver(c, mg)
+
+	var rsp reference.ResolutionResponse
+	var err error
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.ServiceplanID),
+		Extract:      ServicePlanId(),
+		Reference:    mg.Spec.ForProvider.ServicePlanRef,
+		Selector:     mg.Spec.ForProvider.ServicePlanSelector,
+		To: reference.To{
+			List:    &ServicePlanList{},
+			Managed: &ServicePlan{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ServiceplanID")
+	}
+	mg.Spec.ForProvider.ServiceplanID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.ForProvider.ServicePlanRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountID),
+		Extract:      SubaccountUuid(),
+		Reference:    mg.Spec.ForProvider.SubaccountRef,
+		Selector:     mg.Spec.ForProvider.SubaccountSelector,
+		To: reference.To{
+			List:    &SubaccountList{},
+			Managed: &Subaccount{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.SubaccountID")
+	}
+	mg.Spec.ForProvider.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.ForProvider.SubaccountRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.ServiceplanID),
+		Extract:      ServicePlanId(),
+		Reference:    mg.Spec.InitProvider.ServicePlanRef,
+		Selector:     mg.Spec.InitProvider.ServicePlanSelector,
+		To: reference.To{
+			List:    &ServicePlanList{},
+			Managed: &ServicePlan{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.InitProvider.ServiceplanID")
+	}
+	mg.Spec.InitProvider.ServiceplanID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.InitProvider.ServicePlanRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.SubaccountID),
+		Extract:      SubaccountUuid(),
 		Reference:    mg.Spec.InitProvider.SubaccountRef,
 		Selector:     mg.Spec.InitProvider.SubaccountSelector,
 		To: reference.To{

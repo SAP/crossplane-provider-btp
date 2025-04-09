@@ -2,6 +2,7 @@ package rolecollectionassignment
 
 import (
 	"context"
+	"github.com/sap/crossplane-provider-btp/internal"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -11,7 +12,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
-	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -128,7 +128,7 @@ func TestObserve(t *testing.T) {
 			if diff := cmp.Diff(&tc.want.CalledIdentifier, tc.args.client.CalledIdentifier); diff != "" {
 				t.Errorf("\n%s\ne.Observe(...): -want, +CalledIdentifier:\n", diff)
 			}
-			expectedErrorBehaviour(t, tc.want.err, err)
+			internal.VerifyTestError(t, tc.want.err, err)
 			if diff := cmp.Diff(tc.want.o, got); diff != "" {
 				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n", diff)
 			}
@@ -226,7 +226,7 @@ func TestCreate(t *testing.T) {
 			if diff := cmp.Diff(&tc.want.CalledIdentifier, tc.args.client.CalledIdentifier); diff != "" {
 				t.Errorf("\n%s\ne.Create(...): -want, +CalledIdentifier:\n", diff)
 			}
-			expectedErrorBehaviour(t, tc.want.err, err)
+			internal.VerifyTestError(t, tc.want.err, err)
 			if diff := cmp.Diff(tc.want.o, got); diff != "" {
 				t.Errorf("\n%s\ne.Create(...): -want, +got:\n", diff)
 			}
@@ -342,7 +342,7 @@ func TestDelete(t *testing.T) {
 			if diff := cmp.Diff(&tc.want.CalledIdentifier, tc.args.client.CalledIdentifier); diff != "" {
 				t.Errorf("\n%s\ne.Delete(...): -want, +CalledIdentifier:\n", diff)
 			}
-			expectedErrorBehaviour(t, tc.want.err, err)
+			internal.VerifyTestError(t, tc.want.err, err)
 			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
 				t.Errorf("\ne.Create(): expected cr after operation -want, +got:\n%s\n", diff)
 			}
@@ -469,7 +469,7 @@ func TestConnect(t *testing.T) {
 				newGroupAssignerFn: tc.args.newGroupAssignerFn,
 			}
 			got, err := c.Connect(context.Background(), tc.args.cr)
-			expectedErrorBehaviour(t, tc.want.err, err)
+			internal.VerifyTestError(t, tc.want.err, err)
 			if tc.want.externalCreated != (got != nil) {
 				t.Errorf("expected external to be created: %t, got %t", tc.want.externalCreated, got != nil)
 			}
@@ -499,7 +499,7 @@ func TestConfigureUserAssignerFn(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, err := configureUserAssignerFn([]byte(tc.json))
-			expectedErrorBehaviour(t, tc.expectErr, err)
+			internal.VerifyTestError(t, tc.expectErr, err)
 		})
 	}
 }
@@ -526,20 +526,9 @@ func TestConfigureGroupAssignerFn(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, err := configureGroupAssignerFn([]byte(tc.json))
-			expectedErrorBehaviour(t, tc.expectErr, err)
+			internal.VerifyTestError(t, tc.expectErr, err)
 		})
 	}
-}
-
-func expectedErrorBehaviour(t *testing.T, expectedErr error, gotErr error) {
-	if gotErr != nil {
-		assert.Truef(t, errors.Is(gotErr, expectedErr), "expected error %v, got %v", expectedErr, gotErr)
-		return
-	}
-	if expectedErr != nil {
-		t.Errorf("expected error %v, got nil", expectedErr.Error())
-	}
-
 }
 
 func cr(m ...RoleCollectionModifier) *v1alpha1.RoleCollectionAssignment {
