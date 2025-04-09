@@ -15,5 +15,7 @@ __debug_bin
 /examples/sample/certs.sh
 crossplane-provider-btp-account.iml
 /test/e2e/testdata/secrets
-
+kubeconfig
 dist/
+*.local.yaml
+

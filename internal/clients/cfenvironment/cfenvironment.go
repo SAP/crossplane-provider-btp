@@ -3,11 +3,13 @@ package environments
 import (
 	"context"
 	"fmt"
+
 	cfv3 "github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/config"
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
+
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
@@ -47,7 +49,7 @@ func NewCloudFoundryOrganization(btp btp.Client) *CloudFoundryOrganization {
 func (c CloudFoundryOrganization) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.CloudFoundryEnvironment,
-) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 	name := meta.GetExternalName(&cr)
 	environment, err := c.btp.GetEnvironmentByNameAndType(ctx, name, btp.CloudFoundryEnvironmentType())
 	if err != nil {
@@ -77,7 +79,7 @@ func (c CloudFoundryOrganization) DescribeInstance(
 
 }
 
-func (c CloudFoundryOrganization) createClient(environment *provisioningclient.EnvironmentInstanceResponseObject) (
+func (c CloudFoundryOrganization) createClient(environment *provisioningclient.BusinessEnvironmentInstanceResponseObject) (
 	*organizationClient,
 	error,
 ) {

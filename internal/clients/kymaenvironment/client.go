@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
@@ -16,7 +17,7 @@ import (
 
 type Client interface {
 	DescribeInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (
-		*provisioningclient.EnvironmentInstanceResponseObject,
+		*provisioningclient.BusinessEnvironmentInstanceResponseObject,
 		error,
 	)
 	CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error
@@ -25,7 +26,7 @@ type Client interface {
 }
 
 func GenerateObservation(
-	environment *provisioningclient.EnvironmentInstanceResponseObject,
+	environment *provisioningclient.BusinessEnvironmentInstanceResponseObject,
 ) v1alpha1.KymaEnvironmentObservation {
 	observation := v1alpha1.KymaEnvironmentObservation{}
 
@@ -66,7 +67,7 @@ func GenerateObservation(
 	return observation
 }
 
-func GetConnectionDetails(instance *provisioningclient.EnvironmentInstanceResponseObject, httpClient *http.Client) (managed.ConnectionDetails, error) {
+func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject, httpClient *http.Client) (managed.ConnectionDetails, error) {
 	labelMap := map[string]string{}
 
 	var iLabel string
