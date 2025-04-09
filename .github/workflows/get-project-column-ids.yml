@@ -22,7 +22,10 @@ jobs:
           github-token: ${{ secrets.GH_READ_TOKEN }}
           script: |
             const org = context.repo.owner;
-            const projectNames = ["Refinement", "Backlog"];  // Adjust project names as needed
+            const projectNames = [
+                  "Refinement: Crossplane BTP Provider", 
+                  "Backlog"
+            ];  // Adjust project names as needed
 
             const query = `query($org: String!) {
               organization(login: $org) {
