@@ -23,9 +23,9 @@ jobs:
           script: |
               // below are the IDs for the Project, Status Field, and "Validation" Status Option.
               // Those IDs can all be retrieved using the GitHub Action "get-project-column-ids.yml" (in case they change of we introduce new ones)
-              const projectId = ${{ env.PROJECT_REFINEMENT_ID }};; // Project ID for "Refinement Board" 
-              const statusFieldId = ${{ env.ISSUE_REFINEMENT_STATUS_ID }}"; // "Status" Field ID of that Project
-              const statusOptionId = ${{ env.ISSUE_REFINEMENT_VALIDATION_STATUS_OPTION_ID }}"; // Option ID for "Validation" Status
+              const projectId = ${{ env.PROJECT_REFINEMENT_ID }} // Project ID for "Refinement Board" 
+              const statusFieldId = ${{ env.ISSUE_REFINEMENT_STATUS_ID }} // "Status" Field ID of that Project
+              const statusOptionId = ${{ env.ISSUE_REFINEMENT_VALIDATION_STATUS_OPTION_ID }} // Option ID for "Validation" Status
               const issue = context.payload.issue;
               const org = context.payload.repository.owner.login;
   
