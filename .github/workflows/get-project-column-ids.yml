@@ -24,7 +24,7 @@ jobs:
             const org = context.repo.owner;
             const projectNames = [
                   "Refinement: Crossplane BTP Provider", 
-                  "Backlog"
+                  "Backlog: Crossplane BTP Provider"
             ];  // Adjust project names as needed
 
             const query = `query($org: String!) {
