@@ -9,8 +9,9 @@ import (
 	_ "embed"
 
 	ujconfig "github.com/crossplane/upjet/pkg/config"
+	apicredentials "github.com/sap/crossplane-provider-btp/config/btp_subaccount_api_credential"
 	directoryentitlement "github.com/sap/crossplane-provider-btp/config/directory_entitlement"
-	global_trustconfig "github.com/sap/crossplane-provider-btp/config/globalaccount_trust_configuration"
+	globaltrustconfig "github.com/sap/crossplane-provider-btp/config/globalaccount_trust_configuration"
 	servicebinding "github.com/sap/crossplane-provider-btp/config/subaccount_service_binding"
 	servicebroker "github.com/sap/crossplane-provider-btp/config/subaccount_service_broker"
 	serviceinstance "github.com/sap/crossplane-provider-btp/config/subaccount_service_instance"
@@ -41,11 +42,12 @@ func GetProvider() *ujconfig.Provider {
 	for _, configure := range []func(provider *ujconfig.Provider){
 		// add custom config functions
 		trustconfig.Configure,
-		global_trustconfig.Configure,
+		globaltrustconfig.Configure,
 		directoryentitlement.Configure,
 		serviceinstance.Configure,
 		servicebinding.Configure,
 		servicebroker.Configure,
+		apicredentials.Configure,
 	} {
 		configure(pc)
 	}
