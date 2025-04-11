@@ -33,8 +33,6 @@ type ResourceUsage struct {
 
 	//Spec ResourceUsageSpec `json:"spec"`
 	Spec ResourceUsageSpec `json:"spec"`
-
-	Status metav1.Status `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

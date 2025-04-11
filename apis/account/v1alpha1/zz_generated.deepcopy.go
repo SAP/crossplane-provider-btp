@@ -1978,6 +1978,7 @@ func (in *SubaccountServiceBrokerInitParameters) DeepCopyInto(out *SubaccountSer
 		*out = new(string)
 		**out = **in
 	}
+	out.PasswordSecretRef = in.PasswordSecretRef
 	if in.SubaccountID != nil {
 		in, out := &in.SubaccountID, &out.SubaccountID
 		*out = new(string)

@@ -8,13 +8,14 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	cmclient "github.com/sap/crossplane-provider-btp/internal/clients/cis"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	test2 "github.com/sap/crossplane-provider-btp/internal/tracking/test"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -506,7 +507,7 @@ func TestDelete(t *testing.T) {
 				tracker:  test2.NoOpReferenceResolverTracker{},
 				tfClient: tc.args.tfClient,
 			}
-			err := uua.Delete(context.TODO(), tc.args.cr)
+			_, err := uua.Delete(context.TODO(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Delete(): -want error, +got error:\n%s\n", diff)
 			}

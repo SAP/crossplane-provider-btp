@@ -12,10 +12,11 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const bindingData = `{"endpoints":{"accounts_service_url":"xxx","cloud_automation_url":"xxx","entitlements_service_url":"xxx","events_service_url":"xxx","metadata_service_url":"xxx","order_processing_url":"xxx","provisioning_service_url":"xxx","saas_registry_service_url":"xxx"},"grant_type":"client_credentials","sap.cloud.service":"com.sap.core.commercial.service.local","uaa":{"apiurl":"xxx","clientid":"xxx","clientsecret":"xxx","credential-type":"binding-secret","identityzone":"xxx","identityzoneid":"xxx","sburl":"xxx","serviceInstanceId":"xxx","subaccountid":"xxx","tenantid":"xxx","tenantmode":"shared","uaadomain":"xxx","url":"xxx","verificationkey":"xxx","xsappname":"xxx","xsmasterappname":"xxx","zoneid":"xxx"}}`
@@ -458,8 +459,8 @@ func TestDeleteResources(t *testing.T) {
 			args: args{
 				cr: testCMCr("subaccountId", "planId", "someID/anotherID", ""),
 				sbExternal: ExternalClientFake{
-					deleteFn: func() error {
-						return errors.New("bindingDeleteError")
+					deleteFn: func() (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, errors.New("bindingDeleteError")
 					},
 				},
 			},
@@ -472,13 +473,13 @@ func TestDeleteResources(t *testing.T) {
 			args: args{
 				cr: testCMCr("subaccountId", "planId", "someID/anotherID", ""),
 				sbExternal: ExternalClientFake{
-					deleteFn: func() error {
-						return nil
+					deleteFn: func() (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, nil
 					},
 				},
 				siExternal: ExternalClientFake{
-					deleteFn: func() error {
-						return errors.New("instanceDeleteError")
+					deleteFn: func() (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, errors.New("instanceDeleteError")
 					},
 				},
 			},
@@ -491,13 +492,13 @@ func TestDeleteResources(t *testing.T) {
 			args: args{
 				cr: testCMCr("subaccountId", "planId", "someID/anotherID", ""),
 				sbExternal: ExternalClientFake{
-					deleteFn: func() error {
-						return nil
+					deleteFn: func() (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, nil
 					},
 				},
 				siExternal: ExternalClientFake{
-					deleteFn: func() error {
-						return nil
+					deleteFn: func() (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, nil
 					},
 				},
 			},
@@ -594,7 +595,12 @@ type ExternalClientFake struct {
 	observeFn func() (managed.ExternalObservation, error)
 	createFn  func(mg resource.Managed) (managed.ExternalCreation, error)
 	updateFn  func() (managed.ExternalUpdate, error)
-	deleteFn  func() error
+	deleteFn  func() (managed.ExternalDelete, error)
+}
+
+func (c ExternalClientFake) Disconnect(ctx context.Context) error {
+	// No-op
+	return nil
 }
 
 func (e ExternalClientFake) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -609,7 +615,7 @@ func (e ExternalClientFake) Update(ctx context.Context, mg resource.Managed) (ma
 	return e.updateFn()
 }
 
-func (e ExternalClientFake) Delete(ctx context.Context, mg resource.Managed) error {
+func (e ExternalClientFake) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	return e.deleteFn()
 }
 

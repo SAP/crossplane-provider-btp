@@ -13,8 +13,6 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
-	meta "github.com/sap/crossplane-provider-btp/apis"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -24,6 +22,9 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
+
+	meta "github.com/sap/crossplane-provider-btp/apis"
+	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
 
 var (
@@ -145,7 +146,7 @@ func waitForEntitlementResource(cfg *envconf.Config, t *testing.T, entitlementNa
 				condition := d.GetCondition(xpv1.Available().Type)
 				result := condition.Status == v1.ConditionTrue
 				klog.V(4).Infof(
-					"Checking %s on %s. result=%v",
+					"Checking %s on %v. result=%v",
 					resources.Identifier(d),
 					condition,
 					condition.Status == v1.ConditionTrue,

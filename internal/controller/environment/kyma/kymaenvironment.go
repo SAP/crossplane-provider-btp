@@ -156,21 +156,25 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Disconnect(ctx context.Context) error {
+	// No-op
+	return nil
+}
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironment)
 	if !ok {
-		return errors.New(errNotKymaEnvironment)
+		return managed.ExternalDelete{}, errors.New(errNotKymaEnvironment)
 	}
 	c.tracker.SetConditions(ctx, cr)
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
-		return errors.New(providerv1alpha1.ErrResourceInUse)
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
 	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateDeleting {
-		return nil
+		return managed.ExternalDelete{}, nil
 	}
 
-	return c.client.DeleteInstance(ctx, *cr)
+	return managed.ExternalDelete{}, c.client.DeleteInstance(ctx, *cr)
 }
 
 func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {

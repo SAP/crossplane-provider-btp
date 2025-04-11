@@ -4,14 +4,14 @@ metadata:
   name:  e2e-test-directory
 spec:
   forProvider:
-    description: "$BUILD_ID- created by e2e tests"
+    description: "- created by e2e tests"
     directoryAdmins:
-    - "$SECOND_DIRECTORY_ADMIN_EMAIL"
-    - "$TECHNICAL_USER_EMAIL"
+    - ""
+    - ""
     directoryFeatures:
     - "DEFAULT"
-    displayName: $BUILD_ID-e2e-test-directory
+    displayName: -e2e-test-directory
     labels:
       custom_label: ["custom_value"]
       another_label: ["onevalue", "twovalue"]
-      BUILD_ID: [ "$BUILD_ID" ]
+      BUILD_ID: [ "" ]

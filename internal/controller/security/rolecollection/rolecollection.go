@@ -2,6 +2,7 @@ package rolecollection
 
 import (
 	"context"
+
 	"github.com/sap/crossplane-provider-btp/btp"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -169,19 +170,23 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Disconnect(ctx context.Context) error {
+	// No-op
+	return nil
+}
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.RoleCollection)
 	if !ok {
-		return errors.New(errNotRoleCollection)
+		return managed.ExternalDelete{}, errors.New(errNotRoleCollection)
 	}
 
 	cr.Status.SetConditions(xpv1.Deleting())
 
 	if err := c.client.Delete(ctx, meta.GetExternalName(cr)); err != nil {
-		return errors.Wrap(err, errDeleteeRolecollection)
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteeRolecollection)
 	}
 
-	return nil
+	return managed.ExternalDelete{}, nil
 }
 
 // setObservation sets the observation within the CR

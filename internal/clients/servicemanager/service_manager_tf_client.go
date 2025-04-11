@@ -9,11 +9,13 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/pkg/errors"
+
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 
-	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/sap/crossplane-provider-btp/internal"
 )
 
 // ResourcesStatus contains a summary of the status of the tf resources managed by the ITfClient
@@ -166,11 +168,11 @@ type TfClient struct {
 }
 
 func (tf *TfClient) DeleteResources(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
-	err := tf.sbExternal.Delete(ctx, tf.sBinding)
+	_, err := tf.sbExternal.Delete(ctx, tf.sBinding)
 	if err != nil {
 		return err
 	}
-	err = tf.siExternal.Delete(ctx, tf.sInstance)
+	_, err = tf.siExternal.Delete(ctx, tf.sInstance)
 	if err != nil {
 		return err
 	}
