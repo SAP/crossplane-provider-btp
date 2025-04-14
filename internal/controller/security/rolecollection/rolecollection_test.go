@@ -2,8 +2,9 @@ package rolecollection
 
 import (
 	"context"
-	"github.com/sap/crossplane-provider-btp/internal"
 	"testing"
+
+	"github.com/sap/crossplane-provider-btp/internal"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -12,10 +13,11 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
-	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 )
 
 var (
@@ -304,7 +306,7 @@ func TestDelete(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			e := external{client: tc.args.client}
-			err := e.Delete(context.Background(), tc.args.cr)
+			_, err := e.Delete(context.Background(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.CalledIdentifier, tc.args.client.CalledIdentifier); diff != "" {
 				t.Errorf("\n%s\ne.Observe(...): -want, +CalledIdentifier:\n", diff)
 			}

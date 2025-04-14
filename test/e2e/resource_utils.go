@@ -16,7 +16,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	crClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/e2e-framework/klient/decoder"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	wairres "sigs.k8s.io/e2e-framework/klient/k8s/resources"
@@ -27,7 +27,7 @@ import (
 )
 
 type mockList struct {
-	client.ObjectList
+	crClient.ObjectList
 
 	Items []k8s.Object
 }
@@ -42,7 +42,7 @@ func waitForResource(res k8s.Object, cfg *envconf.Config, t *testing.T, opts ...
 		condition := d.GetCondition(xpv1.Available().Type)
 		result := condition.Status == v1.ConditionTrue
 		klog.V(4).Infof(
-			"Checking %s on %s. result=%v",
+			"Checking %s on %v. result=%v",
 			resources.Identifier(res),
 			condition,
 			condition.Status == v1.ConditionTrue,
@@ -61,7 +61,7 @@ func waitForResource(res k8s.Object, cfg *envconf.Config, t *testing.T, opts ...
 func MustGetResource[T k8s.Object](t *testing.T, cfg *envconf.Config, name string, ns *string, ct T) T {
 	res, err := GetResource(cfg, name, ns, ct)
 	if err != nil {
-		t.Error("Failed to get resource. error : ", err)
+		t.Error("Failed to get resource. error: ", err)
 	}
 	return res
 }

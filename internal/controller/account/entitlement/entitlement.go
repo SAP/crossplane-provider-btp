@@ -196,25 +196,29 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Disconnect(ctx context.Context) error {
+	// No-op
+	return nil
+}
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*apisv1alpha1.Entitlement)
 	if !ok {
-		return errors.New(errNotEntitlement)
+		return managed.ExternalDelete{}, errors.New(errNotEntitlement)
 	}
 
 	instance, err := c.client.DescribeInstance(ctx, cr)
 
 	if err != nil {
-		return err
+		return managed.ExternalDelete{}, err
 	}
 
 	if c.updateInProgress(cr) {
-		return nil
+		return managed.ExternalDelete{}, nil
 	}
 
 	c.tracker.SetConditions(ctx, cr)
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
-		return errors.New(providerv1alpha1.ErrResourceInUse)
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
 	entitlements, err := c.findRelatedEntitlements(
@@ -223,19 +227,19 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		func(entitlement apisv1alpha1.Entitlement) bool { return entitlement.UID != cr.UID },
 	)
 	if err != nil {
-		return err
+		return managed.ExternalDelete{}, err
 	}
 	cr.Status.AtProvider, err = entitlementclient.GenerateObservation(instance, entitlements)
 	if err != nil {
-		return err
+		return managed.ExternalDelete{}, err
 	}
 
 	if err := c.client.DeleteInstance(ctx, cr); err != nil {
-		return err
+		return managed.ExternalDelete{}, err
 	}
 
 	cr.SetConditions(xpv1.Deleting())
-	return nil
+	return managed.ExternalDelete{}, nil
 }
 
 func (c *external) updateInProgress(cr *apisv1alpha1.Entitlement) bool {

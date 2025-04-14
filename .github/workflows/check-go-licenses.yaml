@@ -20,7 +20,7 @@ jobs:
 
       - name: Install go-licenses
         run: |
-          go install github.com/google/go-licenses@latest
+          go install github.com/google/go-licenses@v1.6.0
 
       - name: check licenses
         run: |

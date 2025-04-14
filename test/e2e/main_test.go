@@ -16,11 +16,12 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	meta_api "github.com/sap/crossplane-provider-btp/apis"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+
+	meta_api "github.com/sap/crossplane-provider-btp/apis"
 
 	"github.com/pkg/errors"
 	"github.com/vladimirvivien/gexe"
@@ -33,8 +34,8 @@ import (
 
 var (
 	UUT_IMAGES_KEY     = "UUT_IMAGES"
-	UUT_CONFIG_KEY     = "crossplane/provider-btp"
-	UUT_CONTROLLER_KEY = "crossplane/provider-btp-controller"
+	UUT_CONFIG_KEY     = "package"
+	UUT_CONTROLLER_KEY = "controller"
 
 	CIS_SECRET_NAME          = "cis-provider-secret"
 	SERVICE_USER_SECRET_NAME = "sa-provider-secret"

@@ -20,7 +20,7 @@ BUILD_ID ?= $(shell date +"%H%M%S")
 PLATFORMS ?= linux_amd64
 #get version from current git release tag
 VERSION := $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse HEAD)
-$(info VERSION is $(VERSION))
+
 
 -include build/makelib/common.mk
 
@@ -30,6 +30,10 @@ $(info VERSION is $(VERSION))
 # Setup Versions
 GO_REQUIRED_VERSION=1.23
 GOLANGCILINT_VERSION ?= 1.64.5
+
+# GOLANGCILINT_VERSION is inherited from build submodule by default.
+# Uncomment below if you need to override the version.
+GOLANGCILINT_VERSION ?= 1.64.8
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
@@ -49,11 +53,11 @@ KIND_NODE_IMAGE_TAG ?= v1.30.2
 # Setup Images
 DOCKER_REGISTRY ?= crossplane
 IMAGES = $(PROJECT_NAME) $(PROJECT_NAME)-controller
--include build/makelib/image.mk
+-include build/makelib/imagelight.mk
 
-export UUT_CONFIG = $(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME)):$(VERSION)
-export UUT_CONTROLLER = $(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME))-controller:$(VERSION)
-export UUT_IMAGES = {"crossplane/provider-btp":"$(UUT_CONFIG)","crossplane/provider-btp-controller":"$(UUT_CONTROLLER)"}
+export UUT_CONFIG = $(BUILD_REGISTRY)/$(PROJECT_NAME):$(VERSION)
+export UUT_CONTROLLER = $(BUILD_REGISTRY)/$(PROJECT_NAME)-controller:$(VERSION)
+export UUT_IMAGES = {"package":"$(UUT_CONFIG)","controller":"$(UUT_CONTROLLER)"}
 testFilter ?= .*
 # NOTE(hasheddan): we force image building to happen prior to xpkg build so that
 # we ensure image is present in daemon.
@@ -231,16 +235,16 @@ help-special: crossplane.help
 test.run: go.test.unit
 
 # e2e tests
-e2e.run: test-acceptance
+e2e.run: build.all test-acceptance
 
-test-e2e: $(KIND) $(HELM3) build generate-test-crs
+test-e2e: $(KIND) $(HELM3) build.all generate-test-crs
 	@$(INFO) running e2e tests
 	@$(INFO) Skipping long running tests
 	@UUT_CONFIG=$(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME)):$(VERSION) UUT_CONTROLLER=$(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME))-controller:$(VERSION) go test $(PROJECT_REPO)/test/... -tags=e2e -short -count=1 -timeout 30m
 	@$(OK) e2e tests passed
 
 
-test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
+test-e2e-long: $(KIND) $(HELM3) build.all generate-test-crs
 	@$(INFO) running integration tests
 	@echo UUT_CONFIG=$$UUT_CONFIG
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
@@ -249,7 +253,7 @@ test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
 
 #run single e2e test with <make e2e testFilter=functionNameOfTest>
 .PHONY: test-acceptance
-test-acceptance: $(KIND) $(HELM3) build generate-test-crs
+test-acceptance: $(KIND) $(HELM3) build.all generate-test-crs
 	@$(INFO) running integration tests
 	@$(INFO) Skipping long running tests
 	@echo UUT_CONFIG=$$UUT_CONFIG
@@ -264,7 +268,7 @@ test-acceptance: $(KIND) $(HELM3) build generate-test-crs
      esac
 
 .PHONY: test-acceptance-debug
-test-acceptance-debug: $(KIND) $(HELM3) build generate-test-crs
+test-acceptance-debug: $(KIND) $(HELM3) build.all generate-test-crs
 	@$(INFO) running integration tests
 	@$(INFO) Skipping long running tests
 	@echo UUT_CONFIG=$$UUT_CONFIG
@@ -286,8 +290,8 @@ generate-test-crs:
 
 PUBLISH_IMAGES ?= crossplane/provider-btp crossplane/provider-btp-controller
 
-.PONY: publish
-publish:
+.PONY: publish-images
+publish-images:
 	@$(INFO) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
 	@for image in $(PUBLISH_IMAGES); do \
 		echo "Publishing image $(DOCKER_REGISTRY)/$${image}:$(VERSION)"; \

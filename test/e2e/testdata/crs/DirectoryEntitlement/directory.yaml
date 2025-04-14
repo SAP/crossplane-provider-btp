@@ -5,16 +5,16 @@ metadata:
   name: e2e-directory-for-entitlement-testing
 spec:
   forProvider:
-    description: "$BUILD_ID- created by code"
+    description: "- created by code"
     directoryAdmins:
-      - "$SECOND_DIRECTORY_ADMIN_EMAIL"
-      - "$TECHNICAL_USER_EMAIL"
+      - ""
+      - ""
     directoryFeatures:
       - "DEFAULT"
       - "ENTITLEMENTS"
       - "AUTHORIZATIONS"
-    displayName: $BUILD_ID-e2e-directory-for-entitlement-testing
+    displayName: -e2e-directory-for-entitlement-testing
     labels:
       custom_label: ["custom_value"]
       another_label: ["onevalue", "twovalue"]
-      BUILD_ID: [ "$BUILD_ID" ]
+      BUILD_ID: [ "" ]

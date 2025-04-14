@@ -8,12 +8,13 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/pkg/errors"
-	"github.com/sap/crossplane-provider-btp/internal"
-	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -154,6 +155,10 @@ type external struct {
 	tfClient cmclient.ITfClient
 }
 
+func (c *external) Disconnect(ctx context.Context) error {
+	// No-op
+	return nil
+}
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*apisv1alpha1.CloudManagement)
 	if !ok {
@@ -196,10 +201,10 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalUpdate{}, errors.Errorf("%s/%s update not implemented", cr.Namespace, cr.Name)
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*apisv1alpha1.CloudManagement)
 	if !ok {
-		return errors.New(errNotCloudManagement)
+		return managed.ExternalDelete{}, errors.New(errNotCloudManagement)
 	}
 
 	cr.SetConditions(xpv1.Deleting())
@@ -207,10 +212,10 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	c.tracker.SetConditions(ctx, cr)
 
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
-		return errors.New(providerv1alpha1.ErrResourceInUse)
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
-	return c.tfClient.DeleteResources(ctx, cr)
+	return managed.ExternalDelete{}, c.tfClient.DeleteResources(ctx, cr)
 }
 
 func (c *external) setStatus(ctx context.Context, status cmclient.ResourcesStatus, cr *apisv1alpha1.CloudManagement) error {

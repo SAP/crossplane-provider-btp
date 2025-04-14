@@ -8,8 +8,9 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
-	sm "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	sm "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -153,10 +154,15 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalUpdate{}, err
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Disconnect(ctx context.Context) error {
+	// No-op
+	return nil
+}
+
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*apisv1beta1.ServiceManager)
 	if !ok {
-		return errors.New(errNotServiceManager)
+		return managed.ExternalDelete{}, errors.New(errNotServiceManager)
 	}
 
 	cr.SetConditions(xpv1.Deleting())
@@ -164,10 +170,10 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	c.tracker.SetConditions(ctx, cr)
 
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
-		return errors.New(providerv1alpha1.ErrResourceInUse)
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
-	return c.tfClient.DeleteResources(ctx, cr)
+	return managed.ExternalDelete{}, c.tfClient.DeleteResources(ctx, cr)
 }
 
 func (c *external) setStatus(ctx context.Context, status sm.ResourcesStatus, cr *apisv1beta1.ServiceManager) error {

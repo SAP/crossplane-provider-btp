@@ -8,14 +8,15 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/clients/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -180,19 +181,24 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Disconnect(ctx context.Context) error {
+	// No-op
+	return nil
+}
+
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.Subscription)
 	if !ok {
-		return errors.New(errNotSubscription)
+		return managed.ExternalDelete{}, errors.New(errNotSubscription)
 	}
 
 	cr.SetConditions(xpv1.Deleting())
 
 	if !c.typeMapper.IsAvailable(cr) {
 		// api will return 500 if called multiple times, so we will ensure to call it only once
-		return nil
+		return managed.ExternalDelete{}, nil
 	}
-	return c.apiHandler.DeleteSubscription(ctx, meta.GetExternalName(cr))
+	return managed.ExternalDelete{}, c.apiHandler.DeleteSubscription(ctx, meta.GetExternalName(cr))
 }
 
 // loadSubscription gets a Subscription using the APIHandler if a proper externalName has been set, otherwise returns nil
