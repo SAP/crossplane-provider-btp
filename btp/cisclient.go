@@ -292,7 +292,7 @@ func (c *Client) UpdateKymaEnvironment(ctx context.Context, environmentInstanceI
 }
 
 func (c *Client) CreateCloudFoundryOrg(
-	ctx context.Context, instanceName string, serviceAccountEmail string, resourceUID string,
+	ctx context.Context, serviceAccountEmail string, resourceUID string,
 	landscape string, orgName string, environmentName string, 
 ) (createdOrg string, err error) {
 	parameters := map[string]interface{}{
@@ -335,7 +335,7 @@ func (c *Client) CreateCloudFoundryOrgIfNotExists(
 	}
 	var orgId string
 	if cfEnvironment == nil {
-		orgId, err = c.CreateCloudFoundryOrg(ctx, instanceName, serviceAccountEmail, resourceUID, landscape, orgName, environmentName,)
+		orgId, err = c.CreateCloudFoundryOrg(ctx, serviceAccountEmail, resourceUID, landscape, orgName, environmentName,)
 		if err != nil {
 			return nil, err
 		}
