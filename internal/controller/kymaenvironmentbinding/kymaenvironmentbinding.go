@@ -84,13 +84,14 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
+// validateBindings checks if bindings in status are still active (did not reach rotation deadline) or not yet expired (reached time to live)
 func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, []v1alpha1.Binding) {
 	bindings := cr.Status.AtProvider.Bindings
 	if bindings == nil {
 		return false, nil
 	}
 
-	hasValidBinding := false
+	hasActiveBinding := false
 	validBindings := []v1alpha1.Binding{}
 	now := time.Now()
 
@@ -98,30 +99,38 @@ func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, 
 	for i := range bindings {
 		b := &bindings[i]
 		if b.IsActive {
-			// Check if binding has expired
-			if b.ExpiresAt.Time.Before(now) {
+			// Check if binding has expired, might happen if rotation deadline is exceeded and has not been reconciled for a while
+			if ttlIsExpired(b, now) {
 				b.IsActive = false
 				continue
 			}
 
 			// Check if rotation interval has been reached
-			deadline := b.CreatedAt.Add(cr.Spec.ForProvider.RotationInterval.Duration)
-			if now.After(deadline) {
+			if reachedRotationDeadline(now, b, cr) {
 				b.IsActive = false
 			} else {
-				hasValidBinding = true
+				hasActiveBinding = true
 			}
 		}
 	}
 
 	// Second pass: keep non-expired bindings (active or inactive)
 	for _, b := range bindings {
-		if !b.ExpiresAt.Time.Before(now) {
+		if !ttlIsExpired(&b, now) {
 			validBindings = append(validBindings, b)
 		}
 	}
 
-	return hasValidBinding, validBindings
+	return hasActiveBinding, validBindings
+}
+
+func reachedRotationDeadline(now time.Time, b *v1alpha1.Binding, cr *v1alpha1.KymaEnvironmentBinding) bool {
+	deadline := b.CreatedAt.Add(cr.Spec.ForProvider.RotationInterval.Duration)
+	return now.After(deadline)
+}
+
+func ttlIsExpired(b *v1alpha1.Binding, now time.Time) bool {
+	return b.ExpiresAt.Time.Before(now)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
