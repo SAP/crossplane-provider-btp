@@ -1,4 +1,4 @@
-name: Main Workflow
+name: Add Refined Issues to Backlog
 
 on:
   schedule:
@@ -8,7 +8,6 @@ on:
 env:
   ACTIONS_STEP_DEBUG: true
 
-  
 jobs:
   call-reusable-workflow:
     uses: openmcp-project/.github/tree/main/.github/workflows/addRefinedIssuesToBacklog.yml@feat/shared-workflows 
