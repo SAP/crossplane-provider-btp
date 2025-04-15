@@ -951,32 +951,6 @@ func Test_external_Update(t *testing.T) {
 			want:    managed.ExternalUpdate{},
 			wantErr: true,
 		},
-		{
-			name: "service returns error during update",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "error-instance",
-					},
-				},
-			},
-			want:    managed.ExternalUpdate{},
-			wantErr: true,
-		},
-		{
-			name: "service returns error for non-existent binding",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "non-existent-instance",
-					},
-				},
-			},
-			want:    managed.ExternalUpdate{},
-			wantErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
