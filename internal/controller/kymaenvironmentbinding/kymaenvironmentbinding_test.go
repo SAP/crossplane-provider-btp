@@ -633,7 +633,7 @@ func Test_external_Delete(t *testing.T) {
 				},
 			},
 			client: &fakeClient{
-				deleteInstanceFunc: func(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error {
+				deleteInstanceFunc: func(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error {
 					return nil
 				},
 			},
@@ -662,7 +662,7 @@ func Test_external_Delete(t *testing.T) {
 				},
 			},
 			client: &fakeClient{
-				deleteInstanceFunc: func(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error {
+				deleteInstanceFunc: func(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error {
 					return errors.New("service error")
 				},
 			},
@@ -691,7 +691,7 @@ func Test_external_Delete(t *testing.T) {
 				},
 			},
 			client: &fakeClient{
-				deleteInstanceFunc: func(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error {
+				deleteInstanceFunc: func(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error {
 					return errors.New("binding not found")
 				},
 			},
@@ -713,7 +713,7 @@ func Test_external_Delete(t *testing.T) {
 				},
 			},
 			client: &fakeClient{
-				deleteInstanceFunc: func(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error {
+				deleteInstanceFunc: func(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error {
 					return nil
 				},
 			},
@@ -779,7 +779,7 @@ func Test_external_Create(t *testing.T) {
 				},
 			},
 			client: &fakeClient{
-				createInstanceFunc: func(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) (*kymaenvironmentbinding.Binding, error) {
+				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
 					return &kymaenvironmentbinding.Binding{
 						Metadata: &kymaenvironmentbinding.Metadata{
 							Id:        "new-binding-id",
@@ -825,7 +825,7 @@ func Test_external_Create(t *testing.T) {
 				},
 			},
 			client: &fakeClient{
-				createInstanceFunc: func(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) (*kymaenvironmentbinding.Binding, error) {
+				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
 					return &kymaenvironmentbinding.Binding{
 						Metadata: &kymaenvironmentbinding.Metadata{
 							Id:        "valid-id",
@@ -864,7 +864,7 @@ func Test_external_Create(t *testing.T) {
 				},
 			},
 			client: &fakeClient{
-				createInstanceFunc: func(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) (*kymaenvironmentbinding.Binding, error) {
+				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
 					return nil, errors.New("service error")
 				},
 			},
@@ -890,7 +890,7 @@ func Test_external_Create(t *testing.T) {
 				},
 			},
 			client: &fakeClient{
-				createInstanceFunc: func(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) (*kymaenvironmentbinding.Binding, error) {
+				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
 					return nil, errors.New("invalid instance")
 				},
 			},
@@ -972,28 +972,28 @@ func Test_external_Update(t *testing.T) {
 }
 
 type fakeClient struct {
-	describeInstanceFunc func(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error)
-	createInstanceFunc   func(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) (*kymaenvironmentbinding.Binding, error)
-	deleteInstanceFunc   func(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error
+	describeInstanceFunc func(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error)
+	createInstanceFunc   func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error)
+	deleteInstanceFunc   func(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error
 }
 
-func (f fakeClient) DescribeInstance(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
+func (f fakeClient) DescribeInstance(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
 	if f.describeInstanceFunc != nil {
-		return f.describeInstanceFunc(ctx, cr)
+		return f.describeInstanceFunc(ctx, kymaInstanceId)
 	}
 	return nil, nil
 }
 
-func (f fakeClient) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) (*kymaenvironmentbinding.Binding, error) {
+func (f fakeClient) CreateInstance(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
 	if f.createInstanceFunc != nil {
-		return f.createInstanceFunc(ctx, cr)
+		return f.createInstanceFunc(ctx, kymaInstanceId, ttl)
 	}
 	return nil, nil
 }
 
-func (f fakeClient) DeleteInstance(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error {
+func (f fakeClient) DeleteInstances(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error {
 	if f.deleteInstanceFunc != nil {
-		return f.deleteInstanceFunc(ctx, cr)
+		return f.deleteInstanceFunc(ctx, bindings, kymaInstanceId)
 	}
 	return nil
 }

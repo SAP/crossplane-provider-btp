@@ -11,10 +11,10 @@ import (
 type BindingMetadata = map[string]interface{}
 
 type Client interface {
-	DescribeInstance(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) (
+	DescribeInstance(ctx context.Context, kymaInstanceId string) (
 		[]provisioningclient.EnvironmentInstanceBindingMetadata,
 		error,
 	)
-	CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) (*Binding, error)
-	DeleteInstance(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error
+	CreateInstance(ctx context.Context, kymaInstanceId string, ttl int) (*Binding, error)
+	DeleteInstances(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error
 }

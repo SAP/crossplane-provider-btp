@@ -2,6 +2,7 @@ package kymaenvironmentbinding
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"time"
 
@@ -157,7 +158,8 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	// Create new binding only if we don't have a valid one
-	clientBinding, err := c.client.CreateInstance(ctx, *cr)
+	ttl := int(math.Round(cr.Spec.ForProvider.BindingTTl.Seconds()))
+	clientBinding, err := c.client.CreateInstance(ctx, cr.Spec.KymaInstanceId, ttl)
 	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
@@ -200,7 +202,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotKymaEnvironmentBinding)
 	}
 
-	err := c.client.DeleteInstance(ctx, cr)
+	err := c.client.DeleteInstances(ctx, cr.Status.AtProvider.Bindings, cr.Spec.KymaInstanceId)
 	err2 := c.kube.Status().Update(ctx, cr)
 	if err2 != nil {
 		return err2

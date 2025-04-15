@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -31,10 +30,10 @@ func NewKymaBindings(btp btp.Client) *KymaBindings {
 
 func (c KymaBindings) DescribeInstance(
 	ctx context.Context,
-	cr v1alpha1.KymaEnvironmentBinding,
+	kymaInstanceId string,
 ) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
 
-	bindings, _, err := c.btp.ProvisioningServiceClient.GetAllEnvironmentInstanceBindings(ctx, cr.Spec.KymaInstanceId).Execute()
+	bindings, _, err := c.btp.ProvisioningServiceClient.GetAllEnvironmentInstanceBindings(ctx, kymaInstanceId).Execute()
 	if err != nil {
 		return make([]provisioningclient.EnvironmentInstanceBindingMetadata, 0), errors.Wrap(err, errKymaBindingCreateFailed)
 	}
@@ -42,11 +41,11 @@ func (c KymaBindings) DescribeInstance(
 	return bindings.Bindings, nil
 }
 
-func (c KymaBindings) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironmentBinding) (*Binding, error) {
+func (c KymaBindings) CreateInstance(ctx context.Context, kymaInstanceId string, ttl int) (*Binding, error) {
 
 	params := make(map[string]interface{})
-	params["expiration_seconds"] = int(math.Round(cr.Spec.ForProvider.BindingTTl.Seconds()))
-	binding, h, err := c.btp.ProvisioningServiceClient.CreateEnvironmentInstanceBinding(ctx, cr.Spec.KymaInstanceId).
+	params["expiration_seconds"] = ttl
+	binding, h, err := c.btp.ProvisioningServiceClient.CreateEnvironmentInstanceBinding(ctx, kymaInstanceId).
 		CreateEnvironmentInstanceBindingRequest(provisioningclient.CreateEnvironmentInstanceBindingRequest{Parameters: params}).
 		Execute()
 	if err != nil {
@@ -71,16 +70,13 @@ func (c KymaBindings) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnviro
 	return &bindingMetadata, nil
 }
 
-func (c KymaBindings) DeleteInstance(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error {
-	bindings := cr.Status.AtProvider.Bindings
-
-	for i, binding := range bindings {
-		if _, http, err := c.btp.ProvisioningServiceClient.DeleteEnvironmentInstanceBinding(ctx, cr.Spec.KymaInstanceId, binding.Id).Execute(); err != nil {
+func (c KymaBindings) DeleteInstances(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error {
+	for _, binding := range bindings {
+		if _, http, err := c.btp.ProvisioningServiceClient.DeleteEnvironmentInstanceBinding(ctx, kymaInstanceId, binding.Id).Execute(); err != nil {
 			if http != nil && http.StatusCode != 404 {
 				return errors.Wrap(err, errKymaBindingDeleteFailed)
 			}
 		}
-		cr.Status.AtProvider.Bindings = append(cr.Status.AtProvider.Bindings[:i], cr.Status.AtProvider.Bindings[i+1:]...)
 	}
 
 	return nil
