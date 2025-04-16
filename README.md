@@ -1,3 +1,4 @@
+[![Slack](https://img.shields.io/badge/Slack-4A154B?logo=slack)](https://crossplane.slack.com/archives/C07UZ3UJY7Q)
 ![Golang](https://img.shields.io/badge/Go-1.23-informational)
 [![REUSE status](https://api.reuse.software/badge/github.com/SAP/crossplane-provider-btp)](https://api.reuse.software/info/github.com/SAP/crossplane-provider-btp)
 
