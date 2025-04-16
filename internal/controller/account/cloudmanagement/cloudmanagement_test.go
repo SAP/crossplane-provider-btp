@@ -111,8 +111,8 @@ func TestConnect(t *testing.T) {
 					}),
 				),
 				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
-					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string) (string, error) {
+					return &servicemanager.PlanIdResolverFake{
+						PlanLookupMockFn: func() (string, error) {
 							return "planID", nil
 						},
 					}, nil
@@ -159,8 +159,8 @@ func TestConnect(t *testing.T) {
 					}),
 				),
 				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
-					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string) (string, error) {
+					return &servicemanager.PlanIdResolverFake{
+						PlanLookupMockFn: func() (string, error) {
 							return "planID", nil
 						},
 					}, nil
@@ -213,8 +213,8 @@ func TestConnect(t *testing.T) {
 					}),
 				),
 				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
-					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string) (string, error) {
+					return &servicemanager.PlanIdResolverFake{
+						PlanLookupMockFn: func() (string, error) {
 							return "planID", nil
 						},
 					}, nil
@@ -579,16 +579,6 @@ func (t TfClientFake) UpdateResources(ctx context.Context, cr *v1alpha1.CloudMan
 
 func (t TfClientFake) DeleteResources(ctx context.Context, cr *v1alpha1.CloudManagement) error {
 	return t.deleteFn()
-}
-
-var _ servicemanager.PlanIdResolver = &PlanIDFake{}
-
-type PlanIDFake struct {
-	PlanIDByNameFn func(ctx context.Context, offeringName string, servicePlanName string) (string, error)
-}
-
-func (p PlanIDFake) PlanIDByName(ctx context.Context, offeringName string, servicePlanName string) (string, error) {
-	return p.PlanIDByNameFn(ctx, offeringName, servicePlanName)
 }
 
 var _ cmclient.ITfClientInitializer = &ClientInitializerFake{}

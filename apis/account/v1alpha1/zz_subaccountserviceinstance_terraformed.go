@@ -33,7 +33,7 @@ func (mg *SubaccountServiceInstance) GetTerraformResourceType() string {
 
 // GetConnectionDetailsMapping for this SubaccountServiceInstance
 func (tr *SubaccountServiceInstance) GetConnectionDetailsMapping() map[string]string {
-	return nil
+	return map[string]string{"parameters": "spec.forProvider.parametersSecretRef"}
 }
 
 // GetObservation of this SubaccountServiceInstance
