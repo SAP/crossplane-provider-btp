@@ -9,11 +9,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewProviderConfig(name string, cisSecret string, saSecret string) *v1alpha12.ProviderConfig {
+func NewProviderConfigFull(name string, cisSecret string, saSecret string, globalAccount string, cliServerUrl string) *v1alpha12.ProviderConfig {
 	return &v1alpha12.ProviderConfig{
 		TypeMeta:   metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1alpha12.ProviderConfigSpec{
+			GlobalAccount: globalAccount,
+			CliServerUrl:  cliServerUrl,
 			CISSecret: v1alpha12.ProviderCredentials{
 				Source: "Secret",
 				CommonCredentialSelectors: xpv1.CommonCredentialSelectors{
@@ -38,6 +40,10 @@ func NewProviderConfig(name string, cisSecret string, saSecret string) *v1alpha1
 			},
 		},
 	}
+}
+
+func NewProviderConfig(name string, cisSecret string, saSecret string) *v1alpha12.ProviderConfig {
+	return NewProviderConfigFull(name, cisSecret, saSecret, "", "")
 }
 
 func NewSecret(name string, data map[string][]byte) *v1.Secret {
