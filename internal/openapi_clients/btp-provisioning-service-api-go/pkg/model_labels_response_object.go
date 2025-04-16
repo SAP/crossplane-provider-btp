@@ -1,7 +1,7 @@
 /*
 Provisioning Service
 
-The Provisioning service provides REST APIs that are responsible for the provisioning and deprovisioning of environment instances and tenants in the corresponding region.  Provisioning is performed after validation by the Entitlements service. Use the APIs in this service to manage and create environment instances, such as a Cloud Foundry org, in a subaccount and to retrieve the plans and quota assignments for a subaccount.  NOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The Provisioning service provides REST APIs that are responsible for the provisioning and deprovisioning of environment instances and tenants in the corresponding region.  Provisioning is performed after validation by the Entitlements service. Use the APIs in this service to manage and create environment instances, such as a Cloud Foundry org, in a subaccount and to retrieve the plans and quota assignments for a subaccount.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -19,8 +19,8 @@ var _ MappedNullable = &LabelsResponseObject{}
 
 // LabelsResponseObject Labels assigned as key-value pairs to the entity.
 type LabelsResponseObject struct {
-	// User-defined labels that are assigned as key-value pairs in a JSON array to the entity.  Example: {    \"Cost Center\": [\"19700626\"],    \"Department\": [\"Sales\"],    \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],    \"EMEA\":[] }
-	Labels *map[string][]string `json:"labels,omitempty"`
+	// User-defined labels that are assigned as key-value pairs in a JSON array to the entity.  Example: {     \"Cost Center\": [\"19700626\"],     \"Department\": [\"Sales\"],     \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],     \"EMEA\":[]  }
+	Labels map[string]interface{} `json:"labels,omitempty"`
 }
 
 // NewLabelsResponseObject instantiates a new LabelsResponseObject object
@@ -41,19 +41,19 @@ func NewLabelsResponseObjectWithDefaults() *LabelsResponseObject {
 }
 
 // GetLabels returns the Labels field value if set, zero value otherwise.
-func (o *LabelsResponseObject) GetLabels() map[string][]string {
+func (o *LabelsResponseObject) GetLabels() map[string]interface{} {
 	if o == nil || IsNil(o.Labels) {
-		var ret map[string][]string
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Labels
+	return o.Labels
 }
 
 // GetLabelsOk returns a tuple with the Labels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *LabelsResponseObject) GetLabelsOk() (*map[string][]string, bool) {
+func (o *LabelsResponseObject) GetLabelsOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Labels) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Labels, true
 }
@@ -67,13 +67,13 @@ func (o *LabelsResponseObject) HasLabels() bool {
 	return false
 }
 
-// SetLabels gets a reference to the given map[string][]string and assigns it to the Labels field.
-func (o *LabelsResponseObject) SetLabels(v map[string][]string) {
-	o.Labels = &v
+// SetLabels gets a reference to the given map[string]interface{} and assigns it to the Labels field.
+func (o *LabelsResponseObject) SetLabels(v map[string]interface{}) {
+	o.Labels = v
 }
 
 func (o LabelsResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,5 +123,3 @@ func (v *NullableLabelsResponseObject) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

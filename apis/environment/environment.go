@@ -1,2 +1,2 @@
-// Package environment contains group cloudfoundry API versions
+// Package environment contains group environment API versions
 package environment

@@ -7,8 +7,9 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	json "github.com/json-iterator/go"
-	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 	"sigs.k8s.io/yaml"
+
+	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -31,7 +32,7 @@ func NewKymaEnvironments(btp btp.Client) *KymaEnvironments {
 func (c KymaEnvironments) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.KymaEnvironment,
-) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	environment, err := c.btp.GetEnvironmentByNameAndType(ctx, cr.Name, btp.KymaEnvironmentType())
 	if err != nil {
 		return nil, err

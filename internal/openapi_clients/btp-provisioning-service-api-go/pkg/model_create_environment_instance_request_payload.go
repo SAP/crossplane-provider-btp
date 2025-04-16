@@ -1,7 +1,7 @@
 /*
 Provisioning Service
 
-The Provisioning service provides REST APIs that are responsible for the provisioning and deprovisioning of environment instances and tenants in the corresponding region.  Provisioning is performed after validation by the Entitlements service. Use the APIs in this service to manage and create environment instances, such as a Cloud Foundry org, in a subaccount and to retrieve the plans and quota assignments for a subaccount.  NOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The Provisioning service provides REST APIs that are responsible for the provisioning and deprovisioning of environment instances and tenants in the corresponding region.  Provisioning is performed after validation by the Entitlements service. Use the APIs in this service to manage and create environment instances, such as a Cloud Foundry org, in a subaccount and to retrieve the plans and quota assignments for a subaccount.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -11,15 +11,15 @@ API version: 1.0
 package openapi
 
 import (
-	"encoding/json"
 	"bytes"
+	"encoding/json"
 	"fmt"
 )
 
 // checks if the CreateEnvironmentInstanceRequestPayload type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CreateEnvironmentInstanceRequestPayload{}
 
-// CreateEnvironmentInstanceRequestPayload JSON object with configuration parameters specific to environment instance.
+// CreateEnvironmentInstanceRequestPayload JSON object with configuration parameters specific to environment instance binding.
 type CreateEnvironmentInstanceRequestPayload struct {
 	// The description of the environment instance.
 	Description *string `json:"description,omitempty"`
@@ -31,7 +31,7 @@ type CreateEnvironmentInstanceRequestPayload struct {
 	Name *string `json:"name,omitempty"`
 	// The origin of the user in case of a custom IdP configuration. This parameter is only required if the OAuth 2.0 client credentials grant flow is used, a user parameter is provided and the target environment supports custom IdP, otherwise it is ignored.
 	Origin *string `json:"origin,omitempty"`
-	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameters 'id' and 'email' are specified:  {  \"instance_name\": \"myOrg\"  } 
+	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameters 'id' and 'email' are specified:  {  \"instance_name\": \"myOrg\"  }
 	Parameters map[string]interface{} `json:"parameters,omitempty"`
 	// Name of the service plan for the environment instance. Must match the name in the corresponding service broker's catalog. (for example: standard)
 	PlanName string `json:"planName"`
@@ -362,7 +362,7 @@ func (o *CreateEnvironmentInstanceRequestPayload) SetUser(v string) {
 }
 
 func (o CreateEnvironmentInstanceRequestPayload) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -413,10 +413,10 @@ func (o *CreateEnvironmentInstanceRequestPayload) UnmarshalJSON(data []byte) (er
 	err = json.Unmarshal(data, &allProperties)
 
 	if err != nil {
-		return err;
+		return err
 	}
 
-	for _, requiredProperty := range(requiredProperties) {
+	for _, requiredProperty := range requiredProperties {
 		if _, exists := allProperties[requiredProperty]; !exists {
 			return fmt.Errorf("no value given for required property %v", requiredProperty)
 		}
@@ -472,5 +472,3 @@ func (v *NullableCreateEnvironmentInstanceRequestPayload) UnmarshalJSON(src []by
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

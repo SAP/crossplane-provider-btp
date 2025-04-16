@@ -33,6 +33,7 @@ const (
 	errCheckUpdate          = "Could not check for needsUpdate"
 	errParameterParsing     = ".Spec.ForProvider.Parameters seem to be corrupted"
 	errServiceParsing       = "Parameters from service response seem to be corrupted"
+	errCantDescribe         = "Could not describe kyma instance"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -62,7 +63,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	instance, err := c.client.DescribeInstance(ctx, *cr)
 	if err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errCantDescribe)
 	}
 	lastModified := cr.Status.AtProvider.ModifiedDate
 	cr.Status.AtProvider = kymaenv.GenerateObservation(instance)

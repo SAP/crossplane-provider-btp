@@ -14,10 +14,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/pkg/errors"
-	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
+	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -64,20 +65,20 @@ func TestObserve(t *testing.T) {
 		},
 		"ErrorGettingKymaEnvironment": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return nil, errors.New("Could not call backend")
 				}},
 				cr: environment(),
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.New("Could not call backend"),
+				err: errors.Wrap(errors.New("Could not call backend"), "Could not describe kyma instance"),
 				cr:  environment(),
 			},
 		},
 		"NeedsCreate": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return nil, nil
 				}},
 				cr: environment(),
@@ -92,8 +93,8 @@ func TestObserve(t *testing.T) {
 		},
 		"ErrorParsingLabels": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("}corrupted{"),
@@ -114,8 +115,8 @@ func TestObserve(t *testing.T) {
 		},
 		"SuccessfulAvailable": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
 					}, nil
@@ -133,8 +134,8 @@ func TestObserve(t *testing.T) {
 		},
 		"AvailableWithConnectionDetails": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
@@ -162,8 +163,8 @@ func TestObserve(t *testing.T) {
 		},
 		"AvailableWithPartialConnectionDetails": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
@@ -191,8 +192,8 @@ func TestObserve(t *testing.T) {
 		},
 		"UpdateInProgress": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State: internal.Ptr("UPDATING"),
 					}, nil
 				}},
@@ -209,8 +210,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Update with Json Parameters": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`{"foo": "bar"}`),
 					}, nil
@@ -233,8 +234,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Update with YAML Parameters": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`foo: bar`),
 					}, nil
@@ -257,8 +258,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Update with invalid json Parameters": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`foo: bar`),
 					}, nil
@@ -285,8 +286,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Update with invalid yaml Parameters": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`foo: bar`),
 					}, nil
@@ -313,8 +314,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Update with invalid Service response": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`asd`),
 					}, nil
@@ -341,8 +342,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Deleting": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State: internal.Ptr("DELETING"),
 					}, nil
 				}},
@@ -359,8 +360,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Creating": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State: internal.Ptr("CREATING"),
 					}, nil
 				}},

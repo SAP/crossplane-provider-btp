@@ -1,5 +1,10 @@
 package v1alpha1
 
+import (
+	"github.com/crossplane/crossplane-runtime/pkg/reference"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
+)
+
 type EnvironmentObservation struct {
 
 	// The ID of the associated environment broker.
@@ -93,4 +98,18 @@ type EnvironmentObservation struct {
 	// Example: Provision
 	// Enum: [Provision Update Deprovision]
 	Type *string `json:"type,omitempty"`
+}
+
+// KymaInstanceId is a function that extracts the ID of the KymaEnvironment instance from the managed resource.
+func KymaInstanceId() reference.ExtractValueFn {
+	return func(mg resource.Managed) string {
+		sg, ok := mg.(*KymaEnvironment)
+		if !ok {
+			return ""
+		}
+		if sg.Status.AtProvider.ID == nil {
+			return ""
+		}
+		return *sg.Status.AtProvider.ID
+	}
 }
