@@ -81,6 +81,9 @@ func main() {
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 
+
+	fmt.Print("TestChange for PR")
+	
 	zl := zap.New(zap.UseDevMode(*debug))
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	ctrl.SetLogger(zl)
