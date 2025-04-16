@@ -1,0 +1,76 @@
+# Release builds and publish a new release.
+
+# Secrets:
+# TEST_REGISTRY_USER: registry user for the container registry
+# TEST_REGISTRY_PASSWORD: password for container registry
+# Vars:
+# REGISTRY_URL: registry url for the container registry
+
+name: Publish Release Candidate
+
+on:
+    workflow_dispatch:
+      inputs:
+        nextVersion:
+          description: 'specify the release version in the semver format v[major].[minor].[patch] e.g. v0.0.0'
+          required: true
+
+# Releases need permissions to read and write the repository contents.
+# GitHub considers creating releases and uploading assets as writing contents.
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+    release:
+      runs-on: ubuntu-latest
+      steps:
+      - name: Set Version
+        id: version
+        run: echo "VERSION=fromPR-${{}}${{ github.event.inputs.nextVersion }}" >> $GITHUB_OUTPUT
+      - name: Print Version Number
+        run: echo "Effective version ${{ github.steps.version.outputs.VERSION }}"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
+        with:
+          version: v0.15.1
+          install: true
+
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: true
+
+      - name: Fetch History
+        run: git fetch --prune --unshallow
+
+      - name: Set up Go
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version: '1.21'
+
+      - name: Vendor Dependencies
+        run: make vendor vendor.check
+
+      - name: Build Images
+        run: make build VERSION=${{ github.steps.version.outputs.VERSION }}
+        env:
+          # We're using docker buildx, which doesn't actually load the images it
+          # builds by default. Specifying --load does so.
+          BUILD_ARGS: "--load"
+          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
+          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
+
+      - name: Login to Container Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ${{ vars.REGISTRY_URL }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Artifacts to DockerHub
+        run: make publish VERSION=${{ github.steps.version.outputs.VERSION }}
+        env:
+          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
+          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
