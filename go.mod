@@ -6,7 +6,7 @@ toolchain go1.24.1
 
 require (
 	dario.cat/mergo v1.0.1
-	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.9
+	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.12
 	github.com/crossplane-contrib/xp-testing v1.3.4
 	github.com/crossplane/crossplane-runtime v1.15.1
 	github.com/crossplane/crossplane-tools v0.0.0-20230925130601-628280f8bf79
@@ -21,10 +21,10 @@ require (
 	github.com/muvaf/typewriter v0.0.0-20240614220100-70f9d4a54ea0
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.47.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/vladimirvivien/gexe v0.2.0
 	golang.org/x/net v0.39.0
-	golang.org/x/oauth2 v0.23.0
+	golang.org/x/oauth2 v0.28.0
 	golang.org/x/sync v0.13.0
 	gopkg.in/alecthomas/kingpin.v2 v2.4.0
 	gopkg.in/validator.v2 v2.0.1
