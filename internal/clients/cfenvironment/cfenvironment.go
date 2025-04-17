@@ -105,7 +105,7 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 	return cloudFoundryClient, err
 }
 
-func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
+func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error) {
 	adminServiceAccountEmail := c.btp.Credential.UserCredential.Email
 	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	org, err := c.btp.CreateCloudFoundryOrgIfNotExists(
@@ -113,21 +113,21 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName, 
 	)
 	if err != nil {
-		return errors.Wrap(err, instanceCreateFailed)
+		return "", errors.Wrap(err, instanceCreateFailed)
 	}
 
 	cloudFoundryClient, err := c.createClientWithType(org)
 	if err != nil {
-		return errors.Wrap(err, instanceCreateFailed)
+		return "", errors.Wrap(err, instanceCreateFailed)
 	}
 
 	for _, managerEmail := range cr.Spec.ForProvider.Managers {
 		if err := cloudFoundryClient.addManager(ctx, managerEmail, defaultOrigin); err != nil {
-			return errors.Wrap(err, instanceCreateFailed)
+			return "", errors.Wrap(err, instanceCreateFailed)
 		}
 	}
 
-	return nil
+	return org.Name, nil
 }
 
 func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {

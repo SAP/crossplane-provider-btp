@@ -119,13 +119,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
-	if instance != nil  && *instance.State == v1alpha1.InstanceStateOk && *env.ExternalName(instance) != meta.GetExternalName(cr) {
-		meta.SetExternalName(cr, *env.ExternalName(instance))
-		err := c.kube.Update(ctx, cr)
-		if err != nil {
-			return managed.ExternalObservation{}, err
-		}
-	}
 	cr.Status.AtProvider = env.GenerateObservation(instance, managers)
 
 	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateOk {
@@ -154,10 +147,11 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotEnvironment)
 	}
 
-	err := c.client.CreateInstance(ctx, *cr)
+	createdOrgName, err := c.client.CreateInstance(ctx, *cr)
 	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
+	meta.SetExternalName(cr, createdOrgName)
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
