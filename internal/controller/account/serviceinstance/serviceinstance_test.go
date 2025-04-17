@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,44 @@ import (
 )
 
 var errApi = errors.New("apiError")
+
+// Helper function to build a complete ServiceInstance CR dynamically
+func buildExpectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.ServiceInstance {
+	cr := &v1alpha1.ServiceInstance{}
+
+	// Apply each option to modify the CR
+	for _, opt := range opts {
+		opt(cr)
+	}
+
+	return cr
+}
+
+// Option to set the external name annotation
+func withExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		if cr.GetAnnotations() == nil {
+			cr.SetAnnotations(map[string]string{})
+		}
+		cr.GetAnnotations()["crossplane.io/external-name"] = externalName
+	}
+}
+
+// Option to set observation data (e.g., ID)
+func withObservationData(id string) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Status.AtProvider = v1alpha1.ServiceInstanceObservation{
+			ID: id,
+		}
+	}
+}
+
+// Option to set conditions
+func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Status.Conditions = conditions
+	}
+}
 
 func TestObserve(t *testing.T) {
 	type fields struct {
@@ -28,6 +67,7 @@ func TestObserve(t *testing.T) {
 	type want struct {
 		o   managed.ExternalObservation
 		err error
+		cr  *v1alpha1.ServiceInstance // Expected complete CR
 	}
 
 	cases := map[string]struct {
@@ -46,6 +86,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				err: errApi,
+				cr:  buildExpectedServiceInstance(), // No annotations, observation data, or conditions
 			},
 		},
 		"NotFound": {
@@ -61,6 +102,7 @@ func TestObserve(t *testing.T) {
 				o: managed.ExternalObservation{
 					ResourceExists: false,
 				},
+				cr: buildExpectedServiceInstance(), // No annotations, observation data, or conditions
 			},
 		},
 		"Happy, while async in process": {
@@ -78,6 +120,7 @@ func TestObserve(t *testing.T) {
 					ResourceUpToDate:  true,
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
+				cr: buildExpectedServiceInstance(), // No annotations, observation data, or conditions
 			},
 		},
 		"Happy, no drift": {
@@ -101,6 +144,11 @@ func TestObserve(t *testing.T) {
 					ResourceUpToDate:  true,
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
+				cr: buildExpectedServiceInstance(
+					withExternalName("some-ext-name"),
+					withObservationData("some-id"),
+					withConditions(xpv1.Available()),
+				),
 			},
 		},
 	}
@@ -118,6 +166,15 @@ func TestObserve(t *testing.T) {
 			expectedErrorBehaviour(t, tc.want.err, err)
 			if diff := cmp.Diff(tc.want.o, got); diff != "" {
 				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+
+			// Verify the entire CR
+			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
+			if !ok {
+				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
+			}
+			if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
 			}
 		})
 	}

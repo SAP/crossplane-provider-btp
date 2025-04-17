@@ -7,6 +7,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
@@ -107,6 +108,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		if err := e.saveInstanceData(ctx, cr, *data); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 		}
+		cr.SetConditions(xpv1.Available())
 	}
 
 	return managed.ExternalObservation{
