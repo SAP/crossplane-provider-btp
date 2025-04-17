@@ -155,6 +155,9 @@ spec:
                 description: CfEnvironmentParameters are the configurable fields of
                   a CloudFoundryEnvironment.
                 properties:
+                  environmentName:
+                    description: CF environment instance name
+                    type: string
                   initialOrgManagers:
                     description: |-
                       A list of users (with username/email and origin) to assign as the Org Manager role.
@@ -170,6 +173,9 @@ spec:
                       Landscape, region of the cloud foundry org, e.g. cf-eu12
                       must be set, when cloud foundry name is set
                     minLength: 1
+                    type: string
+                  orgName:
+                    description: Org name of the Cloud Foundry environment
                     type: string
                 type: object
               managementPolicies:

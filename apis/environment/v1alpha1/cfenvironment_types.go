@@ -54,6 +54,14 @@ type CfEnvironmentParameters struct {
 	// +kubebuilder:validation:MinLength=1
 	// +optional
 	Landscape string `json:"landscape,omitempty"`
+
+	// Org name of the Cloud Foundry environment
+	// +optional
+	OrgName string `json:"orgName,omitempty"`
+
+	// CF environment instance name
+	// +optional
+	EnvironmentName string `json:"environmentName,omitempty"`
 }
 
 // CfEnvironmentObservation  are the observable fields of a CloudFoundryEnvironment.
