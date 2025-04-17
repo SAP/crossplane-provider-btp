@@ -181,32 +181,81 @@ func TestObserve(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
+	type fields struct {
+		client *TfProxyMock
+	}
+
+	type args struct {
+		mg resource.Managed
+	}
+
 	type want struct {
 		err error
+		cr  *v1alpha1.ServiceInstance // Expected complete CR after creation
 	}
-	type args struct {
-		client *TfProxyMock
-		mg     *v1alpha1.ServiceInstance
-	}
+
 	cases := map[string]struct {
-		args args
-		want want
+		reason string
+		fields fields
+		args   args
+		want   want
 	}{
 		"ApiError": {
-			args: args{
+			reason: "should return an error when the API call fails",
+			fields: fields{
 				client: &TfProxyMock{err: errApi},
-				mg:     &v1alpha1.ServiceInstance{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
 			},
 			want: want{
 				err: errApi,
+				cr: buildExpectedServiceInstance(
+					withConditions(
+						xpv1.Creating(),
+					),
+				),
+			},
+		},
+		"HappyPath": {
+			reason: "should create the resource successfully and set Creating condition",
+			fields: fields{
+				client: &TfProxyMock{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: nil,
+				cr: buildExpectedServiceInstance(
+					withConditions(
+						xpv1.Creating(),
+					),
+				),
 			},
 		},
 	}
+
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{tfClient: tc.args.client}
+			e := external{
+				tfClient: tc.fields.client,
+				kube: &test.MockClient{
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			}
+
 			_, err := e.Create(context.Background(), tc.args.mg)
 			expectedErrorBehaviour(t, tc.want.err, err)
+
+			// Verify the entire CR
+			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
+			if !ok {
+				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
+			}
+			if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+			}
 		})
 	}
 }
