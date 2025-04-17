@@ -2,6 +2,7 @@ package subaccount
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -720,6 +721,79 @@ func TestCreate(t *testing.T) {
 
 		})
 	}
+}
+
+func TestDelete(t *testing.T) {
+	type args struct {
+		cr           resource.Managed
+		mockClient   *MockSubaccountClient
+	}
+	type want struct {
+		err error
+	}
+	tests := map[string]struct {
+		args   args
+		want   want
+	} {
+		"DeleteSuccess": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123"), })),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{Guid: "123", State: "Deleting"}, &http.Response{StatusCode: 200}, nil
+					},
+				},
+			},
+			want: want{
+				err: errors.New("Deletion Pending: Current status: Deleting"),
+			},
+		},
+		"DeleteAPI404": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123"), })),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{Guid: "123", }, &http.Response{StatusCode: 404}, nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+		"DeleteAPIError": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123"), })),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{Guid: "123", }, &http.Response{StatusCode: 500}, errors.New("apiError")
+					},
+				},
+			},
+			want: want{
+				err: errors.New("deletion of subaccount failed"),
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := external{
+				btp: btp.Client{
+					AccountsServiceClient: &accountclient.APIClient{
+						SubaccountOperationsAPI: tc.args.mockClient}},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			}
+			err := ctrl.Delete(context.Background(), tc.args.cr)
+			if contained := testutils.ContainsError(err, tc.want.err); !contained {
+				t.Errorf("\ne.Create(...): error \"%v\" not part of \"%v\"", err, tc.want.err)
+			}
+		})
+	}
+
 }
 
 func TestUpdate(t *testing.T) {
