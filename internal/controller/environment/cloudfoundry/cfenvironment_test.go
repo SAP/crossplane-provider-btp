@@ -112,9 +112,6 @@ func TestObserve(t *testing.T) {
 				err: nil,
 				cr: environment(withUID("1234"), withConditions(xpv1.Available()),
 					withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", Managers: []string{aUser.Username}}),
-					withAnnotaions(map[string]string{
-						"crossplane.io/external-name": "test-org",
-					}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
 							State:  internal.Ptr("OK"),
@@ -210,8 +207,8 @@ func TestCreate(t *testing.T) {
 		},
 		"CreateError": {
 			args: args{
-				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) error {
-					return errors.New("Could not call backend")
+				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
+					return "", errors.New("Could not call backend")
 				}},
 				cr: environment(),
 			},
@@ -223,8 +220,8 @@ func TestCreate(t *testing.T) {
 		},
 		"Successful": {
 			args: args{
-				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) error {
-					return nil
+				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
+					return "test-org",nil
 				},
 				},
 				cr: environment(withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", EnvironmentName: "test-env"})),
@@ -232,7 +229,10 @@ func TestCreate(t *testing.T) {
 			want: want{
 				o:   managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}},
 				err: nil,
-				cr:  environment(withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", EnvironmentName: "test-env"})),
+				cr:  environment(withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", EnvironmentName: "test-env"}),
+								withAnnotaions(map[string]string{
+									"crossplane.io/external-name": "test-org",
+								}),),
 			},
 		},
 	}
