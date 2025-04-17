@@ -254,7 +254,7 @@ spec:
                 description: ServiceInstanceObservation are the observable fields
                   of a ServiceInstance.
                 properties:
-                  observableField:
+                  id:
                     type: string
                 type: object
               conditions:

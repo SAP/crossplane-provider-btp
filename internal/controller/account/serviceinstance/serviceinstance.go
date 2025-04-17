@@ -14,6 +14,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/features"
@@ -27,12 +28,8 @@ const (
 
 	errGetInstance    = "cannot observe serviceinstnace"
 	errCreateInstance = "cannot create serviceinstnace"
+	errSaveData       = "cannot update cr data"
 )
-
-type TfProxyClient interface {
-	Observe(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error)
-	Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error
-}
 
 // Setup adds a controller that reconciles ServiceInstance managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
@@ -60,6 +57,18 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
+type ServiceInstanceData struct {
+	ExternalName string `json:"externalName"`
+	ID           string `json:"id"`
+}
+
+type TfProxyClient interface {
+	Observe(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error)
+	Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error
+	// QueryUpdatedData returns the relevant status data once the async creation is done
+	QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *ServiceInstanceData
+}
+
 type connector struct {
 	kube  client.Client
 	usage resource.Tracker
@@ -76,6 +85,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 type external struct {
 	tfClient TfProxyClient
+	kube     client.Client
 }
 
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -90,7 +100,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !exists {
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
-	// add uodate logic
+	//TODO: add uodate logic
+	data := e.tfClient.QueryAsyncData(ctx, cr)
+
+	if data != nil {
+		if err := e.saveInstanceData(ctx, cr, *data); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
+		}
+	}
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
@@ -130,5 +147,18 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	if !ok {
 		return errors.New(errNotServiceInstance)
 	}
+	return nil
+}
+
+func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceInstance, sid ServiceInstanceData) error {
+	if meta.GetExternalName(cr) != sid.ExternalName {
+		meta.SetExternalName(cr, sid.ExternalName)
+		// manually saving external-name, since crossplane reconciler won't update spec and status in one loop
+		if err := e.kube.Update(ctx, cr); err != nil {
+			return err
+		}
+	}
+	// we rely on status being saved in crossplane reconciler here
+	cr.Status.AtProvider.ID = sid.ID
 	return nil
 }

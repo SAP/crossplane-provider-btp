@@ -11,6 +11,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 )
 
 var errApi = errors.New("apiError")
@@ -48,7 +49,7 @@ func TestObserve(t *testing.T) {
 			},
 		},
 		"NotFound": {
-			reason: "not found should return",
+			reason: "should return not existing",
 			fields: fields{
 				client: &TfProxyMock{found: false},
 			},
@@ -62,10 +63,33 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
-		"UpToDate": {
-			reason: "if found then upToDate",
+		"Happy, while async in process": {
+			reason: "should return existing, but no data",
 			fields: fields{
 				client: &TfProxyMock{found: true},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: nil,
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  true,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+			},
+		},
+		"Happy, no drift": {
+			reason: "should return existing and pull data from embedded tf resource",
+			fields: fields{
+				client: &TfProxyMock{
+					found: true,
+					data: &ServiceInstanceData{
+						ExternalName: "some-ext-name",
+						ID:           "some-id",
+					},
+				},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -85,6 +109,9 @@ func TestObserve(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := external{
 				tfClient: tc.fields.client,
+				kube: &test.MockClient{
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
 			}
 
 			got, err := e.Observe(context.Background(), tc.args.mg)
@@ -131,7 +158,13 @@ var _ TfProxyClient = &TfProxyMock{}
 
 type TfProxyMock struct {
 	found bool
+	data  *ServiceInstanceData
 	err   error
+}
+
+// QueryAsyncData implements TfProxyClient.
+func (t *TfProxyMock) QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *ServiceInstanceData {
+	return t.data
 }
 
 // Create implements TfProxyClient.

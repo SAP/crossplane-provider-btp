@@ -32,7 +32,7 @@ type ServiceInstanceParameters struct {
 
 // ServiceInstanceObservation are the observable fields of a ServiceInstance.
 type ServiceInstanceObservation struct {
-	ObservableField string `json:"observableField,omitempty"`
+	ID string `json:"id,omitempty"`
 }
 
 // A ServiceInstanceSpec defines the desired state of a ServiceInstance.
