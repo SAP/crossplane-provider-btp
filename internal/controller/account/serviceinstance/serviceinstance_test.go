@@ -17,44 +17,6 @@ import (
 
 var errApi = errors.New("apiError")
 
-// Helper function to build a complete ServiceInstance CR dynamically
-func buildExpectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.ServiceInstance {
-	cr := &v1alpha1.ServiceInstance{}
-
-	// Apply each option to modify the CR
-	for _, opt := range opts {
-		opt(cr)
-	}
-
-	return cr
-}
-
-// Option to set the external name annotation
-func withExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		if cr.GetAnnotations() == nil {
-			cr.SetAnnotations(map[string]string{})
-		}
-		cr.GetAnnotations()["crossplane.io/external-name"] = externalName
-	}
-}
-
-// Option to set observation data (e.g., ID)
-func withObservationData(id string) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Status.AtProvider = v1alpha1.ServiceInstanceObservation{
-			ID: id,
-		}
-	}
-}
-
-// Option to set conditions
-func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Status.Conditions = conditions
-	}
-}
-
 func TestObserve(t *testing.T) {
 	type fields struct {
 		client *TfProxyMock
@@ -290,5 +252,43 @@ func expectedErrorBehaviour(t *testing.T, expectedErr error, gotErr error) {
 	}
 	if expectedErr != nil {
 		t.Errorf("expected error %v, got nil", expectedErr.Error())
+	}
+}
+
+// Helper function to build a complete ServiceInstance CR dynamically
+func buildExpectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.ServiceInstance {
+	cr := &v1alpha1.ServiceInstance{}
+
+	// Apply each option to modify the CR
+	for _, opt := range opts {
+		opt(cr)
+	}
+
+	return cr
+}
+
+// Option to set the external name annotation
+func withExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		if cr.GetAnnotations() == nil {
+			cr.SetAnnotations(map[string]string{})
+		}
+		cr.GetAnnotations()["crossplane.io/external-name"] = externalName
+	}
+}
+
+// Option to set observation data (e.g., ID)
+func withObservationData(id string) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Status.AtProvider = v1alpha1.ServiceInstanceObservation{
+			ID: id,
+		}
+	}
+}
+
+// Option to set conditions
+func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Status.Conditions = conditions
 	}
 }
