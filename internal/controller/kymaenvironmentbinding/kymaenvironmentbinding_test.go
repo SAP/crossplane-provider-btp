@@ -18,13 +18,7 @@ import (
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 )
 
-// Unlike many Kubernetes projects Crossplane does not use third party testing
-// libraries, per the common Go test review comments. Crossplane encourages the
-// use of table driven unit tests. The tests of the crossplane-runtime project
-// are representative of the testing style Crossplane encourages.
-//
-// https://github.com/golang/go/wiki/TestComments
-// https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md#contributing-code
+var timeNow = time.Now()
 
 func Test_external_validateBindings(t *testing.T) {
 	type args struct {
@@ -47,8 +41,8 @@ func Test_external_validateBindings(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Minute * 10 * -1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Minute * 10 * -1)),
 								},
 							},
 						},
@@ -74,8 +68,8 @@ func Test_external_validateBindings(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * +1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * +1)),
 								},
 							},
 						},
@@ -101,8 +95,8 @@ func Test_external_validateBindings(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * +2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * +2)),
 								},
 							},
 						},
@@ -128,8 +122,8 @@ func Test_external_validateBindings(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Minute * 10 * -1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Minute * 10 * -1)),
 								},
 							},
 						},
@@ -180,8 +174,8 @@ func Test_external_validateBindings(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  false,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * +1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * +1)),
 								},
 							},
 						},
@@ -202,14 +196,14 @@ func Test_external_validateBindings(t *testing.T) {
 								{
 									Id:        "id1",
 									IsActive:  false,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * +1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * +1)),
 								},
 								{
 									Id:        "id2",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Minute * 10 * -1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Minute * 10 * -1)),
 								},
 							},
 						},
@@ -230,8 +224,8 @@ func Test_external_validateBindings(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now()),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow),
 								},
 							},
 						},
@@ -257,8 +251,8 @@ func Test_external_validateBindings(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 							},
 						},
@@ -284,14 +278,14 @@ func Test_external_validateBindings(t *testing.T) {
 								{
 									Id:        "id1",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 								{
 									Id:        "id2",
 									IsActive:  false,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -2)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -2)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 1)),
 								},
 							},
 						},
@@ -317,14 +311,14 @@ func Test_external_validateBindings(t *testing.T) {
 								{
 									Id:        "id1",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 								{
 									Id:        "id2",
 									IsActive:  false,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -2)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Minute * 10 * -1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -2)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Minute * 10 * -1)),
 								},
 							},
 						},
@@ -368,20 +362,22 @@ func Test_external_Observe(t *testing.T) {
 		mg  resource.Managed
 	}
 	tests := []struct {
-		name    string
-		args    args
-		client  *fakeClient
-		want    managed.ExternalObservation
-		wantErr bool
+		name           string
+		args           args
+		client         *fakeClient
+		want           managed.ExternalObservation
+		wantErr        bool
+		expectedStatus v1alpha1.KymaEnvironmentBindingObservation
 	}{
 		{
 			name: "not a KymaEnvironmentBinding",
 			args: args{
 				ctx: context.Background(),
-				mg:  &v1alpha1.KymaEnvironment{},
+				mg:  &v1alpha1.KymaEnvironmentBinding{},
 			},
-			want:    managed.ExternalObservation{},
-			wantErr: true,
+			want:           managed.ExternalObservation{},
+			wantErr:        true,
+			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{},
 		},
 		{
 			name: "no connection secret reference",
@@ -412,12 +408,19 @@ func Test_external_Observe(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Minute * 10 * -1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Minute * 10 * -1)),
 								},
 							},
 						},
 					},
+				},
+			},
+			client: &fakeClient{
+				describeInstanceFunc: func(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
+					return []provisioningclient.EnvironmentInstanceBindingMetadata{
+						{BindingId: &[]string{"id"}[0]},
+					}, nil
 				},
 			},
 			want: managed.ExternalObservation{
@@ -425,6 +428,9 @@ func Test_external_Observe(t *testing.T) {
 				ResourceUpToDate: true,
 			},
 			wantErr: false,
+			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{
+				Bindings: []v1alpha1.Binding{},
+			},
 		},
 		{
 			name: "valid binding exists",
@@ -445,12 +451,19 @@ func Test_external_Observe(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 							},
 						},
 					},
+				},
+			},
+			client: &fakeClient{
+				describeInstanceFunc: func(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
+					return []provisioningclient.EnvironmentInstanceBindingMetadata{
+						{BindingId: &[]string{"id"}[0]},
+					}, nil
 				},
 			},
 			want: managed.ExternalObservation{
@@ -458,6 +471,16 @@ func Test_external_Observe(t *testing.T) {
 				ResourceUpToDate: true,
 			},
 			wantErr: false,
+			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{
+				Bindings: []v1alpha1.Binding{
+					{
+						Id:        "id",
+						IsActive:  true,
+						CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+						ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
+					},
+				},
+			},
 		},
 		{
 			name: "needs rotation, rotation interval reached",
@@ -478,12 +501,19 @@ func Test_external_Observe(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 							},
 						},
 					},
+				},
+			},
+			client: &fakeClient{
+				describeInstanceFunc: func(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
+					return []provisioningclient.EnvironmentInstanceBindingMetadata{
+						{BindingId: &[]string{"id"}[0]},
+					}, nil
 				},
 			},
 			want: managed.ExternalObservation{
@@ -491,6 +521,16 @@ func Test_external_Observe(t *testing.T) {
 				ResourceUpToDate: true,
 			},
 			wantErr: false,
+			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{
+				Bindings: []v1alpha1.Binding{
+					{
+						Id:        "id",
+						IsActive:  false,
+						CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+						ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
+					},
+				},
+			},
 		},
 		{
 			name: "inactive but non-expired bindings exist",
@@ -511,12 +551,19 @@ func Test_external_Observe(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  false,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 							},
 						},
 					},
+				},
+			},
+			client: &fakeClient{
+				describeInstanceFunc: func(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
+					return []provisioningclient.EnvironmentInstanceBindingMetadata{
+						{BindingId: &[]string{"id"}[0]},
+					}, nil
 				},
 			},
 			want: managed.ExternalObservation{
@@ -524,6 +571,17 @@ func Test_external_Observe(t *testing.T) {
 				ResourceUpToDate: true,
 			},
 			wantErr: false,
+			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{
+				Bindings: []v1alpha1.Binding{
+
+					{
+						Id:        "id",
+						IsActive:  false,
+						CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+						ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
+					},
+				},
+			},
 		},
 		{
 			name: "multiple bindings with one active and valid",
@@ -544,18 +602,25 @@ func Test_external_Observe(t *testing.T) {
 								{
 									Id:        "id1",
 									IsActive:  false,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -2)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -2)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 1)),
 								},
 								{
 									Id:        "id2",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 							},
 						},
 					},
+				},
+			},
+			client: &fakeClient{
+				describeInstanceFunc: func(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
+					return []provisioningclient.EnvironmentInstanceBindingMetadata{
+						{BindingId: &[]string{"id1"}[0]}, {BindingId: &[]string{"id2"}[0]},
+					}, nil
 				},
 			},
 			want: managed.ExternalObservation{
@@ -563,6 +628,200 @@ func Test_external_Observe(t *testing.T) {
 				ResourceUpToDate: true,
 			},
 			wantErr: false,
+			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{
+				Bindings: []v1alpha1.Binding{
+					{
+						Id:        "id1",
+						IsActive:  false,
+						CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -2)),
+						ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 1)),
+					},
+					{
+						Id:        "id2",
+						IsActive:  true,
+						CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+						ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
+					},
+				},
+			},
+		},
+		{
+			name: "service response has extra bindings not in status",
+			args: args{
+				ctx: context.Background(),
+				mg: &v1alpha1.KymaEnvironmentBinding{
+					Spec: v1alpha1.KymaEnvironmentBindingSpec{
+						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
+							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
+						},
+						ResourceSpec: xpv1.ResourceSpec{
+							WriteConnectionSecretToReference: &xpv1.SecretReference{},
+						},
+					},
+					Status: v1alpha1.KymaEnvironmentBindingStatus{
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+							Bindings: []v1alpha1.Binding{
+								{
+									Id:        "id1",
+									IsActive:  true,
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
+								},
+							},
+						},
+					},
+				},
+			},
+			client: &fakeClient{
+				describeInstanceFunc: func(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
+					return []provisioningclient.EnvironmentInstanceBindingMetadata{
+						{BindingId: &[]string{"id1"}[0]},
+						{BindingId: &[]string{"id2"}[0]}, // Extra binding
+					}, nil
+				},
+			},
+			want: managed.ExternalObservation{
+				ResourceExists:   true,
+				ResourceUpToDate: true,
+			},
+			wantErr: false,
+			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{
+				Bindings: []v1alpha1.Binding{
+					{
+						Id:        "id1",
+						IsActive:  true,
+						CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+						ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
+					},
+				},
+			},
+		},
+		{
+			name: "service response is missing bindings present in status",
+			args: args{
+				ctx: context.Background(),
+				mg: &v1alpha1.KymaEnvironmentBinding{
+					Spec: v1alpha1.KymaEnvironmentBindingSpec{
+						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
+							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
+						},
+						ResourceSpec: xpv1.ResourceSpec{
+							WriteConnectionSecretToReference: &xpv1.SecretReference{},
+						},
+					},
+					Status: v1alpha1.KymaEnvironmentBindingStatus{
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+							Bindings: []v1alpha1.Binding{
+								{
+									Id:        "id1",
+									IsActive:  true,
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
+								},
+								{
+									Id:        "id2",
+									IsActive:  false,
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -2)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 1)),
+								},
+							},
+						},
+					},
+				},
+			},
+			client: &fakeClient{
+				describeInstanceFunc: func(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
+					return []provisioningclient.EnvironmentInstanceBindingMetadata{
+						{BindingId: &[]string{"id1"}[0]}, // Missing "id2"
+					}, nil
+				},
+			},
+			want: managed.ExternalObservation{
+				ResourceExists:   true,
+				ResourceUpToDate: true,
+			},
+			wantErr: false,
+			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{
+				Bindings: []v1alpha1.Binding{
+					{
+						Id:        "id1",
+						IsActive:  true,
+						CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+						ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
+					},
+				},
+			},
+		},
+		{
+			name: "service response has no bindings while status has bindings",
+			args: args{
+				ctx: context.Background(),
+				mg: &v1alpha1.KymaEnvironmentBinding{
+					Spec: v1alpha1.KymaEnvironmentBindingSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							WriteConnectionSecretToReference: &xpv1.SecretReference{},
+						},
+					},
+					Status: v1alpha1.KymaEnvironmentBindingStatus{
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+							Bindings: []v1alpha1.Binding{
+								{
+									Id:        "id1",
+									IsActive:  true,
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
+								},
+							},
+						},
+					},
+				},
+			},
+			client: &fakeClient{
+				describeInstanceFunc: func(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
+					return []provisioningclient.EnvironmentInstanceBindingMetadata{}, nil // No bindings
+				},
+			},
+			want: managed.ExternalObservation{
+				ResourceExists:   false,
+				ResourceUpToDate: true,
+			},
+			wantErr: false,
+			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{
+				Bindings: []v1alpha1.Binding{},
+			},
+		},
+		{
+			name: "service response has bindings while status has none",
+			args: args{
+				ctx: context.Background(),
+				mg: &v1alpha1.KymaEnvironmentBinding{
+					Spec: v1alpha1.KymaEnvironmentBindingSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							WriteConnectionSecretToReference: &xpv1.SecretReference{},
+						},
+					},
+					Status: v1alpha1.KymaEnvironmentBindingStatus{
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+							Bindings: []v1alpha1.Binding{}, // No bindings in status
+						},
+					},
+				},
+			},
+			client: &fakeClient{
+				describeInstanceFunc: func(ctx context.Context, kymaInstanceId string) ([]provisioningclient.EnvironmentInstanceBindingMetadata, error) {
+					return []provisioningclient.EnvironmentInstanceBindingMetadata{
+						{BindingId: &[]string{"id1"}[0]}, // Basically an unknown to us
+					}, nil
+				},
+			},
+			want: managed.ExternalObservation{
+				ResourceExists:   false,
+				ResourceUpToDate: true,
+			},
+			wantErr: false,
+			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{
+				Bindings: []v1alpha1.Binding{},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -579,6 +838,11 @@ func Test_external_Observe(t *testing.T) {
 				}, cmp.Ignore()),
 				cmp.AllowUnexported(managed.ExternalObservation{})); diff != "" {
 				t.Errorf("Observe() mismatch (-want +got):\n%s", diff)
+			}
+			// Assert status update
+			cr := tt.args.mg.(*v1alpha1.KymaEnvironmentBinding)
+			if diff := cmp.Diff(tt.expectedStatus, cr.Status.AtProvider); diff != "" {
+				t.Errorf("Status mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -618,14 +882,14 @@ func Test_external_Delete(t *testing.T) {
 								{
 									Id:        "id1",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 								{
 									Id:        "id2",
 									IsActive:  false,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -2)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -2)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 1)),
 								},
 							},
 						},
@@ -653,8 +917,8 @@ func Test_external_Delete(t *testing.T) {
 								{
 									Id:        "id1",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 							},
 						},
@@ -682,8 +946,8 @@ func Test_external_Delete(t *testing.T) {
 								{
 									Id:        "non-existent-id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 							},
 						},
@@ -770,8 +1034,8 @@ func Test_external_Create(t *testing.T) {
 								{
 									Id:        "id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Minute * 10 * -1)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Minute * 10 * -1)),
 								},
 							},
 						},
@@ -783,7 +1047,7 @@ func Test_external_Create(t *testing.T) {
 					return &kymaenvironmentbinding.Binding{
 						Metadata: &kymaenvironmentbinding.Metadata{
 							Id:        "new-binding-id",
-							ExpiresAt: time.Now().Add(time.Hour * 2),
+							ExpiresAt: timeNow.Add(time.Hour * 2),
 						},
 						Credentials: &kymaenvironmentbinding.Credentials{
 							Kubeconfig: "new-binding-secret",
@@ -816,8 +1080,8 @@ func Test_external_Create(t *testing.T) {
 								{
 									Id:        "valid-id",
 									IsActive:  true,
-									CreatedAt: metav1.NewTime(time.Now().Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(time.Now().Add(time.Hour * 2)),
+									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 								},
 							},
 						},
@@ -829,7 +1093,7 @@ func Test_external_Create(t *testing.T) {
 					return &kymaenvironmentbinding.Binding{
 						Metadata: &kymaenvironmentbinding.Metadata{
 							Id:        "valid-id",
-							ExpiresAt: time.Now().Add(time.Hour * 2),
+							ExpiresAt: timeNow.Add(time.Hour * 2),
 						},
 						Credentials: &kymaenvironmentbinding.Credentials{
 							Kubeconfig: "valid-id",
