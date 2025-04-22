@@ -66,7 +66,13 @@ func TestConnectResources(t *testing.T) {
 					Name:          internal.Ptr("test"),
 					ServiceplanID: internal.Ptr("planId"),
 					SubaccountID:  internal.Ptr("subaccountId"),
-					Parameters:    internal.Ptr(`{"grantType":"clientCredentials"}`),
+					ParametersSecretRef: &xpv1.SecretKeySelector{
+						SecretReference: xpv1.SecretReference{
+							Namespace: InternalParametersSecretNS,
+							Name:      InternalParametersSecretName,
+						},
+						Key: InternalParametersSecretKey,
+					},
 				},
 				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
 					SubaccountID:      internal.Ptr("subaccountId"),

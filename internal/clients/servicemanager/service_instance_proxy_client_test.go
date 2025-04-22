@@ -168,13 +168,3 @@ func adminBinding() *saops.ServiceManagerBindingResponseObject {
 	// since we mock all other components, this only needs to be != nil
 	return saops.NewServiceManagerBindingResponseObject()
 }
-
-var _ PlanIdResolver = &PlanIdResolverFake{}
-
-type PlanIdResolverFake struct {
-	PlanLookupMockFn func() (string, error)
-}
-
-func (p *PlanIdResolverFake) PlanIDByName(ctx context.Context, offeringName, planName string) (string, error) {
-	return p.PlanLookupMockFn()
-}
