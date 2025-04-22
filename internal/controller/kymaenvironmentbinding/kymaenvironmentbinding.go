@@ -165,18 +165,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		cr.Status.AtProvider.Bindings = []v1alpha1.Binding{}
 	}
 
-	// Check if we have any valid active bindings
-	hasValidBinding, validBindings := c.validateBindings(cr)
-	cr.Status.AtProvider.Bindings = validBindings
-
-	// If we already have a valid binding, return its details
-	if hasValidBinding {
-		err := c.kube.Status().Update(ctx, cr)
-		if err != nil {
-			return managed.ExternalCreation{}, err
-		}
-	}
-
 	// Create new binding only if we don't have a valid one
 	ttl := int(math.Round(cr.Spec.ForProvider.BindingTTl.Seconds()))
 	clientBinding, err := c.client.CreateInstance(ctx, cr.Spec.KymaInstanceId, ttl)
