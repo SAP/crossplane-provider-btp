@@ -13,6 +13,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironmentbinding"
 )
 
@@ -64,6 +65,11 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errGetCredentialsSecret)
 	}
 	svc, err := c.newServiceFn(cisBinding, ServiceAccountSecretData)
-
-	return &external{client: kymaenvironmentbinding.NewKymaBindings(*svc), tracker: c.resourcetracker, httpClient: &http.Client{Timeout: 10 * time.Second}, kube: c.kube}, err
+	return &external{
+			client:     kymaenvironmentbinding.NewKymaBindings(*svc),
+			tracker:    c.resourcetracker,
+			httpClient: btp.DebugPrintHTTPClient(btp.WithHttpClient(&http.Client{Timeout: 10 * time.Second})),
+			kube:       c.kube,
+		},
+		err
 }
