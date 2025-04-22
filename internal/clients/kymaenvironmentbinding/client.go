@@ -8,8 +8,6 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 )
 
-type BindingMetadata = map[string]interface{}
-
 type Client interface {
 	DescribeInstance(ctx context.Context, kymaInstanceId string) (
 		[]provisioningclient.EnvironmentInstanceBindingMetadata,
