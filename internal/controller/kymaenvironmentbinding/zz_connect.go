@@ -16,11 +16,6 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironmentbinding"
 )
 
-// Connect typically produces an ExternalClient by:
-// 1. Tracking that the managed resource is using a ProviderConfig.
-// 2. Getting the managed resource's ProviderConfig.
-// 3. Getting the credentials specified by the ProviderConfig.
-// 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironmentBinding)
 	if !ok {
