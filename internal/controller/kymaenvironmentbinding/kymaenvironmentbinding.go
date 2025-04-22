@@ -61,12 +61,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNoSecretsToPublish)
 	}
 
-	validBindings, bindings := c.validateBindings(cr)
-	cr.Status.AtProvider.Bindings = bindings
-	err := c.kube.Status().Update(ctx, cr)
+	err := c.updateBindingsFromService(ctx, cr)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
+	validBindings, bindings := c.validateBindings(cr)
+	cr.Status.AtProvider.Bindings = bindings
+	_ = c.kube.Status().Update(ctx, cr)
 	if !validBindings {
 		return managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: true}, nil
 	}
@@ -83,6 +84,32 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		// resource reconciler know that it needs to call Update.
 		ResourceUpToDate: true,
 	}, nil
+}
+
+func (c *external) updateBindingsFromService(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error {
+	bindingsAtService, err := c.client.DescribeInstance(ctx, cr.Spec.KymaInstanceId)
+	if err != nil {
+		return err
+	}
+
+	validBindings := []v1alpha1.Binding{}
+
+	for _, b := range cr.Status.AtProvider.Bindings {
+		found := false
+		for _, bs := range bindingsAtService {
+			if b.Id == *bs.BindingId {
+				found = true
+				break
+			}
+		}
+		if found {
+			validBindings = append(validBindings, b)
+		}
+	}
+
+	// Update the bindings with the valid ones
+	cr.Status.AtProvider.Bindings = validBindings
+	return nil
 }
 
 // validateBindings checks if bindings in status are still active (did not reach rotation deadline) or not yet expired (reached time to live)
@@ -174,10 +201,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	// Add new binding to status
 	cr.Status.AtProvider.Bindings = append(cr.Status.AtProvider.Bindings, newBinding)
-	err = c.kube.Status().Update(ctx, cr)
-	if err != nil {
-		return managed.ExternalCreation{}, err
-	}
 	// Prepare connection details
 	connectionDetails := managed.ConnectionDetails{
 		"binding_id": []byte(newBinding.Id),
@@ -188,7 +211,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	return managed.ExternalCreation{
 		ConnectionDetails: connectionDetails,
-	}, nil
+	}, c.kube.Status().Update(ctx, cr)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -203,9 +226,5 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	}
 
 	err := c.client.DeleteInstances(ctx, cr.Status.AtProvider.Bindings, cr.Spec.KymaInstanceId)
-	err2 := c.kube.Status().Update(ctx, cr)
-	if err2 != nil {
-		return err2
-	}
 	return err
 }
