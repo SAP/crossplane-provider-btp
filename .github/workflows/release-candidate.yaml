@@ -27,7 +27,7 @@ jobs:
       steps:
       - name: Set Version
         id: version
-        run: echo "VERSION=fromPR-${{}}${{ github.event.inputs.nextVersion }}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${{ github.event.inputs.nextVersion }}-fromPR" >> $GITHUB_OUTPUT
       - name: Print Version Number
         run: echo "Effective version ${{ github.steps.version.outputs.VERSION }}"
 
