@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
@@ -14,7 +15,7 @@ import (
 
 type Client interface {
 	DescribeInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (
-		*provisioningclient.EnvironmentInstanceResponseObject,
+		*provisioningclient.BusinessEnvironmentInstanceResponseObject,
 		[]v1alpha1.User,
 		error,
 	)
@@ -25,7 +26,7 @@ type Client interface {
 	NeedsUpdate(cr v1alpha1.CloudFoundryEnvironment) bool
 }
 
-func ExternalName(environment *provisioningclient.EnvironmentInstanceResponseObject) *string {
+func ExternalName(environment *provisioningclient.BusinessEnvironmentInstanceResponseObject) *string {
 	if environment == nil {
 		return nil
 	}
@@ -42,7 +43,7 @@ func ExternalName(environment *provisioningclient.EnvironmentInstanceResponseObj
 }
 
 func GenerateObservation(
-	environment *provisioningclient.EnvironmentInstanceResponseObject,
+	environment *provisioningclient.BusinessEnvironmentInstanceResponseObject,
 	managers []v1alpha1.User,
 ) v1alpha1.CfEnvironmentObservation {
 	observation := v1alpha1.CfEnvironmentObservation{}
@@ -85,7 +86,7 @@ func GenerateObservation(
 	return observation
 }
 
-func GetConnectionDetails(instance *provisioningclient.EnvironmentInstanceResponseObject) (managed.ConnectionDetails, error) {
+func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject) (managed.ConnectionDetails, error) {
 	if instance == nil {
 		return managed.ConnectionDetails{}, nil
 	}

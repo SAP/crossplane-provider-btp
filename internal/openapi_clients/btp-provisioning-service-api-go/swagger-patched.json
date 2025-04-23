@@ -4,48 +4,6 @@
       "AbstractDTO": {
         "type": "object"
       },
-      "ApiExceptionResponseObject": {
-        "properties": {
-          "error": {
-            "properties": {
-              "code": {
-                "description": "Technical code of the error as a reference for support",
-                "format": "int32",
-                "type": "integer"
-              },
-              "correlationID": {
-                "description": "Log correlation ID to track the event",
-                "type": "string"
-              },
-              "description": {
-                "$ref": "#/components/schemas/JsonNode"
-              },
-              "details": {
-                "description": "Nesting of error responses",
-                "items": {
-                  "$ref": "#/components/schemas/NestingErrorDetailsResponseObject"
-                },
-                "type": "array"
-              },
-              "message": {
-                "description": "User-friendly description of the error.",
-                "type": "string"
-              },
-              "target": {
-                "description": "Describes a data element (for example, a resource path: /online-store/v1/products/123)",
-                "type": "string"
-              }
-            },
-            "required": [
-              "code",
-              "correlationID",
-              "message"
-            ],
-            "type": "object"
-          }
-        },
-        "type": "object"
-      },
       "AvailableEnvironmentResponseCollection": {
         "properties": {
           "availableEnvironments": {
@@ -130,8 +88,170 @@
         },
         "type": "object"
       },
+      "BusinessEnvironmentInstanceResponseObject": {
+        "properties": {
+          "brokerId": {
+            "description": "The ID of the associated environment broker.",
+            "type": "string"
+          },
+          "commercialType": {
+            "description": "The commercial type of the environment broker.",
+            "type": "string"
+          },
+          "createdBy": {
+            "description": "Details about the user that created this environment instance.",
+            "type": "string"
+          },
+          "createdDate": {
+            "type": "number"
+          },
+          "customLabels": {
+            "additionalProperties": {
+              "description": "Custom labels that are defined by a user and assigned as key-value pairs in a JSON array to the environment instance. \nExample:\n{\n  \"Cost Center\": [\"19700626\"],\n  \"Department\": [\"Sales\"],\n  \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n  \"EMEA\":[]\n}\nNOTE: Custom labels apply only to SAP BTP. They are not the same labels that might be defined by your environment broker (see \"labels\" field).",
+              "items": {
+                "description": "Custom labels that are defined by a user and assigned as key-value pairs in a JSON array to the environment instance. \nExample:\n{\n  \"Cost Center\": [\"19700626\"],\n  \"Department\": [\"Sales\"],\n  \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n  \"EMEA\":[]\n}\nNOTE: Custom labels apply only to SAP BTP. They are not the same labels that might be defined by your environment broker (see \"labels\" field).",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": "Custom labels that are defined by a user and assigned as key-value pairs in a JSON array to the environment instance. \nExample:\n{\n  \"Cost Center\": [\"19700626\"],\n  \"Department\": [\"Sales\"],\n  \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n  \"EMEA\":[]\n}\nNOTE: Custom labels apply only to SAP BTP. They are not the same labels that might be defined by your environment broker (see \"labels\" field).",
+            "type": "object"
+          },
+          "dashboardUrl": {
+            "description": "The URL of the service dashboard, which is a web-based management user interface for the service instances.",
+            "type": "string"
+          },
+          "description": {
+            "description": "The description of the environment instance.",
+            "type": "string"
+          },
+          "environmentType": {
+            "description": "Type of the environment instance that is used.",
+            "enum": [
+              "cloudfoundry",
+              "kubernetes",
+              "neo"
+            ],
+            "example": "cloudfoundry",
+            "type": "string"
+          },
+          "globalAccountGUID": {
+            "description": "The GUID of the global account that is associated with the environment instance.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Automatically generated unique identifier for the environment instance.",
+            "type": "string"
+          },
+          "labels": {
+            "description": "Broker-specified key-value pairs that specify attributes of an environment instance.",
+            "type": "string"
+          },
+          "landscapeLabel": {
+            "description": "The name of the landscape within the logged-in region on which the environment instance is created.",
+            "type": "string"
+          },
+          "modifiedBy": {
+            "description": "Details about the user that last modified this environment instance.",
+            "type": "string"
+          },
+          "modifiedDate": {
+            "type": "number"
+          },
+          "name": {
+            "description": "Name of the environment instance.",
+            "type": "string"
+          },
+          "operation": {
+            "description": "An identifier that represents the last operation. This ID is returned by the environment brokers.",
+            "type": "string"
+          },
+          "parameters": {
+            "description": "Configuration parameters for the environment instance.",
+            "type": "string"
+          },
+          "planId": {
+            "description": "ID of the service plan for the environment instance in the corresponding service broker's catalog.",
+            "type": "string"
+          },
+          "planName": {
+            "description": "Name of the service plan for the environment instance in the corresponding service broker's catalog.",
+            "type": "string"
+          },
+          "platformId": {
+            "description": "ID of the platform for the environment instance in the corresponding service broker's catalog.",
+            "type": "string"
+          },
+          "serviceId": {
+            "description": "ID of the service for the environment instance in the corresponding service broker's catalog.",
+            "type": "string"
+          },
+          "serviceName": {
+            "description": "Name of the service for the environment instance in the corresponding service broker's catalog.",
+            "type": "string"
+          },
+          "state": {
+            "description": "Current state of the environment instance.",
+            "enum": [
+              "CREATING",
+              "UPDATING",
+              "DELETING",
+              "OK",
+              "CREATION_FAILED",
+              "DELETION_FAILED",
+              "UPDATE_FAILED"
+            ],
+            "example": "CREATING",
+            "type": "string"
+          },
+          "stateMessage": {
+            "description": "Information about the current state of the environment instance.",
+            "type": "string"
+          },
+          "subaccountGUID": {
+            "description": "The GUID of the subaccount associated with the environment instance.",
+            "type": "string"
+          },
+          "tenantId": {
+            "description": "The ID of the tenant that owns the environment instance.",
+            "type": "string"
+          },
+          "type": {
+            "description": "The last provisioning operation on the environment instance.\n* <b>Provision:</b> Environment instance created.\n* <b>Update:</b> Environment instance changed.\n* <b>Deprovision:</b> Environment instance deleted.",
+            "enum": [
+              "Provision",
+              "Update",
+              "Deprovision"
+            ],
+            "example": "Provision",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "BusinessEnvironmentInstancesResponseCollection": {
+        "properties": {
+          "environmentInstances": {
+            "description": "List of all the environment instances",
+            "items": {
+              "$ref": "#/components/schemas/BusinessEnvironmentInstanceResponseObject"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CreateEnvironmentInstanceBindingRequest": {
+        "description": "JSON object with configuration parameters specific to environment instance binding as specified in the OSB API.",
+        "properties": {
+          "parameters": {
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
       "CreateEnvironmentInstanceRequestPayload": {
-        "description": "JSON object with configuration parameters specific to environment instance.",
+        "description": "JSON object with configuration parameters specific to environment instance binding.",
         "properties": {
           "description": {
             "description": "The description of the environment instance.",
@@ -190,6 +310,48 @@
         },
         "type": "object"
       },
+      "DeleteEnvironmentInstanceBindingResponse": {
+        "properties": {
+          "bindingId": {
+            "description": "The ID of the binding to delete.",
+            "type": "string"
+          },
+          "planId": {
+            "description": "The plan ID of the associated environment instance.",
+            "type": "string"
+          },
+          "serviceId": {
+            "description": "The associated environment instance ID.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EnvironmentInstanceBindingMetadata": {
+        "properties": {
+          "bindingId": {
+            "description": "The binding ID for the specified environment instance.",
+            "type": "string"
+          },
+          "createdBy": {
+            "description": "The entity that created the binding.",
+            "type": "string"
+          },
+          "createdDate": {
+            "description": "When the binding was created",
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "Expiry date for the binding.",
+            "type": "string"
+          },
+          "instanceId": {
+            "description": "The environment instance ID associated with the binding.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "EnvironmentInstanceResponseObject": {
         "properties": {
           "brokerId": {
@@ -201,8 +363,6 @@
             "type": "string"
           },
           "createdDate": {
-            "description": "The date the environment instance was created. Dates and times are in UTC format.",
-            "format": "date-time",
             "type": "number"
           },
           "customLabels": {
@@ -228,7 +388,9 @@
           "environmentType": {
             "description": "Type of the environment instance that is used.",
             "enum": [
-              "cloudfoundry, kubernetes, neo"
+              "cloudfoundry",
+              "kubernetes",
+              "neo"
             ],
             "example": "cloudfoundry",
             "type": "string"
@@ -250,8 +412,6 @@
             "type": "string"
           },
           "modifiedDate": {
-            "description": "The last date the environment instance was last modified. Dates and times are in UTC format.",
-            "format": "date-time",
             "type": "number"
           },
           "name": {
@@ -289,32 +449,15 @@
           "state": {
             "description": "Current state of the environment instance.",
             "enum": [
-              "STARTED",
               "CREATING",
               "UPDATING",
-              "MOVING",
-              "MOVING_TO_OTHER_GA",
-              "PROCESSING",
               "DELETING",
               "OK",
-              "PENDING_REVIEW",
-              "CANCELED",
               "CREATION_FAILED",
-              "UPDATE_FAILED",
-              "SUSPENSION_FAILED",
-              "UPDATE_ACCOUNT_TYPE_FAILED",
-              "UPDATE_DIRECTORY_TYPE_FAILED",
-              "PROCESSING_FAILED",
               "DELETION_FAILED",
-              "MOVE_FAILED",
-              "MOVE_TO_OTHER_GA_FAILED",
-              "MIGRATING",
-              "MIGRATION_FAILED",
-              "ROLLBACK_MIGRATION_PROCESSING",
-              "MIGRATED",
-              "CREATING, UPDATING, DELETING, OK, CREATION_FAILED, DELETION_FAILED, UPDATE_FAILED"
+              "UPDATE_FAILED"
             ],
-            "example": "cloudfoundry",
+            "example": "CREATING",
             "type": "string"
           },
           "stateMessage": {
@@ -334,8 +477,7 @@
             "enum": [
               "Provision",
               "Update",
-              "Deprovision",
-              "Provision, Update, Deprovision"
+              "Deprovision"
             ],
             "example": "Provision",
             "type": "string"
@@ -355,23 +497,177 @@
         },
         "type": "object"
       },
-      "JsonNode": {
-        "description": "Error description in JSON format",
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "description": "Technical code of the error as a reference for support",
+            "format": "int32",
+            "type": "integer"
+          },
+          "correlationID": {
+            "description": "Log correlation ID to track the event",
+            "type": "string"
+          },
+          "description": {
+            "description": "Error description in JSON format",
+            "type": "string"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/NestingErrorDetailsResponseObject"
+            },
+            "type": "array"
+          },
+          "message": {
+            "description": "User-friendly description of the error.",
+            "type": "string"
+          },
+          "target": {
+            "description": "Describes a data element (for example, a resource path: /online-store/v1/products/123)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "correlationID",
+          "message"
+        ],
+        "type": "object"
+      },
+      "GetAllInstanceBindingsResponse": {
+        "description": "The response list of all bindings for a given environment instance.",
+        "properties": {
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentInstanceBindingMetadata"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "GetEnvironmentInstanceBindingResponse": {
+        "properties": {
+          "credentials": {
+            "additionalProperties": {
+              "description": "A free-form hash of credentials that can be used by applications or users to access the service. MUST be returned if the service broker supports generation of credentials.",
+              "type": "object"
+            },
+            "description": "A free-form hash of credentials that can be used by applications or users to access the service. MUST be returned if the service broker supports generation of credentials.",
+            "type": "object"
+          },
+          "endpoints": {
+            "description": "All network endpoints that the application uses to connect to the service instance.",
+            "items": {
+              "description": "All network endpoints that the application uses to connect to the service instance.",
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "description": "An optional object containing metadata about this service binding. This metadata is mainly used to manage the service binding itself and does not contain any data needed to connect to the service instance.",
+              "type": "object"
+            },
+            "description": "An optional object containing metadata about this service binding. This metadata is mainly used to manage the service binding itself and does not contain any data needed to connect to the service instance.",
+            "type": "object"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "description": "Configuration parameters for the Service Binding.",
+              "type": "object"
+            },
+            "description": "Configuration parameters for the Service Binding.",
+            "type": "object"
+          },
+          "route_service_url": {
+            "description": "A URL to which the environment proxies requests for the address sent with bind_resource.route in the request body.",
+            "type": "string"
+          },
+          "syslog_drain_url": {
+            "description": "A URL to which logs are streamed.",
+            "type": "string"
+          },
+          "volume_mounts": {
+            "description": "An array of configurations for remote storage devices to be mounted into an application container filesystem.",
+            "items": {
+              "description": "An array of configurations for remote storage devices to be mounted into an application container filesystem.",
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "credentials",
+          "parameters"
+        ],
+        "type": "object"
+      },
+      "JobParameter": {
+        "properties": {
+          "identifying": {
+            "type": "boolean"
+          },
+          "type": {
+            "enum": [
+              "STRING",
+              "DATE",
+              "LONG",
+              "DOUBLE"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "JobStatusResponseObject": {
+        "properties": {
+          "customParams": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "description": {
+            "description": "A description of the exit status of a job when it ends.",
+            "type": "string"
+          },
+          "jobParams": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobParameter"
+            },
+            "type": "object"
+          },
+          "status": {
+            "description": "The current state of the job. \n* <b>IN_PROGRESS:</b> The job is being executed.\n* <b>COMPLETED:</b> The job has completed.\n* <b>FAILED:</b> The job failed and did not complete. The job can be restarted.",
+            "enum": [
+              "IN_PROGRESS",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "statusDetails": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "description",
+          "status"
+        ],
         "type": "object"
       },
       "LabelAssignmentRequestPayload": {
         "description": "JSON object with labels as key-value pairs that specify custom attributes of the entity.",
         "properties": {
           "labels": {
-            "additionalProperties": {
-              "description": "Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\").\nFor example: {\n\"Cost Center\":\"2624061970\"\n\"Department\":\"Sales\"\n\"tags\": [\"Green\", \"Pharma\", \"Audited\"]\n}",
-              "items": {
-                "description": "Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\").\nFor example: {\n\"Cost Center\":\"2624061970\"\n\"Department\":\"Sales\"\n\"tags\": [\"Green\", \"Pharma\", \"Audited\"]\n}",
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "description": "Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\").\nFor example: {\n\"Cost Center\":\"2624061970\"\n\"Department\":\"Sales\"\n\"tags\": [\"Green\", \"Pharma\", \"Audited\"]\n}",
+            "description": "Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\").\n\nFor example: {\n\n\"Cost Center\":\"2624061970\"\n\n\"Department\":\"Sales\"\n\n\"tags\": [\"Green\", \"Pharma\", \"Audited\"]\n\n}",
             "type": "object"
           }
         },
@@ -381,22 +677,13 @@
         "description": "Labels assigned as key-value pairs to the entity.",
         "properties": {
           "labels": {
-            "additionalProperties": {
-              "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the entity.\n\nExample: {\n   \"Cost Center\": [\"19700626\"],\n   \"Department\": [\"Sales\"],\n   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n   \"EMEA\":[]\n}",
-              "items": {
-                "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the entity.\n\nExample: {\n   \"Cost Center\": [\"19700626\"],\n   \"Department\": [\"Sales\"],\n   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n   \"EMEA\":[]\n}",
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the entity.\n\nExample: {\n   \"Cost Center\": [\"19700626\"],\n   \"Department\": [\"Sales\"],\n   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n   \"EMEA\":[]\n}",
+            "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the entity.\n\nExample: {\n\n   \"Cost Center\": [\"19700626\"],\n\n   \"Department\": [\"Sales\"],\n\n   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n\n   \"EMEA\":[]\n\n}",
             "type": "object"
           }
         },
         "type": "object"
       },
       "NestingErrorDetailsResponseObject": {
-        "description": "Nesting of error responses",
         "properties": {
           "code": {
             "format": "int32",
@@ -576,7 +863,7 @@
     "url": "https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/17b6a171552544a6804f12ea83112a3f.html"
   },
   "info": {
-    "description": "The Provisioning service provides REST APIs that are responsible for the provisioning and deprovisioning of environment instances and tenants in the corresponding region. \nProvisioning is performed after validation by the Entitlements service. Use the APIs in this service to manage and create environment instances, such as a Cloud Foundry org, in a subaccount and to retrieve the plans and quota assignments for a subaccount. \nNOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).\n\nSee also:\n* [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html)\n* [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html)\n* [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html)\n* [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)",
+    "description": "The Provisioning service provides REST APIs that are responsible for the provisioning and deprovisioning of environment instances and tenants in the corresponding region. \nProvisioning is performed after validation by the Entitlements service. Use the APIs in this service to manage and create environment instances, such as a Cloud Foundry org, in a subaccount and to retrieve the plans and quota assignments for a subaccount.\n\nSee also:\n* [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html)\n* [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html)\n* [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html)\n* [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)",
     "termsOfService": "http://www.sap.com",
     "title": "Provisioning Service",
     "version": "1.0"
@@ -603,7 +890,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/JobStatusResponseObject"
                 }
               }
             },
@@ -613,7 +900,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -629,7 +916,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -652,7 +939,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -704,11 +991,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -717,7 +1004,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -727,7 +1014,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -750,7 +1037,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -782,11 +1069,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -798,7 +1085,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -808,7 +1095,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -831,7 +1118,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -871,7 +1158,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnvironmentInstancesResponseCollection"
+                  "$ref": "#/components/schemas/BusinessEnvironmentInstancesResponseCollection"
                 }
               }
             },
@@ -881,11 +1168,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -894,7 +1181,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -904,7 +1191,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -927,7 +1214,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -953,6 +1240,16 @@
           "required": true
         },
         "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedEnvironmentInstanceResponseObject"
+                }
+              }
+            },
+            "description": "Service Binding already exists and the requested parameters are identical to the existing Service Binding. Only valid in synchronous operations"
+          },
           "202": {
             "content": {
               "application/json": {
@@ -967,11 +1264,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Broker was not found"
+            "description": "Broker was not found, or, plan and service are not part of the broker catalog, or, service and plan are not allowed for the subaccount license type"
           },
           "401": {
             "description": "Not Authorized"
@@ -983,7 +1280,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1006,7 +1303,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1049,11 +1346,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1065,7 +1362,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1075,7 +1372,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1098,7 +1395,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1129,7 +1426,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnvironmentInstanceResponseObject"
+                  "$ref": "#/components/schemas/BusinessEnvironmentInstanceResponseObject"
                 }
               }
             },
@@ -1139,11 +1436,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1155,7 +1452,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1178,7 +1475,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1229,7 +1526,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1245,7 +1542,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1268,7 +1565,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1281,9 +1578,378 @@
         ]
       }
     },
+    "/provisioning/v1/environments/{environmentInstanceId}/bindings": {
+      "get": {
+        "description": "Get all environment instance bindings for a given environment \ninstance.<br/>The list includes metadata of each binding.<br/>To get\ncredentials and additional binding details, run Get an environment\ninstance binding API and specify the binding ID.<br/><br/>Required\nscope: $XSAPPNAME.subaccount.environment.read",
+        "operationId": "getAllEnvironmentInstanceBindings",
+        "parameters": [
+          {
+            "description": "The ID of the environment instance for which to get bindings.",
+            "in": "path",
+            "name": "environmentInstanceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAllInstanceBindingsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Not Authorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No environment instance binding found for the specified environment instance ID."
+          },
+          "429": {
+            "description": "Rate Limit Exceeded",
+            "headers": {
+              "X-Ratelimit-Reset": {
+                "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
+                "example": "167918400000",
+                "schema": {
+                  "format": "long",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Get all environment instance bindings",
+        "tags": [
+          "Environments"
+        ]
+      },
+      "put": {
+        "description": "Create an environment instance binding.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.create",
+        "operationId": "createEnvironmentInstanceBinding",
+        "parameters": [
+          {
+            "description": "The ID of the environment instance for which to create a binding.",
+            "in": "path",
+            "name": "environmentInstanceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEnvironmentInstanceBindingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Broker not found, service or plan not in broker catalog or not allowed for subaccount license type"
+          },
+          "401": {
+            "description": "Not Authorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Tenant does not exist"
+          },
+          "429": {
+            "description": "Rate Limit Exceeded",
+            "headers": {
+              "X-Ratelimit-Reset": {
+                "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
+                "example": "167918400000",
+                "schema": {
+                  "format": "long",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Create environment instance binding",
+        "tags": [
+          "Environments"
+        ]
+      }
+    },
+    "/provisioning/v1/environments/{environmentInstanceId}/bindings/{bindingId}": {
+      "delete": {
+        "description": "Delete an environment instance binding.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete",
+        "operationId": "deleteEnvironmentInstanceBinding",
+        "parameters": [
+          {
+            "description": "The ID of the environment instance for which the binding is to be deleted.",
+            "in": "path",
+            "name": "environmentInstanceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The ID of the binding to delete.",
+            "in": "path",
+            "name": "bindingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteEnvironmentInstanceBindingResponse"
+                }
+              }
+            },
+            "description": "The binding was successfully deleted"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Not Authorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No binding exists with the provided ID"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The binding has expired on the environment broker side, but metadata still exists. It will be deleted from the provisioning database"
+          },
+          "429": {
+            "description": "Rate Limit Exceeded",
+            "headers": {
+              "X-Ratelimit-Reset": {
+                "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
+                "example": "167918400000",
+                "schema": {
+                  "format": "long",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Delete environment instance binding",
+        "tags": [
+          "Environments"
+        ]
+      },
+      "get": {
+        "description": "Get the details of a specific environment instance binding.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.read",
+        "operationId": "getEnvironmentInstanceBinding",
+        "parameters": [
+          {
+            "description": "The ID of the associated environment instance.",
+            "in": "path",
+            "name": "environmentInstanceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The ID of the environment instance binding",
+            "in": "path",
+            "name": "bindingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/GetEnvironmentInstanceBindingResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EnvironmentInstanceBindingMetadata"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Returns either 'GetEnvironmentInstanceBindingResponse' if the binding is active or 'EnvironmentInstanceBindingMetadata' if the binding has expired."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Not Authorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No environment instance binding found for the specified environment instance ID"
+          },
+          "429": {
+            "description": "Rate Limit Exceeded",
+            "headers": {
+              "X-Ratelimit-Reset": {
+                "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
+                "example": "167918400000",
+                "schema": {
+                  "format": "long",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Get an environment instance binding",
+        "tags": [
+          "Environments"
+        ]
+      }
+    },
     "/provisioning/v1/environments/{environmentInstanceId}/labels": {
       "delete": {
-        "description": "Remove all user-defined labels that are assigned to a given environment instance. \n\nTo remove specific labels, use instead: PUT /provisioning/v1/environments/{environmentInstanceId}/labels\n\nNOTE: This API applies only to custom labels that are defined by users for SAP BTP. Any labels that might be defined by your environment broker are not removed by this API.\n\nRequired scope: $XSAPPNAME.subaccount.environment.delete",
+        "description": "Remove all user-defined labels that are assigned to a given environment instance. \nTo remove specific labels, use instead: PUT /provisioning/v1/environments/{environmentInstanceId}/labels\nNOTE: This API applies only to custom labels that are defined by users for SAP BTP. Any labels that might be defined by your environment broker are not removed by this API.\nRequired scope: $XSAPPNAME.subaccount.environment.delete",
         "operationId": "deleteEnvironmentInstanceLabels",
         "parameters": [
           {
@@ -1311,11 +1977,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1327,7 +1993,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1350,7 +2016,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1363,7 +2029,7 @@
         ]
       },
       "get": {
-        "description": "Get all the custom labels that are assigned as key-value pairs to a given environment instance. \n\nNOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not retrieve the broker-defined labels that may exist. \n\nRequired scope: $XSAPPNAME.subaccount.environment.read",
+        "description": "Get all the custom labels that are assigned as key-value pairs to a given environment instance. \nNOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not retrieve the broker-defined labels that may exist. \nRequired scope: $XSAPPNAME.subaccount.environment.read",
         "operationId": "getEnvironmentInstanceLabels",
         "parameters": [
           {
@@ -1391,11 +2057,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1407,7 +2073,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1430,7 +2096,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1443,7 +2109,7 @@
         ]
       },
       "put": {
-        "description": "Create and assign custom labels to a given environment instance. Labels are specified as key-value pairs. \n\nNOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not update broker-defined labels that may exist. \n\nRequired scope: $XSAPPNAME.subaccount.environment.create",
+        "description": "Create and assign custom labels to a given environment instance. Labels are specified as key-value pairs. \nNOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not update broker-defined labels that may exist. \nRequired scope: $XSAPPNAME.subaccount.environment.create",
         "operationId": "createEnvironmentInstanceLabels",
         "parameters": [
           {
@@ -1481,11 +2147,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1497,7 +2163,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1520,7 +2186,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1552,11 +2218,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1568,7 +2234,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1591,7 +2257,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },

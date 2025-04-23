@@ -173,3 +173,77 @@ func (mg *KymaEnvironment) ResolveReferences(ctx context.Context, c client.Reade
 
 	return nil
 }
+
+// ResolveReferences of this KymaEnvironmentBinding.
+func (mg *KymaEnvironmentBinding) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPIResolver(c, mg)
+
+	var rsp reference.ResolutionResponse
+	var err error
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.KymaInstanceId,
+		Extract:      KymaInstanceId(),
+		Reference:    mg.Spec.KymaRef,
+		Selector:     mg.Spec.KymaSelector,
+		To: reference.To{
+			List:    &KymaEnvironmentList{},
+			Managed: &KymaEnvironment{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.KymaInstanceId")
+	}
+	mg.Spec.KymaInstanceId = rsp.ResolvedValue
+	mg.Spec.KymaRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.CloudManagementSecret,
+		Extract:      v1alpha1.CloudManagementSecret(),
+		Reference:    mg.Spec.CloudManagementRef,
+		Selector:     mg.Spec.CloudManagementSelector,
+		To: reference.To{
+			List:    &v1alpha1.CloudManagementList{},
+			Managed: &v1alpha1.CloudManagement{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.CloudManagementSecret")
+	}
+	mg.Spec.CloudManagementSecret = rsp.ResolvedValue
+	mg.Spec.CloudManagementRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.CloudManagementSecretNamespace,
+		Extract:      v1alpha1.CloudManagementSecretSecretNamespace(),
+		Reference:    mg.Spec.CloudManagementRef,
+		Selector:     mg.Spec.CloudManagementSelector,
+		To: reference.To{
+			List:    &v1alpha1.CloudManagementList{},
+			Managed: &v1alpha1.CloudManagement{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.CloudManagementSecretNamespace")
+	}
+	mg.Spec.CloudManagementSecretNamespace = rsp.ResolvedValue
+	mg.Spec.CloudManagementRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.CloudManagementSubaccountGuid,
+		Extract:      v1alpha1.CloudManagementSubaccountUuid(),
+		Reference:    mg.Spec.CloudManagementRef,
+		Selector:     mg.Spec.CloudManagementSelector,
+		To: reference.To{
+			List:    &v1alpha1.CloudManagementList{},
+			Managed: &v1alpha1.CloudManagement{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.CloudManagementSubaccountGuid")
+	}
+	mg.Spec.CloudManagementSubaccountGuid = rsp.ResolvedValue
+	mg.Spec.CloudManagementRef = rsp.ResolvedReference
+
+	return nil
+}
