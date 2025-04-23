@@ -9,11 +9,7 @@
 name: Publish Release Candidate
 
 on:
-    workflow_dispatch:
-      inputs:
-        nextVersion:
-          description: 'specify the release version in the semver format v[major].[minor].[patch] e.g. v0.0.0'
-          required: true
+    workflow_dispatch: {}
 
 # Releases need permissions to read and write the repository contents.
 # GitHub considers creating releases and uploading assets as writing contents.
@@ -27,9 +23,9 @@ jobs:
       steps:
       - name: Set Version
         id: version
-        run: echo "VERSION=${{ github.event.inputs.nextVersion }}-fromPR" >> $GITHUB_OUTPUT
+        run: echo "version=v0.0.0-$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
       - name: Print Version Number
-        run: echo "Effective version ${{ github.steps.version.outputs.VERSION }}"
+        run: echo "Effective version ${{ github.steps.version.outputs.version }}"
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
