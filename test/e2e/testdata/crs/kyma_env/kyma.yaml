@@ -8,7 +8,7 @@ spec:
     planName: azure
     parameters:
       {
-        "administrators": ["$TECHNICAL_USER_EMAIL"]
+        "administrators": [""]
       }
   subaccountRef:
     name: kyma-test-subaccount

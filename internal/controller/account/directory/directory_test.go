@@ -11,13 +11,14 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/directory"
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
 	tracking_test "github.com/sap/crossplane-provider-btp/internal/tracking/test"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestConnect(t *testing.T) {
@@ -488,7 +489,7 @@ func TestDelete(t *testing.T) {
 				tracker: nil,
 				kube:    &mockKube,
 			}
-			err := ctrl.Delete(context.Background(), tc.args.cr)
+			_, err := ctrl.Delete(context.Background(), tc.args.cr)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\ne.Delete(...): -want error, +got error:\n%s\n", tc.reason, diff)

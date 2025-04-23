@@ -5,12 +5,13 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/pkg/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/clients/directory"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -61,6 +62,10 @@ type external struct {
 	tracker tracking.ReferenceResolverTracker
 }
 
+func (c *external) Disconnect(ctx context.Context) error {
+	// No-op
+	return nil
+}
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.Directory)
 	if !ok {
@@ -144,15 +149,15 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.Directory)
 	if !ok {
-		return errors.New(errNotDirectory)
+		return managed.ExternalDelete{}, errors.New(errNotDirectory)
 	}
 
 	cr.SetConditions(xpv1.Deleting())
 
-	return c.handler(cr).DeleteDirectory(ctx)
+	return managed.ExternalDelete{}, c.handler(cr).DeleteDirectory(ctx)
 }
 
 func (c *external) handler(cr *v1alpha1.Directory) directory.DirectoryClientI {

@@ -489,7 +489,7 @@ func TestDelete(t *testing.T) {
 		t.Run(tc.reason, func(t *testing.T) {
 			calledDeleteOnName := ""
 			e := external{service: tc.fields.loginClient, kube: ctrloidc.MockCertLookup(tc.args.secrets, &calledDeleteOnName)}
-			err := e.Delete(context.Background(), tc.args.mg)
+			_, err := e.Delete(context.Background(), tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\ne.Delete(...): -want error, +got error:\n%s\n", tc.reason, diff)
 			}
