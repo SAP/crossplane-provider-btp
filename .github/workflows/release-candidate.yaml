@@ -21,6 +21,10 @@ jobs:
     release:
       runs-on: ubuntu-latest
       steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: true
       - name: Set Version
         id: version
         run: echo "version=v0.0.0-$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
@@ -33,10 +37,6 @@ jobs:
           version: v0.15.1
           install: true
 
-      - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          submodules: true
 
       - name: Fetch History
         run: git fetch --prune --unshallow
