@@ -27,7 +27,7 @@ jobs:
           submodules: true
       - name: Set Version
         id: version
-        run: echo "version=v0.0.0-$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+        run: echo "version=v0.0.0-$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Print Version Number
         run: echo "Effective version ${{ github.steps.version.outputs.version }}"
 
