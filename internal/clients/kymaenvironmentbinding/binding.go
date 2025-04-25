@@ -38,6 +38,10 @@ func (c KymaBindings) DescribeInstance(
 		return make([]provisioningclient.EnvironmentInstanceBindingMetadata, 0), errors.Wrap(err, errKymaBindingCreateFailed)
 	}
 
+	if bindings == nil {
+		return make([]provisioningclient.EnvironmentInstanceBindingMetadata, 0), nil
+	}
+
 	return bindings.Bindings, nil
 }
 
