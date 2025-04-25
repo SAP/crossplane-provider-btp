@@ -168,9 +168,9 @@ spec:
                       The binding secret will be deleted after this time.
                     type: string
                 type: object
-              kymaInstanceId:
+              kymaEnvironmentId:
                 type: string
-              kymaRef:
+              kymaEnvironmentRef:
                 description: A Reference to a named object.
                 properties:
                   name:
@@ -204,7 +204,7 @@ spec:
                 required:
                 - name
                 type: object
-              kymaSelector:
+              kymaEnvironmentSelector:
                 description: A Selector selects an object.
                 properties:
                   matchControllerRef:

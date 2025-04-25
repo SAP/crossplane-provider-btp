@@ -874,7 +874,7 @@ func Test_external_Delete(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "test-instance",
+						KymaEnvironmentId: "test-instance",
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
 						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
@@ -909,7 +909,7 @@ func Test_external_Delete(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "error-instance",
+						KymaEnvironmentId: "error-instance",
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
 						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
@@ -938,7 +938,7 @@ func Test_external_Delete(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "non-existent-instance",
+						KymaEnvironmentId: "non-existent-instance",
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
 						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
@@ -967,7 +967,7 @@ func Test_external_Delete(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "test-instance",
+						KymaEnvironmentId: "test-instance",
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
 						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
@@ -1023,7 +1023,7 @@ func Test_external_Create(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "test-instance",
+						KymaEnvironmentId: "test-instance",
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
 							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
 						},
@@ -1069,7 +1069,7 @@ func Test_external_Create(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "test-instance",
+						KymaEnvironmentId: "test-instance",
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
 							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
 						},
@@ -1115,7 +1115,7 @@ func Test_external_Create(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "error-instance",
+						KymaEnvironmentId: "error-instance",
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
 							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
 						},
@@ -1141,7 +1141,7 @@ func Test_external_Create(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "invalid-instance",
+						KymaEnvironmentId: "invalid-instance",
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
 							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
 						},
@@ -1208,7 +1208,7 @@ func Test_external_Update(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaInstanceId: "test-instance",
+						KymaEnvironmentId: "test-instance",
 					},
 				},
 			},

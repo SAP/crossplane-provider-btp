@@ -80,7 +80,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) updateBindingsFromService(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error {
-	bindingsAtService, err := c.client.DescribeInstance(ctx, cr.Spec.KymaInstanceId)
+	bindingsAtService, err := c.client.DescribeInstance(ctx, cr.Spec.KymaEnvironmentId)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	// Create new binding only if we don't have a valid one
 	ttl := int(math.Round(cr.Spec.ForProvider.BindingTTl.Seconds()))
-	clientBinding, err := c.client.CreateInstance(ctx, cr.Spec.KymaInstanceId, ttl)
+	clientBinding, err := c.client.CreateInstance(ctx, cr.Spec.KymaEnvironmentId, ttl)
 	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
@@ -206,6 +206,6 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotKymaEnvironmentBinding)
 	}
 
-	err := c.client.DeleteInstances(ctx, cr.Status.AtProvider.Bindings, cr.Spec.KymaInstanceId)
+	err := c.client.DeleteInstances(ctx, cr.Status.AtProvider.Bindings, cr.Spec.KymaEnvironmentId)
 	return err
 }

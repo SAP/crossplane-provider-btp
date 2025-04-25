@@ -41,14 +41,14 @@ type KymaEnvironmentBindingSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 	ForProvider       KymaEnvironmentBindingParameters `json:"forProvider"`
 	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1.KymaEnvironment
-	// +crossplane:generate:reference:refFieldName=KymaRef
-	// +crossplane:generate:reference:selectorFieldName=KymaSelector
+	// +crossplane:generate:reference:refFieldName=KymaEnvironmentRef
+	// +crossplane:generate:reference:selectorFieldName=KymaEnvironmentSelector
 	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1.KymaInstanceId()
-	KymaInstanceId string `json:"kymaInstanceId,omitempty"`
+	KymaEnvironmentId string `json:"kymaEnvironmentId,omitempty"`
 	// +kubebuilder:validation:Optional
-	KymaSelector *xpv1.Selector `json:"kymaSelector,omitempty"`
+	KymaEnvironmentSelector *xpv1.Selector `json:"kymaEnvironmentSelector,omitempty"`
 	// +kubebuilder:validation:Optional
-	KymaRef *xpv1.Reference `json:"kymaRef,omitempty" reference-group:"environment.btp.sap.crossplane.io" reference-kind:"KymaEnvironment" reference-apiversion:"v1alpha1"`
+	KymaEnvironmentRef *xpv1.Reference `json:"kymaEnvironmentRef,omitempty" reference-group:"environment.btp.sap.crossplane.io" reference-kind:"KymaEnvironment" reference-apiversion:"v1alpha1"`
 
 	// +kubebuilder:validation:Optional
 	CloudManagementSelector *xpv1.Selector `json:"cloudManagementSelector,omitempty"`

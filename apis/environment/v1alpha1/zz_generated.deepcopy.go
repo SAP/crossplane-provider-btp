@@ -481,13 +481,13 @@ func (in *KymaEnvironmentBindingSpec) DeepCopyInto(out *KymaEnvironmentBindingSp
 	*out = *in
 	in.ResourceSpec.DeepCopyInto(&out.ResourceSpec)
 	out.ForProvider = in.ForProvider
-	if in.KymaSelector != nil {
-		in, out := &in.KymaSelector, &out.KymaSelector
+	if in.KymaEnvironmentSelector != nil {
+		in, out := &in.KymaEnvironmentSelector, &out.KymaEnvironmentSelector
 		*out = new(v1.Selector)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.KymaRef != nil {
-		in, out := &in.KymaRef, &out.KymaRef
+	if in.KymaEnvironmentRef != nil {
+		in, out := &in.KymaEnvironmentRef, &out.KymaEnvironmentRef
 		*out = new(v1.Reference)
 		(*in).DeepCopyInto(*out)
 	}

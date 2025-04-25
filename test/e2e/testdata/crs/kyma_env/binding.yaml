@@ -4,7 +4,7 @@ metadata:
   name: kyma-environment
   namespace: default
 spec:
-  kymaRef:
+  kymaEnvironmentRef:
     name: kyma-environment
   writeConnectionSecretToRef:
     name: kyma-binding

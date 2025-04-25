@@ -8,7 +8,8 @@ spec:
     planName: aws
     parameters:
       {
-        "administrators": ["$TECHNICAL_USER_EMAIL"]
+        "administrators": ["dl_673efb6870d04101363fc6b3@global.corp.sap"],
+        "region": "eu-west-2"
       }
   subaccountRef:
     name: kyma-test-subaccount

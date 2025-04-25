@@ -182,20 +182,20 @@ func (mg *KymaEnvironmentBinding) ResolveReferences(ctx context.Context, c clien
 	var err error
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.KymaInstanceId,
+		CurrentValue: mg.Spec.KymaEnvironmentId,
 		Extract:      KymaInstanceId(),
-		Reference:    mg.Spec.KymaRef,
-		Selector:     mg.Spec.KymaSelector,
+		Reference:    mg.Spec.KymaEnvironmentRef,
+		Selector:     mg.Spec.KymaEnvironmentSelector,
 		To: reference.To{
 			List:    &KymaEnvironmentList{},
 			Managed: &KymaEnvironment{},
 		},
 	})
 	if err != nil {
-		return errors.Wrap(err, "mg.Spec.KymaInstanceId")
+		return errors.Wrap(err, "mg.Spec.KymaEnvironmentId")
 	}
-	mg.Spec.KymaInstanceId = rsp.ResolvedValue
-	mg.Spec.KymaRef = rsp.ResolvedReference
+	mg.Spec.KymaEnvironmentId = rsp.ResolvedValue
+	mg.Spec.KymaEnvironmentRef = rsp.ResolvedReference
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSecret,
