@@ -19,7 +19,7 @@ type Client interface {
 		[]v1alpha1.User,
 		error,
 	)
-	CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error
+	CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error)
 	UpdateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error
 	DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error
 

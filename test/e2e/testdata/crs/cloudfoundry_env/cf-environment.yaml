@@ -9,6 +9,8 @@ spec:
     namespace: default
   forProvider:
     landscape: cf-eu10
+    orgName: cfenv-e2e-test-org
+    environmentName: cfenv-e2e-test-org-env
   subaccountRef:
     name:  cf-test-subaccount
   cloudManagementRef:

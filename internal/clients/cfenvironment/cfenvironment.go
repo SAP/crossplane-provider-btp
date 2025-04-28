@@ -51,7 +51,8 @@ func (c CloudFoundryOrganization) DescribeInstance(
 	cr v1alpha1.CloudFoundryEnvironment,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 	name := meta.GetExternalName(&cr)
-	environment, err := c.btp.GetEnvironmentByNameAndType(ctx, name, btp.CloudFoundryEnvironmentType())
+	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	environment, err := c.btp.GetCFEnvironmentByNameAndOrg(ctx, name, orgName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -106,34 +107,42 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 	return cloudFoundryClient, err
 }
 
-func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
-	cloudFoundryOrgName := cr.Name
+func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error) {
 	adminServiceAccountEmail := c.btp.Credential.UserCredential.Email
-
+	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	org, err := c.btp.CreateCloudFoundryOrgIfNotExists(
-		ctx, cloudFoundryOrgName, adminServiceAccountEmail, string(cr.UID),
-		cr.Spec.ForProvider.Landscape,
+		ctx, cr.Name, adminServiceAccountEmail, string(cr.UID),
+		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName, 
 	)
 	if err != nil {
-		return errors.Wrap(err, instanceCreateFailed)
+		return "", errors.Wrap(err, instanceCreateFailed)
 	}
 
 	cloudFoundryClient, err := c.createClientWithType(org)
 	if err != nil {
-		return errors.Wrap(err, instanceCreateFailed)
+		return "", errors.Wrap(err, instanceCreateFailed)
 	}
 
 	for _, managerEmail := range cr.Spec.ForProvider.Managers {
 		if err := cloudFoundryClient.addManager(ctx, managerEmail, defaultOrigin); err != nil {
-			return errors.Wrap(err, instanceCreateFailed)
+			return "", errors.Wrap(err, instanceCreateFailed)
 		}
 	}
 
-	return nil
+	return org.Name, nil
 }
 
 func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
-	return c.btp.DeleteEnvironment(ctx, cr.Name, btp.CloudFoundryEnvironmentType())
+	name := meta.GetExternalName(&cr) 
+	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	return c.btp.DeleteCloudFoundryEnvironment(ctx, name, orgName)
+}
+
+func formOrgName (orgName string, subaccountId string, crName string) string {
+	if orgName == "" {
+		return subaccountId + "-" + crName
+	}
+	return orgName
 }
 
 type organizationClient struct {

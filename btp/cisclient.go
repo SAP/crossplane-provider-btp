@@ -293,20 +293,24 @@ func (c *Client) UpdateKymaEnvironment(ctx context.Context, environmentInstanceI
 }
 
 func (c *Client) CreateCloudFoundryOrg(
-	ctx context.Context, instanceName string, serviceAccountEmail string, resourceUID string,
-	landscape string,
-) error {
+	ctx context.Context, serviceAccountEmail string, resourceUID string,
+	landscape string, orgName string, environmentName string, 
+) (createdOrg string, err error) {
 	parameters := map[string]interface{}{
-		cfenvironmentParameterInstanceName: instanceName, v1alpha1.SubaccountOperatorLabel: resourceUID,
+		cfenvironmentParameterInstanceName: orgName, v1alpha1.SubaccountOperatorLabel: resourceUID,
 	}
 	cloudFoundryPlanName := "standard"
 	envType := CloudFoundryEnvironmentType()
 
+	var envName *string = nil
+	if environmentName != "" {
+		envName = &environmentName
+	}
 	payload := provisioningclient.CreateEnvironmentInstanceRequestPayload{
 		Description:     internal.Ptr("created via crossplane-btp-account-provider"),
 		EnvironmentType: envType.Identifier,
 		LandscapeLabel:  &landscape,
-		Name:            nil,
+		Name:            envName,
 		Origin:          nil,
 		Parameters:      parameters,
 		PlanName:        cloudFoundryPlanName,
@@ -314,30 +318,61 @@ func (c *Client) CreateCloudFoundryOrg(
 		TechnicalKey:    nil,
 		User:            &serviceAccountEmail,
 	}
-	_, _, err := c.ProvisioningServiceClient.CreateEnvironmentInstance(ctx).CreateEnvironmentInstanceRequestPayload(payload).Execute()
+	localReturnValue, _, err := c.ProvisioningServiceClient.CreateEnvironmentInstance(ctx).CreateEnvironmentInstanceRequestPayload(payload).Execute()
 	if err != nil {
-		return specifyAPIError(err)
+		return "", specifyAPIError(err)
 	}
-	return nil
+	createdOrg = *localReturnValue.Id
+	return createdOrg, nil
 }
 
 func (c *Client) CreateCloudFoundryOrgIfNotExists(
 	ctx context.Context, instanceName string, serviceAccountEmail string, resourceUID string,
-	landscape string,
+	landscape string, orgName string, environmentName string, 
 ) (*CloudFoundryOrg, error) {
-	org, err := c.GetCloudFoundryOrg(ctx, instanceName)
+	cfEnvironment, err := c.GetCFEnvironmentByNameAndOrg(ctx, instanceName, orgName)
 	if err != nil {
 		return nil, err
 	}
-	if org == nil || org.Id == "" {
-		err = c.CreateCloudFoundryOrg(ctx, instanceName, serviceAccountEmail, resourceUID, landscape)
+	var orgId string
+	if cfEnvironment == nil {
+		orgId, err = c.CreateCloudFoundryOrg(ctx, serviceAccountEmail, resourceUID, landscape, orgName, environmentName,)
 		if err != nil {
 			return nil, err
 		}
-		return c.GetCloudFoundryOrg(ctx, instanceName)
+	}else{
+		orgId = *cfEnvironment.Id
 	}
+	cfOrg, err := c.GetCloudFoundryOrg(ctx, orgId)
+	if err != nil {
+		return nil, err
+	}
+	return cfOrg, err
+}
 
-	return org, err
+func (c *Client) GetCloudFoundryOrg(
+	ctx context.Context, orgId string,
+) (*CloudFoundryOrg, error) {
+	cfEnvironment, err := c.GetCFEnvironmentByOrgId(ctx, orgId)
+	if err != nil {
+		return nil, err
+	}
+	return c.ExtractOrg(cfEnvironment)
+}
+
+func (c *Client) getCloudFoundryEnvironmentId(ctx context.Context, instanceName string, orgName string) (
+	string, error,
+) {
+	environment, err:= c.GetCFEnvironmentByNameAndOrg(ctx, instanceName, orgName)
+	
+	if err != nil {
+		return "", err
+	}
+	cloudFoundryOrgId := ""
+	if environment != nil && environment.Id != nil {
+		cloudFoundryOrgId = *environment.Id
+	}
+	return cloudFoundryOrgId, nil
 }
 
 func (c *Client) DeleteEnvironmentById(ctx context.Context, environmentId string) error {
@@ -348,8 +383,8 @@ func (c *Client) DeleteEnvironmentById(ctx context.Context, environmentId string
 	return nil
 }
 
-func (c *Client) DeleteEnvironment(ctx context.Context, instanceName string, environmentType EnvironmentType) error {
-	environmentId, getErr := c.getEnvironmentId(ctx, instanceName, environmentType)
+func (c *Client) DeleteCloudFoundryEnvironment(ctx context.Context, instanceName string, orgName string) error {
+	environmentId, getErr := c.getCloudFoundryEnvironmentId(ctx, instanceName, orgName)
 	if getErr != nil {
 		return specifyAPIError(getErr)
 	}
@@ -397,28 +432,67 @@ func (c *Client) GetEnvironmentByNameAndType(
 	return environmentInstance, err
 }
 
-func (c *Client) getEnvironmentId(ctx context.Context, instanceName string, environmentType EnvironmentType) (
-	string, error,
-) {
-	environment, err := c.GetEnvironmentByNameAndType(ctx, instanceName, environmentType)
-	if err != nil {
-		return "", err
-	}
-	cloudFoundryOrgId := ""
-	if environment != nil && environment.Id != nil {
-		cloudFoundryOrgId = *environment.Id
-	}
-	return cloudFoundryOrgId, nil
-}
-
-func (c *Client) GetCloudFoundryOrg(
-	ctx context.Context, instanceName string,
-) (*CloudFoundryOrg, error) {
-	cfEnvironment, err := c.GetEnvironmentByNameAndType(ctx, instanceName, CloudFoundryEnvironmentType())
+func (c *Client) GetCFEnvironmentByNameAndOrg(
+	ctx context.Context, instanceName string, orgName string,
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	var environmentInstance *provisioningclient.BusinessEnvironmentInstanceResponseObject
+	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
+	envInstances, err := c.getCFEnvironments(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return c.ExtractOrg(cfEnvironment)
+	for _, instance := range envInstances {
+		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
+			continue
+		}
+
+		var parameters string
+		var parameterList map[string]interface{}
+		if instance.Parameters != nil {
+			parameters = *instance.Parameters
+		}
+		err := json.Unmarshal([]byte(parameters), &parameterList)
+		if err != nil {
+			return nil, err
+		}
+		if parameterList[cfenvironmentParameterInstanceName] == instanceName {
+			environmentInstance = &instance
+			break
+		}
+		if parameterList[cfenvironmentParameterInstanceName] == orgName {
+			environmentInstance = &instance
+			break
+		}	
+	}
+	return environmentInstance, err
+}
+
+func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error){
+	var environmentInstance *provisioningclient.BusinessEnvironmentInstanceResponseObject
+	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
+	envInstances, err := c.getCFEnvironments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, instance := range envInstances {
+		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
+			continue
+		}
+		if *instance.Id == orgId {
+			environmentInstance = &instance
+			break
+		}
+	}
+	return environmentInstance, err
+}
+
+func (c *Client) getCFEnvironments(ctx context.Context) ([]provisioningclient.BusinessEnvironmentInstanceResponseObject, error){
+	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
+	response, _, err := c.ProvisioningServiceClient.GetEnvironmentInstances(ctx).Authorization("").Execute()
+	if err != nil {
+		return nil, specifyAPIError(err)
+	}
+	return response.EnvironmentInstances, nil
 }
 
 func (c *Client) ExtractOrg(cfEnvironment *provisioningclient.BusinessEnvironmentInstanceResponseObject) (*CloudFoundryOrg, error) {
