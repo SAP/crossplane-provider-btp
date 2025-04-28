@@ -746,6 +746,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			want: want{
+				// this needs a fix from implementation side, shoul not return error after deletion success. issue: https://github.com/SAP/crossplane-provider-btp/issues/155
 				err: errors.New("Deletion Pending: Current status: Deleting"),
 			},
 		},
