@@ -434,8 +434,8 @@ func (c *Client) GetEnvironmentByNameAndType(
 
 func (c *Client) GetCFEnvironmentByNameAndOrg(
 	ctx context.Context, instanceName string, orgName string,
-) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-	var environmentInstance *provisioningclient.EnvironmentInstanceResponseObject
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	var environmentInstance *provisioningclient.BusinessEnvironmentInstanceResponseObject
 	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
 	envInstances, err := c.getCFEnvironments(ctx)
 	if err != nil {
@@ -467,8 +467,8 @@ func (c *Client) GetCFEnvironmentByNameAndOrg(
 	return environmentInstance, err
 }
 
-func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*provisioningclient.EnvironmentInstanceResponseObject, error){
-	var environmentInstance *provisioningclient.EnvironmentInstanceResponseObject
+func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error){
+	var environmentInstance *provisioningclient.BusinessEnvironmentInstanceResponseObject
 	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
 	envInstances, err := c.getCFEnvironments(ctx)
 	if err != nil {
@@ -486,7 +486,7 @@ func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*pr
 	return environmentInstance, err
 }
 
-func (c *Client) getCFEnvironments(ctx context.Context) ([]provisioningclient.EnvironmentInstanceResponseObject, error){
+func (c *Client) getCFEnvironments(ctx context.Context) ([]provisioningclient.BusinessEnvironmentInstanceResponseObject, error){
 	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
 	response, _, err := c.ProvisioningServiceClient.GetEnvironmentInstances(ctx).Authorization("").Execute()
 	if err != nil {
