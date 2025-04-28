@@ -10,4 +10,4 @@ env:
 
 jobs:
   call-reusable-workflow:
-    uses: openmcp-project/.github/tree/main/.github/workflows/addRefinedIssuesToBacklog.yml@main
+    uses: openmcp-project/.github/workflows/addRefinedIssuesToBacklog.yml@main

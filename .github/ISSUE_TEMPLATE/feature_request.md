@@ -1,20 +1,28 @@
 ---
 name: Feature request
-about: Suggest an new Feature or Improvment
+about: Suggest an new Feature or Improvement
 title: "[FEATURE]"
 type: feature
 assignees: ''
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+**Context**
+Tell us about the scenario you and use case, you seek additional functionality in.
 
-**Describe the solution you'd like**
+**Scope**
 A clear and concise description of what you want to happen.
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+**Out of scope**
+If needed, describe what parts of a feature can be ignored for now.
+
+_Hint_: Smaller feature wishes tend to be implemented and shipped quicker!
+
+**Technical Steps** 
+(Optional) - outline steps for contributors to give implementation guidance and allow transparent technical discussions.
+
+**Workarounds & Alternatives**
+Describe, if possible, how you are solving this problem today.
 
 **Additional context**
 Add any other context or screenshots about the feature request here.
