@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
@@ -12,7 +13,7 @@ import (
 
 func TestGetConnectionDetails(t *testing.T) {
 	type args struct {
-		instance *provisioningclient.EnvironmentInstanceResponseObject
+		instance *provisioningclient.BusinessEnvironmentInstanceResponseObject
 	}
 	tests := []struct {
 		name    string
@@ -74,14 +75,14 @@ func TestGetConnectionDetails(t *testing.T) {
 	}
 }
 
-type instanceModifier func(*provisioningclient.EnvironmentInstanceResponseObject)
+type instanceModifier func(*provisioningclient.BusinessEnvironmentInstanceResponseObject)
 
 func withLabels(labels string) instanceModifier {
-	return func(r *provisioningclient.EnvironmentInstanceResponseObject) { r.Labels = &labels }
+	return func(r *provisioningclient.BusinessEnvironmentInstanceResponseObject) { r.Labels = &labels }
 }
 
-func instance(m ...instanceModifier) *provisioningclient.EnvironmentInstanceResponseObject {
-	cr := &provisioningclient.EnvironmentInstanceResponseObject{}
+func instance(m ...instanceModifier) *provisioningclient.BusinessEnvironmentInstanceResponseObject {
+	cr := &provisioningclient.BusinessEnvironmentInstanceResponseObject{}
 	for _, f := range m {
 		f(cr)
 	}

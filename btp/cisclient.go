@@ -9,11 +9,12 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
+	"golang.org/x/oauth2/clientcredentials"
+
 	"github.com/sap/crossplane-provider-btp/internal"
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	entitlementsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
-	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
@@ -396,8 +397,8 @@ func (c *Client) DeleteCloudFoundryEnvironment(ctx context.Context, instanceName
 
 func (c *Client) GetEnvironmentByNameAndType(
 	ctx context.Context, instanceName string, environmentType EnvironmentType,
-) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-	var environmentInstance *provisioningclient.EnvironmentInstanceResponseObject
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	var environmentInstance *provisioningclient.BusinessEnvironmentInstanceResponseObject
 	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
 	response, _, err := c.ProvisioningServiceClient.GetEnvironmentInstances(ctx).Authorization("").Execute()
 
@@ -494,7 +495,7 @@ func (c *Client) getCFEnvironments(ctx context.Context) ([]provisioningclient.En
 	return response.EnvironmentInstances, nil
 }
 
-func (c *Client) ExtractOrg(cfEnvironment *provisioningclient.EnvironmentInstanceResponseObject) (*CloudFoundryOrg, error) {
+func (c *Client) ExtractOrg(cfEnvironment *provisioningclient.BusinessEnvironmentInstanceResponseObject) (*CloudFoundryOrg, error) {
 	if cfEnvironment == nil {
 		return nil, nil
 	}
@@ -526,7 +527,7 @@ func specifyAPIError(err error) error {
 			return errors.New(fmt.Sprintf("API Error: %v, Code %v", provisionErr.Error.Message, provisionErr.Error.Code))
 		}
 		if genericErr.Body() != nil {
-			return fmt.Errorf("API Error: %s", string(genericErr.Body()))
+			return errors.Wrap(err, string(genericErr.Body()))
 		}
 	}
 	return err
