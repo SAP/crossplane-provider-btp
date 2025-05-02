@@ -63,6 +63,10 @@ type ServiceInstanceData struct {
 	ID           string `json:"id"`
 }
 
+type TfProxyClientCreator interface {
+	Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (TfProxyClient, error)
+}
+
 type TfProxyClient interface {
 	Observe(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error)
 	Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error
@@ -73,6 +77,8 @@ type TfProxyClient interface {
 type connector struct {
 	kube  client.Client
 	usage resource.Tracker
+
+	clientCreator TfProxyClientCreator
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -81,7 +87,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotServiceInstance)
 	}
 
-	return &external{}, nil
+	client, err := c.clientCreator.Connect(ctx, mg.(*v1alpha1.ServiceInstance))
+	if err != nil {
+		return nil, err
+	}
+
+	return &external{tfClient: client, kube: c.kube}, nil
 }
 
 type external struct {

@@ -15,7 +15,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 )
 
-var errApi = errors.New("apiError")
+var (
+	errClient  = errors.New("apiError")
+	errCreator = errors.New("creatorError")
+)
 
 func TestObserve(t *testing.T) {
 	type fields struct {
@@ -41,13 +44,13 @@ func TestObserve(t *testing.T) {
 		"LookupError": {
 			reason: "error should be returned",
 			fields: fields{
-				client: &TfProxyMock{err: errApi},
+				client: &TfProxyMock{err: errClient},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
 			},
 			want: want{
-				err: errApi,
+				err: errClient,
 				cr:  buildExpectedServiceInstance(), // No annotations, observation data, or conditions
 			},
 		},
@@ -165,13 +168,13 @@ func TestCreate(t *testing.T) {
 		"ApiError": {
 			reason: "should return an error when the API call fails",
 			fields: fields{
-				client: &TfProxyMock{err: errApi},
+				client: &TfProxyMock{err: errClient},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
 			},
 			want: want{
-				err: errApi,
+				err: errClient,
 				cr: buildExpectedServiceInstance(
 					withConditions(
 						xpv1.Creating(),
@@ -222,6 +225,80 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+func TestConnect(t *testing.T) {
+	type fields struct {
+		creator *TfProxyClientCreatorMock
+	}
+
+	type args struct {
+		mg resource.Managed
+	}
+
+	type want struct {
+		err            error
+		externalExists bool
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"ConnectError": {
+			reason: "should return an error when the creator fails",
+			fields: fields{
+				creator: &TfProxyClientCreatorMock{err: errCreator},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: errCreator,
+			},
+		},
+		"ConnectSuccess": {
+			reason: "should return a client when the creator succeeds",
+			fields: fields{
+				creator: &TfProxyClientCreatorMock{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			c := connector{
+				clientCreator: tc.fields.creator,
+			}
+
+			got, err := c.Connect(context.Background(), tc.args.mg)
+			if tc.want.externalExists && got == nil {
+				t.Errorf("expected external client, got nil")
+			}
+			expectedErrorBehaviour(t, tc.want.err, err)
+		})
+	}
+}
+
+var _ TfProxyClientCreator = &TfProxyClientCreatorMock{}
+
+type TfProxyClientCreatorMock struct {
+	err error
+}
+
+func (t *TfProxyClientCreatorMock) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (TfProxyClient, error) {
+	if t.err != nil {
+		return nil, t.err
+	}
+	return &TfProxyMock{}, nil
+}
+
 var _ TfProxyClient = &TfProxyMock{}
 
 type TfProxyMock struct {
@@ -230,17 +307,14 @@ type TfProxyMock struct {
 	err   error
 }
 
-// QueryAsyncData implements TfProxyClient.
 func (t *TfProxyMock) QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *ServiceInstanceData {
 	return t.data
 }
 
-// Create implements TfProxyClient.
 func (t *TfProxyMock) Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
 	return t.err
 }
 
-// Observe implements TfProxyClient.
 func (t *TfProxyMock) Observe(context context.Context, cr *v1alpha1.ServiceInstance) (bool, error) {
 	return t.found, t.err
 }
