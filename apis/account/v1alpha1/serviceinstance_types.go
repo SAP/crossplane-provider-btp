@@ -27,7 +27,33 @@ import (
 
 // ServiceInstanceParameters are the configurable fields of a ServiceInstance.
 type ServiceInstanceParameters struct {
-	ConfigurableField string `json:"configurableField"`
+	// Reference to a ServicePlan in account to populate serviceplanId.
+	// +kubebuilder:validation:Optional
+	ServicePlanRef *xpv1.Reference `json:"servicePlanRef,omitempty" tf:"-"`
+
+	// Selector for a ServicePlan in account to populate serviceplanId.
+	// +kubebuilder:validation:Optional
+	ServicePlanSelector *xpv1.Selector `json:"servicePlanSelector,omitempty" tf:"-"`
+
+	// (String) The ID of the service plan.
+	// The ID of the service plan.
+	ServiceplanID *string `json:"serviceplanId,omitempty" tf:"serviceplan_id,omitempty"`
+
+	// (String) The ID of the subaccount.
+	// The ID of the subaccount.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()
+	// +crossplane:generate:reference:refFieldName=SubaccountRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
+	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
+
+	// Reference to a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountRef *xpv1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+
+	// Selector for a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountSelector *xpv1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
 }
 
 // ServiceInstanceObservation are the observable fields of a ServiceInstance.

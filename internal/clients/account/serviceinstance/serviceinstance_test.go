@@ -15,7 +15,7 @@ var tfError = errors.New("tf error")
 func TestObserve(t *testing.T) {
 
 	type fields struct {
-		tfClient managed.ExternalClient
+		tfClient *TfControllerMock
 	}
 
 	type args struct {
@@ -29,14 +29,12 @@ func TestObserve(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		reason string
 		args   args
 		fields fields
 		want   want
 	}{
 		{
-			name:   "TfError",
-			reason: "tf error should be returned from client",
+			name: "TfError",
 			args: args{
 				cr: &v1alpha1.ServiceInstance{},
 			},
@@ -51,8 +49,7 @@ func TestObserve(t *testing.T) {
 			},
 		},
 		{
-			name:   "ResourceExists",
-			reason: "resourceExists should be returned as true when tfClient returns an observation with ResourceExists set to true",
+			name: "ResourceExists",
 			args: args{
 				cr: &v1alpha1.ServiceInstance{},
 			},
@@ -75,12 +72,18 @@ func TestObserve(t *testing.T) {
 			client := &ServiceInstanceClient{tfClient: tc.fields.tfClient}
 			exists, err := client.Observe(context.Background(), tc.args.cr)
 			if err != tc.want.err {
-				t.Fatalf("\n%s\n, ServiceInstanceClient.Observe() error = %v, want %v", tc.reason, err, tc.want.err)
+				t.Errorf("ServiceInstanceClient.Observe() error = %v, want %v", err, tc.want.err)
 
 			}
 			if exists != tc.want.exists {
-				t.Fatalf("\n%s\n, ServiceInstanceClient.Observe() exists = %v, want %v", tc.reason, exists, tc.want.exists)
+				t.Errorf("ServiceInstanceClient.Observe() exists = %v, want %v", exists, tc.want.exists)
 			}
+
+			//verify CalledWithMg is of type SubaccountServiceInstance
+			if _, ok := tc.fields.tfClient.CalledWithMg.(*v1alpha1.SubaccountServiceInstance); !ok {
+				t.Errorf("ServiceInstanceClient.Observe() called with wrong type %T, want %T", tc.fields.tfClient.CalledWithMg, &v1alpha1.ServiceInstance{})
+			}
+
 		})
 	}
 
@@ -91,6 +94,9 @@ var _ managed.ExternalClient = &TfControllerMock{}
 type TfControllerMock struct {
 	err         error
 	observation managed.ExternalObservation
+
+	// CalledWithMg is used to check if the correct resource was passed to the methods
+	CalledWithMg resource.Managed
 }
 
 // Create implements managed.ExternalClient.
@@ -105,6 +111,7 @@ func (t *TfControllerMock) Delete(ctx context.Context, mg resource.Managed) erro
 
 // Observe implements managed.ExternalClient.
 func (t *TfControllerMock) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
+	t.CalledWithMg = mg
 	return t.observation, t.err
 }
 
