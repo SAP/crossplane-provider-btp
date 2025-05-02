@@ -1,4 +1,4 @@
-package subaccount_trust_configuration
+package subaccount_service_instance
 
 import (
 	"context"
@@ -11,9 +11,6 @@ func Configure(p *config.Provider) {
 	p.AddResourceConfigurator("btp_subaccount_service_instance", func(r *config.Resource) {
 		r.ShortGroup = "account"
 		r.Kind = "SubaccountServiceInstance"
-		// we only use this resource internally to set the client_credentials grant type, so there is no harm in avoiding usage of secrets here
-		// it makes the setup a lot easier
-		r.TerraformResource.Schema["parameters"].Sensitive = false
 
 		r.ExternalName.OmittedFields = []string{"timeouts"}
 		r.ExternalName.GetIDFn = func(_ context.Context, externalName string, _ map[string]any, _ map[string]any) (string, error) {
@@ -24,7 +21,21 @@ func Configure(p *config.Provider) {
 			}
 			return externalName, nil
 		}
-		// this prevents a callback to the manager, which makes integration of controller calls from within another controller easier
-		r.UseAsync = false
+		r.UseAsync = true
+
+		r.References["subaccount_id"] = config.Reference{
+			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
+			Extractor:         "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()",
+			RefFieldName:      "SubaccountRef",
+			SelectorFieldName: "SubaccountSelector",
+		}
+
+		//r.References["serviceplan_id"] = config.Reference{
+		//	Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServicePlan",
+		//	Extractor:         "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServicePlanId()",
+		//	RefFieldName:      "ServicePlanRef",
+		//	SelectorFieldName: "ServicePlanSelector",
+		//}
+
 	})
 }
