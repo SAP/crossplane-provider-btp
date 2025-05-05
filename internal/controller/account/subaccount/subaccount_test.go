@@ -890,13 +890,13 @@ func TestConnect(t *testing.T) {
 					return tc.args.serviceFnReturn, tc.args.serviceFnErr
 				},
 			}
-			connect, err := ctrl.Connect(context.Background(), tc.args.cr)
+			client, err := ctrl.Connect(context.Background(), tc.args.cr)
 
 			if contained := testutils.ContainsError(err, tc.want.err); !contained {
 				t.Errorf("\ne.Connect(...): error \"%v\" not part of \"%v\"", err, tc.want.err)
 			}
 			if tc.want.err == nil {
-				if connect == nil {
+				if client == nil {
 					t.Errorf("Expected connector to be != nil")
 				}
 			}
