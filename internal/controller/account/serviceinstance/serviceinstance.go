@@ -18,6 +18,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
+	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/features"
 )
 
@@ -45,7 +47,14 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		resource.ManagedKind(v1alpha1.ServiceInstanceGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
 			kube:  mgr.GetClient(),
-			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{})}),
+			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
+
+			newClientCreatorFn: func() siClient.TfProxyClientCreator {
+				return siClient.NewServiceInstanceClientCreator(
+					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", v1alpha1.SubaccountServiceInstance_GroupVersionKind),
+				)
+			},
+		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 		managed.WithConnectionPublishers(cps...))
@@ -58,27 +67,11 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
-type ServiceInstanceData struct {
-	ExternalName string `json:"externalName"`
-	ID           string `json:"id"`
-}
-
-type TfProxyClientCreator interface {
-	Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (TfProxyClient, error)
-}
-
-type TfProxyClient interface {
-	Observe(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error)
-	Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error
-	// QueryUpdatedData returns the relevant status data once the async creation is done
-	QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *ServiceInstanceData
-}
-
 type connector struct {
 	kube  client.Client
 	usage resource.Tracker
 
-	clientCreator TfProxyClientCreator
+	newClientCreatorFn func() siClient.TfProxyClientCreator
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -87,7 +80,11 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotServiceInstance)
 	}
 
-	client, err := c.clientCreator.Connect(ctx, mg.(*v1alpha1.ServiceInstance))
+	// when working with tf proxy resources we want to keep the Connect() logic as part of the delgating Connect calls of the native resources to
+	// deal with errors in the part of process that they belong to
+	clientCreator := c.newClientCreatorFn()
+
+	client, err := clientCreator.Connect(ctx, mg.(*v1alpha1.ServiceInstance))
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +93,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 }
 
 type external struct {
-	tfClient TfProxyClient
+	tfClient siClient.TfProxyClient
 	kube     client.Client
 }
 
@@ -163,7 +160,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	return nil
 }
 
-func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceInstance, sid ServiceInstanceData) error {
+func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceInstance, sid siClient.ServiceInstanceData) error {
 	if meta.GetExternalName(cr) != sid.ExternalName {
 		meta.SetExternalName(cr, sid.ExternalName)
 		// manually saving external-name, since crossplane reconciler won't update spec and status in one loop

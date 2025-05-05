@@ -8,6 +8,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -93,7 +94,7 @@ func TestObserve(t *testing.T) {
 			fields: fields{
 				client: &TfProxyMock{
 					found: true,
-					data: &ServiceInstanceData{
+					data: &siClient.ServiceInstanceData{
 						ExternalName: "some-ext-name",
 						ID:           "some-id",
 					},
@@ -274,7 +275,7 @@ func TestConnect(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			c := connector{
-				clientCreator: tc.fields.creator,
+				newClientCreatorFn: func() siClient.TfProxyClientCreator { return tc.fields.creator },
 			}
 
 			got, err := c.Connect(context.Background(), tc.args.mg)
@@ -286,28 +287,28 @@ func TestConnect(t *testing.T) {
 	}
 }
 
-var _ TfProxyClientCreator = &TfProxyClientCreatorMock{}
+var _ siClient.TfProxyClientCreator = &TfProxyClientCreatorMock{}
 
 type TfProxyClientCreatorMock struct {
 	err error
 }
 
-func (t *TfProxyClientCreatorMock) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (TfProxyClient, error) {
+func (t *TfProxyClientCreatorMock) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (siClient.TfProxyClient, error) {
 	if t.err != nil {
 		return nil, t.err
 	}
 	return &TfProxyMock{}, nil
 }
 
-var _ TfProxyClient = &TfProxyMock{}
+var _ siClient.TfProxyClient = &TfProxyMock{}
 
 type TfProxyMock struct {
 	found bool
-	data  *ServiceInstanceData
+	data  *siClient.ServiceInstanceData
 	err   error
 }
 
-func (t *TfProxyMock) QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *ServiceInstanceData {
+func (t *TfProxyMock) QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *siClient.ServiceInstanceData {
 	return t.data
 }
 

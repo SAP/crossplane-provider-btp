@@ -9,17 +9,38 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
 )
 
-var _ serviceinstance.TfProxyClientCreator = &ServiceInstanceClientCreator{}
+type TfProxyClientCreator interface {
+	Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (TfProxyClient, error)
+}
+
+type TfProxyClient interface {
+	Observe(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error)
+	Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error
+	// QueryUpdatedData returns the relevant status data once the async creation is done
+	QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *ServiceInstanceData
+}
+
+type ServiceInstanceData struct {
+	ExternalName string `json:"externalName"`
+	ID           string `json:"id"`
+}
+
+var _ TfProxyClientCreator = &ServiceInstanceClientCreator{}
 
 type ServiceInstanceClientCreator struct {
 	connector managed.ExternalConnecter
 }
 
-// Connect implements serviceinstance.TfProxyClientCreator.
-func (s *ServiceInstanceClientCreator) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (serviceinstance.TfProxyClient, error) {
+func NewServiceInstanceClientCreator(connector managed.ExternalConnecter) *ServiceInstanceClientCreator {
+	return &ServiceInstanceClientCreator{
+		connector: connector,
+	}
+}
+
+// Connect implements TfProxyClientCreator.
+func (s *ServiceInstanceClientCreator) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (TfProxyClient, error) {
 	ssi := tfServiceInstanceCr(cr)
 	ctrl, err := s.connector.Connect(ctx, ssi)
 	if err != nil {
@@ -31,7 +52,7 @@ func (s *ServiceInstanceClientCreator) Connect(ctx context.Context, cr *v1alpha1
 	}, nil
 }
 
-var _ serviceinstance.TfProxyClient = &ServiceInstanceClient{}
+var _ TfProxyClient = &ServiceInstanceClient{}
 
 // ServiceInstanceClient is an implementation that provides lifecycle management for service instances
 // by interacting with the terraform based resource SubaccountServiceInstance
@@ -40,12 +61,12 @@ type ServiceInstanceClient struct {
 	tfClient managed.ExternalClient
 }
 
-// Create implements serviceinstance.TfProxyClient.
+// Create implements TfProxyClient
 func (s *ServiceInstanceClient) Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
 	panic("unimplemented")
 }
 
-// Observe implements serviceinstance.TfProxyClient.
+// Observe implements TfProxyClient
 func (s *ServiceInstanceClient) Observe(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error) {
 	ssi := tfServiceInstanceCr(cr)
 	obs, err := s.tfClient.Observe(ctx, ssi)
@@ -55,8 +76,8 @@ func (s *ServiceInstanceClient) Observe(ctx context.Context, cr *v1alpha1.Servic
 	return obs.ResourceExists, nil
 }
 
-// QueryAsyncData implements serviceinstance.TfProxyClient.
-func (s *ServiceInstanceClient) QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *serviceinstance.ServiceInstanceData {
+// QueryAsyncData implements TfProxyClient
+func (s *ServiceInstanceClient) QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *ServiceInstanceData {
 	panic("unimplemented")
 }
 
