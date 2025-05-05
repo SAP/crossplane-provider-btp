@@ -10,7 +10,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
 
-var tfError = errors.New("tf error")
+var errTf = errors.New("tf error")
 
 func TestConnect(t *testing.T) {
 	type args struct {
@@ -36,12 +36,12 @@ func TestConnect(t *testing.T) {
 			},
 			fields: fields{
 				connector: &TfConnectorMock{
-					err: tfError,
+					err: errTf,
 				},
 			},
 			want: want{
 				clientReturned: false,
-				err:            tfError,
+				err:            errTf,
 			},
 		},
 		{
@@ -126,12 +126,12 @@ func TestObserve(t *testing.T) {
 			},
 			fields: fields{
 				tfClient: &TfControllerMock{
-					err: tfError,
+					err: errTf,
 				},
 			},
 			want: want{
 				exists: false,
-				err:    tfError,
+				err:    errTf,
 			},
 		},
 		{
