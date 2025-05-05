@@ -12,9 +12,26 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
 )
 
-var _ TfProxyClient = &ServiceInstanceClient{}
+var _ serviceinstance.TfProxyClientCreator = &ServiceInstanceClientCreator{}
 
-type TfProxyClient = serviceinstance.TfProxyClient
+type ServiceInstanceClientCreator struct {
+	connector managed.ExternalConnecter
+}
+
+// Connect implements serviceinstance.TfProxyClientCreator.
+func (s *ServiceInstanceClientCreator) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (serviceinstance.TfProxyClient, error) {
+	ssi := tfServiceInstanceCr(cr)
+	ctrl, err := s.connector.Connect(ctx, ssi)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ServiceInstanceClient{
+		tfClient: ctrl,
+	}, nil
+}
+
+var _ serviceinstance.TfProxyClient = &ServiceInstanceClient{}
 
 // ServiceInstanceClient is an implementation that provides lifecycle management for service instances
 // by interacting with the terraform based resource SubaccountServiceInstance

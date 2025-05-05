@@ -12,6 +12,68 @@ import (
 
 var tfError = errors.New("tf error")
 
+func TestConnect(t *testing.T) {
+	type args struct {
+		cr *v1alpha1.ServiceInstance
+	}
+	type fields struct {
+		connector managed.ExternalConnecter
+	}
+	type want struct {
+		client *ServiceInstanceClient
+		err    error
+	}
+	tests := []struct {
+		name   string
+		args   args
+		fields fields
+		want   want
+	}{
+		{
+			name: "ConnectError",
+			args: args{
+				cr: &v1alpha1.ServiceInstance{},
+			},
+			fields: fields{
+				connector: &TfConnectorMock{
+					err: tfError,
+				},
+			},
+			want: want{
+				client: nil,
+				err:    tfError,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			clientCreator := &ServiceInstanceClientCreator{
+				connector: tc.fields.connector,
+			}
+			_, err := clientCreator.Connect(context.Background(), tc.args.cr)
+			if err != nil && err.Error() != tc.want.err.Error() {
+				t.Errorf("ServiceInstanceClientCreator.Connect() error = %v, want %v", err, tc.want.err)
+			}
+
+		})
+	}
+}
+
+var _ managed.ExternalConnecter = &TfConnectorMock{}
+
+// ClientCreator mock
+type TfConnectorMock struct {
+	err error
+}
+
+// Connect implements managed.ExternalConnecter.
+func (t *TfConnectorMock) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
+	if t.err != nil {
+		return nil, t.err
+	}
+	return &TfControllerMock{}, nil
+}
+
 func TestObserve(t *testing.T) {
 
 	type fields struct {
