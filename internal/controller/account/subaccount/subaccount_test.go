@@ -881,7 +881,7 @@ func TestConnect(t *testing.T) {
 				usage:           trackingtest.NoOpReferenceResolverTracker{},
 				resourcetracker: trackingtest.NoOpReferenceResolverTracker{},
 				newServiceFn: func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error) {
-					if tc.want.newServiceArgs.cisCreds != nil && string(tc.want.newServiceArgs.cisCreds) != string(serviceAccountSecretData) {
+					if tc.want.newServiceArgs.cisCreds != nil && string(tc.want.newServiceArgs.cisCreds) != string(cisSecretData) {
 						t.Errorf("Passed CIS Creds to newServiceFN do not match; Passed: %v, Expected: %v", cisSecretData, tc.want.newServiceArgs.cisCreds)
 					}
 					if tc.want.newServiceArgs.saCreds != nil && string(tc.want.newServiceArgs.saCreds) != string(serviceAccountSecretData) {
