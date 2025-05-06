@@ -764,16 +764,9 @@ func TestConnect(t *testing.T) {
 		},
 		"NoCISCredentials": {
 			args: args{
-				cr: &v1alpha1.Subaccount{
-					Spec: v1alpha1.SubaccountSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
-								Name: "pc-reference",
-							}},
-					},
-				},
+				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
 				kubeObjects: []client.Object{
-					testutils.NewProviderConfig("pc-reference", "cis-provider-secret", "sa-provider-secret"),
+					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
 				},
 			},
 			want: want{
@@ -782,16 +775,9 @@ func TestConnect(t *testing.T) {
 		},
 		"NoSACredentials": {
 			args: args{
-				cr: &v1alpha1.Subaccount{
-					Spec: v1alpha1.SubaccountSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
-								Name: "pc-reference",
-							}},
-					},
-				},
+				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
 				kubeObjects: []client.Object{
-					testutils.NewProviderConfig("pc-reference", "cis-provider-secret", "sa-provider-secret"),
+					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
 					testutils.NewSecret("cis-provider-secret", nil),
 				},
 			},
@@ -801,16 +787,9 @@ func TestConnect(t *testing.T) {
 		},
 		"EmptyCISSecret": {
 			args: args{
-				cr: &v1alpha1.Subaccount{
-					Spec: v1alpha1.SubaccountSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
-								Name: "pc-reference",
-							}},
-					},
-				},
+				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
 				kubeObjects: []client.Object{
-					testutils.NewProviderConfig("pc-reference", "cis-provider-secret", "sa-provider-secret"),
+					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
 					testutils.NewSecret("cis-provider-secret", nil),
 					testutils.NewSecret("sa-provider-secret", nil),
 				},
@@ -821,16 +800,9 @@ func TestConnect(t *testing.T) {
 		},
 		"NewServiceFnError": {
 			args: args{
-				cr: &v1alpha1.Subaccount{
-					Spec: v1alpha1.SubaccountSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
-								Name: "pc-reference",
-							}},
-					},
-				},
+				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
 				kubeObjects: []client.Object{
-					testutils.NewProviderConfig("pc-reference", "cis-provider-secret", "sa-provider-secret"),
+					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
 					testutils.NewSecret("cis-provider-secret", map[string][]byte{"data": []byte("someCISCreds")}),
 					testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte("someSACreds")}),
 				},
@@ -847,16 +819,9 @@ func TestConnect(t *testing.T) {
 		},
 		"ConnectSuccess": {
 			args: args{
-				cr: &v1alpha1.Subaccount{
-					Spec: v1alpha1.SubaccountSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
-								Name: "pc-reference",
-							}},
-					},
-				},
+				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
 				kubeObjects: []client.Object{
-					testutils.NewProviderConfig("pc-reference", "cis-provider-secret", "sa-provider-secret"),
+					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
 					testutils.NewSecret("cis-provider-secret", map[string][]byte{"data": []byte("someCISCreds")}),
 					testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte("someSACreds")}),
 				},
