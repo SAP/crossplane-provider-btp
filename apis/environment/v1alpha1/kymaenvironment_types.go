@@ -76,10 +76,12 @@ type KymaEnvironmentSpec struct {
 type KymaEnvironmentStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
 	AtProvider          KymaEnvironmentObservation `json:"atProvider,omitempty"`
-	// Added a new field to track retry information in the status
-	// This will replace the annotations used for retry tracking
-
-	// RetryStatus represents the retry tracking information
+	// RetryStatus holds information about the circuit breaker
+	// In some cases, the update of the environment fails and the circuit breaker is triggered.
+	// This field contains the last detected difference and the number of retries.
+	// The circuit breaker is triggered if the number of retries exceeds the maxRetries.
+	// The maxRetries can be set in the annotation "environment.btp.sap.crossplane.io/max-retries".
+	// To disable the circuit breaker, set the annotation "environment.btp.sap.crossplane.io/ignore-circuit-breaker" to any value.
 	// +kubebuilder:validation:Optional
 	RetryStatus *RetryStatus `json:"updateRetryStatus,omitempty"`
 }
