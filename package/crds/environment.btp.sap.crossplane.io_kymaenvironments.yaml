@@ -577,6 +577,27 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              updateRetryStatus:
+                description: RetryStatus represents the retry tracking information
+                properties:
+                  circuitBreaker:
+                    description: CircuitBreaker indicates if the circuit breaker is
+                      triggered
+                    type: boolean
+                  count:
+                    description: Count represents the number of retries for the same
+                      diff
+                    type: integer
+                  currentHash:
+                    type: string
+                  desiredHash:
+                    description: Added fields to track the hash of desired and current
+                      parameters
+                    type: string
+                  diff:
+                    description: Diff represents the last detected difference
+                    type: string
+                type: object
             type: object
         required:
         - spec
