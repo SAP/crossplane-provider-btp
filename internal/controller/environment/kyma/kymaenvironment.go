@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -41,6 +40,8 @@ const (
 	errParameterParsing     = ".Spec.ForProvider.Parameters seem to be corrupted"
 	errServiceParsing       = "Parameters from service response seem to be corrupted"
 	errCantDescribe         = "Could not describe kyma instance"
+	errCircutBreak          = "circuit breaker is on; check retry status, update parameters or set annotation " + v1alpha1.IgnoreCircuitBreaker + " to any value"
+	maxRetriesDefault       = 3
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -99,19 +100,18 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	needsUpdate, diff, err := c.needsUpdateWithDiff(cr)
 	if needsUpdate || err != nil {
-		if cr.Status.RetryStatus != nil && cr.Status.RetryStatus.CircuitBreaker {
-			return managed.ExternalObservation{
-				ResourceExists:   true,
-				ResourceUpToDate: false,
-			}, nil
-		}
+
 		errstatus := c.kube.Status().Update(ctx, cr)
 		if errstatus != nil {
 			c.log.Error(err, "failed to update status")
 		}
+		upToDate := !needsUpdate
+		if cr.Status.RetryStatus != nil && cr.Status.RetryStatus.CircuitBreaker {
+			upToDate = false
+		}
 		return managed.ExternalObservation{
 			ResourceExists:   true,
-			ResourceUpToDate: !needsUpdate,
+			ResourceUpToDate: upToDate,
 			Diff:             diff,
 		}, errors.Wrap(err, errCheckUpdate)
 	}
@@ -165,7 +165,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotKymaEnvironment)
 	}
 	if cr.Status.RetryStatus != nil && cr.Status.RetryStatus.CircuitBreaker && !metav1.HasAnnotation(cr.ObjectMeta, v1alpha1.IgnoreCircuitBreaker) {
-		return managed.ExternalUpdate{}, errors.New(fmt.Sprintf("circuit breaker is on; check retry status, update parameters or set annotation %s to any value", v1alpha1.IgnoreCircuitBreaker))
+		return managed.ExternalUpdate{}, errors.New(errCircutBreak)
 	}
 
 	err := c.client.UpdateInstance(ctx, *cr)
@@ -218,30 +218,36 @@ func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, stri
 		return false, "", errors.Wrap(err, errServiceParsing)
 	}
 
-	maxRetries := 3
-	if metav1.HasAnnotation(cr.ObjectMeta, v1alpha1.AnnotationMaxRetries) {
-		maxRetries, err = strconv.Atoi(cr.GetAnnotations()[v1alpha1.AnnotationMaxRetries])
-		if err != nil {
-			return false, "", errors.Wrap(err, "could not parse max retries annotation")
-		}
+	maxRetries, err := lookupMaxRetries(cr, maxRetriesDefault)
+	if err != nil {
+		return false, "", err
 	}
 
-	desiredHash := hashParameters(desired)
-	currentHash := hashParameters(current)
+	diff := cmp.Diff(desired, current)
 
+	updateCircuitBreakerStatus(cr, desired, current, diff, maxRetries)
+
+	return diff != "", diff, nil
+
+}
+
+func lookupMaxRetries(cr *v1alpha1.KymaEnvironment, defaultRetries int) (int, error) {
+	if metav1.HasAnnotation(cr.ObjectMeta, v1alpha1.AnnotationMaxRetries) {
+		maxRetries, err := strconv.Atoi(cr.GetAnnotations()[v1alpha1.AnnotationMaxRetries])
+		return maxRetries, errors.Wrap(err, "could not parse max retries annotation")
+	}
+	return defaultRetries, nil
+}
+
+func updateCircuitBreakerStatus(cr *v1alpha1.KymaEnvironment, desired any, current any, diff string, maxRetries int) {
+	desiredHash := hash(desired)
+	currentHash := hash(current)
 	if cr.Status.RetryStatus == nil {
-		cr.Status.RetryStatus = &v1alpha1.RetryStatus{
-			DesiredHash:    desiredHash,
-			CurrentHash:    currentHash,
-			Count:          1,
-			CircuitBreaker: false,
-		}
-	} else if cr.Status.RetryStatus.DesiredHash == desiredHash && cr.Status.RetryStatus.CurrentHash == currentHash {
+		cr.Status.RetryStatus = &v1alpha1.RetryStatus{}
+	}
+	if hashesArePersistent(cr, desiredHash, currentHash) {
 		cr.Status.RetryStatus.Count++
-		if cr.Status.RetryStatus.Count >= maxRetries {
-			cr.Status.RetryStatus.CircuitBreaker = true
-			cr.Status.RetryStatus.Count = maxRetries
-		}
+		cr.Status.RetryStatus.CircuitBreaker = circuitBroken(cr, maxRetries)
 	} else {
 		// Reset retry status if hashes change
 		cr.Status.RetryStatus.DesiredHash = desiredHash
@@ -249,15 +255,21 @@ func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, stri
 		cr.Status.RetryStatus.Count = 1
 		cr.Status.RetryStatus.CircuitBreaker = false
 	}
-
-	diff := cmp.Diff(desired, current)
-	if diff != "" {
-		return true, diff, nil
+	if cr.Status.RetryStatus.CircuitBreaker {
+		cr.Status.RetryStatus.Count = maxRetries
 	}
-	return false, "", nil
+	cr.Status.RetryStatus.Diff = diff
 }
 
-func hashParameters(params map[string]interface{}) string {
+func circuitBroken(cr *v1alpha1.KymaEnvironment, maxRetries int) bool {
+	return cr.Status.RetryStatus.Count >= maxRetries
+}
+
+func hashesArePersistent(cr *v1alpha1.KymaEnvironment, desiredHash string, currentHash string) bool {
+	return cr.Status.RetryStatus.DesiredHash == desiredHash && cr.Status.RetryStatus.CurrentHash == currentHash
+}
+
+func hash(params any) string {
 	h := sha256.New()
 	if err := json.NewEncoder(h).Encode(params); err != nil {
 		return ""
