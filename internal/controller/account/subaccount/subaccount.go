@@ -196,9 +196,6 @@ func needsUpdate(desired apisv1alpha1.SubaccountSpec, actual apisv1alpha1.Subacc
 	if !reflect.DeepEqual(&cleanedDesired.DisplayName, cleanedActual.DisplayName) {
 		return true
 	}
-	if !reflect.DeepEqual(&cleanedDesired.Region, cleanedActual.Region) {
-		return true
-	}
 	if !reflect.DeepEqual(&cleanedDesired.UsedForProduction, cleanedActual.UsedForProduction) {
 		return true
 	}
