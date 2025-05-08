@@ -39,8 +39,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 			newClientInitalizerFn: func() cmClient.ITfClientInitializer {
 				return cmClient.NewTfClient(
-					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind),
-					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind),
+					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false),
+					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false),
 				)
 			},
 		}

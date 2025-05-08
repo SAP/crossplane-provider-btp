@@ -51,7 +51,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 			newClientCreatorFn: func() siClient.TfProxyClientCreator {
 				return siClient.NewServiceInstanceClientCreator(
-					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", v1alpha1.SubaccountServiceInstance_GroupVersionKind),
+					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", v1alpha1.SubaccountServiceInstance_GroupVersionKind, true),
 				)
 			},
 		}),
