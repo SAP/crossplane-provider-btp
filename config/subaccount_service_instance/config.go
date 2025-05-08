@@ -21,7 +21,12 @@ func Configure(p *config.Provider) {
 			}
 			return externalName, nil
 		}
+		// note: can be overwritten during initialization
 		r.UseAsync = true
+
+		// we only use this resource internally to set the client_credentials grant type, so there is no harm in avoiding usage of secrets here
+		// it makes the setup a lot easier
+		r.TerraformResource.Schema["parameters"].Sensitive = false
 
 		r.References["subaccount_id"] = config.Reference{
 			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
