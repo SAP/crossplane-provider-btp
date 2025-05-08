@@ -10,7 +10,6 @@ spec:
       administrators:
         - dl_673efb6870d04101363fc6b3@global.corp.sap
       region: "eu-west-2"
-      additionalWorkerNodePools: []
   subaccountRef:
     name: kyma-test-subaccount
   cloudManagementRef:
