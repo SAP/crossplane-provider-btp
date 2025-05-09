@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	KubeConfigSecretKey = "kubeconfig"
-	KubeConfigLabelKey  = "KubeconfigURL"
+	KubeConfigSecretKey  = "kubeconfig"
+	KubeConfigLabelKey   = "KubeconfigURL"
+	AnnotationMaxRetries = Group + "/max-retries"
+	IgnoreCircuitBreaker = Group + "/ignore-circuit-breaker"
 )
 
 // KymaEnvironmentParameters are the configurable fields of a KymaEnvironment.
@@ -74,6 +76,28 @@ type KymaEnvironmentSpec struct {
 type KymaEnvironmentStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
 	AtProvider          KymaEnvironmentObservation `json:"atProvider,omitempty"`
+	// RetryStatus holds information about the circuit breaker
+	// In some cases, the update of the environment fails and the circuit breaker is triggered.
+	// This field contains the last detected difference and the number of retries.
+	// The circuit breaker is triggered if the number of retries exceeds the maxRetries.
+	// The maxRetries can be set in the annotation "environment.btp.sap.crossplane.io/max-retries".
+	// To disable the circuit breaker, set the annotation "environment.btp.sap.crossplane.io/ignore-circuit-breaker" to any value.
+	// +kubebuilder:validation:Optional
+	RetryStatus *RetryStatus `json:"updateRetryStatus,omitempty"`
+}
+
+// RetryStatus contains information about retries
+// +kubebuilder:validation:Optional
+type RetryStatus struct {
+	// Diff represents the last detected difference
+	Diff string `json:"diff,omitempty"`
+	// Count represents the number of retries for the same diff
+	Count int `json:"count,omitempty"`
+	// CircuitBreaker indicates if the circuit breaker is triggered
+	CircuitBreaker bool `json:"circuitBreaker,omitempty"`
+	// Added fields to track the hash of desired and current parameters
+	DesiredHash string `json:"desiredHash,omitempty"`
+	CurrentHash string `json:"currentHash,omitempty"`
 }
 
 // +kubebuilder:object:root=true

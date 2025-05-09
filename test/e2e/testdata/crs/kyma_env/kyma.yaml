@@ -7,10 +7,9 @@ spec:
   forProvider:
     planName: aws
     parameters:
-      {
-        "administrators": ["dl_673efb6870d04101363fc6b3@global.corp.sap"],
-        "region": "eu-west-2"
-      }
+      administrators:
+        - dl_673efb6870d04101363fc6b3@global.corp.sap
+      region: "eu-west-2"
   subaccountRef:
     name: kyma-test-subaccount
   cloudManagementRef:
