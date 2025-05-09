@@ -245,6 +245,9 @@ func updateCircuitBreakerStatus(cr *v1alpha1.KymaEnvironment, desired any, curre
 	if cr.Status.RetryStatus == nil {
 		cr.Status.RetryStatus = &v1alpha1.RetryStatus{}
 	}
+	if diff == "" {
+		return
+	}
 	if hashesArePersistent(cr, desiredHash, currentHash) {
 		cr.Status.RetryStatus.Count++
 		cr.Status.RetryStatus.CircuitBreaker = circuitBroken(cr, maxRetries)
