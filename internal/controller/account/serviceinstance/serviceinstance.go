@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	tjcontroller "github.com/crossplane/upjet/pkg/controller"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
@@ -29,10 +32,22 @@ const (
 	errGetPC              = "cannot get ProviderConfig"
 	errGetCreds           = "cannot get credentials"
 
-	errGetInstance    = "cannot observe serviceinstnace"
-	errCreateInstance = "cannot create serviceinstnace"
-	errSaveData       = "cannot update cr data"
+	errObserveInstance = "cannot observe serviceinstnace"
+	errCreateInstance  = "cannot create serviceinstnace"
+	errSaveData        = "cannot update cr data"
+	errGetInstance     = "cannot get serviceinstnace"
 )
+
+var clientCreatorFn = func(kube client.Client) siClient.TfProxyClientCreator {
+	return siClient.NewServiceInstanceClientCreator(
+		// client defines what resource he needs a connector for, but here in DI we define how to create such tf connector
+		func(resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) *tjcontroller.Connector {
+
+			return tfclient.NewInternalTfConnector(kube, resourceName, gvk, useAsync, callbackProvider)
+		},
+		saveCallback,
+	)
+}
 
 // Setup adds a controller that reconciles ServiceInstance managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
@@ -49,11 +64,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			kube:  mgr.GetClient(),
 			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
 
-			newClientCreatorFn: func() siClient.TfProxyClientCreator {
-				return siClient.NewServiceInstanceClientCreator(
-					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", v1alpha1.SubaccountServiceInstance_GroupVersionKind, true),
-				)
-			},
+			newClientCreatorFn: clientCreatorFn,
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -67,11 +78,28 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
+// SaveConditionsFn Callback for persisting conditions in the CR
+var saveCallback siClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error {
+
+	si := &v1alpha1.ServiceInstance{}
+
+	nn := types.NamespacedName{Name: name}
+	if kErr := kube.Get(ctx, nn, si); kErr != nil {
+		return errors.Wrap(kErr, errGetInstance)
+	}
+
+	si.SetConditions(conditions...)
+
+	uErr := kube.Status().Update(ctx, si)
+
+	return errors.Wrap(uErr, errSaveData)
+}
+
 type connector struct {
 	kube  client.Client
 	usage resource.Tracker
 
-	newClientCreatorFn func() siClient.TfProxyClientCreator
+	newClientCreatorFn func(kube client.Client) siClient.TfProxyClientCreator
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -82,7 +110,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	// when working with tf proxy resources we want to keep the Connect() logic as part of the delgating Connect calls of the native resources to
 	// deal with errors in the part of process that they belong to
-	clientCreator := c.newClientCreatorFn()
+	clientCreator := c.newClientCreatorFn(c.kube)
 
 	client, err := clientCreator.Connect(ctx, mg.(*v1alpha1.ServiceInstance))
 	if err != nil {

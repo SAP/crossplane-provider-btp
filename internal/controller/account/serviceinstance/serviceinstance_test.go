@@ -10,14 +10,17 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
+	ujresource "github.com/crossplane/upjet/pkg/resource"
 )
 
 var (
 	errClient  = errors.New("apiError")
+	errKube    = errors.New("kubeError")
 	errCreator = errors.New("creatorError")
 )
 
@@ -275,13 +278,76 @@ func TestConnect(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			c := connector{
-				newClientCreatorFn: func() siClient.TfProxyClientCreator { return tc.fields.creator },
+				newClientCreatorFn: func(_ client.Client) siClient.TfProxyClientCreator { return tc.fields.creator },
 			}
 
 			got, err := c.Connect(context.Background(), tc.args.mg)
 			if tc.want.externalExists && got == nil {
 				t.Errorf("expected external client, got nil")
 			}
+			expectedErrorBehaviour(t, tc.want.err, err)
+		})
+	}
+}
+func TestSaveCallback(t *testing.T) {
+	type args struct {
+		kube       client.Client
+		name       string
+		conditions []xpv1.Condition
+	}
+
+	type want struct {
+		err error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"GetError": {
+			reason: "should return an error if the ServiceInstance cannot be retrieved",
+			args: args{
+				kube: &test.MockClient{MockGet: test.NewMockGetFn(errKube)},
+				name: "test-instance",
+			},
+			want: want{
+				err: errKube,
+			},
+		},
+		"UpdateError": {
+			reason: "should return an error if the ServiceInstance status cannot be updated",
+			args: args{
+				kube: &test.MockClient{
+					MockGet:          test.NewMockGetFn(nil),
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(errKube),
+				},
+				name:       "test-instance",
+				conditions: []xpv1.Condition{ujresource.AsyncOperationFinishedCondition()},
+			},
+			want: want{
+				err: errKube,
+			},
+		},
+		"Success": {
+			reason: "should successfully save conditions to the ServiceInstance",
+			args: args{
+				kube: &test.MockClient{
+					MockGet:          test.NewMockGetFn(nil),
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				name:       "test-instance",
+				conditions: []xpv1.Condition{ujresource.AsyncOperationFinishedCondition()},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := saveCallback(context.Background(), tc.args.kube, tc.args.name, tc.args.conditions...)
 			expectedErrorBehaviour(t, tc.want.err, err)
 		})
 	}

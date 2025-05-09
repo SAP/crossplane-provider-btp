@@ -4,12 +4,19 @@ import (
 	"context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	tjcontroller "github.com/crossplane/upjet/pkg/controller"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+type CreateTfConnectorFn func(resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) *tjcontroller.Connector
+
+type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
 
 type TfProxyClientCreator interface {
 	Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (TfProxyClient, error)
@@ -31,11 +38,18 @@ var _ TfProxyClientCreator = &ServiceInstanceClientCreator{}
 
 type ServiceInstanceClientCreator struct {
 	connector managed.ExternalConnecter
+
+	saveConditionsCallback SaveConditionsFn
 }
 
-func NewServiceInstanceClientCreator(connector managed.ExternalConnecter) *ServiceInstanceClientCreator {
+// NewServiceInstanceClientCreator creates a connector for the service instance client
+// - it uses a callback that creates a tf connector, it defines what resource and configuration it needs via this callback
+func NewServiceInstanceClientCreator(createConnectorFn CreateTfConnectorFn, saveConditionsCallback SaveConditionsFn) *ServiceInstanceClientCreator {
 	return &ServiceInstanceClientCreator{
-		connector: connector,
+		connector: createConnectorFn("btp_subaccount_service_instance",
+			v1alpha1.SubaccountServiceInstance_GroupVersionKind,
+			true, &APICallbacks{}),
+		saveConditionsCallback: saveConditionsCallback,
 	}
 }
 
@@ -69,6 +83,7 @@ func (s *ServiceInstanceClient) Create(ctx context.Context, cr *v1alpha1.Service
 // Observe implements TfProxyClient
 func (s *ServiceInstanceClient) Observe(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error) {
 	ssi := tfServiceInstanceCr(cr)
+	// will return true, true, in case of in memory running async operations
 	obs, err := s.tfClient.Observe(ctx, ssi)
 	if err != nil {
 		return false, err
