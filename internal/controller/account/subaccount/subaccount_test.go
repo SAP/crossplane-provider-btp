@@ -1291,7 +1291,7 @@ func TestDelete(t *testing.T) {
 			},
 		},
 		"TrackerBlocked": {
-			reason: "Deletion should be successful if subaccount already in deleting state",
+			reason: "Deletion should be blocked if tracker is blocked",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
 					WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123")}),
