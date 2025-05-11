@@ -7,6 +7,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
 
@@ -173,6 +174,50 @@ func TestObserve(t *testing.T) {
 		})
 	}
 
+}
+
+func TestQueryAsyncData(t *testing.T) {
+	type args struct {
+		cr *v1alpha1.ServiceInstance
+	}
+	type want struct {
+		data *ServiceInstanceData
+	}
+	tests := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"CreationInProcess": {
+			reason: "No data available yet during creation",
+			args: args{
+				cr: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				data: nil,
+			},
+		},
+		"DataAvailable": {
+			reason: "Data is available after creation",
+			args: args{
+				cr: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				data: &ServiceInstanceData{},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			client := &ServiceInstanceClient{}
+			data := client.QueryAsyncData(context.Background(), tc.args.cr)
+
+			if diff := cmp.Diff(tc.want.data, data); diff != "" {
+				t.Errorf("\nServiceInstanceClient.QueryAsyncData(...): -want, +got:\n%s\n", diff)
+			}
+
+		})
+	}
 }
 
 var _ managed.ExternalClient = &TfControllerMock{}
