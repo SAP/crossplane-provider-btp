@@ -157,7 +157,7 @@ func TestObserve(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			client := &ServiceInstanceClient{tfClient: tc.fields.tfClient}
-			exists, err := client.Observe(context.Background(), tc.args.cr)
+			exists, err := client.Observe(context.Background())
 			if err != tc.want.err {
 				t.Errorf("ServiceInstanceClient.Observe() error = %v, want %v", err, tc.want.err)
 
@@ -210,7 +210,7 @@ func TestQueryAsyncData(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			client := &ServiceInstanceClient{}
-			data := client.QueryAsyncData(context.Background(), tc.args.cr)
+			data := client.QueryAsyncData(context.Background())
 
 			if diff := cmp.Diff(tc.want.data, data); diff != "" {
 				t.Errorf("\nServiceInstanceClient.QueryAsyncData(...): -want, +got:\n%s\n", diff)

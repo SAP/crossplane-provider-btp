@@ -130,7 +130,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
-	exists, err := e.tfClient.Observe(ctx, cr)
+	exists, err := e.tfClient.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
 	}
@@ -138,7 +138,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 	//TODO: add uodate logic
-	data := e.tfClient.QueryAsyncData(ctx, cr)
+	data := e.tfClient.QueryAsyncData(ctx)
 
 	if data != nil {
 		if err := e.saveInstanceData(ctx, cr, *data); err != nil {
@@ -160,7 +160,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotServiceInstance)
 	}
 	cr.SetConditions(xpv1.Creating())
-	if err := e.tfClient.Create(ctx, cr); err != nil {
+	if err := e.tfClient.Create(ctx); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateInstance)
 	}
 

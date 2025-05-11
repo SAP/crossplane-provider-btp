@@ -23,10 +23,10 @@ type TfProxyClientCreator interface {
 }
 
 type TfProxyClient interface {
-	Observe(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error)
-	Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error
+	Observe(ctx context.Context) (bool, error)
+	Create(ctx context.Context) error
 	// QueryUpdatedData returns the relevant status data once the async creation is done
-	QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *ServiceInstanceData
+	QueryAsyncData(ctx context.Context) *ServiceInstanceData
 }
 
 type ServiceInstanceData struct {
@@ -62,7 +62,8 @@ func (s *ServiceInstanceClientCreator) Connect(ctx context.Context, cr *v1alpha1
 	}
 
 	return &ServiceInstanceClient{
-		tfClient: ctrl,
+		tfClient:   ctrl,
+		tfResource: ssi,
 	}, nil
 }
 
@@ -72,19 +73,19 @@ var _ TfProxyClient = &ServiceInstanceClient{}
 // by interacting with the terraform based resource SubaccountServiceInstance
 // it basically behaves as a proxy that maps all the data between our native resource and the tf resource
 type ServiceInstanceClient struct {
-	tfClient managed.ExternalClient
+	tfClient   managed.ExternalClient
+	tfResource *v1alpha1.SubaccountServiceInstance
 }
 
 // Create implements TfProxyClient
-func (s *ServiceInstanceClient) Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
+func (s *ServiceInstanceClient) Create(ctx context.Context) error {
 	panic("unimplemented")
 }
 
 // Observe implements TfProxyClient
-func (s *ServiceInstanceClient) Observe(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error) {
-	ssi := tfServiceInstanceCr(cr)
+func (s *ServiceInstanceClient) Observe(ctx context.Context) (bool, error) {
 	// will return true, true, in case of in memory running async operations
-	obs, err := s.tfClient.Observe(ctx, ssi)
+	obs, err := s.tfClient.Observe(ctx, s.tfResource)
 	if err != nil {
 		return false, err
 	}
@@ -92,7 +93,7 @@ func (s *ServiceInstanceClient) Observe(ctx context.Context, cr *v1alpha1.Servic
 }
 
 // QueryAsyncData implements TfProxyClient
-func (s *ServiceInstanceClient) QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *ServiceInstanceData {
+func (s *ServiceInstanceClient) QueryAsyncData(ctx context.Context) *ServiceInstanceData {
 	panic("unimplemented")
 }
 

@@ -374,15 +374,15 @@ type TfProxyMock struct {
 	err   error
 }
 
-func (t *TfProxyMock) QueryAsyncData(ctx context.Context, cr *v1alpha1.ServiceInstance) *siClient.ServiceInstanceData {
+func (t *TfProxyMock) QueryAsyncData(ctx context.Context) *siClient.ServiceInstanceData {
 	return t.data
 }
 
-func (t *TfProxyMock) Create(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
+func (t *TfProxyMock) Create(ctx context.Context) error {
 	return t.err
 }
 
-func (t *TfProxyMock) Observe(context context.Context, cr *v1alpha1.ServiceInstance) (bool, error) {
+func (t *TfProxyMock) Observe(context context.Context) (bool, error) {
 	return t.found, t.err
 }
 
