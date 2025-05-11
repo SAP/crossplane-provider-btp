@@ -9,12 +9,14 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	tjcontroller "github.com/crossplane/upjet/pkg/controller"
+	ujcontroller "github.com/crossplane/upjet/pkg/controller"
+	ujresource "github.com/crossplane/upjet/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type CreateTfConnectorFn func(resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) *tjcontroller.Connector
+type CreateTfConnectorFn func(resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider ujcontroller.CallbackProvider) *ujcontroller.Connector
 
 type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
 
@@ -32,6 +34,7 @@ type TfProxyClient interface {
 type ServiceInstanceData struct {
 	ExternalName string `json:"externalName"`
 	ID           string `json:"id"`
+	Conditions   []xpv1.Condition
 }
 
 var _ TfProxyClientCreator = &ServiceInstanceClientCreator{}
@@ -62,8 +65,8 @@ func (s *ServiceInstanceClientCreator) Connect(ctx context.Context, cr *v1alpha1
 	}
 
 	return &ServiceInstanceClient{
-		tfClient:   ctrl,
-		tfResource: ssi,
+		tfClient:          ctrl,
+		tfServiceInstance: ssi,
 	}, nil
 }
 
@@ -73,8 +76,8 @@ var _ TfProxyClient = &ServiceInstanceClient{}
 // by interacting with the terraform based resource SubaccountServiceInstance
 // it basically behaves as a proxy that maps all the data between our native resource and the tf resource
 type ServiceInstanceClient struct {
-	tfClient   managed.ExternalClient
-	tfResource *v1alpha1.SubaccountServiceInstance
+	tfClient          managed.ExternalClient
+	tfServiceInstance *v1alpha1.SubaccountServiceInstance
 }
 
 // Create implements TfProxyClient
@@ -85,7 +88,7 @@ func (s *ServiceInstanceClient) Create(ctx context.Context) error {
 // Observe implements TfProxyClient
 func (s *ServiceInstanceClient) Observe(ctx context.Context) (bool, error) {
 	// will return true, true, in case of in memory running async operations
-	obs, err := s.tfClient.Observe(ctx, s.tfResource)
+	obs, err := s.tfClient.Observe(ctx, s.tfServiceInstance)
 	if err != nil {
 		return false, err
 	}
@@ -94,7 +97,15 @@ func (s *ServiceInstanceClient) Observe(ctx context.Context) (bool, error) {
 
 // QueryAsyncData implements TfProxyClient
 func (s *ServiceInstanceClient) QueryAsyncData(ctx context.Context) *ServiceInstanceData {
-	panic("unimplemented")
+	// only query the async data if the operation is finished
+	if s.tfServiceInstance.GetCondition(ujresource.TypeAsyncOperation).Reason == ujresource.ReasonFinished {
+		sid := &ServiceInstanceData{}
+		sid.ID = internal.Val(s.tfServiceInstance.Status.AtProvider.ID)
+		sid.ExternalName = meta.GetExternalName(s.tfServiceInstance)
+		sid.Conditions = []xpv1.Condition{xpv1.Available(), ujresource.AsyncOperationFinishedCondition()}
+		return sid
+	}
+	return nil
 }
 
 // generates the tf resource for the service instance to run tf operations against

@@ -5,8 +5,11 @@ import (
 	"errors"
 	"testing"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	ujresource "github.com/crossplane/upjet/pkg/resource"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
@@ -178,7 +181,7 @@ func TestObserve(t *testing.T) {
 
 func TestQueryAsyncData(t *testing.T) {
 	type args struct {
-		cr *v1alpha1.ServiceInstance
+		cr *v1alpha1.SubaccountServiceInstance
 	}
 	type want struct {
 		data *ServiceInstanceData
@@ -191,7 +194,10 @@ func TestQueryAsyncData(t *testing.T) {
 		"CreationInProcess": {
 			reason: "No data available yet during creation",
 			args: args{
-				cr: &v1alpha1.ServiceInstance{},
+				cr: tfServiceInstanceCrWithData("test-external-name", "test-id", []xpv1.Condition{
+					xpv1.Available(),
+					ujresource.AsyncOperationOngoingCondition(),
+				}),
 			},
 			want: want{
 				data: nil,
@@ -200,16 +206,28 @@ func TestQueryAsyncData(t *testing.T) {
 		"DataAvailable": {
 			reason: "Data is available after creation",
 			args: args{
-				cr: &v1alpha1.ServiceInstance{},
+				cr: tfServiceInstanceCrWithData("test-external-name", "test-id", []xpv1.Condition{
+					xpv1.Available(),
+					ujresource.AsyncOperationFinishedCondition(),
+				}),
 			},
 			want: want{
-				data: &ServiceInstanceData{},
+				data: &ServiceInstanceData{
+					Conditions: []xpv1.Condition{
+						xpv1.Available(),
+						ujresource.AsyncOperationFinishedCondition(),
+					},
+					ExternalName: "test-external-name",
+					ID:           "test-id",
+				},
 			},
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			client := &ServiceInstanceClient{}
+			client := &ServiceInstanceClient{
+				tfServiceInstance: tc.args.cr,
+			}
 			data := client.QueryAsyncData(context.Background())
 
 			if diff := cmp.Diff(tc.want.data, data); diff != "" {
@@ -218,6 +236,24 @@ func TestQueryAsyncData(t *testing.T) {
 
 		})
 	}
+}
+
+// tfServiceInstanceCrWithData is a helper function to create a SubaccountServiceInstance resource with the given data
+func tfServiceInstanceCrWithData(externalName, id string, conditions []xpv1.Condition) *v1alpha1.SubaccountServiceInstance {
+	cr := &v1alpha1.SubaccountServiceInstance{
+		Status: v1alpha1.SubaccountServiceInstanceStatus{
+			ResourceStatus: xpv1.ResourceStatus{
+				ConditionedStatus: xpv1.ConditionedStatus{
+					Conditions: conditions,
+				},
+			},
+			AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
+				ID: &id,
+			},
+		},
+	}
+	meta.SetExternalName(cr, externalName)
+	return cr
 }
 
 var _ managed.ExternalClient = &TfControllerMock{}
