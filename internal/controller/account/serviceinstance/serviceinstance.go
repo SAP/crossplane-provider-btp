@@ -159,6 +159,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotServiceInstance)
 	}
+
 	cr.SetConditions(xpv1.Creating())
 	if err := e.tfClient.Create(ctx); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateInstance)

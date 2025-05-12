@@ -82,7 +82,8 @@ type ServiceInstanceClient struct {
 
 // Create implements TfProxyClient
 func (s *ServiceInstanceClient) Create(ctx context.Context) error {
-	panic("unimplemented")
+	_, err := s.tfClient.Create(ctx, s.tfServiceInstance)
+	return err
 }
 
 // Observe implements TfProxyClient
