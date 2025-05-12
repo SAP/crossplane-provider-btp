@@ -47,11 +47,14 @@ type ServiceInstanceClientCreator struct {
 
 // NewServiceInstanceClientCreator creates a connector for the service instance client
 // - it uses a callback that creates a tf connector, it defines what resource and configuration it needs via this callback
-func NewServiceInstanceClientCreator(createConnectorFn CreateTfConnectorFn, saveConditionsCallback SaveConditionsFn) *ServiceInstanceClientCreator {
+func NewServiceInstanceClientCreator(createConnectorFn CreateTfConnectorFn, saveConditionsCallback SaveConditionsFn, kube client.Client) *ServiceInstanceClientCreator {
 	return &ServiceInstanceClientCreator{
 		connector: createConnectorFn("btp_subaccount_service_instance",
 			v1alpha1.SubaccountServiceInstance_GroupVersionKind,
-			true, &APICallbacks{}),
+			true, &APICallbacks{
+				saveCallbackFn: saveConditionsCallback,
+				kube:           kube,
+			}),
 		saveConditionsCallback: saveConditionsCallback,
 	}
 }

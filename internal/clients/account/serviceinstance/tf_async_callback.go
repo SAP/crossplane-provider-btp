@@ -14,8 +14,7 @@ import (
 var errUpdateStatusFmt = "cannot update status of the resource %s after an async %s"
 
 type APICallbacks struct {
-	kube   client.Client
-	crName string
+	kube client.Client
 
 	saveCallbackFn SaveConditionsFn
 }

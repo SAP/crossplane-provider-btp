@@ -46,6 +46,7 @@ var clientCreatorFn = func(kube client.Client) siClient.TfProxyClientCreator {
 			return tfclient.NewInternalTfConnector(kube, resourceName, gvk, useAsync, callbackProvider)
 		},
 		saveCallback,
+		kube,
 	)
 }
 
