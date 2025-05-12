@@ -27,6 +27,7 @@ type TfProxyClientCreator interface {
 type TfProxyClient interface {
 	Observe(ctx context.Context) (bool, error)
 	Create(ctx context.Context) error
+	Delete(ctx context.Context) error
 	// QueryUpdatedData returns the relevant status data once the async creation is done
 	QueryAsyncData(ctx context.Context) *ServiceInstanceData
 }
@@ -87,6 +88,11 @@ type ServiceInstanceClient struct {
 func (s *ServiceInstanceClient) Create(ctx context.Context) error {
 	_, err := s.tfClient.Create(ctx, s.tfServiceInstance)
 	return err
+}
+
+// Delete implements TfProxyClient
+func (s *ServiceInstanceClient) Delete(ctx context.Context) error {
+	return s.tfClient.Delete(ctx, s.tfServiceInstance)
 }
 
 // Observe implements TfProxyClient

@@ -183,9 +183,13 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	_, ok := mg.(*v1alpha1.ServiceInstance)
+	cr, ok := mg.(*v1alpha1.ServiceInstance)
 	if !ok {
 		return errors.New(errNotServiceInstance)
+	}
+	cr.SetConditions(xpv1.Deleting())
+	if err := c.tfClient.Delete(ctx); err != nil {
+		return errors.Wrap(err, "cannot delete serviceinstance")
 	}
 	return nil
 }

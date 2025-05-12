@@ -353,6 +353,80 @@ func TestSaveCallback(t *testing.T) {
 	}
 }
 
+func TestDelete(t *testing.T) {
+	type fields struct {
+		client *TfProxyMock
+	}
+	type args struct {
+		mg resource.Managed
+	}
+	type want struct {
+		err error
+		cr  *v1alpha1.ServiceInstance
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"ApiError": {
+			reason: "should return an error when the API call fails",
+			fields: fields{
+				client: &TfProxyMock{err: errClient},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: errClient,
+				cr: buildExpectedServiceInstance(
+					withConditions(xpv1.Deleting()),
+				),
+			},
+		},
+		"HappyPath": {
+			reason: "should delete the resource successfully and set Deleting condition",
+			fields: fields{
+				client: &TfProxyMock{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: nil,
+				cr: buildExpectedServiceInstance(
+					withConditions(xpv1.Deleting()),
+				),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				tfClient: tc.fields.client,
+				kube: &test.MockClient{
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			}
+
+			err := e.Delete(context.Background(), tc.args.mg)
+			expectedErrorBehaviour(t, tc.want.err, err)
+
+			// Verify the entire CR
+			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
+			if !ok {
+				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
+			}
+			if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
+
 var _ siClient.TfProxyClientCreator = &TfProxyClientCreatorMock{}
 
 type TfProxyClientCreatorMock struct {
@@ -384,6 +458,10 @@ func (t *TfProxyMock) Create(ctx context.Context) error {
 
 func (t *TfProxyMock) Observe(context context.Context) (bool, error) {
 	return t.found, t.err
+}
+
+func (t *TfProxyMock) Delete(ctx context.Context) error {
+	return t.err
 }
 
 func expectedErrorBehaviour(t *testing.T, expectedErr error, gotErr error) {

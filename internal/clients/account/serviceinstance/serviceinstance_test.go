@@ -245,6 +245,72 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+func TestDelete(t *testing.T) {
+	type args struct {
+		cr *v1alpha1.SubaccountServiceInstance
+	}
+	type fields struct {
+		tfClient *TfControllerMock
+	}
+	type want struct {
+		err error
+	}
+	tests := []struct {
+		name   string
+		args   args
+		fields fields
+		want   want
+	}{
+		{
+			name: "TfError",
+			args: args{
+				cr: &v1alpha1.SubaccountServiceInstance{},
+			},
+			fields: fields{
+				tfClient: &TfControllerMock{
+					err: errTf,
+				},
+			},
+			want: want{
+				err: errTf,
+			},
+		},
+		{
+			name: "SuccessfulDelete",
+			args: args{
+				cr: &v1alpha1.SubaccountServiceInstance{},
+			},
+			fields: fields{
+				tfClient: &TfControllerMock{
+					err: nil,
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &ServiceInstanceClient{
+				tfClient:          tc.fields.tfClient,
+				tfServiceInstance: tc.args.cr,
+			}
+
+			err := client.Delete(context.Background())
+			if err != nil && err.Error() != tc.want.err.Error() {
+				t.Errorf("ServiceInstanceClient.Delete() error = %v, want %v", err, tc.want.err)
+			}
+
+			// Verify that the Delete method was called with the correct type
+			if _, ok := tc.fields.tfClient.CalledWithMg.(*v1alpha1.SubaccountServiceInstance); !ok {
+				t.Errorf("ServiceInstanceClient.Delete() called with wrong type %T, want %T", tc.fields.tfClient.CalledWithMg, &v1alpha1.SubaccountServiceInstance{})
+			}
+		})
+	}
+}
+
 func TestQueryAsyncData(t *testing.T) {
 	type args struct {
 		cr *v1alpha1.SubaccountServiceInstance
@@ -343,7 +409,11 @@ func (t *TfControllerMock) Create(ctx context.Context, mg resource.Managed) (man
 
 // Delete implements managed.ExternalClient.
 func (t *TfControllerMock) Delete(ctx context.Context, mg resource.Managed) error {
-	panic("unimplemented")
+	t.CalledWithMg = mg
+	if t.err != nil {
+		return t.err
+	}
+	return nil
 }
 
 // Observe implements managed.ExternalClient.
