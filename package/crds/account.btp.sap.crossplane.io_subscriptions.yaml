@@ -163,7 +163,8 @@ spec:
                     - message: appName can't be updated once set
                       rule: self == oldSelf
                   planName:
-                    description: PlanName to subscribe to
+                    description: PlanName to subscribe to, empty plannames are shown
+                      as "default" in cockpit, use "" instead
                     type: string
                     x-kubernetes-validations:
                     - message: planName can't be updated once set
