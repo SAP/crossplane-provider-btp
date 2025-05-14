@@ -388,24 +388,23 @@ func TestObserve(t *testing.T) {
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
-						Parameters: internal.Ptr(`foo: bar`),
+						Parameters: internal.Ptr(`foo: bar1`),
 					}, nil
 				}},
 				cr: environment(withKymaParameters(v1alpha1.KymaEnvironmentParameters{
-					Parameters: runtime.RawExtension{Raw: []byte(`foo: baz`)},
-				}), func(r *v1alpha1.KymaEnvironment) {
-					r.Status.RetryStatus = &v1alpha1.RetryStatus{
-						DesiredHash: hash(map[string]interface{}{
-							"foo":  "baz",
-							"name": "kyma",
-						}),
-						CurrentHash: hash(map[string]interface{}{
-							"foo": "bar",
-						}),
-						Count:          2,
-						CircuitBreaker: false,
-					}
+					Parameters: runtime.RawExtension{Raw: []byte(`foo: bar2`)},
+				}), withRetryStatus(&v1alpha1.RetryStatus{
+					DesiredHash: hash(map[string]interface{}{
+						"foo":  "bar2",
+						"name": "kyma",
+					}),
+					CurrentHash: hash(map[string]interface{}{
+						"foo": "bar1",
+					}),
+					Count:          2,
+					CircuitBreaker: false,
 				}),
+				),
 			},
 			want: want{
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerDiff()},
@@ -416,22 +415,21 @@ func TestObserve(t *testing.T) {
 				err: nil,
 				cr: environment(
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
-						Parameters: runtime.RawExtension{Raw: []byte(`foo: baz`)},
+						Parameters: runtime.RawExtension{Raw: []byte(`foo: bar2`)},
 					}),
 					withConditions(xpv1.Available()),
-					func(r *v1alpha1.KymaEnvironment) {
-						r.Status.RetryStatus = &v1alpha1.RetryStatus{
-							CircuitBreaker: true,
-							DesiredHash: hash(map[string]interface{}{
-								"foo":  "baz",
-								"name": "kyma",
-							}),
-							CurrentHash: hash(map[string]interface{}{
-								"foo": "bar",
-							}),
-							Count: 3,
-						}
+					withRetryStatus(&v1alpha1.RetryStatus{
+						CircuitBreaker: true,
+						DesiredHash: hash(map[string]interface{}{
+							"foo":  "bar2",
+							"name": "kyma",
+						}),
+						CurrentHash: hash(map[string]interface{}{
+							"foo": "bar1",
+						}),
+						Count: 3,
 					}),
+				),
 			},
 		},
 	}
@@ -677,6 +675,11 @@ func withKymaParameters(c v1alpha1.KymaEnvironmentParameters) environmentModifie
 func withUID(uid types.UID) environmentModifier {
 	return func(r *v1alpha1.KymaEnvironment) { r.UID = uid }
 }
+
+func withRetryStatus(retryStatus *v1alpha1.RetryStatus) environmentModifier {
+	return func(r *v1alpha1.KymaEnvironment) { r.Status.RetryStatus = retryStatus }
+}
+
 func withObservation(observation v1alpha1.KymaEnvironmentObservation) environmentModifier {
 	return func(r *v1alpha1.KymaEnvironment) {
 		r.Status.AtProvider = observation
