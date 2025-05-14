@@ -1299,7 +1299,9 @@ func TestDelete(t *testing.T) {
 				mockClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
 				},
-				tracker: trackingtest.NoOpReferenceResolverTrackerBlocked{},
+				tracker: trackingtest.NoOpReferenceResolverTracker{
+					IsResourceBlocked: true,
+				},
 			},
 			want: want{
 				err: errors.New("Resource cannot be deleted, still has usages"),
