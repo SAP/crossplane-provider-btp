@@ -100,18 +100,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	needsUpdate, diff, err := c.needsUpdateWithDiff(cr)
 	if needsUpdate || err != nil {
-
-		errstatus := c.kube.Status().Update(ctx, cr)
-		if errstatus != nil {
-			c.log.Error(err, "failed to update status")
-		}
-		upToDate := !needsUpdate
-		if cr.Status.RetryStatus != nil && cr.Status.RetryStatus.CircuitBreaker {
-			upToDate = false
-		}
 		return managed.ExternalObservation{
 			ResourceExists:   true,
-			ResourceUpToDate: upToDate,
+			ResourceUpToDate: !needsUpdate,
 			Diff:             diff,
 		}, errors.Wrap(err, errCheckUpdate)
 	}
@@ -245,20 +236,20 @@ func updateCircuitBreakerStatus(cr *v1alpha1.KymaEnvironment, desired any, curre
 	if cr.Status.RetryStatus == nil {
 		cr.Status.RetryStatus = &v1alpha1.RetryStatus{}
 	}
-	if hashesArePersistent(cr, desiredHash, currentHash) {
-		cr.Status.RetryStatus.Count++
-		cr.Status.RetryStatus.CircuitBreaker = circuitBroken(cr, maxRetries)
-	} else {
+
+	cr.Status.RetryStatus.Diff = diff
+	if diff == "" || !hashesArePersistent(cr, desiredHash, currentHash) {
 		// Reset retry status if hashes change
 		cr.Status.RetryStatus.DesiredHash = desiredHash
 		cr.Status.RetryStatus.CurrentHash = currentHash
 		cr.Status.RetryStatus.Count = 1
 		cr.Status.RetryStatus.CircuitBreaker = false
+	} else {
+		if !cr.Status.RetryStatus.CircuitBreaker {
+			cr.Status.RetryStatus.Count++
+			cr.Status.RetryStatus.CircuitBreaker = circuitBroken(cr, maxRetries)
+		}
 	}
-	if cr.Status.RetryStatus.CircuitBreaker {
-		cr.Status.RetryStatus.Count = maxRetries
-	}
-	cr.Status.RetryStatus.Diff = diff
 }
 
 func circuitBroken(cr *v1alpha1.KymaEnvironment, maxRetries int) bool {
