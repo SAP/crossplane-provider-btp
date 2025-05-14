@@ -290,6 +290,11 @@ func deleteBTPSubaccount(
 	}
 
 	deletionState := response.State
+
+	if deletionState == subaccountStateDeleting {
+		return nil
+	}
+
 	return errors.New(fmt.Sprintf("Deletion Pending: Current status: %s", deletionState))
 }
 
