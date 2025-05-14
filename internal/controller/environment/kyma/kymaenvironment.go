@@ -100,18 +100,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	needsUpdate, diff, err := c.needsUpdateWithDiff(cr)
 	if needsUpdate || err != nil {
-
-		errstatus := c.kube.Status().Update(ctx, cr)
-		if errstatus != nil {
-			c.log.Error(err, "failed to update status")
-		}
-		upToDate := !needsUpdate
-		if cr.Status.RetryStatus != nil && cr.Status.RetryStatus.CircuitBreaker {
-			upToDate = false
-		}
 		return managed.ExternalObservation{
 			ResourceExists:   true,
-			ResourceUpToDate: upToDate,
+			ResourceUpToDate: !needsUpdate,
 			Diff:             diff,
 		}, errors.Wrap(err, errCheckUpdate)
 	}
