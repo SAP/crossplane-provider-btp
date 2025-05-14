@@ -523,7 +523,6 @@ func TestCircuitBreaker(t *testing.T) {
 }
 
 func TestUpdateCircuitBreakerStatus(t *testing.T) {
-	const anything = "something"
 	type args struct {
 		cr         *v1alpha1.KymaEnvironment
 		desired    any
@@ -540,63 +539,93 @@ func TestUpdateCircuitBreakerStatus(t *testing.T) {
 			name: "Initial Retry Status Creation",
 			args: args{
 				cr:         &v1alpha1.KymaEnvironment{Status: v1alpha1.KymaEnvironmentStatus{}},
-				desired:    anything,
-				current:    anything,
+				desired:    "something",
+				current:    "something",
 				diff:       "",
 				maxRetries: 3,
 			},
 			want: &v1alpha1.RetryStatus{
+				DesiredHash:    hash("something"),
+				CurrentHash:    hash("something"),
+				Diff:           "",
+				Count:          1,
 				CircuitBreaker: false,
 			},
 		},
 		{
-			name: "Retry Count Increment",
+			name: "Count Increment and Circuit Breaker On",
 			args: args{
 				cr: &v1alpha1.KymaEnvironment{
 					Status: v1alpha1.KymaEnvironmentStatus{
 						RetryStatus: &v1alpha1.RetryStatus{
-							DesiredHash:    hash(anything),
-							CurrentHash:    hash(anything),
+							DesiredHash:    hash("something"),
+							CurrentHash:    hash("somethingElse"),
 							Count:          2,
 							CircuitBreaker: false,
 						},
 					},
 				},
-				desired:    anything,
-				current:    anything,
+				desired:    "something",
+				current:    "somethingElse",
 				diff:       "some-diff",
 				maxRetries: 3,
 			},
 			want: &v1alpha1.RetryStatus{
-				DesiredHash:    hash(anything),
-				CurrentHash:    hash(anything),
+				DesiredHash:    hash("something"),
+				CurrentHash:    hash("somethingElse"),
 				Diff:           "some-diff",
 				Count:          3,
 				CircuitBreaker: true,
 			},
 		},
 		{
-			name: "Reset Retry Status",
+			name: "Reset Retry Status on new diff",
 			args: args{
 				cr: &v1alpha1.KymaEnvironment{
 					Status: v1alpha1.KymaEnvironmentStatus{
 						RetryStatus: &v1alpha1.RetryStatus{
-							DesiredHash:    hash(map[string]interface{}{"key": "old"}),
-							CurrentHash:    hash(map[string]interface{}{"key": "old"}),
+							DesiredHash:    hash("something"),
+							CurrentHash:    hash("somethingElse"),
 							Count:          3,
 							CircuitBreaker: true,
 						},
 					},
 				},
-				desired:    map[string]interface{}{"key": "new"},
-				current:    map[string]interface{}{"key": "new"},
+				desired:    "changedSomething",
+				current:    "somethingElse",
 				diff:       "some-diff",
 				maxRetries: 3,
 			},
 			want: &v1alpha1.RetryStatus{
-				DesiredHash:    hash(map[string]interface{}{"key": "new"}),
-				CurrentHash:    hash(map[string]interface{}{"key": "new"}),
+				DesiredHash:    hash("changedSomething"),
+				CurrentHash:    hash("somethingElse"),
 				Diff:           "some-diff",
+				Count:          1,
+				CircuitBreaker: false,
+			},
+		},
+		{
+			name: "Reset Retry Status on empty diff",
+			args: args{
+				cr: &v1alpha1.KymaEnvironment{
+					Status: v1alpha1.KymaEnvironmentStatus{
+						RetryStatus: &v1alpha1.RetryStatus{
+							DesiredHash:    hash("something"),
+							CurrentHash:    hash("somethingElse"),
+							Count:          3,
+							CircuitBreaker: true,
+						},
+					},
+				},
+				desired:    "somethingElse",
+				current:    "somethingElse",
+				diff:       "",
+				maxRetries: 3,
+			},
+			want: &v1alpha1.RetryStatus{
+				DesiredHash:    hash("somethingElse"),
+				CurrentHash:    hash("somethingElse"),
+				Diff:           "",
 				Count:          1,
 				CircuitBreaker: false,
 			},
