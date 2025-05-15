@@ -75,9 +75,12 @@ func TestObserve(t *testing.T) {
 			},
 		},
 		"Happy, while async in process": {
-			reason: "should return existing, but no data",
+			reason: "should return existing, but no data, or connection details",
 			fields: fields{
-				client: &TfProxyMock{found: true},
+				client: &TfProxyMock{
+					found:   true,
+					details: map[string][]byte{},
+				},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceBinding{},
@@ -101,6 +104,9 @@ func TestObserve(t *testing.T) {
 						ExternalName: "some-ext-name",
 						ID:           "some-id",
 					},
+					details: map[string][]byte{
+						"some-key": []byte("some-value"),
+					},
 				},
 			},
 			args: args{
@@ -109,9 +115,11 @@ func TestObserve(t *testing.T) {
 			want: want{
 				err: nil,
 				o: managed.ExternalObservation{
-					ResourceExists:    true,
-					ResourceUpToDate:  true,
-					ConnectionDetails: managed.ConnectionDetails{},
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+					ConnectionDetails: managed.ConnectionDetails{
+						"some-key": []byte("some-value"),
+					},
 				},
 				cr: buildExpectedServiceBinding(
 					withExternalName("some-ext-name"),
@@ -443,9 +451,10 @@ func (t *TfProxyClientCreatorMock) Connect(ctx context.Context, cr *v1alpha1.Ser
 var _ siClient.TfProxyClient = &TfProxyMock{}
 
 type TfProxyMock struct {
-	found bool
-	data  *siClient.ServiceBindingData
-	err   error
+	found   bool
+	data    *siClient.ServiceBindingData
+	err     error
+	details map[string][]byte
 }
 
 func (t *TfProxyMock) QueryAsyncData(ctx context.Context) *siClient.ServiceBindingData {
@@ -456,8 +465,8 @@ func (t *TfProxyMock) Create(ctx context.Context) error {
 	return t.err
 }
 
-func (t *TfProxyMock) Observe(context context.Context) (bool, error) {
-	return t.found, t.err
+func (t *TfProxyMock) Observe(context context.Context) (bool, map[string][]byte, error) {
+	return t.found, t.details, t.err
 }
 
 func (t *TfProxyMock) Delete(ctx context.Context) error {

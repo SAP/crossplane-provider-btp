@@ -38,23 +38,12 @@ const (
 	errGetInstance     = "cannot get servicebinding"
 )
 
-var clientCreatorFn = func(kube client.Client) siClient.TfProxyClientCreator {
-	return siClient.NewServiceBindingClientCreator(
-		// client defines what resource he needs a connector for, but here in DI we define how to create such tf connector
-		func(resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) *tjcontroller.Connector {
-
-			return tfclient.NewInternalTfConnector(kube, resourceName, gvk, useAsync, callbackProvider)
-		},
-		saveCallback,
-		kube,
-	)
-}
-
 // Setup adds a controller that reconciles ServiceBinding managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
 	name := managed.ControllerName(v1alpha1.ServiceBindingGroupKind)
 
-	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
+	defaultPublisher := managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())
+	cps := []managed.ConnectionPublisher{defaultPublisher}
 	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
 		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), apisv1alpha1.StoreConfigGroupVersionKind))
 	}
@@ -65,7 +54,18 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			kube:  mgr.GetClient(),
 			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
 
-			newClientCreatorFn: clientCreatorFn,
+			newClientCreatorFn: func(kube client.Client) siClient.TfProxyClientCreator {
+				return siClient.NewServiceBindingClientCreator(
+					// client defines what resource he needs a connector for, but here in DI we define how to create such tf connector
+					func(resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) *tjcontroller.Connector {
+
+						return tfclient.NewInternalTfConnector(kube, resourceName, gvk, useAsync, callbackProvider)
+					},
+					saveCallback,
+					kube,
+					defaultPublisher,
+				)
+			},
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -131,7 +131,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotServiceBinding)
 	}
-	exists, err := e.tfClient.Observe(ctx)
+	exists, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
 	}
@@ -151,7 +151,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	return managed.ExternalObservation{
 		ResourceExists:    true,
 		ResourceUpToDate:  true,
-		ConnectionDetails: managed.ConnectionDetails{},
+		ConnectionDetails: details,
 	}, nil
 }
 

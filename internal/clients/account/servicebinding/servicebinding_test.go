@@ -113,8 +113,9 @@ func TestObserve(t *testing.T) {
 	}
 
 	type want struct {
-		exists bool
-		err    error
+		exists  bool
+		err     error
+		details map[string][]byte
 	}
 
 	tests := []struct {
@@ -148,25 +149,34 @@ func TestObserve(t *testing.T) {
 					err: nil,
 					observation: managed.ExternalObservation{
 						ResourceExists: true,
+						ConnectionDetails: map[string][]byte{
+							"key1": []byte("value1"),
+						},
 					},
 				},
 			},
 			want: want{
 				exists: true,
 				err:    nil,
+				details: map[string][]byte{
+					"key1": []byte("value1"),
+				},
 			},
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			client := &ServiceBindingClient{tfClient: tc.fields.tfClient}
-			exists, err := client.Observe(context.Background())
+			exists, details, err := client.Observe(context.Background())
 			if err != tc.want.err {
 				t.Errorf("ServiceBindingClient.Observe() error = %v, want %v", err, tc.want.err)
 
 			}
 			if exists != tc.want.exists {
 				t.Errorf("ServiceBindingClient.Observe() exists = %v, want %v", exists, tc.want.exists)
+			}
+			if diff := cmp.Diff(tc.want.details, details); diff != "" {
+				t.Errorf("\nServiceBindingClient.Observe(...): details -want, +got:\n%s\n", diff)
 			}
 
 			//verify CalledWithMg is of type SubaccountServiceBinding

@@ -25,7 +25,7 @@ type TfProxyClientCreator interface {
 }
 
 type TfProxyClient interface {
-	Observe(ctx context.Context) (bool, error)
+	Observe(ctx context.Context) (bool, map[string][]byte, error)
 	Create(ctx context.Context) error
 	Delete(ctx context.Context) error
 	// QueryUpdatedData returns the relevant status data once the async creation is done
@@ -44,11 +44,13 @@ type ServiceBindingClientCreator struct {
 	connector managed.ExternalConnecter
 
 	saveConditionsCallback SaveConditionsFn
+
+	connectionPublisher managed.ConnectionPublisher
 }
 
 // NewServiceBindingClientCreator creates a connector for the service instance client
 // - it uses a callback that creates a tf connector, it defines what resource and configuration it needs via this callback
-func NewServiceBindingClientCreator(createConnectorFn CreateTfConnectorFn, saveConditionsCallback SaveConditionsFn, kube client.Client) *ServiceBindingClientCreator {
+func NewServiceBindingClientCreator(createConnectorFn CreateTfConnectorFn, saveConditionsCallback SaveConditionsFn, kube client.Client, connectionPublisher managed.ConnectionPublisher) *ServiceBindingClientCreator {
 	return &ServiceBindingClientCreator{
 		connector: createConnectorFn("btp_subaccount_service_instance",
 			v1alpha1.SubaccountServiceBinding_GroupVersionKind,
@@ -57,6 +59,7 @@ func NewServiceBindingClientCreator(createConnectorFn CreateTfConnectorFn, saveC
 				kube:           kube,
 			}),
 		saveConditionsCallback: saveConditionsCallback,
+		connectionPublisher:    connectionPublisher,
 	}
 }
 
@@ -96,13 +99,13 @@ func (s *ServiceBindingClient) Delete(ctx context.Context) error {
 }
 
 // Observe implements TfProxyClient
-func (s *ServiceBindingClient) Observe(ctx context.Context) (bool, error) {
+func (s *ServiceBindingClient) Observe(ctx context.Context) (bool, map[string][]byte, error) {
 	// will return true, true, in case of in memory running async operations
 	obs, err := s.tfClient.Observe(ctx, s.tfServiceBinding)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	return obs.ResourceExists, nil
+	return obs.ResourceExists, obs.ConnectionDetails, nil
 }
 
 // QueryAsyncData implements TfProxyClient
