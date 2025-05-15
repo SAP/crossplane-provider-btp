@@ -1,4 +1,4 @@
-package serviceinstance
+package servicebinding
 
 import (
 	"context"
@@ -21,25 +21,25 @@ import (
 	tjcontroller "github.com/crossplane/upjet/pkg/controller"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
-	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
+	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/features"
 )
 
 const (
-	errNotServiceInstance = "managed resource is not a ServiceInstance custom resource"
-	errTrackPCUsage       = "cannot track ProviderConfig usage"
-	errGetPC              = "cannot get ProviderConfig"
-	errGetCreds           = "cannot get credentials"
+	errNotServiceBinding = "managed resource is not a ServiceBinding custom resource"
+	errTrackPCUsage      = "cannot track ProviderConfig usage"
+	errGetPC             = "cannot get ProviderConfig"
+	errGetCreds          = "cannot get credentials"
 
-	errObserveInstance = "cannot observe serviceinstance"
-	errCreateInstance  = "cannot create serviceinstance"
+	errObserveInstance = "cannot observe servicebinding"
+	errCreateInstance  = "cannot create servicebinding"
 	errSaveData        = "cannot update cr data"
-	errGetInstance     = "cannot get serviceinstance"
+	errGetInstance     = "cannot get servicebinding"
 )
 
 var clientCreatorFn = func(kube client.Client) siClient.TfProxyClientCreator {
-	return siClient.NewServiceInstanceClientCreator(
+	return siClient.NewServiceBindingClientCreator(
 		// client defines what resource he needs a connector for, but here in DI we define how to create such tf connector
 		func(resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) *tjcontroller.Connector {
 
@@ -50,9 +50,9 @@ var clientCreatorFn = func(kube client.Client) siClient.TfProxyClientCreator {
 	)
 }
 
-// Setup adds a controller that reconciles ServiceInstance managed resources.
+// Setup adds a controller that reconciles ServiceBinding managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	name := managed.ControllerName(v1alpha1.ServiceInstanceGroupKind)
+	name := managed.ControllerName(v1alpha1.ServiceBindingGroupKind)
 
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
@@ -60,7 +60,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 	}
 
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(v1alpha1.ServiceInstanceGroupVersionKind),
+		resource.ManagedKind(v1alpha1.ServiceBindingGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
 			kube:  mgr.GetClient(),
 			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
@@ -74,7 +74,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
-		For(&v1alpha1.ServiceInstance{}).
+		For(&v1alpha1.ServiceBinding{}).
 		WithEventFilter(resource.DesiredStateChanged()).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
@@ -82,7 +82,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 // SaveConditionsFn Callback for persisting conditions in the CR
 var saveCallback siClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error {
 
-	si := &v1alpha1.ServiceInstance{}
+	si := &v1alpha1.ServiceBinding{}
 
 	nn := types.NamespacedName{Name: name}
 	if kErr := kube.Get(ctx, nn, si); kErr != nil {
@@ -104,16 +104,16 @@ type connector struct {
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	_, ok := mg.(*v1alpha1.ServiceInstance)
+	_, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
-		return nil, errors.New(errNotServiceInstance)
+		return nil, errors.New(errNotServiceBinding)
 	}
 
 	// when working with tf proxy resources we want to keep the Connect() logic as part of the delgating Connect calls of the native resources to
 	// deal with errors in the part of process that they belong to
 	clientCreator := c.newClientCreatorFn(c.kube)
 
-	client, err := clientCreator.Connect(ctx, mg.(*v1alpha1.ServiceInstance))
+	client, err := clientCreator.Connect(ctx, mg.(*v1alpha1.ServiceBinding))
 	if err != nil {
 		return nil, err
 	}
@@ -127,9 +127,9 @@ type external struct {
 }
 
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.ServiceInstance)
+	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
-		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
+		return managed.ExternalObservation{}, errors.New(errNotServiceBinding)
 	}
 	exists, err := e.tfClient.Observe(ctx)
 	if err != nil {
@@ -156,9 +156,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.ServiceInstance)
+	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
-		return managed.ExternalCreation{}, errors.New(errNotServiceInstance)
+		return managed.ExternalCreation{}, errors.New(errNotServiceBinding)
 	}
 
 	cr.SetConditions(xpv1.Creating())
@@ -172,9 +172,9 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	_, ok := mg.(*v1alpha1.ServiceInstance)
+	_, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errNotServiceInstance)
+		return managed.ExternalUpdate{}, errors.New(errNotServiceBinding)
 	}
 
 	return managed.ExternalUpdate{
@@ -183,18 +183,18 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	cr, ok := mg.(*v1alpha1.ServiceInstance)
+	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
-		return errors.New(errNotServiceInstance)
+		return errors.New(errNotServiceBinding)
 	}
 	cr.SetConditions(xpv1.Deleting())
 	if err := c.tfClient.Delete(ctx); err != nil {
-		return errors.Wrap(err, "cannot delete serviceinstance")
+		return errors.Wrap(err, "cannot delete servicebinding")
 	}
 	return nil
 }
 
-func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceInstance, sid siClient.ServiceInstanceData) error {
+func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceBinding, sid siClient.ServiceBindingData) error {
 	if meta.GetExternalName(cr) != sid.ExternalName {
 		meta.SetExternalName(cr, sid.ExternalName)
 		// manually saving external-name, since crossplane reconciler won't update spec and status in one loop

@@ -3,6 +3,7 @@ package controller
 import (
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/directory"
+	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/controller/oidc/kubeconfiggenerator"
@@ -40,6 +41,7 @@ func CustomSetup(mgr ctrl.Manager, o controller.Options) error {
 		rolecollectionassignment.Setup,
 		rolecollection.Setup,
 		serviceinstance.Setup,
+		servicebinding.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err

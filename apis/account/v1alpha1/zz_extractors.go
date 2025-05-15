@@ -112,3 +112,14 @@ func CloudManagementSubaccountUuid() reference.ExtractValueFn {
 		return sg.Spec.ForProvider.SubaccountGuid
 	}
 }
+
+// CloudManagementSubaccountUuid extracts the Reference of a Subaccount to the namespace of secret
+func ServiceInstanceUuid() reference.ExtractValueFn {
+	return func(mg resource.Managed) string {
+		sg, ok := mg.(*ServiceInstance)
+		if !ok {
+			return ""
+		}
+		return sg.Status.AtProvider.ID
+	}
+}

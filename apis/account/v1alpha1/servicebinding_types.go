@@ -37,6 +37,10 @@ type ServiceBindingParameters struct {
 
 	// (String) The ID of the service instance.
 	// The ID of the service instance.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceInstance
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceInstanceUuid()
+	// +crossplane:generate:reference:refFieldName=ServiceInstanceRef
+	// +crossplane:generate:reference:selectorFieldName=ServiceInstanceSelector
 	ServiceInstanceID *string `json:"serviceinstanceId,omitempty" tf:"serviceinstance_id,omitempty"`
 
 	// (String) The ID of the subaccount.
