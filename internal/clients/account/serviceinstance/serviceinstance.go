@@ -56,11 +56,7 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance) *v1alph
 				ManagementPolicies:               []xpv1.ManagementAction{xpv1.ManagementActionAll},
 				WriteConnectionSecretToReference: si.GetWriteConnectionSecretToReference(),
 			},
-			ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
-				Name:          &si.Name,
-				ServiceplanID: si.Spec.ForProvider.ServiceplanID,
-				SubaccountID:  si.Spec.ForProvider.SubaccountID,
-			},
+			ForProvider:  si.Spec.ForProvider.SubaccountServiceInstanceParameters,
 			InitProvider: v1alpha1.SubaccountServiceInstanceInitParameters{},
 		},
 		Status: v1alpha1.SubaccountServiceInstanceStatus{},

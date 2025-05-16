@@ -227,20 +227,20 @@ func (mg *ServiceInstance) ResolveReferences(ctx context.Context, c client.Reade
 	var err error
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountID),
+		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountServiceInstanceParameters.SubaccountID),
 		Extract:      SubaccountUuid(),
-		Reference:    mg.Spec.ForProvider.SubaccountRef,
-		Selector:     mg.Spec.ForProvider.SubaccountSelector,
+		Reference:    mg.Spec.ForProvider.SubaccountServiceInstanceParameters.SubaccountRef,
+		Selector:     mg.Spec.ForProvider.SubaccountServiceInstanceParameters.SubaccountSelector,
 		To: reference.To{
 			List:    &SubaccountList{},
 			Managed: &Subaccount{},
 		},
 	})
 	if err != nil {
-		return errors.Wrap(err, "mg.Spec.ForProvider.SubaccountID")
+		return errors.Wrap(err, "mg.Spec.ForProvider.SubaccountServiceInstanceParameters.SubaccountID")
 	}
-	mg.Spec.ForProvider.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
-	mg.Spec.ForProvider.SubaccountRef = rsp.ResolvedReference
+	mg.Spec.ForProvider.SubaccountServiceInstanceParameters.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.ForProvider.SubaccountServiceInstanceParameters.SubaccountRef = rsp.ResolvedReference
 
 	return nil
 }
