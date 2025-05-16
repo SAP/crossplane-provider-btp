@@ -1,125 +1,42 @@
 package serviceinstanceclient
 
 import (
-	"context"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	ujcontroller "github.com/crossplane/upjet/pkg/controller"
-	ujresource "github.com/crossplane/upjet/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type CreateTfConnectorFn func(resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider ujcontroller.CallbackProvider) *ujcontroller.Connector
-
-type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
-
-type TfProxyClientCreator interface {
-	Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (TfProxyClient, error)
-}
-
-type TfProxyClient interface {
-	Observe(ctx context.Context) (bool, error)
-	Create(ctx context.Context) error
-	Delete(ctx context.Context) error
-	// QueryUpdatedData returns the relevant status data once the async creation is done
-	QueryAsyncData(ctx context.Context) *ServiceInstanceData
-}
-
-type ServiceInstanceData struct {
-	ExternalName string `json:"externalName"`
-	ID           string `json:"id"`
-	Conditions   []xpv1.Condition
-}
-
-var _ TfProxyClientCreator = &ServiceInstanceClientCreator{}
-
-type ServiceInstanceClientCreator struct {
-	connector managed.ExternalConnecter
-
-	saveConditionsCallback SaveConditionsFn
-}
-
-// NewServiceInstanceClientCreator creates a connector for the service instance client
-// - it uses a callback that creates a tf connector, it defines what resource and configuration it needs via this callback
-func NewServiceInstanceClientCreator(createConnectorFn CreateTfConnectorFn, saveConditionsCallback SaveConditionsFn, kube client.Client) *ServiceInstanceClientCreator {
-	return &ServiceInstanceClientCreator{
-		connector: createConnectorFn("btp_subaccount_service_instance",
-			v1alpha1.SubaccountServiceInstance_GroupVersionKind,
-			true, &APICallbacks{
-				saveCallbackFn: saveConditionsCallback,
-				kube:           kube,
-			}),
-		saveConditionsCallback: saveConditionsCallback,
+func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsFn, kube client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
+	con := &ServiceInstanceConnector{
+		TfProxyConnector: tfclient.NewTfProxyConnector(
+			tfclient.NewInternalTfConnector(
+				kube,
+				"btp_subaccount_service_instance",
+				v1alpha1.SubaccountServiceInstance_GroupVersionKind,
+				true,
+				tfclient.NewAPICallbacks(
+					kube,
+					saveConditionsCallback,
+				),
+			),
+			&ServiceInstanceMapper{},
+		),
 	}
+	return con
 }
 
-// Connect implements TfProxyClientCreator.
-func (s *ServiceInstanceClientCreator) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (TfProxyClient, error) {
-	ssi := tfServiceInstanceCr(cr)
-	ctrl, err := s.connector.Connect(ctx, ssi)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ServiceInstanceClient{
-		tfClient:          ctrl,
-		tfServiceInstance: ssi,
-	}, nil
+type ServiceInstanceConnector struct {
+	tfclient.TfProxyConnector[*v1alpha1.ServiceInstance, *v1alpha1.SubaccountServiceInstance]
 }
 
-var _ TfProxyClient = &ServiceInstanceClient{}
-
-// ServiceInstanceClient is an implementation that provides lifecycle management for service instances
-// by interacting with the terraform based resource SubaccountServiceInstance
-// it basically behaves as a proxy that maps all the data between our native resource and the tf resource
-type ServiceInstanceClient struct {
-	tfClient          managed.ExternalClient
-	tfServiceInstance *v1alpha1.SubaccountServiceInstance
+type ServiceInstanceMapper struct {
 }
 
-// Create implements TfProxyClient
-func (s *ServiceInstanceClient) Create(ctx context.Context) error {
-	_, err := s.tfClient.Create(ctx, s.tfServiceInstance)
-	return err
-}
-
-// Delete implements TfProxyClient
-func (s *ServiceInstanceClient) Delete(ctx context.Context) error {
-	return s.tfClient.Delete(ctx, s.tfServiceInstance)
-}
-
-// Observe implements TfProxyClient
-func (s *ServiceInstanceClient) Observe(ctx context.Context) (bool, error) {
-	// will return true, true, in case of in memory running async operations
-	obs, err := s.tfClient.Observe(ctx, s.tfServiceInstance)
-	if err != nil {
-		return false, err
-	}
-	return obs.ResourceExists, nil
-}
-
-// QueryAsyncData implements TfProxyClient
-func (s *ServiceInstanceClient) QueryAsyncData(ctx context.Context) *ServiceInstanceData {
-	// only query the async data if the operation is finished
-	if s.tfServiceInstance.GetCondition(ujresource.TypeAsyncOperation).Reason == ujresource.ReasonFinished {
-		sid := &ServiceInstanceData{}
-		sid.ID = internal.Val(s.tfServiceInstance.Status.AtProvider.ID)
-		sid.ExternalName = meta.GetExternalName(s.tfServiceInstance)
-		sid.Conditions = []xpv1.Condition{xpv1.Available(), ujresource.AsyncOperationFinishedCondition()}
-		return sid
-	}
-	return nil
-}
-
-// generates the tf resource for the service instance to run tf operations against
-func tfServiceInstanceCr(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServiceInstance {
+func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServiceInstance {
 	sInstance := &v1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha1.SubaccountServiceInstance_Kind,

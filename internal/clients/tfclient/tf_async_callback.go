@@ -1,4 +1,4 @@
-package serviceinstanceclient
+package tfclient
 
 import (
 	"context"
@@ -12,6 +12,13 @@ import (
 )
 
 var errUpdateStatusFmt = "cannot update status of the resource %s after an async %s"
+
+func NewAPICallbacks(kube client.Client, saveConditionsFn SaveConditionsFn) *APICallbacks {
+	return &APICallbacks{
+		kube:           kube,
+		saveCallbackFn: saveConditionsFn,
+	}
+}
 
 type APICallbacks struct {
 	kube client.Client

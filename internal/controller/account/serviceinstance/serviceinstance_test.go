@@ -8,7 +8,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
+	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -97,7 +97,7 @@ func TestObserve(t *testing.T) {
 			fields: fields{
 				client: &TfProxyMock{
 					found: true,
-					data: &siClient.ServiceInstanceData{
+					data: &tfclient.ObservationData{
 						ExternalName: "some-ext-name",
 						ID:           "some-id",
 					},
@@ -278,7 +278,7 @@ func TestConnect(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			c := connector{
-				newClientCreatorFn: func(_ client.Client) siClient.TfProxyClientCreator { return tc.fields.creator },
+				newClientCreatorFn: func(_ client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] { return tc.fields.creator },
 			}
 
 			got, err := c.Connect(context.Background(), tc.args.mg)
@@ -427,28 +427,28 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-var _ siClient.TfProxyClientCreator = &TfProxyClientCreatorMock{}
+var _ tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] = &TfProxyClientCreatorMock{}
 
 type TfProxyClientCreatorMock struct {
 	err error
 }
 
-func (t *TfProxyClientCreatorMock) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (siClient.TfProxyClient, error) {
+func (t *TfProxyClientCreatorMock) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (tfclient.TfProxyControllerI, error) {
 	if t.err != nil {
 		return nil, t.err
 	}
 	return &TfProxyMock{}, nil
 }
 
-var _ siClient.TfProxyClient = &TfProxyMock{}
+var _ tfclient.TfProxyControllerI = &TfProxyMock{}
 
 type TfProxyMock struct {
 	found bool
-	data  *siClient.ServiceInstanceData
+	data  *tfclient.ObservationData
 	err   error
 }
 
-func (t *TfProxyMock) QueryAsyncData(ctx context.Context) *siClient.ServiceInstanceData {
+func (t *TfProxyMock) QueryAsyncData(ctx context.Context) *tfclient.ObservationData {
 	return t.data
 }
 
