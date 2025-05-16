@@ -32,6 +32,7 @@ type ObservationData struct {
 	Conditions   []xpv1.Condition
 }
 
+// TfMapper is a generic interface to map a native resource to an upjet resource that will be used for applying to terraform
 type TfMapper[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] interface {
 	TfResource(NATIVE) UPJETTED
 }
