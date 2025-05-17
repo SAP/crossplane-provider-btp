@@ -34,24 +34,25 @@ type ObservationData struct {
 
 // TfMapper is a generic interface to map a native resource to an upjet resource that will be used for applying to terraform
 type TfMapper[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] interface {
-	TfResource(NATIVE) UPJETTED
+	TfResource(NATIVE, client.Client) UPJETTED
 }
 
 type TfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] struct {
-	tfMapper TfMapper[NATIVE, UPJETTED]
-
+	tfMapper  TfMapper[NATIVE, UPJETTED]
 	connector managed.ExternalConnecter
+	kube      client.Client
 }
 
-func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed](tfConnector managed.ExternalConnecter, tfMapper TfMapper[NATIVE, UPJETTED]) TfProxyConnector[NATIVE, UPJETTED] {
+func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed](tfConnector managed.ExternalConnecter, tfMapper TfMapper[NATIVE, UPJETTED], kube client.Client) TfProxyConnector[NATIVE, UPJETTED] {
 	return TfProxyConnector[NATIVE, UPJETTED]{
 		connector: tfConnector,
 		tfMapper:  tfMapper,
+		kube:      kube,
 	}
 }
 
 func (t *TfProxyConnector[NATIVE, UPJETTED]) Connect(ctx context.Context, cr NATIVE) (TfProxyControllerI, error) {
-	ssi := t.tfMapper.TfResource(cr)
+	ssi := t.tfMapper.TfResource(cr, t.kube)
 
 	ctrl, err := t.connector.Connect(ctx, ssi)
 	if err != nil {

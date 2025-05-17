@@ -24,6 +24,7 @@ func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsF
 				),
 			),
 			&ServiceInstanceMapper{},
+			kube,
 		),
 	}
 	return con
@@ -36,7 +37,7 @@ type ServiceInstanceConnector struct {
 type ServiceInstanceMapper struct {
 }
 
-func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServiceInstance {
+func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube client.Client) *v1alpha1.SubaccountServiceInstance {
 	sInstance := &v1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha1.SubaccountServiceInstance_Kind,

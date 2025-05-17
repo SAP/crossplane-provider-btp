@@ -12,6 +12,7 @@ import (
 	"github.com/crossplane/upjet/pkg/resource/fake"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var errTf = errors.New("tf error")
@@ -23,6 +24,7 @@ func TestConnect(t *testing.T) {
 	type fields struct {
 		connector *TfConnectorMock
 		tfMapper  TfMapper[ManagedMock, *fake.Terraformed]
+		kube      client.Client
 	}
 	type want struct {
 		clientReturned bool
@@ -44,6 +46,7 @@ func TestConnect(t *testing.T) {
 					err: errTf,
 				},
 				tfMapper: &TfMapperMock{},
+				kube:     nil,
 			},
 			want: want{
 				clientReturned: false,
@@ -60,6 +63,7 @@ func TestConnect(t *testing.T) {
 					err: nil,
 				},
 				tfMapper: &TfMapperMock{},
+				kube:     nil,
 			},
 			want: want{
 				clientReturned: true,
@@ -73,6 +77,7 @@ func TestConnect(t *testing.T) {
 			tfConnector := &TfProxyConnector[ManagedMock, *fake.Terraformed]{
 				tfMapper:  tc.fields.tfMapper,
 				connector: tc.fields.connector,
+				kube:      tc.fields.kube,
 			}
 
 			client, err := tfConnector.Connect(context.Background(), tc.args.cr)
@@ -355,7 +360,7 @@ type TfMapperMock struct {
 }
 
 // TfResource implements TfMapper.
-func (t *TfMapperMock) TfResource(cr ManagedMock) *fake.Terraformed {
+func (t *TfMapperMock) TfResource(cr ManagedMock, kube client.Client) *fake.Terraformed {
 	return &fake.Terraformed{}
 }
 
