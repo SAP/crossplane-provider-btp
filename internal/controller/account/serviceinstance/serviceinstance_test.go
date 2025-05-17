@@ -55,7 +55,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				err: errClient,
-				cr:  buildExpectedServiceInstance(), // No annotations, observation data, or conditions
+				cr:  ExpectedServiceInstance(), // No annotations, observation data, or conditions
 			},
 		},
 		"NotFound": {
@@ -71,7 +71,7 @@ func TestObserve(t *testing.T) {
 				o: managed.ExternalObservation{
 					ResourceExists: false,
 				},
-				cr: buildExpectedServiceInstance(), // No annotations, observation data, or conditions
+				cr: ExpectedServiceInstance(), // No annotations, observation data, or conditions
 			},
 		},
 		"Happy, while async in process": {
@@ -89,7 +89,7 @@ func TestObserve(t *testing.T) {
 					ResourceUpToDate:  true,
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
-				cr: buildExpectedServiceInstance(), // No annotations, observation data, or conditions
+				cr: ExpectedServiceInstance(), // No annotations, observation data, or conditions
 			},
 		},
 		"Happy, no drift": {
@@ -113,10 +113,10 @@ func TestObserve(t *testing.T) {
 					ResourceUpToDate:  true,
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
-				cr: buildExpectedServiceInstance(
-					withExternalName("some-ext-name"),
-					withObservationData("some-id"),
-					withConditions(xpv1.Available()),
+				cr: ExpectedServiceInstance(
+					WithExternalName("some-ext-name"),
+					WithObservationData("some-id"),
+					WithConditions(xpv1.Available()),
 				),
 			},
 		},
@@ -179,8 +179,8 @@ func TestCreate(t *testing.T) {
 			},
 			want: want{
 				err: errClient,
-				cr: buildExpectedServiceInstance(
-					withConditions(
+				cr: ExpectedServiceInstance(
+					WithConditions(
 						xpv1.Creating(),
 					),
 				),
@@ -196,8 +196,8 @@ func TestCreate(t *testing.T) {
 			},
 			want: want{
 				err: nil,
-				cr: buildExpectedServiceInstance(
-					withConditions(
+				cr: ExpectedServiceInstance(
+					WithConditions(
 						xpv1.Creating(),
 					),
 				),
@@ -381,8 +381,8 @@ func TestDelete(t *testing.T) {
 			},
 			want: want{
 				err: errClient,
-				cr: buildExpectedServiceInstance(
-					withConditions(xpv1.Deleting()),
+				cr: ExpectedServiceInstance(
+					WithConditions(xpv1.Deleting()),
 				),
 			},
 		},
@@ -396,8 +396,8 @@ func TestDelete(t *testing.T) {
 			},
 			want: want{
 				err: nil,
-				cr: buildExpectedServiceInstance(
-					withConditions(xpv1.Deleting()),
+				cr: ExpectedServiceInstance(
+					WithConditions(xpv1.Deleting()),
 				),
 			},
 		},
@@ -475,7 +475,7 @@ func expectedErrorBehaviour(t *testing.T, expectedErr error, gotErr error) {
 }
 
 // Helper function to build a complete ServiceInstance CR dynamically
-func buildExpectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.ServiceInstance {
+func ExpectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.ServiceInstance {
 	cr := &v1alpha1.ServiceInstance{}
 
 	// Apply each option to modify the CR
@@ -487,7 +487,7 @@ func buildExpectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1al
 }
 
 // Option to set the external name annotation
-func withExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
+func WithExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
 		if cr.GetAnnotations() == nil {
 			cr.SetAnnotations(map[string]string{})
@@ -497,7 +497,7 @@ func withExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
 }
 
 // Option to set observation data (e.g., ID)
-func withObservationData(id string) func(*v1alpha1.ServiceInstance) {
+func WithObservationData(id string) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
 		cr.Status.AtProvider = v1alpha1.ServiceInstanceObservation{
 			ID: id,
@@ -506,7 +506,7 @@ func withObservationData(id string) func(*v1alpha1.ServiceInstance) {
 }
 
 // Option to set conditions
-func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceInstance) {
+func WithConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
 		cr.Status.Conditions = conditions
 	}
