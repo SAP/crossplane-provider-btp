@@ -30,6 +30,8 @@ type ServiceInstanceParameters struct {
 	// All parameters of the tf resource are included here as well
 	SubaccountServiceInstanceParameters `json:",inline"`
 
+	ParameterSecrets []xpv1.SecretKeySelector `json:"parameterSecrets,omitempty"`
+
 	// Reference to a ServicePlan in account to populate serviceplanId.
 	// +kubebuilder:validation:Optional
 	ServicePlanRef *xpv1.Reference `json:"servicePlanRef,omitempty" tf:"-"`

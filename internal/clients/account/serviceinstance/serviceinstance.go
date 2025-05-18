@@ -1,12 +1,19 @@
 package serviceinstanceclient
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -37,7 +44,22 @@ type ServiceInstanceConnector struct {
 type ServiceInstanceMapper struct {
 }
 
-func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube client.Client) *v1alpha1.SubaccountServiceInstance {
+func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube client.Client) (*v1alpha1.SubaccountServiceInstance, error) {
+	// resolve all parameter secret references and merge them into a single map
+	parameterData, err := lookupSecrets(kube, si.Spec.ForProvider.ParameterSecrets)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to map tf resource")
+	}
+	// merge the plain parameters with the secret parameters
+	plainParameters := si.Spec.ForProvider.SubaccountServiceInstanceParameters.Parameters
+	if err := mergeJsonData(parameterData, []byte(internal.Val(plainParameters))); err != nil {
+		return nil, errors.Wrap(err, "failed to map tf resource")
+	}
+	parameterJson, err := json.Marshal(parameterData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to map tf resource")
+	}
+
 	sInstance := &v1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha1.SubaccountServiceInstance_Kind,
@@ -62,8 +84,9 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 		},
 		Status: v1alpha1.SubaccountServiceInstanceStatus{},
 	}
+	sInstance.Spec.ForProvider.Parameters = internal.Ptr(string(parameterJson))
 	meta.SetExternalName(sInstance, meta.GetExternalName(si))
-	return sInstance
+	return sInstance, nil
 }
 
 func pcName(si *v1alpha1.ServiceInstance) string {
@@ -72,4 +95,35 @@ func pcName(si *v1alpha1.ServiceInstance) string {
 		return pc.Name
 	}
 	return ""
+}
+
+// lookupSecrets retrieves the data from secretKeySelectors, converts them from json to a map and merges them into a single map.
+func lookupSecrets(kube client.Client, secretsSelectors []xpv1.SecretKeySelector) (map[string]string, error) {
+	combinedData := make(map[string]string)
+	for _, secret := range secretsSelectors {
+		secretObj := &corev1.Secret{}
+		if err := kube.Get(context.Background(), client.ObjectKey{Namespace: secret.Namespace, Name: secret.Name}, secretObj); err != nil {
+			return nil, err
+		}
+		if val, ok := secretObj.Data[secret.Key]; ok {
+			if err := mergeJsonData(combinedData, val); err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, fmt.Errorf("key %s not found in secret %s", secret.Key, secret.Name)
+		}
+		//TODO: add test for not existing key
+	}
+	return combinedData, nil
+}
+
+func mergeJsonData(mergedData map[string]string, jsonToMerge []byte) error {
+	var toAdd map[string]string
+	if err := json.Unmarshal(jsonToMerge, &toAdd); err != nil {
+		return err
+	}
+	for k, v := range toAdd {
+		mergedData[k] = v
+	}
+	return nil
 }
