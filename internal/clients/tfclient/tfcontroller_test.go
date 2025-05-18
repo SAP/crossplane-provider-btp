@@ -36,6 +36,7 @@ func TestConnect(t *testing.T) {
 		fields fields
 		want   want
 	}{
+		//TODO: add test case for error returned from TfMapper
 		{
 			name: "ConnectError",
 			args: args{

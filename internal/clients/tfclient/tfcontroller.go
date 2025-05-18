@@ -53,7 +53,11 @@ func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraforme
 
 func (t *TfProxyConnector[NATIVE, UPJETTED]) Connect(ctx context.Context, cr NATIVE) (TfProxyControllerI, error) {
 	//TODO: add error handling for the mapper
-	ssi, _ := t.tfMapper.TfResource(cr, t.kube)
+	ssi, err := t.tfMapper.TfResource(cr, t.kube)
+
+	if err != nil {
+		return nil, err
+	}
 
 	ctrl, err := t.connector.Connect(ctx, ssi)
 	if err != nil {

@@ -55,6 +55,7 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 	if err := mergeJsonData(parameterData, []byte(internal.Val(plainParameters))); err != nil {
 		return nil, errors.Wrap(err, "failed to map tf resource")
 	}
+	//TODO: prevent nilpointer
 	parameterJson, err := json.Marshal(parameterData)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to map tf resource")
@@ -98,10 +99,11 @@ func pcName(si *v1alpha1.ServiceInstance) string {
 }
 
 // lookupSecrets retrieves the data from secretKeySelectors, converts them from json to a map and merges them into a single map.
-func lookupSecrets(kube client.Client, secretsSelectors []xpv1.SecretKeySelector) (map[string]string, error) {
-	combinedData := make(map[string]string)
+func lookupSecrets(kube client.Client, secretsSelectors []xpv1.SecretKeySelector) (map[string]interface{}, error) {
+	combinedData := make(map[string]interface{})
 	for _, secret := range secretsSelectors {
 		secretObj := &corev1.Secret{}
+		//TODO: use context from parent
 		if err := kube.Get(context.Background(), client.ObjectKey{Namespace: secret.Namespace, Name: secret.Name}, secretObj); err != nil {
 			return nil, err
 		}
@@ -117,8 +119,9 @@ func lookupSecrets(kube client.Client, secretsSelectors []xpv1.SecretKeySelector
 	return combinedData, nil
 }
 
-func mergeJsonData(mergedData map[string]string, jsonToMerge []byte) error {
-	var toAdd map[string]string
+// mergeJsonData merges the json data into the map
+func mergeJsonData(mergedData map[string]interface{}, jsonToMerge []byte) error {
+	var toAdd map[string]interface{} = make(map[string]interface{})
 	if err := json.Unmarshal(jsonToMerge, &toAdd); err != nil {
 		return err
 	}
