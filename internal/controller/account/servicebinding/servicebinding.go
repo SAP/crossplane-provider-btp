@@ -86,6 +86,7 @@ var saveCallback siClient.SaveConditionsFn = func(ctx context.Context, kube clie
 
 	nn := types.NamespacedName{Name: name}
 	if kErr := kube.Get(ctx, nn, si); kErr != nil {
+		//TODO: fix copy paste errors here
 		return errors.Wrap(kErr, errGetInstance)
 	}
 

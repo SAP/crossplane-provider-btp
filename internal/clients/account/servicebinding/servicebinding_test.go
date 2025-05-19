@@ -150,7 +150,7 @@ func TestObserve(t *testing.T) {
 					observation: managed.ExternalObservation{
 						ResourceExists: true,
 						ConnectionDetails: map[string][]byte{
-							"key1": []byte("value1"),
+							"tf-credentials-key": []byte(`{"key1":"value1","key2":"value2"}`),
 						},
 					},
 				},
@@ -160,6 +160,7 @@ func TestObserve(t *testing.T) {
 				err:    nil,
 				details: map[string][]byte{
 					"key1": []byte("value1"),
+					"key2": []byte("value2"),
 				},
 			},
 		},
