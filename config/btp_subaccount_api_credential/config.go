@@ -11,9 +11,15 @@ func Configure(p *config.Provider) {
 		r.Kind = "SubaccountApiCredential"
 		r.UseAsync = false
 
+		// Mark all as sensitive to expose them as a secret
+		r.TerraformResource.Schema["client_secret"].Sensitive = true
+		r.TerraformResource.Schema["client_id"].Sensitive = true
+		r.TerraformResource.Schema["token_url"].Sensitive = true
+		r.TerraformResource.Schema["api_url"].Sensitive = true
+
 		r.ExternalName.SetIdentifierArgumentFn = func(base map[string]any, name string) {
 			if name == "" {
-				base["name"] = "managed-subbaccount-api-credential"
+				base["name"] = "managed-subbaccount-api-credential-3"
 			} else {
 				base["name"] = name
 			}
@@ -21,9 +27,8 @@ func Configure(p *config.Provider) {
 		r.ExternalName.GetExternalNameFn = func(tfstate map[string]any) (string, error) {
 			return tfstate["name"].(string), nil
 		}
-
-		// Create custom secret structure for sensitive data
 		r.Sensitive.AdditionalConnectionDetailsFn = func(attr map[string]any) (map[string][]byte, error) {
+			// We need to return the sensitive values as byte array
 
 			result := make(map[string][]byte)
 			if clientID, ok := attr["client_id"].(string); ok {
