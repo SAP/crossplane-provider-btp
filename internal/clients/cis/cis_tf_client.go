@@ -168,7 +168,7 @@ func (tf *TfClient) UpdateResources(ctx context.Context, cr *apisv1alpha1.CloudM
 // What of the resources need to be created is determined by set IDs in SM's status
 func (tf *TfClient) CreateResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) (string, string, error) {
 	// since instance and binding depend on each other and tf resources are written in Connect() we need to use 2 Create() calls to first create instance and later binding
-	// so its expected to do either one of them here
+	// so it's expected to do either one of them here
 	//
 	if cr.Status.AtProvider.ServiceInstanceID == "" {
 		sID, err := tf.createInstance(ctx)

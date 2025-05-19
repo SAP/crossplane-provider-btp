@@ -14,10 +14,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/pkg/errors"
-	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
+	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -43,9 +44,10 @@ func TestObserve(t *testing.T) {
 	}
 
 	type want struct {
-		o   managed.ExternalObservation
-		cr  resource.Managed
-		err error
+		o             managed.ExternalObservation
+		crCompareOpts []cmp.Option
+		cr            resource.Managed
+		err           error
 	}
 
 	var cases = map[string]struct {
@@ -64,20 +66,20 @@ func TestObserve(t *testing.T) {
 		},
 		"ErrorGettingKymaEnvironment": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return nil, errors.New("Could not call backend")
 				}},
 				cr: environment(),
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.New("Could not call backend"),
+				err: errors.Wrap(errors.New("Could not call backend"), "Could not describe kyma instance"),
 				cr:  environment(),
 			},
 		},
 		"NeedsCreate": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return nil, nil
 				}},
 				cr: environment(),
@@ -92,8 +94,8 @@ func TestObserve(t *testing.T) {
 		},
 		"ErrorParsingLabels": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("}corrupted{"),
@@ -108,14 +110,15 @@ func TestObserve(t *testing.T) {
 					ResourceExists:   true,
 					ResourceUpToDate: true,
 				},
-				err: errors.Wrap(errors.New("invalid character '}' looking for beginning of value"), "can not obtain kubeConfig"),
-				cr:  environment(withUID("1234"), withConditions(xpv1.Available())),
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           errors.Wrap(errors.New("invalid character '}' looking for beginning of value"), "can not obtain kubeConfig"),
+				cr:            environment(withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
 		"SuccessfulAvailable": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
 					}, nil
@@ -127,14 +130,15 @@ func TestObserve(t *testing.T) {
 					ResourceExists:   true,
 					ResourceUpToDate: true,
 				},
-				err: nil,
-				cr:  environment(withUID("1234"), withConditions(xpv1.Available())),
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           nil,
+				cr:            environment(withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
 		"AvailableWithConnectionDetails": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
@@ -156,14 +160,15 @@ func TestObserve(t *testing.T) {
 						"certificate-authority-data": []byte("someCaData"),
 					},
 				},
-				err: nil,
-				cr:  environment(withUID("1234"), withConditions(xpv1.Available())),
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           nil,
+				cr:            environment(withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
 		"AvailableWithPartialConnectionDetails": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
@@ -185,14 +190,15 @@ func TestObserve(t *testing.T) {
 						"certificate-authority-data": []byte{},
 					},
 				},
-				err: nil,
-				cr:  environment(withUID("1234"), withConditions(xpv1.Available())),
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           nil,
+				cr:            environment(withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
 		"UpdateInProgress": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State: internal.Ptr("UPDATING"),
 					}, nil
 				}},
@@ -209,12 +215,13 @@ func TestObserve(t *testing.T) {
 		},
 		"Update with Json Parameters": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
-						State:      internal.Ptr("OK"),
-						Parameters: internal.Ptr(`{"foo": "bar"}`),
-					}, nil
-				}},
+				client: fake.MockClient{
+					MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+						return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+							State:      internal.Ptr("OK"),
+							Parameters: internal.Ptr(`{"foo": "bar"}`),
+						}, nil
+					}},
 				cr: environment(withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 					Parameters: runtime.RawExtension{Raw: []byte(`{"foo": "baz"}`)},
 				})),
@@ -224,7 +231,8 @@ func TestObserve(t *testing.T) {
 					ResourceExists:   true,
 					ResourceUpToDate: false,
 				},
-				err: nil,
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           nil,
 				cr: environment(withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 						Parameters: runtime.RawExtension{Raw: []byte(`{"foo": "baz"}`)},
@@ -233,8 +241,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Update with YAML Parameters": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`foo: bar`),
 					}, nil
@@ -248,7 +256,7 @@ func TestObserve(t *testing.T) {
 					ResourceExists:   true,
 					ResourceUpToDate: false,
 				},
-				err: nil,
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()}, err: nil,
 				cr: environment(withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 						Parameters: runtime.RawExtension{Raw: []byte(`foo: baz`)},
@@ -257,8 +265,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Update with invalid json Parameters": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`foo: bar`),
 					}, nil
@@ -285,8 +293,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Update with invalid yaml Parameters": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`foo: bar`),
 					}, nil
@@ -313,8 +321,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Update with invalid Service response": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`asd`),
 					}, nil
@@ -341,8 +349,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Deleting": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State: internal.Ptr("DELETING"),
 					}, nil
 				}},
@@ -359,8 +367,8 @@ func TestObserve(t *testing.T) {
 		},
 		"Creating": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State: internal.Ptr("CREATING"),
 					}, nil
 				}},
@@ -375,10 +383,61 @@ func TestObserve(t *testing.T) {
 				cr:  environment(withConditions(xpv1.Creating())),
 			},
 		},
+		"CircuitBreakerOn": {
+			args: args{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+						State:      internal.Ptr("OK"),
+						Parameters: internal.Ptr(`foo: bar`),
+					}, nil
+				}},
+				cr: environment(withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+					Parameters: runtime.RawExtension{Raw: []byte(`foo: baz`)},
+				}), func(r *v1alpha1.KymaEnvironment) {
+					r.Status.RetryStatus = &v1alpha1.RetryStatus{
+						DesiredHash: hash(map[string]interface{}{
+							"foo":  "baz",
+							"name": "kyma",
+						}),
+						CurrentHash: hash(map[string]interface{}{
+							"foo": "bar",
+						}),
+						Count:          2,
+						CircuitBreaker: false,
+					}
+				}),
+			},
+			want: want{
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerDiff()},
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+				},
+				err: nil,
+				cr: environment(
+					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+						Parameters: runtime.RawExtension{Raw: []byte(`foo: baz`)},
+					}),
+					withConditions(xpv1.Available()),
+					func(r *v1alpha1.KymaEnvironment) {
+						r.Status.RetryStatus = &v1alpha1.RetryStatus{
+							CircuitBreaker: true,
+							DesiredHash: hash(map[string]interface{}{
+								"foo":  "baz",
+								"name": "kyma",
+							}),
+							CurrentHash: hash(map[string]interface{}{
+								"foo": "bar",
+							}),
+							Count: 3,
+						}
+					}),
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client, httpClient: http.DefaultClient}
+			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient()}
 			if tc.args.httpClient != nil {
 				e.httpClient = tc.args.httpClient
 			}
@@ -386,11 +445,225 @@ func TestObserve(t *testing.T) {
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Observe(...): -want error, +got error:\n%s\n", diff)
 			}
-			if diff := cmp.Diff(tc.want.cr, tc.args.cr, test.EquateConditions(), cmpopts.IgnoreTypes(v1alpha1.KymaEnvironmentObservation{})); diff != "" {
+			opts := []cmp.Option{
+				test.EquateConditions(), cmpopts.IgnoreTypes(v1alpha1.KymaEnvironmentObservation{}),
+			}
+			opts = append(opts, tc.want.crCompareOpts...)
+
+			if diff := cmp.Diff(tc.want.cr, tc.args.cr, opts...); diff != "" {
 				t.Errorf("\ne.Observe(...): -want error, +got error:\n%s\n", diff)
 			}
-			if diff := cmp.Diff(tc.want.o, got); diff != "" {
+			if diff := cmp.Diff(tc.want.o, got, cmpopts.IgnoreFields(managed.ExternalObservation{}, "Diff")); diff != "" {
 				t.Errorf("\ne.Observe(...): -want, +got:\n%s\n", diff)
+			}
+		})
+	}
+}
+
+func ignoreCircuitBreakerStatus() cmp.Option {
+	return cmpopts.IgnoreTypes(&v1alpha1.RetryStatus{})
+}
+func ignoreCircuitBreakerDiff() cmp.Option {
+	return cmpopts.IgnoreFields(v1alpha1.RetryStatus{}, "Diff")
+}
+
+func TestCircuitBreaker(t *testing.T) {
+	type args struct {
+		cr     resource.Managed
+		client kyma.Client
+	}
+
+	type want struct {
+		o   managed.ExternalUpdate
+		err error
+	}
+
+	cases := map[string]struct {
+		args args
+		want want
+	}{
+		"CircuitBreakerOn": {
+			args: args{
+				client: fake.MockClient{},
+				cr: environment(func(r *v1alpha1.KymaEnvironment) {
+					r.Status.RetryStatus = &v1alpha1.RetryStatus{
+						CircuitBreaker: true,
+					}
+				}),
+			},
+			want: want{
+				o:   managed.ExternalUpdate{},
+				err: errors.New(errCircutBreak),
+			},
+		},
+		"CircuitBreakerOff": {
+			args: args{
+				client: fake.MockClient{},
+				cr: environment(func(r *v1alpha1.KymaEnvironment) {
+					r.Status.RetryStatus = &v1alpha1.RetryStatus{}
+				}),
+			},
+			want: want{
+				o:   managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{}},
+				err: nil,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{client: tc.args.client}
+			got, err := e.Update(context.Background(), tc.args.cr)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\ne.Update(...): -want error, +got error:\n%s\n", diff)
+			}
+			if diff := cmp.Diff(tc.want.o, got); diff != "" {
+				t.Errorf("\ne.Update(...): -want, +got:\n%s\n", diff)
+			}
+		})
+	}
+}
+
+func TestUpdateCircuitBreakerStatus(t *testing.T) {
+	const anything = "something"
+	type args struct {
+		cr         *v1alpha1.KymaEnvironment
+		desired    any
+		current    any
+		diff       string
+		maxRetries int
+	}
+	tests := []struct {
+		name string
+		args args
+		want *v1alpha1.RetryStatus
+	}{
+		{
+			name: "Initial Retry Status Creation",
+			args: args{
+				cr:         &v1alpha1.KymaEnvironment{Status: v1alpha1.KymaEnvironmentStatus{}},
+				desired:    anything,
+				current:    anything,
+				diff:       "",
+				maxRetries: 3,
+			},
+			want: &v1alpha1.RetryStatus{
+				DesiredHash:    hash(anything),
+				CurrentHash:    hash(anything),
+				Diff:           "",
+				Count:          1,
+				CircuitBreaker: false,
+			},
+		},
+		{
+			name: "Retry Count Increment",
+			args: args{
+				cr: &v1alpha1.KymaEnvironment{
+					Status: v1alpha1.KymaEnvironmentStatus{
+						RetryStatus: &v1alpha1.RetryStatus{
+							DesiredHash:    hash(anything),
+							CurrentHash:    hash(anything),
+							Count:          2,
+							CircuitBreaker: false,
+						},
+					},
+				},
+				desired:    anything,
+				current:    anything,
+				diff:       "",
+				maxRetries: 3,
+			},
+			want: &v1alpha1.RetryStatus{
+				DesiredHash:    hash(anything),
+				CurrentHash:    hash(anything),
+				Diff:           "",
+				Count:          3,
+				CircuitBreaker: true,
+			},
+		},
+		{
+			name: "Reset Retry Status",
+			args: args{
+				cr: &v1alpha1.KymaEnvironment{
+					Status: v1alpha1.KymaEnvironmentStatus{
+						RetryStatus: &v1alpha1.RetryStatus{
+							DesiredHash:    hash(map[string]interface{}{"key": "old"}),
+							CurrentHash:    hash(map[string]interface{}{"key": "old"}),
+							Count:          3,
+							CircuitBreaker: true,
+						},
+					},
+				},
+				desired:    map[string]interface{}{"key": "new"},
+				current:    map[string]interface{}{"key": "new"},
+				diff:       "some-diff",
+				maxRetries: 3,
+			},
+			want: &v1alpha1.RetryStatus{
+				DesiredHash:    hash(map[string]interface{}{"key": "new"}),
+				CurrentHash:    hash(map[string]interface{}{"key": "new"}),
+				Diff:           "some-diff",
+				Count:          1,
+				CircuitBreaker: false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			updateCircuitBreakerStatus(tt.args.cr, tt.args.desired, tt.args.current, tt.args.diff, tt.args.maxRetries)
+			if diff := cmp.Diff(tt.want, tt.args.cr.Status.RetryStatus); diff != "" {
+				t.Errorf("updateCircuitBreakerStatus() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestMaxRetriesExtraction(t *testing.T) {
+	tests := []struct {
+		name          string
+		annotations   map[string]string
+		expectedValue int
+		expectError   bool
+	}{
+		{
+			name:          "Valid annotation",
+			annotations:   map[string]string{v1alpha1.AnnotationMaxRetries: "5"},
+			expectedValue: 5,
+			expectError:   false,
+		},
+		{
+			name:          "Invalid annotation value",
+			annotations:   map[string]string{v1alpha1.AnnotationMaxRetries: "invalid"},
+			expectedValue: 0,
+			expectError:   true,
+		},
+		{
+			name:          "Missing annotation",
+			annotations:   map[string]string{},
+			expectedValue: maxRetriesDefault, // Default value
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cr := &v1alpha1.KymaEnvironment{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: tt.annotations,
+				},
+			}
+
+			retries, err := lookupMaxRetries(cr, maxRetriesDefault)
+			if err != nil {
+				return
+			}
+
+			if (err != nil) != tt.expectError {
+				t.Errorf("expected error: %v, got: %v", tt.expectError, err)
+			}
+			if retries != tt.expectedValue {
+				t.Errorf("expected maxRetries: %d, got: %d", tt.expectedValue, retries)
 			}
 		})
 	}

@@ -70,5 +70,5 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 	svc, err := c.newServiceFn(cisBinding, ServiceAccountSecretData)
 
-	return &external{client: kymaenv.NewKymaEnvironments(*svc), tracker: c.resourcetracker, httpClient: &http.Client{Timeout: 10 * time.Second}}, err
+	return &external{client: kymaenv.NewKymaEnvironments(*svc), log: c.log, kube: c.kube, tracker: c.resourcetracker, httpClient: &http.Client{Timeout: 10 * time.Second}}, err
 }
