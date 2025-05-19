@@ -9,6 +9,37 @@ func Configure(p *config.Provider) {
 	p.AddResourceConfigurator("btp_subaccount_api_credential", func(r *config.Resource) {
 		r.ShortGroup = "security"
 		r.Kind = "SubaccountApiCredential"
+		r.UseAsync = false
+
+		r.ExternalName.SetIdentifierArgumentFn = func(base map[string]any, name string) {
+			if name == "" {
+				base["name"] = "managed-subbaccount-api-credential"
+			} else {
+				base["name"] = name
+			}
+		}
+		r.ExternalName.GetExternalNameFn = func(tfstate map[string]any) (string, error) {
+			return tfstate["name"].(string), nil
+		}
+
+		// Create custom secret structure for sensitive data
+		r.Sensitive.AdditionalConnectionDetailsFn = func(attr map[string]any) (map[string][]byte, error) {
+
+			result := make(map[string][]byte)
+			if clientID, ok := attr["client_id"].(string); ok {
+				result["client_id"] = []byte(clientID)
+			}
+			if clientSecret, ok := attr["client_secret"].(string); ok {
+				result["client_secret"] = []byte(clientSecret)
+			}
+			if tokenURL, ok := attr["token_url"].(string); ok {
+				result["token_url"] = []byte(tokenURL)
+			}
+			if apiURL, ok := attr["api_url"].(string); ok {
+				result["api_url"] = []byte(apiURL)
+			}
+			return result, nil
+		}
 
 		r.References["subaccount_id"] = config.Reference{
 			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",

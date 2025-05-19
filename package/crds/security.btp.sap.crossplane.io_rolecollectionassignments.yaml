@@ -327,8 +327,8 @@ spec:
                           reference cannot be resolved. 'Optional' means this reference will be
                           a no-op if it cannot be resolved.
                         enum:
-                          - Required
-                          - Optional
+                        - Required
+                        - Optional
                         type: string
                       resolve:
                         description: |-
@@ -337,12 +337,12 @@ spec:
                           the corresponding field is not present. Use 'Always' to resolve the
                           reference on every reconcile.
                         enum:
-                          - Always
-                          - IfNotPresent
+                        - Always
+                        - IfNotPresent
                         type: string
                     type: object
                 required:
-                  - name
+                - name
                 type: object
               subaccountApiCredentialSecret:
                 type: string
@@ -373,8 +373,8 @@ spec:
                           reference cannot be resolved. 'Optional' means this reference will be
                           a no-op if it cannot be resolved.
                         enum:
-                          - Required
-                          - Optional
+                        - Required
+                        - Optional
                         type: string
                       resolve:
                         description: |-
@@ -383,8 +383,8 @@ spec:
                           the corresponding field is not present. Use 'Always' to resolve the
                           reference on every reconcile.
                         enum:
-                          - Always
-                          - IfNotPresent
+                        - Always
+                        - IfNotPresent
                         type: string
                     type: object
                 type: object
