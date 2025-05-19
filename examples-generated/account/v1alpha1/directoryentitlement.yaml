@@ -1,0 +1,15 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: DirectoryEntitlement
+metadata:
+  annotations:
+    meta.upbound.io/example-id: account/v1alpha1/directoryentitlement
+  labels:
+    testing.upbound.io/example-name: alert_notification_service
+  name: alert-notification-service
+spec:
+  forProvider:
+    directorySelector:
+      matchLabels:
+        testing.upbound.io/example-name: example
+    planName: free
+    serviceName: alert-notification

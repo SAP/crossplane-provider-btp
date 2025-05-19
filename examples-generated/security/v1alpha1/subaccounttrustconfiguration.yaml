@@ -1,0 +1,14 @@
+apiVersion: security.btp.sap.crossplane.io/v1alpha1
+kind: SubaccountTrustConfiguration
+metadata:
+  annotations:
+    meta.upbound.io/example-id: security/v1alpha1/subaccounttrustconfiguration
+  labels:
+    testing.upbound.io/example-name: simple
+  name: simple
+spec:
+  forProvider:
+    identityProvider: terraformint.accounts400.ondemand.com
+    subaccountSelector:
+      matchLabels:
+        testing.upbound.io/example-name: example

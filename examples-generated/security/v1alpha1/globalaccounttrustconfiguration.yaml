@@ -1,0 +1,11 @@
+apiVersion: security.btp.sap.crossplane.io/v1alpha1
+kind: GlobalaccountTrustConfiguration
+metadata:
+  annotations:
+    meta.upbound.io/example-id: security/v1alpha1/globalaccounttrustconfiguration
+  labels:
+    testing.upbound.io/example-name: simple
+  name: simple
+spec:
+  forProvider:
+    identityProvider: terraformint.accounts400.ondemand.com

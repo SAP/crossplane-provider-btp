@@ -58,10 +58,6 @@ type SubaccountApiCredentialInitParameters struct {
 
 type SubaccountApiCredentialObservation struct {
 
-	// (String) The URL to be used to make the API calls.
-	// The URL to be used to make the API calls.
-	APIURL *string `json:"apiUrl,omitempty" tf:"api_url,omitempty"`
-
 	// ---BEGIN CERTIFICATE-----...-----END CERTIFICATE-----".
 	// If the user prefers to use a certificate, they must provide the certificate value in PEM format "----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----".
 	CertificatePassed *string `json:"certificatePassed,omitempty" tf:"certificate_passed,omitempty"`
@@ -69,14 +65,6 @@ type SubaccountApiCredentialObservation struct {
 	// (String) The certificate that is computed based on the one passed by the user.
 	// The certificate that is computed based on the one passed by the user.
 	CertificateReceived *string `json:"certificateReceived,omitempty" tf:"certificate_received,omitempty"`
-
-	// (String) A unique ID associated with the API credential.
-	// A unique ID associated with the API credential.
-	ClientID *string `json:"clientId,omitempty" tf:"client_id,omitempty"`
-
-	// (String) If the certificate is omitted, then a unique secret is generated for the API credential.
-	// If the certificate is omitted, then a unique secret is generated for the API credential.
-	ClientSecret *string `json:"clientSecret,omitempty" tf:"client_secret,omitempty"`
 
 	// (String) The supported credential types are Secrets (Default) or Certificates.
 	// The supported credential types are Secrets (Default) or Certificates.
@@ -99,10 +87,6 @@ type SubaccountApiCredentialObservation struct {
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
 	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
-
-	// (String) The URL to be used to fetch the access token to make use of the XSUAA REST APIs.
-	// The URL to be used to fetch the access token to make use of the XSUAA REST APIs.
-	TokenURL *string `json:"tokenUrl,omitempty" tf:"token_url,omitempty"`
 }
 
 type SubaccountApiCredentialParameters struct {

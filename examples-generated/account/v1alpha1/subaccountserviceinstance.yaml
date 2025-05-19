@@ -1,0 +1,13 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: SubaccountServiceInstance
+metadata:
+  annotations:
+    meta.upbound.io/example-id: account/v1alpha1/subaccountserviceinstance
+  labels:
+    testing.upbound.io/example-name: alert_notification_free
+  name: alert-notification-free
+spec:
+  forProvider:
+    name: my-alert-notification-instance-new
+    serviceplanId: b50d1b0b-2059-4f21-a014-2ea87752eb48
+    subaccountId: 6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f

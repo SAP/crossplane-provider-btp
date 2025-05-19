@@ -33,7 +33,7 @@ func (mg *SubaccountApiCredential) GetTerraformResourceType() string {
 
 // GetConnectionDetailsMapping for this SubaccountApiCredential
 func (tr *SubaccountApiCredential) GetConnectionDetailsMapping() map[string]string {
-	return nil
+	return map[string]string{"api_url": "status.atProvider.apiUrl", "client_id": "status.atProvider.clientId", "client_secret": "status.atProvider.clientSecret", "token_url": "status.atProvider.tokenUrl"}
 }
 
 // GetObservation of this SubaccountApiCredential
