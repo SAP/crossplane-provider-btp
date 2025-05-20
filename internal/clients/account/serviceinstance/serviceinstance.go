@@ -45,22 +45,40 @@ type ServiceInstanceMapper struct {
 }
 
 func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube client.Client) (*v1alpha1.SubaccountServiceInstance, error) {
+	sInstance := buildBaseTfResource(si)
+
+	// combine parameters
+	parameterJson, err := buildComplexParameterJson(kube, si)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to map tf resource")
+	}
+	sInstance.Spec.ForProvider.Parameters = internal.Ptr(string(parameterJson))
+
+	// transfer external name
+	meta.SetExternalName(sInstance, meta.GetExternalName(si))
+	return sInstance, nil
+}
+
+func buildComplexParameterJson(kube client.Client, si *v1alpha1.ServiceInstance) ([]byte, error) {
 	// resolve all parameter secret references and merge them into a single map
 	parameterData, err := lookupSecrets(kube, si.Spec.ForProvider.ParameterSecrets)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to map tf resource")
+		return nil, err
 	}
 	// merge the plain parameters with the secret parameters
 	plainParameters := si.Spec.ForProvider.SubaccountServiceInstanceParameters.Parameters
 	if err := mergeJsonData(parameterData, []byte(internal.Val(plainParameters))); err != nil {
-		return nil, errors.Wrap(err, "failed to map tf resource")
+		return nil, err
 	}
 	//TODO: prevent nilpointer
 	parameterJson, err := json.Marshal(parameterData)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to map tf resource")
+		return nil, err
 	}
+	return parameterJson, nil
+}
 
+func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServiceInstance {
 	sInstance := &v1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha1.SubaccountServiceInstance_Kind,
@@ -85,9 +103,7 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 		},
 		Status: v1alpha1.SubaccountServiceInstanceStatus{},
 	}
-	sInstance.Spec.ForProvider.Parameters = internal.Ptr(string(parameterJson))
-	meta.SetExternalName(sInstance, meta.GetExternalName(si))
-	return sInstance, nil
+	return sInstance
 }
 
 func pcName(si *v1alpha1.ServiceInstance) string {
