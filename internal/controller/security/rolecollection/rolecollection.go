@@ -48,6 +48,9 @@ type RoleCollectionMaintainer interface {
 
 var configureRoleCollectionMaintainerFn = func(binding *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error) {
 
+	if binding == nil {
+		return nil, errInvalidSecret
+	}
 	return service.NewXsuaaRoleCollectionMaintainer(btp.NewBackgroundContextWithDebugPrintHTTPClient(), binding.ClientId, binding.ClientSecret, binding.TokenURL, binding.ApiUrl), nil
 }
 
