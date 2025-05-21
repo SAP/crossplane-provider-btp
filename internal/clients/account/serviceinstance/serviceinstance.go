@@ -61,7 +61,7 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 
 func buildComplexParameterJson(kube client.Client, si *v1alpha1.ServiceInstance) ([]byte, error) {
 	// resolve all parameter secret references and merge them into a single map
-	parameterData, err := lookupSecrets(kube, si.Spec.ForProvider.ParameterSecrets)
+	parameterData, err := lookupSecrets(kube, si.Spec.ForProvider.ParameterSecretRefs)
 	if err != nil {
 		return nil, err
 	}

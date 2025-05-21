@@ -1511,8 +1511,8 @@ func (in *ServiceInstanceObservation) DeepCopy() *ServiceInstanceObservation {
 func (in *ServiceInstanceParameters) DeepCopyInto(out *ServiceInstanceParameters) {
 	*out = *in
 	in.SubaccountServiceInstanceParameters.DeepCopyInto(&out.SubaccountServiceInstanceParameters)
-	if in.ParameterSecrets != nil {
-		in, out := &in.ParameterSecrets, &out.ParameterSecrets
+	if in.ParameterSecretRefs != nil {
+		in, out := &in.ParameterSecretRefs, &out.ParameterSecretRefs
 		*out = make([]v1.SecretKeySelector, len(*in))
 		copy(*out, *in)
 	}

@@ -255,9 +255,9 @@ func withTfParameters(jsonParams string) func(*v1alpha1.SubaccountServiceInstanc
 
 func withParameterSecrets(parameterSecrets map[string]string) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Spec.ForProvider.ParameterSecrets = make([]xpv1.SecretKeySelector, 0)
+		cr.Spec.ForProvider.ParameterSecretRefs = make([]xpv1.SecretKeySelector, 0)
 		for k, v := range parameterSecrets {
-			cr.Spec.ForProvider.ParameterSecrets = append(cr.Spec.ForProvider.ParameterSecrets, xpv1.SecretKeySelector{
+			cr.Spec.ForProvider.ParameterSecretRefs = append(cr.Spec.ForProvider.ParameterSecretRefs, xpv1.SecretKeySelector{
 				SecretReference: xpv1.SecretReference{
 					Name: k,
 				},

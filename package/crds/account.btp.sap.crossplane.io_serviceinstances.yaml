@@ -88,7 +88,7 @@ spec:
                       (String) The name of the service instance.
                       The name of the service instance.
                     type: string
-                  parameterSecrets:
+                  parameterSecretRefs:
                     items:
                       description: A SecretKeySelector is a reference to a secret
                         key in an arbitrary namespace.
