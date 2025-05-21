@@ -26,6 +26,48 @@ import (
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// ResolveReferences of this RoleCollection.
+func (mg *RoleCollection) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPIResolver(c, mg)
+
+	var rsp reference.ResolutionResponse
+	var err error
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret,
+		Extract:      SubaccountApiCredentialSecret(),
+		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
+		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
+		To: reference.To{
+			List:    &SubaccountApiCredentialList{},
+			Managed: &SubaccountApiCredential{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret")
+	}
+	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret = rsp.ResolvedValue
+	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace,
+		Extract:      SubaccountApiCredentialSecretSecretNamespace(),
+		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
+		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
+		To: reference.To{
+			List:    &SubaccountApiCredentialList{},
+			Managed: &SubaccountApiCredential{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace")
+	}
+	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace = rsp.ResolvedValue
+	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef = rsp.ResolvedReference
+
+	return nil
+}
+
 // ResolveReferences of this RoleCollectionAssignment.
 func (mg *RoleCollectionAssignment) ResolveReferences(ctx context.Context, c client.Reader) error {
 	r := reference.NewAPIResolver(c, mg)
@@ -34,36 +76,36 @@ func (mg *RoleCollectionAssignment) ResolveReferences(ctx context.Context, c cli
 	var err error
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.SubaccountApiCredentialSecret,
+		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret,
 		Extract:      SubaccountApiCredentialSecret(),
-		Reference:    mg.Spec.SubaccountApiCredentialRef,
-		Selector:     mg.Spec.SubaccountApiCredentialSelector,
+		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
+		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
 		To: reference.To{
 			List:    &SubaccountApiCredentialList{},
 			Managed: &SubaccountApiCredential{},
 		},
 	})
 	if err != nil {
-		return errors.Wrap(err, "mg.Spec.SubaccountApiCredentialSecret")
+		return errors.Wrap(err, "mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret")
 	}
-	mg.Spec.SubaccountApiCredentialSecret = rsp.ResolvedValue
-	mg.Spec.SubaccountApiCredentialRef = rsp.ResolvedReference
+	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret = rsp.ResolvedValue
+	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef = rsp.ResolvedReference
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.SubaccountApiCredentialSecretNamespace,
+		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace,
 		Extract:      SubaccountApiCredentialSecretSecretNamespace(),
-		Reference:    mg.Spec.SubaccountApiCredentialRef,
-		Selector:     mg.Spec.SubaccountApiCredentialSelector,
+		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
+		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
 		To: reference.To{
 			List:    &SubaccountApiCredentialList{},
 			Managed: &SubaccountApiCredential{},
 		},
 	})
 	if err != nil {
-		return errors.Wrap(err, "mg.Spec.SubaccountApiCredentialSecretNamespace")
+		return errors.Wrap(err, "mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace")
 	}
-	mg.Spec.SubaccountApiCredentialSecretNamespace = rsp.ResolvedValue
-	mg.Spec.SubaccountApiCredentialRef = rsp.ResolvedReference
+	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace = rsp.ResolvedValue
+	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef = rsp.ResolvedReference
 
 	return nil
 }

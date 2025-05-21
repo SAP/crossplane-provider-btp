@@ -4,7 +4,6 @@ import (
 	"context"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	corev1 "k8s.io/api/core/v1"
 
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -75,23 +74,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
-	// We default to secrets referenced directly in the spec
-	var useApiCredentials *bool = nil
-
-	// If the direct source is empty and there is a reference we use that, else throw an error
-	if cr.Spec.SubaccountApiCredentialRef != nil {
-		value := false
-		useApiCredentials = &value
-	} else if cr.Spec.APICredentials.Source != "" {
-		value := true
-		useApiCredentials = &value
-	}
-
-	if useApiCredentials == nil {
-		return nil, errNoSource
-	}
-
-	binding, err := CreateBindingFromSource(useApiCredentials, cr, ctx, c)
+	binding, err := v1alpha1.CreateBindingFromSource(&cr.Spec.XSUAACredentialsReference, ctx, c.kube)
 
 	if err != nil {
 		return nil, errors.Wrap(err, errGetSecret)
@@ -193,36 +176,4 @@ func IdentifierName(cr *v1alpha1.RoleCollectionAssignment) string {
 		return cr.Spec.ForProvider.UserName
 	}
 	return cr.Spec.ForProvider.GroupName
-}
-
-// CreateBindingFromSource creates a binding from the source specified in the spec
-func CreateBindingFromSource(useApiCredentials *bool, cr *v1alpha1.RoleCollectionAssignment, ctx context.Context, c *connector) (*v1alpha1.XsuaaBinding, error) {
-
-	if *useApiCredentials {
-		// We default to the secret source if it is set
-		secretBytes, err := resource.CommonCredentialExtractor(
-			ctx,
-			cr.Spec.APICredentials.Source,
-			c.kube,
-			cr.Spec.APICredentials.CommonCredentialSelectors,
-		)
-
-		if secretBytes == nil {
-			return nil, errors.Wrap(err, errReadSecret)
-		}
-
-		return v1alpha1.ReadXsuaaCredentialsCustom(secretBytes)
-
-	} else {
-		// If the secret is not referenced directly, we need to get it from the subaccountapicredential
-		secret := &corev1.Secret{}
-		err := c.kube.Get(ctx, client.ObjectKey{Name: cr.Spec.SubaccountApiCredentialSecret, Namespace: cr.Spec.SubaccountApiCredentialSecretNamespace}, secret)
-
-		if secret.Data == nil {
-			return nil, errors.Wrap(err, errReadSecret)
-		}
-
-		return v1alpha1.ReadXsuaaCredentialsUpjet(*secret)
-
-	}
 }

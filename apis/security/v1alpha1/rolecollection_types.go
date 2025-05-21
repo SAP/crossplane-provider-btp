@@ -61,8 +61,7 @@ type RoleCollectionSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 	ForProvider       RoleCollectionParameters `json:"forProvider"`
 
-	// xsuaa api credentials used to manage the assignment
-	APICredentials APICredentials `json:"apiCredentials"`
+	XSUAACredentialsReference `json:",inline"`
 }
 
 // A RoleCollectionStatus represents the observed state of a RoleCollection.
