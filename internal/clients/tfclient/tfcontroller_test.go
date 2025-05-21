@@ -15,7 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var errTf = errors.New("tf error")
+var (
+	errTf     = errors.New("tf error")
+	errMapper = errors.New("mapper error")
+)
 
 func TestConnect(t *testing.T) {
 	type args struct {
@@ -36,7 +39,23 @@ func TestConnect(t *testing.T) {
 		fields fields
 		want   want
 	}{
-		//TODO: add test case for error returned from TfMapper
+		{
+			name: "MapperError",
+			args: args{
+				cr: ManagedMock{},
+			},
+			fields: fields{
+				connector: &TfConnectorMock{
+					err: errTf,
+				},
+				tfMapper: &TfMapperMock{err: errMapper},
+				kube:     nil,
+			},
+			want: want{
+				clientReturned: false,
+				err:            errMapper,
+			},
+		},
 		{
 			name: "ConnectError",
 			args: args{
@@ -358,11 +377,12 @@ func (t *TfConnectorMock) Connect(ctx context.Context, mg resource.Managed) (man
 var _ TfMapper[ManagedMock, *fake.Terraformed] = &TfMapperMock{}
 
 type TfMapperMock struct {
+	err error
 }
 
 // TfResource implements TfMapper.
 func (t *TfMapperMock) TfResource(cr ManagedMock, kube client.Client) (*fake.Terraformed, error) {
-	return &fake.Terraformed{}, nil
+	return &fake.Terraformed{}, t.err
 }
 
 var _ managed.ExternalClient = &TfControllerMock{}
