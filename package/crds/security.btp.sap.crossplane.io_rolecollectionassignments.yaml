@@ -110,6 +110,7 @@ spec:
                     - InjectedIdentity
                     - Environment
                     - Filesystem
+                    - ""
                     type: string
                 required:
                 - source
@@ -410,7 +411,6 @@ spec:
                 - namespace
                 type: object
             required:
-            - apiCredentials
             - forProvider
             type: object
           status:

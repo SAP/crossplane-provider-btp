@@ -4,6 +4,8 @@ import (
 	"context"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/btp"
 	rolecollectiongroupassignment "github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollectiongroupassignment"
@@ -21,7 +23,8 @@ const (
 	errNotRoleCollectionAssignment = "managed resource is not a RoleCollectionAssignment custom resource"
 	errTrackPCUsage                = "cannot track ProviderConfig usage"
 
-	errGetSecret = "api credential secret not found"
+	errGetSecret  = "api credential secret not found"
+	errReadSecret = "api credential secret is malformed"
 
 	errRetrieveRole = "cannot retrieve api data"
 	errAssignRole   = "cannot assign role"
@@ -32,25 +35,17 @@ const (
 )
 
 var (
-	errInvalidSecret = errors.New("api credential secret invalid")
+	errNoSource = errors.New("no source specified for api credentials")
 )
 
 var _ RoleAssigner = &rolecollectionuserassignment.XsusaaUserRoleAssigner{}
 
-var configureUserAssignerFn = func(secretData []byte) (RoleAssigner, error) {
-	binding, err := v1alpha1.ReadXsuaaCredentials(secretData)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read xsuaa credentials.")
-	}
+var configureUserAssignerFn = func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error) {
 
 	return rolecollectionuserassignment.NewXsuaaUserRoleAssigner(btp.NewBackgroundContextWithDebugPrintHTTPClient(), binding.ClientId, binding.ClientSecret, binding.TokenURL, binding.ApiUrl), nil
 }
 
-var configureGroupAssignerFn = func(secretData []byte) (RoleAssigner, error) {
-	binding, err := v1alpha1.ReadXsuaaCredentials(secretData)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read xsuaa credentials.")
-	}
+var configureGroupAssignerFn = func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error) {
 
 	return rolecollectiongroupassignment.NewXsuaaGroupRoleAssigner(btp.NewBackgroundContextWithDebugPrintHTTPClient(), binding.ClientId, binding.ClientSecret, binding.TokenURL, binding.ApiUrl), nil
 }
@@ -66,8 +61,8 @@ type RoleAssigner interface {
 type connector struct {
 	kube               client.Client
 	usage              resource.Tracker
-	newUserAssignerFn  func(creds []byte) (RoleAssigner, error)
-	newGroupAssignerFn func(creds []byte) (RoleAssigner, error)
+	newUserAssignerFn  func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error)
+	newGroupAssignerFn func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error)
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -80,21 +75,30 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
-	secretBytes, err := resource.CommonCredentialExtractor(
-		ctx,
-		cr.Spec.APICredentials.Source,
-		c.kube,
-		cr.Spec.APICredentials.CommonCredentialSelectors,
-	)
+	// We default to secrets referenced directly in the spec
+	var useApiCredentials *bool = nil
+
+	// If the direct source is empty and there is a reference we use that, else throw an error
+	if cr.Spec.SubaccountApiCredentialRef != nil {
+		value := false
+		useApiCredentials = &value
+	} else if cr.Spec.APICredentials.Source != "" {
+		value := true
+		useApiCredentials = &value
+	}
+
+	if useApiCredentials == nil {
+		return nil, errNoSource
+	}
+
+	binding, err := CreateBindingFromSource(useApiCredentials, cr, ctx, c)
 
 	if err != nil {
 		return nil, errors.Wrap(err, errGetSecret)
 	}
-	if secretBytes == nil {
-		return nil, errInvalidSecret
-	}
 
-	svc, err := c.newService(cr, secretBytes)
+	svc, err := c.newService(cr, binding)
+
 	if err != nil {
 		return nil, errors.Wrap(err, errNewClient)
 	}
@@ -170,11 +174,11 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 }
 
 // newService chooses one of the serviceCreation functions based on the type of the RoleCollectionAssignment
-func (c *connector) newService(cr *v1alpha1.RoleCollectionAssignment, bytes []byte) (RoleAssigner, error) {
+func (c *connector) newService(cr *v1alpha1.RoleCollectionAssignment, binding *v1alpha1.XsuaaBinding) (RoleAssigner, error) {
 	if isUserAssignment(cr) {
-		return c.newUserAssignerFn(bytes)
+		return c.newUserAssignerFn(binding)
 	}
-	return c.newGroupAssignerFn(bytes)
+	return c.newGroupAssignerFn(binding)
 }
 
 // isUserAssignment checks if the rolecollection assignment is for a user or a group
@@ -189,4 +193,36 @@ func IdentifierName(cr *v1alpha1.RoleCollectionAssignment) string {
 		return cr.Spec.ForProvider.UserName
 	}
 	return cr.Spec.ForProvider.GroupName
+}
+
+// CreateBindingFromSource creates a binding from the source specified in the spec
+func CreateBindingFromSource(useApiCredentials *bool, cr *v1alpha1.RoleCollectionAssignment, ctx context.Context, c *connector) (*v1alpha1.XsuaaBinding, error) {
+
+	if *useApiCredentials {
+		// We default to the secret source if it is set
+		secretBytes, err := resource.CommonCredentialExtractor(
+			ctx,
+			cr.Spec.APICredentials.Source,
+			c.kube,
+			cr.Spec.APICredentials.CommonCredentialSelectors,
+		)
+
+		if secretBytes == nil {
+			return nil, errors.Wrap(err, errReadSecret)
+		}
+
+		return v1alpha1.ReadXsuaaCredentialsCustom(secretBytes)
+
+	} else {
+		// If the secret is not referenced directly, we need to get it from the subaccountapicredential
+		secret := &corev1.Secret{}
+		err := c.kube.Get(ctx, client.ObjectKey{Name: cr.Spec.SubaccountApiCredentialSecret, Namespace: cr.Spec.SubaccountApiCredentialSecretNamespace}, secret)
+
+		if secret.Data == nil {
+			return nil, errors.Wrap(err, errReadSecret)
+		}
+
+		return v1alpha1.ReadXsuaaCredentialsUpjet(*secret)
+
+	}
 }

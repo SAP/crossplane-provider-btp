@@ -2,6 +2,7 @@ package rolecollection
 
 import (
 	"context"
+
 	"github.com/sap/crossplane-provider-btp/btp"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -46,7 +47,7 @@ type RoleCollectionMaintainer interface {
 }
 
 var configureRoleCollectionMaintainerFn = func(secretData []byte) (RoleCollectionMaintainer, error) {
-	binding, err := v1alpha1.ReadXsuaaCredentials(secretData)
+	binding, err := v1alpha1.ReadXsuaaCredentialsCustom(secretData)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read xsuaa credentials.")
 	}

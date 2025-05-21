@@ -109,6 +109,7 @@ spec:
                     - InjectedIdentity
                     - Environment
                     - Filesystem
+                    - ""
                     type: string
                 required:
                 - source
