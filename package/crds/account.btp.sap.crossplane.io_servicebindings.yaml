@@ -74,9 +74,55 @@ spec:
                 description: ServiceBindingParameters are the configurable fields
                   of a ServiceBinding.
                 properties:
+                  labels:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: |-
+                      (Map of Set of String) The set of words or phrases assigned to the service binding.
+                      The set of words or phrases assigned to the service binding.
+                    type: object
+                  name:
+                    description: |-
+                      (String) The name of the service binding.
+                      The name of the service binding.
+                    type: string
+                  parameterSecretRefs:
+                    description: Parameters stored in secret, will be merged with
+                      spec parameters
+                    items:
+                      description: A SecretKeySelector is a reference to a secret
+                        key in an arbitrary namespace.
+                      properties:
+                        key:
+                          description: The key to select.
+                          type: string
+                        name:
+                          description: Name of the secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the secret.
+                          type: string
+                      required:
+                      - key
+                      - name
+                      - namespace
+                      type: object
+                    type: array
+                  parameters:
+                    description: |-
+                      (String) The parameters of the service binding as a valid JSON object.
+                      The parameters of the service binding as a valid JSON object.
+                    type: string
+                  serviceInstanceId:
+                    description: |-
+                      (String) The ID of the service instance associated with the binding.
+                      The ID of the service instance associated with the binding.
+                    type: string
                   serviceInstanceRef:
                     description: Reference to a ServiceInstance in account to populate
-                      serviceinstanceId.
+                      serviceInstanceId.
                     properties:
                       name:
                         description: Name of the referenced object.
@@ -111,7 +157,7 @@ spec:
                     type: object
                   serviceInstanceSelector:
                     description: Selector for a ServiceInstance in account to populate
-                      serviceinstanceId.
+                      serviceInstanceId.
                     properties:
                       matchControllerRef:
                         description: |-
@@ -150,11 +196,6 @@ spec:
                             type: string
                         type: object
                     type: object
-                  serviceinstanceId:
-                    description: |-
-                      (String) The ID of the service instance.
-                      The ID of the service instance.
-                    type: string
                   subaccountId:
                     description: |-
                       (String) The ID of the subaccount.

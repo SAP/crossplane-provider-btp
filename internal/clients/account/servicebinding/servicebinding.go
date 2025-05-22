@@ -1,165 +1,95 @@
 package servicebindingclient
 
 import (
-	"context"
 	"encoding/json"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	ujcontroller "github.com/crossplane/upjet/pkg/controller"
-	ujresource "github.com/crossplane/upjet/pkg/resource"
+	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
+	instanceClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
+	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type CreateTfConnectorFn func(resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider ujcontroller.CallbackProvider) *ujcontroller.Connector
-
-type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
-
-type TfProxyClientCreator interface {
-	Connect(ctx context.Context, cr *v1alpha1.ServiceBinding) (TfProxyClient, error)
-}
-
-type TfProxyClient interface {
-	Observe(ctx context.Context) (bool, map[string][]byte, error)
-	Create(ctx context.Context) error
-	Delete(ctx context.Context) error
-	// QueryUpdatedData returns the relevant status data once the async creation is done
-	QueryAsyncData(ctx context.Context) *ServiceBindingData
-}
-
-type ServiceBindingData struct {
-	ExternalName string `json:"externalName"`
-	ID           string `json:"id"`
-	Conditions   []xpv1.Condition
-}
-
-var _ TfProxyClientCreator = &ServiceBindingClientCreator{}
-
-type ServiceBindingClientCreator struct {
-	connector managed.ExternalConnecter
-
-	saveConditionsCallback SaveConditionsFn
-
-	connectionPublisher managed.ConnectionPublisher
-}
-
-// NewServiceBindingClientCreator creates a connector for the service instance client
-// - it uses a callback that creates a tf connector, it defines what resource and configuration it needs via this callback
-func NewServiceBindingClientCreator(createConnectorFn CreateTfConnectorFn, saveConditionsCallback SaveConditionsFn, kube client.Client, connectionPublisher managed.ConnectionPublisher) *ServiceBindingClientCreator {
-	return &ServiceBindingClientCreator{
-		connector: createConnectorFn("btp_subaccount_service_instance",
-			v1alpha1.SubaccountServiceBinding_GroupVersionKind,
-			true, &APICallbacks{
-				saveCallbackFn: saveConditionsCallback,
-				kube:           kube,
-			}),
-		saveConditionsCallback: saveConditionsCallback,
-		connectionPublisher:    connectionPublisher,
+// NewServiceBindingConnector creates a connector for the service binding client using the generic TfProxyConnector
+func NewServiceBindingConnector(saveConditionsCallback tfclient.SaveConditionsFn, kube client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceBinding] {
+	con := &ServiceBindingConnector{
+		TfProxyConnector: tfclient.NewTfProxyConnector(
+			tfclient.NewInternalTfConnector(
+				kube,
+				"btp_subaccount_service_instance",
+				v1alpha1.SubaccountServiceBinding_GroupVersionKind,
+				true,
+				tfclient.NewAPICallbacks(
+					kube,
+					saveConditionsCallback,
+				),
+			),
+			&ServiceBindingMapper{},
+			kube,
+		),
 	}
+	return con
 }
 
-// Connect implements TfProxyClientCreator.
-func (s *ServiceBindingClientCreator) Connect(ctx context.Context, cr *v1alpha1.ServiceBinding) (TfProxyClient, error) {
-	ssi := tfServiceBindingCr(cr)
-	ctrl, err := s.connector.Connect(ctx, ssi)
+type ServiceBindingConnector struct {
+	tfclient.TfProxyConnector[*v1alpha1.ServiceBinding, *v1alpha1.SubaccountServiceBinding]
+}
+
+type ServiceBindingMapper struct{}
+
+func (s *ServiceBindingMapper) TfResource(sb *v1alpha1.ServiceBinding, kube client.Client) (*v1alpha1.SubaccountServiceBinding, error) {
+	sBinding := buildBaseTfResource(sb)
+
+	// combine parameters
+	parameterJson, err := instanceClient.BuildComplexParameterJson(kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to map tf resource")
 	}
+	sBinding.Spec.ForProvider.Parameters = internal.Ptr(string(parameterJson))
 
-	return &ServiceBindingClient{
-		tfClient:         ctrl,
-		tfServiceBinding: ssi,
-	}, nil
+	// transfer external name
+	meta.SetExternalName(sBinding, meta.GetExternalName(sb))
+	return sBinding, nil
 }
 
-var _ TfProxyClient = &ServiceBindingClient{}
-
-// ServiceBindingClient is an implementation that provides lifecycle management for service instances
-// by interacting with the terraform based resource SubaccountServiceBinding
-// it basically behaves as a proxy that maps all the data between our native resource and the tf resource
-type ServiceBindingClient struct {
-	tfClient         managed.ExternalClient
-	tfServiceBinding *v1alpha1.SubaccountServiceBinding
-}
-
-// Create implements TfProxyClient
-func (s *ServiceBindingClient) Create(ctx context.Context) error {
-	_, err := s.tfClient.Create(ctx, s.tfServiceBinding)
-	return err
-}
-
-// Delete implements TfProxyClient
-func (s *ServiceBindingClient) Delete(ctx context.Context) error {
-	return s.tfClient.Delete(ctx, s.tfServiceBinding)
-}
-
-// Observe implements TfProxyClient
-func (s *ServiceBindingClient) Observe(ctx context.Context) (bool, map[string][]byte, error) {
-	// will return true, true, in case of in memory running async operations
-	obs, err := s.tfClient.Observe(ctx, s.tfServiceBinding)
-	if err != nil {
-		return false, nil, err
-	}
-
-	flatDetails, err := flattenSecretData(obs.ConnectionDetails)
-	if err != nil {
-		return false, nil, err
-	}
-
-	return obs.ResourceExists, flatDetails, nil
-}
-
-// QueryAsyncData implements TfProxyClient
-func (s *ServiceBindingClient) QueryAsyncData(ctx context.Context) *ServiceBindingData {
-	// only query the async data if the operation is finished
-	if s.tfServiceBinding.GetCondition(ujresource.TypeAsyncOperation).Reason == ujresource.ReasonFinished {
-		sid := &ServiceBindingData{}
-		sid.ID = internal.Val(s.tfServiceBinding.Status.AtProvider.ID)
-		sid.ExternalName = meta.GetExternalName(s.tfServiceBinding)
-		sid.Conditions = []xpv1.Condition{xpv1.Available(), ujresource.AsyncOperationFinishedCondition()}
-		return sid
-	}
-	return nil
-}
-
-// generates the tf resource for the service instance to run tf operations against
-func tfServiceBindingCr(si *v1alpha1.ServiceBinding) *v1alpha1.SubaccountServiceBinding {
-	sInstance := &v1alpha1.SubaccountServiceBinding{
+func buildBaseTfResource(sb *v1alpha1.ServiceBinding) *v1alpha1.SubaccountServiceBinding {
+	sBinding := &v1alpha1.SubaccountServiceBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha1.SubaccountServiceBinding_Kind,
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: si.Name,
-			// make sure no naming conflicts are there for upjet tmp folder creation
-			UID:               si.UID + "-service-instance",
-			DeletionTimestamp: si.DeletionTimestamp,
+			Name:              sb.Name,
+			UID:               sb.UID + "-service-instance",
+			DeletionTimestamp: sb.DeletionTimestamp,
 		},
 		Spec: v1alpha1.SubaccountServiceBindingSpec{
 			ResourceSpec: xpv1.ResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
-					Name: pcName(si),
+					Name: pcName(sb),
 				},
 				ManagementPolicies:               []xpv1.ManagementAction{xpv1.ManagementActionAll},
-				WriteConnectionSecretToReference: si.GetWriteConnectionSecretToReference(),
+				WriteConnectionSecretToReference: sb.GetWriteConnectionSecretToReference(),
 			},
-			ForProvider: v1alpha1.SubaccountServiceBindingParameters{
-				Name:              &si.Name,
-				ServiceInstanceID: si.Spec.ForProvider.ServiceInstanceID,
-				SubaccountID:      si.Spec.ForProvider.SubaccountID,
-			},
+			ForProvider:  sb.Spec.ForProvider.SubaccountServiceBindingParameters,
 			InitProvider: v1alpha1.SubaccountServiceBindingInitParameters{},
 		},
 		Status: v1alpha1.SubaccountServiceBindingStatus{},
 	}
-	meta.SetExternalName(sInstance, meta.GetExternalName(si))
-	return sInstance
+	return sBinding
+}
+
+func pcName(sb *v1alpha1.ServiceBinding) string {
+	pc := sb.GetProviderConfigReference()
+	if pc != nil && pc.Name != "" {
+		return pc.Name
+	}
+	return ""
 }
 
 // FlattenSecretData takes a map[string][]byte and flattens any JSON object values into the result map.
@@ -187,12 +117,4 @@ func flattenSecretData(secretData map[string][]byte) (map[string][]byte, error) 
 		}
 	}
 	return result, nil
-}
-
-func pcName(si *v1alpha1.ServiceBinding) string {
-	pc := si.GetProviderConfigReference()
-	if pc != nil && pc.Name != "" {
-		return pc.Name
-	}
-	return ""
 }

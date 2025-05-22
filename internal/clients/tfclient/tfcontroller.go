@@ -2,6 +2,7 @@ package tfclient
 
 import (
 	"context"
+	"encoding/json"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -17,7 +18,7 @@ type TfProxyConnectorI[NATIVE resource.Managed] interface {
 }
 
 type TfProxyControllerI interface {
-	Observe(ctx context.Context) (bool, error)
+	Observe(ctx context.Context) (bool, map[string][]byte, error)
 	Create(ctx context.Context) error
 	Delete(ctx context.Context) error
 	// QueryUpdatedData returns the relevant status data once the async creation is done
@@ -106,11 +107,43 @@ func (t *TfProxyController[UPJETTED]) Delete(ctx context.Context) error {
 }
 
 // Observe implements TfProxyControllerI.
-func (t *TfProxyController[UPJETTED]) Observe(ctx context.Context) (bool, error) {
+func (t *TfProxyController[UPJETTED]) Observe(ctx context.Context) (bool, map[string][]byte, error) {
 	// will return true, true, in case of in memory running async operations
 	obs, err := t.tfClient.Observe(ctx, t.tfResource)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	return obs.ResourceExists, nil
+	flatDetails, err := flattenSecretData(obs.ConnectionDetails)
+	if err != nil {
+		return false, nil, err
+	}
+
+	return obs.ResourceExists, flatDetails, nil
+}
+
+// FlattenSecretData takes a map[string][]byte and flattens any JSON object values into the result map.
+// For each key whose value is a JSON object, its keys/values are added to the result map as top-level entries.
+// Non-JSON values are kept as-is.
+func flattenSecretData(secretData map[string][]byte) (map[string][]byte, error) {
+	result := make(map[string][]byte)
+	for k, v := range secretData {
+		var jsonMap map[string]any
+		if err := json.Unmarshal(v, &jsonMap); err == nil {
+			for jk, jv := range jsonMap {
+				switch val := jv.(type) {
+				case string:
+					result[jk] = []byte(val)
+				default:
+					b, err := json.Marshal(val)
+					if err != nil {
+						return nil, err
+					}
+					result[jk] = b
+				}
+			}
+		} else {
+			result[k] = v
+		}
+	}
+	return result, nil
 }

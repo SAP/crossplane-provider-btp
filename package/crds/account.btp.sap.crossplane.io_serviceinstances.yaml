@@ -89,6 +89,8 @@ spec:
                       The name of the service instance.
                     type: string
                   parameterSecretRefs:
+                    description: Parameters stored in secret, will be merged with
+                      spec parameters
                     items:
                       description: A SecretKeySelector is a reference to a secret
                         key in an arbitrary namespace.

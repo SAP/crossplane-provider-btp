@@ -48,7 +48,7 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 	sInstance := buildBaseTfResource(si)
 
 	// combine parameters
-	parameterJson, err := buildComplexParameterJson(kube, si)
+	parameterJson, err := BuildComplexParameterJson(kube, si.Spec.ForProvider.ParameterSecretRefs, si.Spec.ForProvider.Parameters)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to map tf resource")
 	}
@@ -59,15 +59,14 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 	return sInstance, nil
 }
 
-func buildComplexParameterJson(kube client.Client, si *v1alpha1.ServiceInstance) ([]byte, error) {
+func BuildComplexParameterJson(kube client.Client, secretRefs []xpv1.SecretKeySelector, specParameters *string) ([]byte, error) {
 	// resolve all parameter secret references and merge them into a single map
-	parameterData, err := lookupSecrets(kube, si.Spec.ForProvider.ParameterSecretRefs)
+	parameterData, err := lookupSecrets(kube, secretRefs)
 	if err != nil {
 		return nil, err
 	}
 	// merge the plain parameters with the secret parameters
-	plainParameters := si.Spec.ForProvider.SubaccountServiceInstanceParameters.Parameters
-	if err := mergeJsonData(parameterData, []byte(internal.Val(plainParameters))); err != nil {
+	if err := mergeJsonData(parameterData, []byte(internal.Val(specParameters))); err != nil {
 		return nil, err
 	}
 	//TODO: prevent nilpointer

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -18,11 +17,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	tjcontroller "github.com/crossplane/upjet/pkg/controller"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
-	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/features"
 )
 
@@ -54,17 +52,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			kube:  mgr.GetClient(),
 			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
 
-			newClientCreatorFn: func(kube client.Client) siClient.TfProxyClientCreator {
-				return siClient.NewServiceBindingClientCreator(
-					// client defines what resource he needs a connector for, but here in DI we define how to create such tf connector
-					func(resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) *tjcontroller.Connector {
-
-						return tfclient.NewInternalTfConnector(kube, resourceName, gvk, useAsync, callbackProvider)
-					},
-					saveCallback,
-					kube,
-					defaultPublisher,
-				)
+			newClientCreatorFn: func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding] {
+				return siClient.NewServiceBindingConnector(saveCallback, kube)
 			},
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
@@ -80,7 +69,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 }
 
 // SaveConditionsFn Callback for persisting conditions in the CR
-var saveCallback siClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error {
+var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error {
 
 	si := &v1alpha1.ServiceBinding{}
 
@@ -101,7 +90,7 @@ type connector struct {
 	kube  client.Client
 	usage resource.Tracker
 
-	newClientCreatorFn func(kube client.Client) siClient.TfProxyClientCreator
+	newClientCreatorFn func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding]
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -123,7 +112,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 }
 
 type external struct {
-	tfClient siClient.TfProxyClient
+	tfClient tfClient.TfProxyControllerI
 	kube     client.Client
 }
 
@@ -195,7 +184,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	return nil
 }
 
-func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceBinding, sid siClient.ServiceBindingData) error {
+func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceBinding, sid tfClient.ObservationData) error {
 	if meta.GetExternalName(cr) != sid.ExternalName {
 		meta.SetExternalName(cr, sid.ExternalName)
 		// manually saving external-name, since crossplane reconciler won't update spec and status in one loop

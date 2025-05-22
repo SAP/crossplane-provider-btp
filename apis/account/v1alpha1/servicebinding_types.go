@@ -27,37 +27,12 @@ import (
 
 // ServiceBindingParameters are the configurable fields of a ServiceBinding.
 type ServiceBindingParameters struct {
-	// Reference to a ServiceInstance in account to populate serviceinstanceId.
+	// All parameters of the tf resource are included here as well
+	SubaccountServiceBindingParameters `json:",inline"`
+
+	// Parameters stored in secret, will be merged with spec parameters
 	// +kubebuilder:validation:Optional
-	ServiceInstanceRef *xpv1.Reference `json:"serviceInstanceRef,omitempty" tf:"-"`
-
-	// Selector for a ServiceInstance in account to populate serviceinstanceId.
-	// +kubebuilder:validation:Optional
-	ServiceInstanceSelector *xpv1.Selector `json:"serviceInstanceSelector,omitempty" tf:"-"`
-
-	// (String) The ID of the service instance.
-	// The ID of the service instance.
-	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceInstance
-	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceInstanceUuid()
-	// +crossplane:generate:reference:refFieldName=ServiceInstanceRef
-	// +crossplane:generate:reference:selectorFieldName=ServiceInstanceSelector
-	ServiceInstanceID *string `json:"serviceinstanceId,omitempty" tf:"serviceinstance_id,omitempty"`
-
-	// (String) The ID of the subaccount.
-	// The ID of the subaccount.
-	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
-	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()
-	// +crossplane:generate:reference:refFieldName=SubaccountRef
-	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
-	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
-
-	// Reference to a Subaccount in account to populate subaccountId.
-	// +kubebuilder:validation:Optional
-	SubaccountRef *xpv1.Reference `json:"subaccountRef,omitempty" tf:"-"`
-
-	// Selector for a Subaccount in account to populate subaccountId.
-	// +kubebuilder:validation:Optional
-	SubaccountSelector *xpv1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+	ParameterSecretRefs []xpv1.SecretKeySelector `json:"parameterSecretRefs,omitempty"`
 }
 
 // ServiceBindingObservation are the observable fields of a ServiceBinding.

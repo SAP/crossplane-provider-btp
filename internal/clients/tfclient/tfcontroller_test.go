@@ -109,8 +109,10 @@ func TestConnect(t *testing.T) {
 			}
 
 			// Verify that the Connect method was called with the correct type
-			if _, ok := tc.fields.connector.CalledWithMg.(*fake.Terraformed); !ok {
-				t.Errorf("TfProxyConnector.Connect() called with wrong type %T, want %T", tc.fields.connector.CalledWithMg, &fake.Terraformed{})
+			if tc.want.err == nil {
+				if _, ok := tc.fields.connector.CalledWithMg.(*fake.Terraformed); !ok {
+					t.Errorf("TfProxyConnector.Connect() called with wrong type %T, want %T", tc.fields.connector.CalledWithMg, &fake.Terraformed{})
+				}
 			}
 		})
 	}
@@ -123,8 +125,9 @@ func TestObserve(t *testing.T) {
 	}
 
 	type want struct {
-		exists bool
-		err    error
+		exists  bool
+		err     error
+		details map[string][]byte
 	}
 
 	tests := []struct {
@@ -155,8 +158,31 @@ func TestObserve(t *testing.T) {
 				},
 			},
 			want: want{
+				exists:  true,
+				err:     nil,
+				details: map[string][]byte{},
+			},
+		},
+		{
+			name: "ConnectionDetailsFlattened",
+			fields: fields{
+				tfClient: &TfControllerMock{
+					err: nil,
+					observation: managed.ExternalObservation{
+						ResourceExists: true,
+						ConnectionDetails: map[string][]byte{
+							"tf-credentials-key": []byte(`{"key1":"value1","key2":"value2"}`),
+						},
+					},
+				},
+			},
+			want: want{
 				exists: true,
 				err:    nil,
+				details: map[string][]byte{
+					"key1": []byte("value1"),
+					"key2": []byte("value2"),
+				},
 			},
 		},
 	}
@@ -166,13 +192,16 @@ func TestObserve(t *testing.T) {
 				tfClient: tc.fields.tfClient,
 			}
 
-			exists, err := controller.Observe(context.Background())
+			exists, details, err := controller.Observe(context.Background())
 			if err != tc.want.err {
 				t.Errorf("TfProxyController.Observe() error = %v, want %v", err, tc.want.err)
 
 			}
 			if exists != tc.want.exists {
 				t.Errorf("TfProxyController.Observe() exists = %v, want %v", exists, tc.want.exists)
+			}
+			if diff := cmp.Diff(tc.want.details, details); diff != "" {
+				t.Errorf("\nServiceBindingClient.Observe(...): details -want, +got:\n%s\n", diff)
 			}
 
 			//verify CalledWithMg is of type
