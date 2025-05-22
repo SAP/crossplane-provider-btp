@@ -24,7 +24,7 @@ type SubscriptionParameters struct {
 	// AppName of the app to subscribe to
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="appName can't be updated once set"
 	AppName string `json:"appName"`
-	// PlanName to subscribe to
+	// PlanName to subscribe to, empty plannames are shown as "default" in cockpit, use "" instead
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="planName can't be updated once set"
 	PlanName string `json:"planName"`
 }
