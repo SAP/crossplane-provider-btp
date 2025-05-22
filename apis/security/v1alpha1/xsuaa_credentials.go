@@ -12,7 +12,8 @@ import (
 )
 
 var InvalidXsuaaCredentials = errors.New("invalid xsuaa api credentials")
-var InvalidSourceReference = "invalid source reference"
+var InvalidSourceReference = errors.New("invalid source reference")
+var FailedToGetSecret = errors.New("failed to get secret")
 
 // XsuaaBinding defines the json structure stored in secret to configure xsuaa api client
 type XsuaaBinding struct {
@@ -74,7 +75,7 @@ func DetermineBindingSource(cr *XSUAACredentialsReference) (*bool, error) {
 		value := false
 		return &value, nil
 	}
-	return nil, errors.New(InvalidSourceReference)
+	return nil, InvalidSourceReference
 }
 
 // CreateBindingFromSource creates a binding from the source specified in the spec
@@ -82,17 +83,21 @@ func CreateBindingFromSource(cr *XSUAACredentialsReference, ctx context.Context,
 
 	useApiCredentials, err := DetermineBindingSource(cr)
 	if err != nil {
-		return nil, errors.Wrap(err, InvalidSourceReference)
+		return nil, err
 	}
 
 	if *useApiCredentials {
 		// We default to the secret source if it is set
-		secretBytes, _ := resource.CommonCredentialExtractor(
+		secretBytes, err := resource.CommonCredentialExtractor(
 			ctx,
 			cr.APICredentials.Source,
 			kube,
 			cr.APICredentials.CommonCredentialSelectors,
 		)
+
+		if err != nil {
+			return nil, FailedToGetSecret
+		}
 
 		if secretBytes == nil {
 			return nil, InvalidXsuaaCredentials
@@ -103,12 +108,16 @@ func CreateBindingFromSource(cr *XSUAACredentialsReference, ctx context.Context,
 	} else {
 		// Backoff to the SubaccountApiCredentialRef if the source is not set
 		secret := &corev1.Secret{}
-		kube.Get(
+		err = kube.Get(
 			ctx,
 			client.ObjectKey{
 				Name:      cr.SubaccountApiCredentialSecret,
 				Namespace: cr.SubaccountApiCredentialSecretNamespace},
 			secret)
+
+		if err != nil {
+			return nil, FailedToGetSecret
+		}
 
 		if secret.Data == nil {
 			return nil, InvalidXsuaaCredentials

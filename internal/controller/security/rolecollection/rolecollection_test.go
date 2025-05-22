@@ -319,14 +319,22 @@ func TestDelete(t *testing.T) {
 
 func TestConnect(t *testing.T) {
 	trackErr := errors.New("trackError")
-	noSecretErr := errors.New("no secret err")
-	createServiceErr := errors.New("error creating service")
 
-	kubeStub := func(err error, secretData map[string][]byte) client.Client {
+	kubeStubCustom := func(err error, secretData map[string][]byte) client.Client {
 		return &test.MockClient{
 			MockGet: test.NewMockGetFn(err, func(obj client.Object) error {
 				secret := obj.(*corev1.Secret)
 				secret.Data = secretData
+				return nil
+			}),
+		}
+	}
+
+	kubeStubUpjet := func(err error, secretObj *corev1.Secret) client.Client {
+		return &test.MockClient{
+			MockGet: test.NewMockGetFn(err, func(obj client.Object) error {
+				secret := obj.(*corev1.Secret)
+				*secret = *secretObj
 				return nil
 			}),
 		}
@@ -358,42 +366,102 @@ func TestConnect(t *testing.T) {
 			},
 		},
 		// existance of secret ref is enforced on schema level and needs to be verified in e2e tests
-		"Not found secret": {
+		"Not found secret Custom": {
 			args: args{
-				cr:    cr("test-collection", withCreds()),
+				cr:    cr("test-collection", withCredsCustom()),
 				track: newTracker(nil),
-				kube:  kubeStub(noSecretErr, nil),
+				kube:  kubeStubCustom(v1alpha1.FailedToGetSecret, nil),
 			},
 			want: want{
-				err: noSecretErr,
+				err: v1alpha1.FailedToGetSecret,
 			},
 		},
-		"Secret without key": {
+		"Secret without key Custom": {
 			args: args{
-				cr:    cr("test-collection", withCreds()),
+				cr:    cr("test-collection", withCredsCustom()),
 				track: newTracker(nil),
-				kube:  kubeStub(nil, nil),
+				kube:  kubeStubCustom(nil, nil),
 			},
 			want: want{
-				err: errInvalidSecret,
+				err: v1alpha1.InvalidXsuaaCredentials,
 			},
 		},
-		"NewServiceFn err": {
+
+		"NewServiceFn err Custom": {
 			args: args{
-				cr:           cr("test-collection", withCreds()),
-				track:        newTracker(nil),
-				kube:         kubeStub(nil, map[string][]byte{cr("test-collection", withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
-				newServiceFn: newMaintainerStub(createServiceErr),
+				cr:    cr("test-collection", withCredsCustom()),
+				track: newTracker(nil),
+				kube: kubeStubCustom(nil, map[string][]byte{
+					"credentials": []byte(`{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`),
+				}),
+				newServiceFn: newMaintainerStub(v1alpha1.InvalidXsuaaCredentials),
 			},
 			want: want{
-				err: createServiceErr,
+				err: v1alpha1.InvalidXsuaaCredentials,
 			},
 		},
-		"NewServiceFn success": {
+		"NewServiceFn success Custom": {
 			args: args{
-				cr:           cr("test-collection", withCreds()),
-				track:        newTracker(nil),
-				kube:         kubeStub(nil, map[string][]byte{cr("test-collection", withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
+				cr:    cr("test-collection", withCredsCustom()),
+				track: newTracker(nil),
+				kube: kubeStubCustom(nil, map[string][]byte{
+					"credentials": []byte(`{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`),
+				}),
+				newServiceFn: newMaintainerStub(nil),
+			},
+			want: want{
+				err:             nil,
+				externalCreated: true,
+			},
+		},
+
+		"Not found secret Upjet": {
+			args: args{
+				cr:    cr("test-collection", withCredsCustom()),
+				track: newTracker(nil),
+				kube:  kubeStubUpjet(v1alpha1.FailedToGetSecret, &corev1.Secret{}),
+			},
+			want: want{
+				err: v1alpha1.FailedToGetSecret,
+			},
+		},
+		"Secret without key Upjet": {
+			args: args{
+				cr:    cr("test-collection", withCredsCustom()),
+				track: newTracker(nil),
+				kube:  kubeStubUpjet(nil, &corev1.Secret{}),
+			},
+			want: want{
+				err: v1alpha1.InvalidXsuaaCredentials,
+			},
+		},
+
+		"NewServiceFn err Upjet": {
+			args: args{
+				cr:    cr("test-collection", withCredsCustom()),
+				track: newTracker(nil),
+				kube: kubeStubUpjet(nil, &corev1.Secret{Data: map[string][]byte{
+					"attribute.api_url":       []byte("aurl"),
+					"attribute.client_id":     []byte("cid"),
+					"attribute.client_secret": []byte("csecret"),
+					"attribute.token_url":     []byte("turl"),
+				}}),
+				newServiceFn: newMaintainerStub(v1alpha1.InvalidXsuaaCredentials),
+			},
+			want: want{
+				err: v1alpha1.InvalidXsuaaCredentials,
+			},
+		},
+		"NewServiceFn success Upjet": {
+			args: args{
+				cr:    cr("test-collection", withCredsUpjet()),
+				track: newTracker(nil),
+				kube: kubeStubUpjet(nil, &corev1.Secret{Data: map[string][]byte{
+					"attribute.api_url":       []byte("aurl"),
+					"attribute.client_id":     []byte("cid"),
+					"attribute.client_secret": []byte("csecret"),
+					"attribute.token_url":     []byte("turl"),
+				}}),
 				newServiceFn: newMaintainerStub(nil),
 			},
 			want: want{
@@ -542,18 +610,10 @@ func withCredsCustom() RoleCollectionModifier {
 
 func withCredsUpjet() RoleCollectionModifier {
 	return func(roleCollection *v1alpha1.RoleCollection) {
-		roleCollection.Spec.APICredentials = v1alpha1.APICredentials{
-			Source: xpv1.CredentialsSourceSecret,
-			CommonCredentialSelectors: xpv1.CommonCredentialSelectors{
-				SecretRef: &xpv1.SecretKeySelector{
-					Key: "credentials",
-					SecretReference: xpv1.SecretReference{
-						Namespace: "default",
-						Name:      "xsuaa-secret",
-					},
-				},
-			},
-		}
+		roleCollection.Spec.SubaccountApiCredentialRef = &xpv1.Reference{
+			Name: "api-credential-ref"}
+		roleCollection.Spec.SubaccountApiCredentialSecret = "xsuaa-secret"
+		roleCollection.Spec.SubaccountApiCredentialSecretNamespace = "default"
 	}
 }
 

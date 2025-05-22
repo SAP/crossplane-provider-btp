@@ -158,13 +158,13 @@ func TestCreate(t *testing.T) {
 	}{
 		"ApiError UserAssigner": {
 			args: args{
-				cr: cr(withCreds(), withUser("someUser")),
+				cr: cr(withCredsCustom(), withUser("someUser")),
 				client: &RoleAssignerMock{
 					err: apiError,
 				},
 			},
 			want: want{
-				cr:               cr(WithConditions(xpv1.Creating()), withCreds(), withUser("someUser")),
+				cr:               cr(WithConditions(xpv1.Creating()), withCredsCustom(), withUser("someUser")),
 				o:                managed.ExternalCreation{},
 				err:              apiError,
 				CalledIdentifier: "someUser",
@@ -172,13 +172,13 @@ func TestCreate(t *testing.T) {
 		},
 		"ApiError GroupAssigner": {
 			args: args{
-				cr: cr(withGroup("someGroup"), withCreds()),
+				cr: cr(withGroup("someGroup"), withCredsCustom()),
 				client: &RoleAssignerMock{
 					err: apiError,
 				},
 			},
 			want: want{
-				cr:               cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCreds()),
+				cr:               cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCredsCustom()),
 				o:                managed.ExternalCreation{},
 				err:              apiError,
 				CalledIdentifier: "someGroup",
@@ -186,14 +186,14 @@ func TestCreate(t *testing.T) {
 		},
 		"Successful UserAssigner": {
 			args: args{
-				cr: cr(withUser("someUser"), withCreds()),
+				cr: cr(withUser("someUser"), withCredsCustom()),
 				client: &RoleAssignerMock{
 					hasRole: true,
 					err:     nil,
 				},
 			},
 			want: want{
-				cr: cr(WithConditions(xpv1.Creating()), withUser("someUser"), withCreds()),
+				cr: cr(WithConditions(xpv1.Creating()), withUser("someUser"), withCredsCustom()),
 				o: managed.ExternalCreation{
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
@@ -202,14 +202,14 @@ func TestCreate(t *testing.T) {
 		},
 		"Successful GroupAssigner": {
 			args: args{
-				cr: cr(withGroup("someGroup"), withCreds()),
+				cr: cr(withGroup("someGroup"), withCredsCustom()),
 				client: &RoleAssignerMock{
 					hasRole: true,
 					err:     nil,
 				},
 			},
 			want: want{
-				cr: cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCreds()),
+				cr: cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCredsCustom()),
 				o: managed.ExternalCreation{
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
@@ -394,7 +394,7 @@ func TestConnect(t *testing.T) {
 		// existance of secret ref is enforced on schema level and needs to be verified in e2e tests
 		"Not found secret": {
 			args: args{
-				cr:    cr(withCreds()),
+				cr:    cr(withCredsCustom()),
 				track: newTracker(nil),
 				kube:  kubeStub(noSecretErr, nil),
 			},
@@ -404,7 +404,7 @@ func TestConnect(t *testing.T) {
 		},
 		"Secret without key": {
 			args: args{
-				cr:    cr(withCreds()),
+				cr:    cr(withCredsCustom()),
 				track: newTracker(nil),
 				kube:  kubeStub(nil, nil),
 			},
@@ -414,9 +414,9 @@ func TestConnect(t *testing.T) {
 		},
 		"NewUserAssignerFn err": {
 			args: args{
-				cr:                cr(withCreds(), withUser("someUser")),
+				cr:                cr(withCredsCustom(), withUser("someUser")),
 				track:             newTracker(nil),
-				kube:              kubeStub(nil, map[string][]byte{cr(withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
+				kube:              kubeStub(nil, map[string][]byte{cr(withCredsCustom()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
 				newUserAssignerFn: newAssignerStub(createServiceErr),
 			},
 			want: want{
@@ -425,9 +425,9 @@ func TestConnect(t *testing.T) {
 		},
 		"NewUserAssignerFn success": {
 			args: args{
-				cr:                cr(withCreds(), withUser("someUser")),
+				cr:                cr(withCredsCustom(), withUser("someUser")),
 				track:             newTracker(nil),
-				kube:              kubeStub(nil, map[string][]byte{cr(withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
+				kube:              kubeStub(nil, map[string][]byte{cr(withCredsCustom()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
 				newUserAssignerFn: newAssignerStub(nil),
 			},
 			want: want{
@@ -437,9 +437,9 @@ func TestConnect(t *testing.T) {
 		},
 		"NewGroupAssignerFn err": {
 			args: args{
-				cr:                 cr(withCreds(), withGroup("someGroup")),
+				cr:                 cr(withCredsCustom(), withGroup("someGroup")),
 				track:              newTracker(nil),
-				kube:               kubeStub(nil, map[string][]byte{cr(withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
+				kube:               kubeStub(nil, map[string][]byte{cr(withCredsCustom()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
 				newGroupAssignerFn: newAssignerStub(createServiceErr),
 			},
 			want: want{
@@ -448,9 +448,9 @@ func TestConnect(t *testing.T) {
 		},
 		"NewGroupAssignerFn success": {
 			args: args{
-				cr:                 cr(withCreds(), withGroup("someGroup")),
+				cr:                 cr(withCredsCustom(), withGroup("someGroup")),
 				track:              newTracker(nil),
-				kube:               kubeStub(nil, map[string][]byte{cr(withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
+				kube:               kubeStub(nil, map[string][]byte{cr(withCredsCustom()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
 				newGroupAssignerFn: newAssignerStub(nil),
 			},
 			want: want{
@@ -553,7 +553,7 @@ func cr(m ...RoleCollectionModifier) *v1alpha1.RoleCollectionAssignment {
 	return cr
 }
 
-func withCreds() RoleCollectionModifier {
+func withCredsCustom() RoleCollectionModifier {
 	return func(assignment *v1alpha1.RoleCollectionAssignment) {
 		assignment.Spec.APICredentials = v1alpha1.APICredentials{
 			Source: xpv1.CredentialsSourceSecret,
