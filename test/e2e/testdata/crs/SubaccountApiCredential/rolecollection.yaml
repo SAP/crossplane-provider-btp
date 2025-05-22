@@ -1,0 +1,18 @@
+apiVersion: security.btp.orchestrate.cloud.sap/v1alpha1
+kind: RoleCollection
+metadata:
+  namespace: default
+  name: subaccountapicredentials-custom-admin-rolecollection
+spec:
+  forProvider:
+    name: "subaccountapicredentials-custom-admin-rolecollection"
+    description: "this is a custom rolecollection from e2e tests"
+    roles:
+      - name: "Destination Administrator"
+        roleTemplateAppId: "destination-xsappname!b9"
+        roleTemplateName: "Destination_Administrator"
+      - name: "Subaccount Admin"
+        roleTemplateAppId: "cis-local!b2"
+        roleTemplateName: "Subaccount_Admin"
+  subaccountApiCredentialRef:
+    name: e2e-sac-subaccountapicredentials
