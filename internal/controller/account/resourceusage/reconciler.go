@@ -33,11 +33,6 @@ const (
 	errUpdateStatus = "cannot update ResourceUsage status"
 )
 
-// Event reasons.
-const (
-	reasonAccount event.Reason = "UsageAccounting"
-)
-
 // Condition types and reasons.
 const (
 	TypeTerminating xpv1.ConditionType   = "Terminating"
@@ -138,11 +133,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 		return reconcile.Result{}, errors.Wrap(resource.IgnoreNotFound(err), errGetPC)
 	}
 
-	log = log.WithValues(
-		"uid", ru.GetUID(),
-		"version", ru.GetResourceVersion(),
-		"name", ru.GetName(),
-	)
 	// check if target is still in place (on delete)
 	target, err := r.tracker.ResolveTarget(ctx, *ru)
 	if resource.IgnoreNotFound(err) != nil {
@@ -164,13 +154,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 
 	if meta.WasDeleted(ru) {
 		if target != nil {
-			msg := "Blocking deletion while target still exist"
-
-			log.Debug(msg)
-			r.record.Event(ru, event.Warning(reasonAccount, errors.New(msg)))
-
-			// We're watching our usages, so we'll be requeued when they go.
-			return reconcile.Result{Requeue: false}, errors.Wrap(r.client.Status().Update(ctx, ru), errUpdateStatus)
+			// Disjoining the target from the resource usage
+			meta.RemoveFinalizer(ru, v1alpha1.Finalizer)
+			if err := r.client.Update(ctx, ru); err != nil {
+				r.log.Debug(errUpdate, "error", err)
+				return reconcile.Result{RequeueAfter: shortWait}, nil
+			}
+			if err := r.client.Delete(ctx, ru); err != nil {
+				r.log.Debug(errDeletePU, "error", err)
+				return reconcile.Result{RequeueAfter: shortWait}, nil
+			}
+			return reconcile.Result{Requeue: false}, nil
 		}
 		// Deletion and removal of finalizer must happen before
 		return reconcile.Result{Requeue: true}, errors.New("inconsistent state, do requeue")
