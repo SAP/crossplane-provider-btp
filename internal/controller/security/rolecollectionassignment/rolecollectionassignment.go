@@ -34,18 +34,22 @@ const (
 )
 
 var (
-	errNoSource = errors.New("no source specified for api credentials")
+	errInvalidSecret = errors.New("api credential secret invalid")
 )
 
 var _ RoleAssigner = &rolecollectionuserassignment.XsusaaUserRoleAssigner{}
 
 var configureUserAssignerFn = func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error) {
-
+	if binding == nil {
+		return nil, errInvalidSecret
+	}
 	return rolecollectionuserassignment.NewXsuaaUserRoleAssigner(btp.NewBackgroundContextWithDebugPrintHTTPClient(), binding.ClientId, binding.ClientSecret, binding.TokenURL, binding.ApiUrl), nil
 }
 
 var configureGroupAssignerFn = func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error) {
-
+	if binding == nil {
+		return nil, errInvalidSecret
+	}
 	return rolecollectiongroupassignment.NewXsuaaGroupRoleAssigner(btp.NewBackgroundContextWithDebugPrintHTTPClient(), binding.ClientId, binding.ClientSecret, binding.TokenURL, binding.ApiUrl), nil
 }
 

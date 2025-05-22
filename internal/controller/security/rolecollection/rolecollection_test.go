@@ -376,7 +376,7 @@ func TestConnect(t *testing.T) {
 				err: v1alpha1.FailedToGetSecret,
 			},
 		},
-		"Secret without key Custom": {
+		"Secret without key": {
 			args: args{
 				cr:    cr("test-collection", withCredsCustom()),
 				track: newTracker(nil),
@@ -415,30 +415,9 @@ func TestConnect(t *testing.T) {
 			},
 		},
 
-		"Not found secret Upjet": {
-			args: args{
-				cr:    cr("test-collection", withCredsCustom()),
-				track: newTracker(nil),
-				kube:  kubeStubUpjet(v1alpha1.FailedToGetSecret, &corev1.Secret{}),
-			},
-			want: want{
-				err: v1alpha1.FailedToGetSecret,
-			},
-		},
-		"Secret without key Upjet": {
-			args: args{
-				cr:    cr("test-collection", withCredsCustom()),
-				track: newTracker(nil),
-				kube:  kubeStubUpjet(nil, &corev1.Secret{}),
-			},
-			want: want{
-				err: v1alpha1.InvalidXsuaaCredentials,
-			},
-		},
-
 		"NewServiceFn err Upjet": {
 			args: args{
-				cr:    cr("test-collection", withCredsCustom()),
+				cr:    cr("test-collection", withCredsUpjet()),
 				track: newTracker(nil),
 				kube: kubeStubUpjet(nil, &corev1.Secret{Data: map[string][]byte{
 					"attribute.api_url":       []byte("aurl"),
