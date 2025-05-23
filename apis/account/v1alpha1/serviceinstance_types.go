@@ -27,6 +27,13 @@ import (
 
 // ServiceInstanceParameters are the configurable fields of a ServiceInstance.
 type ServiceInstanceParameters struct {
+
+	// Name of the service offering
+	OfferingName string `json:"offeringName,omitempty"`
+
+	// Name of the service plan of that offering
+	PlanName string `json:"planName,omitempty"`
+
 	// All parameters of the tf resource are included here as well
 	SubaccountServiceInstanceParameters `json:",inline"`
 

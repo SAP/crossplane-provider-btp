@@ -88,6 +88,9 @@ spec:
                       (String) The name of the service instance.
                       The name of the service instance.
                     type: string
+                  offeringName:
+                    description: Name of the service offering
+                    type: string
                   parameterSecretRefs:
                     description: Parameters stored in secret, will be merged with
                       spec parameters
@@ -114,6 +117,9 @@ spec:
                     description: |-
                       (String, Sensitive) The configuration parameters for the service instance.
                       The configuration parameters for the service instance.
+                    type: string
+                  planName:
+                    description: Name of the service plan of that offering
                     type: string
                   servicePlanRef:
                     description: Reference to a ServicePlan in account to populate
