@@ -158,13 +158,13 @@ func TestCreate(t *testing.T) {
 	}{
 		"ApiError UserAssigner": {
 			args: args{
-				cr: cr(withCreds(), withUser("someUser")),
+				cr: cr(withCredsCustom(), withUser("someUser")),
 				client: &RoleAssignerMock{
 					err: apiError,
 				},
 			},
 			want: want{
-				cr:               cr(WithConditions(xpv1.Creating()), withCreds(), withUser("someUser")),
+				cr:               cr(WithConditions(xpv1.Creating()), withCredsCustom(), withUser("someUser")),
 				o:                managed.ExternalCreation{},
 				err:              apiError,
 				CalledIdentifier: "someUser",
@@ -172,13 +172,13 @@ func TestCreate(t *testing.T) {
 		},
 		"ApiError GroupAssigner": {
 			args: args{
-				cr: cr(withGroup("someGroup"), withCreds()),
+				cr: cr(withGroup("someGroup"), withCredsCustom()),
 				client: &RoleAssignerMock{
 					err: apiError,
 				},
 			},
 			want: want{
-				cr:               cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCreds()),
+				cr:               cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCredsCustom()),
 				o:                managed.ExternalCreation{},
 				err:              apiError,
 				CalledIdentifier: "someGroup",
@@ -186,14 +186,14 @@ func TestCreate(t *testing.T) {
 		},
 		"Successful UserAssigner": {
 			args: args{
-				cr: cr(withUser("someUser"), withCreds()),
+				cr: cr(withUser("someUser"), withCredsCustom()),
 				client: &RoleAssignerMock{
 					hasRole: true,
 					err:     nil,
 				},
 			},
 			want: want{
-				cr: cr(WithConditions(xpv1.Creating()), withUser("someUser"), withCreds()),
+				cr: cr(WithConditions(xpv1.Creating()), withUser("someUser"), withCredsCustom()),
 				o: managed.ExternalCreation{
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
@@ -202,14 +202,14 @@ func TestCreate(t *testing.T) {
 		},
 		"Successful GroupAssigner": {
 			args: args{
-				cr: cr(withGroup("someGroup"), withCreds()),
+				cr: cr(withGroup("someGroup"), withCredsCustom()),
 				client: &RoleAssignerMock{
 					hasRole: true,
 					err:     nil,
 				},
 			},
 			want: want{
-				cr: cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCreds()),
+				cr: cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCredsCustom()),
 				o: managed.ExternalCreation{
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
@@ -352,10 +352,8 @@ func TestDelete(t *testing.T) {
 
 func TestConnect(t *testing.T) {
 	trackErr := errors.New("trackError")
-	noSecretErr := errors.New("no secret err")
-	createServiceErr := errors.New("error creating service")
 
-	kubeStub := func(err error, secretData map[string][]byte) client.Client {
+	kubeStubCustom := func(err error, secretData map[string][]byte) client.Client {
 		return &test.MockClient{
 			MockGet: test.NewMockGetFn(err, func(obj client.Object) error {
 				secret := obj.(*corev1.Secret)
@@ -365,12 +363,22 @@ func TestConnect(t *testing.T) {
 		}
 	}
 
+	kubeStubUpjet := func(err error, secretObj *corev1.Secret) client.Client {
+		return &test.MockClient{
+			MockGet: test.NewMockGetFn(err, func(obj client.Object) error {
+				secret := obj.(*corev1.Secret)
+				*secret = *secretObj
+				return nil
+			}),
+		}
+	}
+
 	type args struct {
 		cr                 *v1alpha1.RoleCollectionAssignment
 		track              resource.Tracker
 		kube               client.Client
-		newUserAssignerFn  func(_ []byte) (RoleAssigner, error)
-		newGroupAssignerFn func(_ []byte) (RoleAssigner, error)
+		newUserAssignerFn  func(_ *v1alpha1.XsuaaBinding) (RoleAssigner, error)
+		newGroupAssignerFn func(_ *v1alpha1.XsuaaBinding) (RoleAssigner, error)
 	}
 
 	type want struct {
@@ -394,40 +402,44 @@ func TestConnect(t *testing.T) {
 		// existance of secret ref is enforced on schema level and needs to be verified in e2e tests
 		"Not found secret": {
 			args: args{
-				cr:    cr(withCreds()),
+				cr:    cr(withCredsCustom()),
 				track: newTracker(nil),
-				kube:  kubeStub(noSecretErr, nil),
+				kube:  kubeStubCustom(v1alpha1.FailedToGetSecret, nil),
 			},
 			want: want{
-				err: noSecretErr,
+				err: v1alpha1.FailedToGetSecret,
 			},
 		},
 		"Secret without key": {
 			args: args{
-				cr:    cr(withCreds()),
+				cr:    cr(withCredsCustom()),
 				track: newTracker(nil),
-				kube:  kubeStub(nil, nil),
+				kube:  kubeStubCustom(nil, nil),
 			},
 			want: want{
-				err: errInvalidSecret,
+				err: v1alpha1.InvalidXsuaaCredentials,
 			},
 		},
-		"NewUserAssignerFn err": {
+		"NewUserAssignerFn err Custom": {
 			args: args{
-				cr:                cr(withCreds(), withUser("someUser")),
-				track:             newTracker(nil),
-				kube:              kubeStub(nil, map[string][]byte{cr(withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
-				newUserAssignerFn: newAssignerStub(createServiceErr),
+				cr:    cr(withCredsCustom(), withUser("someUser")),
+				track: newTracker(nil),
+				kube: kubeStubCustom(nil, map[string][]byte{
+					"credentials": []byte(`{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`),
+				}),
+				newUserAssignerFn: newAssignerStub(v1alpha1.InvalidXsuaaCredentials),
 			},
 			want: want{
-				err: createServiceErr,
+				err: v1alpha1.InvalidXsuaaCredentials,
 			},
 		},
-		"NewUserAssignerFn success": {
+		"NewUserAssignerFn success Custom": {
 			args: args{
-				cr:                cr(withCreds(), withUser("someUser")),
-				track:             newTracker(nil),
-				kube:              kubeStub(nil, map[string][]byte{cr(withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
+				cr:    cr(withCredsCustom(), withUser("someUser")),
+				track: newTracker(nil),
+				kube: kubeStubCustom(nil, map[string][]byte{
+					"credentials": []byte(`{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`),
+				}),
 				newUserAssignerFn: newAssignerStub(nil),
 			},
 			want: want{
@@ -435,22 +447,93 @@ func TestConnect(t *testing.T) {
 				externalCreated: true,
 			},
 		},
-		"NewGroupAssignerFn err": {
+		"NewGroupAssignerFn err Custom": {
 			args: args{
-				cr:                 cr(withCreds(), withGroup("someGroup")),
-				track:              newTracker(nil),
-				kube:               kubeStub(nil, map[string][]byte{cr(withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
-				newGroupAssignerFn: newAssignerStub(createServiceErr),
+				cr:    cr(withCredsCustom(), withGroup("someGroup")),
+				track: newTracker(nil),
+				kube: kubeStubCustom(nil, map[string][]byte{
+					"credentials": []byte(`{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`),
+				}),
+				newGroupAssignerFn: newAssignerStub(v1alpha1.InvalidXsuaaCredentials),
 			},
 			want: want{
-				err: createServiceErr,
+				err: v1alpha1.InvalidXsuaaCredentials,
 			},
 		},
-		"NewGroupAssignerFn success": {
+		"NewGroupAssignerFn success Custom": {
 			args: args{
-				cr:                 cr(withCreds(), withGroup("someGroup")),
-				track:              newTracker(nil),
-				kube:               kubeStub(nil, map[string][]byte{cr(withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
+				cr:    cr(withCredsCustom(), withGroup("someGroup")),
+				track: newTracker(nil),
+				kube: kubeStubCustom(nil, map[string][]byte{
+					"credentials": []byte(`{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`),
+				}),
+				newGroupAssignerFn: newAssignerStub(nil),
+			},
+			want: want{
+				err:             nil,
+				externalCreated: true,
+			},
+		},
+
+		"NewUserAssignerFn err Upjet": {
+			args: args{
+				cr:    cr(withCredsUpjet(), withUser("someUser")),
+				track: newTracker(nil),
+				kube: kubeStubUpjet(nil, &corev1.Secret{Data: map[string][]byte{
+					"attribute.api_url":       []byte("aurl"),
+					"attribute.client_id":     []byte("cid"),
+					"attribute.client_secret": []byte("csecret"),
+					"attribute.token_url":     []byte("turl"),
+				}}),
+				newUserAssignerFn: newAssignerStub(v1alpha1.InvalidXsuaaCredentials),
+			},
+			want: want{
+				err: v1alpha1.InvalidXsuaaCredentials,
+			},
+		},
+		"NewUserAssignerFn success Upjet": {
+			args: args{
+				cr:    cr(withCredsUpjet(), withUser("someUser")),
+				track: newTracker(nil),
+				kube: kubeStubUpjet(nil, &corev1.Secret{Data: map[string][]byte{
+					"attribute.api_url":       []byte("aurl"),
+					"attribute.client_id":     []byte("cid"),
+					"attribute.client_secret": []byte("csecret"),
+					"attribute.token_url":     []byte("turl"),
+				}}),
+				newUserAssignerFn: newAssignerStub(nil),
+			},
+			want: want{
+				err:             nil,
+				externalCreated: true,
+			},
+		},
+		"NewGroupAssignerFn err Upjet": {
+			args: args{
+				cr:    cr(withCredsUpjet(), withGroup("someGroup")),
+				track: newTracker(nil),
+				kube: kubeStubUpjet(nil, &corev1.Secret{Data: map[string][]byte{
+					"attribute.api_url":       []byte("aurl"),
+					"attribute.client_id":     []byte("cid"),
+					"attribute.client_secret": []byte("csecret"),
+					"attribute.token_url":     []byte("turl"),
+				}}),
+				newGroupAssignerFn: newAssignerStub(v1alpha1.InvalidXsuaaCredentials),
+			},
+			want: want{
+				err: v1alpha1.InvalidXsuaaCredentials,
+			},
+		},
+		"NewGroupAssignerFn success Upjet": {
+			args: args{
+				cr:    cr(withCredsUpjet(), withGroup("someGroup")),
+				track: newTracker(nil),
+				kube: kubeStubUpjet(nil, &corev1.Secret{Data: map[string][]byte{
+					"attribute.api_url":       []byte("aurl"),
+					"attribute.client_id":     []byte("cid"),
+					"attribute.client_secret": []byte("csecret"),
+					"attribute.token_url":     []byte("turl"),
+				}}),
 				newGroupAssignerFn: newAssignerStub(nil),
 			},
 			want: want{
@@ -479,53 +562,54 @@ func TestConnect(t *testing.T) {
 
 func TestConfigureUserAssignerFn(t *testing.T) {
 	var tests = map[string]struct {
-		json      string
+		binding   *v1alpha1.XsuaaBinding
 		expectErr error
 	}{
-		"InvalidFormat": {
-			json:      `"some invalid json"}`,
-			expectErr: v1alpha1.ErrInvalidXsuaaCredentials,
-		},
-		"MissingRequiredCreds": {
-			json:      `{"clientid": "clientid", "tokenurl": "tokenurl", "apiurl": "apiurl"}`,
-			expectErr: v1alpha1.ErrInvalidXsuaaCredentials,
+		"NilData": {
+			binding:   nil,
+			expectErr: errInvalidSecret,
 		},
 		"ValidCreds": {
-			json:      `{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`,
+			binding: &v1alpha1.XsuaaBinding{
+				ApiUrl:       "aurl",
+				ClientId:     "cid",
+				ClientSecret: "csecret",
+				TokenURL:     "turl",
+			},
 			expectErr: nil,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := configureUserAssignerFn([]byte(tc.json))
+			_, err := configureUserAssignerFn(tc.binding)
 			expectedErrorBehaviour(t, tc.expectErr, err)
 		})
 	}
 }
-
-func TestConfigureGroupAssignerFn(t *testing.T) {
+func TestConfigurGroupAssignerFn(t *testing.T) {
 	var tests = map[string]struct {
-		json      string
+		binding   *v1alpha1.XsuaaBinding
 		expectErr error
 	}{
-		"InvalidFormat": {
-			json:      `"some invalid json"}`,
-			expectErr: v1alpha1.ErrInvalidXsuaaCredentials,
-		},
-		"MissingRequiredCreds": {
-			json:      `{"clientid": "clientid", "tokenurl": "tokenurl", "apiurl": "apiurl"}`,
-			expectErr: v1alpha1.ErrInvalidXsuaaCredentials,
+		"NilData": {
+			binding:   nil,
+			expectErr: errInvalidSecret,
 		},
 		"ValidCreds": {
-			json:      `{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`,
+			binding: &v1alpha1.XsuaaBinding{
+				ApiUrl:       "aurl",
+				ClientId:     "cid",
+				ClientSecret: "csecret",
+				TokenURL:     "turl",
+			},
 			expectErr: nil,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := configureGroupAssignerFn([]byte(tc.json))
+			_, err := configureGroupAssignerFn(tc.binding)
 			expectedErrorBehaviour(t, tc.expectErr, err)
 		})
 	}
@@ -553,7 +637,7 @@ func cr(m ...RoleCollectionModifier) *v1alpha1.RoleCollectionAssignment {
 	return cr
 }
 
-func withCreds() RoleCollectionModifier {
+func withCredsCustom() RoleCollectionModifier {
 	return func(assignment *v1alpha1.RoleCollectionAssignment) {
 		assignment.Spec.APICredentials = v1alpha1.APICredentials{
 			Source: xpv1.CredentialsSourceSecret,
@@ -567,6 +651,15 @@ func withCreds() RoleCollectionModifier {
 				},
 			},
 		}
+	}
+}
+
+func withCredsUpjet() RoleCollectionModifier {
+	return func(roleCollection *v1alpha1.RoleCollectionAssignment) {
+		roleCollection.Spec.SubaccountApiCredentialRef = &xpv1.Reference{
+			Name: "api-credential-ref"}
+		roleCollection.Spec.SubaccountApiCredentialSecret = "xsuaa-secret"
+		roleCollection.Spec.SubaccountApiCredentialSecretNamespace = "default"
 	}
 }
 
@@ -602,8 +695,8 @@ func (t *tracker) Track(ctx context.Context, mg resource.Managed) error {
 	return t.err
 }
 
-func newAssignerStub(err error) func(_ []byte) (RoleAssigner, error) {
-	return func(_ []byte) (RoleAssigner, error) {
+func newAssignerStub(err error) func(_ *v1alpha1.XsuaaBinding) (RoleAssigner, error) {
+	return func(_ *v1alpha1.XsuaaBinding) (RoleAssigner, error) {
 		if err != nil {
 			return nil, err
 		}

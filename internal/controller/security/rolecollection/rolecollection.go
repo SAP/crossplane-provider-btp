@@ -2,6 +2,7 @@ package rolecollection
 
 import (
 	"context"
+
 	"github.com/sap/crossplane-provider-btp/btp"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -45,19 +46,18 @@ type RoleCollectionMaintainer interface {
 	Delete(ctx context.Context, roleCollectionName string) error
 }
 
-var configureRoleCollectionMaintainerFn = func(secretData []byte) (RoleCollectionMaintainer, error) {
-	binding, err := v1alpha1.ReadXsuaaCredentials(secretData)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read xsuaa credentials.")
-	}
+var configureRoleCollectionMaintainerFn = func(binding *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error) {
 
+	if binding == nil {
+		return nil, errInvalidSecret
+	}
 	return service.NewXsuaaRoleCollectionMaintainer(btp.NewBackgroundContextWithDebugPrintHTTPClient(), binding.ClientId, binding.ClientSecret, binding.TokenURL, binding.ApiUrl), nil
 }
 
 type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
-	newServiceFn func(creds []byte) (RoleCollectionMaintainer, error)
+	newServiceFn func(binding *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error)
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -70,21 +70,13 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
-	secretBytes, err := resource.CommonCredentialExtractor(
-		ctx,
-		cr.Spec.APICredentials.Source,
-		c.kube,
-		cr.Spec.APICredentials.CommonCredentialSelectors,
-	)
+	binding, err := v1alpha1.CreateBindingFromSource(&cr.Spec.XSUAACredentialsReference, ctx, c.kube)
 
 	if err != nil {
 		return nil, errors.Wrap(err, errGetSecret)
 	}
-	if secretBytes == nil {
-		return nil, errInvalidSecret
-	}
 
-	svc, err := c.newServiceFn(secretBytes)
+	svc, err := c.newServiceFn(binding)
 	if err != nil {
 		return nil, errors.Wrap(err, errNewClient)
 	}
