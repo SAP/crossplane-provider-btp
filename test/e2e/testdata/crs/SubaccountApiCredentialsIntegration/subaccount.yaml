@@ -2,14 +2,15 @@ apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: Subaccount
 metadata:
   namespace: default
-  name: subaccountapicredentials-sa-test
+  name: sac-subaccount
 spec:
   forProvider:
-    displayName: $BUILD_ID-e2e-test-sa-ent-subaccountapicredentials
+    displayName: $BUILD_ID-subaccount-subaccountapicredentials
     region: eu10
-    subdomain: $BUILD_ID-e2e-test-sa-ent-sub-subaccountapicredentials
+    subdomain: $BUILD_ID-e2e-test-subaccount-subaccountapicredentials
     labels:
       safe-to-delete: [ "yes" ]
       BUILD_ID: [ "$BUILD_ID" ]
     subaccountAdmins:
       - $TECHNICAL_USER_EMAIL
+

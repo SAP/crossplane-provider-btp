@@ -2,11 +2,11 @@ apiVersion: security.btp.sap.crossplane.io/v1alpha1
 kind: RoleCollectionAssignment
 metadata:
   namespace: default
-  name: subaccountapicredentials-assigned-group
+  name: sac-rolecollectionasignment
 spec:
   forProvider:
     origin: "sap.default"
     roleCollectionName: "Subaccount Administrator"
     groupName: some-usergroup
   subaccountApiCredentialRef:
-    name: e2e-sac-subaccountapicredentials
+    name: sac-subaccountapicredentials

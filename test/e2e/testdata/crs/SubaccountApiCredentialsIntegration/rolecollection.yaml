@@ -2,7 +2,7 @@ apiVersion: security.btp.sap.crossplane.io/v1alpha1
 kind: RoleCollection
 metadata:
   namespace: default
-  name: subaccountapicredentials-custom-admin-rolecollection
+  name: sac-rolecollection
 spec:
   forProvider:
     name: "subaccountapicredentials-custom-admin-rolecollection"
@@ -15,4 +15,4 @@ spec:
         roleTemplateAppId: "cis-local!b2"
         roleTemplateName: "Subaccount_Admin"
   subaccountApiCredentialRef:
-    name: e2e-sac-subaccountapicredentials
+    name: sac-subaccountapicredentials

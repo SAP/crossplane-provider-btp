@@ -23,11 +23,11 @@ import (
 )
 
 var (
-	sacCreateName = "e2e-sac-subaccountapicredentials"
+	sacCreateName = "sac-subaccountapicredentials"
 )
 
-func TestSubaccountApiCredentials(t *testing.T) {
-	var manifestDir = "testdata/crs/SubaccountApiCredential"
+func TestSubaccountApiCredentialsStandalone(t *testing.T) {
+	var manifestDir = "testdata/crs/SubaccountApiCredentialsStandalone"
 	crudFeature := features.New("SubaccountApiCredentials Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
@@ -38,7 +38,7 @@ func TestSubaccountApiCredentials(t *testing.T) {
 				sac := v1alpha1.SubaccountApiCredential{
 					ObjectMeta: metav1.ObjectMeta{Name: sacCreateName, Namespace: cfg.Namespace()},
 				}
-				waitForResource(&sac, cfg, t, wait.WithTimeout(7*time.Minute))
+				waitForResource(&sac, cfg, t, wait.WithTimeout(time.Minute*7))
 				return ctx
 			},
 		).
