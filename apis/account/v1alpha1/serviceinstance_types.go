@@ -41,13 +41,21 @@ type ServiceInstanceParameters struct {
 	// +kubebuilder:validation:Optional
 	ParameterSecretRefs []xpv1.SecretKeySelector `json:"parameterSecretRefs,omitempty"`
 
-	// Reference to a ServicePlan in account to populate serviceplanId.
 	// +kubebuilder:validation:Optional
-	ServicePlanRef *xpv1.Reference `json:"servicePlanRef,omitempty" tf:"-"`
+	ServiceManagerSelector *xpv1.Selector `json:"serviceManagerSelector,omitempty"`
+	// +kubebuilder:validation:Optional
+	ServiceManagerRef *xpv1.Reference `json:"serviceManagerRef,omitempty" reference-group:"account.btp.sap.crossplane.io" reference-kind:"ServiceManager" reference-apiversion:"v1alpha1"`
 
-	// Selector for a ServicePlan in account to populate serviceplanId.
-	// +kubebuilder:validation:Optional
-	ServicePlanSelector *xpv1.Selector `json:"servicePlanSelector,omitempty" tf:"-"`
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceManager
+	// +crossplane:generate:reference:refFieldName=ServiceManagerRef
+	// +crossplane:generate:reference:selectorFieldName=ServiceManagerSelector
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceManagerSecret()
+	ServiceManagerSecret string `json:"serviceManagerSecret,omitempty"`
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceManager
+	// +crossplane:generate:reference:refFieldName=ServiceManagerRef
+	// +crossplane:generate:reference:selectorFieldName=ServiceManagerSelector
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceManagerSecretNamespace()
+	ServiceManagerSecretNamespace string `json:"serviceManagerSecretNamespace,omitempty"`
 }
 
 // ServiceInstanceObservation are the observable fields of a ServiceInstance.

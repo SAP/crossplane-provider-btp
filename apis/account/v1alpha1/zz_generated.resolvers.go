@@ -242,6 +242,38 @@ func (mg *ServiceInstance) ResolveReferences(ctx context.Context, c client.Reade
 	mg.Spec.ForProvider.SubaccountServiceInstanceParameters.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
 	mg.Spec.ForProvider.SubaccountServiceInstanceParameters.SubaccountRef = rsp.ResolvedReference
 
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecret,
+		Extract:      ServiceManagerSecret(),
+		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
+		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
+		To: reference.To{
+			List:    &ServiceManagerList{},
+			Managed: &ServiceManager{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ServiceManagerSecret")
+	}
+	mg.Spec.ForProvider.ServiceManagerSecret = rsp.ResolvedValue
+	mg.Spec.ForProvider.ServiceManagerRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecretNamespace,
+		Extract:      ServiceManagerSecretNamespace(),
+		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
+		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
+		To: reference.To{
+			List:    &ServiceManagerList{},
+			Managed: &ServiceManager{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ServiceManagerSecretNamespace")
+	}
+	mg.Spec.ForProvider.ServiceManagerSecretNamespace = rsp.ResolvedValue
+	mg.Spec.ForProvider.ServiceManagerRef = rsp.ResolvedReference
+
 	return nil
 }
 

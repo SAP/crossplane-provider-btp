@@ -121,9 +121,8 @@ spec:
                   planName:
                     description: Name of the service plan of that offering
                     type: string
-                  servicePlanRef:
-                    description: Reference to a ServicePlan in account to populate
-                      serviceplanId.
+                  serviceManagerRef:
+                    description: A Reference to a named object.
                     properties:
                       name:
                         description: Name of the referenced object.
@@ -156,9 +155,12 @@ spec:
                     required:
                     - name
                     type: object
-                  servicePlanSelector:
-                    description: Selector for a ServicePlan in account to populate
-                      serviceplanId.
+                  serviceManagerSecret:
+                    type: string
+                  serviceManagerSecretNamespace:
+                    type: string
+                  serviceManagerSelector:
+                    description: A Selector selects an object.
                     properties:
                       matchControllerRef:
                         description: |-

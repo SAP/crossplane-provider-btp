@@ -1492,14 +1492,14 @@ func (in *ServiceInstanceParameters) DeepCopyInto(out *ServiceInstanceParameters
 		*out = make([]v1.SecretKeySelector, len(*in))
 		copy(*out, *in)
 	}
-	if in.ServicePlanRef != nil {
-		in, out := &in.ServicePlanRef, &out.ServicePlanRef
-		*out = new(v1.Reference)
+	if in.ServiceManagerSelector != nil {
+		in, out := &in.ServiceManagerSelector, &out.ServiceManagerSelector
+		*out = new(v1.Selector)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.ServicePlanSelector != nil {
-		in, out := &in.ServicePlanSelector, &out.ServicePlanSelector
-		*out = new(v1.Selector)
+	if in.ServiceManagerRef != nil {
+		in, out := &in.ServiceManagerRef, &out.ServiceManagerRef
+		*out = new(v1.Reference)
 		(*in).DeepCopyInto(*out)
 	}
 }
