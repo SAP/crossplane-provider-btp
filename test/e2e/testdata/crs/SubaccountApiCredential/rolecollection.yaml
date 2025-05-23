@@ -1,4 +1,4 @@
-apiVersion: security.btp.orchestrate.cloud.sap/v1alpha1
+apiVersion: security.btp.sap.crossplane.io/v1alpha1
 kind: RoleCollection
 metadata:
   namespace: default
