@@ -21,6 +21,7 @@ import (
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/di"
 	"github.com/sap/crossplane-provider-btp/internal/features"
 )
 
@@ -35,6 +36,20 @@ const (
 	errSaveData        = "cannot update cr data"
 	errGetInstance     = "cannot get serviceinstance"
 )
+
+// Dependency Injection
+var newClientCreatorFn = func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
+	return siClient.NewServiceInstanceConnector(
+		saveCallback,
+		kube)
+}
+
+var newServicePlanInitializerFn = func() Initializer {
+	return &servicePlanInitializer{
+		newIdResolverFn: di.NewPlanIdResolverFn,
+		loadSecretFn:    di.LoadSecretData,
+	}
+}
 
 // Setup adds a controller that reconciles ServiceInstance managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
@@ -51,11 +66,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			kube:  mgr.GetClient(),
 			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
 
-			newClientCreatorFn: func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
-				return siClient.NewServiceInstanceConnector(
-					saveCallback,
-					kube)
-			},
+			newClientCreatorFn:          newClientCreatorFn,
+			newServicePlanInitializerFn: newServicePlanInitializerFn,
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -90,13 +102,22 @@ type connector struct {
 	kube  client.Client
 	usage resource.Tracker
 
-	newClientCreatorFn func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance]
+	newClientCreatorFn          func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance]
+	newServicePlanInitializerFn func() Initializer
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 	_, ok := mg.(*v1alpha1.ServiceInstance)
 	if !ok {
 		return nil, errors.New(errNotServiceInstance)
+	}
+
+	// we need to resolve the plan ID here, since at crossplanes initialize stage the required references for the sm secret are not resolved yet
+	planInitializer := c.newServicePlanInitializerFn()
+	err := planInitializer.Initialize(c.kube, ctx, mg)
+
+	if err != nil {
+		return nil, err
 	}
 
 	// when working with tf proxy resources we want to keep the Connect() logic as part of the delgating Connect calls of the native resources to

@@ -1,14 +1,12 @@
 package cloudmanagement
 
 import (
-	"context"
-
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	cmClient "github.com/sap/crossplane-provider-btp/internal/clients/cis"
-	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/di"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -28,14 +26,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 				mgr.GetClient(),
 				&providerv1alpha1.ProviderConfigUsage{},
 			),
-			resourcetracker: resourcetracker,
-			newPlanIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
-				binding, err := servicemanager.NewCredsFromOperatorSecret(secretData)
-				if err != nil {
-					return nil, err
-				}
-				return servicemanager.NewServiceManagerClient(ctx, &binding)
-			},
+			resourcetracker:     resourcetracker,
+			newPlanIdResolverFn: di.NewPlanIdResolverFn,
 
 			newClientInitalizerFn: func() cmClient.ITfClientInitializer {
 				return cmClient.NewTfClient(

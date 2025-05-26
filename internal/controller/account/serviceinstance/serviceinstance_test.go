@@ -19,9 +19,10 @@ import (
 )
 
 var (
-	errClient  = errors.New("apiError")
-	errKube    = errors.New("kubeError")
-	errCreator = errors.New("creatorError")
+	errClient      = errors.New("apiError")
+	errKube        = errors.New("kubeError")
+	errCreator     = errors.New("creatorError")
+	errInitializer = errors.New("initializerError")
 )
 
 func TestObserve(t *testing.T) {
@@ -239,7 +240,8 @@ func TestCreate(t *testing.T) {
 
 func TestConnect(t *testing.T) {
 	type fields struct {
-		creator *TfProxyClientCreatorMock
+		creator     *TfProxyClientCreatorMock
+		initializer Initializer
 	}
 
 	type args struct {
@@ -257,10 +259,24 @@ func TestConnect(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"ConnectError": {
+		"InitializerError": {
+			reason: "should return an error when the initalizer fails",
+			fields: fields{
+				creator:     &TfProxyClientCreatorMock{},
+				initializer: &InitializerMock{err: errInitializer},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: errInitializer,
+			},
+		},
+		"CreatorError": {
 			reason: "should return an error when the creator fails",
 			fields: fields{
-				creator: &TfProxyClientCreatorMock{err: errCreator},
+				creator:     &TfProxyClientCreatorMock{err: errCreator},
+				initializer: &InitializerMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -272,7 +288,8 @@ func TestConnect(t *testing.T) {
 		"ConnectSuccess": {
 			reason: "should return a client when the creator succeeds",
 			fields: fields{
-				creator: &TfProxyClientCreatorMock{},
+				creator:     &TfProxyClientCreatorMock{},
+				initializer: &InitializerMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -286,7 +303,8 @@ func TestConnect(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			c := connector{
-				newClientCreatorFn: func(_ client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] { return tc.fields.creator },
+				newClientCreatorFn:          func(_ client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] { return tc.fields.creator },
+				newServicePlanInitializerFn: func() Initializer { return tc.fields.initializer },
 			}
 
 			got, err := c.Connect(context.Background(), tc.args.mg)
@@ -446,6 +464,17 @@ func (t *TfProxyClientCreatorMock) Connect(ctx context.Context, cr *v1alpha1.Ser
 		return nil, t.err
 	}
 	return &TfProxyMock{}, nil
+}
+
+var _ Initializer = &InitializerMock{}
+
+type InitializerMock struct {
+	err error
+}
+
+// Initialize implements Initializer.
+func (i *InitializerMock) Initialize(kube client.Client, ctx context.Context, mg resource.Managed) error {
+	return i.err
 }
 
 var _ tfclient.TfProxyControllerI = &TfProxyMock{}

@@ -44,7 +44,7 @@ type ServiceInstanceParameters struct {
 	// +kubebuilder:validation:Optional
 	ServiceManagerSelector *xpv1.Selector `json:"serviceManagerSelector,omitempty"`
 	// +kubebuilder:validation:Optional
-	ServiceManagerRef *xpv1.Reference `json:"serviceManagerRef,omitempty" reference-group:"account.btp.sap.crossplane.io" reference-kind:"ServiceManager" reference-apiversion:"v1alpha1"`
+	ServiceManagerRef *xpv1.Reference `json:"serviceManagerRef,omitempty" reference-group:"account.btp.sap.crossplane.io" reference-kind:"ServiceManager" reference-apiversion:"v1beta1"`
 
 	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceManager
 	// +crossplane:generate:reference:refFieldName=ServiceManagerRef
