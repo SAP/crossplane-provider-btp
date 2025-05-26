@@ -61,6 +61,10 @@ type ServiceInstanceParameters struct {
 // ServiceInstanceObservation are the observable fields of a ServiceInstance.
 type ServiceInstanceObservation struct {
 	ID string `json:"id,omitempty"`
+
+	// The ID of the service plan as resolved by the ServiceManager
+	// +kubebuilder:validation:Optional
+	ServiceplanID *string `json:"serviceplanId,omitempty"`
 }
 
 // A ServiceInstanceSpec defines the desired state of a ServiceInstance.

@@ -48,7 +48,7 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 	if err != nil {
 		return errors.Wrap(err, errInitialize)
 	}
-	cr.Spec.ForProvider.ServiceplanID = &planID
+	cr.Status.AtProvider.ServiceplanID = &planID
 	return nil
 }
 

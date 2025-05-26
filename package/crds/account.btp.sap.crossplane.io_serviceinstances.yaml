@@ -468,6 +468,9 @@ spec:
                 properties:
                   id:
                     type: string
+                  serviceplanId:
+                    description: The ID of the service plan as resolved by the ServiceManager
+                    type: string
                 type: object
               conditions:
                 description: Conditions of the resource.

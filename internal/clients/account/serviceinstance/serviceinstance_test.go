@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -56,6 +57,30 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
+				),
+				hasErr: false,
+			},
+		},
+		"Resolved ServicePlanID": {
+			reason: "If no service plan ID is set, it should be resolved from the status",
+			args: args{
+				si: expectedServiceInstance(
+					withParameters(`{"key": "value"}`),
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+					withObservation(v1alpha1.ServiceInstanceObservation{
+						ServiceplanID: internal.Ptr("resolved-plan-id"),
+					}),
+				),
+			},
+			want: want{
+				tfResource: expectedTfSerivceInstance(
+					withTfParameters(`{"key":"value"}`),
+					withTfExternalName("123"),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfServicePlanID("resolved-plan-id"),
 				),
 				hasErr: false,
 			},
@@ -264,5 +289,17 @@ func withParameterSecrets(parameterSecrets map[string]string) func(*v1alpha1.Ser
 				Key: v,
 			})
 		}
+	}
+}
+
+func withObservation(obs v1alpha1.ServiceInstanceObservation) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Status.AtProvider = obs
+	}
+}
+
+func withTfServicePlanID(servicePlanID string) func(*v1alpha1.SubaccountServiceInstance) {
+	return func(cr *v1alpha1.SubaccountServiceInstance) {
+		cr.Spec.ForProvider.ServiceplanID = &servicePlanID
 	}
 }
