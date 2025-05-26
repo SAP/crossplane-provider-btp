@@ -25,10 +25,10 @@ const (
 
 	errNewClient = "cannot create new Service"
 
-	errGetRolecollection     = "cannot get rolecollection"
-	errCreateRolecollection  = "cannot create rolecollection"
-	errUpdateRolecollection  = "cannot update rolecollection"
-	errDeleteeRolecollection = "cannot delete rolecollection"
+	errGetRolecollection    = "cannot get rolecollection"
+	errCreateRolecollection = "cannot create rolecollection"
+	errUpdateRolecollection = "cannot update rolecollection"
+	errDeleteRolecollection = "cannot delete rolecollection"
 )
 
 var (
@@ -170,7 +170,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	cr.Status.SetConditions(xpv1.Deleting())
 
 	if err := c.client.Delete(ctx, meta.GetExternalName(cr)); err != nil {
-		return errors.Wrap(err, errDeleteeRolecollection)
+		return errors.Wrap(err, errDeleteRolecollection)
 	}
 
 	return nil

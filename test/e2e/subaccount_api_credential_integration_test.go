@@ -33,7 +33,7 @@ func TestSubaccountApiCredentialsIntegration(t *testing.T) {
 		Assess(
 			"Await resources to become synced",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				if err := resources.WaitForResourcesToBeSynced(ctx, cfg, manifestDir, wait.WithTimeout(time.Minute*5)); err != nil {
+				if err := resources.WaitForResourcesToBeSynced(ctx, cfg, manifestDir, wait.WithTimeout(time.Minute*7)); err != nil {
 					t.Fatal(err)
 				}
 				return ctx
@@ -42,7 +42,7 @@ func TestSubaccountApiCredentialsIntegration(t *testing.T) {
 		Assess(
 			"Check Resources Delete",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.DeleteResources(ctx, t, cfg, manifestDir, wait.WithTimeout(time.Minute*5))
+				resources.DeleteResources(ctx, t, cfg, manifestDir, wait.WithTimeout(time.Minute*7))
 				return ctx
 			},
 		).
