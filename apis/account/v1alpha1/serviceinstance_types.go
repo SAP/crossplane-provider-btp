@@ -34,8 +34,12 @@ type ServiceInstanceParameters struct {
 	// Name of the service plan of that offering
 	PlanName string `json:"planName,omitempty"`
 
-	// All parameters of the tf resource are included here as well
+	// All parameters of the tf resource are included here as well, this includes the parameters field
 	SubaccountServiceInstanceParameters `json:",inline"`
+
+	// Parameters in YAML format, will be merged with json parameters and secret parameters
+	// +kubebuilder:validation:Optional
+	ParametersYaml *string `json:"parametersYaml,omitempty"`
 
 	// Parameters stored in secret, will be merged with spec parameters
 	// +kubebuilder:validation:Optional

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -48,7 +49,7 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 	sInstance := buildBaseTfResource(si)
 
 	// combine parameters
-	parameterJson, err := BuildComplexParameterJson(kube, si.Spec.ForProvider.ParameterSecretRefs, si.Spec.ForProvider.Parameters)
+	parameterJson, err := BuildComplexParameterJson(kube, si.Spec.ForProvider.ParameterSecretRefs, si.Spec.ForProvider.Parameters, si.Spec.ForProvider.ParametersYaml)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to map tf resource")
 	}
@@ -64,16 +65,25 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 	return sInstance, nil
 }
 
-func BuildComplexParameterJson(kube client.Client, secretRefs []xpv1.SecretKeySelector, specParameters *string) ([]byte, error) {
+func BuildComplexParameterJson(kube client.Client, secretRefs []xpv1.SecretKeySelector, jsonParams, yamlParams *string) ([]byte, error) {
 	// resolve all parameter secret references and merge them into a single map
 	parameterData, err := lookupSecrets(kube, secretRefs)
 	if err != nil {
 		return nil, err
 	}
+
 	// merge the plain parameters with the secret parameters
-	if err := mergeJsonData(parameterData, []byte(internal.Val(specParameters))); err != nil {
-		return nil, err
+	if jsonParams != nil {
+		if err := mergeJsonData(parameterData, []byte(internal.Val(jsonParams))); err != nil {
+			return nil, err
+		}
 	}
+
+	// merge the yaml parameters in if provided
+	if yamlParams != nil {
+		mergeYamlData(parameterData, []byte(*yamlParams))
+	}
+
 	//TODO: prevent nilpointer
 	parameterJson, err := json.Marshal(parameterData)
 	if err != nil {
@@ -146,6 +156,23 @@ func mergeJsonData(mergedData map[string]interface{}, jsonToMerge []byte) error 
 	}
 	for k, v := range toAdd {
 		mergedData[k] = v
+	}
+	return nil
+}
+
+// mergeYamlData merges the yaml data into the map
+func mergeYamlData(mergedData map[string]interface{}, yamlParams []byte) error {
+	yamlMap := make(map[string]interface{})
+	if err := yaml.Unmarshal(yamlParams, &yamlMap); err != nil {
+		return err
+	}
+
+	yamlJson, err := json.Marshal(yamlMap)
+	if err != nil {
+		return err
+	}
+	if err := mergeJsonData(mergedData, yamlJson); err != nil {
+		return err
 	}
 	return nil
 }
