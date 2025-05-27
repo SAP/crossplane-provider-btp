@@ -46,7 +46,7 @@ func (s *ServiceBindingMapper) TfResource(sb *v1alpha1.ServiceBinding, kube clie
 	sBinding := buildBaseTfResource(sb)
 
 	// combine parameters
-	parameterJson, err := instanceClient.BuildComplexParameterJson(kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters)
+	parameterJson, err := instanceClient.BuildComplexParameterJson(kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters, sb.Spec.ForProvider.ParametersYaml)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to map tf resource")
 	}

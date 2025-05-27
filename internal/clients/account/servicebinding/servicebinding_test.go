@@ -40,6 +40,25 @@ func TestTfResource(t *testing.T) {
 				hasErr: true,
 			},
 		},
+		"Not set json parameters": {
+			reason: "Gracefully handle unset json parameters",
+			args: args{
+				si: expectedServiceBinding(
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+				),
+			},
+			want: want{
+				tfResource: expectedTfSerivceInstance(
+					withTfParameters(`{}`),
+					withTfExternalName("123"),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+				),
+				hasErr: false,
+			},
+		},
 		"Simply parameters mapping": {
 			reason: "Transfer json parameters from spec to tf resource if valid",
 			args: args{
@@ -106,6 +125,7 @@ func TestTfResource(t *testing.T) {
 			args: args{
 				si: expectedServiceBinding(
 					withParameters(`{"key": "value"}`),
+					withParametersYaml(`key4: value4`),
 					withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"}),
 					withExternalName("123"),
 					withProviderConfigRef("default"),
@@ -130,7 +150,7 @@ func TestTfResource(t *testing.T) {
 			want: want{
 				hasErr: false,
 				tfResource: expectedTfSerivceInstance(
-					withTfParameters(`{"key":"value","key2":"value2","key3":"value3"}`),
+					withTfParameters(`{"key":"value","key2":"value2","key3":"value3","key4":"value4"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
@@ -264,5 +284,11 @@ func withParameterSecrets(parameterSecrets map[string]string) func(*v1alpha1.Ser
 				Key: v,
 			})
 		}
+	}
+}
+
+func withParametersYaml(yamlParams string) func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
+		cr.Spec.ForProvider.ParametersYaml = &yamlParams
 	}
 }

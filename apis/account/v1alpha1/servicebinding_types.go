@@ -30,6 +30,10 @@ type ServiceBindingParameters struct {
 	// All parameters of the tf resource are included here as well
 	SubaccountServiceBindingParameters `json:",inline"`
 
+	// Parameters in YAML format, will be merged with json parameters and secret parameters
+	// +kubebuilder:validation:Optional
+	ParametersYaml *string `json:"parametersYaml,omitempty"`
+
 	// Parameters stored in secret, will be merged with spec parameters
 	// +kubebuilder:validation:Optional
 	ParameterSecretRefs []xpv1.SecretKeySelector `json:"parameterSecretRefs,omitempty"`
