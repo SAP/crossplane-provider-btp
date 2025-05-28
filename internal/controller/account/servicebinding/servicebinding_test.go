@@ -8,6 +8,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,7 +62,7 @@ func TestObserve(t *testing.T) {
 		"NotFound": {
 			reason: "should return not existing",
 			fields: fields{
-				client: &TfProxyMock{found: false},
+				client: &TfProxyMock{status: tfClient.NotExisting},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceBinding{},
@@ -74,11 +75,29 @@ func TestObserve(t *testing.T) {
 				cr: buildExpectedServiceBinding(), // No annotations, observation data, or conditions
 			},
 		},
+		"Requires Update": {
+			reason: "should return up to date == false",
+			fields: fields{
+				client: &TfProxyMock{status: tfClient.Drift},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceBinding{},
+			},
+			want: want{
+				err: nil,
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  false,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				cr: buildExpectedServiceBinding(), // No annotations, observation data, or conditions
+			},
+		},
 		"Happy, while async in process": {
 			reason: "should return existing, but no data, or connection details",
 			fields: fields{
 				client: &TfProxyMock{
-					found:   true,
+					status:  tfClient.UpToDate,
 					details: map[string][]byte{},
 				},
 			},
@@ -99,7 +118,7 @@ func TestObserve(t *testing.T) {
 			reason: "should return existing and pull data from embedded tf resource",
 			fields: fields{
 				client: &TfProxyMock{
-					found: true,
+					status: tfClient.UpToDate,
 					data: &tfClient.ObservationData{
 						ExternalName: "some-ext-name",
 						ID:           "some-id",
@@ -451,7 +470,7 @@ func (t *TfProxyClientCreatorMock) Connect(ctx context.Context, cr *v1alpha1.Ser
 var _ tfClient.TfProxyControllerI = &TfProxyMock{}
 
 type TfProxyMock struct {
-	found   bool
+	status  tfclient.Status
 	data    *tfClient.ObservationData
 	err     error
 	details map[string][]byte
@@ -465,8 +484,8 @@ func (t *TfProxyMock) Create(ctx context.Context) error {
 	return t.err
 }
 
-func (t *TfProxyMock) Observe(context context.Context) (bool, map[string][]byte, error) {
-	return t.found, t.details, t.err
+func (t *TfProxyMock) Observe(context context.Context) (tfclient.Status, map[string][]byte, error) {
+	return t.status, t.details, t.err
 }
 
 func (t *TfProxyMock) Delete(ctx context.Context) error {

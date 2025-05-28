@@ -125,7 +125,7 @@ func TestObserve(t *testing.T) {
 	}
 
 	type want struct {
-		exists  bool
+		status  Status
 		err     error
 		details map[string][]byte
 	}
@@ -143,33 +143,51 @@ func TestObserve(t *testing.T) {
 				},
 			},
 			want: want{
-				exists: false,
+				status: Unknown,
 				err:    errTf,
 			},
 		},
 		{
-			name: "ResourceExists",
+			name: "NotExisting",
+			fields: fields{
+				tfClient: &TfControllerMock{
+					observation: managed.ExternalObservation{
+						ResourceExists: false,
+					},
+					err: nil,
+				},
+			},
+			want: want{
+				status:  NotExisting,
+				details: map[string][]byte{},
+				err:     nil,
+			},
+		},
+		{
+			name: "Drifted",
 			fields: fields{
 				tfClient: &TfControllerMock{
 					err: nil,
 					observation: managed.ExternalObservation{
-						ResourceExists: true,
+						ResourceExists:   true,
+						ResourceUpToDate: false,
 					},
 				},
 			},
 			want: want{
-				exists:  true,
+				status:  Drift,
 				err:     nil,
 				details: map[string][]byte{},
 			},
 		},
 		{
-			name: "ConnectionDetailsFlattened",
+			name: "UpToDate, connection details flattened",
 			fields: fields{
 				tfClient: &TfControllerMock{
 					err: nil,
 					observation: managed.ExternalObservation{
-						ResourceExists: true,
+						ResourceExists:   true,
+						ResourceUpToDate: true,
 						ConnectionDetails: map[string][]byte{
 							"tf-credentials-key": []byte(`{"key1":"value1","key2":"value2"}`),
 						},
@@ -177,7 +195,7 @@ func TestObserve(t *testing.T) {
 				},
 			},
 			want: want{
-				exists: true,
+				status: UpToDate,
 				err:    nil,
 				details: map[string][]byte{
 					"key1": []byte("value1"),
@@ -192,13 +210,13 @@ func TestObserve(t *testing.T) {
 				tfClient: tc.fields.tfClient,
 			}
 
-			exists, details, err := controller.Observe(context.Background())
+			status, details, err := controller.Observe(context.Background())
 			if err != tc.want.err {
 				t.Errorf("TfProxyController.Observe() error = %v, want %v", err, tc.want.err)
 
 			}
-			if exists != tc.want.exists {
-				t.Errorf("TfProxyController.Observe() exists = %v, want %v", exists, tc.want.exists)
+			if diff := cmp.Diff(tc.want.status, status); diff != "" {
+				t.Errorf("\nTfProxyController.Observe(...): status -want, +got:\n%s\n", diff)
 			}
 			if diff := cmp.Diff(tc.want.details, details); diff != "" {
 				t.Errorf("\nServiceBindingClient.Observe(...): details -want, +got:\n%s\n", diff)

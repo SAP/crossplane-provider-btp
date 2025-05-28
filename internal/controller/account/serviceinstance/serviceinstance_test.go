@@ -62,7 +62,7 @@ func TestObserve(t *testing.T) {
 		"NotFound": {
 			reason: "should return not existing",
 			fields: fields{
-				client: &TfProxyMock{found: false},
+				client: &TfProxyMock{status: tfclient.NotExisting},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -75,11 +75,32 @@ func TestObserve(t *testing.T) {
 				cr: expectedServiceInstance(), // No annotations, observation data, or conditions
 			},
 		},
+		"Requires Update": {
+			reason: "should return existing, not up to date",
+			fields: fields{
+				client: &TfProxyMock{
+					status:  tfclient.Drift,
+					details: map[string][]byte{},
+				},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: nil,
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  false,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				cr: expectedServiceInstance(), // No annotations, observation data, or conditions
+			},
+		},
 		"Happy, while async in process": {
 			reason: "should return existing, but no data",
 			fields: fields{
 				client: &TfProxyMock{
-					found:   true,
+					status:  tfclient.UpToDate,
 					details: map[string][]byte{},
 				},
 			},
@@ -100,7 +121,7 @@ func TestObserve(t *testing.T) {
 			reason: "should return existing and pull data from embedded tf resource",
 			fields: fields{
 				client: &TfProxyMock{
-					found: true,
+					status: tfclient.UpToDate,
 					data: &tfclient.ObservationData{
 						ExternalName: "some-ext-name",
 						ID:           "some-id",
@@ -482,7 +503,7 @@ func (i *InitializerMock) Initialize(kube client.Client, ctx context.Context, mg
 var _ tfclient.TfProxyControllerI = &TfProxyMock{}
 
 type TfProxyMock struct {
-	found   bool
+	status  tfclient.Status
 	data    *tfclient.ObservationData
 	err     error
 	details map[string][]byte
@@ -496,8 +517,8 @@ func (t *TfProxyMock) Create(ctx context.Context) error {
 	return t.err
 }
 
-func (t *TfProxyMock) Observe(context context.Context) (bool, map[string][]byte, error) {
-	return t.found, t.details, t.err
+func (t *TfProxyMock) Observe(context context.Context) (tfclient.Status, map[string][]byte, error) {
+	return t.status, t.details, t.err
 }
 
 func (t *TfProxyMock) Delete(ctx context.Context) error {

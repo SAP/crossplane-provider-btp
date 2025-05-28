@@ -13,12 +13,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type Status string
+
+const (
+	Unknown     Status = "Unknown"
+	NotExisting Status = "NotExisting"
+	Drift       Status = "Drift"
+	UpToDate    Status = "UpToDate"
+)
+
 type TfProxyConnectorI[NATIVE resource.Managed] interface {
 	Connect(context.Context, NATIVE) (TfProxyControllerI, error)
 }
 
 type TfProxyControllerI interface {
-	Observe(ctx context.Context) (bool, map[string][]byte, error)
+	Observe(ctx context.Context) (Status, map[string][]byte, error)
 	Create(ctx context.Context) error
 	Delete(ctx context.Context) error
 	// QueryUpdatedData returns the relevant status data once the async creation is done
@@ -107,18 +116,25 @@ func (t *TfProxyController[UPJETTED]) Delete(ctx context.Context) error {
 }
 
 // Observe implements TfProxyControllerI.
-func (t *TfProxyController[UPJETTED]) Observe(ctx context.Context) (bool, map[string][]byte, error) {
+func (t *TfProxyController[UPJETTED]) Observe(ctx context.Context) (Status, map[string][]byte, error) {
 	// will return true, true, in case of in memory running async operations
 	obs, err := t.tfClient.Observe(ctx, t.tfResource)
 	if err != nil {
-		return false, nil, err
-	}
-	flatDetails, err := flattenSecretData(obs.ConnectionDetails)
-	if err != nil {
-		return false, nil, err
+		return Unknown, nil, err
 	}
 
-	return obs.ResourceExists, flatDetails, nil
+	if !obs.ResourceExists {
+		return NotExisting, map[string][]byte{}, nil
+	}
+	if !obs.ResourceUpToDate {
+		return Drift, map[string][]byte{}, nil
+	}
+
+	flatDetails, err := flattenSecretData(obs.ConnectionDetails)
+	if err != nil {
+		return Unknown, nil, err
+	}
+	return UpToDate, flatDetails, nil
 }
 
 // FlattenSecretData takes a map[string][]byte and flattens any JSON object values into the result map.

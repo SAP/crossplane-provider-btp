@@ -142,28 +142,37 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
-	exists, details, err := e.tfClient.Observe(ctx)
+	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
 	}
-	if !exists {
+
+	switch status {
+	case tfClient.NotExisting:
 		return managed.ExternalObservation{ResourceExists: false}, nil
-	}
-	//TODO: add uodate logic
-	data := e.tfClient.QueryAsyncData(ctx)
+	case tfClient.Drift:
+		return managed.ExternalObservation{
+			ResourceExists:    true,
+			ResourceUpToDate:  false,
+			ConnectionDetails: managed.ConnectionDetails{},
+		}, nil
+	case tfClient.UpToDate:
+		data := e.tfClient.QueryAsyncData(ctx)
 
-	if data != nil {
-		if err := e.saveInstanceData(ctx, cr, *data); err != nil {
-			return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
+		if data != nil {
+			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
+				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
+			}
+			cr.SetConditions(xpv1.Available())
 		}
-		cr.SetConditions(xpv1.Available())
-	}
 
-	return managed.ExternalObservation{
-		ResourceExists:    true,
-		ResourceUpToDate:  true,
-		ConnectionDetails: details,
-	}, nil
+		return managed.ExternalObservation{
+			ResourceExists:    true,
+			ResourceUpToDate:  true,
+			ConnectionDetails: details,
+		}, nil
+	}
+	return managed.ExternalObservation{}, errors.New(errObserveInstance)
 }
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
