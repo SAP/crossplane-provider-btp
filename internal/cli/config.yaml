@@ -1,0 +1,20 @@
+resources:
+  - subaccount:
+      displayName: .*
+      subdomain: .*
+      region: .*
+      description: .*
+      managementPolicies: [Observe]
+  - directory:
+      displayName: .*
+      description: .*
+      directoryFeatures: .*
+      managementPolicies: [Observe]
+  - entitlement:
+      serviceName: .*
+      servicePlanName: .*
+      subaccountGuid: .*
+      managementPolicies: [Observe]
+providerConfigRef:
+  name: default
+  namespace: default
