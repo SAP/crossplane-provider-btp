@@ -23,6 +23,7 @@ import (
 
 const (
 	errNotSubscription = "managed resource is not a Subscription custom resource"
+	errTrackRUsage     = "cannot track ResourceUsage"
 	errTrackPCUsage    = "cannot track ProviderConfig usage"
 
 	errExtractSecretKey     = "no Cloud Management Secret Found"
@@ -54,9 +55,10 @@ var newSubscriptionClientFn = func(ctx context.Context, cisSecretData map[string
 }
 
 type connector struct {
-	kube         client.Client
-	usage        resource.Tracker
-	newServiceFn func(ctx context.Context, cisSecretData map[string][]byte) (subscription.SubscriptionApiHandlerI, error)
+	kube            client.Client
+	usage           resource.Tracker
+	resourcetracker tracking.ReferenceResolverTracker
+	newServiceFn    func(ctx context.Context, cisSecretData map[string][]byte) (subscription.SubscriptionApiHandlerI, error)
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -67,6 +69,10 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	if err := c.usage.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
+	}
+
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, errTrackRUsage)
 	}
 
 	secretName := cr.Spec.CloudManagementSecret
