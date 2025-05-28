@@ -27,6 +27,8 @@ import (
 
 // ServiceInstanceParameters are the configurable fields of a ServiceInstance.
 type ServiceInstanceParameters struct {
+	// Name of the service instance in btp, required
+	Name string `json:"name"`
 
 	// Name of the service offering
 	OfferingName string `json:"offeringName,omitempty"`

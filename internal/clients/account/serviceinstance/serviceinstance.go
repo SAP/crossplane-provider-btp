@@ -58,6 +58,10 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 	// transfer external name
 	meta.SetExternalName(sInstance, meta.GetExternalName(si))
 
+	// transfer (required) name from the wrapping service instance
+	// this is required to ensure that the service instance name is set correctly
+	sInstance.Spec.ForProvider.Name = &si.Spec.ForProvider.Name
+
 	if sInstance.Spec.ForProvider.ServiceplanID == nil {
 		// if no plan id explicitly set by user we take the one resolved via offering and plan name
 		sInstance.Spec.ForProvider.ServiceplanID = si.Status.AtProvider.ServiceplanID

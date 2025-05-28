@@ -115,6 +115,10 @@ spec:
                       (String) The parameters of the service binding as a valid JSON object.
                       The parameters of the service binding as a valid JSON object.
                     type: string
+                  parametersYaml:
+                    description: Parameters in YAML format, will be merged with json
+                      parameters and secret parameters
+                    type: string
                   serviceInstanceId:
                     description: |-
                       (String) The ID of the service instance associated with the binding.

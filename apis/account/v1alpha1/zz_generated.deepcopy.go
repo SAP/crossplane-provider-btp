@@ -1358,6 +1358,11 @@ func (in *ServiceBindingObservation) DeepCopy() *ServiceBindingObservation {
 func (in *ServiceBindingParameters) DeepCopyInto(out *ServiceBindingParameters) {
 	*out = *in
 	in.SubaccountServiceBindingParameters.DeepCopyInto(&out.SubaccountServiceBindingParameters)
+	if in.ParametersYaml != nil {
+		in, out := &in.ParametersYaml, &out.ParametersYaml
+		*out = new(string)
+		**out = **in
+	}
 	if in.ParameterSecretRefs != nil {
 		in, out := &in.ParameterSecretRefs, &out.ParameterSecretRefs
 		*out = make([]v1.SecretKeySelector, len(*in))

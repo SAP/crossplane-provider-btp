@@ -294,6 +294,8 @@ spec:
                             type: string
                         type: object
                     type: object
+                required:
+                - name
                 type: object
               managementPolicies:
                 default:
