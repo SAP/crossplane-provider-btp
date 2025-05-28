@@ -220,6 +220,7 @@ func expectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.
 // Helper function to build a complete SubaccountServiceInstance CR dynamically
 func expectedTfSerivceInstance(opts ...func(*v1alpha1.SubaccountServiceInstance)) *v1alpha1.SubaccountServiceInstance {
 	cr := &v1alpha1.SubaccountServiceInstance{}
+	cr.Spec.ForProvider.Name = internal.Ptr("")
 
 	// Apply each option to modify the CR
 	for _, opt := range opts {
@@ -283,10 +284,8 @@ func withTfManagementPolicies() func(*v1alpha1.SubaccountServiceInstance) {
 
 func withParameters(jsonParams string) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Spec.ForProvider = v1alpha1.ServiceInstanceParameters{
-			SubaccountServiceInstanceParameters: v1alpha1.SubaccountServiceInstanceParameters{
-				Parameters: &jsonParams,
-			},
+		cr.Spec.ForProvider.SubaccountServiceInstanceParameters = v1alpha1.SubaccountServiceInstanceParameters{
+			Parameters: &jsonParams,
 		}
 	}
 }
@@ -299,9 +298,7 @@ func withParametersYaml(yamlParams string) func(*v1alpha1.ServiceInstance) {
 
 func withTfParameters(jsonParams string) func(*v1alpha1.SubaccountServiceInstance) {
 	return func(cr *v1alpha1.SubaccountServiceInstance) {
-		cr.Spec.ForProvider = v1alpha1.SubaccountServiceInstanceParameters{
-			Parameters: &jsonParams,
-		}
+		cr.Spec.ForProvider.Parameters = &jsonParams
 	}
 }
 
