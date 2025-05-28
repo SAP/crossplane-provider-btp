@@ -454,6 +454,76 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestUpdate(t *testing.T) {
+	type fields struct {
+		client *TfProxyMock
+	}
+	type args struct {
+		mg resource.Managed
+	}
+	type want struct {
+		err error
+		cr  *v1alpha1.ServiceBinding
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"ApiError": {
+			reason: "should return an error when the API call fails",
+			fields: fields{
+				client: &TfProxyMock{err: errClient},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceBinding{},
+			},
+			want: want{
+				err: errClient,
+				cr:  buildExpectedServiceBinding(),
+			},
+		},
+		"HappyPath": {
+			reason: "should update the resource successfully",
+			fields: fields{
+				client: &TfProxyMock{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceBinding{},
+			},
+			want: want{
+				err: nil,
+				cr:  buildExpectedServiceBinding(),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				tfClient: tc.fields.client,
+				kube: &test.MockClient{
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			}
+
+			_, err := e.Update(context.Background(), tc.args.mg)
+			expectedErrorBehaviour(t, tc.want.err, err)
+
+			// Verify the entire CR
+			cr, ok := tc.args.mg.(*v1alpha1.ServiceBinding)
+			if !ok {
+				t.Fatalf("expected *v1alpha1.ServiceBinding, got %T", tc.args.mg)
+			}
+			if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
+
 var _ tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding] = &TfProxyClientCreatorMock{}
 
 type TfProxyClientCreatorMock struct {
@@ -489,6 +559,10 @@ func (t *TfProxyMock) Observe(context context.Context) (tfclient.Status, map[str
 }
 
 func (t *TfProxyMock) Delete(ctx context.Context) error {
+	return t.err
+}
+
+func (t *TfProxyMock) Update(ctx context.Context) error {
 	return t.err
 }
 

@@ -25,6 +25,84 @@ var (
 	errInitializer = errors.New("initializerError")
 )
 
+func TestConnect(t *testing.T) {
+	type fields struct {
+		creator     *TfProxyClientCreatorMock
+		initializer Initializer
+	}
+
+	type args struct {
+		mg resource.Managed
+	}
+
+	type want struct {
+		err            error
+		externalExists bool
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"InitializerError": {
+			reason: "should return an error when the initalizer fails",
+			fields: fields{
+				creator:     &TfProxyClientCreatorMock{},
+				initializer: &InitializerMock{err: errInitializer},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: errInitializer,
+			},
+		},
+		"CreatorError": {
+			reason: "should return an error when the creator fails",
+			fields: fields{
+				creator:     &TfProxyClientCreatorMock{err: errCreator},
+				initializer: &InitializerMock{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: errCreator,
+			},
+		},
+		"ConnectSuccess": {
+			reason: "should return a client when the creator succeeds",
+			fields: fields{
+				creator:     &TfProxyClientCreatorMock{},
+				initializer: &InitializerMock{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			c := connector{
+				newClientCreatorFn:          func(_ client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] { return tc.fields.creator },
+				newServicePlanInitializerFn: func() Initializer { return tc.fields.initializer },
+			}
+
+			got, err := c.Connect(context.Background(), tc.args.mg)
+			if tc.want.externalExists && got == nil {
+				t.Errorf("expected external client, got nil")
+			}
+			expectedErrorBehaviour(t, tc.want.err, err)
+		})
+	}
+}
+
 func TestObserve(t *testing.T) {
 	type fields struct {
 		client *TfProxyMock
@@ -261,19 +339,16 @@ func TestCreate(t *testing.T) {
 	}
 }
 
-func TestConnect(t *testing.T) {
+func TestUpdate(t *testing.T) {
 	type fields struct {
-		creator     *TfProxyClientCreatorMock
-		initializer Initializer
+		client *TfProxyMock
 	}
-
 	type args struct {
 		mg resource.Managed
 	}
-
 	type want struct {
-		err            error
-		externalExists bool
+		err error
+		cr  *v1alpha1.ServiceInstance
 	}
 
 	cases := map[string]struct {
@@ -282,62 +357,58 @@ func TestConnect(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"InitializerError": {
-			reason: "should return an error when the initalizer fails",
+		"ApiError": {
+			reason: "should return an error when the API call fails",
 			fields: fields{
-				creator:     &TfProxyClientCreatorMock{},
-				initializer: &InitializerMock{err: errInitializer},
+				client: &TfProxyMock{err: errClient},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
 			},
 			want: want{
-				err: errInitializer,
+				err: errClient,
+				cr:  expectedServiceInstance(),
 			},
 		},
-		"CreatorError": {
-			reason: "should return an error when the creator fails",
+		"HappyPath": {
+			reason: "should update the resource successfully",
 			fields: fields{
-				creator:     &TfProxyClientCreatorMock{err: errCreator},
-				initializer: &InitializerMock{},
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: errCreator,
-			},
-		},
-		"ConnectSuccess": {
-			reason: "should return a client when the creator succeeds",
-			fields: fields{
-				creator:     &TfProxyClientCreatorMock{},
-				initializer: &InitializerMock{},
+				client: &TfProxyMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
 			},
 			want: want{
 				err: nil,
+				cr:  expectedServiceInstance(),
 			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			c := connector{
-				newClientCreatorFn:          func(_ client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] { return tc.fields.creator },
-				newServicePlanInitializerFn: func() Initializer { return tc.fields.initializer },
+			e := external{
+				tfClient: tc.fields.client,
+				kube: &test.MockClient{
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
 			}
 
-			got, err := c.Connect(context.Background(), tc.args.mg)
-			if tc.want.externalExists && got == nil {
-				t.Errorf("expected external client, got nil")
-			}
+			_, err := e.Update(context.Background(), tc.args.mg)
 			expectedErrorBehaviour(t, tc.want.err, err)
+
+			// Verify the entire CR
+			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
+			if !ok {
+				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
+			}
+			if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+			}
 		})
 	}
 }
+
 func TestSaveCallback(t *testing.T) {
 	type args struct {
 		kube       client.Client
@@ -522,6 +593,10 @@ func (t *TfProxyMock) Observe(context context.Context) (tfclient.Status, map[str
 }
 
 func (t *TfProxyMock) Delete(ctx context.Context) error {
+	return t.err
+}
+
+func (t *TfProxyMock) Update(ctx context.Context) error {
 	return t.err
 }
 

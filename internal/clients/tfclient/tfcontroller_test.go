@@ -341,6 +341,62 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestUpdate(t *testing.T) {
+	type fields struct {
+		tfClient *TfControllerMock
+	}
+	type want struct {
+		err error
+	}
+
+	tests := []struct {
+		name   string
+		fields fields
+		want   want
+	}{
+		{
+			name: "TfError",
+			fields: fields{
+				tfClient: &TfControllerMock{
+					err: errTf,
+				},
+			},
+			want: want{
+				err: errTf,
+			},
+		},
+		{
+			name: "SuccessfulUpdate",
+			fields: fields{
+				tfClient: &TfControllerMock{
+					err: nil,
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &TfProxyController[*fake.Terraformed]{
+				tfClient: tc.fields.tfClient,
+			}
+
+			err := client.Update(context.Background())
+			if err != nil && err.Error() != tc.want.err.Error() {
+				t.Errorf("TfProxyController.Update() error = %v, want %v", err, tc.want.err)
+			}
+
+			// Verify that the Update method was called with the correct type
+			if _, ok := tc.fields.tfClient.CalledWithMg.(*fake.Terraformed); !ok {
+				t.Errorf("TfProxyController.Update() called with wrong type %T, want %T", tc.fields.tfClient.CalledWithMg, &fake.Terraformed{})
+			}
+		})
+	}
+}
+
 func TestQueryAsyncData(t *testing.T) {
 	type args struct {
 		cr *fake.Terraformed
@@ -468,7 +524,11 @@ func (t *TfControllerMock) Observe(ctx context.Context, mg resource.Managed) (ma
 
 // Update implements managed.ExternalClient.
 func (t *TfControllerMock) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	panic("unimplemented")
+	t.CalledWithMg = mg
+	if t.err != nil {
+		return managed.ExternalUpdate{}, t.err
+	}
+	return managed.ExternalUpdate{}, nil
 }
 
 // terraformedCrWithData is a helper function to create a terraformed resource with the given data

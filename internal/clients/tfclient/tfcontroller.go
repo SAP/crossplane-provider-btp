@@ -29,6 +29,7 @@ type TfProxyConnectorI[NATIVE resource.Managed] interface {
 type TfProxyControllerI interface {
 	Observe(ctx context.Context) (Status, map[string][]byte, error)
 	Create(ctx context.Context) error
+	Update(ctx context.Context) error
 	Delete(ctx context.Context) error
 	// QueryUpdatedData returns the relevant status data once the async creation is done
 	QueryAsyncData(ctx context.Context) *ObservationData
@@ -106,6 +107,12 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 // Create implements TfProxyControllerI.
 func (t *TfProxyController[UPJETTED]) Create(ctx context.Context) error {
 	_, err := t.tfClient.Create(ctx, t.tfResource)
+	return err
+}
+
+// Update implements TfProxyControllerI.
+func (t *TfProxyController[UPJETTED]) Update(ctx context.Context) error {
+	_, err := t.tfClient.Update(ctx, t.tfResource)
 	return err
 }
 

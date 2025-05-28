@@ -175,7 +175,9 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotServiceBinding)
 	}
-
+	if err := c.tfClient.Update(ctx); err != nil {
+		return managed.ExternalUpdate{}, err
+	}
 	return managed.ExternalUpdate{
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil

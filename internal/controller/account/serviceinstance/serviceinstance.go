@@ -33,6 +33,7 @@ const (
 
 	errObserveInstance = "cannot observe serviceinstance"
 	errCreateInstance  = "cannot create serviceinstance"
+	errUpdateInstance  = "cannot update serviceinstance"
 	errSaveData        = "cannot update cr data"
 	errGetInstance     = "cannot get serviceinstance"
 )
@@ -195,6 +196,11 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	_, ok := mg.(*v1alpha1.ServiceInstance)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotServiceInstance)
+	}
+
+	err := c.tfClient.Update(ctx)
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateInstance)
 	}
 
 	return managed.ExternalUpdate{
