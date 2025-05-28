@@ -16,6 +16,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	tracking_test "github.com/sap/crossplane-provider-btp/internal/tracking/test"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -509,6 +510,7 @@ func TestConnect(t *testing.T) {
 				kube:         &kube,
 				usage:        tracking_test.NoOpReferenceResolverTracker{},
 				newServiceFn: newSubscriptionClientFn,
+				resourcetracker: tracking.NewDefaultReferenceResolverTracker(&kube),
 			}
 
 			connect, err := c.Connect(context.Background(), tc.args.cr)
