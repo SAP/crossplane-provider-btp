@@ -2,40 +2,54 @@ package serviceinstance
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/google/go-cmp/cmp"
+	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var (
+	errSecret      = errors.New("secret error")
+	errNewResolver = errors.New("new resolver error")
+	errApi         = errors.New("api error")
+)
+
 func TestServicePlanInitializer_Initialize(t *testing.T) {
 	testPlanID := "test-plan-id"
+
+	type want struct {
+		err    error
+		planID *string
+	}
+
 	tests := map[string]struct {
 		mg              resource.Managed
-		isInitialized   bool
 		loadSecretFn    func(client.Client, context.Context, string, string) (map[string][]byte, error)
 		newIdResolverFn func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error)
-		wantErr         bool
-		wantPlanID      *string
+		want            want
 	}{
-		"not a ServiceInstance": {
-			mg:      &struct{ resource.Managed }{},
-			wantErr: true,
-		},
 		"already initialized": {
-			mg:            &v1alpha1.ServiceInstance{},
-			isInitialized: true,
-			wantErr:       false,
+			mg: expectedServiceInstance(
+				withObservationData("", internal.Ptr("plan-id")),
+			),
+			want: want{
+				planID: internal.Ptr("plan-id"),
+				err:    nil,
+			},
 		},
 		"loadSecret fails": {
 			mg: &v1alpha1.ServiceInstance{},
 			loadSecretFn: func(kube client.Client, ctx context.Context, name, ns string) (map[string][]byte, error) {
-				return nil, errors.New("secret error")
+				return nil, errSecret
 			},
-			wantErr: true,
+			want: want{
+				err: errSecret,
+			},
 		},
 		"idResolver fails": {
 			mg: &v1alpha1.ServiceInstance{},
@@ -43,9 +57,11 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 				return map[string][]byte{}, nil
 			},
 			newIdResolverFn: func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error) {
-				return nil, errors.New("resolver error")
+				return nil, errNewResolver
 			},
-			wantErr: true,
+			want: want{
+				err: errNewResolver,
+			},
 		},
 		"planID lookup fails": {
 			mg: &v1alpha1.ServiceInstance{
@@ -57,9 +73,11 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 				return map[string][]byte{}, nil
 			},
 			newIdResolverFn: func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error) {
-				return &mockPlanIdResolver{"", errors.New("lookup error")}, nil
+				return &mockPlanIdResolver{"", errApi}, nil
 			},
-			wantErr: true,
+			want: want{
+				err: errApi,
+			},
 		},
 		"success": {
 			mg: &v1alpha1.ServiceInstance{
@@ -73,7 +91,10 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 			newIdResolverFn: func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error) {
 				return &mockPlanIdResolver{testPlanID, nil}, nil
 			},
-			wantPlanID: &testPlanID,
+			want: want{
+				planID: internal.Ptr(testPlanID),
+				err:    nil,
+			},
 		},
 	}
 
@@ -94,19 +115,19 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 				},
 			}
 
-			if si, ok := tc.mg.(*v1alpha1.ServiceInstance); ok && tc.isInitialized {
-				si.Spec.ForProvider.ServiceplanID = new(string)
+			err := init.Initialize(nil, context.Background(), tc.mg)
+
+			// Check if the error matches the expected error
+			expectedErrorBehaviour(t, tc.want.err, err)
+
+			// check if planID has been resolved as expected
+			expectedCr := tc.mg.DeepCopyObject()
+			expectedCr.(*v1alpha1.ServiceInstance).Status.AtProvider.ServiceplanID = tc.want.planID
+
+			if diff := cmp.Diff(expectedCr, tc.mg); diff != "" {
+				t.Errorf("\nCR mismatch (-want, +got):\n%s\n", diff)
 			}
 
-			err := init.Initialize(nil, context.Background(), tc.mg)
-			if (err != nil) != tc.wantErr {
-				t.Errorf("got error = %v, wantErr %v", err, tc.wantErr)
-			}
-			if si, ok := tc.mg.(*v1alpha1.ServiceInstance); ok && tc.wantPlanID != nil {
-				if si.Spec.ForProvider.ServiceplanID == nil || *si.Spec.ForProvider.ServiceplanID != *tc.wantPlanID {
-					t.Errorf("got planID = %v, want %v", si.Spec.ForProvider.ServiceplanID, *tc.wantPlanID)
-				}
-			}
 		})
 	}
 }

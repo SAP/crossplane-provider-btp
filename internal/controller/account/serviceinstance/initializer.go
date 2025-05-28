@@ -53,5 +53,5 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 }
 
 func isInitialized(cr *v1alpha1.ServiceInstance) bool {
-	return cr.Spec.ForProvider.ServiceplanID != nil
+	return cr.Status.AtProvider.ServiceplanID != nil
 }
