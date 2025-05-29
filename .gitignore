@@ -19,3 +19,7 @@ kubeconfig
 dist/
 *.local.yaml
 
+phase1_setup_plan.md
+internal/cli/.xpbtp
+internal/cli/.xpbtp_env.yaml
+internal/cli/xpbtp
