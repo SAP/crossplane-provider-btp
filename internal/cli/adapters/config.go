@@ -187,7 +187,7 @@ func (c *BTPConfig) Validate() bool {
 	}
 
 	// check for empty provider config ref
-	if c.ProviderConfigRef.Name == "" || c.ProviderConfigRef.Namespace == "" {
+	if c.ProviderConfigRef.Name == "" {
 		return false
 	}
 
@@ -223,8 +223,7 @@ func (p *BTPConfigParser) ParseConfig(configPath string) (config.ProviderConfig,
 	btpConfig := &BTPConfig{
 		Resources: config.Resources,
 		ProviderConfigRef: client.ProviderConfigRef{
-			Name:      config.ProviderConfigRef.Name,
-			Namespace: config.ProviderConfigRef.Namespace,
+			Name: config.ProviderConfigRef.Name,
 		},
 	}
 

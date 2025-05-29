@@ -91,6 +91,24 @@ func StoreKeyValues(env map[string]string) error {
 	return nil
 }
 
+// StoreKeyValuesToFile stores key-value pairs in a specified file
+func StoreKeyValuesToFile(env map[string]string, filePath string) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("could not create file %s: %w", filePath, err)
+	}
+	defer file.Close()
+
+	for key, value := range env {
+		_, err := file.WriteString(fmt.Sprintf("%s=%s\n", key, value))
+		if err != nil {
+			return fmt.Errorf("could not write to file %s: %w", filePath, err)
+		}
+	}
+
+	return nil
+}
+
 // OpenFile opens the config file for reading
 func OpenFile(filename string) *os.File {
 	file, err := os.Open(filename)

@@ -29,6 +29,5 @@ type ClientAdapter interface {
 
 // ProviderConfigRef represents a reference to a provider configuration
 type ProviderConfigRef struct {
-	Name      string	`yaml:"name"`
-	Namespace string	`yaml:"namespace"`
+	Name string `yaml:"name"`
 }

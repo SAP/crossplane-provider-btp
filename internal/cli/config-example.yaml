@@ -34,4 +34,3 @@ resources:
 
 providerConfigRef:
   name: default
-  namespace: default

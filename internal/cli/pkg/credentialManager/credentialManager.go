@@ -31,18 +31,18 @@ const (
 )
 
 // CreateEnvironment sets up the environment for the CLI by fetching credentials from Kubernetes
-func CreateEnvironment(kubeConfigPath string, configPath string, ctx context.Context, providerConfigNamespace string, providerConfigName string, clientAdapter *adapters.BTPClientAdapter, scheme *runtime.Scheme) error {
+func CreateEnvironment(kubeConfigPath string, envFilePath string, ctx context.Context, providerConfigName string, clientAdapter *adapters.BTPClientAdapter, scheme *runtime.Scheme) error {
 	// If no kubeConfigPath is provided fall back to ~/.kube/config
 	if kubeConfigPath == "" {
 		kubeConfigPath = getKubeConfigFallBackPath()
 	}
 
-	creds, err := clientAdapter.GetCredentials(ctx, kubeConfigPath, client.ProviderConfigRef{Name: providerConfigName, Namespace: providerConfigNamespace}, scheme)
+	creds, err := clientAdapter.GetCredentials(ctx, kubeConfigPath, client.ProviderConfigRef{Name: providerConfigName}, scheme)
 	if err != nil {
 		return fmt.Errorf("%s: %w", errGetCredentials, err)
 	}
 
-	err = storeCredentials(creds, kubeConfigPath, configPath)
+	err = storeCredentialsToFile(creds, kubeConfigPath, envFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to store credentials: %w", err)
 	}
@@ -65,6 +65,22 @@ func storeCredentials(creds client.Credentials, kubeConfigPath string, configPat
 	}
 
 	return utils.StoreKeyValues(env)
+}
+
+func storeCredentialsToFile(creds client.Credentials, kubeConfigPath string, envFilePath string) error {
+	jsonCreds, err := json.Marshal(creds)
+	if err != nil {
+		return fmt.Errorf("%s: %w", errUnmarshalCredentials, err)
+	}
+
+	env := map[string]string{
+		fieldTransactionID:  "pending",
+		fieldKubeConfigPath: kubeConfigPath,
+		fieldConfigPath:     "", // We don't store the config path when using custom env file
+		fieldCredentials:    string(jsonCreds),
+	}
+
+	return utils.StoreKeyValuesToFile(env, envFilePath)
 }
 
 func getKubeConfigFallBackPath() string {

@@ -22,7 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var preview bool
+var (
+	preview    bool
+	configPath string
+)
 
 var (
 	// error messages

@@ -8,6 +8,7 @@ import (
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	adaptersconfig "github.com/sap/crossplane-provider-btp/internal/cli/adapters"
 	"github.com/sap/crossplane-provider-btp/internal/cli/pkg/utils"
 	"github.com/sap/crossplane-provider-btp/internal/crossplaneimport/client"
 	res "github.com/sap/crossplane-provider-btp/internal/crossplaneimport/resource"
@@ -57,9 +58,20 @@ func (a *BTPSubaccountAdapter) FetchResources(ctx context.Context, client client
 		return nil, err
 	}
 
+	// Extract subaccountAdmins from filter if available
+	var subaccountAdmins []string
+	// The filter is expected to be a *adaptersconfig.BTPResourceFilter with Subaccount field
+	if f, ok := filter.(*adaptersconfig.BTPResourceFilter); ok && f.Subaccount != nil {
+		subaccountAdmins = f.Subaccount.SubaccountAdmins
+	}
+
 	// Map to Resource interface
 	var resources []res.Resource
 	for _, providerResource := range providerResources {
+		// Attach subaccountAdmins to providerResource map for use in MapToResource
+		if m, ok := providerResource.(map[string]interface{}); ok {
+			m["_subaccountAdmins"] = subaccountAdmins
+		}
 		resource, err := a.MapToResource(providerResource, filter.GetManagementPolicies())
 		if err != nil {
 			return nil, err
@@ -72,7 +84,6 @@ func (a *BTPSubaccountAdapter) FetchResources(ctx context.Context, client client
 
 func (a *BTPSubaccountAdapter) MapToResource(providerResource interface{}, managementPolicies []v1.ManagementAction) (res.Resource, error) {
 	// Cast the provider resource to the BTP subaccount type
-	// This should be the actual BTP API response type
 	subaccountData, ok := providerResource.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("invalid subaccount data type")
@@ -103,8 +114,29 @@ func (a *BTPSubaccountAdapter) MapToResource(providerResource interface{}, manag
 	managedResource.Spec.ForProvider.Subdomain = subdomain
 	managedResource.Spec.ForProvider.Region = region
 	managedResource.Spec.ForProvider.Description = description
-	// Note: SubaccountAdmins would need to be fetched separately or from a different API call
-	managedResource.Spec.ForProvider.SubaccountAdmins = []string{} // Will be populated later
+
+	// Use subaccountAdmins from providerResource if present, else fallback to placeholder and log
+	var subaccountAdmins []string
+	if admins, ok := subaccountData["_subaccountAdmins"]; ok {
+		if adminsSlice, ok := admins.([]string); ok {
+			subaccountAdmins = adminsSlice
+		} else if adminsIface, ok := admins.([]interface{}); ok {
+			// Convert []interface{} to []string
+			for _, v := range adminsIface {
+				if s, ok := v.(string); ok {
+					subaccountAdmins = append(subaccountAdmins, s)
+				}
+			}
+		}
+	}
+	if len(subaccountAdmins) > 0 {
+		managedResource.Spec.ForProvider.SubaccountAdmins = subaccountAdmins
+	} else {
+		placeholder := "placeholder-admin@example.com"
+		fmt.Printf("WARNING: No subaccountAdmins specified for subaccount %s (%s). Using placeholder: %s\n", displayName, guid, placeholder)
+		managedResource.Spec.ForProvider.SubaccountAdmins = []string{placeholder}
+	}
+
 	managedResource.Spec.ManagementPolicies = managementPolicies
 	managedResource.Spec.DeletionPolicy = "Orphan"
 

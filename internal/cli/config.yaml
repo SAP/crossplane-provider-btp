@@ -1,20 +1,12 @@
+# Configuration for xpbtp CLI live test
+# Targets the mirza-subaccount in the test BTP environment
+
 resources:
+  # Primary test subaccount - mirza-subaccount
   - subaccount:
-      displayName: .*
-      subdomain: .*
-      region: .*
-      description: .*
+      displayName: "mirza-subaccount"
       managementPolicies: [Observe]
-  - directory:
-      displayName: .*
-      description: .*
-      directoryFeatures: .*
-      managementPolicies: [Observe]
-  - entitlement:
-      serviceName: .*
-      servicePlanName: .*
-      subaccountGuid: .*
-      managementPolicies: [Observe]
+      subaccountAdmins: ["dummy@example.com"]
+
 providerConfigRef:
-  name: default
-  namespace: default
+  name: default-canary
