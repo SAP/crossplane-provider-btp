@@ -52,9 +52,10 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			kube:  mgr.GetClient(),
 			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
 
-			newClientCreatorFn: func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding] {
+			//TODO:  put into dedicated function
+			clientConnector: func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding] {
 				return siClient.NewServiceBindingConnector(saveCallback, kube)
-			},
+			}(mgr.GetClient()),
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -90,7 +91,7 @@ type connector struct {
 	kube  client.Client
 	usage resource.Tracker
 
-	newClientCreatorFn func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding]
+	clientConnector tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding]
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -101,9 +102,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	// when working with tf proxy resources we want to keep the Connect() logic as part of the delgating Connect calls of the native resources to
 	// deal with errors in the part of process that they belong to
-	clientCreator := c.newClientCreatorFn(c.kube)
-
-	client, err := clientCreator.Connect(ctx, mg.(*v1alpha1.ServiceBinding))
+	client, err := c.clientConnector.Connect(ctx, mg.(*v1alpha1.ServiceBinding))
 	if err != nil {
 		return nil, err
 	}

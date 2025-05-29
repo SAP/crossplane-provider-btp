@@ -67,8 +67,11 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			kube:  mgr.GetClient(),
 			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
 
-			newClientCreatorFn:          newClientCreatorFn,
 			newServicePlanInitializerFn: newServicePlanInitializerFn,
+
+			// instead of passing the creatorFn as usual we need to execute here to make sure the connector has only one instance of the client
+			// this is required to ensure terraform workspace is shared among reconciliation loops, since the state of async operations is stored in the client
+			clientConnector: newClientCreatorFn(mgr.GetClient()),
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -103,7 +106,7 @@ type connector struct {
 	kube  client.Client
 	usage resource.Tracker
 
-	newClientCreatorFn          func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance]
+	clientConnector             tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance]
 	newServicePlanInitializerFn func() Initializer
 }
 
@@ -123,9 +126,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	// when working with tf proxy resources we want to keep the Connect() logic as part of the delgating Connect calls of the native resources to
 	// deal with errors in the part of process that they belong to
-	clientCreator := c.newClientCreatorFn(c.kube)
-
-	client, err := clientCreator.Connect(ctx, mg.(*v1alpha1.ServiceInstance))
+	client, err := c.clientConnector.Connect(ctx, mg.(*v1alpha1.ServiceInstance))
 	if err != nil {
 		return nil, err
 	}

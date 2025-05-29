@@ -66,6 +66,10 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 		// if no plan id explicitly set by user we take the one resolved via offering and plan name
 		sInstance.Spec.ForProvider.ServiceplanID = si.Status.AtProvider.ServiceplanID
 	}
+
+	condition := si.GetCondition(xpv1.TypeReady)
+	sInstance.SetConditions(condition)
+
 	return sInstance, nil
 }
 
