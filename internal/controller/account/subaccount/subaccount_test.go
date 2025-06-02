@@ -58,7 +58,8 @@ func TestObserve(t *testing.T) {
 				},
 			},
 			want: want{
-				o: managed.ExternalObservation{ResourceExists: false},
+				o:   managed.ExternalObservation{ResourceExists: false},
+				err: errors.New(errSubaccountNotFound),
 			},
 		},
 		"FindSubaccountError": {
@@ -66,11 +67,12 @@ func TestObserve(t *testing.T) {
 			args: args{
 				cr: NewSubaccount("unittest-sa"),
 				mockAPIClient: &MockSubaccountClient{
-					returnErr: errors.New("some error"),
+					returnErr: errors.New("Error getting subaccount"),
 				},
 			},
 			want: want{
-				o: managed.ExternalObservation{ResourceExists: false},
+				o:   managed.ExternalObservation{ResourceExists: false},
+				err: errors.New("Error getting subaccount"),
 			},
 		},
 		"DontUpdateEmptyDescription": {
@@ -429,24 +431,25 @@ func TestObserve(t *testing.T) {
 				}), WithProviderConfig(xpv1.Reference{
 					Name: "unittest-pc",
 				})),
-				mockAPIClient: &MockSubaccountClient{returnSubaccounts: &accountclient.ResponseCollection{
-					Value: []accountclient.SubaccountResponseObject{
-						{
-							Guid:              "123",
-							Description:       "someDesc",
-							Subdomain:         "sub1",
-							Region:            "eu12",
-							State:             "OK",
-							DisplayName:       "unittest-sa",
-							Labels:            &map[string][]string{},
-							StateMessage:      internal.Ptr("OK"),
-							UsedForProduction: "",
-							BetaEnabled:       false,
-							ParentGUID:        "global-123",
-							GlobalAccountGUID: "global-123",
+				mockAPIClient: &MockSubaccountClient{
+					returnSubaccounts: &accountclient.ResponseCollection{
+						Value: []accountclient.SubaccountResponseObject{
+							{
+								Guid:              "123",
+								Description:       "someDesc",
+								Subdomain:         "sub1",
+								Region:            "eu12",
+								State:             "OK",
+								DisplayName:       "unittest-sa",
+								Labels:            &map[string][]string{},
+								StateMessage:      internal.Ptr("OK"),
+								UsedForProduction: "",
+								BetaEnabled:       false,
+								ParentGUID:        "global-123",
+								GlobalAccountGUID: "global-123",
+							},
 						},
 					},
-				},
 				},
 				mockKube: testutils.NewFakeKubeClientBuilder().
 					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
@@ -487,24 +490,25 @@ func TestObserve(t *testing.T) {
 				}), WithProviderConfig(xpv1.Reference{
 					Name: "unittest-pc",
 				})),
-				mockAPIClient: &MockSubaccountClient{returnSubaccounts: &accountclient.ResponseCollection{
-					Value: []accountclient.SubaccountResponseObject{
-						{
-							Guid:              "123",
-							Description:       "someDesc",
-							Subdomain:         "sub1",
-							Region:            "eu12",
-							State:             "OK",
-							DisplayName:       "unittest-sa",
-							Labels:            &map[string][]string{},
-							StateMessage:      internal.Ptr("OK"),
-							UsedForProduction: "",
-							BetaEnabled:       false,
-							ParentGUID:        "456",
-							GlobalAccountGUID: "global-123",
+				mockAPIClient: &MockSubaccountClient{
+					returnSubaccounts: &accountclient.ResponseCollection{
+						Value: []accountclient.SubaccountResponseObject{
+							{
+								Guid:              "123",
+								Description:       "someDesc",
+								Subdomain:         "sub1",
+								Region:            "eu12",
+								State:             "OK",
+								DisplayName:       "unittest-sa",
+								Labels:            &map[string][]string{},
+								StateMessage:      internal.Ptr("OK"),
+								UsedForProduction: "",
+								BetaEnabled:       false,
+								ParentGUID:        "456",
+								GlobalAccountGUID: "global-123",
+							},
 						},
 					},
-				},
 				},
 				mockKube: testutils.NewFakeKubeClientBuilder().
 					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
@@ -544,24 +548,25 @@ func TestObserve(t *testing.T) {
 				}), WithProviderConfig(xpv1.Reference{
 					Name: "unittest-pc",
 				})),
-				mockAPIClient: &MockSubaccountClient{returnSubaccounts: &accountclient.ResponseCollection{
-					Value: []accountclient.SubaccountResponseObject{
-						{
-							Guid:              "123",
-							Description:       "someDesc",
-							Subdomain:         "sub1",
-							Region:            "eu12",
-							State:             "OK",
-							DisplayName:       "unittest-sa",
-							Labels:            &map[string][]string{},
-							StateMessage:      internal.Ptr("OK"),
-							UsedForProduction: "",
-							BetaEnabled:       false,
-							ParentGUID:        "global-123",
-							GlobalAccountGUID: "global-123",
+				mockAPIClient: &MockSubaccountClient{
+					returnSubaccounts: &accountclient.ResponseCollection{
+						Value: []accountclient.SubaccountResponseObject{
+							{
+								Guid:              "123",
+								Description:       "someDesc",
+								Subdomain:         "sub1",
+								Region:            "eu12",
+								State:             "OK",
+								DisplayName:       "unittest-sa",
+								Labels:            &map[string][]string{},
+								StateMessage:      internal.Ptr("OK"),
+								UsedForProduction: "",
+								BetaEnabled:       false,
+								ParentGUID:        "global-123",
+								GlobalAccountGUID: "global-123",
+							},
 						},
 					},
-				},
 				},
 
 				mockKube: testutils.NewFakeKubeClientBuilder().
@@ -834,7 +839,9 @@ func TestObserve(t *testing.T) {
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
 				btp: btp.Client{
 					AccountsServiceClient: &accountclient.APIClient{
-						SubaccountOperationsAPI: tc.args.mockAPIClient}},
+						SubaccountOperationsAPI: tc.args.mockAPIClient,
+					},
+				},
 			}
 
 			got, err := ctrl.Observe(context.Background(), tc.args.cr)
@@ -959,7 +966,9 @@ func TestCreate(t *testing.T) {
 			ctrl := external{
 				btp: btp.Client{
 					AccountsServiceClient: &accountclient.APIClient{
-						SubaccountOperationsAPI: tc.args.mockClient}},
+						SubaccountOperationsAPI: tc.args.mockClient,
+					},
+				},
 			}
 			got, err := ctrl.Create(context.Background(), tc.args.cr)
 			if contained := testutils.ContainsError(err, tc.want.err); !contained {
@@ -971,7 +980,6 @@ func TestCreate(t *testing.T) {
 			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
 				t.Errorf("\n%s\ne.Create(...): -want cr, +got cr:\n%s\n", tc.reason, diff)
 			}
-
 		})
 	}
 }
@@ -1242,7 +1250,9 @@ func TestDelete(t *testing.T) {
 			ctrl := external{
 				btp: btp.Client{
 					AccountsServiceClient: &accountclient.APIClient{
-						SubaccountOperationsAPI: tc.args.mockClient}},
+						SubaccountOperationsAPI: tc.args.mockClient,
+					},
+				},
 				tracker: tc.args.tracker,
 			}
 			err := ctrl.Delete(context.Background(), tc.args.cr)
@@ -1251,7 +1261,6 @@ func TestDelete(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestUpdate(t *testing.T) {
@@ -1498,7 +1507,9 @@ func TestUpdate(t *testing.T) {
 			ctrl := external{
 				btp: btp.Client{
 					AccountsServiceClient: &accountclient.APIClient{
-						SubaccountOperationsAPI: tc.args.mockClient}},
+						SubaccountOperationsAPI: tc.args.mockClient,
+					},
+				},
 				accountsAccessor: tc.args.mockAccessor,
 			}
 			got, err := ctrl.Update(context.Background(), tc.args.cr)
@@ -1511,7 +1522,6 @@ func TestUpdate(t *testing.T) {
 			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
 				t.Errorf("\n%s\ne.Update(...): -want cr, +got cr:\n%s\n", tc.reason, diff)
 			}
-
 		})
 	}
 }
