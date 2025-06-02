@@ -113,7 +113,6 @@ func (c *external) generateObservation(
 	ctx context.Context,
 	desiredState *apisv1alpha1.Subaccount,
 ) {
-
 	subaccount := c.findBTPSubaccount(ctx, desiredState)
 	if subaccount == nil {
 		resetRemoteState(desiredState)
@@ -147,7 +146,6 @@ func (c *external) needsCreation(cr *apisv1alpha1.Subaccount) bool {
 	}
 
 	return false
-
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -212,11 +210,9 @@ func needsUpdate(desired apisv1alpha1.SubaccountSpec, actual apisv1alpha1.Subacc
 		return true
 	}
 	return false
-
 }
 
 func filter(labels *map[string][]string, toRemove string) map[string][]string {
-
 	var resultLabels map[string][]string
 	if labels != nil {
 		resultLabels = *labels
@@ -267,7 +263,6 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	subaccount := cr
 
 	return deleteBTPSubaccount(ctx, subaccount, c.btp)
-
 }
 
 func deleteBTPSubaccount(
@@ -289,17 +284,16 @@ func deleteBTPSubaccount(
 		return errors.Wrap(err, "deletion of subaccount failed")
 	}
 
-	deletionState := response.State
-
-	if deletionState == subaccountStateDeleting {
-		return nil
+	if response.State != subaccountStateDeleting {
+		return errors.New(fmt.Sprintf("Deletion Pending: Current status: %s", response.State))
 	}
 
-	return errors.New(fmt.Sprintf("Deletion Pending: Current status: %s", deletionState))
+	return nil
 }
 
 func (c *external) updateBTPSubaccount(
-	ctx context.Context, subaccount *apisv1alpha1.Subaccount) error {
+	ctx context.Context, subaccount *apisv1alpha1.Subaccount,
+) error {
 	if directoryParentChanged(&subaccount.Spec.ForProvider, &subaccount.Status.AtProvider) {
 		return c.moveSubaccountAPI(ctx, subaccount)
 	} else {
@@ -316,7 +310,6 @@ func (c *external) moveSubaccountAPI(ctx context.Context, subaccount *apisv1alph
 	}
 
 	err := c.accountsAccessor.MoveSubaccount(ctx, internal.Val(guid), targetID)
-
 	if err != nil {
 		return errors.Wrap(err, "moving subaccount failed")
 	}
@@ -324,7 +317,6 @@ func (c *external) moveSubaccountAPI(ctx context.Context, subaccount *apisv1alph
 }
 
 func (c *external) updateSubaccountAPI(ctx context.Context, subaccount *apisv1alpha1.Subaccount) error {
-
 	guid := subaccount.Status.AtProvider.SubaccountGuid
 
 	label := addOperatorLabel(subaccount)
@@ -338,7 +330,6 @@ func (c *external) updateSubaccountAPI(ctx context.Context, subaccount *apisv1al
 	}
 
 	err := c.accountsAccessor.UpdateSubaccount(ctx, internal.Val(guid), params)
-
 	if err != nil {
 		return errors.Wrap(err, "update of subaccount failed")
 	}
@@ -353,7 +344,6 @@ func (c *external) createBTPSubaccount(
 		CreateSubaccount(ctx).
 		CreateSubaccountRequestPayload(toCreateApiPayload(subaccount)).
 		Execute()
-
 	if err != nil {
 		return specifyAPIError(err)
 	}
