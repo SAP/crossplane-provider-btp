@@ -20,6 +20,7 @@ import (
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -32,7 +33,8 @@ type ServiceBindingParameters struct {
 
 	// Parameters in YAML format, will be merged with json parameters and secret parameters
 	// +kubebuilder:validation:Optional
-	ParametersYaml *string `json:"parametersYaml,omitempty"`
+	// +kubebuilder:pruning:PreserveUnknownFields
+	ParametersYaml runtime.RawExtension `json:"parametersYaml,omitempty"`
 
 	// Parameters stored in secret, will be merged with spec parameters
 	// +kubebuilder:validation:Optional

@@ -118,7 +118,8 @@ spec:
                   parametersYaml:
                     description: Parameters in YAML format, will be merged with json
                       parameters and secret parameters
-                    type: string
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   serviceInstanceId:
                     description: |-
                       (String) The ID of the service instance associated with the binding.
