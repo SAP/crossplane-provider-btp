@@ -67,6 +67,7 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 		sInstance.Spec.ForProvider.ServiceplanID = si.Status.AtProvider.ServiceplanID
 	}
 
+	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
 	condition := si.GetCondition(xpv1.TypeReady)
 	sInstance.SetConditions(condition)
 

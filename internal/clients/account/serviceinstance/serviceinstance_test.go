@@ -16,6 +16,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var (
+	conditionUnknown = xpv1.Condition{
+		Type:   xpv1.TypeReady,
+		Status: corev1.ConditionUnknown,
+	}
+	conditionAvailable = xpv1.Available()
+)
+
 func TestTfResource(t *testing.T) {
 
 	type args struct {
@@ -57,6 +65,7 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
 				),
 				hasErr: false,
 			},
@@ -77,6 +86,7 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
 				),
 				hasErr: false,
 			},
@@ -85,7 +95,6 @@ func TestTfResource(t *testing.T) {
 			reason: "If no service plan ID is set, it should be resolved from the status",
 			args: args{
 				si: expectedServiceInstance(
-					withParameters(`{"key": "value"}`),
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
@@ -96,11 +105,12 @@ func TestTfResource(t *testing.T) {
 			},
 			want: want{
 				tfResource: expectedTfSerivceInstance(
-					withTfParameters(`{"key":"value"}`),
+					withTfParameters(`{}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
 					withTfServicePlanID("resolved-plan-id"),
+					withTfCondition(conditionUnknown),
 				),
 				hasErr: false,
 			},
@@ -157,6 +167,7 @@ func TestTfResource(t *testing.T) {
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
+					withCondition(conditionUnknown),
 				),
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
@@ -181,6 +192,28 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+				),
+			},
+		},
+		"Recurring Successful Reconciliation": {
+			reason: "Ready state should be preserved during reconciliation",
+			args: args{
+				si: expectedServiceInstance(
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+					withCondition(conditionAvailable),
+				),
+			},
+			want: want{
+				hasErr: false,
+				tfResource: expectedTfSerivceInstance(
+					withTfExternalName("123"),
+					withTfParameters(`{}`),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionAvailable),
 				),
 			},
 		},
@@ -300,6 +333,18 @@ func withParametersYaml(yamlParams string) func(*v1alpha1.ServiceInstance) {
 func withTfParameters(jsonParams string) func(*v1alpha1.SubaccountServiceInstance) {
 	return func(cr *v1alpha1.SubaccountServiceInstance) {
 		cr.Spec.ForProvider.Parameters = &jsonParams
+	}
+}
+
+func withCondition(condition xpv1.Condition) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Status.SetConditions(condition)
+	}
+}
+
+func withTfCondition(condition xpv1.Condition) func(*v1alpha1.SubaccountServiceInstance) {
+	return func(cr *v1alpha1.SubaccountServiceInstance) {
+		cr.Status.SetConditions(condition)
 	}
 }
 

@@ -15,6 +15,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var (
+	conditionUnknown = xpv1.Condition{
+		Type:   xpv1.TypeReady,
+		Status: corev1.ConditionUnknown,
+	}
+	conditionAvailable = xpv1.Available()
+)
+
 func TestTfResource(t *testing.T) {
 
 	type args struct {
@@ -51,11 +59,12 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 			want: want{
-				tfResource: expectedTfSerivceInstance(
+				tfResource: expectedTfSerivceBinding(
 					withTfParameters(`{}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
 				),
 				hasErr: false,
 			},
@@ -71,11 +80,12 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 			want: want{
-				tfResource: expectedTfSerivceInstance(
+				tfResource: expectedTfSerivceBinding(
 					withTfParameters(`{"key":"value"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
 				),
 				hasErr: false,
 			},
@@ -150,11 +160,33 @@ func TestTfResource(t *testing.T) {
 			},
 			want: want{
 				hasErr: false,
-				tfResource: expectedTfSerivceInstance(
+				tfResource: expectedTfSerivceBinding(
 					withTfParameters(`{"key":"value","key2":"value2","key3":"value3","key4":"value4"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+				),
+			},
+		},
+		"Recurring Successful Reconciliation": {
+			reason: "Ready state should be preserved during reconciliation",
+			args: args{
+				si: expectedServiceBinding(
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+					withCondition(conditionAvailable),
+				),
+			},
+			want: want{
+				hasErr: false,
+				tfResource: expectedTfSerivceBinding(
+					withTfExternalName("123"),
+					withTfParameters(`{}`),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionAvailable),
 				),
 			},
 		},
@@ -193,7 +225,7 @@ func expectedServiceBinding(opts ...func(*v1alpha1.ServiceBinding)) *v1alpha1.Se
 }
 
 // Helper function to build a complete SubaccountServiceBinding CR dynamically
-func expectedTfSerivceInstance(opts ...func(*v1alpha1.SubaccountServiceBinding)) *v1alpha1.SubaccountServiceBinding {
+func expectedTfSerivceBinding(opts ...func(*v1alpha1.SubaccountServiceBinding)) *v1alpha1.SubaccountServiceBinding {
 	cr := &v1alpha1.SubaccountServiceBinding{}
 
 	// Apply each option to modify the CR
@@ -291,5 +323,17 @@ func withParameterSecrets(parameterSecrets map[string]string) func(*v1alpha1.Ser
 func withParametersYaml(yamlParams string) func(*v1alpha1.ServiceBinding) {
 	return func(cr *v1alpha1.ServiceBinding) {
 		cr.Spec.ForProvider.ParametersYaml = runtime.RawExtension{Raw: []byte(yamlParams)}
+	}
+}
+
+func withCondition(condition xpv1.Condition) func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
+		cr.Status.SetConditions(condition)
+	}
+}
+
+func withTfCondition(condition xpv1.Condition) func(*v1alpha1.SubaccountServiceBinding) {
+	return func(cr *v1alpha1.SubaccountServiceBinding) {
+		cr.Status.SetConditions(condition)
 	}
 }

@@ -52,6 +52,10 @@ func (s *ServiceBindingMapper) TfResource(sb *v1alpha1.ServiceBinding, kube clie
 	}
 	sBinding.Spec.ForProvider.Parameters = internal.Ptr(string(parameterJson))
 
+	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
+	condition := sb.GetCondition(xpv1.TypeReady)
+	sBinding.SetConditions(condition)
+
 	// transfer external name
 	meta.SetExternalName(sBinding, meta.GetExternalName(sb))
 	return sBinding, nil
