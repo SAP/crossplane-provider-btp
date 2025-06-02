@@ -2,6 +2,10 @@ package rolecollectionassignment
 
 import (
 	"context"
+
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type RoleAssignerMock struct {
@@ -27,3 +31,29 @@ func (u *RoleAssignerMock) HasRole(ctx context.Context, origin, identifier, role
 }
 
 var _ RoleAssigner = &RoleAssignerMock{}
+
+// ReferenceResolverTrackerMock is a mock implementation of ReferenceResolverTracker interface
+type ReferenceResolverTrackerMock struct{}
+
+func (r *ReferenceResolverTrackerMock) Track(ctx context.Context, mg resource.Managed) error {
+	return nil
+}
+
+func (r *ReferenceResolverTrackerMock) SetConditions(ctx context.Context, mg resource.Managed) {
+	// No-op for mock
+}
+func (r *ReferenceResolverTrackerMock) ResolveSource(
+	ctx context.Context,
+	ru v1alpha1.ResourceUsage,
+) (*metav1.PartialObjectMetadata, error) {
+	return &metav1.PartialObjectMetadata{}, nil
+}
+func (r *ReferenceResolverTrackerMock) ResolveTarget(
+	ctx context.Context,
+	ru v1alpha1.ResourceUsage,
+) (*metav1.PartialObjectMetadata, error) {
+	return &metav1.PartialObjectMetadata{}, nil
+}
+func (r *ReferenceResolverTrackerMock) DeleteShouldBeBlocked(mg resource.Managed) bool {
+	return false
+}

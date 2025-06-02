@@ -2,19 +2,25 @@ package btp_subaccount_api_credential
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/pkg/errors"
+
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/upjet/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	accountsv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
-	// Custom finalizer to prevent deletion when resource is in use
-	finalizerDeletionProtection = "security.btp.crossplane.io/deletion-protection"
+	errTrackRUsage   = "cannot track ResourceUsage"
+	errTypeAssertion = "managed resource is not of type SubaccountApiCredential"
 )
 
 // Configure configures individual resources by adding custom ResourceConfigurators.
@@ -51,9 +57,6 @@ func Configure(p *config.Provider) {
 
 		// Add pre-delete hook using InitializerFns for finalizer management
 		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
-			return managed.NewNameAsExternalName(kube)
-		})
-		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
 			return &DeletionProtectionInitializer{Kube: kube}
 		})
 	})
@@ -68,135 +71,35 @@ type DeletionProtectionInitializer struct {
 
 // Implement the managed.Initializer interface
 func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resource.Managed) error {
-	return d.InitializeExternal(ctx, mg, nil)
-}
 
-// InitializeExternal handles the custom finalizer logic
-func (d *DeletionProtectionInitializer) InitializeExternal(ctx context.Context, mg resource.Managed, tc managed.ExternalClient) error {
+	// Default reference tracker for tracking references
+	referenceTracker := tracking.NewDefaultReferenceResolverTracker(
+		d.Kube,
+	)
+
 	cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
+
 	if !ok {
-		return fmt.Errorf("managed resource is not a SubaccountApiCredential")
+		return errors.New(errTypeAssertion)
 	}
 
-	// Add our custom finalizer if it doesn't exist and resource is not being deleted
-	if cr.GetDeletionTimestamp() == nil {
-		finalizers := cr.GetFinalizers()
-		hasFinalizer := false
-		for _, f := range finalizers {
-			if f == finalizerDeletionProtection {
-				hasFinalizer = true
-				break
-			}
-		}
-		if !hasFinalizer {
-			finalizers = append(finalizers, finalizerDeletionProtection)
-			cr.SetFinalizers(finalizers)
-		}
-		return nil
-	}
+	// Manually define reference tracking for relevant fields
+	if cr.Spec.ForProvider.SubaccountID != nil {
 
-	// If resource is being deleted, check if it's safe to proceed
-	if cr.GetDeletionTimestamp() != nil {
-		// Check if the resource is still in use
-		inUse, err := d.isResourceInUse(ctx, cr, tc)
+		// Use a custom reference tracker to track the subaccount reference
+		err := referenceTracker.CreateTrackingReference(ctx, cr, *cr.Spec.ForProvider.SubaccountRef, accountsv1alpha1.SubaccountGroupVersionKind)
+
 		if err != nil {
-			return fmt.Errorf("failed to check if resource is in use: %w", err)
+			return errors.Wrap(err, errTrackRUsage)
 		}
-
-		if inUse {
-			// Resource is still in use, don't proceed with deletion
-			return fmt.Errorf("SubaccountApiCredential %s cannot be deleted as it is still being referenced by other resources", cr.GetName())
-		}
-
-		// Resource is not in use, remove our custom finalizer to allow deletion
-		finalizers := cr.GetFinalizers()
-		newFinalizers := make([]string, 0, len(finalizers))
-		for _, f := range finalizers {
-			if f != finalizerDeletionProtection {
-				newFinalizers = append(newFinalizers, f)
-			}
-		}
-		cr.SetFinalizers(newFinalizers)
 	}
 
+	if meta.WasDeleted(mg) {
+
+		referenceTracker.SetConditions(ctx, mg)
+		if blocked := referenceTracker.DeleteShouldBeBlocked(mg); blocked {
+			return errors.New(providerv1alpha1.ErrResourceInUse)
+		}
+	}
 	return nil
-}
-
-// isResourceInUse checks if the SubaccountApiCredential is referenced by other resources
-func (d *DeletionProtectionInitializer) isResourceInUse(ctx context.Context, cr *securityv1alpha1.SubaccountApiCredential, _ managed.ExternalClient) (bool, error) {
-	k8sClient := d.Kube
-	if k8sClient == nil {
-		return true, fmt.Errorf("unable to get Kubernetes client for reference checking")
-	}
-
-	// Check for force-delete annotation that bypasses protection
-	if annotations := cr.GetAnnotations(); annotations != nil {
-		if forceDelete, exists := annotations["security.btp.crossplane.io/force-delete"]; exists && forceDelete == "true" {
-			return false, nil
-		}
-	}
-
-	// Check if any RoleCollection resources reference this SubaccountApiCredential
-	roleCollections := &securityv1alpha1.RoleCollectionList{}
-	if err := k8sClient.List(ctx, roleCollections); err != nil {
-		return false, fmt.Errorf("failed to list RoleCollections: %w", err)
-	}
-
-	credName := cr.GetName()
-	credNamespace := cr.GetNamespace()
-
-	for _, rc := range roleCollections.Items {
-		if d.roleCollectionReferencesCredential(&rc, credName, credNamespace) {
-			return true, fmt.Errorf("RoleCollection %s/%s still references this SubaccountApiCredential", rc.GetNamespace(), rc.GetName())
-		}
-	}
-
-	// Check if any RoleCollectionAssignment resources reference this SubaccountApiCredential
-	roleCollectionAssignments := &securityv1alpha1.RoleCollectionAssignmentList{}
-	if err := k8sClient.List(ctx, roleCollectionAssignments); err != nil {
-		return false, fmt.Errorf("failed to list RoleCollectionAssignments: %w", err)
-	}
-
-	for _, rca := range roleCollectionAssignments.Items {
-		if d.roleCollectionAssignmentReferencesCredential(&rca, credName, credNamespace) {
-			return true, fmt.Errorf("RoleCollectionAssignment %s/%s still references this SubaccountApiCredential", rca.GetNamespace(), rca.GetName())
-		}
-	}
-
-	// No references found, safe to delete
-	return false, nil
-}
-
-// roleCollectionReferencesCredential checks if a RoleCollection references the SubaccountApiCredential
-func (d *DeletionProtectionInitializer) roleCollectionReferencesCredential(rc *securityv1alpha1.RoleCollection, credName, credNamespace string) bool {
-	ref := rc.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef
-	selector := rc.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector
-	if ref != nil {
-		if ref.Name == credName {
-			// xpv1.Reference does not have Namespace, so assume same namespace as the referencing resource
-			return rc.GetNamespace() == credNamespace
-		}
-	}
-	if selector != nil {
-		// If using selector, conservatively assume it might reference our credential
-		return true
-	}
-	return false
-}
-
-// roleCollectionAssignmentReferencesCredential checks if a RoleCollectionAssignment references the SubaccountApiCredential
-func (d *DeletionProtectionInitializer) roleCollectionAssignmentReferencesCredential(rca *securityv1alpha1.RoleCollectionAssignment, credName, credNamespace string) bool {
-	ref := rca.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef
-	selector := rca.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector
-	if ref != nil {
-		if ref.Name == credName {
-			// xpv1.Reference does not have Namespace, so assume same namespace as the referencing resource
-			return rca.GetNamespace() == credNamespace
-		}
-	}
-	if selector != nil {
-		// If using selector, conservatively assume it might reference our credential
-		return true
-	}
-	return false
 }

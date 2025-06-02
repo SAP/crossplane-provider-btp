@@ -9,6 +9,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/btp"
 	rolecollectiongroupassignment "github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollectiongroupassignment"
 	"github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollectionuserassignment"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -21,6 +22,7 @@ import (
 const (
 	errNotRoleCollectionAssignment = "managed resource is not a RoleCollectionAssignment custom resource"
 	errTrackPCUsage                = "cannot track ProviderConfig usage"
+	errTrackRCUsage                = "cannot track ResourceUsage"
 
 	errGetSecret  = "api credential secret not found"
 	errReadSecret = "api credential secret is malformed"
@@ -66,6 +68,7 @@ type connector struct {
 	usage              resource.Tracker
 	newUserAssignerFn  func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error)
 	newGroupAssignerFn func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error)
+	resourcetracker    tracking.ReferenceResolverTracker
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -76,6 +79,10 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	if err := c.usage.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
+	}
+
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, errTrackRCUsage)
 	}
 
 	binding, err := v1alpha1.CreateBindingFromSource(&cr.Spec.XSUAACredentialsReference, ctx, c.kube)

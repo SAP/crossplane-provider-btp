@@ -15,11 +15,13 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	service "github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollection"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
 	errNotRoleCollection = "managed resource is not a RoleCollection custom resource"
 	errTrackPCUsage      = "cannot track ProviderConfig usage"
+	errTrackRCUsage      = "cannot track ResourceUsage"
 
 	errGetSecret = "api credential secret not found"
 
@@ -51,13 +53,15 @@ var configureRoleCollectionMaintainerFn = func(binding *v1alpha1.XsuaaBinding) (
 	if binding == nil {
 		return nil, errInvalidSecret
 	}
+
 	return service.NewXsuaaRoleCollectionMaintainer(btp.NewBackgroundContextWithDebugPrintHTTPClient(), binding.ClientId, binding.ClientSecret, binding.TokenURL, binding.ApiUrl), nil
 }
 
 type connector struct {
-	kube         client.Client
-	usage        resource.Tracker
-	newServiceFn func(binding *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error)
+	kube            client.Client
+	usage           resource.Tracker
+	resourcetracker tracking.ReferenceResolverTracker
+	newServiceFn    func(binding *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error)
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -68,6 +72,10 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	if err := c.usage.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
+	}
+
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, errTrackRCUsage)
 	}
 
 	binding, err := v1alpha1.CreateBindingFromSource(&cr.Spec.XSUAACredentialsReference, ctx, c.kube)

@@ -18,9 +18,10 @@ import (
 func Setup(mgr ctrl.Manager, o controller.Options) error {
 	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.RoleCollection{}, v1alpha1.RoleCollectionGroupKind, v1alpha1.RoleCollectionGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker, newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)) managed.ExternalConnecter {
 		return &connector{
-			kube:         mgr.GetClient(),
-			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &providerv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: configureRoleCollectionMaintainerFn,
+			kube:            mgr.GetClient(),
+			usage:           resource.NewProviderConfigUsageTracker(mgr.GetClient(), &providerv1alpha1.ProviderConfigUsage{}),
+			newServiceFn:    configureRoleCollectionMaintainerFn,
+			resourcetracker: resourcetracker,
 		}
 	})
 }
