@@ -12,6 +12,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -292,7 +293,7 @@ func withParameters(jsonParams string) func(*v1alpha1.ServiceInstance) {
 
 func withParametersYaml(yamlParams string) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Spec.ForProvider.ParametersYaml = &yamlParams
+		cr.Spec.ForProvider.ParametersYaml = runtime.RawExtension{Raw: []byte(yamlParams)}
 	}
 }
 

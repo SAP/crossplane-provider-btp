@@ -90,7 +90,7 @@ func TestConnect(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			c := connector{
-				newClientCreatorFn:          func(_ client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] { return tc.fields.creator },
+				clientConnector:             tc.fields.creator,
 				newServicePlanInitializerFn: func() Initializer { return tc.fields.initializer },
 			}
 

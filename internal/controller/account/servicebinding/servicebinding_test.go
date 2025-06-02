@@ -305,7 +305,7 @@ func TestConnect(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			c := connector{
-				newClientCreatorFn: func(_ client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding] { return tc.fields.creator },
+				clientConnector: tc.fields.creator,
 			}
 
 			got, err := c.Connect(context.Background(), tc.args.mg)
