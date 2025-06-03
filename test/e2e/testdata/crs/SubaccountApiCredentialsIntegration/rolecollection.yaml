@@ -9,10 +9,10 @@ spec:
     description: "this is a custom rolecollection from e2e tests"
     roles:
       - name: "Destination Administrator"
-        roleTemplateAppId: "destination-xsappname!b9"
+        roleTemplateAppId: "destination-xsappname!b404"
         roleTemplateName: "Destination_Administrator"
       - name: "Subaccount Admin"
-        roleTemplateAppId: "cis-local!b2"
+        roleTemplateAppId: "cis-local!b14"
         roleTemplateName: "Subaccount_Admin"
   subaccountApiCredentialRef:
     name: sac-subaccountapicredentials
