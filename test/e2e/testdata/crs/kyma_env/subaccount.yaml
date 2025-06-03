@@ -5,7 +5,7 @@ metadata:
   name:  kyma-test-subaccount
 spec:
   forProvider:
-    displayName: "Created while test: Kyma Environment setup"
+    displayName: "$BUILD_ID-Created while test: Kyma Environment setup"
     labels:
       safe-to-delete: ["yes"]
       BUILD_ID: [ "$BUILD_ID" ]
