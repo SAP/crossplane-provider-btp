@@ -20,7 +20,6 @@ import (
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -39,11 +38,6 @@ type ServiceInstanceParameters struct {
 
 	// All parameters of the tf resource are included here as well, this includes the parameters field
 	SubaccountServiceInstanceParameters `json:",inline"`
-
-	// Parameters in YAML format, will be merged with json parameters and secret parameters
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:pruning:PreserveUnknownFields
-	ParametersYaml runtime.RawExtension `json:"parametersYaml,omitempty"`
 
 	// Parameters stored in secret, will be merged with spec parameters
 	// +kubebuilder:validation:Optional

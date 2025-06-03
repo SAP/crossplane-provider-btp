@@ -118,11 +118,6 @@ spec:
                       (String, Sensitive) The configuration parameters for the service instance.
                       The configuration parameters for the service instance.
                     type: string
-                  parametersYaml:
-                    description: Parameters in YAML format, will be merged with json
-                      parameters and secret parameters
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
                   planName:
                     description: Name of the service plan of that offering
                     type: string
