@@ -38,8 +38,6 @@ func (c *BTPClient) GetResourcesByType(ctx context.Context, resourceType string,
 	switch resourceType {
 	case "Subaccount":
 		return c.getSubaccounts(ctx, filter)
-	case "Directory":
-		return c.getDirectories(ctx, filter)
 	case "Entitlement":
 		return c.getEntitlements(ctx, filter)
 	default:
@@ -74,44 +72,6 @@ func (c *BTPClient) getSubaccounts(ctx context.Context, filter map[string]string
 		// Apply filters
 		if c.matchesFilter(subaccountMap, filter) {
 			results = append(results, subaccountMap)
-		}
-	}
-
-	return results, nil
-}
-
-func (c *BTPClient) getDirectories(ctx context.Context, filter map[string]string) ([]interface{}, error) {
-	// Get global account with expanded structure to get directories
-	response, _, err := c.btpClient.AccountsServiceClient.GlobalAccountOperationsAPI.GetGlobalAccount(ctx).Expand(true).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get global account: %w", err)
-	}
-
-	var results []interface{}
-
-	// Extract directories from the global account children
-	if response.Children != nil {
-		for _, directory := range response.Children {
-			// Convert to map for easier handling in the adapter
-			directoryMap := map[string]interface{}{
-				"guid":              directory.Guid,
-				"displayName":       directory.DisplayName,
-				"description":       directory.Description,
-				"directoryFeatures": directory.DirectoryFeatures,
-				"subdomain":         directory.Subdomain,
-				"labels":            directory.Labels,
-				"parentGuid":        directory.ParentGUID,
-				"globalAccountGuid": directory.GlobalAccountGUID,
-				"entityState":       directory.EntityState,
-				"stateMessage":      directory.StateMessage,
-				"createdDate":       directory.CreatedDate,
-				"modifiedDate":      directory.ModifiedDate,
-			}
-
-			// Apply filters
-			if c.matchesFilter(directoryMap, filter) {
-				results = append(results, directoryMap)
-			}
 		}
 	}
 

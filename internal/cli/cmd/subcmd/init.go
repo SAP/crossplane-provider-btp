@@ -9,6 +9,8 @@ import (
 	v1beta1 "github.com/sap/crossplane-provider-btp/apis/v1beta1"
 	"github.com/sap/crossplane-provider-btp/internal/cli/adapters"
 	"github.com/sap/crossplane-provider-btp/internal/cli/pkg/credentialManager"
+	cpconfig "github.com/sap/crossplane-provider-btp/internal/crossplaneimport/config"
+	"github.com/sap/crossplane-provider-btp/internal/crossplaneimport/importer"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,7 +52,6 @@ var InitCMD = &cobra.Command{
 
 		// Create adapters
 		clientAdapter := &adapters.BTPClientAdapter{}
-		configParser := &adapters.BTPConfigParser{}
 
 		// if no xpbtp config path is provided, fallback to default
 		if xpbtpConfigPath == "" {
@@ -62,16 +63,18 @@ var InitCMD = &cobra.Command{
 			envFilePath = "./.xpbtp_env.yaml"
 		}
 
-		// Parse the xpbtp configuration file to extract providerConfigRef.Name
-		providerConfigRef, _, err := configParser.ParseConfig(xpbtpConfigPath)
+		// Parse the xpbtp configuration file to extract providerConfigRefName
+		// Use the new configuration parser for consistency with import command
+		registryAdapter := importer.NewRegistryAdapter()
+		cfg, err := cpconfig.LoadAndValidateCLIConfigWithRegistry(xpbtpConfigPath, registryAdapter)
 		if err != nil {
 			return fmt.Errorf("%s: %w", errParseConfig, err)
 		}
 
 		// Extract the provider config name from the parsed configuration
-		providerConfigName := providerConfigRef.GetProviderConfigRef().Name
+		providerConfigName := cfg.ProviderConfigRefName
 		if providerConfigName == "" {
-			return fmt.Errorf("providerConfigRef.name is missing or empty in configuration file %s", xpbtpConfigPath)
+			return fmt.Errorf("providerConfigRefName is missing or empty in configuration file %s", xpbtpConfigPath)
 		}
 
 		// Create environment with the extracted provider config name

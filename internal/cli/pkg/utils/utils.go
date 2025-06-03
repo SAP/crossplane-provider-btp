@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const ConfigName = ".xpbtp"
+const ConfigName = ".xpbtp_env.yaml"
 
 // NormalizeToRFC1123 normalizes a string to be RFC1123 compliant
 func NormalizeToRFC1123(name string) string {
@@ -82,7 +82,7 @@ func StoreKeyValues(env map[string]string) error {
 	defer file.Close()
 
 	for key, value := range env {
-		_, err := file.WriteString(fmt.Sprintf("%s=%s\n", key, value))
+		_, err := fmt.Fprintf(file, "%s=%s\n", key, value)
 		if err != nil {
 			return fmt.Errorf("could not write to config file: %w", err)
 		}
@@ -100,7 +100,7 @@ func StoreKeyValuesToFile(env map[string]string, filePath string) error {
 	defer file.Close()
 
 	for key, value := range env {
-		_, err := file.WriteString(fmt.Sprintf("%s=%s\n", key, value))
+		_, err := fmt.Fprintf(file, "%s=%s\n", key, value)
 		if err != nil {
 			return fmt.Errorf("could not write to file %s: %w", filePath, err)
 		}

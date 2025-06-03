@@ -103,6 +103,23 @@ func getKubeConfigFallBackPath() string {
 }
 
 func RetrieveCredentials() client.Credentials {
+	envFilePath := utils.ConfigName
+
+	// Check if the environment file exists
+	if _, err := os.Stat(envFilePath); os.IsNotExist(err) {
+		panic(fmt.Sprintf("environment file '%s' not found. Please run 'xpbtp init' successfully to create it.", envFilePath))
+	}
+
+	// Read file content to check if it's empty
+	fileInfo, err := os.Stat(envFilePath)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get file info for '%s': %v", envFilePath, err))
+	}
+
+	if fileInfo.Size() == 0 {
+		panic(fmt.Sprintf("environment file '%s' is empty. Please run 'xpbtp init' successfully to populate it.", envFilePath))
+	}
+
 	file := utils.OpenFile(utils.ConfigName)
 	defer file.Close()
 
@@ -122,16 +139,26 @@ func RetrieveCredentials() client.Credentials {
 		}
 	}
 
-	err := scanner.Err()
+	err = scanner.Err()
 	if err != nil {
 		panic(fmt.Sprintf("%s: %v", errParseCredEnvironment, err))
 	}
 
+	// Check if credentials field exists and is not empty
+	credentialsJSON, exists := config[fieldCredentials]
+	if !exists {
+		panic(fmt.Sprintf("credentials field not found in environment file '%s'. Please run 'xpbtp init' successfully to populate it.", envFilePath))
+	}
+
+	if strings.TrimSpace(credentialsJSON) == "" {
+		panic(fmt.Sprintf("credentials field is empty in environment file '%s'. Please run 'xpbtp init' successfully to populate it.", envFilePath))
+	}
+
 	// map values and return Credentials
 	var credentials adapters.BTPCredentials
-	err = json.Unmarshal([]byte(config[fieldCredentials]), &credentials)
+	err = json.Unmarshal([]byte(credentialsJSON), &credentials)
 	if err != nil {
-		panic(fmt.Sprintf("%s: %v", errUnmarshalCredentials, err))
+		panic(fmt.Sprintf("Failed to unmarshal credentials JSON from '%s': %v", envFilePath, err))
 	}
 	return &credentials
 }

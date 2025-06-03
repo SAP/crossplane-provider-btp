@@ -23,3 +23,8 @@ phase1_setup_plan.md
 internal/cli/.xpbtp
 internal/cli/.xpbtp_env.yaml
 internal/cli/xpbtp
+xpbtp
+.gitignore
+.xpbtp
+.xpbtp_env.yaml
+cli

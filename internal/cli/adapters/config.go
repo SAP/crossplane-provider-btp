@@ -6,7 +6,7 @@ import (
 
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/sap/crossplane-provider-btp/internal/crossplaneimport/client"
-	"github.com/sap/crossplane-provider-btp/internal/crossplaneimport/config"
+	cpimportconfig "github.com/sap/crossplane-provider-btp/internal/crossplaneimport/config"
 	"github.com/sap/crossplane-provider-btp/internal/crossplaneimport/resource"
 	"gopkg.in/yaml.v2"
 )
@@ -19,7 +19,6 @@ type Config struct {
 
 type Resource struct {
 	Subaccount  Subaccount  `yaml:"subaccount"`
-	Directory   Directory   `yaml:"directory"`
 	Entitlement Entitlement `yaml:"entitlement"`
 	// add more resources here
 }
@@ -34,17 +33,6 @@ type Subaccount struct {
 	SubaccountAdmins   []string            `yaml:"subaccountAdmins,omitempty"`
 	UsedForProduction  string              `yaml:"usedForProduction,omitempty"`
 	GlobalAccountGuid  string              `yaml:"globalAccountGuid,omitempty"`
-	DirectoryGuid      string              `yaml:"directoryGuid,omitempty"`
-	ManagementPolicies []ManagementPolicy  `yaml:"managementPolicies"`
-}
-
-type Directory struct {
-	DisplayName        string              `yaml:"displayName"`
-	Description        string              `yaml:"description"`
-	DirectoryFeatures  string              `yaml:"directoryFeatures"`
-	DirectoryAdmins    []string            `yaml:"directoryAdmins,omitempty"`
-	Subdomain          string              `yaml:"subdomain,omitempty"`
-	Labels             map[string][]string `yaml:"labels,omitempty"`
 	DirectoryGuid      string              `yaml:"directoryGuid,omitempty"`
 	ManagementPolicies []ManagementPolicy  `yaml:"managementPolicies"`
 }
@@ -65,7 +53,6 @@ type ManagementPolicy string
 type BTPResourceFilter struct {
 	Type               string
 	Subaccount         *SubaccountFilter
-	Directory          *DirectoryFilter
 	Entitlement        *EntitlementFilter
 	ManagementPolicies []v1.ManagementAction
 }
@@ -89,18 +76,6 @@ func (f *BTPResourceFilter) GetFilterCriteria() map[string]string {
 		}
 		if f.Subaccount.Description != nil && *f.Subaccount.Description != "" {
 			criteria["description"] = *f.Subaccount.Description
-		}
-	}
-
-	if f.Directory != nil {
-		if f.Directory.DisplayName != "" {
-			criteria["displayName"] = f.Directory.DisplayName
-		}
-		if f.Directory.Description != nil && *f.Directory.Description != "" {
-			criteria["description"] = *f.Directory.Description
-		}
-		if f.Directory.DirectoryFeatures != nil && *f.Directory.DirectoryFeatures != "" {
-			criteria["directoryFeatures"] = *f.Directory.DirectoryFeatures
 		}
 	}
 
@@ -136,16 +111,6 @@ type SubaccountFilter struct {
 	DirectoryGuid     *string
 }
 
-type DirectoryFilter struct {
-	DisplayName       string
-	Description       *string
-	DirectoryFeatures *string
-	DirectoryAdmins   []string
-	Subdomain         *string
-	Labels            map[string][]string
-	DirectoryGuid     *string
-}
-
 type EntitlementFilter struct {
 	ServiceName                 string
 	ServicePlanName             string
@@ -170,11 +135,6 @@ func (c *BTPConfig) Validate() bool {
 		// check for valid subaccount configuration - DisplayName is the primary identifier
 		if resource.Subaccount.DisplayName != "" && resource.Subaccount.ManagementPolicies == nil {
 			fmt.Println("Subaccount configuration is missing management policies")
-			return false
-		}
-		// check for valid directory configuration - DisplayName is the primary identifier
-		if resource.Directory.DisplayName != "" && resource.Directory.ManagementPolicies == nil {
-			fmt.Println("Directory configuration is missing management policies")
 			return false
 		}
 		// check for valid entitlement configuration - all three fields are required
@@ -203,9 +163,13 @@ func stringToPointer(s string) *string {
 }
 
 // BTPConfigParser implements the ConfigParser interface
+//
+// DEPRECATED: This parser uses the old configuration format. For new implementations,
+// use the BTPConfigParser in internal/crossplaneimport/config/parser.go which supports
+// the new ImportConfig structure and dynamic filter validation.
 type BTPConfigParser struct{}
 
-func (p *BTPConfigParser) ParseConfig(configPath string) (config.ProviderConfig, []resource.ResourceFilter, error) {
+func (p *BTPConfigParser) ParseConfig(configPath string) (cpimportconfig.ProviderConfig, []resource.ResourceFilter, error) {
 	// Read config file
 	file, err := os.ReadFile(configPath)
 	if err != nil {
@@ -255,28 +219,6 @@ func (p *BTPConfigParser) ParseConfig(configPath string) (config.ProviderConfig,
 			})
 		}
 
-		// For Directories, DisplayName is the primary identifier
-		if res.Directory.DisplayName != "" {
-			var policies []v1.ManagementAction
-			for _, policy := range res.Directory.ManagementPolicies {
-				policies = append(policies, v1.ManagementAction(policy))
-			}
-
-			filters = append(filters, &BTPResourceFilter{
-				Type: "Directory",
-				Directory: &DirectoryFilter{
-					DisplayName:       res.Directory.DisplayName,
-					Description:       stringToPointer(res.Directory.Description),
-					DirectoryFeatures: stringToPointer(res.Directory.DirectoryFeatures),
-					DirectoryAdmins:   res.Directory.DirectoryAdmins,
-					Subdomain:         stringToPointer(res.Directory.Subdomain),
-					Labels:            res.Directory.Labels,
-					DirectoryGuid:     stringToPointer(res.Directory.DirectoryGuid),
-				},
-				ManagementPolicies: policies,
-			})
-		}
-
 		// For Entitlements, all three fields remain required as per requirements
 		if res.Entitlement.ServiceName != "" || res.Entitlement.ServicePlanName != "" ||
 			res.Entitlement.SubaccountGuid != "" {
@@ -301,4 +243,33 @@ func (p *BTPConfigParser) ParseConfig(configPath string) (config.ProviderConfig,
 	}
 
 	return btpConfig, filters, nil
+}
+
+// LoadAndValidateNewConfig is a convenience function that uses the new BTPConfigParser
+// from the config package to load and validate configuration with dynamic filter validation.
+//
+// This function demonstrates how to migrate from the old parser to the new one.
+//
+// Parameters:
+//   - configPath: Path to the configuration file
+//
+// Returns:
+//   - *cpimportconfig.ImportConfig: The parsed and validated configuration using the new format
+//   - error: Any parsing or validation errors
+//
+// Example usage:
+//
+//	import (
+//	    "github.com/sap/crossplane-provider-btp/internal/crossplaneimport/config"
+//	    "github.com/sap/crossplane-provider-btp/internal/crossplaneimport/importer"
+//	)
+//
+//	registry := importer.NewRegistryAdapter()
+//	config, err := adapters.LoadAndValidateNewConfig("config.yaml", registry)
+//	if err != nil {
+//	    log.Fatalf("Configuration validation failed: %v", err)
+//	}
+func LoadAndValidateNewConfig(configPath string, registry cpimportconfig.AdapterRegistry) (*cpimportconfig.ImportConfig, error) {
+	parser := cpimportconfig.NewBTPConfigParser(registry)
+	return parser.LoadAndValidateCLIConfig(configPath)
 }

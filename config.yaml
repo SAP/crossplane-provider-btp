@@ -1,0 +1,38 @@
+## config.yaml
+#providerConfigRefName: "default-canary"
+#managementPolicy: "Observe" # Global default management policy
+#
+#resources:
+#  - type: "Subaccount"
+#    name: "mirza-subaccount-config-block" # User-defined label for this configuration entry
+#    managementPolicy: "Observe"          # Specific policy for this resource import
+#    filters:
+#      displayName: "mirza-subaccount"    # Filter to find the BTP subaccount by its display name
+#    # subaccountAdmins: ["placeholder-admin@example.com"] # Placeholder, validation to be addressed later
+
+# config.yaml
+providerConfigRefName: "default-canary"
+
+managementPolicy: "Observe" # Global default management policy
+
+resources:
+  - type: "Subaccount"
+    name: "mirza-subaccount-config-block" # User-defined label for this configuration entry
+    managementPolicy: "Observe"          # Specific policy for this resource import
+    filters:
+      displayName: "mirza-subaccount"    # Filter to find the BTP subaccount by its display name
+    subaccountAdmins: ["mirza.kopic@sap.com"] # Placeholder, validation to be addressed later
+
+  # - type: "Directory"
+  #   name: "mirza-test"        # User-defined label for this configuration entry
+  #   managementPolicy: "Observe"          # Specific policy for this resource import
+  #   filters:
+  #     displayName: "mirza-test" # Filter to find the BTP directory by its display name
+
+  - type: "Entitlement"
+    name: "my-specific-entitlements" # A user-defined name for this import block
+    managementPolicy: "Observe"     # Policy for these specific entitlements
+    filters:
+      subaccountGuid: "15c4823b-d2be-4e08-a431-b0ca2b37c3fc"  # Replace with the target subaccount GUID
+      serviceName: "hana-cloud"        # Replace with the target service name (e.g., "alert-notification")
+      servicePlanName: "hana" # Replace with the target service plan name (e.g., "standard")
