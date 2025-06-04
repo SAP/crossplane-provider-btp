@@ -41,17 +41,17 @@ func TestTfResource(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"Corupted json parameters": {
-			reason: "Throw error if json parameters are not valid",
+		"Corrupted parameters": {
+			reason: "Throw error if parameters are neither valid as json nor yaml",
 			args: args{
-				si: expectedServiceInstance(withParameters(`{no-json}`)),
+				si: expectedServiceInstance(withParameters(`{invalid}`)),
 			},
 			want: want{
 				hasErr: true,
 			},
 		},
-		"Not set json parameters": {
-			reason: "Gracefully handle unset json parameters",
+		"Not set parameters": {
+			reason: "Gracefully handle unset parameters",
 			args: args{
 				si: expectedServiceInstance(
 					withExternalName("123"),
@@ -75,6 +75,27 @@ func TestTfResource(t *testing.T) {
 			args: args{
 				si: expectedServiceInstance(
 					withParameters(`{"key": "value"}`),
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+				),
+			},
+			want: want{
+				tfResource: expectedTfSerivceInstance(
+					withTfParameters(`{"key":"value"}`),
+					withTfExternalName("123"),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+				),
+				hasErr: false,
+			},
+		},
+		"Simply yaml parameters mapping": {
+			reason: "Transfer yaml parameters from spec to tf resource if valid",
+			args: args{
+				si: expectedServiceInstance(
+					withParameters(`key: value`),
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
@@ -163,7 +184,6 @@ func TestTfResource(t *testing.T) {
 				si: expectedServiceInstance(
 					withParameters(`{"key": "value"}`),
 					withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"}),
-					withParametersYaml(`key4: value4`),
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
@@ -188,7 +208,45 @@ func TestTfResource(t *testing.T) {
 			want: want{
 				hasErr: false,
 				tfResource: expectedTfSerivceInstance(
-					withTfParameters(`{"key":"value","key2":"value2","key3":"value3","key4":"value4"}`),
+					withTfParameters(`{"key":"value","key2":"value2","key3":"value3"}`),
+					withTfExternalName("123"),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+				),
+			},
+		},
+		"Successful Combined yaml parameters mapping": {
+			reason: "Parameters from secret and plain spec as yaml should be combined in the tf resource",
+			args: args{
+				si: expectedServiceInstance(
+					withParameters(`key: value`),
+					withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"}),
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+					withCondition(conditionUnknown),
+				),
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						s := obj.(*corev1.Secret)
+						if key.Name == "secret1" {
+							s.Data = map[string][]byte{
+								"secret-key1": []byte(`{"key2": "value2"}`),
+							}
+						} else if key.Name == "secret2" {
+							s.Data = map[string][]byte{
+								"secret-key2": []byte(`{"key3": "value3"}`),
+							}
+						}
+						return nil
+					},
+				},
+			},
+			want: want{
+				hasErr: false,
+				tfResource: expectedTfSerivceInstance(
+					withTfParameters(`{"key":"value","key2":"value2","key3":"value3"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
@@ -318,15 +376,7 @@ func withTfManagementPolicies() func(*v1alpha1.SubaccountServiceInstance) {
 
 func withParameters(jsonParams string) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Spec.ForProvider.SubaccountServiceInstanceParameters = v1alpha1.SubaccountServiceInstanceParameters{
-			Parameters: &jsonParams,
-		}
-	}
-}
-
-func withParametersYaml(yamlParams string) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Spec.ForProvider.ParametersYaml = runtime.RawExtension{Raw: []byte(yamlParams)}
+		cr.Spec.ForProvider.Parameters = runtime.RawExtension{Raw: []byte(jsonParams)}
 	}
 }
 

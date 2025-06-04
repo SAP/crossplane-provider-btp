@@ -74,19 +74,8 @@ spec:
                 description: ServiceInstanceParameters are the configurable fields
                   of a ServiceInstance.
                 properties:
-                  labels:
-                    additionalProperties:
-                      items:
-                        type: string
-                      type: array
-                    description: |-
-                      (Map of Set of String) The set of words or phrases assigned to the service instance.
-                      The set of words or phrases assigned to the service instance.
-                    type: object
                   name:
-                    description: |-
-                      (String) The name of the service instance.
-                      The name of the service instance.
+                    description: Name of the service instance in btp, required
                     type: string
                   offeringName:
                     description: Name of the service offering
@@ -114,10 +103,11 @@ spec:
                       type: object
                     type: array
                   parameters:
-                    description: |-
-                      (String, Sensitive) The configuration parameters for the service instance.
-                      The configuration parameters for the service instance.
-                    type: string
+                    description: Parameters in JSON or YAML format, will be merged
+                      with yaml parameters and secret parameters, will overwrite duplicated
+                      keys from secrets
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   planName:
                     description: Name of the service plan of that offering
                     type: string
@@ -199,16 +189,6 @@ spec:
                             type: string
                         type: object
                     type: object
-                  serviceplanId:
-                    description: |-
-                      (String) The ID of the service plan.
-                      The ID of the service plan.
-                    type: string
-                  shared:
-                    description: |-
-                      (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
-                      The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
-                    type: boolean
                   subaccountId:
                     description: |-
                       (String) The ID of the subaccount.

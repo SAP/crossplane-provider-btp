@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -49,7 +48,7 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 	sInstance := buildBaseTfResource(si)
 
 	// combine parameters
-	parameterJson, err := BuildComplexParameterJson(kube, si.Spec.ForProvider.ParameterSecretRefs, si.Spec.ForProvider.Parameters, si.Spec.ForProvider.ParametersYaml.Raw)
+	parameterJson, err := BuildComplexParameterJson(kube, si.Spec.ForProvider.ParameterSecretRefs, si.Spec.ForProvider.Parameters.Raw)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to map tf resource")
 	}
@@ -57,10 +56,6 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 
 	// transfer external name
 	meta.SetExternalName(sInstance, meta.GetExternalName(si))
-
-	// transfer (required) name from the wrapping service instance
-	// this is required to ensure that the service instance name is set correctly
-	sInstance.Spec.ForProvider.Name = &si.Spec.ForProvider.Name
 
 	if sInstance.Spec.ForProvider.ServiceplanID == nil {
 		// if no plan id explicitly set by user we take the one resolved via offering and plan name
@@ -74,7 +69,7 @@ func (s *ServiceInstanceMapper) TfResource(si *v1alpha1.ServiceInstance, kube cl
 	return sInstance, nil
 }
 
-func BuildComplexParameterJson(kube client.Client, secretRefs []xpv1.SecretKeySelector, jsonParams *string, yamlParams []byte) ([]byte, error) {
+func BuildComplexParameterJson(kube client.Client, secretRefs []xpv1.SecretKeySelector, specParams []byte) ([]byte, error) {
 	// resolve all parameter secret references and merge them into a single map
 	parameterData, err := lookupSecrets(kube, secretRefs)
 	if err != nil {
@@ -82,18 +77,12 @@ func BuildComplexParameterJson(kube client.Client, secretRefs []xpv1.SecretKeySe
 	}
 
 	// merge the plain parameters with the secret parameters
-	if jsonParams != nil {
-		if err := mergeJsonData(parameterData, []byte(internal.Val(jsonParams))); err != nil {
-			return nil, err
-		}
+	specParamsMap, err := internal.UnmarshalRawParameters(specParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal spec parameters: %w", err)
 	}
+	addMap(parameterData, specParamsMap)
 
-	// merge the yaml parameters in if provided
-	if yamlParams != nil {
-		mergeYamlData(parameterData, yamlParams)
-	}
-
-	//TODO: prevent nilpointer
 	parameterJson, err := json.Marshal(parameterData)
 	if err != nil {
 		return nil, err
@@ -121,7 +110,10 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 				ManagementPolicies:               []xpv1.ManagementAction{xpv1.ManagementActionAll},
 				WriteConnectionSecretToReference: si.GetWriteConnectionSecretToReference(),
 			},
-			ForProvider:  si.Spec.ForProvider.SubaccountServiceInstanceParameters,
+			ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
+				SubaccountID: si.Spec.ForProvider.SubaccountID,
+				Name:         internal.Ptr(si.Spec.ForProvider.Name),
+			},
 			InitProvider: v1alpha1.SubaccountServiceInstanceInitParameters{},
 		},
 	}
@@ -163,25 +155,13 @@ func mergeJsonData(mergedData map[string]interface{}, jsonToMerge []byte) error 
 	if err := json.Unmarshal(jsonToMerge, &toAdd); err != nil {
 		return err
 	}
-	for k, v := range toAdd {
-		mergedData[k] = v
-	}
+	addMap(mergedData, toAdd)
 	return nil
 }
 
-// mergeYamlData merges the yaml data into the map
-func mergeYamlData(mergedData map[string]interface{}, yamlParams []byte) error {
-	yamlMap := make(map[string]interface{})
-	if err := yaml.Unmarshal(yamlParams, &yamlMap); err != nil {
-		return err
+// mergeMaps merges a
+func addMap(mergedData map[string]interface{}, toAdd map[string]interface{}) {
+	for k, v := range toAdd {
+		mergedData[k] = v
 	}
-
-	yamlJson, err := json.Marshal(yamlMap)
-	if err != nil {
-		return err
-	}
-	if err := mergeJsonData(mergedData, yamlJson); err != nil {
-		return err
-	}
-	return nil
 }

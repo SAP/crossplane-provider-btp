@@ -46,18 +46,19 @@ func (s *ServiceBindingMapper) TfResource(sb *v1alpha1.ServiceBinding, kube clie
 	sBinding := buildBaseTfResource(sb)
 
 	// combine parameters
-	parameterJson, err := instanceClient.BuildComplexParameterJson(kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters, sb.Spec.ForProvider.ParametersYaml.Raw)
+	parameterJson, err := instanceClient.BuildComplexParameterJson(kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters.Raw)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to map tf resource")
 	}
 	sBinding.Spec.ForProvider.Parameters = internal.Ptr(string(parameterJson))
 
+	// transfer external name
+	meta.SetExternalName(sBinding, meta.GetExternalName(sb))
+
 	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
 	condition := sb.GetCondition(xpv1.TypeReady)
 	sBinding.SetConditions(condition)
 
-	// transfer external name
-	meta.SetExternalName(sBinding, meta.GetExternalName(sb))
 	return sBinding, nil
 }
 
@@ -80,7 +81,11 @@ func buildBaseTfResource(sb *v1alpha1.ServiceBinding) *v1alpha1.SubaccountServic
 				ManagementPolicies:               []xpv1.ManagementAction{xpv1.ManagementActionAll},
 				WriteConnectionSecretToReference: sb.GetWriteConnectionSecretToReference(),
 			},
-			ForProvider:  sb.Spec.ForProvider.SubaccountServiceBindingParameters,
+			ForProvider: v1alpha1.SubaccountServiceBindingParameters{
+				SubaccountID:      sb.Spec.ForProvider.SubaccountID,
+				ServiceInstanceID: sb.Spec.ForProvider.ServiceInstanceID,
+				Name:              internal.Ptr(sb.Spec.ForProvider.Name),
+			},
 			InitProvider: v1alpha1.SubaccountServiceBindingInitParameters{},
 		},
 		Status: v1alpha1.SubaccountServiceBindingStatus{},

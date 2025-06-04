@@ -20,8 +20,10 @@ import (
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
@@ -36,8 +38,8 @@ type ServiceInstanceParameters struct {
 	// Name of the service plan of that offering
 	PlanName string `json:"planName,omitempty"`
 
-	// All parameters of the tf resource are included here as well, this includes the parameters field
-	SubaccountServiceInstanceParameters `json:",inline"`
+	// Parameters in JSON or YAML format, will be merged with yaml parameters and secret parameters, will overwrite duplicated keys from secrets
+	Parameters runtime.RawExtension `json:"parameters,omitempty"`
 
 	// Parameters stored in secret, will be merged with spec parameters
 	// +kubebuilder:validation:Optional
@@ -58,6 +60,22 @@ type ServiceInstanceParameters struct {
 	// +crossplane:generate:reference:selectorFieldName=ServiceManagerSelector
 	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceManagerSecretNamespace()
 	ServiceManagerSecretNamespace string `json:"serviceManagerSecretNamespace,omitempty"`
+
+	// (String) The ID of the subaccount.
+	// The ID of the subaccount.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()
+	// +crossplane:generate:reference:refFieldName=SubaccountRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
+	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
+
+	// Reference to a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+
+	// Selector for a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
 }
 
 // ServiceInstanceObservation are the observable fields of a ServiceInstance.

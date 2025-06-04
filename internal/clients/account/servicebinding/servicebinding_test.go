@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,17 +41,17 @@ func TestTfResource(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"Corupted json parameters": {
-			reason: "Throw error if json parameters are not valid",
+		"Corrupted parameters": {
+			reason: "Throw error if are neither valid as json nor yaml",
 			args: args{
-				si: expectedServiceBinding(withParameters(`{no-json}`)),
+				si: expectedServiceBinding(withParameters(`{invalid}`)),
 			},
 			want: want{
 				hasErr: true,
 			},
 		},
-		"Not set json parameters": {
-			reason: "Gracefully handle unset json parameters",
+		"Not set parameters": {
+			reason: "Gracefully handle unset parameters",
 			args: args{
 				si: expectedServiceBinding(
 					withExternalName("123"),
@@ -74,6 +75,27 @@ func TestTfResource(t *testing.T) {
 			args: args{
 				si: expectedServiceBinding(
 					withParameters(`{"key": "value"}`),
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+				),
+			},
+			want: want{
+				tfResource: expectedTfSerivceBinding(
+					withTfParameters(`{"key":"value"}`),
+					withTfExternalName("123"),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+				),
+				hasErr: false,
+			},
+		},
+		"Simply yaml parameters mapping": {
+			reason: "Transfer yaml parameters from spec to tf resource if valid",
+			args: args{
+				si: expectedServiceBinding(
+					withParameters(`key: value`),
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
@@ -136,11 +158,11 @@ func TestTfResource(t *testing.T) {
 			args: args{
 				si: expectedServiceBinding(
 					withParameters(`{"key": "value"}`),
-					withParametersYaml(`key4: value4`),
 					withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"}),
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
+					withCondition(conditionUnknown),
 				),
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
@@ -161,7 +183,45 @@ func TestTfResource(t *testing.T) {
 			want: want{
 				hasErr: false,
 				tfResource: expectedTfSerivceBinding(
-					withTfParameters(`{"key":"value","key2":"value2","key3":"value3","key4":"value4"}`),
+					withTfParameters(`{"key":"value","key2":"value2","key3":"value3"}`),
+					withTfExternalName("123"),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+				),
+			},
+		},
+		"Successful Combined yaml parameters mapping": {
+			reason: "Parameters from secret and plain spec as yaml should be combined in the tf resource",
+			args: args{
+				si: expectedServiceBinding(
+					withParameters(`key: value`),
+					withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"}),
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+					withCondition(conditionUnknown),
+				),
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						s := obj.(*corev1.Secret)
+						if key.Name == "secret1" {
+							s.Data = map[string][]byte{
+								"secret-key1": []byte(`{"key2": "value2"}`),
+							}
+						} else if key.Name == "secret2" {
+							s.Data = map[string][]byte{
+								"secret-key2": []byte(`{"key3": "value3"}`),
+							}
+						}
+						return nil
+					},
+				},
+			},
+			want: want{
+				hasErr: false,
+				tfResource: expectedTfSerivceBinding(
+					withTfParameters(`{"key":"value","key2":"value2","key3":"value3"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
@@ -227,6 +287,7 @@ func expectedServiceBinding(opts ...func(*v1alpha1.ServiceBinding)) *v1alpha1.Se
 // Helper function to build a complete SubaccountServiceBinding CR dynamically
 func expectedTfSerivceBinding(opts ...func(*v1alpha1.SubaccountServiceBinding)) *v1alpha1.SubaccountServiceBinding {
 	cr := &v1alpha1.SubaccountServiceBinding{}
+	cr.Spec.ForProvider.Name = internal.Ptr("")
 
 	// Apply each option to modify the CR
 	for _, opt := range opts {
@@ -288,21 +349,15 @@ func withTfManagementPolicies() func(*v1alpha1.SubaccountServiceBinding) {
 	}
 }
 
-func withParameters(jsonParams string) func(*v1alpha1.ServiceBinding) {
+func withParameters(specParams string) func(*v1alpha1.ServiceBinding) {
 	return func(cr *v1alpha1.ServiceBinding) {
-		cr.Spec.ForProvider = v1alpha1.ServiceBindingParameters{
-			SubaccountServiceBindingParameters: v1alpha1.SubaccountServiceBindingParameters{
-				Parameters: &jsonParams,
-			},
-		}
+		cr.Spec.ForProvider.Parameters = runtime.RawExtension{Raw: []byte(specParams)}
 	}
 }
 
 func withTfParameters(jsonParams string) func(*v1alpha1.SubaccountServiceBinding) {
 	return func(cr *v1alpha1.SubaccountServiceBinding) {
-		cr.Spec.ForProvider = v1alpha1.SubaccountServiceBindingParameters{
-			Parameters: &jsonParams,
-		}
+		cr.Spec.ForProvider.Parameters = &jsonParams
 	}
 }
 
@@ -317,12 +372,6 @@ func withParameterSecrets(parameterSecrets map[string]string) func(*v1alpha1.Ser
 				Key: v,
 			})
 		}
-	}
-}
-
-func withParametersYaml(yamlParams string) func(*v1alpha1.ServiceBinding) {
-	return func(cr *v1alpha1.ServiceBinding) {
-		cr.Spec.ForProvider.ParametersYaml = runtime.RawExtension{Raw: []byte(yamlParams)}
 	}
 }
 

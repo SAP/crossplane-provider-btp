@@ -74,19 +74,8 @@ spec:
                 description: ServiceBindingParameters are the configurable fields
                   of a ServiceBinding.
                 properties:
-                  labels:
-                    additionalProperties:
-                      items:
-                        type: string
-                      type: array
-                    description: |-
-                      (Map of Set of String) The set of words or phrases assigned to the service binding.
-                      The set of words or phrases assigned to the service binding.
-                    type: object
                   name:
-                    description: |-
-                      (String) The name of the service binding.
-                      The name of the service binding.
+                    description: Name of the service instance in btp, required
                     type: string
                   parameterSecretRefs:
                     description: Parameters stored in secret, will be merged with
@@ -111,13 +100,9 @@ spec:
                       type: object
                     type: array
                   parameters:
-                    description: |-
-                      (String) The parameters of the service binding as a valid JSON object.
-                      The parameters of the service binding as a valid JSON object.
-                    type: string
-                  parametersYaml:
-                    description: Parameters in YAML format, will be merged with json
-                      parameters and secret parameters
+                    description: Parameters in JSON or YAML format, will be merged
+                      with yaml parameters and secret parameters, will overwrite duplicated
+                      keys from secrets
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   serviceInstanceId:
@@ -282,6 +267,8 @@ spec:
                             type: string
                         type: object
                     type: object
+                required:
+                - name
                 type: object
               managementPolicies:
                 default:

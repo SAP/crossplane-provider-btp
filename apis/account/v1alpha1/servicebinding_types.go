@@ -23,22 +23,54 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
 // ServiceBindingParameters are the configurable fields of a ServiceBinding.
 type ServiceBindingParameters struct {
-	// All parameters of the tf resource are included here as well
-	SubaccountServiceBindingParameters `json:",inline"`
+	// Name of the service instance in btp, required
+	Name string `json:"name"`
 
-	// Parameters in YAML format, will be merged with json parameters and secret parameters
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:pruning:PreserveUnknownFields
-	ParametersYaml runtime.RawExtension `json:"parametersYaml,omitempty"`
+	// Parameters in JSON or YAML format, will be merged with yaml parameters and secret parameters, will overwrite duplicated keys from secrets
+	Parameters runtime.RawExtension `json:"parameters,omitempty"`
 
 	// Parameters stored in secret, will be merged with spec parameters
 	// +kubebuilder:validation:Optional
 	ParameterSecretRefs []xpv1.SecretKeySelector `json:"parameterSecretRefs,omitempty"`
+
+	// (String) The ID of the subaccount.
+	// The ID of the subaccount.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()
+	// +crossplane:generate:reference:refFieldName=SubaccountRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
+	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
+
+	// Reference to a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+
+	// Selector for a Subaccount in account to populate subaccountId.
+	// +kubebuilder:validation:Optional
+	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+
+	// (String) The ID of the service instance associated with the binding.
+	// The ID of the service instance associated with the binding.
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceInstance
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceInstanceUuid()
+	// +crossplane:generate:reference:refFieldName=ServiceInstanceRef
+	// +crossplane:generate:reference:selectorFieldName=ServiceInstanceSelector
+	// +kubebuilder:validation:Optional
+	ServiceInstanceID *string `json:"serviceInstanceId,omitempty" tf:"service_instance_id,omitempty"`
+
+	// Reference to a ServiceInstance in account to populate serviceInstanceId.
+	// +kubebuilder:validation:Optional
+	ServiceInstanceRef *v1.Reference `json:"serviceInstanceRef,omitempty" tf:"-"`
+
+	// Selector for a ServiceInstance in account to populate serviceInstanceId.
+	// +kubebuilder:validation:Optional
+	ServiceInstanceSelector *v1.Selector `json:"serviceInstanceSelector,omitempty" tf:"-"`
 }
 
 // ServiceBindingObservation are the observable fields of a ServiceBinding.
