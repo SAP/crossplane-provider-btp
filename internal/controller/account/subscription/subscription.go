@@ -188,7 +188,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 
 	cr.SetConditions(xpv1.Deleting())
 
-	if !c.typeMapper.IsAvailable(cr) {
+	if !c.typeMapper.IsDeletable(cr) {
 		// api will return 500 if called multiple times, so we will ensure to call it only once
 		return nil
 	}
