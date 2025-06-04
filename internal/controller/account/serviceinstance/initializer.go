@@ -49,6 +49,9 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 		return errors.Wrap(err, errInitialize)
 	}
 	cr.Status.AtProvider.ServiceplanID = &planID
+	if err := kube.Status().Update(ctx, cr); err != nil {
+		return errors.Wrap(err, errSaveData)
+	}
 	return nil
 }
 

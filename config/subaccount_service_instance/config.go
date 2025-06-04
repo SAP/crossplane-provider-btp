@@ -24,8 +24,7 @@ func Configure(p *config.Provider) {
 		// note: can be overwritten during initialization
 		r.UseAsync = true
 
-		// we only use this resource internally to set the client_credentials grant type, so there is no harm in avoiding usage of secrets here
-		// it makes the setup a lot easier
+		// we only use this resource internally, so there is no harm in avoiding usage of secrets here it makes the setup a lot easier
 		r.TerraformResource.Schema["parameters"].Sensitive = false
 
 		r.References["subaccount_id"] = config.Reference{
