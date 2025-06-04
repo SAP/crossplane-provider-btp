@@ -31,7 +31,7 @@ type SubaccountApiCredentialInitParameters struct {
 	// If the user prefers to use a certificate, they must provide the certificate value in PEM format "----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----".
 	CertificatePassed *string `json:"certificatePassed,omitempty" tf:"certificate_passed,omitempty"`
 
-	// (String) The name for the API credential.
+	// The name if left unset defaults to managedsubbaccountapicredential
 	// The name for the API credential.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
 
@@ -76,7 +76,7 @@ type SubaccountApiCredentialObservation struct {
 	// RSA key generated if the API credential is created with a certificate.
 	Key *string `json:"key,omitempty" tf:"key,omitempty"`
 
-	// (String) The name for the API credential.
+	// The name if left unset defaults to managedsubbaccountapicredential
 	// The name for the API credential.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
 
@@ -96,7 +96,7 @@ type SubaccountApiCredentialParameters struct {
 	// +kubebuilder:validation:Optional
 	CertificatePassed *string `json:"certificatePassed,omitempty" tf:"certificate_passed,omitempty"`
 
-	// (String) The name for the API credential.
+	// The name if left unset defaults to managedsubbaccountapicredential
 	// The name for the API credential.
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`

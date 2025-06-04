@@ -44,6 +44,8 @@ func Configure(p *config.Provider) {
 			}
 		}
 
+		r.MetaResource.ArgumentDocs["name"] = "The name if left unset defaults to managedsubbaccountapicredential"
+
 		r.ExternalName.GetExternalNameFn = func(tfstate map[string]any) (string, error) {
 			return tfstate["name"].(string), nil
 		}
