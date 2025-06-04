@@ -124,7 +124,7 @@ func (c *external) generateObservation(
 	}
 	if subaccount == nil {
 		resetRemoteState(desiredState)
-		return errors.New(errSubaccountNotFound)
+		return nil
 	}
 
 	desiredState.Status.AtProvider.SubaccountGuid = &subaccount.Guid

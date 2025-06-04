@@ -58,8 +58,7 @@ func TestObserve(t *testing.T) {
 				},
 			},
 			want: want{
-				o:   managed.ExternalObservation{ResourceExists: false},
-				err: errors.New(errSubaccountNotFound),
+				o: managed.ExternalObservation{ResourceExists: false},
 			},
 		},
 		"FindSubaccountError": {
