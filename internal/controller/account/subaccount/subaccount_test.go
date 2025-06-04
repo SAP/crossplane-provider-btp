@@ -895,20 +895,6 @@ func TestDelete(t *testing.T) {
 				err: nil,
 			},
 		},
-		"DeleteFailWithWrongState": {
-			args: args{
-				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123")})),
-				mockClient: &MockSubaccountClient{
-					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
-					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
-						return &accountclient.SubaccountResponseObject{Guid: "123", State: subaccountStateOk}, &http.Response{StatusCode: 200}, nil
-					},
-				},
-			},
-			want: want{
-				err: errors.New("Deletion Pending: Current status: OK"),
-			},
-		},
 		"DeleteAPI404": {
 			args: args{
 				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123")})),

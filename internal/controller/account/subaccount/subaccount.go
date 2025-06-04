@@ -274,7 +274,7 @@ func deleteBTPSubaccount(
 
 	subaccountId := *subaccount.Status.AtProvider.SubaccountGuid
 
-	response, raw, err := accountsServiceClient.AccountsServiceClient.SubaccountOperationsAPI.DeleteSubaccount(ctx, subaccountId).Execute()
+	_, raw, err := accountsServiceClient.AccountsServiceClient.SubaccountOperationsAPI.DeleteSubaccount(ctx, subaccountId).Execute()
 	if raw.StatusCode == 404 {
 		ctrl.Log.Info("associated BTP subaccount not found, continue deletion")
 		return nil
@@ -282,10 +282,6 @@ func deleteBTPSubaccount(
 
 	if err != nil {
 		return errors.Wrap(err, "deletion of subaccount failed")
-	}
-
-	if response.State != subaccountStateDeleting {
-		return errors.New(fmt.Sprintf("Deletion Pending: Current status: %s", response.State))
 	}
 
 	return nil
