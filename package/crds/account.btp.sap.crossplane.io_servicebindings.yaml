@@ -34,7 +34,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A ServiceBinding is an example API type.
+        description: A ServiceBinding allows to manage a binding to a service instance
+          in BTP
         properties:
           apiVersion:
             description: |-

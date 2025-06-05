@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A ServiceInstance is an example API type.
+        description: A ServiceInstance allows to manage a ServiceInstance in BTP
         properties:
           apiVersion:
             description: |-
