@@ -258,7 +258,7 @@ func TestTfResource(t *testing.T) {
 			sim := &ServiceBindingMapper{}
 
 			// Call the function under test
-			tfResource, err := sim.TfResource(tc.args.si, tc.args.kube)
+			tfResource, err := sim.TfResource(context.Background(), tc.args.si, tc.args.kube)
 
 			if diff := cmp.Diff(tc.want.tfResource, tfResource, cmpopts.IgnoreFields(v1alpha1.SubaccountServiceBinding{}, "TypeMeta", "ObjectMeta.UID")); diff != "" {
 				t.Errorf("TfResource() mismatch (-want +got):\n%s", diff)

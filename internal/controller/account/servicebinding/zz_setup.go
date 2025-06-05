@@ -7,7 +7,6 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	sbClient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
-	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,10 +23,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			kube:  mgr.GetClient(),
 			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &providerv1alpha1.ProviderConfigUsage{}),
 
-			//TODO:  put into dedicated function
-			clientConnector: func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding] {
-				return sbClient.NewServiceBindingConnector(saveCallback, kube)
-			}(mgr.GetClient()),
+			clientConnector: sbClient.NewServiceBindingConnector(saveCallback, kube),
 		}
 	})
 }

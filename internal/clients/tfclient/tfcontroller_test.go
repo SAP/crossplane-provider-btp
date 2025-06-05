@@ -484,7 +484,7 @@ type TfMapperMock struct {
 }
 
 // TfResource implements TfMapper.
-func (t *TfMapperMock) TfResource(cr ManagedMock, kube client.Client) (*fake.Terraformed, error) {
+func (t *TfMapperMock) TfResource(ctx context.Context, cr ManagedMock, kube client.Client) (*fake.Terraformed, error) {
 	return &fake.Terraformed{}, t.err
 }
 

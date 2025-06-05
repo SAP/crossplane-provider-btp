@@ -22,10 +22,10 @@ const (
 	errGetPC             = "cannot get ProviderConfig"
 	errGetCreds          = "cannot get credentials"
 
-	errObserveInstance = "cannot observe servicebinding"
-	errCreateInstance  = "cannot create servicebinding"
-	errSaveData        = "cannot update cr data"
-	errGetInstance     = "cannot get servicebinding"
+	errObserveBinding = "cannot observe servicebinding"
+	errCreateBinding  = "cannot create servicebinding"
+	errSaveData       = "cannot update cr data"
+	errGetBinding     = "cannot get servicebinding"
 )
 
 // SaveConditionsFn Callback for persisting conditions in the CR
@@ -35,8 +35,7 @@ var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube clie
 
 	nn := types.NamespacedName{Name: name}
 	if kErr := kube.Get(ctx, nn, si); kErr != nil {
-		//TODO: fix copy paste errors here
-		return errors.Wrap(kErr, errGetInstance)
+		return errors.Wrap(kErr, errGetBinding)
 	}
 
 	si.SetConditions(conditions...)
@@ -82,7 +81,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
 	}
 	switch status {
 	case tfClient.NotExisting:
@@ -97,7 +96,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		data := e.tfClient.QueryAsyncData(ctx)
 
 		if data != nil {
-			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
+			if err := e.saveBindingData(ctx, cr, *data); err != nil {
 				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 			}
 			cr.SetConditions(xpv1.Available())
@@ -109,7 +108,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			ConnectionDetails: details,
 		}, nil
 	}
-	return managed.ExternalObservation{}, errors.New(errObserveInstance)
+	return managed.ExternalObservation{}, errors.New(errObserveBinding)
 }
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -120,7 +119,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.SetConditions(xpv1.Creating())
 	if err := e.tfClient.Create(ctx); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreateInstance)
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
 	return managed.ExternalCreation{
@@ -153,7 +152,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	return nil
 }
 
-func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceBinding, sid tfClient.ObservationData) error {
+func (e *external) saveBindingData(ctx context.Context, cr *v1alpha1.ServiceBinding, sid tfClient.ObservationData) error {
 	if meta.GetExternalName(cr) != sid.ExternalName {
 		meta.SetExternalName(cr, sid.ExternalName)
 		// manually saving external-name, since crossplane reconciler won't update spec and status in one loop

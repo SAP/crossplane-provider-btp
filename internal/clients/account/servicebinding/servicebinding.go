@@ -1,6 +1,8 @@
 package servicebindingclient
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -40,11 +42,11 @@ type ServiceBindingConnector struct {
 
 type ServiceBindingMapper struct{}
 
-func (s *ServiceBindingMapper) TfResource(sb *v1alpha1.ServiceBinding, kube client.Client) (*v1alpha1.SubaccountServiceBinding, error) {
+func (s *ServiceBindingMapper) TfResource(ctx context.Context, sb *v1alpha1.ServiceBinding, kube client.Client) (*v1alpha1.SubaccountServiceBinding, error) {
 	sBinding := buildBaseTfResource(sb)
 
 	// combine parameters
-	parameterJson, err := instanceClient.BuildComplexParameterJson(kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters.Raw)
+	parameterJson, err := instanceClient.BuildComplexParameterJson(ctx, kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters.Raw)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to map tf resource")
 	}

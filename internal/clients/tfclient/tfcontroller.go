@@ -45,7 +45,7 @@ type ObservationData struct {
 
 // TfMapper is a generic interface to map a native resource to an upjet resource that will be used for applying to terraform
 type TfMapper[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] interface {
-	TfResource(NATIVE, client.Client) (UPJETTED, error)
+	TfResource(context.Context, NATIVE, client.Client) (UPJETTED, error)
 }
 
 type TfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] struct {
@@ -63,7 +63,7 @@ func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraforme
 }
 
 func (t *TfProxyConnector[NATIVE, UPJETTED]) Connect(ctx context.Context, cr NATIVE) (TfProxyControllerI, error) {
-	ssi, err := t.tfMapper.TfResource(cr, t.kube)
+	ssi, err := t.tfMapper.TfResource(ctx, cr, t.kube)
 
 	if err != nil {
 		return nil, err
@@ -82,7 +82,6 @@ func (t *TfProxyConnector[NATIVE, UPJETTED]) Connect(ctx context.Context, cr NAT
 
 var _ TfProxyControllerI = &TfProxyController[*v1alpha1.SubaccountServiceInstance]{}
 
-// TODO: rethink naming
 // TfProxyController is a client that provides lifecycle management for a resource by internally delegating to a terraform based resource
 type TfProxyController[UPJETTED ujresource.Terraformed] struct {
 	tfClient   managed.ExternalClient
