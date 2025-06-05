@@ -10,7 +10,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var errInitialize = "cannot resolve plan ID"
+var (
+	errInitialize       = "cannot resolve plan ID"
+	errLoadSmBinding    = "cannot load service manager binding secret"
+	errInitPlanResolver = "cannot initialize plan ID resolver"
+)
 
 type Initializer interface {
 	Initialize(kube client.Client, ctx context.Context, mg resource.Managed) error
@@ -36,12 +40,12 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 
 	secretData, err := s.loadSecretFn(kube, ctx, cr.Spec.ForProvider.ServiceManagerSecret, cr.Spec.ForProvider.ServiceManagerSecretNamespace)
 	if err != nil {
-		return errors.Wrap(err, errInitialize)
+		return errors.Wrap(err, errLoadSmBinding)
 	}
 
 	idResolver, err := s.newIdResolverFn(ctx, secretData)
 	if err != nil {
-		return errors.Wrap(err, errInitialize)
+		return errors.Wrap(err, errInitPlanResolver)
 	}
 
 	planID, err := idResolver.PlanIDByName(ctx, cr.Spec.ForProvider.OfferingName, cr.Spec.ForProvider.PlanName)
