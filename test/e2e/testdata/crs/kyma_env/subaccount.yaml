@@ -5,12 +5,11 @@ metadata:
   name:  kyma-test-subaccount
 spec:
   forProvider:
-    displayName: "asdasdasd-Created while test: Kyma Environment setup"
+    displayName: "$BUILD_ID-Created while test: Kyma Environment setup"
     labels:
       safe-to-delete: ["yes"]
-      BUILD_ID: [ "i541351" ]
-    region: eu12
-    subdomain: co-e2e-test-kyma-case-asdasdasd
+      BUILD_ID: [ "$BUILD_ID" ]
+    region: eu10
+    subdomain: $BUILD_ID-co-e2e-test-kyma-case
     subaccountAdmins:
-      - dl_673efb6870d04101363fc6b3@global.corp.sap
-      - maximilian.braun@sap.com
+      - $TECHNICAL_USER_EMAIL
