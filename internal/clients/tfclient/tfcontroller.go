@@ -22,10 +22,12 @@ const (
 	UpToDate    Status = "UpToDate"
 )
 
+// TfProxyConnectorI is an generic interface that prepares a TfProxyController and returns it for the given native resource
 type TfProxyConnectorI[NATIVE resource.Managed] interface {
 	Connect(context.Context, NATIVE) (TfProxyControllerI, error)
 }
 
+// TfProxyControllerI is an interface that provides the lifecycle management for a resource by internally delegating to a terraform based resource
 type TfProxyControllerI interface {
 	Observe(ctx context.Context) (Status, map[string][]byte, error)
 	Create(ctx context.Context) error
@@ -62,6 +64,7 @@ func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraforme
 	}
 }
 
+// Connect prepares the TfProxyController for the given native resource and returns it, it uses an implementation of TfMapper to map the native resource to an upjet resource
 func (t *TfProxyConnector[NATIVE, UPJETTED]) Connect(ctx context.Context, cr NATIVE) (TfProxyControllerI, error) {
 	ssi, err := t.tfMapper.TfResource(ctx, cr, t.kube)
 
@@ -103,19 +106,16 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 	return nil
 }
 
-// Create implements TfProxyControllerI.
 func (t *TfProxyController[UPJETTED]) Create(ctx context.Context) error {
 	_, err := t.tfClient.Create(ctx, t.tfResource)
 	return err
 }
 
-// Update implements TfProxyControllerI.
 func (t *TfProxyController[UPJETTED]) Update(ctx context.Context) error {
 	_, err := t.tfClient.Update(ctx, t.tfResource)
 	return err
 }
 
-// Delete implements TfProxyControllerI.
 func (t *TfProxyController[UPJETTED]) Delete(ctx context.Context) error {
 	err := t.tfClient.Delete(ctx, t.tfResource)
 	return err
