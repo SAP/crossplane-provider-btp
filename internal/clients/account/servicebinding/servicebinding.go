@@ -1,8 +1,6 @@
 package servicebindingclient
 
 import (
-	"encoding/json"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -99,31 +97,4 @@ func pcName(sb *v1alpha1.ServiceBinding) string {
 		return pc.Name
 	}
 	return ""
-}
-
-// FlattenSecretData takes a map[string][]byte and flattens any JSON object values into the result map.
-// For each key whose value is a JSON object, its keys/values are added to the result map as top-level entries.
-// Non-JSON values are kept as-is.
-func flattenSecretData(secretData map[string][]byte) (map[string][]byte, error) {
-	result := make(map[string][]byte)
-	for k, v := range secretData {
-		var jsonMap map[string]any
-		if err := json.Unmarshal(v, &jsonMap); err == nil {
-			for jk, jv := range jsonMap {
-				switch val := jv.(type) {
-				case string:
-					result[jk] = []byte(val)
-				default:
-					b, err := json.Marshal(val)
-					if err != nil {
-						return nil, err
-					}
-					result[jk] = b
-				}
-			}
-		} else {
-			result[k] = v
-		}
-	}
-	return result, nil
 }
