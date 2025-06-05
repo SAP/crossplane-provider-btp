@@ -5,23 +5,15 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/connection"
-	"github.com/crossplane/crossplane-runtime/pkg/controller"
-	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
-	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
-	"github.com/sap/crossplane-provider-btp/internal/features"
 )
 
 const (
@@ -35,39 +27,6 @@ const (
 	errSaveData        = "cannot update cr data"
 	errGetInstance     = "cannot get servicebinding"
 )
-
-// Setup adds a controller that reconciles ServiceBinding managed resources.
-func Setup(mgr ctrl.Manager, o controller.Options) error {
-	name := managed.ControllerName(v1alpha1.ServiceBindingGroupKind)
-
-	defaultPublisher := managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())
-	cps := []managed.ConnectionPublisher{defaultPublisher}
-	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
-		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), apisv1alpha1.StoreConfigGroupVersionKind))
-	}
-
-	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(v1alpha1.ServiceBindingGroupVersionKind),
-		managed.WithExternalConnecter(&connector{
-			kube:  mgr.GetClient(),
-			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-
-			//TODO:  put into dedicated function
-			clientConnector: func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding] {
-				return siClient.NewServiceBindingConnector(saveCallback, kube)
-			}(mgr.GetClient()),
-		}),
-		managed.WithLogger(o.Logger.WithValues("controller", name)),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
-		managed.WithConnectionPublishers(cps...))
-
-	return ctrl.NewControllerManagedBy(mgr).
-		Named(name).
-		WithOptions(o.ForControllerRuntime()).
-		For(&v1alpha1.ServiceBinding{}).
-		WithEventFilter(resource.DesiredStateChanged()).
-		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
-}
 
 // SaveConditionsFn Callback for persisting conditions in the CR
 var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error {

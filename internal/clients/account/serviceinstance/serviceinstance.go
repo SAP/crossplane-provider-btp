@@ -144,7 +144,6 @@ func lookupSecrets(kube client.Client, secretsSelectors []xpv1.SecretKeySelector
 		} else {
 			return nil, fmt.Errorf("key %s not found in secret %s", secret.Key, secret.Name)
 		}
-		//TODO: add test for not existing key
 	}
 	return combinedData, nil
 }

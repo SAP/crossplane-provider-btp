@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -17,7 +18,7 @@ func NewPlanIdResolverFn(ctx context.Context, secretData map[string][]byte) (ser
 	if err != nil {
 		return nil, err
 	}
-	return servicemanager.NewServiceManagerClient(ctx, &binding)
+	return servicemanager.NewServiceManagerClient(btp.NewBackgroundContextWithDebugPrintHTTPClient(), &binding)
 }
 
 func LoadSecretData(kube client.Client, ctx context.Context, secretName, secretNamespace string) (map[string][]byte, error) {

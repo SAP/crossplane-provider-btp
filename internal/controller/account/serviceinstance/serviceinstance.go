@@ -5,24 +5,17 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/connection"
-	"github.com/crossplane/crossplane-runtime/pkg/controller"
-	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/di"
-	"github.com/sap/crossplane-provider-btp/internal/features"
 )
 
 const (
@@ -50,39 +43,6 @@ var newServicePlanInitializerFn = func() Initializer {
 		newIdResolverFn: di.NewPlanIdResolverFn,
 		loadSecretFn:    di.LoadSecretData,
 	}
-}
-
-// Setup adds a controller that reconciles ServiceInstance managed resources.
-func Setup(mgr ctrl.Manager, o controller.Options) error {
-	name := managed.ControllerName(v1alpha1.ServiceInstanceGroupKind)
-
-	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
-	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
-		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), apisv1alpha1.StoreConfigGroupVersionKind))
-	}
-
-	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(v1alpha1.ServiceInstanceGroupVersionKind),
-		managed.WithExternalConnecter(&connector{
-			kube:  mgr.GetClient(),
-			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-
-			newServicePlanInitializerFn: newServicePlanInitializerFn,
-
-			// instead of passing the creatorFn as usual we need to execute here to make sure the connector has only one instance of the client
-			// this is required to ensure terraform workspace is shared among reconciliation loops, since the state of async operations is stored in the client
-			clientConnector: newClientCreatorFn(mgr.GetClient()),
-		}),
-		managed.WithLogger(o.Logger.WithValues("controller", name)),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
-		managed.WithConnectionPublishers(cps...))
-
-	return ctrl.NewControllerManagedBy(mgr).
-		Named(name).
-		WithOptions(o.ForControllerRuntime()).
-		For(&v1alpha1.ServiceInstance{}).
-		WithEventFilter(resource.DesiredStateChanged()).
-		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
 // SaveConditionsFn Callback for persisting conditions in the CR
