@@ -99,13 +99,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 	svc, err := c.newServiceFn(cisBinding, ServiceAccountSecretData)
 
-	return &external{client: env.NewCloudFoundryOrganization(*svc)}, err
+	return &external{client: env.NewCloudFoundryOrganization(*svc), kube: c.kube}, err
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
 // external resource to ensure it reflects the managed resource's desired state.
 type external struct {
 	client env.Client
+	kube   client.Client
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -121,25 +122,14 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.Status.AtProvider = env.GenerateObservation(instance, managers)
 
 	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateOk {
-		externalName := env.ExternalName(instance)
-		if externalName != nil {
-			meta.SetExternalName(cr, *externalName)
-		}
 		cr.Status.SetConditions(xpv1.Available())
 	} else {
 		cr.Status.SetConditions(xpv1.Unavailable())
 	}
-
+	
 	if needsCreation := c.needsCreation(cr); needsCreation {
 		return managed.ExternalObservation{
 			ResourceExists: !needsCreation,
-		}, nil
-	}
-
-	if needsUpdate := c.client.NeedsUpdate(*cr); needsUpdate {
-		return managed.ExternalObservation{
-			ResourceExists:   true,
-			ResourceUpToDate: !needsUpdate,
 		}, nil
 	}
 
@@ -157,10 +147,11 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotEnvironment)
 	}
 
-	err := c.client.CreateInstance(ctx, *cr)
+	createdOrgName, err := c.client.CreateInstance(ctx, *cr)
 	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
+	meta.SetExternalName(cr, createdOrgName)
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
@@ -170,21 +161,12 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
+	_, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotEnvironment)
 	}
 
-	instance, managers, err := c.client.DescribeInstance(ctx, *cr)
-	if err != nil {
-		return managed.ExternalUpdate{}, err
-	}
-	cr.Status.AtProvider = env.GenerateObservation(instance, managers)
-
-	if err := c.client.UpdateInstance(ctx, *cr); err != nil {
-		return managed.ExternalUpdate{}, err
-	}
-
+	// Update is not supported
 	return managed.ExternalUpdate{}, nil
 }
 

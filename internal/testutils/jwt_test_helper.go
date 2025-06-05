@@ -3,7 +3,7 @@ package testutils
 import (
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	jwt "github.com/golang-jwt/jwt/v4"
 )
 
 var hmacSampleSecret = []byte("my_test_key")

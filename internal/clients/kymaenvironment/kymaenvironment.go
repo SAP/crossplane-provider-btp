@@ -7,10 +7,10 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	json "github.com/json-iterator/go"
-	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 	"sigs.k8s.io/yaml"
 
-	v1alpha12 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
+
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 )
@@ -32,7 +32,7 @@ func NewKymaEnvironments(btp btp.Client) *KymaEnvironments {
 func (c KymaEnvironments) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.KymaEnvironment,
-) (*provisioningclient.EnvironmentInstanceResponseObject, error) {
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	environment, err := c.btp.GetEnvironmentByNameAndType(ctx, cr.Name, btp.KymaEnvironmentType())
 	if err != nil {
 		return nil, err
@@ -129,6 +129,5 @@ func hasPrefix(buf []byte, prefix []byte) bool {
 
 func AddKymaDefaultParameters(parameters btp.InstanceParameters, instanceName string, resourceUID string) btp.InstanceParameters {
 	parameters[btp.KymaenvironmentParameterInstanceName] = instanceName
-	parameters[v1alpha12.SubaccountOperatorLabel] = resourceUID
 	return parameters
 }

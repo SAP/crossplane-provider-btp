@@ -209,6 +209,7 @@ func TestNeedsUpdate(t *testing.T) {
 						Description: "desc",
 						DisplayName: "someName",
 						Labels:      &map[string][]string{"custom_label": {"custom_value"}},
+						DirectoryFeatures: []string{"DEFAULT"},
 					}},
 			},
 			want: want{

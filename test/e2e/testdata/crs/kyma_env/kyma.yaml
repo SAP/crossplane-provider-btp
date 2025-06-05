@@ -5,11 +5,10 @@ metadata:
   namespace: default
 spec:
   forProvider:
-    planName: azure
+    planName: aws
     parameters:
-      {
-        "administrators": ["$TECHNICAL_USER_EMAIL"]
-      }
+      administrators:
+        - $TECHNICAL_USER_EMAIL
   subaccountRef:
     name: kyma-test-subaccount
   cloudManagementRef:

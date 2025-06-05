@@ -19,7 +19,7 @@ BUILD_ID ?= $(shell date +"%H%M%S")
 
 PLATFORMS ?= linux_amd64
 #get version from current git release tag
-VERSION := $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse HEAD)
+VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse HEAD)
 $(info VERSION is $(VERSION))
 
 -include build/makelib/common.mk
@@ -27,9 +27,9 @@ $(info VERSION is $(VERSION))
 # Setup Output
 -include build/makelib/output.mk
 
-# Setup Go
-
+# Setup Versions
 GO_REQUIRED_VERSION=1.23
+GOLANGCILINT_VERSION ?= 1.64.5
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
@@ -156,8 +156,6 @@ dev-debug: $(KIND) $(KUBECTL)
 	@$(INFO) Creating kind cluster
 	@$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 	@$(KUBECTL) cluster-info --context kind-$(PROJECT_NAME)-dev
-	@$(INFO) Installing Crossplane CRDs
-	@$(KUBECTL) create -k https://github.com/crossplane/crossplane//cluster?ref=master
 	@$(INFO) Installing Provider Template CRDs
 	@$(KUBECTL) apply -R -f package/crds
 	@$(INFO) Creating crossplane-system namespace
@@ -170,8 +168,6 @@ dev: $(KIND) $(KUBECTL)
 	@$(INFO) Creating kind cluster
 	@$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 	@$(KUBECTL) cluster-info --context kind-$(PROJECT_NAME)-dev
-	@$(INFO) Installing Crossplane CRDs
-	@$(KUBECTL) create -k https://github.com/crossplane/crossplane//cluster?ref=master
 	@$(INFO) Installing Provider Template CRDs
 	@$(KUBECTL) apply -R -f package/crds
 	@$(INFO) Starting Provider Template controllers

@@ -23,6 +23,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 				mgr.GetClient(),
 				&providerv1alpha1.ProviderConfigUsage{},
 			),
+			log:             mgr.GetLogger(),
 			newServiceFn:    btp.NewBTPClient,
 			resourcetracker: resourcetracker,
 		}

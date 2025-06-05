@@ -91,7 +91,7 @@ func TestAccount(t *testing.T) {
 				// Updated Subaccount
 				subaccount := observed.DeepCopy()
 				// change admins should be rejected by K8s validation rules annotated in _types
-				subaccount.Spec.ForProvider.SubaccountAdmins = append(subaccount.Spec.ForProvider.SubaccountAdmins, "dl_65faab09346a9101347c1723@global.corp.sap")
+				subaccount.Spec.ForProvider.SubaccountAdmins = append(subaccount.Spec.ForProvider.SubaccountAdmins, "changedemail")
 
 				err := cfg.Client().Resources().Update(ctx, subaccount)
 				if err == nil {

@@ -164,10 +164,14 @@ func (d *DirectoryClient) externalID() string {
 }
 
 func isSynced(cr *v1alpha1.Directory, api *accountclient.DirectoryResponseObject) bool {
+	providedDirectoryFeatures := cr.Spec.ForProvider.DirectoryFeatures
+	if providedDirectoryFeatures == nil {
+		providedDirectoryFeatures = []string{"DEFAULT"}
+	}
 	return cr.Spec.ForProvider.Description == api.Description &&
 		internal.Val(cr.Spec.ForProvider.DisplayName) == api.DisplayName &&
 		reflect.DeepEqual(cr.Spec.ForProvider.Labels, internal.Val(api.Labels)) &&
-		reflect.DeepEqual(cr.Spec.ForProvider.DirectoryFeatures, api.DirectoryFeatures)
+		reflect.DeepEqual(providedDirectoryFeatures, api.DirectoryFeatures)
 }
 
 func (d *DirectoryClient) toUpdateApiPayload() accountclient.UpdateDirectoryRequestPayload {

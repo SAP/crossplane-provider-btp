@@ -1,0 +1,15 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "customManagers": [
+    {
+      "fileMatch": ["(^|/)Makefile$", "(^|/)Dockerfile$", "(^|/)config.yml$"],
+      "matchStrings": ["(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "datasourceTemplate": "terraform-provider",
+      "versioningTemplate": "hashicorp",
+      "depNameTemplate": "SAP/btp"
+    }
+  ]
+}

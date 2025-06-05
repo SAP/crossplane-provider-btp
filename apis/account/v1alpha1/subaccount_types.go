@@ -31,7 +31,6 @@ type SubaccountParameters struct {
 	Labels map[string][]string `json:"labels,omitempty"`
 
 	// Region
-	// TODO(i541351): add regex validation https://wiki.one.int.sap/wiki/display/PFS/Region+Details
 	// Change requires recreation
 	// +kubebuilder:validation:MinLength=1
 	Region string `json:"region"`

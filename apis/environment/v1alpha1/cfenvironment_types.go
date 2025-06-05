@@ -43,7 +43,9 @@ func (u *User) String() string {
 
 // CfEnvironmentParameters are the configurable fields of a CloudFoundryEnvironment.
 type CfEnvironmentParameters struct {
-	// A list of users (with username/email and origin) to assign as the Org Manager role
+	// A list of users (with username/email and origin) to assign as the Org Manager role.
+	// Cannot be updated after creation --> initial creation only
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="OrgManagers can't be updated once set"
 	// +optional
 	Managers []string `json:"initialOrgManagers,omitempty"`
 
@@ -52,6 +54,14 @@ type CfEnvironmentParameters struct {
 	// +kubebuilder:validation:MinLength=1
 	// +optional
 	Landscape string `json:"landscape,omitempty"`
+
+	// Org name of the Cloud Foundry environment
+	// +optional
+	OrgName string `json:"orgName,omitempty"`
+
+	// CF environment instance name
+	// +optional
+	EnvironmentName string `json:"environmentName,omitempty"`
 }
 
 // CfEnvironmentObservation  are the observable fields of a CloudFoundryEnvironment.

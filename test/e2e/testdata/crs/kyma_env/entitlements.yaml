@@ -5,7 +5,7 @@ metadata:
 spec:
   forProvider:
     serviceName: kymaruntime
-    servicePlanName: azure
+    servicePlanName: aws
     amount: 1
     subaccountRef:
       name: kyma-test-subaccount

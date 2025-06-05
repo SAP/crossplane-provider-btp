@@ -1,3 +1,4 @@
+[![Slack](https://img.shields.io/badge/Slack-4A154B?logo=slack)](https://crossplane.slack.com/archives/C07UZ3UJY7Q)
 ![Golang](https://img.shields.io/badge/Go-1.23-informational)
 [![REUSE status](https://api.reuse.software/badge/github.com/SAP/crossplane-provider-btp)](https://api.reuse.software/info/github.com/SAP/crossplane-provider-btp)
 
@@ -5,7 +6,7 @@
 
 ## About this project
 
-`crossplane-provider-btp` is a [Crossplane](https://crossplane.io/) Provider that handles the orchestration of account related resources on [SAP Business Technology Platform](https://www.sap.com/products/technology-platform.html):
+`crossplane-provider-btp` is a [Crossplane](https://crossplane.io/) provider that handles the orchestration of account related resources on [SAP Business Technology Platform](https://www.sap.com/products/technology-platform.html):
 
 - Subaccount
 - User Management
@@ -14,6 +15,7 @@
 - Cloud Management
 - Environments
 
+Have a look on all available CRDs in the [API reference](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp).
 Check the documentation for more detailed information on available capabilities for different kinds.
 
 ## Roadmap
@@ -32,7 +34,7 @@ While it already is possible today to orchestrate your role collections and assi
 
 We know a lot of you would like to use crossplane for observation of (previously unmanaged) landscapes. Importing resources for observation is already possible, but requires manual process for importing each resource individually. We are working on a more automated way to import resources in bulk.
 
-## Requirements and Setup
+## 📊 Installation
 
 To install this provider in a kubernetes cluster running crossplane, you can use the provider custom resource, replacing the `<version>`placeholder with the current version of this provider:
 
@@ -45,30 +47,54 @@ spec:
   package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<VERSION>
 ```
 
-You should then see the crossplane controller create a deployment for this provider. Once it becomes healthy, you can connect the provider to you BTP global account following the documentation.
+Crossplane will take care to create a deployment for this provider. Once it becomes healthy, you can configure your provider using proper credentials and start orchestrating :rocket:.
 
-## Developing
+## 🔬 Developing
+### Initial Setup
+The provider comes with some tooling to ease a local setup for development. As initial setup you can follow these steps:
+1. Clone the repository
+2. Run `make submodules` to initialize the "build" submodule provided by crossplane
+3. Run `make dev-debug` to create a kind cluster and install the CRDs
 
-For local development, clone this repo and run `make` to initialize the "build" Make submodule we use for running, building and testing first.
+:warning: Please note that you are required to have [kind](https://kind.sigs.k8s.io) and [docker](https://www.docker.com/get-started/) installed on your local machine in order to run dev debug.
 
-Running the provider locally requires kind and docker to be installed on the system.
+Those steps will leave you with a local cluster and your KUBECONFIG being configured to connect to it via e.g. [kubectl](https://kubernetes.io/docs/reference/kubectl/) or [k9s](https://k9scli.io). You can already apply manifests to that cluster at this point.
 
-There are two different make commands for local development:
-1. `make dev` creates a kind cluster, installs the CRDs and runs the provider directly.
-1. `make dev-debug` only creates a kind cluster and installs the CRDs. You then run/debug the provider with any tool by using the `KUBECONFIG` environment variable set to the kind clusters kubeconfig.
+### Running the Controller
+To run the controller locally, you can use the following command:
+```bash
+make run
+```
+This will compile your controller as executable and run it locally (outside of your cluster).
+It will connect to your cluster using your KUBECONFIG configuration and start watching for resources.
 
-For deleting the cluster again, run `make dev-clean`.
-
-The [Crossplane Provider Development][provider-dev] guide may be of use to add new types to the controller.
-
-[provider-dev]: https://github.com/crossplane/crossplane/blob/master/docs/contributing/provider_development_guide.md
-
+### Cleaning up
+For deleting the cluster again, run
+```bash
+make dev-clean
+```
 
 ### E2E Tests
+The provider comes with a set of end-to-end tests that can be run locally. To run them, you can use the following command:
+```bash
+make test-acceptance
+```
+This will spin up a specific kind cluster which runs the provider as docker container in it. The e2e tests will run kubectl commands against that cluster to test the provider's functionality.
 
-To run the end2end tests, a technical user within the BTP is necessary for creation of environments (Kyma & CF). `.username` & `.password` is necessary for futher actions on `CloudFoundryEnvironment`.
+:warning:
+Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
 
-BTP_TECHNICAL_USER
+Please note that when running multiple times you might want to delete the kind cluster again to avoid conflicts:
+```bash
+kind delete cluster <cluster-name>
+```
+
+#### Required Configuration
+In order for the tests to perform successfully some configuration need to be present as environment variables:
+
+**BTP_TECHNICAL_USER**
+
+User credentials for a user that is Global Account Administrator in the configured globalaccount, structure:
 ```json
 {
   "email": "email",
@@ -77,8 +103,9 @@ BTP_TECHNICAL_USER
 }
 ```
 
-CIS_CENTRAL_BINDING
-Contents from the service binding of a `cis-central` service, like
+**CIS_CENTRAL_BINDING**
+
+Contents from the service binding of a `cis-central` service in the same globalaccount, structure:
 ```json
 {
   "endpoints": {
@@ -99,24 +126,44 @@ Contents from the service binding of a `cis-central` service, like
   }
 }
 ```
+**CLI_SERVER_URL**
+
 Contains the CLI server URL, for example:
 ```
-https://cli.btp.cloud.sap/
+https://canary.cli.btp.int.sap/
 ```
 
-GLOBAL_ACCOUNT
+**GLOBAL_ACCOUNT**
+
 Contains the subdomain of the global account.
 
-IDP_URL
-Contains the URL of an IDP that can be connected to the global account.
+**IDP_URL**
 
-SECOND_DIRECTORY_ADMIN_EMAIL
+Contains the URL of an IDP that can be connected to the global account as trustconfiguration.
+
+**SECOND_DIRECTORY_ADMIN_EMAIL**
+
 Contains a second email (different from the technical user's email) for the directory admin field.
 
-TECHNICAL_USER_EMAIL
+**TECHNICAL_USER_EMAIL**
+
 Contains the email of the BTP_TECHNICAL_USER.
 
-## Support, Feedback, Contributing
+#### Optional Configuration
+
+**BUILD_ID**
+
+ID that is injected in resource names to relate them to a specific test run.
+
+**CLUSTER_NAME**
+
+Name of created kind cluster, if not set will be randomly generated
+
+**TEST_REUSE_CLUSTER**
+
+0 or 1, default is 0
+
+## 👐 Support, Feedback, Contributing
 If you have a question always feel free to reach out on our official crossplane slack channel: 
 
 :rocket: [**#provider-sap-btp**](https://crossplane.slack.com/archives/C07UZ3UJY7Q).
@@ -125,13 +172,13 @@ This project is open to feature requests/suggestions, bug reports etc. via [GitH
 
 For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 
-## Security / Disclosure
+## 🔒 Security / Disclosure
 If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/SAP/crossplane-provider-btp/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
 
-## Code of Conduct
+## 🙆‍♀️ Code of Conduct
 
 We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone. By participating in this project, you agree to abide by its [Code of Conduct](https://github.com/SAP/.github/blob/main/CODE_OF_CONDUCT.md) at all times.
 
-## Licensing
+## 📋 Licensing
 
 Copyright 2024 SAP SE or an SAP affiliate company and crossplane-provider-btp contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/SAP/crossplane-provider-btp).

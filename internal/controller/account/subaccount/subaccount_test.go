@@ -2,6 +2,7 @@ package subaccount
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -16,6 +17,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
 	trackingtest "github.com/sap/crossplane-provider-btp/internal/tracking/test"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/btp"
 )
@@ -720,6 +722,225 @@ func TestCreate(t *testing.T) {
 
 		})
 	}
+}
+
+func TestConnect(t *testing.T) {
+	type args struct {
+		cr              resource.Managed
+		kubeObjects     []client.Object
+		serviceFnErr    error
+		serviceFnReturn *btp.Client
+	}
+	type newServiceArgs struct {
+		cisCreds []byte
+		saCreds  []byte
+	}
+	type want struct {
+		err            error
+		newServiceArgs newServiceArgs
+	}
+
+	tests := map[string]struct {
+		args args
+		want want
+	}{
+		"NilResource": {
+			args: args{
+				cr:          nil,
+				kubeObjects: []client.Object{},
+			},
+			want: want{
+				err: errors.New(errNotSubaccount),
+			},
+		},
+		"NoProviderConfig": {
+			args: args{
+				cr:          NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
+				kubeObjects: []client.Object{},
+			},
+			want: want{
+				err: errors.New("cannot get ProviderConfig"),
+			},
+		},
+		"NoCISCredentials": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
+				kubeObjects: []client.Object{
+					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
+				},
+			},
+			want: want{
+				err: errors.New("cannot get CIS credentials"),
+			},
+		},
+		"NoSACredentials": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
+				kubeObjects: []client.Object{
+					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
+					testutils.NewSecret("cis-provider-secret", nil),
+				},
+			},
+			want: want{
+				err: errors.New("cannot get Service Account credentials"),
+			},
+		},
+		"EmptyCISSecret": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
+				kubeObjects: []client.Object{
+					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
+					testutils.NewSecret("cis-provider-secret", nil),
+					testutils.NewSecret("sa-provider-secret", nil),
+				},
+			},
+			want: want{
+				err: errors.New("CF Secret is empty or nil, please check config & secrets referenced in provider config"),
+			},
+		},
+		"NewServiceFnError": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
+				kubeObjects: []client.Object{
+					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
+					testutils.NewSecret("cis-provider-secret", map[string][]byte{"data": []byte("someCISCreds")}),
+					testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte("someSACreds")}),
+				},
+				serviceFnReturn: &btp.Client{},
+				serviceFnErr:    errors.New("serviceFnError"),
+			},
+			want: want{
+				newServiceArgs: newServiceArgs{
+					cisCreds: []byte("someCISCreds"),
+					saCreds:  []byte("someSACreds"),
+				},
+				err: errors.New("serviceFnError"),
+			},
+		},
+		"ConnectSuccess": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
+				kubeObjects: []client.Object{
+					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
+					testutils.NewSecret("cis-provider-secret", map[string][]byte{"data": []byte("someCISCreds")}),
+					testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte("someSACreds")}),
+				},
+				serviceFnReturn: &btp.Client{},
+			},
+			want: want{
+				newServiceArgs: newServiceArgs{
+					cisCreds: []byte("someCISCreds"),
+					saCreds:  []byte("someSACreds"),
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			kube := testutils.NewFakeKubeClientBuilder().
+				AddResources(tc.args.kubeObjects...).
+				Build()
+			ctrl := connector{
+				kube:            &kube,
+				usage:           trackingtest.NoOpReferenceResolverTracker{},
+				resourcetracker: trackingtest.NoOpReferenceResolverTracker{},
+				newServiceFn: func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error) {
+					if tc.want.newServiceArgs.cisCreds != nil && string(tc.want.newServiceArgs.cisCreds) != string(cisSecretData) {
+						t.Errorf("Passed CIS Creds to newServiceFN do not match; Passed: %v, Expected: %v", cisSecretData, tc.want.newServiceArgs.cisCreds)
+					}
+					if tc.want.newServiceArgs.saCreds != nil && string(tc.want.newServiceArgs.saCreds) != string(serviceAccountSecretData) {
+						t.Errorf("Passed SA Creds to newServiceFN do not match; Passed: %v, Expected: %v", cisSecretData, tc.want.newServiceArgs.saCreds)
+					}
+					return tc.args.serviceFnReturn, tc.args.serviceFnErr
+				},
+			}
+			client, err := ctrl.Connect(context.Background(), tc.args.cr)
+
+			if contained := testutils.ContainsError(err, tc.want.err); !contained {
+				t.Errorf("\ne.Connect(...): error \"%v\" not part of \"%v\"", err, tc.want.err)
+			}
+			if tc.want.err == nil {
+				if client == nil {
+					t.Errorf("Expected connector to be != nil")
+				}
+			}
+		})
+	}
+}
+
+func TestDelete(t *testing.T) {
+	type args struct {
+		cr           resource.Managed
+		mockClient   *MockSubaccountClient
+	}
+	type want struct {
+		err error
+	}
+	tests := map[string]struct {
+		args   args
+		want   want
+	} {
+		"DeleteSuccess": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123"), })),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{Guid: "123", State: "Deleting"}, &http.Response{StatusCode: 200}, nil
+					},
+				},
+			},
+			want: want{
+				// this needs a fix from implementation side, shoul not return error after deletion success. issue: https://github.com/SAP/crossplane-provider-btp/issues/155
+				err: errors.New("Deletion Pending: Current status: Deleting"),
+			},
+		},
+		"DeleteAPI404": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123"), })),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{Guid: "123", }, &http.Response{StatusCode: 404}, nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+		"DeleteAPIError": {
+			args: args{
+				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123"), })),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{Guid: "123", }, &http.Response{StatusCode: 500}, errors.New("apiError")
+					},
+				},
+			},
+			want: want{
+				err: errors.New("deletion of subaccount failed"),
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := external{
+				btp: btp.Client{
+					AccountsServiceClient: &accountclient.APIClient{
+						SubaccountOperationsAPI: tc.args.mockClient}},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			}
+			err := ctrl.Delete(context.Background(), tc.args.cr)
+			if contained := testutils.ContainsError(err, tc.want.err); !contained {
+				t.Errorf("\ne.Create(...): error \"%v\" not part of \"%v\"", err, tc.want.err)
+			}
+		})
+	}
+
 }
 
 func TestUpdate(t *testing.T) {

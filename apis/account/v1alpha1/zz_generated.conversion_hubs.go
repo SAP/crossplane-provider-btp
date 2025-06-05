@@ -25,4 +25,7 @@ func (tr *DirectoryEntitlement) Hub() {}
 func (tr *SubaccountServiceBinding) Hub() {}
 
 // Hub marks this type as a conversion hub.
+func (tr *SubaccountServiceBroker) Hub() {}
+
+// Hub marks this type as a conversion hub.
 func (tr *SubaccountServiceInstance) Hub() {}

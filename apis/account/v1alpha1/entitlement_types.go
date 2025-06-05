@@ -21,6 +21,9 @@ const (
 type EntitlementParameters struct {
 	ServicePlanName string `json:"servicePlanName"`
 	ServiceName     string `json:"serviceName"`
+	//+kubebuilder:validation:Optional
+	// The unique identifier of the service plan. This is a unique identifier for service plans that can distinguish between the same service plans with different hosting datacenters. Options Include `hana-cloud-hana` or `hana-cloud-hana-sap_eu-de-1`.
+	ServicePlanUniqueIdentifier *string `json:"servicePlanUniqueIdentifier,omitempty"`
 	// Whether to enable the service plan assignment to the specified subaccount without quantity restrictions. Relevant and mandatory only for plans that do not have a numeric quota. Do not set if amount is specified.
 	Enable *bool `json:"enable,omitempty"`
 	// The quantity of the plan that is assigned to the specified subaccount. Relevant and mandatory only for plans that have a numeric quota. Do not set if enable=TRUE is specified.

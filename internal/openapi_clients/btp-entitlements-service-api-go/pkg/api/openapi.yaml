@@ -2244,6 +2244,7 @@ components:
       description: Contains information about the plans to assign to a subaccount.
       example:
         servicePlanName: servicePlanName
+        servicePlanUniqueIdentifier: servicePlanUniqueIdentifier
         serviceName: serviceName
         assignmentInfo:
         - amount: 0.8008281904610115
@@ -2289,6 +2290,10 @@ components:
           type: string
         servicePlanName:
           description: The technical name of the entitlement's plan.
+          type: string
+        servicePlanUniqueIdentifier:
+          description: The unique identifier of the entitlement's plan. As obtained
+            in the GET assignments endpoint.
           type: string
       required:
       - assignmentInfo
@@ -2549,6 +2554,7 @@ components:
       example:
         subaccountServicePlans:
         - servicePlanName: servicePlanName
+          servicePlanUniqueIdentifier: servicePlanUniqueIdentifier
           serviceName: serviceName
           assignmentInfo:
           - amount: 0.8008281904610115
@@ -2584,6 +2590,7 @@ components:
               resourceType: resourceType
             subaccountGUID: subaccountGUID
         - servicePlanName: servicePlanName
+          servicePlanUniqueIdentifier: servicePlanUniqueIdentifier
           serviceName: serviceName
           assignmentInfo:
           - amount: 0.8008281904610115

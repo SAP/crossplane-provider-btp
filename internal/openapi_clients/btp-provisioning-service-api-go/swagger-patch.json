@@ -1,13 +1,38 @@
 [
   {
     "op": "replace",
-    "path": "/components/schemas/EnvironmentInstanceResponseObject/properties/createdDate/type",
-    "value": "number"
+    "path": "/components/schemas/CreateEnvironmentInstanceBindingRequest/properties/parameters",
+    "value": {
+      "type": "object"
+    }
   },
   {
     "op": "replace",
-    "path": "/components/schemas/EnvironmentInstanceResponseObject/properties/modifiedDate/type",
-    "value": "number"
+    "path": "/components/schemas/EnvironmentInstanceResponseObject/properties/createdDate",
+    "value": {
+      "type": "number"
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/EnvironmentInstanceResponseObject/properties/modifiedDate",
+    "value": {
+      "type": "number"
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/BusinessEnvironmentInstanceResponseObject/properties/createdDate",
+    "value": {
+      "type": "number"
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/BusinessEnvironmentInstanceResponseObject/properties/modifiedDate",
+    "value": {
+      "type": "number"
+    }
   },
   {
     "op": "replace",
@@ -23,52 +48,6 @@
     "value": {
       "description": "If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object.\nFor a list of supported configuration parameters, see the documentation of the particular environment offering.\nIn this example, additional configuration parameter 'instance_name' is specified: \n{ \n\"instance_name\": \"myOrg\" \n} ",
       "type": "object"
-    }
-  },
-  {
-    "op": "replace",
-    "path": "/components/schemas/ApiExceptionResponseObject",
-    "value": {
-      "type": "object",
-      "properties": {
-        "error": {
-          "type": "object",
-          "required": [
-            "code",
-            "correlationID",
-            "message"
-          ],
-          "properties": {
-            "code": {
-              "type": "integer",
-              "description": "Technical code of the error as a reference for support",
-              "format": "int32"
-            },
-            "correlationID": {
-              "type": "string",
-              "description": "Log correlation ID to track the event"
-            },
-            "description": {
-              "$ref": "#/components/schemas/JsonNode"
-            },
-            "details": {
-              "type": "array",
-              "description": "Nesting of error responses",
-              "items": {
-                "$ref": "#/components/schemas/NestingErrorDetailsResponseObject"
-              }
-            },
-            "message": {
-              "type": "string",
-              "description": "User-friendly description of the error."
-            },
-            "target": {
-              "type": "string",
-              "description": "Describes a data element (for example, a resource path: /online-store/v1/products/123)"
-            }
-          }
-        }
-      }
     }
   }
 ]

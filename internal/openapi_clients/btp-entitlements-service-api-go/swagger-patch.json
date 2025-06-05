@@ -31,7 +31,7 @@
     "op": "replace",
     "path": "/components/schemas/AssignedServiceResponseObject/properties/businessCategory",
     "value": {
-        "$ref": "#/components/schemas/BusinessCategoryResponseObject"
+      "$ref": "#/components/schemas/BusinessCategoryResponseObject"
     }
   },
   {
@@ -101,6 +101,14 @@
           }
         }
       }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/components/schemas/ServicePlanAssignmentRequestPayload/properties/servicePlanUniqueIdentifier",
+    "value": {
+      "description": "The unique identifier of the entitlement's plan. As obtained in the GET assignments endpoint.",
+      "type": "string"
     }
   }
 ]
