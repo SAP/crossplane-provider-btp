@@ -34,10 +34,15 @@ var _ subscription.SubscriptionApiHandlerI = &MockApiHandler{}
 type MockTypeMapper struct {
 	synced    bool
 	available bool
+	deletable bool
 }
 
 func (m *MockTypeMapper) IsAvailable(cr *v1alpha1.Subscription) bool {
 	return m.available
+}
+
+func (m *MockTypeMapper) IsDeletable(cr *v1alpha1.Subscription) bool {
+	return m.deletable
 }
 
 func (m *MockTypeMapper) SyncStatus(get *subscription.SubscriptionGet, crStatus *v1alpha1.SubscriptionObservation) {

@@ -297,7 +297,7 @@ func TestDelete(t *testing.T) {
 			args: args{
 				cr:             NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{})),
 				mockApiHandler: &MockApiHandler{returnErr: errors.New("DeleteError")},
-				mockTypeMapper: &MockTypeMapper{available: true},
+				mockTypeMapper: &MockTypeMapper{deletable: true},
 			},
 			want: want{
 				cr:  NewSubscription("dir-unittests", WithConditions(xpv1.Deleting()), WithStatus(v1alpha1.SubscriptionObservation{})),
@@ -311,7 +311,7 @@ func TestDelete(t *testing.T) {
 				mockApiHandler: &MockApiHandler{
 					returnErr: nil,
 				},
-				mockTypeMapper: &MockTypeMapper{available: true},
+				mockTypeMapper: &MockTypeMapper{deletable: true},
 			},
 			want: want{
 				cr:  NewSubscription("dir-unittests", WithConditions(xpv1.Deleting()), WithStatus(v1alpha1.SubscriptionObservation{})),
@@ -322,7 +322,7 @@ func TestDelete(t *testing.T) {
 			reason: "We expect to skip the API call if external resource is not available (deletion in progress)",
 			args: args{
 				cr:             NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{State: internal.Ptr(v1alpha1.SubscriptionStateInProcess)})),
-				mockTypeMapper: &MockTypeMapper{available: false},
+				mockTypeMapper: &MockTypeMapper{deletable: false},
 			},
 			want: want{
 				cr:  NewSubscription("dir-unittests", WithConditions(xpv1.Deleting()), WithStatus(v1alpha1.SubscriptionObservation{State: internal.Ptr(v1alpha1.SubscriptionStateInProcess)})),
