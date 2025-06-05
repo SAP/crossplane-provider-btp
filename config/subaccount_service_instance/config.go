@@ -27,12 +27,5 @@ func Configure(p *config.Provider) {
 		// we only use this resource internally, so there is no harm in avoiding usage of secrets here it makes the setup a lot easier
 		r.TerraformResource.Schema["parameters"].Sensitive = false
 
-		r.References["subaccount_id"] = config.Reference{
-			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
-			Extractor:         "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()",
-			RefFieldName:      "SubaccountRef",
-			SelectorFieldName: "SubaccountSelector",
-		}
-
 	})
 }
