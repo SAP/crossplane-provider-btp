@@ -204,7 +204,7 @@ This Python script automates the following SAP BTP operations using the BTP CLI:
 Invoke the python script `provider-config-setup.py` as below and ensure to pass the required parameters. Also, ensure that you are using technical username and password to setup the provider subaccount as a recommendation.
 
 ```python
-python3 setup_btp_subaccount.py \
+python3 provider-config-setup.py \
   --btpEnvName live \
   --userName <btp-username> \
   --password <btp-password> \
