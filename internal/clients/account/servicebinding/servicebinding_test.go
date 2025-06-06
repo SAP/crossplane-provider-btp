@@ -285,7 +285,7 @@ func expectedServiceBinding(opts ...func(*v1alpha1.ServiceBinding)) *v1alpha1.Se
 }
 
 // Helper function to build a complete SubaccountServiceBinding CR dynamically
-func expectedTfSerivceBinding(opts ...func(*v1alpha1.SubaccountServiceBinding)) *v1alpha1.SubaccountServiceBinding {
+func expectedTfServiceBinding(opts ...func(*v1alpha1.SubaccountServiceBinding)) *v1alpha1.SubaccountServiceBinding {
 	cr := &v1alpha1.SubaccountServiceBinding{}
 	cr.Spec.ForProvider.Name = internal.Ptr("")
 
