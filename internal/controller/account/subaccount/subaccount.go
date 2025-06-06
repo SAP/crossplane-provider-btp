@@ -24,6 +24,7 @@ import (
 
 const (
 	errNotSubaccount        = "managed resource is not a Subaccount custom resource"
+	errSubaccountNotFound   = "subaccount not found"
 	subaccountStateDeleting = "DELETING"
 	subaccountStateOk       = "OK"
 )
@@ -80,7 +81,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotSubaccount)
 	}
 
-	c.generateObservation(ctx, desiredCR)
+	if err := c.generateObservation(ctx, desiredCR); err != nil {
+		return managed.ExternalObservation{}, err
+	}
+
 	c.tracker.SetConditions(ctx, desiredCR)
 	// Needs Creation?
 	if needsCreation := c.needsCreation(desiredCR); needsCreation {
@@ -112,13 +116,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 func (c *external) generateObservation(
 	ctx context.Context,
 	desiredState *apisv1alpha1.Subaccount,
-) {
-
-	subaccount := c.findBTPSubaccount(ctx, desiredState)
+) error {
+	subaccount, err := c.findBTPSubaccount(ctx, desiredState)
+	if err != nil {
+		resetRemoteState(desiredState)
+		return err
+	}
 	if subaccount == nil {
 		resetRemoteState(desiredState)
-		return
+		return nil
 	}
+
 	desiredState.Status.AtProvider.SubaccountGuid = &subaccount.Guid
 	desiredState.Status.AtProvider.Status = &subaccount.State
 	desiredState.Status.AtProvider.StatusMessage = subaccount.StateMessage
@@ -131,6 +139,8 @@ func (c *external) generateObservation(
 	desiredState.Status.AtProvider.UsedForProduction = &subaccount.UsedForProduction
 	desiredState.Status.AtProvider.ParentGuid = &subaccount.ParentGUID
 	desiredState.Status.AtProvider.GlobalAccountGUID = &subaccount.GlobalAccountGUID
+
+	return nil
 }
 
 func resetRemoteState(state *apisv1alpha1.Subaccount) {
@@ -147,7 +157,6 @@ func (c *external) needsCreation(cr *apisv1alpha1.Subaccount) bool {
 	}
 
 	return false
-
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -196,9 +205,6 @@ func needsUpdate(desired apisv1alpha1.SubaccountSpec, actual apisv1alpha1.Subacc
 	if !reflect.DeepEqual(&cleanedDesired.DisplayName, cleanedActual.DisplayName) {
 		return true
 	}
-	if !reflect.DeepEqual(&cleanedDesired.Region, cleanedActual.Region) {
-		return true
-	}
 	if !reflect.DeepEqual(&cleanedDesired.UsedForProduction, cleanedActual.UsedForProduction) {
 		return true
 	}
@@ -212,11 +218,9 @@ func needsUpdate(desired apisv1alpha1.SubaccountSpec, actual apisv1alpha1.Subacc
 		return true
 	}
 	return false
-
 }
 
 func filter(labels *map[string][]string, toRemove string) map[string][]string {
-
 	var resultLabels map[string][]string
 	if labels != nil {
 		resultLabels = *labels
@@ -267,7 +271,6 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	subaccount := cr
 
 	return deleteBTPSubaccount(ctx, subaccount, c.btp)
-
 }
 
 func deleteBTPSubaccount(
@@ -294,7 +297,8 @@ func deleteBTPSubaccount(
 }
 
 func (c *external) updateBTPSubaccount(
-	ctx context.Context, subaccount *apisv1alpha1.Subaccount) error {
+	ctx context.Context, subaccount *apisv1alpha1.Subaccount,
+) error {
 	if directoryParentChanged(&subaccount.Spec.ForProvider, &subaccount.Status.AtProvider) {
 		return c.moveSubaccountAPI(ctx, subaccount)
 	} else {
@@ -311,7 +315,6 @@ func (c *external) moveSubaccountAPI(ctx context.Context, subaccount *apisv1alph
 	}
 
 	err := c.accountsAccessor.MoveSubaccount(ctx, internal.Val(guid), targetID)
-
 	if err != nil {
 		return errors.Wrap(err, "moving subaccount failed")
 	}
@@ -319,7 +322,6 @@ func (c *external) moveSubaccountAPI(ctx context.Context, subaccount *apisv1alph
 }
 
 func (c *external) updateSubaccountAPI(ctx context.Context, subaccount *apisv1alpha1.Subaccount) error {
-
 	guid := subaccount.Status.AtProvider.SubaccountGuid
 
 	label := addOperatorLabel(subaccount)
@@ -333,7 +335,6 @@ func (c *external) updateSubaccountAPI(ctx context.Context, subaccount *apisv1al
 	}
 
 	err := c.accountsAccessor.UpdateSubaccount(ctx, internal.Val(guid), params)
-
 	if err != nil {
 		return errors.Wrap(err, "update of subaccount failed")
 	}
@@ -348,7 +349,6 @@ func (c *external) createBTPSubaccount(
 		CreateSubaccount(ctx).
 		CreateSubaccountRequestPayload(toCreateApiPayload(subaccount)).
 		Execute()
-
 	if err != nil {
 		return specifyAPIError(err)
 	}
@@ -364,11 +364,11 @@ func (c *external) createBTPSubaccount(
 
 func (c *external) findBTPSubaccount(
 	ctx context.Context, subaccount *apisv1alpha1.Subaccount,
-) *accountclient.SubaccountResponseObject {
+) (*accountclient.SubaccountResponseObject, error) {
 	response, _, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccounts(ctx).Execute()
 	if err != nil {
 		ctrl.Log.Error(err, "could not get BTP subaccounts")
-		return nil
+		return nil, err
 	}
 
 	var foundAccount *accountclient.SubaccountResponseObject = nil
@@ -380,7 +380,7 @@ func (c *external) findBTPSubaccount(
 		}
 	}
 
-	return foundAccount
+	return foundAccount, nil
 }
 
 func isRelatedAccount(subaccount *apisv1alpha1.Subaccount, account *accountclient.SubaccountResponseObject) bool {

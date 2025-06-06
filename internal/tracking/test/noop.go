@@ -11,6 +11,8 @@ import (
 
 // NoOpReferenceResolverTracker For testing purposes
 type NoOpReferenceResolverTracker struct {
+	// IsResourceBlocked indicates whether the resource should be blocked for deletion or not
+	IsResourceBlocked bool
 }
 
 func (n NoOpReferenceResolverTracker) Track(ctx context.Context, mg resource.Managed) error {
@@ -30,5 +32,5 @@ func (n NoOpReferenceResolverTracker) ResolveTarget(ctx context.Context, ru prov
 }
 
 func (n NoOpReferenceResolverTracker) DeleteShouldBeBlocked(mg resource.Managed) bool {
-	return false
+	return n.IsResourceBlocked
 }
