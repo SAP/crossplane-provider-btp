@@ -200,6 +200,66 @@ func (mg *RoleCollectionAssignment) SetWriteConnectionSecretToReference(r *xpv1.
 	mg.Spec.WriteConnectionSecretToReference = r
 }
 
+// GetCondition of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+	return mg.Status.GetCondition(ct)
+}
+
+// GetDeletionPolicy of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) GetDeletionPolicy() xpv1.DeletionPolicy {
+	return mg.Spec.DeletionPolicy
+}
+
+// GetManagementPolicies of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) GetManagementPolicies() xpv1.ManagementPolicies {
+	return mg.Spec.ManagementPolicies
+}
+
+// GetProviderConfigReference of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) GetProviderConfigReference() *xpv1.Reference {
+	return mg.Spec.ProviderConfigReference
+}
+
+// GetPublishConnectionDetailsTo of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
+	return mg.Spec.PublishConnectionDetailsTo
+}
+
+// GetWriteConnectionSecretToReference of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
+	return mg.Spec.WriteConnectionSecretToReference
+}
+
+// SetConditions of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) SetConditions(c ...xpv1.Condition) {
+	mg.Status.SetConditions(c...)
+}
+
+// SetDeletionPolicy of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) SetDeletionPolicy(r xpv1.DeletionPolicy) {
+	mg.Spec.DeletionPolicy = r
+}
+
+// SetManagementPolicies of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) SetManagementPolicies(r xpv1.ManagementPolicies) {
+	mg.Spec.ManagementPolicies = r
+}
+
+// SetProviderConfigReference of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) SetProviderConfigReference(r *xpv1.Reference) {
+	mg.Spec.ProviderConfigReference = r
+}
+
+// SetPublishConnectionDetailsTo of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetailsTo) {
+	mg.Spec.PublishConnectionDetailsTo = r
+}
+
+// SetWriteConnectionSecretToReference of this SubaccountApiCredential.
+func (mg *SubaccountApiCredential) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
+	mg.Spec.WriteConnectionSecretToReference = r
+}
+
 // GetCondition of this SubaccountTrustConfiguration.
 func (mg *SubaccountTrustConfiguration) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
 	return mg.Status.GetCondition(ct)

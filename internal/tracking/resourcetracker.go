@@ -38,21 +38,47 @@ func NewDefaultReferenceResolverTracker(c client.Client) *DefaultReferenceResolv
 
 }
 
+// CreateTrackingReference creates a tracking reference for the given managed resource.
+// It does not use the generic Track method because it has to be configured in a way Upjet does not support.
+func (r *DefaultReferenceResolverTracker) CreateTrackingReference(
+	ctx context.Context,
+	cr resource.Managed,
+	reference xpv1.Reference,
+	gvk schema.GroupVersionKind,
+) error {
+
+	err := r.createTracking(ctx, cr, ResolvedReference{
+		Reference:  reference,
+		Group:      gvk.Group,
+		Kind:       gvk.Kind,
+		ApiVersion: gvk.Version,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Track finds all references in the given managed resource and creates tracking resources for them.
+// It skips fields that do not have the `reference-group`, `reference-kind` and `reference-apiversion` tags.
 func (r *DefaultReferenceResolverTracker) Track(ctx context.Context, mg resource.Managed) error {
 	if hasIgnoreAnnotation(mg) {
 		return nil
 	}
+
 	references, err := r.findReferences(mg)
 	if err != nil {
 		return err
 	}
+
 	for _, reference := range references {
 		err := r.createTracking(ctx, mg, reference)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -61,8 +87,12 @@ func hasIgnoreAnnotation(mg resource.Managed) bool {
 	return ok
 }
 
+// findReferences generically finds all references in the given resource.
+// It uses reflection to walk through the resource and find all fields that are of type xpv1.Reference.
 func (r *DefaultReferenceResolverTracker) findReferences(res interface{}) ([]ResolvedReference, error) {
 	w := new(ReferenceWalker)
+	w.Client = r.c
+	w.Ctx = context.Background()
 	err := reflectwalk.Walk(res, w)
 	if err != nil {
 		return nil, err
@@ -73,6 +103,8 @@ func (r *DefaultReferenceResolverTracker) findReferences(res interface{}) ([]Res
 
 type ReferenceWalker struct {
 	Fields []ResolvedReference
+	Client client.Client
+	Ctx    context.Context
 }
 
 type ResolvedReference struct {
