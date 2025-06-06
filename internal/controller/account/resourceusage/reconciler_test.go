@@ -107,6 +107,8 @@ func TestReconciler(t *testing.T) {
 					Client: &test.MockClient{
 						MockGet:          test.NewMockGetFn(nil, GetDeletedResourceUsageAndTarget),
 						MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+						MockUpdate:       test.NewMockUpdateFn(nil),
+						MockDelete:       test.NewMockDeleteFn(nil),
 					},
 					Scheme: fake.SchemeWith(&v1alpha1.ResourceUsage{}, &v1alpha1.ResourceUsageList{}),
 				},
