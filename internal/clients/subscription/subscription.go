@@ -47,6 +47,8 @@ type SubscriptionTypeMapperI interface {
 	IsUpToDate(cr *v1alpha1.Subscription, get *SubscriptionGet) bool
 	// IsAvailable allow additional check for whether a CR is fully available or not, maps to ready condition in controller, might be used for checking an observed API state field
 	IsAvailable(cr *v1alpha1.Subscription) bool
+	// IsDeletable allow additional check for whether a CR can be deleted or not
+	IsDeletable(cr *v1alpha1.Subscription) bool
 	// SyncStatus allows to pull some data from external API resource towards the CR status
 	SyncStatus(get *SubscriptionGet, crStatus *v1alpha1.SubscriptionObservation)
 }
@@ -146,6 +148,16 @@ type SubscriptionTypeMapper struct {
 func (s *SubscriptionTypeMapper) IsAvailable(cr *v1alpha1.Subscription) bool {
 	state := cr.Status.AtProvider.State
 	return state != nil && *state == v1alpha1.SubscriptionStateSubscribed
+}
+
+func (s *SubscriptionTypeMapper) IsDeletable(cr *v1alpha1.Subscription) bool {
+	if state := cr.Status.AtProvider.State; state != nil {
+		switch *state {
+		case v1alpha1.SubscriptionStateSubscribed, v1alpha1.SubscriptionStateSubscribeFailed:
+			return true
+		}
+	}
+	return false
 }
 
 func (s *SubscriptionTypeMapper) SyncStatus(get *SubscriptionGet, crStatus *v1alpha1.SubscriptionObservation) {
