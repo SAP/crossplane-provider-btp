@@ -19,7 +19,7 @@ func Configure(p *config.Provider) {
 			}
 			return externalName, nil
 		}
-		// this prevents a callback to the manager, which makes integration of controller calls from within another controller easier
-		r.UseAsync = false
+		// note: can be overwritten during initialization
+		r.UseAsync = true
 	})
 }

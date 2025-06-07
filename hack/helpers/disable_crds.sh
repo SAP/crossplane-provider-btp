@@ -12,6 +12,8 @@ for folder in "$@"; do
   # remove crd from package/crds folder
   pluralname=$(basename "$folder")s
   rm package/crds/*$pluralname*
+  # remove generated examples
+  rm examples-generated/*/*/$(basename "$folder").yaml 
 done
 
 

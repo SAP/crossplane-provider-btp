@@ -1,14 +1,11 @@
 package environments
 
 import (
-	"bytes"
 	"context"
-	"unicode"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	json "github.com/json-iterator/go"
-	"sigs.k8s.io/yaml"
 
+	"github.com/sap/crossplane-provider-btp/internal"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
@@ -47,7 +44,7 @@ func (c KymaEnvironments) DescribeInstance(
 
 func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error {
 
-	parameters, err := UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
+	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
 	parameters = AddKymaDefaultParameters(parameters, cr.Name, string(cr.UID))
 	if err != nil {
 		return err
@@ -77,7 +74,7 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 		return errors.New(errInstanceIdNotFound)
 	}
 
-	parameters, err := UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
+	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
 	parameters = AddKymaDefaultParameters(parameters, cr.Name, string(cr.UID))
 	if err != nil {
 		return err
@@ -91,40 +88,6 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 	)
 
 	return errors.Wrap(err, errKymaInstanceUpdateFailed)
-}
-
-// UnmarshalRawParameters produces a map structure from a given raw YAML/JSON input
-func UnmarshalRawParameters(in []byte) (map[string]interface{}, error) {
-	parameters := make(map[string]interface{})
-
-	if len(in) == 0 {
-		return parameters, nil
-
-	}
-	if hasJSONPrefix(in) {
-		if err := json.Unmarshal(in, &parameters); err != nil {
-			return parameters, err
-		}
-		return parameters, nil
-	}
-
-	err := yaml.Unmarshal(in, &parameters)
-	return parameters, err
-
-}
-
-var jsonPrefix = []byte("{")
-
-// hasJSONPrefix returns true if the provided buffer appears to start with
-// a JSON open brace.
-func hasJSONPrefix(buf []byte) bool {
-	return hasPrefix(buf, jsonPrefix)
-}
-
-// Return true if the first non-whitespace bytes in buf is prefix.
-func hasPrefix(buf []byte, prefix []byte) bool {
-	trim := bytes.TrimLeftFunc(buf, unicode.IsSpace)
-	return bytes.HasPrefix(trim, prefix)
 }
 
 func AddKymaDefaultParameters(parameters btp.InstanceParameters, instanceName string, resourceUID string) btp.InstanceParameters {

@@ -19,6 +19,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
+	"github.com/sap/crossplane-provider-btp/internal"
 	environments "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
@@ -198,13 +199,13 @@ func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, stri
 		return false, "", nil
 	}
 
-	desired, err := kymaenv.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
+	desired, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
 	desired = kymaenv.AddKymaDefaultParameters(desired, cr.Name, string(cr.UID))
 	if err != nil {
 		return false, "", errors.Wrap(err, errParameterParsing)
 	}
 
-	current, err := kymaenv.UnmarshalRawParameters([]byte(*cr.Status.AtProvider.Parameters))
+	current, err := internal.UnmarshalRawParameters([]byte(*cr.Status.AtProvider.Parameters))
 	if err != nil {
 		return false, "", errors.Wrap(err, errServiceParsing)
 	}

@@ -1,0 +1,15 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceBinding
+metadata:
+  name: destination-binding
+spec:
+  forProvider:
+    name: destination-binding
+    # parameters: ... same options for setting parameters via json, yaml or secrets as for instances
+    serviceInstanceRef: 
+      name: destination-instance
+    subaccountRef:
+      name: sa-serviceinstance
+  writeConnectionSecretToRef:
+    name: destination-binding
+    namespace: default

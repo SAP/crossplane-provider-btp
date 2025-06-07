@@ -51,8 +51,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 				newClientInitalizerFn: func() servicemanager.ITfClientInitializer {
 					return servicemanager.NewServiceManagerTfClient(
-						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind),
-						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind),
+						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil),
+						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil),
 
 						servicemanager.Defaults{
 							InstanceName: apisv1beta1.DefaultServiceInstanceName,
