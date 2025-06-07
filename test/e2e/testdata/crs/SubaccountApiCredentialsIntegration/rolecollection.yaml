@@ -1,0 +1,18 @@
+apiVersion: security.btp.sap.crossplane.io/v1alpha1
+kind: RoleCollection
+metadata:
+  namespace: default
+  name: sac-rolecollection
+spec:
+  forProvider:
+    name: "subaccountapicredentials-custom-admin-rolecollection"
+    description: "this is a custom rolecollection from e2e tests"
+    roles:
+      - name: "Destination Administrator"
+        roleTemplateAppId: "destination-xsappname!b404"
+        roleTemplateName: "Destination_Administrator"
+      - name: "Subaccount Admin"
+        roleTemplateAppId: "cis-local!b14"
+        roleTemplateName: "Subaccount_Admin"
+  subaccountApiCredentialRef:
+    name: sac-subaccountapicredentials

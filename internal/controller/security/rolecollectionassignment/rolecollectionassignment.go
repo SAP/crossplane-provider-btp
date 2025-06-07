@@ -4,10 +4,12 @@ import (
 	"context"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/btp"
 	rolecollectiongroupassignment "github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollectiongroupassignment"
 	"github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollectionuserassignment"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -20,8 +22,10 @@ import (
 const (
 	errNotRoleCollectionAssignment = "managed resource is not a RoleCollectionAssignment custom resource"
 	errTrackPCUsage                = "cannot track ProviderConfig usage"
+	errTrackRCUsage                = "cannot track ResourceUsage"
 
-	errGetSecret = "api credential secret not found"
+	errGetSecret  = "api credential secret not found"
+	errReadSecret = "api credential secret is malformed"
 
 	errRetrieveRole = "cannot retrieve api data"
 	errAssignRole   = "cannot assign role"
@@ -37,21 +41,17 @@ var (
 
 var _ RoleAssigner = &rolecollectionuserassignment.XsusaaUserRoleAssigner{}
 
-var configureUserAssignerFn = func(secretData []byte) (RoleAssigner, error) {
-	binding, err := v1alpha1.ReadXsuaaCredentials(secretData)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read xsuaa credentials.")
+var configureUserAssignerFn = func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error) {
+	if binding == nil {
+		return nil, errInvalidSecret
 	}
-
 	return rolecollectionuserassignment.NewXsuaaUserRoleAssigner(btp.NewBackgroundContextWithDebugPrintHTTPClient(), binding.ClientId, binding.ClientSecret, binding.TokenURL, binding.ApiUrl), nil
 }
 
-var configureGroupAssignerFn = func(secretData []byte) (RoleAssigner, error) {
-	binding, err := v1alpha1.ReadXsuaaCredentials(secretData)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read xsuaa credentials.")
+var configureGroupAssignerFn = func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error) {
+	if binding == nil {
+		return nil, errInvalidSecret
 	}
-
 	return rolecollectiongroupassignment.NewXsuaaGroupRoleAssigner(btp.NewBackgroundContextWithDebugPrintHTTPClient(), binding.ClientId, binding.ClientSecret, binding.TokenURL, binding.ApiUrl), nil
 }
 
@@ -66,8 +66,9 @@ type RoleAssigner interface {
 type connector struct {
 	kube               client.Client
 	usage              resource.Tracker
-	newUserAssignerFn  func(creds []byte) (RoleAssigner, error)
-	newGroupAssignerFn func(creds []byte) (RoleAssigner, error)
+	newUserAssignerFn  func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error)
+	newGroupAssignerFn func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error)
+	resourcetracker    tracking.ReferenceResolverTracker
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -80,21 +81,18 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
-	secretBytes, err := resource.CommonCredentialExtractor(
-		ctx,
-		cr.Spec.APICredentials.Source,
-		c.kube,
-		cr.Spec.APICredentials.CommonCredentialSelectors,
-	)
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, errTrackRCUsage)
+	}
+
+	binding, err := v1alpha1.CreateBindingFromSource(&cr.Spec.XSUAACredentialsReference, ctx, c.kube)
 
 	if err != nil {
 		return nil, errors.Wrap(err, errGetSecret)
 	}
-	if secretBytes == nil {
-		return nil, errInvalidSecret
-	}
 
-	svc, err := c.newService(cr, secretBytes)
+	svc, err := c.newService(cr, binding)
+
 	if err != nil {
 		return nil, errors.Wrap(err, errNewClient)
 	}
@@ -170,11 +168,11 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 }
 
 // newService chooses one of the serviceCreation functions based on the type of the RoleCollectionAssignment
-func (c *connector) newService(cr *v1alpha1.RoleCollectionAssignment, bytes []byte) (RoleAssigner, error) {
+func (c *connector) newService(cr *v1alpha1.RoleCollectionAssignment, binding *v1alpha1.XsuaaBinding) (RoleAssigner, error) {
 	if isUserAssignment(cr) {
-		return c.newUserAssignerFn(bytes)
+		return c.newUserAssignerFn(binding)
 	}
-	return c.newGroupAssignerFn(bytes)
+	return c.newGroupAssignerFn(binding)
 }
 
 // isUserAssignment checks if the rolecollection assignment is for a user or a group

@@ -2,8 +2,12 @@ package rolecollection
 
 import (
 	"context"
-	"github.com/sap/crossplane-provider-btp/internal"
 	"testing"
+
+	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -14,8 +18,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -318,10 +320,8 @@ func TestDelete(t *testing.T) {
 
 func TestConnect(t *testing.T) {
 	trackErr := errors.New("trackError")
-	noSecretErr := errors.New("no secret err")
-	createServiceErr := errors.New("error creating service")
 
-	kubeStub := func(err error, secretData map[string][]byte) client.Client {
+	kubeStubCustom := func(err error, secretData map[string][]byte) client.Client {
 		return &test.MockClient{
 			MockGet: test.NewMockGetFn(err, func(obj client.Object) error {
 				secret := obj.(*corev1.Secret)
@@ -331,11 +331,25 @@ func TestConnect(t *testing.T) {
 		}
 	}
 
+	kubeStubUpjet := func(err error, secretObj *corev1.Secret) client.Client {
+		return &test.MockClient{
+			MockGet: test.NewMockGetFn(err, func(obj client.Object) error {
+				if err != nil || secretObj == nil {
+					return err
+				}
+				secret := obj.(*corev1.Secret)
+				*secret = *secretObj
+				return nil
+			}),
+		}
+	}
+
 	type args struct {
-		cr           *v1alpha1.RoleCollection
-		track        resource.Tracker
-		kube         client.Client
-		newServiceFn func(_ []byte) (RoleCollectionMaintainer, error)
+		cr              *v1alpha1.RoleCollection
+		track           resource.Tracker
+		resourcetracker tracking.ReferenceResolverTracker
+		kube            client.Client
+		newServiceFn    func(_ *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error)
 	}
 
 	type want struct {
@@ -347,52 +361,111 @@ func TestConnect(t *testing.T) {
 		args args
 		want want
 	}{
+
+		"Not found secret Upjet": {
+			args: args{
+				cr:              cr("test-collection", withCredsUpjet()),
+				track:           newTracker(nil),
+				resourcetracker: newResourceTracker(nil),
+				kube:            kubeStubUpjet(v1alpha1.FailedToGetSecret, nil),
+			},
+			want: want{
+				err: v1alpha1.FailedToGetSecret,
+			},
+		},
+		"Secret without key": {
+			args: args{
+				cr:              cr("test-collection", withCredsCustom()),
+				track:           newTracker(nil),
+				resourcetracker: newResourceTracker(nil),
+				kube:            kubeStubCustom(nil, nil),
+			},
+			want: want{
+				err: v1alpha1.InvalidXsuaaCredentials,
+			},
+		},
 		"TrackError": {
 			args: args{
-				cr:    cr("test-collection"),
-				track: newTracker(trackErr),
+				cr:              cr("test-collection"),
+				track:           newTracker(trackErr),
+				resourcetracker: newResourceTracker(nil),
 			},
 			want: want{
 				err: trackErr,
 			},
 		},
 		// existance of secret ref is enforced on schema level and needs to be verified in e2e tests
-		"Not found secret": {
+		"Not found secret Custom": {
 			args: args{
-				cr:    cr("test-collection", withCreds()),
-				track: newTracker(nil),
-				kube:  kubeStub(noSecretErr, nil),
+				cr:              cr("test-collection", withCredsCustom()),
+				track:           newTracker(nil),
+				resourcetracker: newResourceTracker(nil),
+				kube:            kubeStubCustom(v1alpha1.FailedToGetSecret, nil),
 			},
 			want: want{
-				err: noSecretErr,
+				err: v1alpha1.FailedToGetSecret,
 			},
 		},
-		"Secret without key": {
+		"NewServiceFn err Custom": {
 			args: args{
-				cr:    cr("test-collection", withCreds()),
-				track: newTracker(nil),
-				kube:  kubeStub(nil, nil),
+				cr:              cr("test-collection", withCredsCustom()),
+				track:           newTracker(nil),
+				resourcetracker: newResourceTracker(nil),
+
+				kube: kubeStubCustom(nil, map[string][]byte{
+					"credentials": []byte(`{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`),
+				}),
+				newServiceFn: newMaintainerStub(v1alpha1.InvalidXsuaaCredentials),
 			},
 			want: want{
-				err: errInvalidSecret,
+				err: v1alpha1.InvalidXsuaaCredentials,
 			},
 		},
-		"NewServiceFn err": {
+		"NewServiceFn success Custom": {
 			args: args{
-				cr:           cr("test-collection", withCreds()),
-				track:        newTracker(nil),
-				kube:         kubeStub(nil, map[string][]byte{cr("test-collection", withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
-				newServiceFn: newMaintainerStub(createServiceErr),
+				cr:              cr("test-collection", withCredsCustom()),
+				track:           newTracker(nil),
+				resourcetracker: newResourceTracker(nil),
+
+				kube: kubeStubCustom(nil, map[string][]byte{
+					"credentials": []byte(`{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`),
+				}),
+				newServiceFn: newMaintainerStub(nil),
 			},
 			want: want{
-				err: createServiceErr,
+				err:             nil,
+				externalCreated: true,
 			},
 		},
-		"NewServiceFn success": {
+
+		"NewServiceFn err Upjet": {
 			args: args{
-				cr:           cr("test-collection", withCreds()),
-				track:        newTracker(nil),
-				kube:         kubeStub(nil, map[string][]byte{cr("test-collection", withCreds()).Spec.APICredentials.SecretRef.Key: []byte("secret")}),
+				cr:              cr("test-collection", withCredsUpjet()),
+				track:           newTracker(nil),
+				resourcetracker: newResourceTracker(nil),
+				kube: kubeStubUpjet(nil, &corev1.Secret{Data: map[string][]byte{
+					"attribute.api_url":       []byte("aurl"),
+					"attribute.client_id":     []byte("cid"),
+					"attribute.client_secret": []byte("csecret"),
+					"attribute.token_url":     []byte("turl"),
+				}}),
+				newServiceFn: newMaintainerStub(v1alpha1.InvalidXsuaaCredentials),
+			},
+			want: want{
+				err: v1alpha1.InvalidXsuaaCredentials,
+			},
+		},
+		"NewServiceFn success Upjet": {
+			args: args{
+				cr:              cr("test-collection", withCredsUpjet()),
+				track:           newTracker(nil),
+				resourcetracker: newResourceTracker(nil),
+				kube: kubeStubUpjet(nil, &corev1.Secret{Data: map[string][]byte{
+					"attribute.api_url":       []byte("aurl"),
+					"attribute.client_id":     []byte("cid"),
+					"attribute.client_secret": []byte("csecret"),
+					"attribute.token_url":     []byte("turl"),
+				}}),
 				newServiceFn: newMaintainerStub(nil),
 			},
 			want: want{
@@ -405,9 +478,10 @@ func TestConnect(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			c := connector{
-				usage:        tc.args.track,
-				kube:         tc.args.kube,
-				newServiceFn: tc.args.newServiceFn,
+				usage:           tc.args.track,
+				kube:            tc.args.kube,
+				resourcetracker: tc.args.resourcetracker,
+				newServiceFn:    tc.args.newServiceFn,
 			}
 			got, err := c.Connect(context.Background(), tc.args.cr)
 			expectedErrorBehaviour(t, tc.want.err, err)
@@ -418,18 +492,18 @@ func TestConnect(t *testing.T) {
 	}
 }
 
-func TestConfigureUserAssignerFn(t *testing.T) {
+func TestReadCustomSecret(t *testing.T) {
 	var tests = map[string]struct {
 		json      string
 		expectErr error
 	}{
 		"InvalidFormat": {
 			json:      `"some invalid json"}`,
-			expectErr: v1alpha1.ErrInvalidXsuaaCredentials,
+			expectErr: v1alpha1.InvalidXsuaaCredentials,
 		},
 		"MissingRequiredCreds": {
 			json:      `{"clientid": "clientid", "tokenurl": "tokenurl", "apiurl": "apiurl"}`,
-			expectErr: v1alpha1.ErrInvalidXsuaaCredentials,
+			expectErr: v1alpha1.InvalidXsuaaCredentials,
 		},
 		"ValidCreds": {
 			json:      `{"clientid": "clientid", "clientsecret": "clientsecret", "tokenurl": "tokenurl", "apiurl": "apiurl"}`,
@@ -439,8 +513,58 @@ func TestConfigureUserAssignerFn(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := configureRoleCollectionMaintainerFn([]byte(tc.json))
+			_, err := v1alpha1.ReadXsuaaCredentialsCustom([]byte(tc.json))
 			expectedErrorBehaviour(t, tc.expectErr, err)
+		})
+	}
+}
+
+func TestReadXsuaaCredentialsUpjet(t *testing.T) {
+	tests := map[string]struct {
+		creds     corev1.Secret
+		expect    *v1alpha1.XsuaaBinding
+		expectErr error
+	}{
+		"NilData": {
+			creds:     corev1.Secret{Data: nil},
+			expect:    nil,
+			expectErr: v1alpha1.InvalidXsuaaCredentials,
+		},
+		"MissingClientSecret": {
+			creds: corev1.Secret{Data: map[string][]byte{
+				"attribute.api_url":   []byte("aurl"),
+				"attribute.client_id": []byte("cid"),
+				"attribute.token_url": []byte("turl"),
+			}},
+			expect:    nil,
+			expectErr: v1alpha1.InvalidXsuaaCredentials,
+		},
+		"AllFieldsPresent": {
+			creds: corev1.Secret{Data: map[string][]byte{
+				"attribute.api_url":       []byte("aurl"),
+				"attribute.client_id":     []byte("cid"),
+				"attribute.client_secret": []byte("csecret"),
+				"attribute.token_url":     []byte("turl"),
+			}},
+			expect: &v1alpha1.XsuaaBinding{
+				ApiUrl:       "aurl",
+				ClientId:     "cid",
+				ClientSecret: "csecret",
+				TokenURL:     "turl",
+			},
+			expectErr: nil,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := v1alpha1.ReadXsuaaCredentialsUpjet(tc.creds)
+			expectedErrorBehaviour(t, tc.expectErr, err)
+			if tc.expectErr == nil {
+				assert.Equal(t, tc.expect, got)
+			} else {
+				assert.Nil(t, got)
+			}
 		})
 	}
 }
@@ -472,7 +596,12 @@ func newTracker(err error) resource.Tracker {
 	return &tracker{err: err}
 }
 
-func withCreds() RoleCollectionModifier {
+func newResourceTracker(c client.Client) tracking.ReferenceResolverTracker {
+	return &ReferenceResolverTrackerMock{}
+
+}
+
+func withCredsCustom() RoleCollectionModifier {
 	return func(roleCollection *v1alpha1.RoleCollection) {
 		roleCollection.Spec.APICredentials = v1alpha1.APICredentials{
 			Source: xpv1.CredentialsSourceSecret,
@@ -486,6 +615,15 @@ func withCreds() RoleCollectionModifier {
 				},
 			},
 		}
+	}
+}
+
+func withCredsUpjet() RoleCollectionModifier {
+	return func(roleCollection *v1alpha1.RoleCollection) {
+		roleCollection.Spec.SubaccountApiCredentialRef = &xpv1.Reference{
+			Name: "api-credential-ref"}
+		roleCollection.Spec.SubaccountApiCredentialSecret = "xsuaa-secret"
+		roleCollection.Spec.SubaccountApiCredentialSecretNamespace = "default"
 	}
 }
 
@@ -511,8 +649,8 @@ func (t *tracker) Track(ctx context.Context, mg resource.Managed) error {
 
 type RoleCollectionModifier func(dirEnvironment *v1alpha1.RoleCollection)
 
-func newMaintainerStub(err error) func(_ []byte) (RoleCollectionMaintainer, error) {
-	return func(_ []byte) (RoleCollectionMaintainer, error) {
+func newMaintainerStub(err error) func(_ *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error) {
+	return func(_ *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error) {
 		if err != nil {
 			return nil, err
 		}
