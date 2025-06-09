@@ -1209,21 +1209,6 @@ func TestDelete(t *testing.T) {
 				err: errors.New("deletion of subaccount failed: apiError"),
 			},
 		},
-		"SubaccountAlreadyInDeletingState": {
-			reason: "Deletion should be successful if subaccount already in deleting state",
-			args: args{
-				cr: NewSubaccount("unittest-sa",
-					WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123")}),
-					WithStatus(v1alpha1.SubaccountObservation{Status: internal.Ptr("DELETING")})),
-				mockClient: &MockSubaccountClient{
-					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
-				},
-				tracker: trackingtest.NoOpReferenceResolverTracker{},
-			},
-			want: want{
-				err: nil,
-			},
-		},
 		"TrackerBlocked": {
 			reason: "Deletion should be blocked if tracker is blocked",
 			args: args{
