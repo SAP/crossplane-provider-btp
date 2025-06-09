@@ -22,6 +22,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			usage:              resource.NewProviderConfigUsageTracker(mgr.GetClient(), &providerv1alpha1.ProviderConfigUsage{}),
 			newUserAssignerFn:  configureUserAssignerFn,
 			newGroupAssignerFn: configureGroupAssignerFn,
+			resourcetracker:    resourcetracker,
 		}
 	})
 }

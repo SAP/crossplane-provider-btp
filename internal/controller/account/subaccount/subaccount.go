@@ -24,6 +24,7 @@ import (
 
 const (
 	errNotSubaccount        = "managed resource is not a Subaccount custom resource"
+	errSubaccountNotFound   = "subaccount not found"
 	subaccountStateDeleting = "DELETING"
 	subaccountStateOk       = "OK"
 )
@@ -80,7 +81,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotSubaccount)
 	}
 
-	c.generateObservation(ctx, desiredCR)
+	if err := c.generateObservation(ctx, desiredCR); err != nil {
+		return managed.ExternalObservation{}, err
+	}
+
 	c.tracker.SetConditions(ctx, desiredCR)
 	// Needs Creation?
 	if needsCreation := c.needsCreation(desiredCR); needsCreation {
@@ -112,12 +116,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 func (c *external) generateObservation(
 	ctx context.Context,
 	desiredState *apisv1alpha1.Subaccount,
-) {
-	subaccount := c.findBTPSubaccount(ctx, desiredState)
+) error {
+	subaccount, err := c.findBTPSubaccount(ctx, desiredState)
+	if err != nil {
+		resetRemoteState(desiredState)
+		return err
+	}
 	if subaccount == nil {
 		resetRemoteState(desiredState)
-		return
+		return nil
 	}
+
 	desiredState.Status.AtProvider.SubaccountGuid = &subaccount.Guid
 	desiredState.Status.AtProvider.Status = &subaccount.State
 	desiredState.Status.AtProvider.StatusMessage = subaccount.StateMessage
@@ -130,6 +139,8 @@ func (c *external) generateObservation(
 	desiredState.Status.AtProvider.UsedForProduction = &subaccount.UsedForProduction
 	desiredState.Status.AtProvider.ParentGuid = &subaccount.ParentGUID
 	desiredState.Status.AtProvider.GlobalAccountGUID = &subaccount.GlobalAccountGUID
+
+	return nil
 }
 
 func resetRemoteState(state *apisv1alpha1.Subaccount) {
@@ -192,9 +203,6 @@ func needsUpdate(desired apisv1alpha1.SubaccountSpec, actual apisv1alpha1.Subacc
 		return true
 	}
 	if !reflect.DeepEqual(&cleanedDesired.DisplayName, cleanedActual.DisplayName) {
-		return true
-	}
-	if !reflect.DeepEqual(&cleanedDesired.Region, cleanedActual.Region) {
 		return true
 	}
 	if !reflect.DeepEqual(&cleanedDesired.UsedForProduction, cleanedActual.UsedForProduction) {
@@ -355,11 +363,11 @@ func (c *external) createBTPSubaccount(
 
 func (c *external) findBTPSubaccount(
 	ctx context.Context, subaccount *apisv1alpha1.Subaccount,
-) *accountclient.SubaccountResponseObject {
+) (*accountclient.SubaccountResponseObject, error) {
 	response, _, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccounts(ctx).Execute()
 	if err != nil {
 		ctrl.Log.Error(err, "could not get BTP subaccounts")
-		return nil
+		return nil, err
 	}
 
 	var foundAccount *accountclient.SubaccountResponseObject = nil
@@ -371,7 +379,7 @@ func (c *external) findBTPSubaccount(
 		}
 	}
 
-	return foundAccount
+	return foundAccount, nil
 }
 
 func isRelatedAccount(subaccount *apisv1alpha1.Subaccount, account *accountclient.SubaccountResponseObject) bool {
