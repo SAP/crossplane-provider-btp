@@ -130,7 +130,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 		// use the following WorkspaceStoreOption to enable the shared gRPC mode
 		// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
 		WorkspaceStore: terraform.NewWorkspaceStore(log),
-		SetupFn:        tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
+		SetupFn:        tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion, false),
 	}
 
 	if *enableManagementPolicies {
