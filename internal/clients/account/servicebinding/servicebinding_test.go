@@ -60,7 +60,7 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 			want: want{
-				tfResource: expectedTfSerivceBinding(
+				tfResource: expectedTfServiceBinding(
 					withTfParameters(`{}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
@@ -81,7 +81,7 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 			want: want{
-				tfResource: expectedTfSerivceBinding(
+				tfResource: expectedTfServiceBinding(
 					withTfParameters(`{"key":"value"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
@@ -102,7 +102,7 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 			want: want{
-				tfResource: expectedTfSerivceBinding(
+				tfResource: expectedTfServiceBinding(
 					withTfParameters(`{"key":"value"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
@@ -182,7 +182,7 @@ func TestTfResource(t *testing.T) {
 			},
 			want: want{
 				hasErr: false,
-				tfResource: expectedTfSerivceBinding(
+				tfResource: expectedTfServiceBinding(
 					withTfParameters(`{"key":"value","key2":"value2","key3":"value3"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
@@ -220,7 +220,7 @@ func TestTfResource(t *testing.T) {
 			},
 			want: want{
 				hasErr: false,
-				tfResource: expectedTfSerivceBinding(
+				tfResource: expectedTfServiceBinding(
 					withTfParameters(`{"key":"value","key2":"value2","key3":"value3"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
@@ -241,7 +241,7 @@ func TestTfResource(t *testing.T) {
 			},
 			want: want{
 				hasErr: false,
-				tfResource: expectedTfSerivceBinding(
+				tfResource: expectedTfServiceBinding(
 					withTfExternalName("123"),
 					withTfParameters(`{}`),
 					withTfProviderConfigRef("default"),
@@ -303,7 +303,7 @@ func expectedServiceBinding(opts ...func(*v1alpha1.ServiceBinding)) *v1alpha1.Se
 }
 
 // Helper function to build a complete SubaccountServiceBinding CR dynamically
-func expectedTfSerivceBinding(opts ...func(*v1alpha1.SubaccountServiceBinding)) *v1alpha1.SubaccountServiceBinding {
+func expectedTfServiceBinding(opts ...func(*v1alpha1.SubaccountServiceBinding)) *v1alpha1.SubaccountServiceBinding {
 	cr := &v1alpha1.SubaccountServiceBinding{}
 	cr.Spec.ForProvider.Name = internal.Ptr("")
 

@@ -25,6 +25,7 @@ import (
 	subaccountservicebroker "github.com/sap/crossplane-provider-btp/internal/controller/account/subaccountservicebroker"
 	providerconfig "github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	globalaccounttrustconfiguration "github.com/sap/crossplane-provider-btp/internal/controller/security/globalaccounttrustconfiguration"
+	subaccountapicredential "github.com/sap/crossplane-provider-btp/internal/controller/security/subaccountapicredential"
 	subaccounttrustconfiguration "github.com/sap/crossplane-provider-btp/internal/controller/security/subaccounttrustconfiguration"
 )
 
@@ -36,6 +37,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		subaccountservicebroker.Setup,
 		providerconfig.Setup,
 		globalaccounttrustconfiguration.Setup,
+		subaccountapicredential.Setup,
 		subaccounttrustconfiguration.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
