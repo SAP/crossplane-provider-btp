@@ -21,7 +21,7 @@ func NewServiceBindingConnector(saveConditionsCallback tfclient.SaveConditionsFn
 		TfProxyConnector: tfclient.NewTfProxyConnector(
 			tfclient.NewInternalTfConnector(
 				kube,
-				"btp_subaccount_service_instance",
+				"btp_subaccount_service_binding",
 				v1alpha1.SubaccountServiceBinding_GroupVersionKind,
 				true,
 				tfclient.NewAPICallbacks(
