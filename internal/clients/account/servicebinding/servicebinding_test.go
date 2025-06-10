@@ -260,7 +260,7 @@ func TestTfResource(t *testing.T) {
 			},
 			want: want{
 				hasErr: false,
-				tfResource: expectedTfSerivceBinding(
+				tfResource: expectedTfServiceBinding(
 					withTfExternalName("123"),
 					withTfParameters(`{}`),
 					withTfProviderConfigRef("default"),
