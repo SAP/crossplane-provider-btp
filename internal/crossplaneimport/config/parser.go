@@ -46,6 +46,7 @@ type rawImportConfig struct {
 	ProviderConfigRefName string                  `yaml:"providerConfigRefName"`
 	ManagementPolicy      string                  `yaml:"managementPolicy"`
 	Resources             []rawConfiguredResource `yaml:"resources"`
+	Tooling               []SubaccountTooling     `yaml:"tooling,omitempty"` //TODO: probably add more elegant parsing here as for the others
 }
 
 // rawConfiguredResource represents a resource configuration with raw filter data.
@@ -160,6 +161,28 @@ func (p *BTPConfigParser) LoadAndValidateCLIConfig(filePath string) (*ImportConf
 	}
 
 	return cfg, nil
+}
+
+func (p *BTPConfigParser) WriteCLIConfig(filePath string, config *ImportConfig) error {
+	if filePath == "" {
+		return fmt.Errorf("configuration file path cannot be empty")
+	}
+
+	if config == nil {
+		return fmt.Errorf("configuration cannot be nil")
+	}
+
+	yamlData, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal configuration to YAML: %w", err)
+	}
+
+	err = os.WriteFile(filePath, yamlData, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write configuration file '%s': %w", filePath, err)
+	}
+
+	return nil
 }
 
 // SimpleResourceFilterConfig is a basic implementation of ResourceFilterConfig
@@ -284,4 +307,9 @@ func (p *BTPConfigParser) ParseConfig(configPath string) (*ImportConfig, error) 
 func LoadAndValidateCLIConfigWithRegistry(filePath string, registry AdapterRegistry) (*ImportConfig, error) {
 	parser := NewBTPConfigParser(registry)
 	return parser.LoadAndValidateCLIConfig(filePath)
+}
+
+func SaveCLIConfig(filePath string, config *ImportConfig) error {
+	parser := NewBTPConfigParser(nil)
+	return parser.WriteCLIConfig(filePath, config)
 }

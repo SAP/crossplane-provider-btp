@@ -11,6 +11,8 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	cli "github.com/sap/crossplane-provider-btp/internal/cli/pkg/credentialManager"
+	cpconfig "github.com/sap/crossplane-provider-btp/internal/crossplaneimport/config"
+	"github.com/sap/crossplane-provider-btp/internal/crossplaneimport/importer"
 	"github.com/spf13/cobra"
 	"gopkg.in/alecthomas/kingpin.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var Tooling = &cobra.Command{
+var ToolingCMD = &cobra.Command{
 	// TODO: better naming and description
 	Use:   "tooling",
 	Short: "Tooling BTP resources",
@@ -44,24 +46,44 @@ var Tooling = &cobra.Command{
 		k8sClient, err := client.New(k8sConfig, client.Options{Scheme: scheme})
 		kingpin.FatalIfError(err, "Failed to create Kubernetes client")
 
+		// if no xpbtp config path is provided, fallback to default
+		if configPath == "" {
+			configPath = "./config.yaml"
+		}
+
+		// Create registry adapter for configuration parsing
+		registryAdapter := importer.NewRegistryAdapter()
+		cfg, err := cpconfig.LoadAndValidateCLIConfigWithRegistry(configPath, registryAdapter)
+		kingpin.FatalIfError(err, "Failed to load configuration")
+
 		saName := "dcom-demo"
 
+		//TODO: move into function
 		err = k8sClient.Create(ctx, ServiceManager(saName))
 		kingpin.FatalIfError(err, "Failed to create ServiceManager resource")
+		cfg.AddTooling(saName, "ServiceManager", xpv1.SecretReference{Name: saName + "-service-manager", Namespace: "default"})
+		err = cpconfig.SaveCLIConfig(configPath, cfg)
+		kingpin.FatalIfError(err, "Failed to save configuration")
 
 		err = k8sClient.Create(ctx, CloudManagement(saName))
 		kingpin.FatalIfError(err, "Failed to create CloudManagement resource")
+		cfg.AddTooling(saName, "CloudManagement", xpv1.SecretReference{Name: saName + "-cloud-management", Namespace: "default"})
+		err = cpconfig.SaveCLIConfig(configPath, cfg)
+		kingpin.FatalIfError(err, "Failed to save configuration")
 
 		err = k8sClient.Create(ctx, CISEntitlement(saName))
 		kingpin.FatalIfError(err, "Failed to create CISEntitlement resource")
+		cfg.AddTooling(saName, "Entitlement", xpv1.SecretReference{Name: saName + "-cis-entitlement", Namespace: "default"})
+		err = cpconfig.SaveCLIConfig(configPath, cfg)
+		kingpin.FatalIfError(err, "Failed to save configuration")
 
 	},
 }
 
 // AddToolingCMD adds the tooling command to the root command
 func AddToolingCMD(rootCmd *cobra.Command) {
-	rootCmd.AddCommand(Tooling)
-	//ImportCMD.Flags().StringVarP(&configPath, "config", "c", "", "Path to your Import-Config (default ./config.yaml)")
+	rootCmd.AddCommand(ToolingCMD)
+	ToolingCMD.Flags().StringVarP(&configPath, "config", "c", "", "Path to your Import-Config (default ./config.yaml)")
 }
 
 func ServiceManager(saName string) *v1beta1.ServiceManager {
