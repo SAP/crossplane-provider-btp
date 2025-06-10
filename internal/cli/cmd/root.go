@@ -29,4 +29,5 @@ func init() {
 	// Initialize subcommands
 	subcmd.AddInitCMD(rootCmd)
 	subcmd.AddImportCMD(rootCmd)
+	subcmd.AddToolingCMD(rootCmd)
 }
