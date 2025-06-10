@@ -275,6 +275,24 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 		},
+		"Without ManagementPolicies": {
+			reason: "Make sure ManagementPolicies transfered to tf resource",
+			args: args{
+				si: expectedServiceInstance(
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+				),
+			},
+			want: want{
+				hasErr: false,
+				tfResource: expectedTfSerivceInstance(
+					withTfExternalName("123"),
+					withTfParameters(`{}`),
+					withTfProviderConfigRef("default"),
+					withTfCondition(conditionUnknown),
+				),
+			},
+		},
 	}
 
 	for name, tc := range tests {
