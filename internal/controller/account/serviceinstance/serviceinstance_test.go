@@ -211,7 +211,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceInstance(
-					withObservationData("", nil),
+					withObservationData("", ""),
 				),
 			},
 			want: want{
@@ -225,7 +225,7 @@ func TestObserve(t *testing.T) {
 				},
 				cr: expectedServiceInstance(
 					withExternalName("some-ext-name"),
-					withObservationData("some-id", nil),
+					withObservationData("some-id", ""),
 					withConditions(xpv1.Available()),
 				),
 			},
@@ -633,7 +633,7 @@ func withExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
 }
 
 // Option to set observation data (e.g., ID)
-func withObservationData(id string, planId *string) func(*v1alpha1.ServiceInstance) {
+func withObservationData(id string, planId string) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
 		cr.Status.AtProvider = v1alpha1.ServiceInstanceObservation{
 			ID:            id,

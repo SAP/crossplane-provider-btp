@@ -9,7 +9,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/internal"
 	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -26,7 +25,7 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 
 	type want struct {
 		err    error
-		planID *string
+		planID string
 	}
 
 	tests := map[string]struct {
@@ -38,10 +37,10 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 	}{
 		"already initialized": {
 			mg: expectedServiceInstance(
-				withObservationData("", internal.Ptr("plan-id")),
+				withObservationData("", "plan-id"),
 			),
 			want: want{
-				planID: internal.Ptr("plan-id"),
+				planID: "plan-id",
 				err:    nil,
 			},
 		},
@@ -100,7 +99,7 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 				},
 			},
 			want: want{
-				planID: internal.Ptr(testPlanID),
+				planID: testPlanID,
 				err:    errStatusUpdate,
 			},
 		},
@@ -122,7 +121,7 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 				},
 			},
 			want: want{
-				planID: internal.Ptr(testPlanID),
+				planID: testPlanID,
 				err:    nil,
 			},
 		},

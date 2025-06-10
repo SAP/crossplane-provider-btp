@@ -120,7 +120,7 @@ func TestTfResource(t *testing.T) {
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
 					withObservation(v1alpha1.ServiceInstanceObservation{
-						ServiceplanID: internal.Ptr("resolved-plan-id"),
+						ServiceplanID: "resolved-plan-id",
 					}),
 				),
 			},

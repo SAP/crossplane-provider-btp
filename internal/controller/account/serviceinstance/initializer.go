@@ -52,7 +52,7 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 	if err != nil {
 		return errors.Wrap(err, errInitialize)
 	}
-	cr.Status.AtProvider.ServiceplanID = &planID
+	cr.Status.AtProvider.ServiceplanID = planID
 	if err := kube.Status().Update(ctx, cr); err != nil {
 		return errors.Wrap(err, errSaveData)
 	}
@@ -60,5 +60,5 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 }
 
 func isInitialized(cr *v1alpha1.ServiceInstance) bool {
-	return cr.Status.AtProvider.ServiceplanID != nil
+	return cr.Status.AtProvider.ServiceplanID != ""
 }

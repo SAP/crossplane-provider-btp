@@ -57,9 +57,8 @@ func (s *ServiceInstanceMapper) TfResource(ctx context.Context, si *v1alpha1.Ser
 	// transfer external name
 	meta.SetExternalName(sInstance, meta.GetExternalName(si))
 
-	if sInstance.Spec.ForProvider.ServiceplanID == nil {
-		// if no plan id explicitly set by user we take the one resolved via offering and plan name
-		sInstance.Spec.ForProvider.ServiceplanID = si.Status.AtProvider.ServiceplanID
+	if si.Status.AtProvider.ServiceplanID != "" {
+		sInstance.Spec.ForProvider.ServiceplanID = &si.Status.AtProvider.ServiceplanID
 	}
 
 	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
