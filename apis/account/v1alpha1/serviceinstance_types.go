@@ -23,6 +23,7 @@ type ServiceInstanceParameters struct {
 	PlanName string `json:"planName,omitempty"`
 
 	// Parameters in JSON or YAML format, will be merged with yaml parameters and secret parameters, will overwrite duplicated keys from secrets
+	// +kubebuilder:validation:Optional
 	Parameters runtime.RawExtension `json:"parameters,omitempty"`
 
 	// Parameters stored in secret, will be merged with spec parameters
