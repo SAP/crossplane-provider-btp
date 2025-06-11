@@ -140,6 +140,7 @@ func importSingleResource(cfg *cpconfig.ImportConfig, k8sClient client.Client, c
 				ProviderConfigReference: &xpv1.Reference{
 					Name: cfg.ProviderConfigRefName,
 				},
+				ManagementPolicies: XPManagementPolicies(cfg),
 			},
 			ForProvider: v1alpha1env.CfEnvironmentParameters{
 				Managers:        []string{},
@@ -238,4 +239,25 @@ func AddImportCMD(rootCmd *cobra.Command) {
 	ImportCMD.Flags().StringVarP(&configPath, "config", "c", "", "Path to your Import-Config (default ./config.yaml)")
 	ImportCMD.Flags().StringVarP(&singleImportKind, "kind", "k", "", "Kind of single resource to import (e.g. Cloudfoundry). If not set, all resources will be imported based on config.")
 	ImportCMD.Flags().StringVarP(&singleImportSa, "subaccount", "s", "", "Subaccount of the resource to import (e.g. my-subaccount). If not set, all resources will be imported based on config.")
+}
+
+func XPManagementPolicies(cfg *cpconfig.ImportConfig) []xpv1.ManagementAction {
+	// Set management policy - only use standard Crossplane ManagementActions
+	switch cfg.ManagementPolicy {
+	case "Observe":
+		return []xpv1.ManagementAction{xpv1.ManagementActionObserve}
+	case "*":
+		return []xpv1.ManagementAction{xpv1.ManagementActionAll}
+	case "Create":
+		return []xpv1.ManagementAction{xpv1.ManagementActionCreate}
+	case "Update":
+		return []xpv1.ManagementAction{xpv1.ManagementActionUpdate}
+	case "Delete":
+		return []xpv1.ManagementAction{xpv1.ManagementActionDelete}
+	case "LateInitialize":
+		return []xpv1.ManagementAction{xpv1.ManagementActionLateInitialize}
+	default:
+		// Default to Observe for unknown policies
+		return []xpv1.ManagementAction{xpv1.ManagementActionObserve}
+	}
 }
