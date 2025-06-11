@@ -30,17 +30,19 @@ type ImportConfig struct {
 // subaccountTooling keeps a reference to the created binding of certain services created to allow API access
 type SubaccountTooling struct {
 	Subaccount      string               `yaml:"subaccount"`
+	SubaccountID    string               `yaml:"subaccountID,omitempty"`
 	Kind            string               `yaml:"kind"`
 	SecretReference xpv1.SecretReference `yaml:"secretReference,omitempty"`
 }
 
-func (c *ImportConfig) AddTooling(saName, kind string, secretRef xpv1.SecretReference) string {
+func (c *ImportConfig) AddTooling(saName, kind, saID string, secretRef xpv1.SecretReference) string {
 	tooling := c.FindTooling(saName, kind)
 
 	if tooling == nil {
 		tooling = &SubaccountTooling{
-			Subaccount: saName,
-			Kind:       kind,
+			Subaccount:   saName,
+			Kind:         kind,
+			SubaccountID: saID,
 		}
 	}
 	tooling.SecretReference = secretRef

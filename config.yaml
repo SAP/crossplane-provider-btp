@@ -4,20 +4,25 @@ resources:
     - type: Subaccount
       name: dcom-demo
       managementPolicy: Observe
-      filters: {}
+      filters:
+        filters:
+            displayName: dcom-eu12
 tooling:
-    - subaccount: dcom-demo
-      kind: Entitlement
-      secretReference:
-        name: dcom-demo-cis-entitlement
-        namespace: default
-    - subaccount: dcom-demo
+    - subaccount: dcom-eu12-dbhtt
+      subaccountID: 8eb39f5c-6c95-4e54-82d0-09c159186b06
       kind: ServiceManager
       secretReference:
-        name: dcom-demo-sm-binding
+        name: dcom-eu12-dbhtt-sm-binding
         namespace: default
-    - subaccount: dcom-demo
+    - subaccount: dcom-eu12-dbhtt
+      subaccountID: 8eb39f5c-6c95-4e54-82d0-09c159186b06
       kind: CloudManagement
       secretReference:
-        name: dcom-demo-cis-binding
+        name: dcom-eu12-dbhtt-cis-binding
+        namespace: default
+    - subaccount: dcom-eu12-dbhtt
+      subaccountID: 8eb39f5c-6c95-4e54-82d0-09c159186b06
+      kind: Entitlement
+      secretReference:
+        name: dcom-eu12-dbhtt-cis-entitlement
         namespace: default
