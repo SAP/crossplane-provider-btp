@@ -174,7 +174,9 @@ func (p *BTPConfigParser) WriteCLIConfig(filePath string, config *ImportConfig) 
 		return fmt.Errorf("configuration cannot be nil")
 	}
 
-	yamlData, err := yaml.Marshal(config)
+	rawCfg := importConfigToRawImportConfig(config)
+
+	yamlData, err := yaml.Marshal(rawCfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal configuration to YAML: %w", err)
 	}
@@ -280,6 +282,33 @@ func validateFiltersAgainstSchema(filters map[string]interface{}, schema resourc
 	}
 
 	return errors
+}
+
+func importConfigToRawImportConfig(cfg *ImportConfig) rawImportConfig {
+	var rawCfg rawImportConfig = rawImportConfig{
+		ProviderConfigRefName: cfg.ProviderConfigRefName,
+		ManagementPolicy:      cfg.ManagementPolicy,
+		Resources:             make([]rawConfiguredResource, len(cfg.Resources)),
+		Tooling:               cfg.Tooling,
+	}
+	for i, res := range cfg.Resources {
+		rawCfg.Resources[i] = rawConfiguredResource{
+			Type:             res.Type,
+			Name:             res.Name,
+			ManagementPolicy: res.ManagementPolicy,
+			Filters:          make(map[string]interface{}),
+		}
+		if res.Filters != nil {
+			// Convert ResourceFilterConfig to map[string]interface{}
+			criteria := res.Filters.GetCriteria()
+			filters := make(map[string]interface{}, len(criteria))
+			for k, v := range criteria {
+				filters[k] = v
+			}
+			rawCfg.Resources[i].Filters = filters
+		}
+	}
+	return rawCfg
 }
 
 // ParseConfig provides a simplified interface for parsing configuration files.
