@@ -1168,14 +1168,13 @@ func TestDelete(t *testing.T) {
 				mockClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
 					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
-						return &accountclient.SubaccountResponseObject{Guid: "123", State: "Deleting"}, &http.Response{StatusCode: 200}, nil
+						return &accountclient.SubaccountResponseObject{Guid: "123", State: subaccountStateDeleting}, &http.Response{StatusCode: 200}, nil
 					},
 				},
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
 			},
 			want: want{
-				// this needs a fix from implementation side, shoul not return error after deletion success. issue: https://github.com/SAP/crossplane-provider-btp/issues/155
-				err: errors.New("Deletion Pending: Current status: Deleting"),
+				err: nil,
 			},
 		},
 		"DeleteAPI404": {
@@ -1208,21 +1207,6 @@ func TestDelete(t *testing.T) {
 			},
 			want: want{
 				err: errors.New("deletion of subaccount failed: apiError"),
-			},
-		},
-		"SubaccountAlreadyInDeletingState": {
-			reason: "Deletion should be successful if subaccount already in deleting state",
-			args: args{
-				cr: NewSubaccount("unittest-sa",
-					WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123")}),
-					WithStatus(v1alpha1.SubaccountObservation{Status: internal.Ptr("DELETING")})),
-				mockClient: &MockSubaccountClient{
-					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
-				},
-				tracker: trackingtest.NoOpReferenceResolverTracker{},
-			},
-			want: want{
-				err: nil,
 			},
 		},
 		"TrackerBlocked": {
