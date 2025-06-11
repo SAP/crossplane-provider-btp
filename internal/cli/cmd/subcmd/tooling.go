@@ -46,7 +46,7 @@ var ToolingCMD = &cobra.Command{
 		k8sClient, err := client.New(k8sConfig, client.Options{Scheme: scheme})
 		kingpin.FatalIfError(err, "Failed to create Kubernetes client")
 
-		// if no xpbtp config path is provided, fallback to default
+		// if no config path is provided, fallback to default
 		if configPath == "" {
 			configPath = "./config.yaml"
 		}
@@ -61,13 +61,13 @@ var ToolingCMD = &cobra.Command{
 		//TODO: move into function
 		err = k8sClient.Create(ctx, ServiceManager(saName))
 		kingpin.FatalIfError(err, "Failed to create ServiceManager resource")
-		cfg.AddTooling(saName, "ServiceManager", xpv1.SecretReference{Name: saName + "-service-manager", Namespace: "default"})
+		cfg.AddTooling(saName, "ServiceManager", xpv1.SecretReference{Name: saName + "-sm-binding", Namespace: "default"})
 		err = cpconfig.SaveCLIConfig(configPath, cfg)
 		kingpin.FatalIfError(err, "Failed to save configuration")
 
 		err = k8sClient.Create(ctx, CloudManagement(saName))
 		kingpin.FatalIfError(err, "Failed to create CloudManagement resource")
-		cfg.AddTooling(saName, "CloudManagement", xpv1.SecretReference{Name: saName + "-cloud-management", Namespace: "default"})
+		cfg.AddTooling(saName, "CloudManagement", xpv1.SecretReference{Name: saName + "-cis-binding", Namespace: "default"})
 		err = cpconfig.SaveCLIConfig(configPath, cfg)
 		kingpin.FatalIfError(err, "Failed to save configuration")
 

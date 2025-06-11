@@ -148,7 +148,7 @@ func (p *BTPConfigParser) LoadAndValidateCLIConfig(filePath string) (*ImportConf
 		// Create a simple ResourceFilterConfig implementation that holds the raw filter data
 		var filterConfig resource.ResourceFilterConfig
 		if rawResConfig.Filters != nil {
-			filterConfig = &SimpleResourceFilterConfig{filters: rawResConfig.Filters}
+			filterConfig = &SimpleResourceFilterConfig{Filters: rawResConfig.Filters}
 		}
 
 		// Build the final ConfiguredResource
@@ -158,6 +158,8 @@ func (p *BTPConfigParser) LoadAndValidateCLIConfig(filePath string) (*ImportConf
 			ManagementPolicy: rawResConfig.ManagementPolicy,
 			Filters:          filterConfig,
 		}
+
+		cfg.Tooling = rawCfg.Tooling
 	}
 
 	return cfg, nil
@@ -188,18 +190,18 @@ func (p *BTPConfigParser) WriteCLIConfig(filePath string, config *ImportConfig) 
 // SimpleResourceFilterConfig is a basic implementation of ResourceFilterConfig
 // that wraps the raw filter data from YAML unmarshaling.
 type SimpleResourceFilterConfig struct {
-	filters map[string]interface{}
+	Filters map[string]interface{}
 }
 
 // GetCriteria converts the filter data to a map[string]string as expected by the interface.
 // This performs basic string conversion for the filter values.
 func (s *SimpleResourceFilterConfig) GetCriteria() map[string]string {
-	if s.filters == nil {
+	if s.Filters == nil {
 		return nil
 	}
 
 	criteria := make(map[string]string)
-	for k, v := range s.filters {
+	for k, v := range s.Filters {
 		criteria[k] = fmt.Sprintf("%v", v)
 	}
 	return criteria

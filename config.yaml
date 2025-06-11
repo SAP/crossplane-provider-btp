@@ -7,17 +7,17 @@ resources:
       filters: {}
 tooling:
     - subaccount: dcom-demo
+      kind: Entitlement
+      secretReference:
+        name: dcom-demo-cis-entitlement
+        namespace: default
+    - subaccount: dcom-demo
       kind: ServiceManager
       secretReference:
-        name: dcom-demo-service-manager
+        name: dcom-demo-sm-binding
         namespace: default
     - subaccount: dcom-demo
       kind: CloudManagement
       secretReference:
-        name: dcom-demo-cloud-management
-        namespace: default
-    - subaccount: dcom-demo
-      kind: Entitlement
-      secretReference:
-        name: dcom-demo-cis-entitlement
+        name: dcom-demo-cis-binding
         namespace: default

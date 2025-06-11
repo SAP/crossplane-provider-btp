@@ -2,12 +2,17 @@ package subcmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/fatih/color"
 	"github.com/sap/crossplane-provider-btp/apis"
+	v1alpha1env "github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/cli/adapters"
 	cli "github.com/sap/crossplane-provider-btp/internal/cli/pkg/credentialManager"
@@ -17,6 +22,8 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/crossplaneimport/resource"
 	"github.com/spf13/cobra"
 	"gopkg.in/alecthomas/kingpin.v2"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,6 +35,9 @@ import (
 var (
 	preview    bool
 	configPath string
+	// singleImportKind is used to specify a single resource kind to import
+	singleImportKind string
+	singleImportSa   string
 )
 
 var (
@@ -51,22 +61,15 @@ var ImportCMD = &cobra.Command{
 		ctx := context.TODO()
 		kubeConfigPath := cli.RetrieveKubeConfigPath()
 
-		// Load configuration using the new parser
+		// if no config config path is provided, fallback to default
 		if configPath == "" {
-			configPath = cli.RetrieveConfigPath()
+			configPath = "./config.yaml"
 		}
 
 		// Create registry adapter for configuration parsing
 		registryAdapter := importer.NewRegistryAdapter()
 		cfg, err := cpconfig.LoadAndValidateCLIConfigWithRegistry(configPath, registryAdapter)
 		kingpin.FatalIfError(err, "Failed to load configuration")
-
-		// Create BTP client by loading credentials from environment file
-		btpClient, err := createBTPClient()
-		kingpin.FatalIfError(err, "Failed to create BTP client")
-
-		// Wrap the BTP client
-		wrappedBTPClient := resource.NewBTPClientWrapper(btpClient)
 
 		// Create Kubernetes client
 		k8sConfig, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
@@ -76,24 +79,109 @@ var ImportCMD = &cobra.Command{
 		scheme := runtime.NewScheme()
 		err = apis.AddToScheme(scheme)
 		kingpin.FatalIfError(err, "Failed to add APIs to scheme")
-
+		err = v1.AddToScheme(scheme)
+		kingpin.FatalIfError(err, "Failed to add core v1 to scheme")
 		k8sClient, err := client.New(k8sConfig, client.Options{Scheme: scheme})
 		kingpin.FatalIfError(err, "Failed to create Kubernetes client")
 
-		// Create importer with the new structure
-		importerInstance := importer.NewImporter(wrappedBTPClient, k8sClient)
+		if singleImportKind != "" {
+			importSingleResource(cfg, k8sClient, ctx, singleImportKind, singleImportSa, preview)
+		} else {
+			// Create BTP client by loading credentials from environment file
+			btpClient, err := createBTPClient()
+			kingpin.FatalIfError(err, "Failed to create BTP client")
 
-		// Run the import process
-		err = importerInstance.RunImportProcess(ctx, cfg, preview)
-		kingpin.FatalIfError(err, "%s", errImportResources)
-
-		if !preview {
-			fmt.Println("✅ Resource(s) successfully imported")
-			fmt.Println("\n If you want to revert the import run:")
-			fmt.Println(suggestionColorLocal("kubectl delete <RESOURCE TYPE> -l import.xpbtp.crossplane.io/transaction-id=<TRANSACTION_ID>"))
-			fmt.Println("(The transaction ID is displayed in the import process output above)")
+			importFromConfig(btpClient, cfg, k8sClient, ctx, preview)
 		}
 	},
+}
+
+func importSingleResource(cfg *cpconfig.ImportConfig, k8sClient client.Client, ctx context.Context, kind string, saName string, preview bool) {
+	//TODO: make dependant on kind
+	requiredTool := "CloudManagement"
+	tooling := cfg.FindTooling(saName, requiredTool)
+	if tooling == nil {
+		kingpin.FatalIfError(fmt.Errorf("no tooling found for kind %s with service account %s", requiredTool, saName), "Failed to find tooling configuration")
+	}
+	// lookup secret from cached tooling
+	localCisSecret := v1.Secret{}
+	err := k8sClient.Get(ctx, client.ObjectKey{Name: tooling.SecretReference.Name, Namespace: tooling.SecretReference.Namespace}, &localCisSecret)
+	kingpin.FatalIfError(err, "Failed to get local secret %s in namespace %s", tooling.SecretReference.Name, tooling.SecretReference.Namespace)
+
+	cisBinding := localCisSecret.Data[providerv1alpha1.RawBindingKey]
+	if cisBinding == nil {
+		kingpin.FatalIfError(err, "Failed to get local secret %s in namespace %s", tooling.SecretReference.Name, tooling.SecretReference.Namespace)
+	}
+
+	btpClient, err := btp.NewBTPClient(cisBinding, []byte("{}"))
+	kingpin.FatalIfError(err, "failed to create BTP client")
+
+	res, _, err := btpClient.ProvisioningServiceClient.GetEnvironmentInstances(ctx).Authorization("").Execute()
+	if err != nil {
+		kingpin.FatalIfError(err, "failed to get environment instances from BTP")
+	}
+
+	resInstance := res.EnvironmentInstances[0]
+
+	params := map[string]string{}
+	err = json.Unmarshal([]byte(*resInstance.Parameters), &params)
+	kingpin.FatalIfError(err, "failed to unmarshal parameters from environment instance")
+
+	env := v1alpha1env.CloudFoundryEnvironment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: v1alpha1env.SchemeGroupVersion.String(),
+			Kind:       v1alpha1env.CfEnvironmentKind,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: saName + "-cf",
+		},
+		Spec: v1alpha1env.CfEnvironmentSpec{
+			ResourceSpec: xpv1.ResourceSpec{
+				ProviderConfigReference: &xpv1.Reference{
+					Name: cfg.ProviderConfigRefName,
+				},
+			},
+			ForProvider: v1alpha1env.CfEnvironmentParameters{
+				Managers:        []string{},
+				Landscape:       *resInstance.LandscapeLabel,
+				OrgName:         params["instance_name"],
+				EnvironmentName: *resInstance.Name,
+			},
+			SubaccountGuid: *resInstance.SubaccountGUID,
+			//TODO: add
+			//SubaccountRef:      &v1.Reference{},
+			CloudManagementRef: &xpv1.Reference{
+				//TODO: save in state and read from it
+				Name: tooling.Subaccount + "-cloud-management",
+			},
+		},
+		Status: v1alpha1env.EnvironmentStatus{},
+	}
+	meta.SetExternalName(&env, *resInstance.Name)
+
+	err = k8sClient.Create(ctx, &env)
+	kingpin.FatalIfError(err, "Failed to create CloudFoundryEnvironment resource")
+
+}
+
+func importFromConfig(btpClient *btp.Client, cfg *cpconfig.ImportConfig, k8sClient client.Client, ctx context.Context, preview bool) {
+
+	// Wrap the BTP client
+	wrappedBTPClient := resource.NewBTPClientWrapper(btpClient)
+
+	// Create importer with the new structure
+	importerInstance := importer.NewImporter(wrappedBTPClient, k8sClient)
+
+	// Run the import process
+	err := importerInstance.RunImportProcess(ctx, cfg, preview)
+	kingpin.FatalIfError(err, "%s", errImportResources)
+
+	if !preview {
+		fmt.Println("✅ Resource(s) successfully imported")
+		fmt.Println("\n If you want to revert the import run:")
+		fmt.Println(suggestionColorLocal("kubectl delete <RESOURCE TYPE> -l import.xpbtp.crossplane.io/transaction-id=<TRANSACTION_ID>"))
+		fmt.Println("(The transaction ID is displayed in the import process output above)")
+	}
 }
 
 // createBTPClient creates a BTP client by loading credentials from the environment file
@@ -148,4 +236,6 @@ func AddImportCMD(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(ImportCMD)
 	ImportCMD.Flags().BoolVarP(&preview, "preview", "p", false, "Get a detailed overview on importable resources")
 	ImportCMD.Flags().StringVarP(&configPath, "config", "c", "", "Path to your Import-Config (default ./config.yaml)")
+	ImportCMD.Flags().StringVarP(&singleImportKind, "kind", "k", "", "Kind of single resource to import (e.g. Cloudfoundry). If not set, all resources will be imported based on config.")
+	ImportCMD.Flags().StringVarP(&singleImportSa, "subaccount", "s", "", "Subaccount of the resource to import (e.g. my-subaccount). If not set, all resources will be imported based on config.")
 }
