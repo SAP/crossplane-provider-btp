@@ -66,19 +66,19 @@ var ToolingCMD = &cobra.Command{
 		kingpin.FatalIfError(err, "Failed to load configuration")
 
 		//TODO: move into function
-		err = k8sClient.Create(ctx, ServiceManager(flagSaName, flagSaID))
+		err = k8sClient.Create(ctx, ServiceManager(flagSaName, flagSaID, cfg.ProviderConfigRefName))
 		kingpin.FatalIfError(err, "Failed to create ServiceManager resource")
 		cfg.AddTooling(flagSaName, "ServiceManager", flagSaID, xpv1.SecretReference{Name: flagSaName + "-sm-binding", Namespace: "default"})
 		err = cpconfig.SaveCLIConfig(configPath, cfg)
 		kingpin.FatalIfError(err, "Failed to save configuration")
 
-		err = k8sClient.Create(ctx, CloudManagement(flagSaName, flagSaID))
+		err = k8sClient.Create(ctx, CloudManagement(flagSaName, flagSaID, cfg.ProviderConfigRefName))
 		kingpin.FatalIfError(err, "Failed to create CloudManagement resource")
 		cfg.AddTooling(flagSaName, "CloudManagement", flagSaID, xpv1.SecretReference{Name: flagSaName + "-cis-binding", Namespace: "default"})
 		err = cpconfig.SaveCLIConfig(configPath, cfg)
 		kingpin.FatalIfError(err, "Failed to save configuration")
 
-		err = k8sClient.Create(ctx, CISEntitlement(flagSaName, flagSaID))
+		err = k8sClient.Create(ctx, CISEntitlement(flagSaName, flagSaID, cfg.ProviderConfigRefName))
 		kingpin.FatalIfError(err, "Failed to create CISEntitlement resource")
 		cfg.AddTooling(flagSaName, "Entitlement", flagSaID, xpv1.SecretReference{Name: flagSaName + "-cis-entitlement", Namespace: "default"})
 		err = cpconfig.SaveCLIConfig(configPath, cfg)
@@ -95,7 +95,7 @@ func AddToolingCMD(rootCmd *cobra.Command) {
 	ToolingCMD.Flags().StringVarP(&flagSaID, "subaccount-id", "i", "", "Subaccount ID of the resource for which to create the tooling (e.g. a4f88d21-c1f0-486e-b828-bccf776bc9a3)")
 }
 
-func ServiceManager(saName, saID string) *v1beta1.ServiceManager {
+func ServiceManager(saName, saID, providerConfigRef string) *v1beta1.ServiceManager {
 	serviceManager := &v1beta1.ServiceManager{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "account.btp.sap.com/v1beta1",
@@ -107,7 +107,6 @@ func ServiceManager(saName, saID string) *v1beta1.ServiceManager {
 		},
 		Spec: v1beta1.ServiceManagerSpec{
 			ForProvider: v1beta1.ServiceManagerParameters{
-				// TODO: read from CLI
 				SubaccountGuid: saID,
 				//SubaccountRef: &xpv1.Reference{
 				//	Name: "mirza-subaccount-config-block", // Replace with your subaccount name
@@ -116,11 +115,10 @@ func ServiceManager(saName, saID string) *v1beta1.ServiceManager {
 			ResourceSpec: xpv1.ResourceSpec{
 				WriteConnectionSecretToReference: &xpv1.SecretReference{
 					Name:      saName + "-sm-binding",
-					Namespace: "default", // Adjust namespace as needed
+					Namespace: "default",
 				},
 				ProviderConfigReference: &xpv1.Reference{
-					//TODO: read from config
-					Name: "default-canary", // Replace with your provider config name
+					Name: providerConfigRef,
 				},
 			},
 		},
@@ -129,7 +127,7 @@ func ServiceManager(saName, saID string) *v1beta1.ServiceManager {
 	return serviceManager
 }
 
-func CISEntitlement(saName, saID string) *v1alpha1.Entitlement {
+func CISEntitlement(saName, saID, providerConfigRef string) *v1alpha1.Entitlement {
 	ent := &v1alpha1.Entitlement{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "account.btp.sap.com/v1alpha1",
@@ -152,8 +150,7 @@ func CISEntitlement(saName, saID string) *v1alpha1.Entitlement {
 			},
 			ResourceSpec: xpv1.ResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
-					//TODO: read from config
-					Name: "default-canary", // Replace with your provider config name
+					Name: providerConfigRef,
 				},
 			},
 		},
@@ -162,7 +159,7 @@ func CISEntitlement(saName, saID string) *v1alpha1.Entitlement {
 	return ent
 }
 
-func CloudManagement(saName, saID string) *v1alpha1.CloudManagement {
+func CloudManagement(saName, saID, providerConfigRef string) *v1alpha1.CloudManagement {
 	cis := &v1alpha1.CloudManagement{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "account.btp.sap.com/v1alpha1",
@@ -190,8 +187,7 @@ func CloudManagement(saName, saID string) *v1alpha1.CloudManagement {
 					Namespace: "default", // Adjust namespace as needed
 				},
 				ProviderConfigReference: &xpv1.Reference{
-					//TODO: read from config
-					Name: "default-canary", // Replace with your provider config name
+					Name: providerConfigRef,
 				},
 			},
 		},
