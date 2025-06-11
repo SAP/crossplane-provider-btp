@@ -5,8 +5,7 @@ resources:
       name: dcom-demo
       managementPolicy: Observe
       filters:
-        filters:
-            displayName: dcom-eu12
+        displayName: dcom-eu12
 tooling:
     - subaccount: dcom-eu12-dbhtt
       subaccountID: 8eb39f5c-6c95-4e54-82d0-09c159186b06
