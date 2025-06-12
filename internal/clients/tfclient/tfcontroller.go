@@ -141,7 +141,7 @@ func (t *TfProxyController[UPJETTED]) Observe(ctx context.Context) (Status, map[
 	return UpToDate, flatDetails, nil
 }
 
-// FlattenSecretData takes a map[string][]byte and flattens any JSON object values into the result map.
+// flattenSecretData takes a map[string][]byte and flattens any JSON object values into the result map.
 // For each key whose value is a JSON object, its keys/values are added to the result map as top-level entries.
 // Non-JSON values are kept as-is.
 func flattenSecretData(secretData map[string][]byte) (map[string][]byte, error) {
