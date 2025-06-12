@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// NewServiceInstanceConnector creates a connector for the service instance client using the generic TfProxyConnector
 func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsFn, kube client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
 	con := &ServiceInstanceConnector{
 		TfProxyConnector: tfclient.NewTfProxyConnector(
