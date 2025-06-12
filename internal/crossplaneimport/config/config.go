@@ -36,17 +36,15 @@ type SubaccountTooling struct {
 }
 
 func (c *ImportConfig) AddTooling(saName, kind, saID string, secretRef xpv1.SecretReference) string {
-	tooling := c.FindTooling(saName, kind)
+	c.RemoveTooling(saName, kind) // Remove existing tooling if it exists
 
-	if tooling == nil {
-		tooling = &SubaccountTooling{
-			Subaccount:   saName,
-			Kind:         kind,
-			SubaccountID: saID,
-		}
+	tooling := SubaccountTooling{
+		Subaccount:      saName,
+		Kind:            kind,
+		SubaccountID:    saID,
+		SecretReference: secretRef,
 	}
-	tooling.SecretReference = secretRef
-	c.Tooling = append(c.Tooling, *tooling)
+	c.Tooling = append(c.Tooling, tooling)
 	return c.ProviderConfigRefName
 }
 
@@ -57,4 +55,13 @@ func (c *ImportConfig) FindTooling(saName, kind string) *SubaccountTooling {
 		}
 	}
 	return nil
+}
+
+func (c *ImportConfig) RemoveTooling(saName, kind string) {
+	for i, tooling := range c.Tooling {
+		if tooling.Subaccount == saName && tooling.Kind == kind {
+			c.Tooling = append(c.Tooling[:i], c.Tooling[i+1:]...)
+			return
+		}
+	}
 }
