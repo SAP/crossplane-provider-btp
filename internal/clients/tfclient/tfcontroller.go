@@ -96,8 +96,6 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 	// only query the async data if the operation is finished
 	if t.tfResource.GetCondition(ujresource.TypeAsyncOperation).Reason == ujresource.ReasonFinished {
 		sid := &ObservationData{}
-		bla := &v1alpha1.SubaccountServiceInstance{}
-		bla.GetID()
 		sid.ID = t.tfResource.GetID()
 		sid.ExternalName = meta.GetExternalName(t.tfResource)
 		sid.Conditions = []xpv1.Condition{xpv1.Available(), ujresource.AsyncOperationFinishedCondition()}
