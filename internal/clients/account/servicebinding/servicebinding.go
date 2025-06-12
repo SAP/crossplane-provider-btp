@@ -70,7 +70,7 @@ func buildBaseTfResource(sb *v1alpha1.ServiceBinding) *v1alpha1.SubaccountServic
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              sb.Name,
-			UID:               sb.UID + "-service-instance",
+			UID:               sb.UID + "-service-binding",
 			DeletionTimestamp: sb.DeletionTimestamp,
 		},
 		Spec: v1alpha1.SubaccountServiceBindingSpec{
