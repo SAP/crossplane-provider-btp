@@ -22,6 +22,9 @@ import (
 	env1alpha1 "github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 )
 
+var managementPolicy string
+var outputFile string
+
 var ExportCMD = &cobra.Command{
 	// TODO: better naming and description
 	Use:   "export",
@@ -138,6 +141,14 @@ var ExportCMD = &cobra.Command{
 			uObj.Object["metadata"] = metadata
 			delete(uObj.Object, "status")
 
+			// Overwrite managementPolicies if flag is set
+			if managementPolicy != "" {
+				if spec, ok := uObj.Object["spec"].(map[string]interface{}); ok {
+					spec["managementPolicies"] = []interface{}{managementPolicy}
+					uObj.Object["spec"] = spec
+				}
+			}
+
 			b, err := yaml.Marshal(uObj.Object)
 			if err != nil {
 				fmt.Printf("Warning: could not marshal object %s/%s: %v\n", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName(), err)
@@ -147,13 +158,15 @@ var ExportCMD = &cobra.Command{
 			allYaml = append(allYaml, []byte("---\n")...)
 		}
 
-		exportFile := "exported-resources.yaml"
-		err = os.WriteFile(exportFile, allYaml, 0644)
+		if outputFile == "" {
+			outputFile = "exported-resources.yaml"
+		}
+		err = os.WriteFile(outputFile, allYaml, 0644)
 		if err != nil {
 			fmt.Printf("Failed to write export file: %v\n", err)
 			return
 		}
-		fmt.Printf("Exported %d resources to %s\n", len(objects), exportFile)
+		fmt.Printf("Exported %d resources to %s\n", len(objects), outputFile)
 
 	},
 }
@@ -162,4 +175,6 @@ var ExportCMD = &cobra.Command{
 func AddExportCMD(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(ExportCMD)
 	ExportCMD.Flags().StringVarP(&configPath, "config", "c", "", "Path to your Import-Config (default ./config.yaml)")
+	ExportCMD.Flags().StringVarP(&managementPolicy, "management-policies", "m", "", "Overwrite managementPolicies in exported resources (e.g. Observe, FullControl, etc.)")
+	ExportCMD.Flags().StringVarP(&outputFile, "output", "o", "", "Output file for exported resources (default exported-resources.yaml)")
 }
