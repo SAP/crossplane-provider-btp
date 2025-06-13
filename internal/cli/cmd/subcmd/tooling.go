@@ -71,21 +71,24 @@ var ToolingCMD = &cobra.Command{
 		fmt.Printf("Create Tooling for Subaccount %s...\n", flagSaName)
 
 		//TODO: move into function
-		err = k8sClient.Create(ctx, ServiceManager(flagSaName, flagSaID, cfg.ProviderConfigRefName))
+		sm := ServiceManager(flagSaName, flagSaID, cfg.ProviderConfigRefName)
+		err = k8sClient.Create(ctx, sm)
 		kingpin.FatalIfError(err, "Failed to create ServiceManager resource")
-		cfg.AddTooling(flagSaName, "ServiceManager", flagSaID, xpv1.SecretReference{Name: flagSaName + "-sm-binding", Namespace: "default"})
+		cfg.AddTooling(sm.Name, flagSaName, "ServiceManager", flagSaID, xpv1.SecretReference{Name: flagSaName + "-sm-binding", Namespace: "default"})
 		err = cpconfig.SaveCLIConfig(configPath, cfg)
 		kingpin.FatalIfError(err, "Failed to save configuration")
 
-		err = k8sClient.Create(ctx, CloudManagement(flagSaName, flagSaID, cfg.ProviderConfigRefName))
+		cis := CloudManagement(flagSaName, flagSaID, cfg.ProviderConfigRefName)
+		err = k8sClient.Create(ctx, cis)
 		kingpin.FatalIfError(err, "Failed to create CloudManagement resource")
-		cfg.AddTooling(flagSaName, "CloudManagement", flagSaID, xpv1.SecretReference{Name: flagSaName + "-cis-binding", Namespace: "default"})
+		cfg.AddTooling(cis.Name, flagSaName, "CloudManagement", flagSaID, xpv1.SecretReference{Name: flagSaName + "-cis-binding", Namespace: "default"})
 		err = cpconfig.SaveCLIConfig(configPath, cfg)
 		kingpin.FatalIfError(err, "Failed to save configuration")
 
-		err = k8sClient.Create(ctx, CISEntitlement(flagSaName, flagSaID, cfg.ProviderConfigRefName))
+		ent := CISEntitlement(flagSaName, flagSaID, cfg.ProviderConfigRefName)
+		err = k8sClient.Create(ctx, ent)
 		kingpin.FatalIfError(err, "Failed to create CISEntitlement resource")
-		cfg.AddTooling(flagSaName, "Entitlement", flagSaID, xpv1.SecretReference{Name: flagSaName + "-cis-entitlement", Namespace: "default"})
+		cfg.AddTooling(ent.Name, flagSaName, "Entitlement", flagSaID, xpv1.SecretReference{Name: flagSaName + "-cis-entitlement", Namespace: "default"})
 		err = cpconfig.SaveCLIConfig(configPath, cfg)
 		kingpin.FatalIfError(err, "Failed to save configuration")
 

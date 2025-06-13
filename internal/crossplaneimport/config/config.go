@@ -30,6 +30,7 @@ type ImportConfig struct {
 
 // SubaccountTooling keeps a reference to the created binding of certain services created to allow API access
 type SubaccountTooling struct {
+	Name            string               `yaml:"name,omitempty"` // Name of the service account in Kubernetes
 	Subaccount      string               `yaml:"subaccount"`
 	SubaccountID    string               `yaml:"subaccountID,omitempty"`
 	Kind            string               `yaml:"kind"`
@@ -52,10 +53,11 @@ func (c *ImportConfig) AddImported(name, kind string) {
 	c.Imported = append(c.Imported, imported)
 }
 
-func (c *ImportConfig) AddTooling(saName, kind, saID string, secretRef xpv1.SecretReference) {
+func (c *ImportConfig) AddTooling(name, saName, kind, saID string, secretRef xpv1.SecretReference) {
 	c.RemoveTooling(saName, kind) // Remove existing tooling if it exists
 
 	tooling := SubaccountTooling{
+		Name:            name,
 		Subaccount:      saName,
 		Kind:            kind,
 		SubaccountID:    saID,

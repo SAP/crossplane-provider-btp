@@ -30,4 +30,5 @@ func init() {
 	subcmd.AddInitCMD(rootCmd)
 	subcmd.AddImportCMD(rootCmd)
 	subcmd.AddToolingCMD(rootCmd)
+	subcmd.AddExportCMD(rootCmd)
 }
