@@ -94,6 +94,7 @@ var ImportCMD = &cobra.Command{
 
 			importFromConfig(btpClient, cfg, k8sClient, ctx, preview)
 		}
+		cpconfig.SaveCLIConfig(configPath, cfg)
 	},
 }
 
@@ -133,6 +134,7 @@ func importSingleResource(cfg *cpconfig.ImportConfig, k8sClient client.Client, c
 	kingpin.FatalIfError(err, "failed to unmarshal parameters from environment instance")
 
 	orgName := params["instance_name"]
+	name := saName + "-cf"
 
 	env := v1alpha1env.CloudFoundryEnvironment{
 		TypeMeta: metav1.TypeMeta{
@@ -140,7 +142,7 @@ func importSingleResource(cfg *cpconfig.ImportConfig, k8sClient client.Client, c
 			Kind:       v1alpha1env.CfEnvironmentKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: saName + "-cf",
+			Name: name,
 		},
 		Spec: v1alpha1env.CfEnvironmentSpec{
 			ResourceSpec: xpv1.ResourceSpec{
@@ -172,6 +174,7 @@ func importSingleResource(cfg *cpconfig.ImportConfig, k8sClient client.Client, c
 	err = k8sClient.Create(ctx, &env)
 	kingpin.FatalIfError(err, "Failed to create CloudFoundryEnvironment resource")
 
+	cfg.AddImported(name, kind)
 }
 
 func importFromConfig(btpClient *btp.Client, cfg *cpconfig.ImportConfig, k8sClient client.Client, ctx context.Context, preview bool) {

@@ -125,6 +125,8 @@ func (i *Importer) RunImportProcess(ctx context.Context, cfg *config.ImportConfi
 					continue
 				}
 				fmt.Printf("      Successfully created Crossplane resource: %s/%s\n", crossplaneResource.GetNamespace(), crossplaneResource.GetName())
+				// add to state
+				cfg.AddImported(resConfig.Type, crossplaneResource.GetName())
 			}
 		}
 	}

@@ -47,6 +47,7 @@ type rawImportConfig struct {
 	ManagementPolicy      string                  `yaml:"managementPolicy"`
 	Resources             []rawConfiguredResource `yaml:"resources"`
 	Tooling               []SubaccountTooling     `yaml:"tooling,omitempty"` //TODO: probably add more elegant parsing here as for the others
+	Imported              []ImportedResource      `yaml:"imported,omitempty"`
 }
 
 // rawConfiguredResource represents a resource configuration with raw filter data.
@@ -115,6 +116,8 @@ func (p *BTPConfigParser) LoadAndValidateCLIConfig(filePath string) (*ImportConf
 		ProviderConfigRefName: rawCfg.ProviderConfigRefName,
 		ManagementPolicy:      rawCfg.ManagementPolicy,
 		Resources:             make([]ConfiguredResource, len(rawCfg.Resources)),
+		Tooling:               rawCfg.Tooling,
+		Imported:              rawCfg.Imported,
 	}
 
 	// Validate each resource configuration and convert to final structure
@@ -290,6 +293,7 @@ func importConfigToRawImportConfig(cfg *ImportConfig) rawImportConfig {
 		ManagementPolicy:      cfg.ManagementPolicy,
 		Resources:             make([]rawConfiguredResource, len(cfg.Resources)),
 		Tooling:               cfg.Tooling,
+		Imported:              cfg.Imported,
 	}
 	for i, res := range cfg.Resources {
 		rawCfg.Resources[i] = rawConfiguredResource{

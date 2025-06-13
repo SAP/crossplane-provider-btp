@@ -25,9 +25,10 @@ type ImportConfig struct {
 	ManagementPolicy      string               `yaml:"managementPolicy"`      // Global default management policy
 	Resources             []ConfiguredResource `yaml:"resources"`             // List of resources to import
 	Tooling               []SubaccountTooling  `yaml:"tooling,omitempty"`
+	Imported              []ImportedResource   `yaml:"imported,omitempty"`
 }
 
-// subaccountTooling keeps a reference to the created binding of certain services created to allow API access
+// SubaccountTooling keeps a reference to the created binding of certain services created to allow API access
 type SubaccountTooling struct {
 	Subaccount      string               `yaml:"subaccount"`
 	SubaccountID    string               `yaml:"subaccountID,omitempty"`
@@ -35,7 +36,23 @@ type SubaccountTooling struct {
 	SecretReference xpv1.SecretReference `yaml:"secretReference,omitempty"`
 }
 
-func (c *ImportConfig) AddTooling(saName, kind, saID string, secretRef xpv1.SecretReference) string {
+// ImportedResource represents a resource that has been imported into the cluster via cli
+type ImportedResource struct {
+	Kind      string `yaml:"kind"`
+	Name      string `yaml:"name"` // Name of the resource in Kubernetes
+	Namespace string `yaml:"namespace,omitempty"`
+}
+
+func (c *ImportConfig) AddImported(name, kind string) {
+
+	imported := ImportedResource{
+		Kind: kind,
+		Name: name,
+	}
+	c.Imported = append(c.Imported, imported)
+}
+
+func (c *ImportConfig) AddTooling(saName, kind, saID string, secretRef xpv1.SecretReference) {
 	c.RemoveTooling(saName, kind) // Remove existing tooling if it exists
 
 	tooling := SubaccountTooling{
@@ -45,7 +62,6 @@ func (c *ImportConfig) AddTooling(saName, kind, saID string, secretRef xpv1.Secr
 		SecretReference: secretRef,
 	}
 	c.Tooling = append(c.Tooling, tooling)
-	return c.ProviderConfigRefName
 }
 
 func (c *ImportConfig) FindTooling(saName, kind string) *SubaccountTooling {
