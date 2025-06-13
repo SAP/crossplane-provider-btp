@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/google/uuid"
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
@@ -65,6 +66,10 @@ var ToolingCMD = &cobra.Command{
 		cfg, err := cpconfig.LoadAndValidateCLIConfigWithRegistry(configPath, registryAdapter)
 		kingpin.FatalIfError(err, "Failed to load configuration")
 
+		transactionID := uuid.New().String()
+		fmt.Printf("Starting import process. Transaction ID: %s, ProviderConfigRef: %s, Default ManagementPolicy: %s\n", transactionID, cfg.ProviderConfigRefName, cfg.ManagementPolicy)
+		fmt.Printf("Create Tooling for Subaccount %s...\n", flagSaName)
+
 		//TODO: move into function
 		err = k8sClient.Create(ctx, ServiceManager(flagSaName, flagSaID, cfg.ProviderConfigRefName))
 		kingpin.FatalIfError(err, "Failed to create ServiceManager resource")
@@ -84,6 +89,7 @@ var ToolingCMD = &cobra.Command{
 		err = cpconfig.SaveCLIConfig(configPath, cfg)
 		kingpin.FatalIfError(err, "Failed to save configuration")
 
+		fmt.Printf("Tooling Resources created successfully in cluster, please wait for them to reconcile before proceeding with imports\n")
 	},
 }
 
@@ -123,11 +129,14 @@ func ServiceManager(saName, saID, providerConfigRef string) *v1beta1.ServiceMana
 			},
 		},
 	}
-
+	fmt.Printf("- ServiceManager: %s\n", serviceManager.Name)
 	return serviceManager
 }
 
 func CISEntitlement(saName, saID, providerConfigRef string) *v1alpha1.Entitlement {
+	serviceName := "cis"
+	servicePlanName := "local"
+
 	ent := &v1alpha1.Entitlement{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "account.btp.sap.com/v1alpha1",
@@ -139,8 +148,8 @@ func CISEntitlement(saName, saID, providerConfigRef string) *v1alpha1.Entitlemen
 		},
 		Spec: v1alpha1.EntitlementSpec{
 			ForProvider: v1alpha1.EntitlementParameters{
-				ServiceName:     "cis",
-				ServicePlanName: "local",
+				ServiceName:     serviceName,
+				ServicePlanName: servicePlanName,
 				Enable:          internal.Ptr(true),
 				// TODO: read from CLI
 				SubaccountGuid: saID,
@@ -156,6 +165,7 @@ func CISEntitlement(saName, saID, providerConfigRef string) *v1alpha1.Entitlemen
 		},
 	}
 
+	fmt.Printf("- Entitlement: %s with ServiceName: %s and PlanName: %s\n", ent.Name, serviceName, servicePlanName)
 	return ent
 }
 
@@ -193,5 +203,6 @@ func CloudManagement(saName, saID, providerConfigRef string) *v1alpha1.CloudMana
 		},
 	}
 
+	fmt.Printf("- CloudManagement: %s\n", cis.Name)
 	return cis
 }
