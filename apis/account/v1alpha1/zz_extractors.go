@@ -113,7 +113,7 @@ func CloudManagementSubaccountUuid() reference.ExtractValueFn {
 	}
 }
 
-// CloudManagementSubaccountUuid extracts the Reference of a Subaccount to the namespace of secret
+// ServiceInstanceUuid the ServiceInstanceID for the binding
 func ServiceInstanceUuid() reference.ExtractValueFn {
 	return func(mg resource.Managed) string {
 		sg, ok := mg.(*ServiceInstance)
