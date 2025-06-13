@@ -10,6 +10,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/fatih/color"
+	"github.com/google/uuid"
 	"github.com/sap/crossplane-provider-btp/apis"
 	v1alpha1env "github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -97,6 +98,10 @@ var ImportCMD = &cobra.Command{
 }
 
 func importSingleResource(cfg *cpconfig.ImportConfig, k8sClient client.Client, ctx context.Context, kind string, saName string, preview bool) {
+	// Generate a unique transaction ID for this import run
+	transactionID := uuid.New().String()
+	fmt.Printf("Starting import process. Transaction ID: %s, ProviderConfigRef: %s, Default ManagementPolicy: %s\n", transactionID, cfg.ProviderConfigRefName, cfg.ManagementPolicy)
+
 	//TODO: make dependant on kind
 	requiredTool := "CloudManagement"
 	tooling := cfg.FindTooling(saName, requiredTool)
@@ -127,6 +132,8 @@ func importSingleResource(cfg *cpconfig.ImportConfig, k8sClient client.Client, c
 	err = json.Unmarshal([]byte(*resInstance.Parameters), &params)
 	kingpin.FatalIfError(err, "failed to unmarshal parameters from environment instance")
 
+	orgName := params["instance_name"]
+
 	env := v1alpha1env.CloudFoundryEnvironment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: v1alpha1env.SchemeGroupVersion.String(),
@@ -145,7 +152,7 @@ func importSingleResource(cfg *cpconfig.ImportConfig, k8sClient client.Client, c
 			ForProvider: v1alpha1env.CfEnvironmentParameters{
 				Managers:        []string{},
 				Landscape:       *resInstance.LandscapeLabel,
-				OrgName:         params["instance_name"],
+				OrgName:         orgName,
 				EnvironmentName: *resInstance.Name,
 			},
 			SubaccountGuid: *resInstance.SubaccountGUID,
@@ -159,6 +166,8 @@ func importSingleResource(cfg *cpconfig.ImportConfig, k8sClient client.Client, c
 		Status: v1alpha1env.EnvironmentStatus{},
 	}
 	meta.SetExternalName(&env, *resInstance.Name)
+
+	fmt.Printf("- CloudfoundryEnvironment: %s with OrgName: %s\n", *resInstance.Name, orgName)
 
 	err = k8sClient.Create(ctx, &env)
 	kingpin.FatalIfError(err, "Failed to create CloudFoundryEnvironment resource")
