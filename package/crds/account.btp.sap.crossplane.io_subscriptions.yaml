@@ -172,8 +172,8 @@ spec:
                   subscriptionParameters:
                     description: Subscription parameters allows you to add additional
                       parameters
-                    format: byte
-                    type: string
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                 required:
                 - appName
                 - planName

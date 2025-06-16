@@ -164,7 +164,7 @@ Name of created kind cluster, if not set will be randomly generated
 0 or 1, default is 0
 
 ## 👐 Support, Feedback, Contributing
-If you have a question always feel free to reach out on our official crossplane slack channel: 
+If you have a question always feel free to reach out on our official crossplane slack channel:
 
 :rocket: [**#provider-sap-btp**](https://crossplane.slack.com/archives/C07UZ3UJY7Q).
 

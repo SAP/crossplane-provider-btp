@@ -294,4 +294,3 @@ publish:
 		docker push $(DOCKER_REGISTRY)/$${image}:$(VERSION); \
 	done
 	@$(OK) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
-
