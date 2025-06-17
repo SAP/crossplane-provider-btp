@@ -29,6 +29,7 @@ type SubscriptionParameters struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="planName can't be updated once set"
 	PlanName string `json:"planName"`
 	// Subscription parameters allows you to add additional parameters
+	// +kubebuilder:validation:Optional
 	SubscriptionParameters runtime.RawExtension `json:"subscriptionParameters"`
 }
 
