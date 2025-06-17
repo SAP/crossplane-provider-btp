@@ -168,9 +168,19 @@ func (s *SubscriptionTypeMapper) ConvertToCreatePayload(cr *v1alpha1.Subscriptio
 	return SubscriptionPost{
 		appName: cr.Spec.ForProvider.AppName,
 		CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
-			PlanName: &cr.Spec.ForProvider.PlanName,
+			PlanName:           &cr.Spec.ForProvider.PlanName,
+			SubscriptionParams: s.ConvertToClientParams(cr),
 		},
 	}
+}
+
+func (s *SubscriptionTypeMapper) ConvertToClientParams(cr *v1alpha1.Subscription) map[string]map[string]interface{} {
+	subscriptionParams, err := internal.UnmarshalRawMapParameters(cr.Spec.ForProvider.SubscriptionParameters.DeepCopy().Raw)
+	if err != nil {
+		return nil
+	}
+
+	return subscriptionParams
 }
 
 func (s *SubscriptionTypeMapper) ConvertToUpdatePayload(cr *v1alpha1.Subscription) SubscriptionPut {

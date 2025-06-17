@@ -124,6 +124,26 @@ type clusterYaml struct {
 }
 
 // UnmarshalRawParameters produces a map structure from a given raw YAML/JSON input
+func UnmarshalRawMapParameters(in []byte) (map[string]map[string]interface{}, error) {
+	parameters := make(map[string]map[string]interface{})
+
+	if len(in) == 0 {
+		return parameters, nil
+
+	}
+	if hasJSONPrefix(in) {
+		if err := json.Unmarshal(in, &parameters); err != nil {
+			return parameters, err
+		}
+		return parameters, nil
+	}
+
+	err := yaml.Unmarshal(in, &parameters)
+	return parameters, err
+
+}
+
+// UnmarshalRawParameters produces a map structure from a given raw YAML/JSON input
 func UnmarshalRawParameters(in []byte) (map[string]interface{}, error) {
 	parameters := make(map[string]interface{})
 
