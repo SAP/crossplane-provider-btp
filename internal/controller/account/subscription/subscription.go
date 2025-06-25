@@ -118,6 +118,13 @@ type external struct {
 	tracker    tracking.ReferenceResolverTracker
 }
 
+// subscriptionBeingDeleted returns true if the resource conditions
+// indicate that the resource is being deleted.
+func subscriptionBeingDeleted(cr *v1alpha1.Subscription) bool {
+	readyCondition := cr.GetCondition(xpv1.TypeReady)
+	return readyCondition.Status == corev1.ConditionFalse && readyCondition.Reason == xpv1.ReasonDeleting
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.Subscription)
 	if !ok {
@@ -132,6 +139,23 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 
+	if cr.Spec.RecreateOnSubscriptionFailure && apiRes.State != nil && *apiRes.State == v1alpha1.SubscriptionStateSubscribeFailed {
+		// We observed a subscription in SUBSCRIBE_FAILED
+		// state and recreateOnSubscriptionFailure is turned
+		// on.
+		var err error
+		if !subscriptionBeingDeleted(cr) {
+			// The resource is not being deleted. So let's
+			// delete it now.
+			err = c.Delete(ctx, mg)
+		}
+		// Abort the Observe step
+		return managed.ExternalObservation{
+			ResourceExists:    true, // Don't create any new resource
+			ResourceUpToDate:  true, // Don't update the existing resource
+			ConnectionDetails: managed.ConnectionDetails{},
+		}, err
+	}
 	c.syncStatus(apiRes, cr)
 
 	if c.typeMapper.IsAvailable(cr) {

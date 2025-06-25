@@ -316,6 +316,13 @@ spec:
                 required:
                 - name
                 type: object
+              recreateOnSubscriptionFailure:
+                description: |-
+                  RecreateOnSubscriptionFailure indicates whether the
+                  creation of the resources shall be retried when creating a
+                  subscription fails by getting into "SUBSCRIBE_FAILED"
+                  state.
+                type: boolean
               writeConnectionSecretToRef:
                 description: |-
                   WriteConnectionSecretToReference specifies the namespace and name of a
