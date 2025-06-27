@@ -174,8 +174,8 @@ func (s *SubscriptionTypeMapper) ConvertToCreatePayload(cr *v1alpha1.Subscriptio
 	}
 }
 
-func (s *SubscriptionTypeMapper) ConvertToClientParams(cr *v1alpha1.Subscription) map[string]map[string]interface{} {
-	subscriptionParams, err := internal.UnmarshalRawMapParameters(cr.Spec.ForProvider.SubscriptionParameters.DeepCopy().Raw)
+func (s *SubscriptionTypeMapper) ConvertToClientParams(cr *v1alpha1.Subscription) map[string]interface{} {
+	subscriptionParams, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.SubscriptionParameters.DeepCopy().Raw)
 	if err != nil {
 		return nil
 	}

@@ -22,7 +22,9 @@ type CreateSubscriptionRequestPayload struct {
 	// The name of the subscription plan to a multitenant application
 	PlanName *string `json:"planName,omitempty"`
 	// Additional subscription parameters determined by the application provider.
-	SubscriptionParams map[string]map[string]interface{} `json:"subscriptionParams,omitempty"`
+	// Fixing the type which is a result of a potential faulty OpenAPI definition.
+	// SubscriptionParams map[string]map[string]interface{} `json:"subscriptionParams,omitempty"`
+	SubscriptionParams map[string]interface{} `json:"subscriptionParams,omitempty"`
 }
 
 // NewCreateSubscriptionRequestPayload instantiates a new CreateSubscriptionRequestPayload object
@@ -75,9 +77,9 @@ func (o *CreateSubscriptionRequestPayload) SetPlanName(v string) {
 }
 
 // GetSubscriptionParams returns the SubscriptionParams field value if set, zero value otherwise.
-func (o *CreateSubscriptionRequestPayload) GetSubscriptionParams() map[string]map[string]interface{} {
+func (o *CreateSubscriptionRequestPayload) GetSubscriptionParams() map[string]interface{} {
 	if o == nil || IsNil(o.SubscriptionParams) {
-		var ret map[string]map[string]interface{}
+		var ret map[string]interface{}
 		return ret
 	}
 	return o.SubscriptionParams
@@ -85,9 +87,9 @@ func (o *CreateSubscriptionRequestPayload) GetSubscriptionParams() map[string]ma
 
 // GetSubscriptionParamsOk returns a tuple with the SubscriptionParams field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CreateSubscriptionRequestPayload) GetSubscriptionParamsOk() (map[string]map[string]interface{}, bool) {
+func (o *CreateSubscriptionRequestPayload) GetSubscriptionParamsOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.SubscriptionParams) {
-		return map[string]map[string]interface{}{}, false
+		return map[string]interface{}{}, false
 	}
 	return o.SubscriptionParams, true
 }
@@ -102,7 +104,7 @@ func (o *CreateSubscriptionRequestPayload) HasSubscriptionParams() bool {
 }
 
 // SetSubscriptionParams gets a reference to the given map[string]map[string]interface{} and assigns it to the SubscriptionParams field.
-func (o *CreateSubscriptionRequestPayload) SetSubscriptionParams(v map[string]map[string]interface{}) {
+func (o *CreateSubscriptionRequestPayload) SetSubscriptionParams(v map[string]interface{}) {
 	o.SubscriptionParams = v
 }
 

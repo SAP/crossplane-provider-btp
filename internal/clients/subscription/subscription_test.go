@@ -104,13 +104,9 @@ func TestSubscriptionApiHandler_CreateSubscription(t *testing.T) {
 				appName: "name1",
 				CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
 					PlanName: internal.Ptr("plan2"),
-					SubscriptionParams: map[string]map[string]interface{}{
-						"param1": {
-							"key1": "value1",
-						},
-						"param2": {
-							"key2": "value2",
-						},
+					SubscriptionParams: map[string]interface{}{
+						"key1": "value1",
+						"key2": "value2",
 					},
 				},
 			},
@@ -126,13 +122,9 @@ func TestSubscriptionApiHandler_CreateSubscription(t *testing.T) {
 				appName: "name1",
 				CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
 					PlanName: internal.Ptr("plan2"),
-					SubscriptionParams: map[string]map[string]interface{}{
-						"param1": {
-							"key1": "value1",
-						},
-						"param2": {
-							"key2": "value2",
-						},
+					SubscriptionParams: map[string]interface{}{
+						"key1": "value1",
+						"key2": "value2",
 					},
 				},
 			},
@@ -279,25 +271,23 @@ func TestSubscriptionTypeMapper_ConvertToCreatePayload(t *testing.T) {
 	assert.NotNil(t, mapped)
 	assert.Equal(t, "name1", mapped.appName)
 	assert.Equal(t, internal.Ptr("plan2"), mapped.PlanName)
-
+	assert.Equal(t, "John", mapped.SubscriptionParams["name"])
+	assert.Equal(t, float64(30), mapped.SubscriptionParams["age"])
 }
 
-func TestSubscriptionTypeMapper_ConvertToClientParams(t *testing.T) {
-	raw := rawExtension(`{"param1": {"key1": "value1"}, "param2": {"key2": "value2"}}`)
-	cr := &v1alpha1.Subscription{
-		Spec: v1alpha1.SubscriptionSpec{
-			ForProvider: v1alpha1.SubscriptionParameters{
-				SubscriptionParameters: raw,
-			},
-		},
-	}
+func TestSubscriptionTypeMapper_ConvertToCreatePayloadYaml(t *testing.T) {
+	raw := rawExtension(`name: John
+age: 30`)
+	cr := NewSubscription("someName", "name1", "plan2", raw)
 
 	uut := NewSubscriptionTypeMapper()
-	params := uut.ConvertToClientParams(cr)
+	mapped := uut.ConvertToCreatePayload(cr)
 
-	assert.NotNil(t, params)
-	assert.Equal(t, "value1", params["param1"]["key1"])
-	assert.Equal(t, "value2", params["param2"]["key2"])
+	assert.NotNil(t, mapped)
+	assert.Equal(t, "name1", mapped.appName)
+	assert.Equal(t, internal.Ptr("plan2"), mapped.PlanName)
+	assert.Equal(t, "John", mapped.SubscriptionParams["name"])
+	assert.Equal(t, float64(30), mapped.SubscriptionParams["age"])
 }
 
 func TestSubscriptionTypeMapper_IsSynced(t *testing.T) {
