@@ -123,7 +123,7 @@ type clusterYaml struct {
 	Server              string `yaml:"server"`
 }
 
-// UnmarshalRawParameters produces a map structure from a given raw YAML/JSON input
+// UnmarshalRawMapParameters produces a map structure from a given raw YAML/JSON input
 func UnmarshalRawMapParameters(in []byte) (map[string]map[string]interface{}, error) {
 	parameters := make(map[string]map[string]interface{})
 

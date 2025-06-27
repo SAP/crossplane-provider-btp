@@ -30,7 +30,7 @@ type SubscriptionParameters struct {
 	PlanName string `json:"planName"`
 	// Subscription parameters allows you to add additional parameters
 	// +kubebuilder:validation:Optional
-	SubscriptionParameters runtime.RawExtension `json:"subscriptionParameters"`
+	SubscriptionParameters runtime.RawExtension `json:"parameters"`
 }
 
 // SubscriptionObservation are the observable fields of a Subscription.

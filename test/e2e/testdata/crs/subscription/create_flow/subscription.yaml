@@ -7,6 +7,6 @@ spec:
   forProvider:
     appName: auditlog-viewer
     planName: free
-    subscriptionParameters: {"key1": "value1","key2": {"key3":"value3"}}
+    parameters: {"key1": "value1","key2": {"key3":"value3"}}
   cloudManagementRef:
     name: e2e-sub-cis-local
