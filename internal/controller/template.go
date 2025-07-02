@@ -2,6 +2,8 @@ package controller
 
 import (
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
+	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding"
+	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/cloudmanagement"
@@ -39,6 +41,8 @@ func CustomSetup(mgr ctrl.Manager, o controller.Options) error {
 		subscription.Setup,
 		rolecollectionassignment.Setup,
 		rolecollection.Setup,
+		serviceinstance.Setup,
+		servicebinding.Setup,
 		kymaenvironmentbinding.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {

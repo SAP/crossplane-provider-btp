@@ -4,7 +4,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: subscriptions.account.btp.sap.crossplane.io
+  name: servicebindings.account.btp.sap.crossplane.io
 spec:
   group: account.btp.sap.crossplane.io
   names:
@@ -12,10 +12,10 @@ spec:
     - crossplane
     - managed
     - btp
-    kind: Subscription
-    listKind: SubscriptionList
-    plural: subscriptions
-    singular: subscription
+    kind: ServiceBinding
+    listKind: ServiceBindingList
+    plural: servicebindings
+    singular: servicebinding
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -34,10 +34,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: |-
-          A Subscription encodes a subscription of a subaccount to a service
-          It requires a references CloudManagement instance of plan type "local" to authenticate and map to subaccount.
-          To import a subscription use the pattern <app name>/<plan name> as externalName annotation
+        description: A ServiceBinding allows to manage a binding to a service instance
+          in BTP
         properties:
           apiVersion:
             description: |-
@@ -57,87 +55,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: A SubscriptionSpec defines the desired state of a Subscription.
+            description: A ServiceBindingSpec defines the desired state of a ServiceBinding.
             properties:
-              cloudManagementRef:
-                description: Reference to CloudManagement instance of plan type "local"
-                  used for authentication
-                properties:
-                  name:
-                    description: Name of the referenced object.
-                    type: string
-                  policy:
-                    description: Policies for referencing.
-                    properties:
-                      resolution:
-                        default: Required
-                        description: |-
-                          Resolution specifies whether resolution of this reference is required.
-                          The default is 'Required', which means the reconcile will fail if the
-                          reference cannot be resolved. 'Optional' means this reference will be
-                          a no-op if it cannot be resolved.
-                        enum:
-                        - Required
-                        - Optional
-                        type: string
-                      resolve:
-                        description: |-
-                          Resolve specifies when this reference should be resolved. The default
-                          is 'IfNotPresent', which will attempt to resolve the reference only when
-                          the corresponding field is not present. Use 'Always' to resolve the
-                          reference on every reconcile.
-                        enum:
-                        - Always
-                        - IfNotPresent
-                        type: string
-                    type: object
-                required:
-                - name
-                type: object
-              cloudManagementSecret:
-                type: string
-              cloudManagementSecretNamespace:
-                type: string
-              cloudManagementSelector:
-                description: A Selector selects an object.
-                properties:
-                  matchControllerRef:
-                    description: |-
-                      MatchControllerRef ensures an object with the same controller reference
-                      as the selecting object is selected.
-                    type: boolean
-                  matchLabels:
-                    additionalProperties:
-                      type: string
-                    description: MatchLabels ensures an object with matching labels
-                      is selected.
-                    type: object
-                  policy:
-                    description: Policies for selection.
-                    properties:
-                      resolution:
-                        default: Required
-                        description: |-
-                          Resolution specifies whether resolution of this reference is required.
-                          The default is 'Required', which means the reconcile will fail if the
-                          reference cannot be resolved. 'Optional' means this reference will be
-                          a no-op if it cannot be resolved.
-                        enum:
-                        - Required
-                        - Optional
-                        type: string
-                      resolve:
-                        description: |-
-                          Resolve specifies when this reference should be resolved. The default
-                          is 'IfNotPresent', which will attempt to resolve the reference only when
-                          the corresponding field is not present. Use 'Always' to resolve the
-                          reference on every reconcile.
-                        enum:
-                        - Always
-                        - IfNotPresent
-                        type: string
-                    type: object
-                type: object
               deletionPolicy:
                 default: Delete
                 description: |-
@@ -153,25 +72,204 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: SubscriptionParameters are the configurable fields of
-                  a Subscription.
+                description: ServiceBindingParameters are the configurable fields
+                  of a ServiceBinding.
                 properties:
-                  appName:
-                    description: AppName of the app to subscribe to
+                  name:
+                    description: Name of the service instance in btp, required
                     type: string
-                    x-kubernetes-validations:
-                    - message: appName can't be updated once set
-                      rule: self == oldSelf
-                  planName:
-                    description: PlanName to subscribe to, empty plannames are shown
-                      as "default" in cockpit, use "" instead
+                  parameterSecretRefs:
+                    description: Parameters stored in secret, will be merged with
+                      spec parameters
+                    items:
+                      description: A SecretKeySelector is a reference to a secret
+                        key in an arbitrary namespace.
+                      properties:
+                        key:
+                          description: The key to select.
+                          type: string
+                        name:
+                          description: Name of the secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the secret.
+                          type: string
+                      required:
+                      - key
+                      - name
+                      - namespace
+                      type: object
+                    type: array
+                  parameters:
+                    description: Parameters in JSON or YAML format, will be merged
+                      with yaml parameters and secret parameters, will overwrite duplicated
+                      keys from secrets
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  serviceInstanceId:
+                    description: |-
+                      (String) The ID of the service instance associated with the binding.
+                      The ID of the service instance associated with the binding.
                     type: string
-                    x-kubernetes-validations:
-                    - message: planName can't be updated once set
-                      rule: self == oldSelf
+                  serviceInstanceRef:
+                    description: Reference to a ServiceInstance in account to populate
+                      serviceInstanceId.
+                    properties:
+                      name:
+                        description: Name of the referenced object.
+                        type: string
+                      policy:
+                        description: Policies for referencing.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  serviceInstanceSelector:
+                    description: Selector for a ServiceInstance in account to populate
+                      serviceInstanceId.
+                    properties:
+                      matchControllerRef:
+                        description: |-
+                          MatchControllerRef ensures an object with the same controller reference
+                          as the selecting object is selected.
+                        type: boolean
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels ensures an object with matching labels
+                          is selected.
+                        type: object
+                      policy:
+                        description: Policies for selection.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    type: object
+                  subaccountId:
+                    description: |-
+                      (String) The ID of the subaccount.
+                      The ID of the subaccount.
+                    type: string
+                  subaccountRef:
+                    description: Reference to a Subaccount in account to populate
+                      subaccountId.
+                    properties:
+                      name:
+                        description: Name of the referenced object.
+                        type: string
+                      policy:
+                        description: Policies for referencing.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  subaccountSelector:
+                    description: Selector for a Subaccount in account to populate
+                      subaccountId.
+                    properties:
+                      matchControllerRef:
+                        description: |-
+                          MatchControllerRef ensures an object with the same controller reference
+                          as the selecting object is selected.
+                        type: boolean
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels ensures an object with matching labels
+                          is selected.
+                        type: object
+                      policy:
+                        description: Policies for selection.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    type: object
                 required:
-                - appName
-                - planName
+                - name
                 type: object
               managementPolicies:
                 default:
@@ -316,13 +414,6 @@ spec:
                 required:
                 - name
                 type: object
-              recreateOnSubscriptionFailure:
-                description: |-
-                  RecreateOnSubscriptionFailure indicates whether the
-                  creation of the resources shall be retried when creating a
-                  subscription fails by getting into "SUBSCRIBE_FAILED"
-                  state.
-                type: boolean
               writeConnectionSecretToRef:
                 description: |-
                   WriteConnectionSecretToReference specifies the namespace and name of a
@@ -348,14 +439,14 @@ spec:
             - forProvider
             type: object
           status:
-            description: A SubscriptionStatus represents the observed state of a Subscription.
+            description: A ServiceBindingStatus represents the observed state of a
+              ServiceBinding.
             properties:
               atProvider:
-                description: SubscriptionObservation are the observable fields of
-                  a Subscription.
+                description: ServiceBindingObservation are the observable fields of
+                  a ServiceBinding.
                 properties:
-                  state:
-                    description: State as received from the API instance
+                  id:
                     type: string
                 type: object
               conditions:

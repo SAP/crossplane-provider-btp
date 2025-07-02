@@ -57,6 +57,13 @@ type SubscriptionSpec struct {
 	// +crossplane:generate:reference:selectorFieldName=CloudManagementSelector
 	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.CloudManagementSecretSecretNamespace()
 	CloudManagementSecretNamespace string `json:"cloudManagementSecretNamespace,omitempty"`
+
+	// RecreateOnSubscriptionFailure indicates whether the
+	// creation of the resources shall be retried when creating a
+	// subscription fails by getting into "SUBSCRIBE_FAILED"
+	// state.
+	// +kubebuilder:validation:Optional
+	RecreateOnSubscriptionFailure bool `json:"recreateOnSubscriptionFailure,omitempty"`
 }
 
 // A SubscriptionStatus represents the observed state of a Subscription.

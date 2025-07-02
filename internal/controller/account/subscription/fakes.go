@@ -8,6 +8,7 @@ import (
 )
 
 type MockApiHandler struct {
+	deleteCounter      int
 	returnExternalName string
 	returnGet          *subscription.SubscriptionGet
 	returnErr          error
@@ -22,6 +23,7 @@ func (m *MockApiHandler) UpdateSubscription(ctx context.Context, externalName st
 }
 
 func (m *MockApiHandler) DeleteSubscription(ctx context.Context, externalName string) error {
+	m.deleteCounter += 1
 	return m.returnErr
 }
 
