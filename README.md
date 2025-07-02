@@ -100,7 +100,7 @@ Please be aware that as part of the e2e tests a script will be executed which in
 Please note that when running multiple times you might want to delete the kind cluster again to avoid conflicts:
 
 ```bash
-kind delete cluster <cluster-name>
+kind delete cluster --name=<cluster-name>
 ```
 
 #### Required Configuration
