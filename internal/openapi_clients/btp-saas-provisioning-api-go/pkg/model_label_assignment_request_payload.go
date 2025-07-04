@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -19,8 +19,8 @@ var _ MappedNullable = &LabelAssignmentRequestPayload{}
 
 // LabelAssignmentRequestPayload JSON object with labels as key-value pairs that specify custom attributes of the entity.
 type LabelAssignmentRequestPayload struct {
-	// Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\"). For example: { \"Cost Center\":\"2624061970\" \"Department\":\"Sales\" \"tags\": [\"Green\", \"Pharma\", \"Audited\"] }
-	Labels *map[string][]string `json:"labels,omitempty"`
+	// Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\").  For example: {  \"Cost Center\":\"2624061970\"  \"Department\":\"Sales\"  \"tags\": [\"Green\", \"Pharma\", \"Audited\"]  }
+	Labels map[string]interface{} `json:"labels,omitempty"`
 }
 
 // NewLabelAssignmentRequestPayload instantiates a new LabelAssignmentRequestPayload object
@@ -41,19 +41,19 @@ func NewLabelAssignmentRequestPayloadWithDefaults() *LabelAssignmentRequestPaylo
 }
 
 // GetLabels returns the Labels field value if set, zero value otherwise.
-func (o *LabelAssignmentRequestPayload) GetLabels() map[string][]string {
+func (o *LabelAssignmentRequestPayload) GetLabels() map[string]interface{} {
 	if o == nil || IsNil(o.Labels) {
-		var ret map[string][]string
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Labels
+	return o.Labels
 }
 
 // GetLabelsOk returns a tuple with the Labels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *LabelAssignmentRequestPayload) GetLabelsOk() (*map[string][]string, bool) {
+func (o *LabelAssignmentRequestPayload) GetLabelsOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Labels) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Labels, true
 }
@@ -67,9 +67,9 @@ func (o *LabelAssignmentRequestPayload) HasLabels() bool {
 	return false
 }
 
-// SetLabels gets a reference to the given map[string][]string and assigns it to the Labels field.
-func (o *LabelAssignmentRequestPayload) SetLabels(v map[string][]string) {
-	o.Labels = &v
+// SetLabels gets a reference to the given map[string]interface{} and assigns it to the Labels field.
+func (o *LabelAssignmentRequestPayload) SetLabels(v map[string]interface{}) {
+	o.Labels = v
 }
 
 func (o LabelAssignmentRequestPayload) MarshalJSON() ([]byte, error) {

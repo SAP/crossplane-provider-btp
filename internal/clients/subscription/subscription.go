@@ -206,7 +206,7 @@ func formExternalName(appName string, planName string) string {
 // specifyAPIError brings custom API Error object into a string representation if it can be type asserted, otherwise returns given error
 func specifyAPIError(err error) error {
 	if genericErr, ok := err.(*saas_client.GenericOpenAPIError); ok {
-		if saasErr, ok := genericErr.Model().(saas_client.ApiExceptionResponseObject); ok {
+		if saasErr, ok := genericErr.Model().(saas_client.ErrorResponse); ok {
 			return errors.New(fmt.Sprintf("API Error: %v, Code %v", saasErr.Error.Message, saasErr.Error.Code))
 		}
 	}
