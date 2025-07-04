@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -19,6 +19,7 @@ var _ MappedNullable = &ApplicationResourceDto{}
 
 // ApplicationResourceDto The application resource reference in Unified Services. This object includes the name and path of the application resource.
 type ApplicationResourceDto struct {
+	GroupVersionType *GroupVersionType `json:"groupVersionType,omitempty"`
 	Name *string `json:"name,omitempty"`
 	Path *string `json:"path,omitempty"`
 }
@@ -38,6 +39,38 @@ func NewApplicationResourceDto() *ApplicationResourceDto {
 func NewApplicationResourceDtoWithDefaults() *ApplicationResourceDto {
 	this := ApplicationResourceDto{}
 	return &this
+}
+
+// GetGroupVersionType returns the GroupVersionType field value if set, zero value otherwise.
+func (o *ApplicationResourceDto) GetGroupVersionType() GroupVersionType {
+	if o == nil || IsNil(o.GroupVersionType) {
+		var ret GroupVersionType
+		return ret
+	}
+	return *o.GroupVersionType
+}
+
+// GetGroupVersionTypeOk returns a tuple with the GroupVersionType field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ApplicationResourceDto) GetGroupVersionTypeOk() (*GroupVersionType, bool) {
+	if o == nil || IsNil(o.GroupVersionType) {
+		return nil, false
+	}
+	return o.GroupVersionType, true
+}
+
+// HasGroupVersionType returns a boolean if a field has been set.
+func (o *ApplicationResourceDto) HasGroupVersionType() bool {
+	if o != nil && !IsNil(o.GroupVersionType) {
+		return true
+	}
+
+	return false
+}
+
+// SetGroupVersionType gets a reference to the given GroupVersionType and assigns it to the GroupVersionType field.
+func (o *ApplicationResourceDto) SetGroupVersionType(v GroupVersionType) {
+	o.GroupVersionType = &v
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
@@ -114,6 +147,9 @@ func (o ApplicationResourceDto) MarshalJSON() ([]byte, error) {
 
 func (o ApplicationResourceDto) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.GroupVersionType) {
+		toSerialize["groupVersionType"] = o.GroupVersionType
+	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
 	}

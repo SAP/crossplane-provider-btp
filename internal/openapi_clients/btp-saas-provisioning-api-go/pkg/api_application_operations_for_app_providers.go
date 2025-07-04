@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -21,6 +21,33 @@ import (
 
 
 type ApplicationOperationsForAppProvidersAPI interface {
+
+	/*
+	BatchUpdateApplicationAndTenantSubscriptionAsync Batch-update multitenant app subscription dependencies
+
+	<b>Prerequisites</b>:
+You have obtained the access token for the application.<br><br>
+Batch-update the dependencies of a multitenant application.<br>
+This REST call is asynchronous.
+After executing the API, a job to update dependencies is created.
+You can update dependencies for subscriptions with status: SUBSCRIBED, UPDATE_FAILED and UPDATE_PARAMETERS_FAILED.
+After the API has been executed, you will get the notification specifying the details of the created subscription job in the following format:<br>
+“Job for update subscription batch of application: <i>&lt;appId&gt;</i>, was created.”<br>
+Where: 
+* <i>&lt;appId&gt;</i> is the ID of the application to which you subscribed the tenants.
+
+Note that if you enable the allowUpdateOnFailedSubscription parameter, you can also use this API for subscriptions that are with a SUBSCRIBE_FAILED or UNSUBSCRIBE_FAILED status, but only for the purpose of removing dependencies.
+
+<br/><br/>Required scopes: $XSAPPNAME.subscription.write
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest
+	*/
+	BatchUpdateApplicationAndTenantSubscriptionAsync(ctx context.Context) ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest
+
+	// BatchUpdateApplicationAndTenantSubscriptionAsyncExecute executes the request
+	//  @return string
+	BatchUpdateApplicationAndTenantSubscriptionAsyncExecute(r ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest) (string, *http.Response, error)
 
 	/*
 	DeleteApplicationAndTenantSubscriptionAsync Unsubscribe tenant from an application
@@ -84,13 +111,14 @@ You have obtained the access token for the application.
 	Update the dependencies of a multitenant application.
 This REST call is asynchronous.
 After executing the API, a job to update dependencies is created.
-You can update dependencies for tenants with status: SUBSCRIBED, UPDATE_FAILED.
+You can update dependencies for subscriptions with status: SUBSCRIBED, UPDATE_FAILED and UPDATE_PARAMETERS_FAILED.
 After the API has been executed, you will get the notification specifying the details of the created subscription job in the following format: 
 “Job for the subscription of application: <i>&lt;appId&gt;</i> and tenant: <i>&lt;tenantId&gt;</i> was created.”
 Where: 
 * <i>&lt;appId&gt;</i> is the ID of the application to which you subscribed the tenant. 
 * <i>&lt;tenantId&gt;</i> is the ID of the subscribed tenant.
 
+Note that if you enable the allowUpdateOnFailedSubscription parameter, you can also use this API for subscriptions that are with a SUBSCRIBE_FAILED or UNSUBSCRIBE_FAILED status, but only for the purpose of removing dependencies.
 <b>Prerequisites</b>:
 You have obtained the access token for the application.
 <br/><br/>Required scopes: $XSAPPNAME.subscription.write
@@ -108,6 +136,234 @@ You have obtained the access token for the application.
 
 // ApplicationOperationsForAppProvidersAPIService ApplicationOperationsForAppProvidersAPI service
 type ApplicationOperationsForAppProvidersAPIService service
+
+type ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest struct {
+	ctx context.Context
+	ApiService ApplicationOperationsForAppProvidersAPI
+	authorization *string
+	contentType *string
+	batchUpdateXsuaaSubscriptionDependencies *BatchUpdateXsuaaSubscriptionDependencies
+	skipUnchangedDependencies *bool
+	skipUpdatingDependencies *bool
+	updateApplicationURL *bool
+	allowUpdateOnFailedSubscription *bool
+}
+
+// For all the APIs in the Application Operations for App Providers group, use only this authorization method. See the link for details about [how to obtain the access token](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/6391b5dfe4704c6c8b71a32126828e9c.html).
+func (r ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest) Authorization(authorization string) ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest {
+	r.authorization = &authorization
+	return r
+}
+
+// Specifies the type of data that is sent.
+func (r ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest) ContentType(contentType string) ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest {
+	r.contentType = &contentType
+	return r
+}
+
+func (r ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest) BatchUpdateXsuaaSubscriptionDependencies(batchUpdateXsuaaSubscriptionDependencies BatchUpdateXsuaaSubscriptionDependencies) ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest {
+	r.batchUpdateXsuaaSubscriptionDependencies = &batchUpdateXsuaaSubscriptionDependencies
+	return r
+}
+
+// Whether to skip updating the dependencies that haven’t changed.
+func (r ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest) SkipUnchangedDependencies(skipUnchangedDependencies bool) ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest {
+	r.skipUnchangedDependencies = &skipUnchangedDependencies
+	return r
+}
+
+// Whether to skip updating dependencies. If set to true, updateApplicationURL must also be set to true. This way, you can update the application URL without updating its dependencies.
+func (r ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest) SkipUpdatingDependencies(skipUpdatingDependencies bool) ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest {
+	r.skipUpdatingDependencies = &skipUpdatingDependencies
+	return r
+}
+
+// Whether to update the application URL returned from the app callback. If set to true together with skipUpdatingDependencies, the API call becomes synchronous.
+func (r ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest) UpdateApplicationURL(updateApplicationURL bool) ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest {
+	r.updateApplicationURL = &updateApplicationURL
+	return r
+}
+
+// Whether to update a dependency subscription tree when the state of the root subscription is UNSUBSCRIBE_FAILED or SUBSCRIBE_FAILED.  Note that in such cases, you can only use the update feature for the purpose of removing existing dependencies. 
+func (r ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest) AllowUpdateOnFailedSubscription(allowUpdateOnFailedSubscription bool) ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest {
+	r.allowUpdateOnFailedSubscription = &allowUpdateOnFailedSubscription
+	return r
+}
+
+func (r ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest) Execute() (string, *http.Response, error) {
+	return r.ApiService.BatchUpdateApplicationAndTenantSubscriptionAsyncExecute(r)
+}
+
+/*
+BatchUpdateApplicationAndTenantSubscriptionAsync Batch-update multitenant app subscription dependencies
+
+<b>Prerequisites</b>:
+You have obtained the access token for the application.<br><br>
+Batch-update the dependencies of a multitenant application.<br>
+This REST call is asynchronous.
+After executing the API, a job to update dependencies is created.
+You can update dependencies for subscriptions with status: SUBSCRIBED, UPDATE_FAILED and UPDATE_PARAMETERS_FAILED.
+After the API has been executed, you will get the notification specifying the details of the created subscription job in the following format:<br>
+“Job for update subscription batch of application: <i>&lt;appId&gt;</i>, was created.”<br>
+Where: 
+* <i>&lt;appId&gt;</i> is the ID of the application to which you subscribed the tenants.
+
+Note that if you enable the allowUpdateOnFailedSubscription parameter, you can also use this API for subscriptions that are with a SUBSCRIBE_FAILED or UNSUBSCRIBE_FAILED status, but only for the purpose of removing dependencies.
+
+<br/><br/>Required scopes: $XSAPPNAME.subscription.write
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest
+*/
+func (a *ApplicationOperationsForAppProvidersAPIService) BatchUpdateApplicationAndTenantSubscriptionAsync(ctx context.Context) ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest {
+	return ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+//  @return string
+func (a *ApplicationOperationsForAppProvidersAPIService) BatchUpdateApplicationAndTenantSubscriptionAsyncExecute(r ApiBatchUpdateApplicationAndTenantSubscriptionAsyncRequest) (string, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPatch
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  string
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ApplicationOperationsForAppProvidersAPIService.BatchUpdateApplicationAndTenantSubscriptionAsync")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/saas-manager/v1/application/subscriptions/batch"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.authorization == nil {
+		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
+	}
+	if r.contentType == nil {
+		return localVarReturnValue, nil, reportError("contentType is required and must be specified")
+	}
+	if r.batchUpdateXsuaaSubscriptionDependencies == nil {
+		return localVarReturnValue, nil, reportError("batchUpdateXsuaaSubscriptionDependencies is required and must be specified")
+	}
+
+	if r.skipUnchangedDependencies != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "skipUnchangedDependencies", r.skipUnchangedDependencies, "form", "")
+	}
+	if r.skipUpdatingDependencies != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "skipUpdatingDependencies", r.skipUpdatingDependencies, "form", "")
+	}
+	if r.updateApplicationURL != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "updateApplicationURL", r.updateApplicationURL, "form", "")
+	}
+	if r.allowUpdateOnFailedSubscription != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "allowUpdateOnFailedSubscription", r.allowUpdateOnFailedSubscription, "form", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
+	parameterAddToHeaderOrQuery(localVarHeaderParams, "Content-Type", r.contentType, "simple", "")
+	// body params
+	localVarPostBody = r.batchUpdateXsuaaSubscriptionDependencies
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v string
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v string
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v string
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
 
 type ApiDeleteApplicationAndTenantSubscriptionAsyncRequest struct {
 	ctx context.Context
@@ -244,7 +500,7 @@ func (a *ApplicationOperationsForAppProvidersAPIService) DeleteApplicationAndTen
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -375,7 +631,7 @@ func (a *ApplicationOperationsForAppProvidersAPIService) GetApplicationDetailsEx
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -386,7 +642,7 @@ func (a *ApplicationOperationsForAppProvidersAPIService) GetApplicationDetailsEx
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -427,6 +683,7 @@ type ApiGetApplicationSubscriptionsRequest struct {
 	authorization *string
 	contentType *string
 	tenantId *string
+	subscriptionGUID *string
 	state *string
 	globalAccountId *string
 	subaccountId *string
@@ -449,6 +706,12 @@ func (r ApiGetApplicationSubscriptionsRequest) ContentType(contentType string) A
 // Get subscriptions by tenant ID.
 func (r ApiGetApplicationSubscriptionsRequest) TenantId(tenantId string) ApiGetApplicationSubscriptionsRequest {
 	r.tenantId = &tenantId
+	return r
+}
+
+// The unique ID of the root subscription.
+func (r ApiGetApplicationSubscriptionsRequest) SubscriptionGUID(subscriptionGUID string) ApiGetApplicationSubscriptionsRequest {
+	r.subscriptionGUID = &subscriptionGUID
 	return r
 }
 
@@ -531,6 +794,9 @@ func (a *ApplicationOperationsForAppProvidersAPIService) GetApplicationSubscript
 	if r.tenantId != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "tenantId", r.tenantId, "form", "")
 	}
+	if r.subscriptionGUID != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "subscriptionGUID", r.subscriptionGUID, "form", "")
+	}
 	if r.state != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "state", r.state, "form", "")
 	}
@@ -549,7 +815,7 @@ func (a *ApplicationOperationsForAppProvidersAPIService) GetApplicationSubscript
 	if r.size != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "size", r.size, "form", "")
 	} else {
-		var defaultValue string = "-1"
+		var defaultValue string = "500"
 		r.size = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -594,7 +860,7 @@ func (a *ApplicationOperationsForAppProvidersAPIService) GetApplicationSubscript
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -605,7 +871,7 @@ func (a *ApplicationOperationsForAppProvidersAPIService) GetApplicationSubscript
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -638,6 +904,7 @@ type ApiUpdateApplicationAndTenantSubscriptionAsyncRequest struct {
 	skipUnchangedDependencies *bool
 	skipUpdatingDependencies *bool
 	updateApplicationURL *bool
+	allowUpdateOnFailedSubscription *bool
 	updateApplicationDependenciesRequestPayload *UpdateApplicationDependenciesRequestPayload
 }
 
@@ -671,6 +938,12 @@ func (r ApiUpdateApplicationAndTenantSubscriptionAsyncRequest) UpdateApplication
 	return r
 }
 
+// Whether to update a dependency subscription tree when the state of the root subscription is UNSUBSCRIBE_FAILED or SUBSCRIBE_FAILED.  Note that in such cases, you can only use the update feature for the purpose of removing existing dependencies. 
+func (r ApiUpdateApplicationAndTenantSubscriptionAsyncRequest) AllowUpdateOnFailedSubscription(allowUpdateOnFailedSubscription bool) ApiUpdateApplicationAndTenantSubscriptionAsyncRequest {
+	r.allowUpdateOnFailedSubscription = &allowUpdateOnFailedSubscription
+	return r
+}
+
 func (r ApiUpdateApplicationAndTenantSubscriptionAsyncRequest) UpdateApplicationDependenciesRequestPayload(updateApplicationDependenciesRequestPayload UpdateApplicationDependenciesRequestPayload) ApiUpdateApplicationAndTenantSubscriptionAsyncRequest {
 	r.updateApplicationDependenciesRequestPayload = &updateApplicationDependenciesRequestPayload
 	return r
@@ -686,13 +959,14 @@ UpdateApplicationAndTenantSubscriptionAsync Update subscription dependencies
 Update the dependencies of a multitenant application.
 This REST call is asynchronous.
 After executing the API, a job to update dependencies is created.
-You can update dependencies for tenants with status: SUBSCRIBED, UPDATE_FAILED.
+You can update dependencies for subscriptions with status: SUBSCRIBED, UPDATE_FAILED and UPDATE_PARAMETERS_FAILED.
 After the API has been executed, you will get the notification specifying the details of the created subscription job in the following format: 
 “Job for the subscription of application: <i>&lt;appId&gt;</i> and tenant: <i>&lt;tenantId&gt;</i> was created.”
 Where: 
 * <i>&lt;appId&gt;</i> is the ID of the application to which you subscribed the tenant. 
 * <i>&lt;tenantId&gt;</i> is the ID of the subscribed tenant.
 
+Note that if you enable the allowUpdateOnFailedSubscription parameter, you can also use this API for subscriptions that are with a SUBSCRIBE_FAILED or UNSUBSCRIBE_FAILED status, but only for the purpose of removing dependencies.
 <b>Prerequisites</b>:
 You have obtained the access token for the application.
 <br/><br/>Required scopes: $XSAPPNAME.subscription.write
@@ -745,6 +1019,9 @@ func (a *ApplicationOperationsForAppProvidersAPIService) UpdateApplicationAndTen
 	}
 	if r.updateApplicationURL != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "updateApplicationURL", r.updateApplicationURL, "form", "")
+	}
+	if r.allowUpdateOnFailedSubscription != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "allowUpdateOnFailedSubscription", r.allowUpdateOnFailedSubscription, "form", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{"application/json"}
@@ -801,7 +1078,7 @@ func (a *ApplicationOperationsForAppProvidersAPIService) UpdateApplicationAndTen
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -813,6 +1090,17 @@ func (a *ApplicationOperationsForAppProvidersAPIService) UpdateApplicationAndTen
 		}
 		if localVarHTTPResponse.StatusCode == 409 {
 			var v string
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 429 {
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()

@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -26,6 +26,8 @@ type JobStateResponseObject struct {
 	Id *string `json:"id,omitempty"`
 	// The current state of the corresponding job. Possible values: * <b>CREATED:</b> Job processing has created. * <b>STARTED:</b> Job processing has started. * <b>SUCCEEDED:</b> The job has completed. * <b>FAILED:</b> The job failed and did not complete. * <b>RETRY:</b> Subscription has timed out and job processing is pending a retry.
 	State *string `json:"state,omitempty"`
+	// The state details of the corresponding job.
+	StateDetails map[string]map[string]interface{} `json:"stateDetails,omitempty"`
 }
 
 // NewJobStateResponseObject instantiates a new JobStateResponseObject object
@@ -173,6 +175,38 @@ func (o *JobStateResponseObject) SetState(v string) {
 	o.State = &v
 }
 
+// GetStateDetails returns the StateDetails field value if set, zero value otherwise.
+func (o *JobStateResponseObject) GetStateDetails() map[string]map[string]interface{} {
+	if o == nil || IsNil(o.StateDetails) {
+		var ret map[string]map[string]interface{}
+		return ret
+	}
+	return o.StateDetails
+}
+
+// GetStateDetailsOk returns a tuple with the StateDetails field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *JobStateResponseObject) GetStateDetailsOk() (map[string]map[string]interface{}, bool) {
+	if o == nil || IsNil(o.StateDetails) {
+		return map[string]map[string]interface{}{}, false
+	}
+	return o.StateDetails, true
+}
+
+// HasStateDetails returns a boolean if a field has been set.
+func (o *JobStateResponseObject) HasStateDetails() bool {
+	if o != nil && !IsNil(o.StateDetails) {
+		return true
+	}
+
+	return false
+}
+
+// SetStateDetails gets a reference to the given map[string]map[string]interface{} and assigns it to the StateDetails field.
+func (o *JobStateResponseObject) SetStateDetails(v map[string]map[string]interface{}) {
+	o.StateDetails = v
+}
+
 func (o JobStateResponseObject) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -194,6 +228,9 @@ func (o JobStateResponseObject) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State
+	}
+	if !IsNil(o.StateDetails) {
+		toSerialize["stateDetails"] = o.StateDetails
 	}
 	return toSerialize, nil
 }

@@ -61,7 +61,7 @@ func (m *MockSubscriptionOperationsConsumer) DeleteSubscriptionLabels(ctx contex
 	panic("implement me")
 }
 
-func (m *MockSubscriptionOperationsConsumer) DeleteSubscriptionLabelsExecute(r saas_client.ApiDeleteSubscriptionLabelsRequest) (*saas_client.LabelsResponseObject, *http.Response, error) {
+func (m *MockSubscriptionOperationsConsumer) DeleteSubscriptionLabelsExecute(r saas_client.ApiDeleteSubscriptionLabelsRequest) (map[string]interface{}, *http.Response, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -81,7 +81,7 @@ func (m *MockSubscriptionOperationsConsumer) GetSubscriptionLabels(ctx context.C
 	panic("implement me")
 }
 
-func (m *MockSubscriptionOperationsConsumer) GetSubscriptionLabelsExecute(r saas_client.ApiGetSubscriptionLabelsRequest) (*saas_client.LabelsResponseObject, *http.Response, error) {
+func (m *MockSubscriptionOperationsConsumer) GetSubscriptionLabelsExecute(r saas_client.ApiGetSubscriptionLabelsRequest) (map[string]interface{}, *http.Response, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -91,7 +91,17 @@ func (m *MockSubscriptionOperationsConsumer) UpsertSubscriptionLabels(ctx contex
 	panic("implement me")
 }
 
-func (m *MockSubscriptionOperationsConsumer) UpsertSubscriptionLabelsExecute(r saas_client.ApiUpsertSubscriptionLabelsRequest) (*saas_client.LabelsResponseObject, *http.Response, error) {
+func (m *MockSubscriptionOperationsConsumer) UpsertSubscriptionLabelsExecute(r saas_client.ApiUpsertSubscriptionLabelsRequest) (map[string]interface{}, *http.Response, error) {
 	//TODO implement me
 	panic("implement me")
+}
+
+// GetSubscriptionParams implements openapi.SubscriptionOperationsForAppConsumersAPI.
+func (m *MockSubscriptionOperationsConsumer) GetSubscriptionParams(ctx context.Context, appName string) saas_client.ApiGetSubscriptionParamsRequest {
+	panic("unimplemented")
+}
+
+// GetSubscriptionParamsExecute implements openapi.SubscriptionOperationsForAppConsumersAPI.
+func (m *MockSubscriptionOperationsConsumer) GetSubscriptionParamsExecute(r saas_client.ApiGetSubscriptionParamsRequest) (map[string]interface{}, *http.Response, error) {
+	panic("unimplemented")
 }

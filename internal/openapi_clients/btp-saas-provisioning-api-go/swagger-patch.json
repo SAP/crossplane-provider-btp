@@ -19,7 +19,15 @@
   },
   {
     "op": "replace",
-    "path": "/components/schemas/ApiExceptionResponseObject",
+    "path": "/components/schemas/CreateSubscriptionRequestPayload/properties/subscriptionParams",
+    "value": {
+      "description": "If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object.\nFor a list of supported configuration parameters, see the documentation of the particular environment offering.\nIn this example, additional configuration parameters 'id' and 'email' are specified: \n{ \n\"instance_name\": \"myOrg\" \n} ",
+      "type": "object"
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/ErrorResponse",
     "value": {
       "type": "object",
       "properties": {
@@ -41,7 +49,7 @@
               "description": "Log correlation ID to track the event"
             },
             "description": {
-              "$ref": "#/components/schemas/JsonNode"
+              "type": "string"
             },
             "details": {
               "type": "array",

@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -27,6 +28,9 @@ type SubscriptionParameters struct {
 	// PlanName to subscribe to, empty plannames are shown as "default" in cockpit, use "" instead
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="planName can't be updated once set"
 	PlanName string `json:"planName"`
+	// Subscription parameters allows you to add additional parameters
+	// +kubebuilder:validation:Optional
+	SubscriptionParameters runtime.RawExtension `json:"parameters"`
 }
 
 // SubscriptionObservation are the observable fields of a Subscription.

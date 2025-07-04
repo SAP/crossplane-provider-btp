@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -34,8 +34,8 @@ type JobManagementAPI interface {
 	GetStatus(ctx context.Context, jobInstanceIdOrUniqueId string) ApiGetStatusRequest
 
 	// GetStatusExecute executes the request
-	//  @return string
-	GetStatusExecute(r ApiGetStatusRequest) (string, *http.Response, error)
+	//  @return JobStatusResponseObject
+	GetStatusExecute(r ApiGetStatusRequest) (*JobStatusResponseObject, *http.Response, error)
 }
 
 // JobManagementAPIService JobManagementAPI service
@@ -47,7 +47,7 @@ type ApiGetStatusRequest struct {
 	jobInstanceIdOrUniqueId string
 }
 
-func (r ApiGetStatusRequest) Execute() (string, *http.Response, error) {
+func (r ApiGetStatusRequest) Execute() (*JobStatusResponseObject, *http.Response, error) {
 	return r.ApiService.GetStatusExecute(r)
 }
 
@@ -69,13 +69,13 @@ func (a *JobManagementAPIService) GetStatus(ctx context.Context, jobInstanceIdOr
 }
 
 // Execute executes the request
-//  @return string
-func (a *JobManagementAPIService) GetStatusExecute(r ApiGetStatusRequest) (string, *http.Response, error) {
+//  @return JobStatusResponseObject
+func (a *JobManagementAPIService) GetStatusExecute(r ApiGetStatusRequest) (*JobStatusResponseObject, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  string
+		localVarReturnValue  *JobStatusResponseObject
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "JobManagementAPIService.GetStatus")
@@ -130,7 +130,7 @@ func (a *JobManagementAPIService) GetStatusExecute(r ApiGetStatusRequest) (strin
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -141,7 +141,7 @@ func (a *JobManagementAPIService) GetStatusExecute(r ApiGetStatusRequest) (strin
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -152,7 +152,7 @@ func (a *JobManagementAPIService) GetStatusExecute(r ApiGetStatusRequest) (strin
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()

@@ -218,7 +218,6 @@ python3 provider-config-setup.py \
 The credentials section of the service binding, which can be securely stored in SAP Vault or similar secrets manager.
 
 ## 👐 Support, Feedback, Contributing
-
 If you have a question always feel free to reach out on our official crossplane slack channel:
 
 :rocket: [**#provider-sap-btp**](https://crossplane.slack.com/archives/C07UZ3UJY7Q).

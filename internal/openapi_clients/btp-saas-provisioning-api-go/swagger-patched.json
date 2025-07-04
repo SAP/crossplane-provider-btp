@@ -1,51 +1,12 @@
 {
   "components": {
     "schemas": {
-      "ApiExceptionResponseObject": {
-        "properties": {
-          "error": {
-            "properties": {
-              "code": {
-                "description": "Technical code of the error as a reference for support",
-                "format": "int32",
-                "type": "integer"
-              },
-              "correlationID": {
-                "description": "Log correlation ID to track the event",
-                "type": "string"
-              },
-              "description": {
-                "$ref": "#/components/schemas/JsonNode"
-              },
-              "details": {
-                "description": "Nesting of error responses",
-                "items": {
-                  "$ref": "#/components/schemas/NestingErrorDetailsResponseObject"
-                },
-                "type": "array"
-              },
-              "message": {
-                "description": "User-friendly description of the error.",
-                "type": "string"
-              },
-              "target": {
-                "description": "Describes a data element (for example, a resource path: /online-store/v1/products/123)",
-                "type": "string"
-              }
-            },
-            "required": [
-              "code",
-              "correlationID",
-              "message"
-            ],
-            "type": "object"
-          }
-        },
-        "type": "object"
-      },
       "ApplicationResourceDto": {
         "description": "The application resource reference in Unified Services. This object includes the name and path of the application resource.",
         "properties": {
+          "groupVersionType": {
+            "$ref": "#/components/schemas/GroupVersionType"
+          },
           "name": {
             "type": "string"
           },
@@ -157,11 +118,7 @@
             "type": "string"
           },
           "subscriptionParams": {
-            "additionalProperties": {
-              "description": "Additional subscription parameters determined by the application provider.",
-              "type": "object"
-            },
-            "description": "Additional subscription parameters determined by the application provider.",
+            "description": "If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object.\nFor a list of supported configuration parameters, see the documentation of the particular environment offering.\nIn this example, additional configuration parameters 'id' and 'email' are specified: \n{ \n\"instance_name\": \"myOrg\" \n} ",
             "type": "object"
           }
         },
@@ -237,6 +194,14 @@
             },
             "type": "array"
           },
+          "allowedTargetPlans": {
+            "description": "List of plans to which the existing subscription can switch. Includes upgrades, downgrades, and other types of transitions.",
+            "items": {
+              "description": "List of plans to which the existing subscription can switch. Includes upgrades, downgrades, and other types of transitions.",
+              "type": "string"
+            },
+            "type": "array"
+          },
           "appId": {
             "description": "The ID returned by XSUAA after the app provider has performed a bind of the multitenant application to a XSUAA service instance.",
             "type": "string"
@@ -285,6 +250,10 @@
             "description": "The commercial name of the deployed multitenant application as defined by the app developer.",
             "type": "string"
           },
+          "createdBy": {
+            "description": "Details about the user or client that created this subscription.",
+            "type": "string"
+          },
           "createdDate": {
             "description": "The date the subscription was created. Dates and times are in UTC format.",
             "format": "date-time",
@@ -319,20 +288,14 @@
             "type": "string"
           },
           "labels": {
-            "additionalProperties": {
-              "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the multitenant application subscription. \nExample:\n{\n  \"Cost Center\": [\"19700626\"],\n  \"Department\": [\"Sales\"],\n  \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n  \"EMEA\":[]\n}",
-              "items": {
-                "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the multitenant application subscription. \nExample:\n{\n  \"Cost Center\": [\"19700626\"],\n  \"Department\": [\"Sales\"],\n  \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n  \"EMEA\":[]\n}",
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the multitenant application subscription. \nExample:\n{\n  \"Cost Center\": [\"19700626\"],\n  \"Department\": [\"Sales\"],\n  \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n  \"EMEA\":[]\n}",
+            "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the multitenant application subscription. \n\nExample:\n\n{\n\n  \"Cost Center\": [\"19700626\"],\n\n  \"Department\": [\"Sales\"],\n\n  \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n\n  \"EMEA\":[]\n\n}",
+            "example": null,
             "type": "object"
           },
           "metadata": {
             "additionalProperties": {
               "description": "JSON schema that describes the metadata that the consumer provide when subscribing to the application.",
+              "example": null,
               "type": "object"
             },
             "description": "JSON schema that describes the metadata that the consumer provide when subscribing to the application.",
@@ -343,6 +306,10 @@
             },
             "type": "object"
           },
+          "modifiedBy": {
+            "description": "Details about the user or client that last modified this subscription.",
+            "type": "string"
+          },
           "modifiedDate": {
             "description": "The date the subscription was last modified. Dates and times are in UTC format.",
             "format": "date-time",
@@ -351,6 +318,7 @@
           "paramsSchema": {
             "additionalProperties": {
               "description": "JSON schema that describes the parameters that the consumer must provide when subscribing to the application.",
+              "example": null,
               "type": "object"
             },
             "description": "JSON schema that describes the parameters that the consumer must provide when subscribing to the application.",
@@ -418,6 +386,10 @@
             "description": "URL for app users to launch the subscribed application.",
             "type": "string"
           },
+          "supportsGetParameters": {
+            "description": "Specifies whether a subaccount can provide its subscriptions parameters.",
+            "type": "boolean"
+          },
           "supportsParametersUpdates": {
             "description": "Specifies whether a consumer, whose subaccount is subscribed to the application, can change its subscriptions parameters.",
             "type": "boolean"
@@ -428,6 +400,62 @@
           },
           "tenantId": {
             "description": "Tenant ID of the application provider.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "properties": {
+              "code": {
+                "description": "Technical code of the error as a reference for support",
+                "format": "int32",
+                "type": "integer"
+              },
+              "correlationID": {
+                "description": "Log correlation ID to track the event",
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "details": {
+                "description": "Nesting of error responses",
+                "items": {
+                  "$ref": "#/components/schemas/NestingErrorDetailsResponseObject"
+                },
+                "type": "array"
+              },
+              "message": {
+                "description": "User-friendly description of the error.",
+                "type": "string"
+              },
+              "target": {
+                "description": "Describes a data element (for example, a resource path: /online-store/v1/products/123)",
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "correlationID",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "GroupVersionType": {
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "version": {
             "type": "string"
           }
         },
@@ -465,6 +493,27 @@
         },
         "type": "object"
       },
+      "JobParameter": {
+        "properties": {
+          "identifying": {
+            "type": "boolean"
+          },
+          "type": {
+            "enum": [
+              "STRING",
+              "DATE",
+              "LONG",
+              "DOUBLE"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "example": null,
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
       "JobStateResponseObject": {
         "properties": {
           "createdBy": {
@@ -488,27 +537,67 @@
               "RETRY"
             ],
             "type": "string"
+          },
+          "stateDetails": {
+            "additionalProperties": {
+              "description": "The state details of the corresponding job.",
+              "example": null,
+              "type": "object"
+            },
+            "description": "The state details of the corresponding job.",
+            "type": "object"
           }
         },
         "type": "object"
       },
-      "JsonNode": {
-        "description": "Error description in JSON format",
+      "JobStatusResponseObject": {
+        "properties": {
+          "customParams": {
+            "additionalProperties": {
+              "example": null,
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "description": {
+            "description": "A description of the exit status of a job when it ends.",
+            "type": "string"
+          },
+          "jobParams": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobParameter"
+            },
+            "type": "object"
+          },
+          "status": {
+            "description": "The current state of the job. \n* <b>IN_PROGRESS:</b> The job is being executed.\n* <b>COMPLETED:</b> The job has completed.\n* <b>FAILED:</b> The job failed and did not complete. The job can be restarted.",
+            "enum": [
+              "IN_PROGRESS",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "statusDetails": {
+            "additionalProperties": {
+              "example": null,
+              "type": "object"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "description",
+          "status"
+        ],
         "type": "object"
       },
       "LabelAssignmentRequestPayload": {
         "description": "JSON object with labels as key-value pairs that specify custom attributes of the entity.",
         "properties": {
           "labels": {
-            "additionalProperties": {
-              "description": "Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\").\nFor example: {\n\"Cost Center\":\"2624061970\"\n\"Department\":\"Sales\"\n\"tags\": [\"Green\", \"Pharma\", \"Audited\"]\n}",
-              "items": {
-                "description": "Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\").\nFor example: {\n\"Cost Center\":\"2624061970\"\n\"Department\":\"Sales\"\n\"tags\": [\"Green\", \"Pharma\", \"Audited\"]\n}",
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "description": "Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\").\nFor example: {\n\"Cost Center\":\"2624061970\"\n\"Department\":\"Sales\"\n\"tags\": [\"Green\", \"Pharma\", \"Audited\"]\n}",
+            "description": "Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\").\n\nFor example: {\n\n\"Cost Center\":\"2624061970\"\n\n\"Department\":\"Sales\"\n\n\"tags\": [\"Green\", \"Pharma\", \"Audited\"]\n\n}",
+            "example": null,
             "type": "object"
           }
         },
@@ -516,24 +605,9 @@
       },
       "LabelsResponseObject": {
         "description": "Labels assigned as key-value pairs to the entity.",
-        "properties": {
-          "labels": {
-            "additionalProperties": {
-              "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the entity.\n\nExample: {\n   \"Cost Center\": [\"19700626\"],\n   \"Department\": [\"Sales\"],\n   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n   \"EMEA\":[]\n}",
-              "items": {
-                "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the entity.\n\nExample: {\n   \"Cost Center\": [\"19700626\"],\n   \"Department\": [\"Sales\"],\n   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n   \"EMEA\":[]\n}",
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "description": "User-defined labels that are assigned as key-value pairs in a JSON array to the entity.\n\nExample: {\n   \"Cost Center\": [\"19700626\"],\n   \"Department\": [\"Sales\"],\n   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],\n   \"EMEA\":[]\n}",
-            "type": "object"
-          }
-        },
         "type": "object"
       },
       "NestingErrorDetailsResponseObject": {
-        "description": "Nesting of error responses",
         "properties": {
           "code": {
             "format": "int32",
@@ -543,6 +617,10 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "ParamsResponseObject": {
+        "description": "Params assigned as key-value pairs.",
         "type": "object"
       },
       "RegistrationDetailsResponseObject": {
@@ -607,6 +685,7 @@
           "paramsSchema": {
             "additionalProperties": {
               "description": "JSON schema that describes the parameters that the consumer must provide when subscribing to the application.",
+              "example": null,
               "type": "object"
             },
             "description": "JSON schema that describes the parameters that the consumer must provide when subscribing to the application.",
@@ -643,6 +722,15 @@
       "SaasAsyncSubscriptionRequestPayload": {
         "description": "The details of the subaccount tenant subscription an app provider sends to users.",
         "properties": {
+          "additionalOutput": {
+            "additionalProperties": {
+              "description": "Additional output for callback response.",
+              "example": null,
+              "type": "object"
+            },
+            "description": "Additional output for callback response.",
+            "type": "object"
+          },
           "message": {
             "description": "Additional details accompanying the subscription process. Relates mostly to the cases when the subscription process status is FAILED. ",
             "type": "string"
@@ -699,6 +787,7 @@
           "appProviderCustomProperties": {
             "additionalProperties": {
               "description": "A JSON object with key-value pairs. Values can further be JSON objects. (nested structure)",
+              "example": null,
               "type": "object"
             },
             "description": "A JSON object with key-value pairs. Values can further be JSON objects. (nested structure)",
@@ -717,10 +806,38 @@
           "subscriptionParams": {
             "additionalProperties": {
               "description": "Additional subscription parameters determined by the application provider.",
+              "example": null,
               "type": "object"
             },
             "description": "Additional subscription parameters determined by the application provider.",
             "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "batchUpdateXsuaaSubscriptionDependencies": {
+        "description": "The payload for a batch operation. Specify either GUIDs or tenant IDs (but not both) of multitenant (xsuaa-utilizing) app subscriptions whose dependencies need updating. Use the wildcard character (*) instead of individual IDs to update all subscription dependencies. Send custom property values in the form of key-value pairs to dependent services (provider applications) during the update to notify them about a change related to an existing subscription.",
+        "properties": {
+          "appProviderCustomProperties": {
+            "additionalProperties": {
+              "description": "A JSON object with key-value pairs. Values can further be JSON objects. (nested structure)",
+              "example": null,
+              "type": "object"
+            },
+            "description": "A JSON object with key-value pairs. Values can further be JSON objects. (nested structure)",
+            "type": "object"
+          },
+          "subscriptionGuids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tenantIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -747,7 +864,7 @@
     "url": "https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/ed08c7dcb35d4082936c045e7d7b3ecd.html"
   },
   "info": {
-    "description": "The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.  \nUse the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.\n\nSee also:\n* [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html)\n* [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html)\n* [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html)\n* [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)",
+    "description": "The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.  \nUse the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.\n\nSee also:\n* [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html)\n* [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html)\n* [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html)\n* [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)",
     "termsOfService": "http://www.sap.com",
     "title": "SaaS Provisioning Service",
     "version": "1.0"
@@ -784,11 +901,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -800,7 +917,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -823,7 +940,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -831,6 +948,98 @@
           }
         },
         "summary": "Get job errorStatusCode",
+        "tags": [
+          "Job Management for Application Operations (for App Providers)"
+        ]
+      }
+    },
+    "/api/v2.0/jobs/{jobUuid}/terminate": {
+      "put": {
+        "description": "Graceful terminate the last run of the job with the specified job instance ID. Only jobs with statuses STARTING or STARTED can be stopped. <br/><br/>Required scope: $XSAPPNAME.job.update",
+        "operationId": "gracefulTerminationJob",
+        "parameters": [
+          {
+            "description": "Id of the async job",
+            "in": "path",
+            "name": "jobUuid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Not Authorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Async job can not be stopped while not running"
+          },
+          "429": {
+            "description": "Rate Limit Exceeded",
+            "headers": {
+              "X-Ratelimit-Reset": {
+                "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
+                "example": "167918400000",
+                "schema": {
+                  "format": "long",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Graceful termination of an async job",
         "tags": [
           "Job Management for Application Operations (for App Providers)"
         ]
@@ -856,7 +1065,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/JobStatusResponseObject"
                 }
               }
             },
@@ -866,7 +1075,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -882,7 +1091,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -905,7 +1114,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -952,11 +1161,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -968,7 +1177,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1013,6 +1222,15 @@
             "description": "Get subscriptions by tenant ID.",
             "in": "query",
             "name": "tenantId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The unique ID of the root subscription.",
+            "in": "query",
+            "name": "subscriptionGUID",
             "required": false,
             "schema": {
               "type": "string"
@@ -1069,7 +1287,7 @@
             "name": "size",
             "required": false,
             "schema": {
-              "default": "-1",
+              "default": "500",
               "type": "string"
             }
           },
@@ -1118,7 +1336,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1141,7 +1359,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1149,6 +1367,177 @@
           }
         },
         "summary": "Get application subscriptions",
+        "tags": [
+          "Application Operations for App Providers"
+        ]
+      }
+    },
+    "/saas-manager/v1/application/subscriptions/batch": {
+      "patch": {
+        "description": "<b>Prerequisites</b>:\nYou have obtained the access token for the application.<br><br>\nBatch-update the dependencies of a multitenant application.<br>\nThis REST call is asynchronous.\nAfter executing the API, a job to update dependencies is created.\nYou can update dependencies for subscriptions with status: SUBSCRIBED, UPDATE_FAILED and UPDATE_PARAMETERS_FAILED.\nAfter the API has been executed, you will get the notification specifying the details of the created subscription job in the following format:<br>\n“Job for update subscription batch of application: <i>&lt;appId&gt;</i>, was created.”<br>\nWhere: \n* <i>&lt;appId&gt;</i> is the ID of the application to which you subscribed the tenants.\n\nNote that if you enable the allowUpdateOnFailedSubscription parameter, you can also use this API for subscriptions that are with a SUBSCRIBE_FAILED or UNSUBSCRIBE_FAILED status, but only for the purpose of removing dependencies.\n\n<br/><br/>Required scopes: $XSAPPNAME.subscription.write",
+        "operationId": "batchUpdateApplicationAndTenantSubscriptionAsync",
+        "parameters": [
+          {
+            "description": "Whether to skip updating the dependencies that haven’t changed.",
+            "in": "query",
+            "name": "skipUnchangedDependencies",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Whether to skip updating dependencies. If set to true, updateApplicationURL must also be set to true.\nThis way, you can update the application URL without updating its dependencies.",
+            "in": "query",
+            "name": "skipUpdatingDependencies",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Whether to update the application URL returned from the app callback. If set to true together with skipUpdatingDependencies, the API call becomes synchronous.",
+            "in": "query",
+            "name": "updateApplicationURL",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Whether to update a dependency subscription tree when the state of the root subscription is UNSUBSCRIBE_FAILED or SUBSCRIBE_FAILED. \nNote that in such cases, you can only use the update feature for the purpose of removing existing dependencies. ",
+            "in": "query",
+            "name": "allowUpdateOnFailedSubscription",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "For all the APIs in the Application Operations for App Providers group, use only this authorization method.\nSee the link for details about [how to obtain the access token](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/6391b5dfe4704c6c8b71a32126828e9c.html).",
+            "example": "Bearer <access-token-here>",
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Specifies the type of data that is sent.",
+            "example": "<application/json>",
+            "in": "header",
+            "name": "Content-Type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "application/json"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/batchUpdateXsuaaSubscriptionDependencies"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Accepted",
+            "headers": {
+              "Location": {
+                "description": "A path to job status. This path serves as the relative path for the base request URI of the API 'Get job status'.",
+                "schema": {
+                  "type": "string"
+                },
+                "style": "simple"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Not Authorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate Limit Exceeded",
+            "headers": {
+              "X-Ratelimit-Reset": {
+                "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
+                "example": "167918400000",
+                "schema": {
+                  "format": "long",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Batch-update multitenant app subscription dependencies",
         "tags": [
           "Application Operations for App Providers"
         ]
@@ -1229,7 +1618,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1265,7 +1654,7 @@
         ]
       },
       "patch": {
-        "description": "Update the dependencies of a multitenant application.\nThis REST call is asynchronous.\nAfter executing the API, a job to update dependencies is created.\nYou can update dependencies for tenants with status: SUBSCRIBED, UPDATE_FAILED.\nAfter the API has been executed, you will get the notification specifying the details of the created subscription job in the following format: \n“Job for the subscription of application: <i>&lt;appId&gt;</i> and tenant: <i>&lt;tenantId&gt;</i> was created.”\nWhere: \n* <i>&lt;appId&gt;</i> is the ID of the application to which you subscribed the tenant. \n* <i>&lt;tenantId&gt;</i> is the ID of the subscribed tenant.\n\n<b>Prerequisites</b>:\nYou have obtained the access token for the application.\n<br/><br/>Required scopes: $XSAPPNAME.subscription.write",
+        "description": "Update the dependencies of a multitenant application.\nThis REST call is asynchronous.\nAfter executing the API, a job to update dependencies is created.\nYou can update dependencies for subscriptions with status: SUBSCRIBED, UPDATE_FAILED and UPDATE_PARAMETERS_FAILED.\nAfter the API has been executed, you will get the notification specifying the details of the created subscription job in the following format: \n“Job for the subscription of application: <i>&lt;appId&gt;</i> and tenant: <i>&lt;tenantId&gt;</i> was created.”\nWhere: \n* <i>&lt;appId&gt;</i> is the ID of the application to which you subscribed the tenant. \n* <i>&lt;tenantId&gt;</i> is the ID of the subscribed tenant.\n\nNote that if you enable the allowUpdateOnFailedSubscription parameter, you can also use this API for subscriptions that are with a SUBSCRIBE_FAILED or UNSUBSCRIBE_FAILED status, but only for the purpose of removing dependencies.\n<b>Prerequisites</b>:\nYou have obtained the access token for the application.\n<br/><br/>Required scopes: $XSAPPNAME.subscription.write",
         "operationId": "updateApplicationAndTenantSubscriptionAsync",
         "parameters": [
           {
@@ -1299,6 +1688,15 @@
             "description": "Whether to update the application URL returned from the app callback. If set to true together with skipUpdatingDependencies, the API call becomes synchronous.",
             "in": "query",
             "name": "updateApplicationURL",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Whether to update a dependency subscription tree when the state of the root subscription is UNSUBSCRIBE_FAILED or SUBSCRIBE_FAILED. \nNote that in such cases, you can only use the update feature for the purpose of removing existing dependencies. ",
+            "in": "query",
+            "name": "allowUpdateOnFailedSubscription",
             "required": false,
             "schema": {
               "type": "boolean"
@@ -1387,7 +1785,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1404,17 +1802,14 @@
             "description": "Conflict"
           },
           "429": {
-            "description": "Rate Limit Exceeded",
-            "headers": {
-              "X-Ratelimit-Reset": {
-                "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
-                "example": "167918400000",
+            "content": {
+              "application/json": {
                 "schema": {
-                  "format": "long",
-                  "type": "string"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Too many requests"
           },
           "500": {
             "content": {
@@ -1464,11 +1859,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1480,7 +1875,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1503,7 +1898,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1540,6 +1935,16 @@
             }
           },
           {
+            "description": "Whether appName is used as a commercialAppName. default is false, means it is used as the appName.",
+            "in": "query",
+            "name": "useCommercialAppName",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Indicates the natural language and locale that the client prefers.",
             "example": "*",
             "in": "header",
@@ -1568,11 +1973,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1584,7 +1989,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1607,7 +2012,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1635,6 +2040,16 @@
             }
           },
           {
+            "description": "Whether appName is used as a commercialAppName. default is false, means it is used as the appName.",
+            "in": "query",
+            "name": "useCommercialAppName",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Provide a set of correlation parameters to be used by the initial and subsequent components involved in the request: \n- The Root Context ID (GUID) identifies the initial context within a complex scenario, for example, the initiating user session. \n- The Transaction ID (GUID) identifies a technical transaction. \n- Connection ID (GUID) and Connection Counter uniquely identify together  every request or message leaving a component via outbound communication.",
             "in": "header",
             "name": "SAP-PASSPORT",
@@ -1652,11 +2067,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1668,7 +2083,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1701,7 +2116,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1725,6 +2140,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Whether appName is used as a commercialAppName. default is false, means it is used as the appName.",
+            "in": "query",
+            "name": "useCommercialAppName",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "requestBody": {
@@ -1744,11 +2169,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1760,7 +2185,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1770,7 +2195,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1780,7 +2205,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1803,7 +2228,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1826,6 +2251,16 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Whether appName is used as a commercialAppName. default is false, means it is used as the appName.",
+            "in": "query",
+            "name": "useCommercialAppName",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           },
           {
@@ -1855,11 +2290,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1871,7 +2306,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1881,7 +2316,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1904,7 +2339,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1930,6 +2365,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Whether appName is used as a commercialAppName. default is false, means it is used as the appName.",
+            "in": "query",
+            "name": "useCommercialAppName",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -1947,11 +2392,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1963,7 +2408,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1986,7 +2431,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -2010,6 +2455,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Whether appName is used as a commercialAppName. default is false, means it is used as the appName.",
+            "in": "query",
+            "name": "useCommercialAppName",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2027,11 +2482,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -2043,7 +2498,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -2066,7 +2521,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -2089,6 +2544,16 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Whether appName is used as a commercialAppName. default is false, means it is used as the appName.",
+            "in": "query",
+            "name": "useCommercialAppName",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -2117,11 +2582,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -2133,7 +2598,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -2156,7 +2621,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -2164,6 +2629,98 @@
           }
         },
         "summary": "Assign labels to a multitenant application subscription",
+        "tags": [
+          "Subscription Operations for App Consumers"
+        ]
+      }
+    },
+    "/saas-manager/v1/applications/{appName}/subscription/parameters": {
+      "get": {
+        "description": "Get all user-defined consumer subaccount's subscription parameters to a multitenant application. \n\nRequired scope: $XSAPPNAME.subaccount.application.subscription.read",
+        "operationId": "getSubscriptionParams",
+        "parameters": [
+          {
+            "description": "The name of the multitenant application to which a subaccount is subscribed.",
+            "in": "path",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Whether appName is used as a commercialAppName. default is false, means it is used as the appName.",
+            "in": "query",
+            "name": "useCommercialAppName",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParamsResponseObject"
+                }
+              }
+            },
+            "description": "Ok"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Not Authorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Supported"
+          },
+          "429": {
+            "description": "Rate Limit Exceeded",
+            "headers": {
+              "X-Ratelimit-Reset": {
+                "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
+                "example": "167918400000",
+                "schema": {
+                  "format": "long",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Get subscription parameters",
         "tags": [
           "Subscription Operations for App Consumers"
         ]
@@ -2242,7 +2799,7 @@
         },
         "summary": "Subscribe a subaccount tenant to an application",
         "tags": [
-          "Asynchronous Callback Operations for XSUAA"
+          "Asynchronous Callback Operations for SAP Authorization and Trust Management Service (XSUAA)"
         ]
       }
     }
@@ -2260,12 +2817,12 @@
   ],
   "tags": [
     {
-      "description": "Asynchronous Callback Operations for XSUAA",
-      "name": "Asynchronous Callback Operations for XSUAA"
-    },
-    {
       "description": "Job Management",
       "name": "Job Management"
+    },
+    {
+      "description": "Asynchronous Callback Operations for SAP Authorization and Trust Management Service (XSUAA)",
+      "name": "Asynchronous Callback Operations for SAP Authorization and Trust Management Service (XSUAA)"
     },
     {
       "description": "Subscription Operations for App Consumers",

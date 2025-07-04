@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -21,6 +21,8 @@ var _ MappedNullable = &EntitledApplicationsResponseObject{}
 type EntitledApplicationsResponseObject struct {
 	// The list of features specific to this plan.
 	AdditionalPlanFeatures []string `json:"additionalPlanFeatures,omitempty"`
+	// List of plans to which the existing subscription can switch. Includes upgrades, downgrades, and other types of transitions.
+	AllowedTargetPlans []string `json:"allowedTargetPlans,omitempty"`
 	// The ID returned by XSUAA after the app provider has performed a bind of the multitenant application to a XSUAA service instance.
 	AppId *string `json:"appId,omitempty"`
 	// The unique registration name of the deployed multitenant application as defined by the app developer.
@@ -40,6 +42,8 @@ type EntitledApplicationsResponseObject struct {
 	CategoryDisplayName *string `json:"categoryDisplayName,omitempty"`
 	// The commercial name of the deployed multitenant application as defined by the app developer.
 	CommercialAppName *string `json:"commercialAppName,omitempty"`
+	// Details about the user or client that created this subscription.
+	CreatedBy *string `json:"createdBy,omitempty"`
 	// The date the subscription was created. Dates and times are in UTC format.
 	CreatedDate *float32 `json:"createdDate,omitempty"`
 	// Whether the application was developed by a customer. If not, then the application is developed by the cloud operator, such as SAP.
@@ -56,9 +60,11 @@ type EntitledApplicationsResponseObject struct {
 	IconBase64 *string `json:"iconBase64,omitempty"`
 	// The application's incident-tracking component provided in metadata for customer-facing UIs.
 	IncidentTrackingComponent *string `json:"incidentTrackingComponent,omitempty"`
-	// User-defined labels that are assigned as key-value pairs in a JSON array to the multitenant application subscription.  Example: {   \"Cost Center\": [\"19700626\"],   \"Department\": [\"Sales\"],   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],   \"EMEA\":[] }
-	Labels *map[string][]string `json:"labels,omitempty"`
+	// User-defined labels that are assigned as key-value pairs in a JSON array to the multitenant application subscription.   Example:  {    \"Cost Center\": [\"19700626\"],    \"Department\": [\"Sales\"],    \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],    \"EMEA\":[]  }
+	Labels map[string]interface{} `json:"labels,omitempty"`
 	Metadata *EntitledApplicationsResponseObjectMetadata `json:"metadata,omitempty"`
+	// Details about the user or client that last modified this subscription.
+	ModifiedBy *string `json:"modifiedBy,omitempty"`
 	// The date the subscription was last modified. Dates and times are in UTC format.
 	ModifiedDate *float32 `json:"modifiedDate,omitempty"`
 	ParamsSchema *EntitledApplicationsResponseObjectParamsSchema `json:"paramsSchema,omitempty"`
@@ -85,6 +91,8 @@ type EntitledApplicationsResponseObject struct {
 	SubscriptionId *string `json:"subscriptionId,omitempty"`
 	// URL for app users to launch the subscribed application.
 	SubscriptionUrl *string `json:"subscriptionUrl,omitempty"`
+	// Specifies whether a subaccount can provide its subscriptions parameters.
+	SupportsGetParameters *bool `json:"supportsGetParameters,omitempty"`
 	// Specifies whether a consumer, whose subaccount is subscribed to the application, can change its subscriptions parameters.
 	SupportsParametersUpdates *bool `json:"supportsParametersUpdates,omitempty"`
 	// Specifies if a consumer, whose subaccount is subscribed to the application, can change the subscription to a different plan that is available for this application and subaccount.
@@ -140,6 +148,38 @@ func (o *EntitledApplicationsResponseObject) HasAdditionalPlanFeatures() bool {
 // SetAdditionalPlanFeatures gets a reference to the given []string and assigns it to the AdditionalPlanFeatures field.
 func (o *EntitledApplicationsResponseObject) SetAdditionalPlanFeatures(v []string) {
 	o.AdditionalPlanFeatures = v
+}
+
+// GetAllowedTargetPlans returns the AllowedTargetPlans field value if set, zero value otherwise.
+func (o *EntitledApplicationsResponseObject) GetAllowedTargetPlans() []string {
+	if o == nil || IsNil(o.AllowedTargetPlans) {
+		var ret []string
+		return ret
+	}
+	return o.AllowedTargetPlans
+}
+
+// GetAllowedTargetPlansOk returns a tuple with the AllowedTargetPlans field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *EntitledApplicationsResponseObject) GetAllowedTargetPlansOk() ([]string, bool) {
+	if o == nil || IsNil(o.AllowedTargetPlans) {
+		return nil, false
+	}
+	return o.AllowedTargetPlans, true
+}
+
+// HasAllowedTargetPlans returns a boolean if a field has been set.
+func (o *EntitledApplicationsResponseObject) HasAllowedTargetPlans() bool {
+	if o != nil && !IsNil(o.AllowedTargetPlans) {
+		return true
+	}
+
+	return false
+}
+
+// SetAllowedTargetPlans gets a reference to the given []string and assigns it to the AllowedTargetPlans field.
+func (o *EntitledApplicationsResponseObject) SetAllowedTargetPlans(v []string) {
+	o.AllowedTargetPlans = v
 }
 
 // GetAppId returns the AppId field value if set, zero value otherwise.
@@ -462,6 +502,38 @@ func (o *EntitledApplicationsResponseObject) SetCommercialAppName(v string) {
 	o.CommercialAppName = &v
 }
 
+// GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
+func (o *EntitledApplicationsResponseObject) GetCreatedBy() string {
+	if o == nil || IsNil(o.CreatedBy) {
+		var ret string
+		return ret
+	}
+	return *o.CreatedBy
+}
+
+// GetCreatedByOk returns a tuple with the CreatedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *EntitledApplicationsResponseObject) GetCreatedByOk() (*string, bool) {
+	if o == nil || IsNil(o.CreatedBy) {
+		return nil, false
+	}
+	return o.CreatedBy, true
+}
+
+// HasCreatedBy returns a boolean if a field has been set.
+func (o *EntitledApplicationsResponseObject) HasCreatedBy() bool {
+	if o != nil && !IsNil(o.CreatedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetCreatedBy gets a reference to the given string and assigns it to the CreatedBy field.
+func (o *EntitledApplicationsResponseObject) SetCreatedBy(v string) {
+	o.CreatedBy = &v
+}
+
 // GetCreatedDate returns the CreatedDate field value if set, zero value otherwise.
 func (o *EntitledApplicationsResponseObject) GetCreatedDate() float32 {
 	if o == nil || IsNil(o.CreatedDate) {
@@ -719,19 +791,19 @@ func (o *EntitledApplicationsResponseObject) SetIncidentTrackingComponent(v stri
 }
 
 // GetLabels returns the Labels field value if set, zero value otherwise.
-func (o *EntitledApplicationsResponseObject) GetLabels() map[string][]string {
+func (o *EntitledApplicationsResponseObject) GetLabels() map[string]interface{} {
 	if o == nil || IsNil(o.Labels) {
-		var ret map[string][]string
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Labels
+	return o.Labels
 }
 
 // GetLabelsOk returns a tuple with the Labels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *EntitledApplicationsResponseObject) GetLabelsOk() (*map[string][]string, bool) {
+func (o *EntitledApplicationsResponseObject) GetLabelsOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Labels) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Labels, true
 }
@@ -745,9 +817,9 @@ func (o *EntitledApplicationsResponseObject) HasLabels() bool {
 	return false
 }
 
-// SetLabels gets a reference to the given map[string][]string and assigns it to the Labels field.
-func (o *EntitledApplicationsResponseObject) SetLabels(v map[string][]string) {
-	o.Labels = &v
+// SetLabels gets a reference to the given map[string]interface{} and assigns it to the Labels field.
+func (o *EntitledApplicationsResponseObject) SetLabels(v map[string]interface{}) {
+	o.Labels = v
 }
 
 // GetMetadata returns the Metadata field value if set, zero value otherwise.
@@ -780,6 +852,38 @@ func (o *EntitledApplicationsResponseObject) HasMetadata() bool {
 // SetMetadata gets a reference to the given EntitledApplicationsResponseObjectMetadata and assigns it to the Metadata field.
 func (o *EntitledApplicationsResponseObject) SetMetadata(v EntitledApplicationsResponseObjectMetadata) {
 	o.Metadata = &v
+}
+
+// GetModifiedBy returns the ModifiedBy field value if set, zero value otherwise.
+func (o *EntitledApplicationsResponseObject) GetModifiedBy() string {
+	if o == nil || IsNil(o.ModifiedBy) {
+		var ret string
+		return ret
+	}
+	return *o.ModifiedBy
+}
+
+// GetModifiedByOk returns a tuple with the ModifiedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *EntitledApplicationsResponseObject) GetModifiedByOk() (*string, bool) {
+	if o == nil || IsNil(o.ModifiedBy) {
+		return nil, false
+	}
+	return o.ModifiedBy, true
+}
+
+// HasModifiedBy returns a boolean if a field has been set.
+func (o *EntitledApplicationsResponseObject) HasModifiedBy() bool {
+	if o != nil && !IsNil(o.ModifiedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetModifiedBy gets a reference to the given string and assigns it to the ModifiedBy field.
+func (o *EntitledApplicationsResponseObject) SetModifiedBy(v string) {
+	o.ModifiedBy = &v
 }
 
 // GetModifiedDate returns the ModifiedDate field value if set, zero value otherwise.
@@ -1230,6 +1334,38 @@ func (o *EntitledApplicationsResponseObject) SetSubscriptionUrl(v string) {
 	o.SubscriptionUrl = &v
 }
 
+// GetSupportsGetParameters returns the SupportsGetParameters field value if set, zero value otherwise.
+func (o *EntitledApplicationsResponseObject) GetSupportsGetParameters() bool {
+	if o == nil || IsNil(o.SupportsGetParameters) {
+		var ret bool
+		return ret
+	}
+	return *o.SupportsGetParameters
+}
+
+// GetSupportsGetParametersOk returns a tuple with the SupportsGetParameters field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *EntitledApplicationsResponseObject) GetSupportsGetParametersOk() (*bool, bool) {
+	if o == nil || IsNil(o.SupportsGetParameters) {
+		return nil, false
+	}
+	return o.SupportsGetParameters, true
+}
+
+// HasSupportsGetParameters returns a boolean if a field has been set.
+func (o *EntitledApplicationsResponseObject) HasSupportsGetParameters() bool {
+	if o != nil && !IsNil(o.SupportsGetParameters) {
+		return true
+	}
+
+	return false
+}
+
+// SetSupportsGetParameters gets a reference to the given bool and assigns it to the SupportsGetParameters field.
+func (o *EntitledApplicationsResponseObject) SetSupportsGetParameters(v bool) {
+	o.SupportsGetParameters = &v
+}
+
 // GetSupportsParametersUpdates returns the SupportsParametersUpdates field value if set, zero value otherwise.
 func (o *EntitledApplicationsResponseObject) GetSupportsParametersUpdates() bool {
 	if o == nil || IsNil(o.SupportsParametersUpdates) {
@@ -1339,6 +1475,9 @@ func (o EntitledApplicationsResponseObject) ToMap() (map[string]interface{}, err
 	if !IsNil(o.AdditionalPlanFeatures) {
 		toSerialize["additionalPlanFeatures"] = o.AdditionalPlanFeatures
 	}
+	if !IsNil(o.AllowedTargetPlans) {
+		toSerialize["allowedTargetPlans"] = o.AllowedTargetPlans
+	}
 	if !IsNil(o.AppId) {
 		toSerialize["appId"] = o.AppId
 	}
@@ -1369,6 +1508,9 @@ func (o EntitledApplicationsResponseObject) ToMap() (map[string]interface{}, err
 	if !IsNil(o.CommercialAppName) {
 		toSerialize["commercialAppName"] = o.CommercialAppName
 	}
+	if !IsNil(o.CreatedBy) {
+		toSerialize["createdBy"] = o.CreatedBy
+	}
 	if !IsNil(o.CreatedDate) {
 		toSerialize["createdDate"] = o.CreatedDate
 	}
@@ -1398,6 +1540,9 @@ func (o EntitledApplicationsResponseObject) ToMap() (map[string]interface{}, err
 	}
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
+	}
+	if !IsNil(o.ModifiedBy) {
+		toSerialize["modifiedBy"] = o.ModifiedBy
 	}
 	if !IsNil(o.ModifiedDate) {
 		toSerialize["modifiedDate"] = o.ModifiedDate
@@ -1440,6 +1585,9 @@ func (o EntitledApplicationsResponseObject) ToMap() (map[string]interface{}, err
 	}
 	if !IsNil(o.SubscriptionUrl) {
 		toSerialize["subscriptionUrl"] = o.SubscriptionUrl
+	}
+	if !IsNil(o.SupportsGetParameters) {
+		toSerialize["supportsGetParameters"] = o.SupportsGetParameters
 	}
 	if !IsNil(o.SupportsParametersUpdates) {
 		toSerialize["supportsParametersUpdates"] = o.SupportsParametersUpdates

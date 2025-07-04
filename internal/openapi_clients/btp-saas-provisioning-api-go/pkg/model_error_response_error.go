@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -16,17 +16,16 @@ import (
 	"fmt"
 )
 
-// checks if the ApiExceptionResponseObjectError type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ApiExceptionResponseObjectError{}
+// checks if the ErrorResponseError type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &ErrorResponseError{}
 
-// ApiExceptionResponseObjectError struct for ApiExceptionResponseObjectError
-type ApiExceptionResponseObjectError struct {
+// ErrorResponseError struct for ErrorResponseError
+type ErrorResponseError struct {
 	// Technical code of the error as a reference for support
 	Code int32 `json:"code"`
 	// Log correlation ID to track the event
 	CorrelationID string `json:"correlationID"`
-	// Error description in JSON format
-	Description map[string]interface{} `json:"description,omitempty"`
+	Description *string `json:"description,omitempty"`
 	// Nesting of error responses
 	Details []NestingErrorDetailsResponseObject `json:"details,omitempty"`
 	// User-friendly description of the error.
@@ -35,30 +34,30 @@ type ApiExceptionResponseObjectError struct {
 	Target *string `json:"target,omitempty"`
 }
 
-type _ApiExceptionResponseObjectError ApiExceptionResponseObjectError
+type _ErrorResponseError ErrorResponseError
 
-// NewApiExceptionResponseObjectError instantiates a new ApiExceptionResponseObjectError object
+// NewErrorResponseError instantiates a new ErrorResponseError object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewApiExceptionResponseObjectError(code int32, correlationID string, message string) *ApiExceptionResponseObjectError {
-	this := ApiExceptionResponseObjectError{}
+func NewErrorResponseError(code int32, correlationID string, message string) *ErrorResponseError {
+	this := ErrorResponseError{}
 	this.Code = code
 	this.CorrelationID = correlationID
 	this.Message = message
 	return &this
 }
 
-// NewApiExceptionResponseObjectErrorWithDefaults instantiates a new ApiExceptionResponseObjectError object
+// NewErrorResponseErrorWithDefaults instantiates a new ErrorResponseError object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewApiExceptionResponseObjectErrorWithDefaults() *ApiExceptionResponseObjectError {
-	this := ApiExceptionResponseObjectError{}
+func NewErrorResponseErrorWithDefaults() *ErrorResponseError {
+	this := ErrorResponseError{}
 	return &this
 }
 
 // GetCode returns the Code field value
-func (o *ApiExceptionResponseObjectError) GetCode() int32 {
+func (o *ErrorResponseError) GetCode() int32 {
 	if o == nil {
 		var ret int32
 		return ret
@@ -69,7 +68,7 @@ func (o *ApiExceptionResponseObjectError) GetCode() int32 {
 
 // GetCodeOk returns a tuple with the Code field value
 // and a boolean to check if the value has been set.
-func (o *ApiExceptionResponseObjectError) GetCodeOk() (*int32, bool) {
+func (o *ErrorResponseError) GetCodeOk() (*int32, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -77,12 +76,12 @@ func (o *ApiExceptionResponseObjectError) GetCodeOk() (*int32, bool) {
 }
 
 // SetCode sets field value
-func (o *ApiExceptionResponseObjectError) SetCode(v int32) {
+func (o *ErrorResponseError) SetCode(v int32) {
 	o.Code = v
 }
 
 // GetCorrelationID returns the CorrelationID field value
-func (o *ApiExceptionResponseObjectError) GetCorrelationID() string {
+func (o *ErrorResponseError) GetCorrelationID() string {
 	if o == nil {
 		var ret string
 		return ret
@@ -93,7 +92,7 @@ func (o *ApiExceptionResponseObjectError) GetCorrelationID() string {
 
 // GetCorrelationIDOk returns a tuple with the CorrelationID field value
 // and a boolean to check if the value has been set.
-func (o *ApiExceptionResponseObjectError) GetCorrelationIDOk() (*string, bool) {
+func (o *ErrorResponseError) GetCorrelationIDOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -101,30 +100,30 @@ func (o *ApiExceptionResponseObjectError) GetCorrelationIDOk() (*string, bool) {
 }
 
 // SetCorrelationID sets field value
-func (o *ApiExceptionResponseObjectError) SetCorrelationID(v string) {
+func (o *ErrorResponseError) SetCorrelationID(v string) {
 	o.CorrelationID = v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
-func (o *ApiExceptionResponseObjectError) GetDescription() map[string]interface{} {
+func (o *ErrorResponseError) GetDescription() string {
 	if o == nil || IsNil(o.Description) {
-		var ret map[string]interface{}
+		var ret string
 		return ret
 	}
-	return o.Description
+	return *o.Description
 }
 
 // GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ApiExceptionResponseObjectError) GetDescriptionOk() (map[string]interface{}, bool) {
+func (o *ErrorResponseError) GetDescriptionOk() (*string, bool) {
 	if o == nil || IsNil(o.Description) {
-		return map[string]interface{}{}, false
+		return nil, false
 	}
 	return o.Description, true
 }
 
 // HasDescription returns a boolean if a field has been set.
-func (o *ApiExceptionResponseObjectError) HasDescription() bool {
+func (o *ErrorResponseError) HasDescription() bool {
 	if o != nil && !IsNil(o.Description) {
 		return true
 	}
@@ -132,13 +131,13 @@ func (o *ApiExceptionResponseObjectError) HasDescription() bool {
 	return false
 }
 
-// SetDescription gets a reference to the given map[string]interface{} and assigns it to the Description field.
-func (o *ApiExceptionResponseObjectError) SetDescription(v map[string]interface{}) {
-	o.Description = v
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *ErrorResponseError) SetDescription(v string) {
+	o.Description = &v
 }
 
 // GetDetails returns the Details field value if set, zero value otherwise.
-func (o *ApiExceptionResponseObjectError) GetDetails() []NestingErrorDetailsResponseObject {
+func (o *ErrorResponseError) GetDetails() []NestingErrorDetailsResponseObject {
 	if o == nil || IsNil(o.Details) {
 		var ret []NestingErrorDetailsResponseObject
 		return ret
@@ -148,7 +147,7 @@ func (o *ApiExceptionResponseObjectError) GetDetails() []NestingErrorDetailsResp
 
 // GetDetailsOk returns a tuple with the Details field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ApiExceptionResponseObjectError) GetDetailsOk() ([]NestingErrorDetailsResponseObject, bool) {
+func (o *ErrorResponseError) GetDetailsOk() ([]NestingErrorDetailsResponseObject, bool) {
 	if o == nil || IsNil(o.Details) {
 		return nil, false
 	}
@@ -156,7 +155,7 @@ func (o *ApiExceptionResponseObjectError) GetDetailsOk() ([]NestingErrorDetailsR
 }
 
 // HasDetails returns a boolean if a field has been set.
-func (o *ApiExceptionResponseObjectError) HasDetails() bool {
+func (o *ErrorResponseError) HasDetails() bool {
 	if o != nil && !IsNil(o.Details) {
 		return true
 	}
@@ -165,12 +164,12 @@ func (o *ApiExceptionResponseObjectError) HasDetails() bool {
 }
 
 // SetDetails gets a reference to the given []NestingErrorDetailsResponseObject and assigns it to the Details field.
-func (o *ApiExceptionResponseObjectError) SetDetails(v []NestingErrorDetailsResponseObject) {
+func (o *ErrorResponseError) SetDetails(v []NestingErrorDetailsResponseObject) {
 	o.Details = v
 }
 
 // GetMessage returns the Message field value
-func (o *ApiExceptionResponseObjectError) GetMessage() string {
+func (o *ErrorResponseError) GetMessage() string {
 	if o == nil {
 		var ret string
 		return ret
@@ -181,7 +180,7 @@ func (o *ApiExceptionResponseObjectError) GetMessage() string {
 
 // GetMessageOk returns a tuple with the Message field value
 // and a boolean to check if the value has been set.
-func (o *ApiExceptionResponseObjectError) GetMessageOk() (*string, bool) {
+func (o *ErrorResponseError) GetMessageOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -189,12 +188,12 @@ func (o *ApiExceptionResponseObjectError) GetMessageOk() (*string, bool) {
 }
 
 // SetMessage sets field value
-func (o *ApiExceptionResponseObjectError) SetMessage(v string) {
+func (o *ErrorResponseError) SetMessage(v string) {
 	o.Message = v
 }
 
 // GetTarget returns the Target field value if set, zero value otherwise.
-func (o *ApiExceptionResponseObjectError) GetTarget() string {
+func (o *ErrorResponseError) GetTarget() string {
 	if o == nil || IsNil(o.Target) {
 		var ret string
 		return ret
@@ -204,7 +203,7 @@ func (o *ApiExceptionResponseObjectError) GetTarget() string {
 
 // GetTargetOk returns a tuple with the Target field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ApiExceptionResponseObjectError) GetTargetOk() (*string, bool) {
+func (o *ErrorResponseError) GetTargetOk() (*string, bool) {
 	if o == nil || IsNil(o.Target) {
 		return nil, false
 	}
@@ -212,7 +211,7 @@ func (o *ApiExceptionResponseObjectError) GetTargetOk() (*string, bool) {
 }
 
 // HasTarget returns a boolean if a field has been set.
-func (o *ApiExceptionResponseObjectError) HasTarget() bool {
+func (o *ErrorResponseError) HasTarget() bool {
 	if o != nil && !IsNil(o.Target) {
 		return true
 	}
@@ -221,11 +220,11 @@ func (o *ApiExceptionResponseObjectError) HasTarget() bool {
 }
 
 // SetTarget gets a reference to the given string and assigns it to the Target field.
-func (o *ApiExceptionResponseObjectError) SetTarget(v string) {
+func (o *ErrorResponseError) SetTarget(v string) {
 	o.Target = &v
 }
 
-func (o ApiExceptionResponseObjectError) MarshalJSON() ([]byte, error) {
+func (o ErrorResponseError) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -233,7 +232,7 @@ func (o ApiExceptionResponseObjectError) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ApiExceptionResponseObjectError) ToMap() (map[string]interface{}, error) {
+func (o ErrorResponseError) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["code"] = o.Code
 	toSerialize["correlationID"] = o.CorrelationID
@@ -250,7 +249,7 @@ func (o ApiExceptionResponseObjectError) ToMap() (map[string]interface{}, error)
 	return toSerialize, nil
 }
 
-func (o *ApiExceptionResponseObjectError) UnmarshalJSON(data []byte) (err error) {
+func (o *ErrorResponseError) UnmarshalJSON(data []byte) (err error) {
 	// This validates that all required properties are included in the JSON object
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
@@ -274,53 +273,53 @@ func (o *ApiExceptionResponseObjectError) UnmarshalJSON(data []byte) (err error)
 		}
 	}
 
-	varApiExceptionResponseObjectError := _ApiExceptionResponseObjectError{}
+	varErrorResponseError := _ErrorResponseError{}
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varApiExceptionResponseObjectError)
+	err = decoder.Decode(&varErrorResponseError)
 
 	if err != nil {
 		return err
 	}
 
-	*o = ApiExceptionResponseObjectError(varApiExceptionResponseObjectError)
+	*o = ErrorResponseError(varErrorResponseError)
 
 	return err
 }
 
-type NullableApiExceptionResponseObjectError struct {
-	value *ApiExceptionResponseObjectError
+type NullableErrorResponseError struct {
+	value *ErrorResponseError
 	isSet bool
 }
 
-func (v NullableApiExceptionResponseObjectError) Get() *ApiExceptionResponseObjectError {
+func (v NullableErrorResponseError) Get() *ErrorResponseError {
 	return v.value
 }
 
-func (v *NullableApiExceptionResponseObjectError) Set(val *ApiExceptionResponseObjectError) {
+func (v *NullableErrorResponseError) Set(val *ErrorResponseError) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableApiExceptionResponseObjectError) IsSet() bool {
+func (v NullableErrorResponseError) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableApiExceptionResponseObjectError) Unset() {
+func (v *NullableErrorResponseError) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableApiExceptionResponseObjectError(val *ApiExceptionResponseObjectError) *NullableApiExceptionResponseObjectError {
-	return &NullableApiExceptionResponseObjectError{value: val, isSet: true}
+func NewNullableErrorResponseError(val *ErrorResponseError) *NullableErrorResponseError {
+	return &NullableErrorResponseError{value: val, isSet: true}
 }
 
-func (v NullableApiExceptionResponseObjectError) MarshalJSON() ([]byte, error) {
+func (v NullableErrorResponseError) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableApiExceptionResponseObjectError) UnmarshalJSON(src []byte) error {
+func (v *NullableErrorResponseError) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

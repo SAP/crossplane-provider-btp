@@ -162,6 +162,11 @@ spec:
                     x-kubernetes-validations:
                     - message: appName can't be updated once set
                       rule: self == oldSelf
+                  parameters:
+                    description: Subscription parameters allows you to add additional
+                      parameters
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   planName:
                     description: PlanName to subscribe to, empty plannames are shown
                       as "default" in cockpit, use "" instead
