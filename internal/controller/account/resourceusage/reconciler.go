@@ -170,7 +170,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 			r.record.Event(ru, event.Warning(reasonAccount, errors.New(msg)))
 
 			// We're watching our usages, so we'll be requeued when they go.
-			return reconcile.Result{Requeue: false}, errors.Wrap(r.client.Status().Update(ctx, ru), errUpdateStatus)
+			return reconcile.Result{Requeue: false}, nil
 		}
 		// Deletion and removal of finalizer must happen before
 		return reconcile.Result{Requeue: true}, errors.New("inconsistent state, do requeue")
