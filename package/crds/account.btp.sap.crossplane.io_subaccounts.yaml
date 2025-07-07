@@ -254,7 +254,6 @@ spec:
                   region:
                     description: |-
                       Region
-                      TODO(i541351): add regex validation https://wiki.one.int.sap/wiki/display/PFS/Region+Details
                       Change requires recreation
                     minLength: 1
                     type: string

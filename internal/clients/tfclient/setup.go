@@ -150,7 +150,7 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 }
 
 // NewInternalTfConnector creates a new internal Terraform connector, it does not have a callback handler, since those won't be managed by the controller manager
-func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind) *tjcontroller.Connector {
+func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) *tjcontroller.Connector {
 	tfVersion := TF_VERSION_CALLBACK()
 	zl := zap.New(zap.UseDevMode(tfVersion.DebugLogs))
 	setupFn := TerraformSetupBuilderNoTracking(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion)
@@ -159,10 +159,15 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	provider := config.GetProvider()
 	eventHandler := handler.NewEventHandler(handler.WithLogger(log.WithValues("gvk", gvk)))
 
+	// depending on the context we might need resources that are async or not
+	res := provider.Resources[resourceName]
+	res.UseAsync = useAsync
+
 	connector := tjcontroller.NewConnector(client, ws, setupFn,
-		provider.Resources[resourceName],
+		res,
 		tjcontroller.WithLogger(log),
 		tjcontroller.WithConnectorEventHandler(eventHandler),
+		tjcontroller.WithCallbackProvider(callbackProvider),
 	)
 
 	return connector

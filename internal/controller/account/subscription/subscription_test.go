@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -16,8 +18,10 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	tracking_test "github.com/sap/crossplane-provider-btp/internal/tracking/test"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -267,6 +271,116 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+func TestRecreateOnFailed(t *testing.T) {
+	mockKube := testutils.NewFakeKubeClientBuilder().Build()
+	extName := "test-ext-name"
+	ctrl := external{
+		tracker:    nil,
+		kube:       &mockKube,
+		apiHandler: &MockApiHandler{
+			deleteCounter: 0,
+			returnExternalName: extName,
+			returnGet: &subscription.SubscriptionGet{
+				State: ptr.To(v1alpha1.SubscriptionStateSubscribeFailed),
+			},
+		},
+		typeMapper: &MockTypeMapper{
+			synced:    true,
+			available: true,
+			deletable: true,
+		},
+	}
+
+	cr := NewSubscription("initial-fail",
+		WithExternalName(extName),
+		WithRecreateOnSubscriptionFailure())
+
+	// When we observe it, the observed state is SUBSCRIBE_FAILED
+	got, err := ctrl.Observe(context.Background(), cr)
+	if err != nil {
+		t.Errorf("initial observation returned error: %v", err)
+	}
+
+	// The controller shall trigger a deletion
+	if c := ctrl.apiHandler.(*MockApiHandler).deleteCounter; c != 1 {
+		t.Errorf("the initial observation should perform a delete operation (%v)", c)
+	}
+
+	// No need to create or update the external resource
+	if diff := cmp.Diff(managed.ExternalObservation{
+		ResourceExists:    true,
+		ResourceUpToDate:  true,
+		ConnectionDetails: managed.ConnectionDetails{},
+
+	}, got); diff != "" {
+		t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", "initial observation", diff)
+	}
+
+	// The delete operation sets the ready condition
+	readyCondition := cr.GetCondition(xpv1.TypeReady)
+	if readyCondition.Status != corev1.ConditionFalse {
+		t.Errorf("returned CR has wrong ready condition status: %v", readyCondition.Status)
+	}
+	if readyCondition.Reason != xpv1.ReasonDeleting {
+		t.Errorf("returned CR has wrong ready condition reason: %v", readyCondition.Reason)
+	}
+
+	// We observe it again
+	got, err = ctrl.Observe(context.Background(), cr)
+	if err != nil {
+		t.Errorf("initial observation returned error: %v", err)
+	}
+
+	// The controller shall not trigger deletion, since we're in deleting state
+	if c := ctrl.apiHandler.(*MockApiHandler).deleteCounter; c != 1 {
+		t.Errorf("the second observation should not perform a delete operation (%v)", c)
+	}
+
+	// No need to create or update the external resource
+	if diff := cmp.Diff(managed.ExternalObservation{
+		ResourceExists:    true,
+		ResourceUpToDate:  true,
+		ConnectionDetails: managed.ConnectionDetails{},
+
+	}, got); diff != "" {
+		t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", "initial observation", diff)
+	}
+
+	// The external resource is deleted
+	ctrl.typeMapper = &MockTypeMapper{
+			synced:    false,
+			available: false,
+			deletable: false,
+	}
+	// The API does not return SUBSCRIBE_FAILED anymore
+	ctrl.apiHandler = &MockApiHandler{
+		deleteCounter: 0,
+		returnExternalName: extName,
+		// returnGet: &subscription.SubscriptionGet{
+		// 	State: ptr.To(v1alpha1.SubscriptionStateSubscribeFailed),
+		// },
+	}
+
+	// We observe it again
+	got, err = ctrl.Observe(context.Background(), cr)
+	if err != nil {
+		t.Errorf("initial observation returned error: %v", err)
+	}
+
+	// The controller shall not trigger deletion
+	if c := ctrl.apiHandler.(*MockApiHandler).deleteCounter; c != 0 {
+		t.Errorf("the third observation should not perform a delete operation (%v)", c)
+	}
+
+	// The resource shall be created
+	if diff := cmp.Diff(managed.ExternalObservation{
+		ResourceExists:    false,
+
+	}, got); diff != "" {
+		t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", "initial observation", diff)
+	}
+}
+
 func TestDelete(t *testing.T) {
 	type args struct {
 		cr             resource.Managed
@@ -296,7 +410,7 @@ func TestDelete(t *testing.T) {
 			args: args{
 				cr:             NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{})),
 				mockApiHandler: &MockApiHandler{returnErr: errors.New("DeleteError")},
-				mockTypeMapper: &MockTypeMapper{available: true},
+				mockTypeMapper: &MockTypeMapper{deletable: true},
 			},
 			want: want{
 				cr:  NewSubscription("dir-unittests", WithConditions(xpv1.Deleting()), WithStatus(v1alpha1.SubscriptionObservation{})),
@@ -310,7 +424,7 @@ func TestDelete(t *testing.T) {
 				mockApiHandler: &MockApiHandler{
 					returnErr: nil,
 				},
-				mockTypeMapper: &MockTypeMapper{available: true},
+				mockTypeMapper: &MockTypeMapper{deletable: true},
 			},
 			want: want{
 				cr:  NewSubscription("dir-unittests", WithConditions(xpv1.Deleting()), WithStatus(v1alpha1.SubscriptionObservation{})),
@@ -321,7 +435,7 @@ func TestDelete(t *testing.T) {
 			reason: "We expect to skip the API call if external resource is not available (deletion in progress)",
 			args: args{
 				cr:             NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{State: internal.Ptr(v1alpha1.SubscriptionStateInProcess)})),
-				mockTypeMapper: &MockTypeMapper{available: false},
+				mockTypeMapper: &MockTypeMapper{deletable: false},
 			},
 			want: want{
 				cr:  NewSubscription("dir-unittests", WithConditions(xpv1.Deleting()), WithStatus(v1alpha1.SubscriptionObservation{State: internal.Ptr(v1alpha1.SubscriptionStateInProcess)})),
@@ -509,6 +623,7 @@ func TestConnect(t *testing.T) {
 				kube:         &kube,
 				usage:        tracking_test.NoOpReferenceResolverTracker{},
 				newServiceFn: newSubscriptionClientFn,
+				resourcetracker: tracking.NewDefaultReferenceResolverTracker(&kube),
 			}
 
 			connect, err := c.Connect(context.Background(), tc.args.cr)
@@ -557,5 +672,11 @@ func WithConditions(c ...xpv1.Condition) SubscriptionModifier {
 func WithExternalName(externalName string) SubscriptionModifier {
 	return func(r *v1alpha1.Subscription) {
 		meta.SetExternalName(r, externalName)
+	}
+}
+
+func WithRecreateOnSubscriptionFailure() SubscriptionModifier {
+	return func(r *v1alpha1.Subscription) {
+		r.Spec.RecreateOnSubscriptionFailure = true
 	}
 }

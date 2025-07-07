@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -52,7 +52,7 @@ type APIClient struct {
 
 	ApplicationOperationsForAppProvidersAPI ApplicationOperationsForAppProvidersAPI
 
-	AsynchronousCallbackOperationsForXSUAAAPI AsynchronousCallbackOperationsForXSUAAAPI
+	AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPI AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPI
 
 	JobManagementAPI JobManagementAPI
 
@@ -78,7 +78,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 
 	// API Services
 	c.ApplicationOperationsForAppProvidersAPI = (*ApplicationOperationsForAppProvidersAPIService)(&c.common)
-	c.AsynchronousCallbackOperationsForXSUAAAPI = (*AsynchronousCallbackOperationsForXSUAAAPIService)(&c.common)
+	c.AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPI = (*AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPIService)(&c.common)
 	c.JobManagementAPI = (*JobManagementAPIService)(&c.common)
 	c.JobManagementForApplicationOperationsForAppProvidersAPI = (*JobManagementForApplicationOperationsForAppProvidersAPIService)(&c.common)
 	c.SubscriptionOperationsForAppConsumersAPI = (*SubscriptionOperationsForAppConsumersAPIService)(&c.common)
@@ -140,6 +140,10 @@ func typeCheckParameter(obj interface{}, expected string, name string) error {
 
 func parameterValueToString( obj interface{}, key string ) string {
 	if reflect.TypeOf(obj).Kind() != reflect.Ptr {
+		if actualObj, ok := obj.(interface{ GetActualInstanceValue() interface{} }); ok {
+			return fmt.Sprintf("%v", actualObj.GetActualInstanceValue())
+		}
+
 		return fmt.Sprintf("%v", obj)
 	}
 	var param,ok = obj.(MappedNullable)

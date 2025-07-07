@@ -27,6 +27,7 @@ var _ AccountsApiAccessor = &MockAccountsApiAccessor{}
 type MockSubaccountClient struct {
 	returnSubaccounts *accountclient.ResponseCollection
 	returnSubaccount  *accountclient.SubaccountResponseObject
+	mockDeleteSubaccountExecute  func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error)
 	returnErr         error
 }
 
@@ -63,6 +64,15 @@ func (m *MockSubaccountClient) MoveSubaccount(ctx context.Context, subaccountGUI
 func (m *MockSubaccountClient) MoveSubaccountExecute(r accountclient.ApiMoveSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
 	return m.returnSubaccount, nil, m.returnErr
 }
+
+func (m *MockSubaccountClient) DeleteSubaccount(ctx context.Context, subaccountGUID string) accountclient.ApiDeleteSubaccountRequest {
+	return accountclient.ApiDeleteSubaccountRequest{ApiService: m}
+}
+
+func (m *MockSubaccountClient) DeleteSubaccountExecute(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+	return m.mockDeleteSubaccountExecute(r)
+}
+
 
 func (m *MockSubaccountClient) CloneNeoSubaccount(ctx context.Context, sourceSubaccountGUID string) accountclient.ApiCloneNeoSubaccountRequest {
 	//TODO implement me
@@ -130,16 +140,6 @@ func (m *MockSubaccountClient) DeleteServiceManagerBindingV2(ctx context.Context
 }
 
 func (m *MockSubaccountClient) DeleteServiceManagerBindingV2Execute(r accountclient.ApiDeleteServiceManagerBindingV2Request) (*http.Response, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m *MockSubaccountClient) DeleteSubaccount(ctx context.Context, subaccountGUID string) accountclient.ApiDeleteSubaccountRequest {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m *MockSubaccountClient) DeleteSubaccountExecute(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
 	//TODO implement me
 	panic("implement me")
 }

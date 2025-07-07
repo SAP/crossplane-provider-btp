@@ -112,3 +112,14 @@ func CloudManagementSubaccountUuid() reference.ExtractValueFn {
 		return sg.Spec.ForProvider.SubaccountGuid
 	}
 }
+
+// ServiceInstanceUuid the ServiceInstanceID for the binding
+func ServiceInstanceUuid() reference.ExtractValueFn {
+	return func(mg resource.Managed) string {
+		sg, ok := mg.(*ServiceInstance)
+		if !ok {
+			return ""
+		}
+		return sg.Status.AtProvider.ID
+	}
+}

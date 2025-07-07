@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -20,7 +20,7 @@ import (
 )
 
 
-type AsynchronousCallbackOperationsForXSUAAAPI interface {
+type AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPI interface {
 
 	/*
 	SubscriptionCallbackAsync Subscribe a subaccount tenant to an application
@@ -38,12 +38,12 @@ type AsynchronousCallbackOperationsForXSUAAAPI interface {
 	SubscriptionCallbackAsyncExecute(r ApiSubscriptionCallbackAsyncRequest) (string, *http.Response, error)
 }
 
-// AsynchronousCallbackOperationsForXSUAAAPIService AsynchronousCallbackOperationsForXSUAAAPI service
-type AsynchronousCallbackOperationsForXSUAAAPIService service
+// AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPIService AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPI service
+type AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPIService service
 
 type ApiSubscriptionCallbackAsyncRequest struct {
 	ctx context.Context
-	ApiService AsynchronousCallbackOperationsForXSUAAAPI
+	ApiService AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPI
 	identifier string
 	saasAsyncSubscriptionRequestPayload *SaasAsyncSubscriptionRequestPayload
 }
@@ -66,7 +66,7 @@ Use the async callback feature to subscribe a subaccount tenant to a multitenant
  @param identifier Unique identifier of the current subscription job.
  @return ApiSubscriptionCallbackAsyncRequest
 */
-func (a *AsynchronousCallbackOperationsForXSUAAAPIService) SubscriptionCallbackAsync(ctx context.Context, identifier string) ApiSubscriptionCallbackAsyncRequest {
+func (a *AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPIService) SubscriptionCallbackAsync(ctx context.Context, identifier string) ApiSubscriptionCallbackAsyncRequest {
 	return ApiSubscriptionCallbackAsyncRequest{
 		ApiService: a,
 		ctx: ctx,
@@ -76,7 +76,7 @@ func (a *AsynchronousCallbackOperationsForXSUAAAPIService) SubscriptionCallbackA
 
 // Execute executes the request
 //  @return string
-func (a *AsynchronousCallbackOperationsForXSUAAAPIService) SubscriptionCallbackAsyncExecute(r ApiSubscriptionCallbackAsyncRequest) (string, *http.Response, error) {
+func (a *AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPIService) SubscriptionCallbackAsyncExecute(r ApiSubscriptionCallbackAsyncRequest) (string, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPut
 		localVarPostBody     interface{}
@@ -84,7 +84,7 @@ func (a *AsynchronousCallbackOperationsForXSUAAAPIService) SubscriptionCallbackA
 		localVarReturnValue  string
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AsynchronousCallbackOperationsForXSUAAAPIService.SubscriptionCallbackAsync")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AsynchronousCallbackOperationsForSAPAuthorizationAndTrustManagementServiceXSUAAAPIService.SubscriptionCallbackAsync")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}

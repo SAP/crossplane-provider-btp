@@ -8,6 +8,7 @@ import (
 )
 
 type MockApiHandler struct {
+	deleteCounter      int
 	returnExternalName string
 	returnGet          *subscription.SubscriptionGet
 	returnErr          error
@@ -22,6 +23,7 @@ func (m *MockApiHandler) UpdateSubscription(ctx context.Context, externalName st
 }
 
 func (m *MockApiHandler) DeleteSubscription(ctx context.Context, externalName string) error {
+	m.deleteCounter += 1
 	return m.returnErr
 }
 
@@ -34,10 +36,15 @@ var _ subscription.SubscriptionApiHandlerI = &MockApiHandler{}
 type MockTypeMapper struct {
 	synced    bool
 	available bool
+	deletable bool
 }
 
 func (m *MockTypeMapper) IsAvailable(cr *v1alpha1.Subscription) bool {
 	return m.available
+}
+
+func (m *MockTypeMapper) IsDeletable(cr *v1alpha1.Subscription) bool {
+	return m.deletable
 }
 
 func (m *MockTypeMapper) SyncStatus(get *subscription.SubscriptionGet, crStatus *v1alpha1.SubscriptionObservation) {

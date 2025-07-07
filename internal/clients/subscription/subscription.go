@@ -47,6 +47,8 @@ type SubscriptionTypeMapperI interface {
 	IsUpToDate(cr *v1alpha1.Subscription, get *SubscriptionGet) bool
 	// IsAvailable allow additional check for whether a CR is fully available or not, maps to ready condition in controller, might be used for checking an observed API state field
 	IsAvailable(cr *v1alpha1.Subscription) bool
+	// IsDeletable allow additional check for whether a CR can be deleted or not
+	IsDeletable(cr *v1alpha1.Subscription) bool
 	// SyncStatus allows to pull some data from external API resource towards the CR status
 	SyncStatus(get *SubscriptionGet, crStatus *v1alpha1.SubscriptionObservation)
 }
@@ -148,6 +150,16 @@ func (s *SubscriptionTypeMapper) IsAvailable(cr *v1alpha1.Subscription) bool {
 	return state != nil && *state == v1alpha1.SubscriptionStateSubscribed
 }
 
+func (s *SubscriptionTypeMapper) IsDeletable(cr *v1alpha1.Subscription) bool {
+	if state := cr.Status.AtProvider.State; state != nil {
+		switch *state {
+		case v1alpha1.SubscriptionStateSubscribed, v1alpha1.SubscriptionStateSubscribeFailed:
+			return true
+		}
+	}
+	return false
+}
+
 func (s *SubscriptionTypeMapper) SyncStatus(get *SubscriptionGet, crStatus *v1alpha1.SubscriptionObservation) {
 	crStatus.State = get.State
 }
@@ -156,9 +168,19 @@ func (s *SubscriptionTypeMapper) ConvertToCreatePayload(cr *v1alpha1.Subscriptio
 	return SubscriptionPost{
 		appName: cr.Spec.ForProvider.AppName,
 		CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
-			PlanName: &cr.Spec.ForProvider.PlanName,
+			PlanName:           &cr.Spec.ForProvider.PlanName,
+			SubscriptionParams: s.ConvertToClientParams(cr),
 		},
 	}
+}
+
+func (s *SubscriptionTypeMapper) ConvertToClientParams(cr *v1alpha1.Subscription) map[string]interface{} {
+	subscriptionParams, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.SubscriptionParameters.DeepCopy().Raw)
+	if err != nil {
+		return nil
+	}
+
+	return subscriptionParams
 }
 
 func (s *SubscriptionTypeMapper) ConvertToUpdatePayload(cr *v1alpha1.Subscription) SubscriptionPut {
@@ -184,7 +206,7 @@ func formExternalName(appName string, planName string) string {
 // specifyAPIError brings custom API Error object into a string representation if it can be type asserted, otherwise returns given error
 func specifyAPIError(err error) error {
 	if genericErr, ok := err.(*saas_client.GenericOpenAPIError); ok {
-		if saasErr, ok := genericErr.Model().(saas_client.ApiExceptionResponseObject); ok {
+		if saasErr, ok := genericErr.Model().(saas_client.ErrorResponse); ok {
 			return errors.New(fmt.Sprintf("API Error: %v, Code %v", saasErr.Error.Message, saasErr.Error.Code))
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -24,9 +25,12 @@ type SubscriptionParameters struct {
 	// AppName of the app to subscribe to
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="appName can't be updated once set"
 	AppName string `json:"appName"`
-	// PlanName to subscribe to
+	// PlanName to subscribe to, empty plannames are shown as "default" in cockpit, use "" instead
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="planName can't be updated once set"
 	PlanName string `json:"planName"`
+	// Subscription parameters allows you to add additional parameters
+	// +kubebuilder:validation:Optional
+	SubscriptionParameters runtime.RawExtension `json:"parameters"`
 }
 
 // SubscriptionObservation are the observable fields of a Subscription.
@@ -57,6 +61,13 @@ type SubscriptionSpec struct {
 	// +crossplane:generate:reference:selectorFieldName=CloudManagementSelector
 	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.CloudManagementSecretSecretNamespace()
 	CloudManagementSecretNamespace string `json:"cloudManagementSecretNamespace,omitempty"`
+
+	// RecreateOnSubscriptionFailure indicates whether the
+	// creation of the resources shall be retried when creating a
+	// subscription fails by getting into "SUBSCRIBE_FAILED"
+	// state.
+	// +kubebuilder:validation:Optional
+	RecreateOnSubscriptionFailure bool `json:"recreateOnSubscriptionFailure,omitempty"`
 }
 
 // A SubscriptionStatus represents the observed state of a Subscription.

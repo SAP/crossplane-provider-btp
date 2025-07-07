@@ -1,0 +1,84 @@
+# Plain Json parameters
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: destination-instance
+spec:
+  parameters:
+    {
+      "HTML5Runtime_enabled": false
+    }
+  forProvider:
+    name: destination-instance
+    serviceManagerRef:
+      name: sa-serviceinstance-sm
+    offeringName: destination
+    planName: lite
+    subaccountRef:
+      name: sa-serviceinstance
+---
+# Plain Yaml parameters
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: destination-instance2
+spec:
+  parameters:
+    HTML5Runtime_enabled: false
+  forProvider:
+    name: destination-instance2
+    serviceManagerRef:
+      name: sa-serviceinstance-sm
+    offeringName: destination
+    planName: lite
+    subaccountRef:
+      name: sa-serviceinstance
+---  
+# Combined parameters with two parameter secrets
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: cloud-logging-instance
+spec:
+  forProvider:
+    offeringName: cloud-logging
+    planName: standard
+    name: cloud-logging-instance
+    parameters: 
+      dataPrepperEnabled: true
+      retentionPeriod: 14
+    serviceManagerRef:
+      name: sa-serviceinstance-sm
+    parameterSecretRefs:
+      - name: cloud-logging-parameters1
+        namespace: default
+        key: parameters
+      - name: cloud-logging-parameters2
+        namespace: default
+        key: parameters
+    subaccountRef:
+      name: sa-serviceinstance
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: default
+  name: cloud-logging-parameters1
+type: Opaque
+stringData:
+  parameters: |
+    {
+        "esApiEnabled": true
+    }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: default
+  name: cloud-logging-parameters2
+type: Opaque
+stringData:
+  parameters: |
+    {
+        "ingest_otlp":{"enabled": true}
+    }

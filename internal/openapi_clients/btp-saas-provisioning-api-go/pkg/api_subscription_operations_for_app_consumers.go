@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -69,8 +69,8 @@ Required scope: $XSAPPNAME.subaccount.application.subscription.update
 	DeleteSubscriptionLabels(ctx context.Context, appName string) ApiDeleteSubscriptionLabelsRequest
 
 	// DeleteSubscriptionLabelsExecute executes the request
-	//  @return LabelsResponseObject
-	DeleteSubscriptionLabelsExecute(r ApiDeleteSubscriptionLabelsRequest) (*LabelsResponseObject, *http.Response, error)
+	//  @return map[string]interface{}
+	DeleteSubscriptionLabelsExecute(r ApiDeleteSubscriptionLabelsRequest) (map[string]interface{}, *http.Response, error)
 
 	/*
 	GetEntitledApplication Get details of a multitenant application
@@ -115,8 +115,25 @@ Required scope: $XSAPPNAME.subaccount.application.subscription.read
 	GetSubscriptionLabels(ctx context.Context, appName string) ApiGetSubscriptionLabelsRequest
 
 	// GetSubscriptionLabelsExecute executes the request
-	//  @return LabelsResponseObject
-	GetSubscriptionLabelsExecute(r ApiGetSubscriptionLabelsRequest) (*LabelsResponseObject, *http.Response, error)
+	//  @return map[string]interface{}
+	GetSubscriptionLabelsExecute(r ApiGetSubscriptionLabelsRequest) (map[string]interface{}, *http.Response, error)
+
+	/*
+	GetSubscriptionParams Get subscription parameters
+
+	Get all user-defined consumer subaccount's subscription parameters to a multitenant application. 
+
+Required scope: $XSAPPNAME.subaccount.application.subscription.read
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param appName The name of the multitenant application to which a subaccount is subscribed.
+	@return ApiGetSubscriptionParamsRequest
+	*/
+	GetSubscriptionParams(ctx context.Context, appName string) ApiGetSubscriptionParamsRequest
+
+	// GetSubscriptionParamsExecute executes the request
+	//  @return map[string]interface{}
+	GetSubscriptionParamsExecute(r ApiGetSubscriptionParamsRequest) (map[string]interface{}, *http.Response, error)
 
 	/*
 	UpdateSubscriptionParametersAsync Update parameters of a multitenant application subscription
@@ -147,8 +164,8 @@ Required scope: $XSAPPNAME.subaccount.application.subscription.update
 	UpsertSubscriptionLabels(ctx context.Context, appName string) ApiUpsertSubscriptionLabelsRequest
 
 	// UpsertSubscriptionLabelsExecute executes the request
-	//  @return LabelsResponseObject
-	UpsertSubscriptionLabelsExecute(r ApiUpsertSubscriptionLabelsRequest) (*LabelsResponseObject, *http.Response, error)
+	//  @return map[string]interface{}
+	UpsertSubscriptionLabelsExecute(r ApiUpsertSubscriptionLabelsRequest) (map[string]interface{}, *http.Response, error)
 }
 
 // SubscriptionOperationsForAppConsumersAPIService SubscriptionOperationsForAppConsumersAPI service
@@ -158,8 +175,15 @@ type ApiCreateSubscriptionAsyncRequest struct {
 	ctx context.Context
 	ApiService SubscriptionOperationsForAppConsumersAPI
 	appName string
+	useCommercialAppName *bool
 	sAPPASSPORT *string
 	createSubscriptionRequestPayload *CreateSubscriptionRequestPayload
+}
+
+// Whether appName is used as a commercialAppName. default is false, means it is used as the appName.
+func (r ApiCreateSubscriptionAsyncRequest) UseCommercialAppName(useCommercialAppName bool) ApiCreateSubscriptionAsyncRequest {
+	r.useCommercialAppName = &useCommercialAppName
+	return r
 }
 
 // Provide a set of correlation parameters to be used by the initial and subsequent components involved in the request:  - The Root Context ID (GUID) identifies the initial context within a complex scenario, for example, the initiating user session.  - The Transaction ID (GUID) identifies a technical transaction.  - Connection ID (GUID) and Connection Counter uniquely identify together  every request or message leaving a component via outbound communication.
@@ -217,6 +241,12 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) CreateSubscriptionAsyn
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.useCommercialAppName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
+	} else {
+		var defaultValue bool = false
+		r.useCommercialAppName = &defaultValue
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{"application/json"}
 
@@ -262,7 +292,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) CreateSubscriptionAsyn
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -273,7 +303,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) CreateSubscriptionAsyn
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -284,7 +314,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) CreateSubscriptionAsyn
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 409 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -295,7 +325,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) CreateSubscriptionAsyn
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -314,7 +344,14 @@ type ApiDeleteSubscriptionAsyncRequest struct {
 	ctx context.Context
 	ApiService SubscriptionOperationsForAppConsumersAPI
 	appName string
+	useCommercialAppName *bool
 	sAPPASSPORT *string
+}
+
+// Whether appName is used as a commercialAppName. default is false, means it is used as the appName.
+func (r ApiDeleteSubscriptionAsyncRequest) UseCommercialAppName(useCommercialAppName bool) ApiDeleteSubscriptionAsyncRequest {
+	r.useCommercialAppName = &useCommercialAppName
+	return r
 }
 
 // Provide a set of correlation parameters to be used by the initial and subsequent components involved in the request:  - The Root Context ID (GUID) identifies the initial context within a complex scenario, for example, the initiating user session.  - The Transaction ID (GUID) identifies a technical transaction.  - Connection ID (GUID) and Connection Counter uniquely identify together  every request or message leaving a component via outbound communication.
@@ -364,6 +401,12 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionAsyn
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.useCommercialAppName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
+	} else {
+		var defaultValue bool = false
+		r.useCommercialAppName = &defaultValue
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -407,7 +450,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionAsyn
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -418,7 +461,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionAsyn
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -440,7 +483,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionAsyn
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -459,9 +502,16 @@ type ApiDeleteSubscriptionLabelsRequest struct {
 	ctx context.Context
 	ApiService SubscriptionOperationsForAppConsumersAPI
 	appName string
+	useCommercialAppName *bool
 }
 
-func (r ApiDeleteSubscriptionLabelsRequest) Execute() (*LabelsResponseObject, *http.Response, error) {
+// Whether appName is used as a commercialAppName. default is false, means it is used as the appName.
+func (r ApiDeleteSubscriptionLabelsRequest) UseCommercialAppName(useCommercialAppName bool) ApiDeleteSubscriptionLabelsRequest {
+	r.useCommercialAppName = &useCommercialAppName
+	return r
+}
+
+func (r ApiDeleteSubscriptionLabelsRequest) Execute() (map[string]interface{}, *http.Response, error) {
 	return r.ApiService.DeleteSubscriptionLabelsExecute(r)
 }
 
@@ -487,13 +537,13 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionLabe
 }
 
 // Execute executes the request
-//  @return LabelsResponseObject
-func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionLabelsExecute(r ApiDeleteSubscriptionLabelsRequest) (*LabelsResponseObject, *http.Response, error) {
+//  @return map[string]interface{}
+func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionLabelsExecute(r ApiDeleteSubscriptionLabelsRequest) (map[string]interface{}, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodDelete
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *LabelsResponseObject
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SubscriptionOperationsForAppConsumersAPIService.DeleteSubscriptionLabels")
@@ -508,6 +558,12 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionLabe
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.useCommercialAppName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
+	} else {
+		var defaultValue bool = false
+		r.useCommercialAppName = &defaultValue
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -548,7 +604,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionLabe
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -559,7 +615,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionLabe
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -570,7 +626,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionLabe
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -599,12 +655,19 @@ type ApiGetEntitledApplicationRequest struct {
 	ApiService SubscriptionOperationsForAppConsumersAPI
 	appName string
 	planName *string
+	useCommercialAppName *bool
 	acceptLanguage *string
 }
 
 // The name of the subscription plan to the multitenant application.
 func (r ApiGetEntitledApplicationRequest) PlanName(planName string) ApiGetEntitledApplicationRequest {
 	r.planName = &planName
+	return r
+}
+
+// Whether appName is used as a commercialAppName. default is false, means it is used as the appName.
+func (r ApiGetEntitledApplicationRequest) UseCommercialAppName(useCommercialAppName bool) ApiGetEntitledApplicationRequest {
+	r.useCommercialAppName = &useCommercialAppName
 	return r
 }
 
@@ -660,6 +723,12 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetEntitledApplication
 	if r.planName != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "planName", r.planName, "form", "")
 	}
+	if r.useCommercialAppName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
+	} else {
+		var defaultValue bool = false
+		r.useCommercialAppName = &defaultValue
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -703,7 +772,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetEntitledApplication
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -714,7 +783,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetEntitledApplication
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -725,7 +794,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetEntitledApplication
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -844,7 +913,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetEntitledApplication
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -855,7 +924,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetEntitledApplication
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -866,7 +935,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetEntitledApplication
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -894,9 +963,16 @@ type ApiGetSubscriptionLabelsRequest struct {
 	ctx context.Context
 	ApiService SubscriptionOperationsForAppConsumersAPI
 	appName string
+	useCommercialAppName *bool
 }
 
-func (r ApiGetSubscriptionLabelsRequest) Execute() (*LabelsResponseObject, *http.Response, error) {
+// Whether appName is used as a commercialAppName. default is false, means it is used as the appName.
+func (r ApiGetSubscriptionLabelsRequest) UseCommercialAppName(useCommercialAppName bool) ApiGetSubscriptionLabelsRequest {
+	r.useCommercialAppName = &useCommercialAppName
+	return r
+}
+
+func (r ApiGetSubscriptionLabelsRequest) Execute() (map[string]interface{}, *http.Response, error) {
 	return r.ApiService.GetSubscriptionLabelsExecute(r)
 }
 
@@ -920,13 +996,13 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionLabels(
 }
 
 // Execute executes the request
-//  @return LabelsResponseObject
-func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionLabelsExecute(r ApiGetSubscriptionLabelsRequest) (*LabelsResponseObject, *http.Response, error) {
+//  @return map[string]interface{}
+func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionLabelsExecute(r ApiGetSubscriptionLabelsRequest) (map[string]interface{}, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *LabelsResponseObject
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SubscriptionOperationsForAppConsumersAPIService.GetSubscriptionLabels")
@@ -941,6 +1017,12 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionLabelsE
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.useCommercialAppName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
+	} else {
+		var defaultValue bool = false
+		r.useCommercialAppName = &defaultValue
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -981,7 +1063,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionLabelsE
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -992,7 +1074,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionLabelsE
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -1003,7 +1085,157 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionLabelsE
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiGetSubscriptionParamsRequest struct {
+	ctx context.Context
+	ApiService SubscriptionOperationsForAppConsumersAPI
+	appName string
+	useCommercialAppName *bool
+}
+
+// Whether appName is used as a commercialAppName. default is false, means it is used as the appName.
+func (r ApiGetSubscriptionParamsRequest) UseCommercialAppName(useCommercialAppName bool) ApiGetSubscriptionParamsRequest {
+	r.useCommercialAppName = &useCommercialAppName
+	return r
+}
+
+func (r ApiGetSubscriptionParamsRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.GetSubscriptionParamsExecute(r)
+}
+
+/*
+GetSubscriptionParams Get subscription parameters
+
+Get all user-defined consumer subaccount's subscription parameters to a multitenant application. 
+
+Required scope: $XSAPPNAME.subaccount.application.subscription.read
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param appName The name of the multitenant application to which a subaccount is subscribed.
+ @return ApiGetSubscriptionParamsRequest
+*/
+func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionParams(ctx context.Context, appName string) ApiGetSubscriptionParamsRequest {
+	return ApiGetSubscriptionParamsRequest{
+		ApiService: a,
+		ctx: ctx,
+		appName: appName,
+	}
+}
+
+// Execute executes the request
+//  @return map[string]interface{}
+func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionParamsExecute(r ApiGetSubscriptionParamsRequest) (map[string]interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SubscriptionOperationsForAppConsumersAPIService.GetSubscriptionParams")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/saas-manager/v1/applications/{appName}/subscription/parameters"
+	localVarPath = strings.Replace(localVarPath, "{"+"appName"+"}", url.PathEscape(parameterValueToString(r.appName, "appName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.useCommercialAppName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
+	} else {
+		var defaultValue bool = false
+		r.useCommercialAppName = &defaultValue
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -1031,7 +1263,14 @@ type ApiUpdateSubscriptionParametersAsyncRequest struct {
 	ctx context.Context
 	ApiService SubscriptionOperationsForAppConsumersAPI
 	appName string
+	useCommercialAppName *bool
 	updateSubscriptionRequestPayload *UpdateSubscriptionRequestPayload
+}
+
+// Whether appName is used as a commercialAppName. default is false, means it is used as the appName.
+func (r ApiUpdateSubscriptionParametersAsyncRequest) UseCommercialAppName(useCommercialAppName bool) ApiUpdateSubscriptionParametersAsyncRequest {
+	r.useCommercialAppName = &useCommercialAppName
+	return r
 }
 
 func (r ApiUpdateSubscriptionParametersAsyncRequest) UpdateSubscriptionRequestPayload(updateSubscriptionRequestPayload UpdateSubscriptionRequestPayload) ApiUpdateSubscriptionParametersAsyncRequest {
@@ -1080,6 +1319,12 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpdateSubscriptionPara
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.useCommercialAppName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
+	} else {
+		var defaultValue bool = false
+		r.useCommercialAppName = &defaultValue
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{"application/json"}
 
@@ -1122,7 +1367,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpdateSubscriptionPara
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -1133,7 +1378,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpdateSubscriptionPara
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -1144,7 +1389,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpdateSubscriptionPara
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 409 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -1155,7 +1400,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpdateSubscriptionPara
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 422 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -1166,7 +1411,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpdateSubscriptionPara
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -1186,6 +1431,7 @@ type ApiUpsertSubscriptionLabelsRequest struct {
 	ApiService SubscriptionOperationsForAppConsumersAPI
 	appName string
 	labelAssignmentRequestPayload *LabelAssignmentRequestPayload
+	useCommercialAppName *bool
 }
 
 func (r ApiUpsertSubscriptionLabelsRequest) LabelAssignmentRequestPayload(labelAssignmentRequestPayload LabelAssignmentRequestPayload) ApiUpsertSubscriptionLabelsRequest {
@@ -1193,7 +1439,13 @@ func (r ApiUpsertSubscriptionLabelsRequest) LabelAssignmentRequestPayload(labelA
 	return r
 }
 
-func (r ApiUpsertSubscriptionLabelsRequest) Execute() (*LabelsResponseObject, *http.Response, error) {
+// Whether appName is used as a commercialAppName. default is false, means it is used as the appName.
+func (r ApiUpsertSubscriptionLabelsRequest) UseCommercialAppName(useCommercialAppName bool) ApiUpsertSubscriptionLabelsRequest {
+	r.useCommercialAppName = &useCommercialAppName
+	return r
+}
+
+func (r ApiUpsertSubscriptionLabelsRequest) Execute() (map[string]interface{}, *http.Response, error) {
 	return r.ApiService.UpsertSubscriptionLabelsExecute(r)
 }
 
@@ -1218,13 +1470,13 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpsertSubscriptionLabe
 }
 
 // Execute executes the request
-//  @return LabelsResponseObject
-func (a *SubscriptionOperationsForAppConsumersAPIService) UpsertSubscriptionLabelsExecute(r ApiUpsertSubscriptionLabelsRequest) (*LabelsResponseObject, *http.Response, error) {
+//  @return map[string]interface{}
+func (a *SubscriptionOperationsForAppConsumersAPIService) UpsertSubscriptionLabelsExecute(r ApiUpsertSubscriptionLabelsRequest) (map[string]interface{}, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPut
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *LabelsResponseObject
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SubscriptionOperationsForAppConsumersAPIService.UpsertSubscriptionLabels")
@@ -1242,6 +1494,12 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpsertSubscriptionLabe
 		return localVarReturnValue, nil, reportError("labelAssignmentRequestPayload is required and must be specified")
 	}
 
+	if r.useCommercialAppName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
+	} else {
+		var defaultValue bool = false
+		r.useCommercialAppName = &defaultValue
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{"application/json"}
 
@@ -1284,7 +1542,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpsertSubscriptionLabe
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -1295,7 +1553,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpsertSubscriptionLabe
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -1306,7 +1564,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpsertSubscriptionLabe
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()

@@ -1,7 +1,7 @@
 /*
 Provisioning Service
 
-The Provisioning service provides REST APIs that are responsible for the provisioning and deprovisioning of environment instances and tenants in the corresponding region.  Provisioning is performed after validation by the Entitlements service. Use the APIs in this service to manage and create environment instances, such as a Cloud Foundry org, in a subaccount and to retrieve the plans and quota assignments for a subaccount.  NOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The Provisioning service provides REST APIs that are responsible for the provisioning and deprovisioning of environment instances and tenants in the corresponding region.  Provisioning is performed after validation by the Entitlements service. Use the APIs in this service to manage and create environment instances, such as a Cloud Foundry org, in a subaccount and to retrieve the plans and quota assignments for a subaccount.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -19,13 +19,12 @@ import (
 	"strings"
 )
 
-
 // EnvironmentsAPIService EnvironmentsAPI service
 type EnvironmentsAPIService service
 
 type ApiCreateEnvironmentInstanceRequest struct {
-	ctx context.Context
-	ApiService *EnvironmentsAPIService
+	ctx                                     context.Context
+	ApiService                              *EnvironmentsAPIService
 	createEnvironmentInstanceRequestPayload *CreateEnvironmentInstanceRequestPayload
 }
 
@@ -43,24 +42,25 @@ CreateEnvironmentInstance Create an environment instance
 
 Create an environment instance, such as a Cloud Foundry org, in a subaccount.<br/>To see which environments are available to the subaccount, use the API:  GET /provisioning/v1/availableEnvironments<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.create
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiCreateEnvironmentInstanceRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiCreateEnvironmentInstanceRequest
 */
 func (a *EnvironmentsAPIService) CreateEnvironmentInstance(ctx context.Context) ApiCreateEnvironmentInstanceRequest {
 	return ApiCreateEnvironmentInstanceRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return CreatedEnvironmentInstanceResponseObject
+//
+//	@return CreatedEnvironmentInstanceResponseObject
 func (a *EnvironmentsAPIService) CreateEnvironmentInstanceExecute(r ApiCreateEnvironmentInstanceRequest) (*CreatedEnvironmentInstanceResponseObject, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *CreatedEnvironmentInstanceResponseObject
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *CreatedEnvironmentInstanceResponseObject
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.CreateEnvironmentInstance")
@@ -119,36 +119,183 @@ func (a *EnvironmentsAPIService) CreateEnvironmentInstanceExecute(r ApiCreateEnv
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiCreateEnvironmentInstanceBindingRequest struct {
+	ctx                                     context.Context
+	ApiService                              *EnvironmentsAPIService
+	environmentInstanceId                   string
+	createEnvironmentInstanceBindingRequest *CreateEnvironmentInstanceBindingRequest
+}
+
+func (r ApiCreateEnvironmentInstanceBindingRequest) CreateEnvironmentInstanceBindingRequest(createEnvironmentInstanceBindingRequest CreateEnvironmentInstanceBindingRequest) ApiCreateEnvironmentInstanceBindingRequest {
+	r.createEnvironmentInstanceBindingRequest = &createEnvironmentInstanceBindingRequest
+	return r
+}
+
+func (r ApiCreateEnvironmentInstanceBindingRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.CreateEnvironmentInstanceBindingExecute(r)
+}
+
+/*
+CreateEnvironmentInstanceBinding Create environment instance binding
+
+Create an environment instance binding.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.create
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param environmentInstanceId The ID of the environment instance for which to create a binding.
+	@return ApiCreateEnvironmentInstanceBindingRequest
+*/
+func (a *EnvironmentsAPIService) CreateEnvironmentInstanceBinding(ctx context.Context, environmentInstanceId string) ApiCreateEnvironmentInstanceBindingRequest {
+	return ApiCreateEnvironmentInstanceBindingRequest{
+		ApiService:            a,
+		ctx:                   ctx,
+		environmentInstanceId: environmentInstanceId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return map[string]interface{}
+func (a *EnvironmentsAPIService) CreateEnvironmentInstanceBindingExecute(r ApiCreateEnvironmentInstanceBindingRequest) (map[string]interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPut
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.CreateEnvironmentInstanceBinding")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/provisioning/v1/environments/{environmentInstanceId}/bindings"
+	localVarPath = strings.Replace(localVarPath, "{"+"environmentInstanceId"+"}", url.PathEscape(parameterValueToString(r.environmentInstanceId, "environmentInstanceId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.createEnvironmentInstanceBindingRequest == nil {
+		return localVarReturnValue, nil, reportError("createEnvironmentInstanceBindingRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.createEnvironmentInstanceBindingRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -166,9 +313,9 @@ func (a *EnvironmentsAPIService) CreateEnvironmentInstanceExecute(r ApiCreateEnv
 }
 
 type ApiCreateEnvironmentInstanceLabelsRequest struct {
-	ctx context.Context
-	ApiService *EnvironmentsAPIService
-	environmentInstanceId string
+	ctx                           context.Context
+	ApiService                    *EnvironmentsAPIService
+	environmentInstanceId         string
 	labelAssignmentRequestPayload *LabelAssignmentRequestPayload
 }
 
@@ -184,32 +331,31 @@ func (r ApiCreateEnvironmentInstanceLabelsRequest) Execute() (*LabelsResponseObj
 /*
 CreateEnvironmentInstanceLabels Assign labels to an environment instance
 
-Create and assign custom labels to a given environment instance. Labels are specified as key-value pairs. 
-
-NOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not update broker-defined labels that may exist. 
-
+Create and assign custom labels to a given environment instance. Labels are specified as key-value pairs.
+NOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not update broker-defined labels that may exist.
 Required scope: $XSAPPNAME.subaccount.environment.create
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param environmentInstanceId The ID of the environment instance.
- @return ApiCreateEnvironmentInstanceLabelsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param environmentInstanceId The ID of the environment instance.
+	@return ApiCreateEnvironmentInstanceLabelsRequest
 */
 func (a *EnvironmentsAPIService) CreateEnvironmentInstanceLabels(ctx context.Context, environmentInstanceId string) ApiCreateEnvironmentInstanceLabelsRequest {
 	return ApiCreateEnvironmentInstanceLabelsRequest{
-		ApiService: a,
-		ctx: ctx,
+		ApiService:            a,
+		ctx:                   ctx,
 		environmentInstanceId: environmentInstanceId,
 	}
 }
 
 // Execute executes the request
-//  @return LabelsResponseObject
+//
+//	@return LabelsResponseObject
 func (a *EnvironmentsAPIService) CreateEnvironmentInstanceLabelsExecute(r ApiCreateEnvironmentInstanceLabelsRequest) (*LabelsResponseObject, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPut
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *LabelsResponseObject
+		localVarHTTPMethod  = http.MethodPut
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *LabelsResponseObject
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.CreateEnvironmentInstanceLabels")
@@ -269,36 +415,36 @@ func (a *EnvironmentsAPIService) CreateEnvironmentInstanceLabelsExecute(r ApiCre
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -316,8 +462,8 @@ func (a *EnvironmentsAPIService) CreateEnvironmentInstanceLabelsExecute(r ApiCre
 }
 
 type ApiDeleteEnvironmentInstanceRequest struct {
-	ctx context.Context
-	ApiService *EnvironmentsAPIService
+	ctx                   context.Context
+	ApiService            *EnvironmentsAPIService
 	environmentInstanceId string
 }
 
@@ -328,29 +474,30 @@ func (r ApiDeleteEnvironmentInstanceRequest) Execute() (*EnvironmentInstanceResp
 /*
 DeleteEnvironmentInstance Delete an environment instance
 
-Delete a specific environment instance, including all its data in the environment relating to the subaccount. 
+Delete a specific environment instance, including all its data in the environment relating to the subaccount.
 The deletion may take a while depending on the amount of content in your environment instance.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param environmentInstanceId ID of the environment instance to delete
- @return ApiDeleteEnvironmentInstanceRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param environmentInstanceId ID of the environment instance to delete
+	@return ApiDeleteEnvironmentInstanceRequest
 */
 func (a *EnvironmentsAPIService) DeleteEnvironmentInstance(ctx context.Context, environmentInstanceId string) ApiDeleteEnvironmentInstanceRequest {
 	return ApiDeleteEnvironmentInstanceRequest{
-		ApiService: a,
-		ctx: ctx,
+		ApiService:            a,
+		ctx:                   ctx,
 		environmentInstanceId: environmentInstanceId,
 	}
 }
 
 // Execute executes the request
-//  @return EnvironmentInstanceResponseObject
+//
+//	@return EnvironmentInstanceResponseObject
 func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceExecute(r ApiDeleteEnvironmentInstanceRequest) (*EnvironmentInstanceResponseObject, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *EnvironmentInstanceResponseObject
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *EnvironmentInstanceResponseObject
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.DeleteEnvironmentInstance")
@@ -405,47 +552,198 @@ func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceExecute(r ApiDeleteEnv
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 409 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiDeleteEnvironmentInstanceBindingRequest struct {
+	ctx                   context.Context
+	ApiService            *EnvironmentsAPIService
+	environmentInstanceId string
+	bindingId             string
+}
+
+func (r ApiDeleteEnvironmentInstanceBindingRequest) Execute() (*DeleteEnvironmentInstanceBindingResponse, *http.Response, error) {
+	return r.ApiService.DeleteEnvironmentInstanceBindingExecute(r)
+}
+
+/*
+DeleteEnvironmentInstanceBinding Delete environment instance binding
+
+Delete an environment instance binding.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param environmentInstanceId The ID of the environment instance for which the binding is to be deleted.
+	@param bindingId The ID of the binding to delete.
+	@return ApiDeleteEnvironmentInstanceBindingRequest
+*/
+func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceBinding(ctx context.Context, environmentInstanceId string, bindingId string) ApiDeleteEnvironmentInstanceBindingRequest {
+	return ApiDeleteEnvironmentInstanceBindingRequest{
+		ApiService:            a,
+		ctx:                   ctx,
+		environmentInstanceId: environmentInstanceId,
+		bindingId:             bindingId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return DeleteEnvironmentInstanceBindingResponse
+func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceBindingExecute(r ApiDeleteEnvironmentInstanceBindingRequest) (*DeleteEnvironmentInstanceBindingResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *DeleteEnvironmentInstanceBindingResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.DeleteEnvironmentInstanceBinding")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/provisioning/v1/environments/{environmentInstanceId}/bindings/{bindingId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"environmentInstanceId"+"}", url.PathEscape(parameterValueToString(r.environmentInstanceId, "environmentInstanceId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"bindingId"+"}", url.PathEscape(parameterValueToString(r.bindingId, "bindingId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 410 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -463,8 +761,8 @@ func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceExecute(r ApiDeleteEnv
 }
 
 type ApiDeleteEnvironmentInstanceLabelsRequest struct {
-	ctx context.Context
-	ApiService *EnvironmentsAPIService
+	ctx                   context.Context
+	ApiService            *EnvironmentsAPIService
 	environmentInstanceId string
 }
 
@@ -475,34 +773,32 @@ func (r ApiDeleteEnvironmentInstanceLabelsRequest) Execute() (*LabelsResponseObj
 /*
 DeleteEnvironmentInstanceLabels Remove all labels from an environment instance
 
-Remove all user-defined labels that are assigned to a given environment instance. 
-
+Remove all user-defined labels that are assigned to a given environment instance.
 To remove specific labels, use instead: PUT /provisioning/v1/environments/{environmentInstanceId}/labels
-
 NOTE: This API applies only to custom labels that are defined by users for SAP BTP. Any labels that might be defined by your environment broker are not removed by this API.
-
 Required scope: $XSAPPNAME.subaccount.environment.delete
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param environmentInstanceId The ID of the environment instance.
- @return ApiDeleteEnvironmentInstanceLabelsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param environmentInstanceId The ID of the environment instance.
+	@return ApiDeleteEnvironmentInstanceLabelsRequest
 */
 func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceLabels(ctx context.Context, environmentInstanceId string) ApiDeleteEnvironmentInstanceLabelsRequest {
 	return ApiDeleteEnvironmentInstanceLabelsRequest{
-		ApiService: a,
-		ctx: ctx,
+		ApiService:            a,
+		ctx:                   ctx,
 		environmentInstanceId: environmentInstanceId,
 	}
 }
 
 // Execute executes the request
-//  @return LabelsResponseObject
+//
+//	@return LabelsResponseObject
 func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceLabelsExecute(r ApiDeleteEnvironmentInstanceLabelsRequest) (*LabelsResponseObject, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *LabelsResponseObject
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *LabelsResponseObject
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.DeleteEnvironmentInstanceLabels")
@@ -557,36 +853,36 @@ func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceLabelsExecute(r ApiDel
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -604,7 +900,7 @@ func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceLabelsExecute(r ApiDel
 }
 
 type ApiDeleteEnvironmentInstancesRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService *EnvironmentsAPIService
 }
 
@@ -615,27 +911,28 @@ func (r ApiDeleteEnvironmentInstancesRequest) Execute() (*EnvironmentInstancesRe
 /*
 DeleteEnvironmentInstances Delete all environment instances
 
-Delete all environment instances, including their data in the environment relating to the subaccount. 
+Delete all environment instances, including their data in the environment relating to the subaccount.
 The deletion may take a while depending on the amount of content in your environment instance.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiDeleteEnvironmentInstancesRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiDeleteEnvironmentInstancesRequest
 */
 func (a *EnvironmentsAPIService) DeleteEnvironmentInstances(ctx context.Context) ApiDeleteEnvironmentInstancesRequest {
 	return ApiDeleteEnvironmentInstancesRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return EnvironmentInstancesResponseCollection
+//
+//	@return EnvironmentInstancesResponseCollection
 func (a *EnvironmentsAPIService) DeleteEnvironmentInstancesExecute(r ApiDeleteEnvironmentInstancesRequest) (*EnvironmentInstancesResponseCollection, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *EnvironmentInstancesResponseCollection
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *EnvironmentInstancesResponseCollection
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.DeleteEnvironmentInstances")
@@ -689,47 +986,187 @@ func (a *EnvironmentsAPIService) DeleteEnvironmentInstancesExecute(r ApiDeleteEn
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 409 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiGetAllEnvironmentInstanceBindingsRequest struct {
+	ctx                   context.Context
+	ApiService            *EnvironmentsAPIService
+	environmentInstanceId string
+}
+
+func (r ApiGetAllEnvironmentInstanceBindingsRequest) Execute() (*GetAllInstanceBindingsResponse, *http.Response, error) {
+	return r.ApiService.GetAllEnvironmentInstanceBindingsExecute(r)
+}
+
+/*
+GetAllEnvironmentInstanceBindings Get all environment instance bindings
+
+Get all environment instance bindings for a given environment
+instance.<br/>The list includes metadata of each binding.<br/>To get
+credentials and additional binding details, run Get an environment
+instance binding API and specify the binding ID.<br/><br/>Required
+scope: $XSAPPNAME.subaccount.environment.read
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param environmentInstanceId The ID of the environment instance for which to get bindings.
+	@return ApiGetAllEnvironmentInstanceBindingsRequest
+*/
+func (a *EnvironmentsAPIService) GetAllEnvironmentInstanceBindings(ctx context.Context, environmentInstanceId string) ApiGetAllEnvironmentInstanceBindingsRequest {
+	return ApiGetAllEnvironmentInstanceBindingsRequest{
+		ApiService:            a,
+		ctx:                   ctx,
+		environmentInstanceId: environmentInstanceId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return GetAllInstanceBindingsResponse
+func (a *EnvironmentsAPIService) GetAllEnvironmentInstanceBindingsExecute(r ApiGetAllEnvironmentInstanceBindingsRequest) (*GetAllInstanceBindingsResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *GetAllInstanceBindingsResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.GetAllEnvironmentInstanceBindings")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/provisioning/v1/environments/{environmentInstanceId}/bindings"
+	localVarPath = strings.Replace(localVarPath, "{"+"environmentInstanceId"+"}", url.PathEscape(parameterValueToString(r.environmentInstanceId, "environmentInstanceId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -747,10 +1184,10 @@ func (a *EnvironmentsAPIService) DeleteEnvironmentInstancesExecute(r ApiDeleteEn
 }
 
 type ApiGetAvailableEnvironmentsRequest struct {
-	ctx context.Context
-	ApiService *EnvironmentsAPIService
+	ctx           context.Context
+	ApiService    *EnvironmentsAPIService
 	authorization *string
-	xIDToken *string
+	xIDToken      *string
 }
 
 // Access token to work with this API group.
@@ -772,26 +1209,27 @@ func (r ApiGetAvailableEnvironmentsRequest) Execute() (*AvailableEnvironmentResp
 /*
 GetAvailableEnvironments Get available environments
 
-Get all the available environments for a specified subaccount.<br/>This includes the environments, such as Cloud Foundry, which are available by default to all subaccounts, and those restricted environments, such as Kyma, which are offered in the product catalog as service entitlements and whose plans have been assigned by a global account admin to the subaccount.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.read 
+Get all the available environments for a specified subaccount.<br/>This includes the environments, such as Cloud Foundry, which are available by default to all subaccounts, and those restricted environments, such as Kyma, which are offered in the product catalog as service entitlements and whose plans have been assigned by a global account admin to the subaccount.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.read
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiGetAvailableEnvironmentsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiGetAvailableEnvironmentsRequest
 */
 func (a *EnvironmentsAPIService) GetAvailableEnvironments(ctx context.Context) ApiGetAvailableEnvironmentsRequest {
 	return ApiGetAvailableEnvironmentsRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return AvailableEnvironmentResponseCollection
+//
+//	@return AvailableEnvironmentResponseCollection
 func (a *EnvironmentsAPIService) GetAvailableEnvironmentsExecute(r ApiGetAvailableEnvironmentsRequest) (*AvailableEnvironmentResponseCollection, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *AvailableEnvironmentResponseCollection
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *AvailableEnvironmentResponseCollection
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.GetAvailableEnvironments")
@@ -852,47 +1290,47 @@ func (a *EnvironmentsAPIService) GetAvailableEnvironmentsExecute(r ApiGetAvailab
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -910,12 +1348,12 @@ func (a *EnvironmentsAPIService) GetAvailableEnvironmentsExecute(r ApiGetAvailab
 }
 
 type ApiGetEnvironmentInstanceRequest struct {
-	ctx context.Context
-	ApiService *EnvironmentsAPIService
+	ctx                   context.Context
+	ApiService            *EnvironmentsAPIService
 	environmentInstanceId string
 }
 
-func (r ApiGetEnvironmentInstanceRequest) Execute() (*EnvironmentInstanceResponseObject, *http.Response, error) {
+func (r ApiGetEnvironmentInstanceRequest) Execute() (*BusinessEnvironmentInstanceResponseObject, *http.Response, error) {
 	return r.ApiService.GetEnvironmentInstanceExecute(r)
 }
 
@@ -924,26 +1362,27 @@ GetEnvironmentInstance Get an environment instance
 
 Get the details of a specific environment instance in a subaccount.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.read
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param environmentInstanceId The ID of the environment instance to view.
- @return ApiGetEnvironmentInstanceRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param environmentInstanceId The ID of the environment instance to view.
+	@return ApiGetEnvironmentInstanceRequest
 */
 func (a *EnvironmentsAPIService) GetEnvironmentInstance(ctx context.Context, environmentInstanceId string) ApiGetEnvironmentInstanceRequest {
 	return ApiGetEnvironmentInstanceRequest{
-		ApiService: a,
-		ctx: ctx,
+		ApiService:            a,
+		ctx:                   ctx,
 		environmentInstanceId: environmentInstanceId,
 	}
 }
 
 // Execute executes the request
-//  @return EnvironmentInstanceResponseObject
-func (a *EnvironmentsAPIService) GetEnvironmentInstanceExecute(r ApiGetEnvironmentInstanceRequest) (*EnvironmentInstanceResponseObject, *http.Response, error) {
+//
+//	@return BusinessEnvironmentInstanceResponseObject
+func (a *EnvironmentsAPIService) GetEnvironmentInstanceExecute(r ApiGetEnvironmentInstanceRequest) (*BusinessEnvironmentInstanceResponseObject, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *EnvironmentInstanceResponseObject
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *BusinessEnvironmentInstanceResponseObject
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.GetEnvironmentInstance")
@@ -998,36 +1437,176 @@ func (a *EnvironmentsAPIService) GetEnvironmentInstanceExecute(r ApiGetEnvironme
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiGetEnvironmentInstanceBindingRequest struct {
+	ctx                   context.Context
+	ApiService            *EnvironmentsAPIService
+	environmentInstanceId string
+	bindingId             string
+}
+
+func (r ApiGetEnvironmentInstanceBindingRequest) Execute() (*GetEnvironmentInstanceBinding200Response, *http.Response, error) {
+	return r.ApiService.GetEnvironmentInstanceBindingExecute(r)
+}
+
+/*
+GetEnvironmentInstanceBinding Get an environment instance binding
+
+Get the details of a specific environment instance binding.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.read
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param environmentInstanceId The ID of the associated environment instance.
+	@param bindingId The ID of the environment instance binding
+	@return ApiGetEnvironmentInstanceBindingRequest
+*/
+func (a *EnvironmentsAPIService) GetEnvironmentInstanceBinding(ctx context.Context, environmentInstanceId string, bindingId string) ApiGetEnvironmentInstanceBindingRequest {
+	return ApiGetEnvironmentInstanceBindingRequest{
+		ApiService:            a,
+		ctx:                   ctx,
+		environmentInstanceId: environmentInstanceId,
+		bindingId:             bindingId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return GetEnvironmentInstanceBinding200Response
+func (a *EnvironmentsAPIService) GetEnvironmentInstanceBindingExecute(r ApiGetEnvironmentInstanceBindingRequest) (*GetEnvironmentInstanceBinding200Response, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *GetEnvironmentInstanceBinding200Response
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.GetEnvironmentInstanceBinding")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/provisioning/v1/environments/{environmentInstanceId}/bindings/{bindingId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"environmentInstanceId"+"}", url.PathEscape(parameterValueToString(r.environmentInstanceId, "environmentInstanceId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"bindingId"+"}", url.PathEscape(parameterValueToString(r.bindingId, "bindingId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -1045,8 +1624,8 @@ func (a *EnvironmentsAPIService) GetEnvironmentInstanceExecute(r ApiGetEnvironme
 }
 
 type ApiGetEnvironmentInstanceLabelsRequest struct {
-	ctx context.Context
-	ApiService *EnvironmentsAPIService
+	ctx                   context.Context
+	ApiService            *EnvironmentsAPIService
 	environmentInstanceId string
 }
 
@@ -1057,32 +1636,31 @@ func (r ApiGetEnvironmentInstanceLabelsRequest) Execute() (*LabelsResponseObject
 /*
 GetEnvironmentInstanceLabels Get labels for an environment instance
 
-Get all the custom labels that are assigned as key-value pairs to a given environment instance. 
-
-NOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not retrieve the broker-defined labels that may exist. 
-
+Get all the custom labels that are assigned as key-value pairs to a given environment instance.
+NOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not retrieve the broker-defined labels that may exist.
 Required scope: $XSAPPNAME.subaccount.environment.read
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param environmentInstanceId The ID of the environment instance.
- @return ApiGetEnvironmentInstanceLabelsRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param environmentInstanceId The ID of the environment instance.
+	@return ApiGetEnvironmentInstanceLabelsRequest
 */
 func (a *EnvironmentsAPIService) GetEnvironmentInstanceLabels(ctx context.Context, environmentInstanceId string) ApiGetEnvironmentInstanceLabelsRequest {
 	return ApiGetEnvironmentInstanceLabelsRequest{
-		ApiService: a,
-		ctx: ctx,
+		ApiService:            a,
+		ctx:                   ctx,
 		environmentInstanceId: environmentInstanceId,
 	}
 }
 
 // Execute executes the request
-//  @return LabelsResponseObject
+//
+//	@return LabelsResponseObject
 func (a *EnvironmentsAPIService) GetEnvironmentInstanceLabelsExecute(r ApiGetEnvironmentInstanceLabelsRequest) (*LabelsResponseObject, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *LabelsResponseObject
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *LabelsResponseObject
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.GetEnvironmentInstanceLabels")
@@ -1137,36 +1715,36 @@ func (a *EnvironmentsAPIService) GetEnvironmentInstanceLabelsExecute(r ApiGetEnv
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -1184,10 +1762,10 @@ func (a *EnvironmentsAPIService) GetEnvironmentInstanceLabelsExecute(r ApiGetEnv
 }
 
 type ApiGetEnvironmentInstancesRequest struct {
-	ctx context.Context
-	ApiService *EnvironmentsAPIService
+	ctx           context.Context
+	ApiService    *EnvironmentsAPIService
 	authorization *string
-	xIDToken *string
+	xIDToken      *string
 }
 
 // Access token to work with this API group.
@@ -1202,7 +1780,7 @@ func (r ApiGetEnvironmentInstancesRequest) XIDToken(xIDToken string) ApiGetEnvir
 	return r
 }
 
-func (r ApiGetEnvironmentInstancesRequest) Execute() (*EnvironmentInstancesResponseCollection, *http.Response, error) {
+func (r ApiGetEnvironmentInstancesRequest) Execute() (*BusinessEnvironmentInstancesResponseCollection, *http.Response, error) {
 	return r.ApiService.GetEnvironmentInstancesExecute(r)
 }
 
@@ -1211,24 +1789,25 @@ GetEnvironmentInstances Get environment instances
 
 Get all environment instances of a subaccount.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.read
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiGetEnvironmentInstancesRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiGetEnvironmentInstancesRequest
 */
 func (a *EnvironmentsAPIService) GetEnvironmentInstances(ctx context.Context) ApiGetEnvironmentInstancesRequest {
 	return ApiGetEnvironmentInstancesRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return EnvironmentInstancesResponseCollection
-func (a *EnvironmentsAPIService) GetEnvironmentInstancesExecute(r ApiGetEnvironmentInstancesRequest) (*EnvironmentInstancesResponseCollection, *http.Response, error) {
+//
+//	@return BusinessEnvironmentInstancesResponseCollection
+func (a *EnvironmentsAPIService) GetEnvironmentInstancesExecute(r ApiGetEnvironmentInstancesRequest) (*BusinessEnvironmentInstancesResponseCollection, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *EnvironmentInstancesResponseCollection
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *BusinessEnvironmentInstancesResponseCollection
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.GetEnvironmentInstances")
@@ -1289,47 +1868,47 @@ func (a *EnvironmentsAPIService) GetEnvironmentInstancesExecute(r ApiGetEnvironm
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -1347,9 +1926,9 @@ func (a *EnvironmentsAPIService) GetEnvironmentInstancesExecute(r ApiGetEnvironm
 }
 
 type ApiUpdateEnvironmentInstanceRequest struct {
-	ctx context.Context
-	ApiService *EnvironmentsAPIService
-	environmentInstanceId string
+	ctx                                     context.Context
+	ApiService                              *EnvironmentsAPIService
+	environmentInstanceId                   string
 	updateEnvironmentInstanceRequestPayload *UpdateEnvironmentInstanceRequestPayload
 }
 
@@ -1367,26 +1946,27 @@ UpdateEnvironmentInstance Update an environment instance
 
 Update an environment instance.<br/>To see which environments are provisioned for the subaccount, use the API:  GET /provisioning/v1/environments<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param environmentInstanceId ID of the environment instance to update
- @return ApiUpdateEnvironmentInstanceRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param environmentInstanceId ID of the environment instance to update
+	@return ApiUpdateEnvironmentInstanceRequest
 */
 func (a *EnvironmentsAPIService) UpdateEnvironmentInstance(ctx context.Context, environmentInstanceId string) ApiUpdateEnvironmentInstanceRequest {
 	return ApiUpdateEnvironmentInstanceRequest{
-		ApiService: a,
-		ctx: ctx,
+		ApiService:            a,
+		ctx:                   ctx,
 		environmentInstanceId: environmentInstanceId,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
+//
+//	@return map[string]interface{}
 func (a *EnvironmentsAPIService) UpdateEnvironmentInstanceExecute(r ApiUpdateEnvironmentInstanceRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPatch
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EnvironmentsAPIService.UpdateEnvironmentInstance")
@@ -1446,36 +2026,36 @@ func (a *EnvironmentsAPIService) UpdateEnvironmentInstanceExecute(r ApiUpdateEnv
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}

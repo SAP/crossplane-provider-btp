@@ -162,8 +162,14 @@ spec:
                     x-kubernetes-validations:
                     - message: appName can't be updated once set
                       rule: self == oldSelf
+                  parameters:
+                    description: Subscription parameters allows you to add additional
+                      parameters
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   planName:
-                    description: PlanName to subscribe to
+                    description: PlanName to subscribe to, empty plannames are shown
+                      as "default" in cockpit, use "" instead
                     type: string
                     x-kubernetes-validations:
                     - message: planName can't be updated once set
@@ -315,6 +321,13 @@ spec:
                 required:
                 - name
                 type: object
+              recreateOnSubscriptionFailure:
+                description: |-
+                  RecreateOnSubscriptionFailure indicates whether the
+                  creation of the resources shall be retried when creating a
+                  subscription fails by getting into "SUBSCRIBE_FAILED"
+                  state.
+                type: boolean
               writeConnectionSecretToRef:
                 description: |-
                   WriteConnectionSecretToReference specifies the namespace and name of a

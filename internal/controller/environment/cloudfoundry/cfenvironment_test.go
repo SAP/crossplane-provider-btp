@@ -10,13 +10,14 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	environments "github.com/sap/crossplane-provider-btp/internal/clients/cfenvironment"
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/cloudfoundry/fake"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // Unlike many Kubernetes projects Crossplane does not use third party testing
@@ -57,7 +58,7 @@ func TestObserve(t *testing.T) {
 		},
 		"ErrorGettingCFEnvironment": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return nil, nil, errors.New("Could not call backend")
 				}},
 				cr: environment(),
@@ -70,7 +71,7 @@ func TestObserve(t *testing.T) {
 		},
 		"NeedsCreate": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return nil, nil, nil
 				}},
 				cr: environment(),
@@ -83,56 +84,22 @@ func TestObserve(t *testing.T) {
 				cr:  environment(withConditions(xpv1.Unavailable())),
 			},
 		},
-		"NeedsUpdate": {
-			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
-						State:  internal.Ptr("OK"),
-						Labels: internal.Ptr("{}"),
-					}, []v1alpha1.User{aUser}, nil
-				}, MockNeedsUpdate: func(cr v1alpha1.CloudFoundryEnvironment) bool {
-					return true
-				}},
-				cr: environment(withUID("1234"), withStatus(v1alpha1.CfEnvironmentObservation{
-					EnvironmentObservation: v1alpha1.EnvironmentObservation{
-						State:  internal.Ptr("OK"),
-						Labels: internal.Ptr("{}"),
-					},
-					Managers: nil,
-				})),
-			},
-			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists:    true,
-					ResourceUpToDate:  false,
-					ConnectionDetails: nil,
-				},
-				err: nil,
-				cr: environment(withUID("1234"), withConditions(xpv1.Available()), withStatus(v1alpha1.CfEnvironmentObservation{
-					EnvironmentObservation: v1alpha1.EnvironmentObservation{
-						State:  internal.Ptr("OK"),
-						Labels: internal.Ptr("{}"),
-					},
-					Managers: []v1alpha1.User{aUser},
-				})),
-			},
-		},
 		"SuccessfulAvailableAndUpToDate": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:  internal.Ptr("OK"),
-						Labels: internal.Ptr("{}"),
+						Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
 					}, []v1alpha1.User{aUser}, nil
 				}, MockNeedsUpdate: func(cr v1alpha1.CloudFoundryEnvironment) bool {
 					return false
 				}},
 				cr: environment(withUID("1234"),
-					withData(v1alpha1.CfEnvironmentParameters{Managers: []string{aUser.Username}}),
+					withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", Managers: []string{aUser.Username}}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
 							State:  internal.Ptr("OK"),
-							Labels: internal.Ptr("{}"),
+							Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
 						},
 						Managers: []v1alpha1.User{aUser},
 					})),
@@ -141,15 +108,15 @@ func TestObserve(t *testing.T) {
 				o: managed.ExternalObservation{
 					ResourceExists:    true,
 					ResourceUpToDate:  true,
-					ConnectionDetails: managed.ConnectionDetails{"__raw": []byte("{}")},
+					ConnectionDetails: managed.ConnectionDetails{"__raw": []byte("{\"Org Name\":\"test-org\"}"), "orgName": []byte("test-org")},
 				},
 				err: nil,
 				cr: environment(withUID("1234"), withConditions(xpv1.Available()),
-					withData(v1alpha1.CfEnvironmentParameters{Managers: []string{aUser.Username}}),
+					withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", Managers: []string{aUser.Username}}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
 							State:  internal.Ptr("OK"),
-							Labels: internal.Ptr("{}"),
+							Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
 						},
 						Managers: []v1alpha1.User{aUser},
 					},
@@ -158,8 +125,8 @@ func TestObserve(t *testing.T) {
 		},
 		"ExistingButNotAvailable": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-					return &provisioningclient.EnvironmentInstanceResponseObject{
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:  internal.Ptr("CREATING"),
 						Labels: internal.Ptr("{}"),
 					}, []v1alpha1.User{aUser}, nil
@@ -198,7 +165,7 @@ func TestObserve(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client}
+			e := external{client: tc.args.client, kube: &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)}}
 			got, err := e.Observe(context.Background(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Observe(...): -want error, +got error:\n%s\n", diff)
@@ -241,8 +208,8 @@ func TestCreate(t *testing.T) {
 		},
 		"CreateError": {
 			args: args{
-				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) error {
-					return errors.New("Could not call backend")
+				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
+					return "", errors.New("Could not call backend")
 				}},
 				cr: environment(),
 			},
@@ -254,22 +221,25 @@ func TestCreate(t *testing.T) {
 		},
 		"Successful": {
 			args: args{
-				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) error {
-					return nil
+				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
+					return "test-org",nil
 				},
 				},
-				cr: environment(),
+				cr: environment(withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", EnvironmentName: "test-env"})),
 			},
 			want: want{
 				o:   managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}},
 				err: nil,
-				cr:  environment(),
+				cr:  environment(withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", EnvironmentName: "test-env"}),
+								withAnnotaions(map[string]string{
+									"crossplane.io/external-name": "test-org",
+								}),),
 			},
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client}
+			e := external{client: tc.args.client, kube: &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)}}
 			got, err := e.Create(context.Background(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Observe(...): -want error, +got error:\n%s\n", diff)
@@ -348,128 +318,6 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func TestUpdate(t *testing.T) {
-	type args struct {
-		cr     resource.Managed
-		client environments.Client
-	}
-
-	type want struct {
-		o   managed.ExternalUpdate
-		cr  resource.Managed
-		err error
-	}
-
-	var cases = map[string]struct {
-		args args
-		want want
-	}{
-		"NilManaged": {
-			args: args{
-				client: fake.MockClient{},
-				cr:     nil,
-			},
-			want: want{
-				o:   managed.ExternalUpdate{},
-				err: errors.New(errNotEnvironment),
-			},
-		},
-		"ErrorGettingCFEnvironment": {
-			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-					return nil, nil, errors.New("Could not call backend")
-				}},
-				cr: environment(),
-			},
-			want: want{
-				o:   managed.ExternalUpdate{},
-				err: errors.New("Could not call backend"),
-				cr:  environment(),
-			},
-		},
-		"ErrorWhileUpdating": {
-			args: args{
-				client: fake.MockClient{
-					MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-						return &provisioningclient.EnvironmentInstanceResponseObject{
-							State:  internal.Ptr("OK"),
-							Labels: internal.Ptr("{}"),
-						}, []v1alpha1.User{aUser}, nil
-					},
-					MockUpdate: func(cr v1alpha1.CloudFoundryEnvironment) error {
-						return errors.New("error while updating")
-					},
-				},
-				cr: environment(),
-			},
-			want: want{
-				o:   managed.ExternalUpdate{},
-				err: errors.New("error while updating"),
-				cr: environment(
-					withStatus(v1alpha1.CfEnvironmentObservation{
-						EnvironmentObservation: v1alpha1.EnvironmentObservation{
-							State:  internal.Ptr("OK"),
-							Labels: internal.Ptr("{}"),
-						},
-						Managers: []v1alpha1.User{aUser},
-					}),
-				),
-			},
-		},
-		"SuccessfulUpdate": {
-			args: args{
-				client: fake.MockClient{
-					MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.EnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-						return &provisioningclient.EnvironmentInstanceResponseObject{
-							State:  internal.Ptr("OK"),
-							Labels: internal.Ptr("{}"),
-						}, []v1alpha1.User{aUser}, nil
-					},
-					MockUpdate: func(cr v1alpha1.CloudFoundryEnvironment) error {
-						return nil
-					},
-				},
-				cr: environment(
-					withStatus(v1alpha1.CfEnvironmentObservation{
-						EnvironmentObservation: v1alpha1.EnvironmentObservation{
-							State:  internal.Ptr("OK"),
-							Labels: internal.Ptr("{}"),
-						},
-						Managers: []v1alpha1.User{aUser},
-					})),
-			},
-			want: want{
-				o:   managed.ExternalUpdate{},
-				err: nil,
-				cr: environment(
-					withStatus(v1alpha1.CfEnvironmentObservation{
-						EnvironmentObservation: v1alpha1.EnvironmentObservation{
-							State:  internal.Ptr("OK"),
-							Labels: internal.Ptr("{}"),
-						},
-						Managers: []v1alpha1.User{aUser},
-					},
-					)),
-			},
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client}
-			got, err := e.Update(context.Background(), tc.args.cr)
-			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\ne.Observe(...): -want error, +got error:\n%s\n", diff)
-			}
-			if diff := cmp.Diff(tc.want.cr, tc.args.cr, test.EquateConditions()); diff != "" {
-				t.Errorf("\ne.Observe(...): -want error, +got error:\n%s\n", diff)
-			}
-			if diff := cmp.Diff(tc.want.o, got); diff != "" {
-				t.Errorf("\ne.Observe(...): -want, +got:\n%s\n", diff)
-			}
-		})
-	}
-}
-
 type environmentModifier func(foundryEnvironment *v1alpha1.CloudFoundryEnvironment)
 
 func withConditions(c ...xpv1.Condition) environmentModifier {
@@ -486,6 +334,12 @@ func withStatus(status v1alpha1.CfEnvironmentObservation) environmentModifier {
 func withData(data v1alpha1.CfEnvironmentParameters) environmentModifier {
 	return func(r *v1alpha1.CloudFoundryEnvironment) {
 		r.Spec.ForProvider = data
+	}
+}
+
+func withAnnotaions(annotations map[string]string) environmentModifier {
+	return func(r *v1alpha1.CloudFoundryEnvironment) {
+		r.ObjectMeta.Annotations = annotations
 	}
 }
 

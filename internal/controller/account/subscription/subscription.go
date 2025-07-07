@@ -23,6 +23,7 @@ import (
 
 const (
 	errNotSubscription = "managed resource is not a Subscription custom resource"
+	errTrackRUsage     = "cannot track ResourceUsage"
 	errTrackPCUsage    = "cannot track ProviderConfig usage"
 
 	errExtractSecretKey     = "no Cloud Management Secret Found"
@@ -54,9 +55,10 @@ var newSubscriptionClientFn = func(ctx context.Context, cisSecretData map[string
 }
 
 type connector struct {
-	kube         client.Client
-	usage        resource.Tracker
-	newServiceFn func(ctx context.Context, cisSecretData map[string][]byte) (subscription.SubscriptionApiHandlerI, error)
+	kube            client.Client
+	usage           resource.Tracker
+	resourcetracker tracking.ReferenceResolverTracker
+	newServiceFn    func(ctx context.Context, cisSecretData map[string][]byte) (subscription.SubscriptionApiHandlerI, error)
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -67,6 +69,10 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	if err := c.usage.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
+	}
+
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, errTrackRUsage)
 	}
 
 	secretName := cr.Spec.CloudManagementSecret
@@ -112,6 +118,13 @@ type external struct {
 	tracker    tracking.ReferenceResolverTracker
 }
 
+// subscriptionBeingDeleted returns true if the resource conditions
+// indicate that the resource is being deleted.
+func subscriptionBeingDeleted(cr *v1alpha1.Subscription) bool {
+	readyCondition := cr.GetCondition(xpv1.TypeReady)
+	return readyCondition.Status == corev1.ConditionFalse && readyCondition.Reason == xpv1.ReasonDeleting
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.Subscription)
 	if !ok {
@@ -126,6 +139,23 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 
+	if cr.Spec.RecreateOnSubscriptionFailure && apiRes.State != nil && *apiRes.State == v1alpha1.SubscriptionStateSubscribeFailed {
+		// We observed a subscription in SUBSCRIBE_FAILED
+		// state and recreateOnSubscriptionFailure is turned
+		// on.
+		var err error
+		if !subscriptionBeingDeleted(cr) {
+			// The resource is not being deleted. So let's
+			// delete it now.
+			err = c.Delete(ctx, mg)
+		}
+		// Abort the Observe step
+		return managed.ExternalObservation{
+			ResourceExists:    true, // Don't create any new resource
+			ResourceUpToDate:  true, // Don't update the existing resource
+			ConnectionDetails: managed.ConnectionDetails{},
+		}, err
+	}
 	c.syncStatus(apiRes, cr)
 
 	if c.typeMapper.IsAvailable(cr) {
@@ -188,7 +218,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 
 	cr.SetConditions(xpv1.Deleting())
 
-	if !c.typeMapper.IsAvailable(cr) {
+	if !c.typeMapper.IsDeletable(cr) {
 		// api will return 500 if called multiple times, so we will ensure to call it only once
 		return nil
 	}

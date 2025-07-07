@@ -23,7 +23,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 				mgr.GetClient(),
 				&providerv1alpha1.ProviderConfigUsage{},
 			),
-			newServiceFn: newSubscriptionClientFn,
+			newServiceFn:    newSubscriptionClientFn,
+			resourcetracker: resourcetracker,
 		}
 	})
 }
