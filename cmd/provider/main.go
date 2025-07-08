@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/config"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/features"
+	"github.com/sap/crossplane-provider-btp/internal/version"
 	"gopkg.in/alecthomas/kingpin.v2"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,6 +91,9 @@ func main() {
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
+
+	os.Setenv("BTP_APPEND_USER_AGENT", version.ProviderVersion)
+	bla := os.Getenv("BTP_APPEND_USER_AGENT") // ensure the env var is set
 
 	mgr, err := ctrl.NewManager(
 		ratelimiter.LimitRESTConfig(cfg, *maxReconcileRate), ctrl.Options{
