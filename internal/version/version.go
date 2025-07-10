@@ -1,3 +1,3 @@
 package version
 
-var ProviderVersion string = "crossplane/dev"
+var ProviderVersion string = "dev"

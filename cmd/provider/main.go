@@ -92,8 +92,9 @@ func main() {
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
 
-	os.Setenv("BTP_APPEND_USER_AGENT", version.ProviderVersion)
-	bla := os.Getenv("BTP_APPEND_USER_AGENT") // ensure the env var is set
+	// Set custom user agent for terraform http calls via env variable
+	envErr := os.Setenv("BTP_APPEND_USER_AGENT", fmt.Sprintf("crossplane/%s", version.ProviderVersion))
+	kingpin.FatalIfError(envErr, "Cannot set environment variable BTP_APPEND_USER_AGENT")
 
 	mgr, err := ctrl.NewManager(
 		ratelimiter.LimitRESTConfig(cfg, *maxReconcileRate), ctrl.Options{
