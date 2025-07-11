@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 
 	"github.com/sap/crossplane-provider-btp/internal"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
@@ -29,27 +30,34 @@ func NewKymaEnvironments(btp btp.Client) *KymaEnvironments {
 func (c KymaEnvironments) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.KymaEnvironment,
-) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
-	environment, err := c.btp.GetEnvironmentByNameAndType(ctx, cr.Name, btp.KymaEnvironmentType())
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
+	environment, err := c.btp.GetEnvironment(ctx, meta.GetExternalName(&cr), cr.Name, btp.KymaEnvironmentType())
+
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	if environment == nil {
-		return nil, nil
+		return nil, false, nil
 	}
 
-	return environment, nil
+	// If the external name is not set yet, we set it to the ID of the environment. And force an update.
+	if *environment.Id != meta.GetExternalName(&cr) {
+		meta.SetExternalName(&cr, *environment.Id)
+		return environment, true, nil
+	}
+
+	return environment, false, nil
 }
 
-func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error {
+func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error) {
 
 	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
 	parameters = AddKymaDefaultParameters(parameters, cr.Name, string(cr.UID))
 	if err != nil {
-		return err
+		return "", err
 	}
-	err = c.btp.CreateKymaEnvironment(
+	guid, err := c.btp.CreateKymaEnvironment(
 		ctx,
 		cr.Name,
 		cr.Spec.ForProvider.PlanName,
@@ -57,8 +65,10 @@ func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEn
 		string(cr.UID),
 		c.btp.Credential.UserCredential.Email,
 	)
-
-	return errors.Wrap(err, errKymaInstanceCreateFailed)
+	if err != nil {
+		return "", errors.Wrap(err, errKymaInstanceCreateFailed)
+	}
+	return guid, nil
 }
 
 func (c KymaEnvironments) DeleteInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error {

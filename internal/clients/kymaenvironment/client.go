@@ -18,9 +18,10 @@ import (
 type Client interface {
 	DescribeInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (
 		*provisioningclient.BusinessEnvironmentInstanceResponseObject,
+		bool, // true if the external name was updated
 		error,
 	)
-	CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error
+	CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error)
 	UpdateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error
 	DeleteInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error
 }

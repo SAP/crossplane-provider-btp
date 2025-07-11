@@ -19,9 +19,9 @@ var _ MappedNullable = &JobParameter{}
 
 // JobParameter struct for JobParameter
 type JobParameter struct {
-	Identifying *bool                  `json:"identifying,omitempty"`
-	Type        *string                `json:"type,omitempty"`
-	Value       map[string]interface{} `json:"value,omitempty"`
+	Identifying *bool `json:"identifying,omitempty"`
+	Type *string `json:"type,omitempty"`
+	Value map[string]interface{} `json:"value,omitempty"`
 }
 
 // NewJobParameter instantiates a new JobParameter object
@@ -138,7 +138,7 @@ func (o *JobParameter) SetValue(v map[string]interface{}) {
 }
 
 func (o JobParameter) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -194,3 +194,5 @@ func (v *NullableJobParameter) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

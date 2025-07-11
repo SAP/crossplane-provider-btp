@@ -9,7 +9,7 @@ for other OS see [official guide](https://openapi-generator.tech/docs/installati
 
 ### How to regenerate
 ```bash
-openapi-generator generate -i swagger-patched.json -g go -o pkg/
+openapi-generator generate -i swagger-patched.json -g go -o pkg/ --additional-properties=generateInterfaces=true
 go fmt ./...
 go mod tidy -v
 ```

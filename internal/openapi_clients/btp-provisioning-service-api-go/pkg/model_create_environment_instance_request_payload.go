@@ -11,8 +11,8 @@ API version: 1.0
 package openapi
 
 import (
-	"bytes"
 	"encoding/json"
+	"bytes"
 	"fmt"
 )
 
@@ -31,7 +31,7 @@ type CreateEnvironmentInstanceRequestPayload struct {
 	Name *string `json:"name,omitempty"`
 	// The origin of the user in case of a custom IdP configuration. This parameter is only required if the OAuth 2.0 client credentials grant flow is used, a user parameter is provided and the target environment supports custom IdP, otherwise it is ignored.
 	Origin *string `json:"origin,omitempty"`
-	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameters 'id' and 'email' are specified:  {  \"instance_name\": \"myOrg\"  }
+	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameters 'id' and 'email' are specified:  {  \"instance_name\": \"myOrg\"  } 
 	Parameters map[string]interface{} `json:"parameters,omitempty"`
 	// Name of the service plan for the environment instance. Must match the name in the corresponding service broker's catalog. (for example: standard)
 	PlanName string `json:"planName"`
@@ -362,7 +362,7 @@ func (o *CreateEnvironmentInstanceRequestPayload) SetUser(v string) {
 }
 
 func (o CreateEnvironmentInstanceRequestPayload) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -413,10 +413,10 @@ func (o *CreateEnvironmentInstanceRequestPayload) UnmarshalJSON(data []byte) (er
 	err = json.Unmarshal(data, &allProperties)
 
 	if err != nil {
-		return err
+		return err;
 	}
 
-	for _, requiredProperty := range requiredProperties {
+	for _, requiredProperty := range(requiredProperties) {
 		if _, exists := allProperties[requiredProperty]; !exists {
 			return fmt.Errorf("no value given for required property %v", requiredProperty)
 		}
@@ -472,3 +472,5 @@ func (v *NullableCreateEnvironmentInstanceRequestPayload) UnmarshalJSON(src []by
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

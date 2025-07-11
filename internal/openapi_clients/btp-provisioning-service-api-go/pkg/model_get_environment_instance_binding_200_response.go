@@ -18,7 +18,7 @@ import (
 
 // GetEnvironmentInstanceBinding200Response - struct for GetEnvironmentInstanceBinding200Response
 type GetEnvironmentInstanceBinding200Response struct {
-	EnvironmentInstanceBindingMetadata    *EnvironmentInstanceBindingMetadata
+	EnvironmentInstanceBindingMetadata *EnvironmentInstanceBindingMetadata
 	GetEnvironmentInstanceBindingResponse *GetEnvironmentInstanceBindingResponse
 }
 
@@ -35,6 +35,7 @@ func GetEnvironmentInstanceBindingResponseAsGetEnvironmentInstanceBinding200Resp
 		GetEnvironmentInstanceBindingResponse: v,
 	}
 }
+
 
 // Unmarshal JSON data into one of the pointers in the struct
 func (dst *GetEnvironmentInstanceBinding200Response) UnmarshalJSON(data []byte) error {
@@ -101,7 +102,7 @@ func (src GetEnvironmentInstanceBinding200Response) MarshalJSON() ([]byte, error
 }
 
 // Get the actual instance
-func (obj *GetEnvironmentInstanceBinding200Response) GetActualInstance() interface{} {
+func (obj *GetEnvironmentInstanceBinding200Response) GetActualInstance() (interface{}) {
 	if obj == nil {
 		return nil
 	}
@@ -118,7 +119,7 @@ func (obj *GetEnvironmentInstanceBinding200Response) GetActualInstance() interfa
 }
 
 // Get the actual instance value
-func (obj GetEnvironmentInstanceBinding200Response) GetActualInstanceValue() interface{} {
+func (obj GetEnvironmentInstanceBinding200Response) GetActualInstanceValue() (interface{}) {
 	if obj.EnvironmentInstanceBindingMetadata != nil {
 		return *obj.EnvironmentInstanceBindingMetadata
 	}
@@ -166,3 +167,5 @@ func (v *NullableGetEnvironmentInstanceBinding200Response) UnmarshalJSON(src []b
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

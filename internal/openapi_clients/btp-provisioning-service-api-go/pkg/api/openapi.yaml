@@ -47,13 +47,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobStatusResponseObject'
+                $ref: "#/components/schemas/JobStatusResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad request
         "401":
           description: Not Authorized
@@ -63,7 +63,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -82,7 +82,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get job status
       tags:
@@ -119,13 +119,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AvailableEnvironmentResponseCollection'
+                $ref: "#/components/schemas/AvailableEnvironmentResponseCollection"
           description: OK
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -133,13 +133,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Forbidden
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Tenant Not Found
         "429":
           description: Rate Limit Exceeded
@@ -158,7 +158,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get available environments
       tags:
@@ -175,13 +175,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EnvironmentInstancesResponseCollection'
+                $ref: "#/components/schemas/EnvironmentInstancesResponseCollection"
           description: Accepted
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -191,13 +191,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Conflict
         "429":
           description: Rate Limit Exceeded
@@ -216,7 +216,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Delete all environment instances
       tags:
@@ -248,13 +248,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BusinessEnvironmentInstancesResponseCollection'
+                $ref: "#/components/schemas/BusinessEnvironmentInstancesResponseCollection"
           description: OK
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -262,13 +262,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: User is unauthorized for this operation
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Subaccount does not exist
         "429":
           description: Rate Limit Exceeded
@@ -287,7 +287,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get environment instances
       tags:
@@ -302,14 +302,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateEnvironmentInstanceRequestPayload'
+              $ref: "#/components/schemas/CreateEnvironmentInstanceRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreatedEnvironmentInstanceResponseObject'
+                $ref: "#/components/schemas/CreatedEnvironmentInstanceResponseObject"
           description: Service Binding already exists and the requested parameters
             are identical to the existing Service Binding. Only valid in synchronous
             operations
@@ -317,13 +317,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreatedEnvironmentInstanceResponseObject'
+                $ref: "#/components/schemas/CreatedEnvironmentInstanceResponseObject"
           description: Accepted
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: "Broker was not found, or, plan and service are not part of\
             \ the broker catalog, or, service and plan are not allowed for the subaccount\
             \ license type"
@@ -335,7 +335,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Tenant does not exist
         "429":
           description: Rate Limit Exceeded
@@ -354,7 +354,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Create an environment instance
       tags:
@@ -380,13 +380,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EnvironmentInstanceResponseObject'
+                $ref: "#/components/schemas/EnvironmentInstanceResponseObject"
           description: Accepted
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -396,13 +396,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: No environment instance found for the specified environmentInstanceId
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Conflict
         "429":
           description: Rate Limit Exceeded
@@ -421,7 +421,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Delete an environment instance
       tags:
@@ -444,13 +444,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BusinessEnvironmentInstanceResponseObject'
+                $ref: "#/components/schemas/BusinessEnvironmentInstanceResponseObject"
           description: OK
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -460,7 +460,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: No environment instance found for the specified environmentInstanceId
         "429":
           description: Rate Limit Exceeded
@@ -479,7 +479,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get an environment instance
       tags:
@@ -502,20 +502,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateEnvironmentInstanceRequestPayload'
+              $ref: "#/components/schemas/UpdateEnvironmentInstanceRequestPayload"
         required: true
       responses:
         "202":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AbstractDTO'
+                $ref: "#/components/schemas/AbstractDTO"
           description: Accepted
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Parameters don't match the broker update schema definition
         "401":
           description: Not Authorized
@@ -525,7 +525,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Tenant does not exist
         "429":
           description: Rate Limit Exceeded
@@ -544,7 +544,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Update an environment instance
       tags:
@@ -570,13 +570,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GetAllInstanceBindingsResponse'
+                $ref: "#/components/schemas/GetAllInstanceBindingsResponse"
           description: OK
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -586,7 +586,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: No environment instance binding found for the specified environment
             instance ID.
         "429":
@@ -606,7 +606,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get all environment instance bindings
       tags:
@@ -628,7 +628,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateEnvironmentInstanceBindingRequest'
+              $ref: "#/components/schemas/CreateEnvironmentInstanceBindingRequest"
         required: true
       responses:
         "202":
@@ -641,7 +641,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: "Broker not found, service or plan not in broker catalog or\
             \ not allowed for subaccount license type"
         "401":
@@ -652,7 +652,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Tenant does not exist
         "429":
           description: Rate Limit Exceeded
@@ -671,7 +671,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Create environment instance binding
       tags:
@@ -704,13 +704,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DeleteEnvironmentInstanceBindingResponse'
+                $ref: "#/components/schemas/DeleteEnvironmentInstanceBindingResponse"
           description: The binding was successfully deleted
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -720,13 +720,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: No binding exists with the provided ID
         "410":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: "The binding has expired on the environment broker side, but\
             \ metadata still exists. It will be deleted from the provisioning database"
         "429":
@@ -746,7 +746,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Delete environment instance binding
       tags:
@@ -777,7 +777,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/getEnvironmentInstanceBinding_200_response'
+                $ref: "#/components/schemas/getEnvironmentInstanceBinding_200_response"
           description: Returns either 'GetEnvironmentInstanceBindingResponse' if the
             binding is active or 'EnvironmentInstanceBindingMetadata' if the binding
             has expired.
@@ -785,7 +785,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -795,7 +795,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: No environment instance binding found for the specified environment
             instance ID
         "429":
@@ -815,7 +815,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get an environment instance binding
       tags:
@@ -842,13 +842,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: OK
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -858,7 +858,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: No environment instance found for the specified environmentInstanceId
         "429":
           description: Rate Limit Exceeded
@@ -877,7 +877,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Remove all labels from an environment instance
       tags:
@@ -903,13 +903,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: OK
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -919,7 +919,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: No environment instance found for the specified environmentInstanceId
         "429":
           description: Rate Limit Exceeded
@@ -938,7 +938,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get labels for an environment instance
       tags:
@@ -963,20 +963,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LabelAssignmentRequestPayload'
+              $ref: "#/components/schemas/LabelAssignmentRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: OK
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -986,7 +986,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: No environment instance found for the specified environmentInstanceId
         "429":
           description: Rate Limit Exceeded
@@ -1005,7 +1005,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Assign labels to an environment instance
       tags:
@@ -1020,13 +1020,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServicePlanAssignmentsResponseCollection'
+                $ref: "#/components/schemas/ServicePlanAssignmentsResponseCollection"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -1036,7 +1036,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Subaccount or tenant does not exist
         "429":
           description: Rate Limit Exceeded
@@ -1055,7 +1055,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get subaccount quota assignments
       tags:
@@ -1104,7 +1104,7 @@ components:
       properties:
         availableEnvironments:
           items:
-            $ref: '#/components/schemas/AvailableEnvironmentResponseObject'
+            $ref: "#/components/schemas/AvailableEnvironmentResponseObject"
           type: array
       type: object
     AvailableEnvironmentResponseObject:
@@ -1422,7 +1422,7 @@ components:
         environmentInstances:
           description: List of all the environment instances
           items:
-            $ref: '#/components/schemas/BusinessEnvironmentInstanceResponseObject'
+            $ref: "#/components/schemas/BusinessEnvironmentInstanceResponseObject"
           type: array
       type: object
     CreateEnvironmentInstanceBindingRequest:
@@ -1779,7 +1779,7 @@ components:
         environmentInstances:
           description: List of all the environment instances
           items:
-            $ref: '#/components/schemas/EnvironmentInstanceResponseObject'
+            $ref: "#/components/schemas/EnvironmentInstanceResponseObject"
           type: array
       type: object
     ErrorResponse:
@@ -1807,7 +1807,7 @@ components:
           type: string
         details:
           items:
-            $ref: '#/components/schemas/NestingErrorDetailsResponseObject'
+            $ref: "#/components/schemas/NestingErrorDetailsResponseObject"
           type: array
         message:
           description: User-friendly description of the error.
@@ -1837,7 +1837,7 @@ components:
       properties:
         bindings:
           items:
-            $ref: '#/components/schemas/EnvironmentInstanceBindingMetadata'
+            $ref: "#/components/schemas/EnvironmentInstanceBindingMetadata"
           type: array
       type: object
     GetEnvironmentInstanceBindingResponse:
@@ -1952,7 +1952,7 @@ components:
           type: string
         jobParams:
           additionalProperties:
-            $ref: '#/components/schemas/JobParameter'
+            $ref: "#/components/schemas/JobParameter"
           type: object
         status:
           description: "The current state of the job. \n* <b>IN_PROGRESS:</b> The\
@@ -2136,7 +2136,7 @@ components:
       properties:
         quotas:
           items:
-            $ref: '#/components/schemas/ServicePlanAssignmentsResponseObject'
+            $ref: "#/components/schemas/ServicePlanAssignmentsResponseObject"
           type: array
       type: object
     ServicePlanAssignmentsResponseObject:
@@ -2204,7 +2204,7 @@ components:
           type: integer
         resources:
           items:
-            $ref: '#/components/schemas/QuotaResourcesResponseObject'
+            $ref: "#/components/schemas/QuotaResourcesResponseObject"
           type: array
         service:
           description: The name of the service of the provisioned quota.
@@ -2256,8 +2256,8 @@ components:
       type: object
     getEnvironmentInstanceBinding_200_response:
       oneOf:
-      - $ref: '#/components/schemas/GetEnvironmentInstanceBindingResponse'
-      - $ref: '#/components/schemas/EnvironmentInstanceBindingMetadata'
+      - $ref: "#/components/schemas/GetEnvironmentInstanceBindingResponse"
+      - $ref: "#/components/schemas/EnvironmentInstanceBindingMetadata"
   securitySchemes:
     OAuth2:
       flows:

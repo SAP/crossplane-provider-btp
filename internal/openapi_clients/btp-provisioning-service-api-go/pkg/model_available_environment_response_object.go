@@ -617,7 +617,7 @@ func (o *AvailableEnvironmentResponseObject) SetUpdateSchema(v string) {
 }
 
 func (o AvailableEnvironmentResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -715,3 +715,5 @@ func (v *NullableAvailableEnvironmentResponseObject) UnmarshalJSON(src []byte) e
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

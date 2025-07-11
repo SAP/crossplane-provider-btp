@@ -12,17 +12,19 @@ import (
 var _ environments.Client = &MockClient{}
 
 type MockClient struct {
-	MockDescribeCluster func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error)
+	MockDescribeCluster func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error)
+	MockCreateCluster   func(ctx context.Context, input *v1alpha1.KymaEnvironment) (string, error)
 }
 
 func (c MockClient) DescribeInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (
 	*provisioningclient.BusinessEnvironmentInstanceResponseObject,
+	bool,
 	error,
 ) {
 	return c.MockDescribeCluster(ctx, &cr)
 }
-func (c MockClient) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error {
-	return nil
+func (c MockClient) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error) {
+	return c.MockCreateCluster(ctx, &cr)
 }
 func (c MockClient) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error {
 	return nil

@@ -11,8 +11,8 @@ API version: 1.0
 package openapi
 
 import (
-	"bytes"
 	"encoding/json"
+	"bytes"
 	"fmt"
 )
 
@@ -26,8 +26,8 @@ type ErrorResponse struct {
 	// Log correlation ID to track the event
 	CorrelationID string `json:"correlationID"`
 	// Error description in JSON format
-	Description *string                             `json:"description,omitempty"`
-	Details     []NestingErrorDetailsResponseObject `json:"details,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Details []NestingErrorDetailsResponseObject `json:"details,omitempty"`
 	// User-friendly description of the error.
 	Message string `json:"message"`
 	// Describes a data element (for example, a resource path: /online-store/v1/products/123)
@@ -225,7 +225,7 @@ func (o *ErrorResponse) SetTarget(v string) {
 }
 
 func (o ErrorResponse) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -264,10 +264,10 @@ func (o *ErrorResponse) UnmarshalJSON(data []byte) (err error) {
 	err = json.Unmarshal(data, &allProperties)
 
 	if err != nil {
-		return err
+		return err;
 	}
 
-	for _, requiredProperty := range requiredProperties {
+	for _, requiredProperty := range(requiredProperties) {
 		if _, exists := allProperties[requiredProperty]; !exists {
 			return fmt.Errorf("no value given for required property %v", requiredProperty)
 		}
@@ -323,3 +323,5 @@ func (v *NullableErrorResponse) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

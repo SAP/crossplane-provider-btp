@@ -19,12 +19,236 @@ import (
 	"strings"
 )
 
+type EnvironmentsAPI interface {
+
+	/*
+		CreateEnvironmentInstance Create an environment instance
+
+		Create an environment instance, such as a Cloud Foundry org, in a subaccount.<br/>To see which environments are available to the subaccount, use the API:  GET /provisioning/v1/availableEnvironments<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.create
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiCreateEnvironmentInstanceRequest
+	*/
+	CreateEnvironmentInstance(ctx context.Context) ApiCreateEnvironmentInstanceRequest
+
+	// CreateEnvironmentInstanceExecute executes the request
+	//  @return CreatedEnvironmentInstanceResponseObject
+	CreateEnvironmentInstanceExecute(r ApiCreateEnvironmentInstanceRequest) (*CreatedEnvironmentInstanceResponseObject, *http.Response, error)
+
+	/*
+		CreateEnvironmentInstanceBinding Create environment instance binding
+
+		Create an environment instance binding.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.create
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param environmentInstanceId The ID of the environment instance for which to create a binding.
+		@return ApiCreateEnvironmentInstanceBindingRequest
+	*/
+	CreateEnvironmentInstanceBinding(ctx context.Context, environmentInstanceId string) ApiCreateEnvironmentInstanceBindingRequest
+
+	// CreateEnvironmentInstanceBindingExecute executes the request
+	//  @return map[string]interface{}
+	CreateEnvironmentInstanceBindingExecute(r ApiCreateEnvironmentInstanceBindingRequest) (map[string]interface{}, *http.Response, error)
+
+	/*
+			CreateEnvironmentInstanceLabels Assign labels to an environment instance
+
+			Create and assign custom labels to a given environment instance. Labels are specified as key-value pairs.
+		NOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not update broker-defined labels that may exist.
+		Required scope: $XSAPPNAME.subaccount.environment.create
+
+			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+			@param environmentInstanceId The ID of the environment instance.
+			@return ApiCreateEnvironmentInstanceLabelsRequest
+	*/
+	CreateEnvironmentInstanceLabels(ctx context.Context, environmentInstanceId string) ApiCreateEnvironmentInstanceLabelsRequest
+
+	// CreateEnvironmentInstanceLabelsExecute executes the request
+	//  @return LabelsResponseObject
+	CreateEnvironmentInstanceLabelsExecute(r ApiCreateEnvironmentInstanceLabelsRequest) (*LabelsResponseObject, *http.Response, error)
+
+	/*
+			DeleteEnvironmentInstance Delete an environment instance
+
+			Delete a specific environment instance, including all its data in the environment relating to the subaccount.
+		The deletion may take a while depending on the amount of content in your environment instance.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
+
+			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+			@param environmentInstanceId ID of the environment instance to delete
+			@return ApiDeleteEnvironmentInstanceRequest
+	*/
+	DeleteEnvironmentInstance(ctx context.Context, environmentInstanceId string) ApiDeleteEnvironmentInstanceRequest
+
+	// DeleteEnvironmentInstanceExecute executes the request
+	//  @return EnvironmentInstanceResponseObject
+	DeleteEnvironmentInstanceExecute(r ApiDeleteEnvironmentInstanceRequest) (*EnvironmentInstanceResponseObject, *http.Response, error)
+
+	/*
+		DeleteEnvironmentInstanceBinding Delete environment instance binding
+
+		Delete an environment instance binding.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param environmentInstanceId The ID of the environment instance for which the binding is to be deleted.
+		@param bindingId The ID of the binding to delete.
+		@return ApiDeleteEnvironmentInstanceBindingRequest
+	*/
+	DeleteEnvironmentInstanceBinding(ctx context.Context, environmentInstanceId string, bindingId string) ApiDeleteEnvironmentInstanceBindingRequest
+
+	// DeleteEnvironmentInstanceBindingExecute executes the request
+	//  @return DeleteEnvironmentInstanceBindingResponse
+	DeleteEnvironmentInstanceBindingExecute(r ApiDeleteEnvironmentInstanceBindingRequest) (*DeleteEnvironmentInstanceBindingResponse, *http.Response, error)
+
+	/*
+			DeleteEnvironmentInstanceLabels Remove all labels from an environment instance
+
+			Remove all user-defined labels that are assigned to a given environment instance.
+		To remove specific labels, use instead: PUT /provisioning/v1/environments/{environmentInstanceId}/labels
+		NOTE: This API applies only to custom labels that are defined by users for SAP BTP. Any labels that might be defined by your environment broker are not removed by this API.
+		Required scope: $XSAPPNAME.subaccount.environment.delete
+
+			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+			@param environmentInstanceId The ID of the environment instance.
+			@return ApiDeleteEnvironmentInstanceLabelsRequest
+	*/
+	DeleteEnvironmentInstanceLabels(ctx context.Context, environmentInstanceId string) ApiDeleteEnvironmentInstanceLabelsRequest
+
+	// DeleteEnvironmentInstanceLabelsExecute executes the request
+	//  @return LabelsResponseObject
+	DeleteEnvironmentInstanceLabelsExecute(r ApiDeleteEnvironmentInstanceLabelsRequest) (*LabelsResponseObject, *http.Response, error)
+
+	/*
+			DeleteEnvironmentInstances Delete all environment instances
+
+			Delete all environment instances, including their data in the environment relating to the subaccount.
+		The deletion may take a while depending on the amount of content in your environment instance.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
+
+			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+			@return ApiDeleteEnvironmentInstancesRequest
+	*/
+	DeleteEnvironmentInstances(ctx context.Context) ApiDeleteEnvironmentInstancesRequest
+
+	// DeleteEnvironmentInstancesExecute executes the request
+	//  @return EnvironmentInstancesResponseCollection
+	DeleteEnvironmentInstancesExecute(r ApiDeleteEnvironmentInstancesRequest) (*EnvironmentInstancesResponseCollection, *http.Response, error)
+
+	/*
+			GetAllEnvironmentInstanceBindings Get all environment instance bindings
+
+			Get all environment instance bindings for a given environment
+		instance.<br/>The list includes metadata of each binding.<br/>To get
+		credentials and additional binding details, run Get an environment
+		instance binding API and specify the binding ID.<br/><br/>Required
+		scope: $XSAPPNAME.subaccount.environment.read
+
+			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+			@param environmentInstanceId The ID of the environment instance for which to get bindings.
+			@return ApiGetAllEnvironmentInstanceBindingsRequest
+	*/
+	GetAllEnvironmentInstanceBindings(ctx context.Context, environmentInstanceId string) ApiGetAllEnvironmentInstanceBindingsRequest
+
+	// GetAllEnvironmentInstanceBindingsExecute executes the request
+	//  @return GetAllInstanceBindingsResponse
+	GetAllEnvironmentInstanceBindingsExecute(r ApiGetAllEnvironmentInstanceBindingsRequest) (*GetAllInstanceBindingsResponse, *http.Response, error)
+
+	/*
+		GetAvailableEnvironments Get available environments
+
+		Get all the available environments for a specified subaccount.<br/>This includes the environments, such as Cloud Foundry, which are available by default to all subaccounts, and those restricted environments, such as Kyma, which are offered in the product catalog as service entitlements and whose plans have been assigned by a global account admin to the subaccount.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.read
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiGetAvailableEnvironmentsRequest
+	*/
+	GetAvailableEnvironments(ctx context.Context) ApiGetAvailableEnvironmentsRequest
+
+	// GetAvailableEnvironmentsExecute executes the request
+	//  @return AvailableEnvironmentResponseCollection
+	GetAvailableEnvironmentsExecute(r ApiGetAvailableEnvironmentsRequest) (*AvailableEnvironmentResponseCollection, *http.Response, error)
+
+	/*
+		GetEnvironmentInstance Get an environment instance
+
+		Get the details of a specific environment instance in a subaccount.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.read
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param environmentInstanceId The ID of the environment instance to view.
+		@return ApiGetEnvironmentInstanceRequest
+	*/
+	GetEnvironmentInstance(ctx context.Context, environmentInstanceId string) ApiGetEnvironmentInstanceRequest
+
+	// GetEnvironmentInstanceExecute executes the request
+	//  @return BusinessEnvironmentInstanceResponseObject
+	GetEnvironmentInstanceExecute(r ApiGetEnvironmentInstanceRequest) (*BusinessEnvironmentInstanceResponseObject, *http.Response, error)
+
+	/*
+		GetEnvironmentInstanceBinding Get an environment instance binding
+
+		Get the details of a specific environment instance binding.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.read
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param environmentInstanceId The ID of the associated environment instance.
+		@param bindingId The ID of the environment instance binding
+		@return ApiGetEnvironmentInstanceBindingRequest
+	*/
+	GetEnvironmentInstanceBinding(ctx context.Context, environmentInstanceId string, bindingId string) ApiGetEnvironmentInstanceBindingRequest
+
+	// GetEnvironmentInstanceBindingExecute executes the request
+	//  @return GetEnvironmentInstanceBinding200Response
+	GetEnvironmentInstanceBindingExecute(r ApiGetEnvironmentInstanceBindingRequest) (*GetEnvironmentInstanceBinding200Response, *http.Response, error)
+
+	/*
+			GetEnvironmentInstanceLabels Get labels for an environment instance
+
+			Get all the custom labels that are assigned as key-value pairs to a given environment instance.
+		NOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not retrieve the broker-defined labels that may exist.
+		Required scope: $XSAPPNAME.subaccount.environment.read
+
+			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+			@param environmentInstanceId The ID of the environment instance.
+			@return ApiGetEnvironmentInstanceLabelsRequest
+	*/
+	GetEnvironmentInstanceLabels(ctx context.Context, environmentInstanceId string) ApiGetEnvironmentInstanceLabelsRequest
+
+	// GetEnvironmentInstanceLabelsExecute executes the request
+	//  @return LabelsResponseObject
+	GetEnvironmentInstanceLabelsExecute(r ApiGetEnvironmentInstanceLabelsRequest) (*LabelsResponseObject, *http.Response, error)
+
+	/*
+		GetEnvironmentInstances Get environment instances
+
+		Get all environment instances of a subaccount.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.read
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiGetEnvironmentInstancesRequest
+	*/
+	GetEnvironmentInstances(ctx context.Context) ApiGetEnvironmentInstancesRequest
+
+	// GetEnvironmentInstancesExecute executes the request
+	//  @return BusinessEnvironmentInstancesResponseCollection
+	GetEnvironmentInstancesExecute(r ApiGetEnvironmentInstancesRequest) (*BusinessEnvironmentInstancesResponseCollection, *http.Response, error)
+
+	/*
+		UpdateEnvironmentInstance Update an environment instance
+
+		Update an environment instance.<br/>To see which environments are provisioned for the subaccount, use the API:  GET /provisioning/v1/environments<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param environmentInstanceId ID of the environment instance to update
+		@return ApiUpdateEnvironmentInstanceRequest
+	*/
+	UpdateEnvironmentInstance(ctx context.Context, environmentInstanceId string) ApiUpdateEnvironmentInstanceRequest
+
+	// UpdateEnvironmentInstanceExecute executes the request
+	//  @return map[string]interface{}
+	UpdateEnvironmentInstanceExecute(r ApiUpdateEnvironmentInstanceRequest) (map[string]interface{}, *http.Response, error)
+}
+
 // EnvironmentsAPIService EnvironmentsAPI service
 type EnvironmentsAPIService service
 
 type ApiCreateEnvironmentInstanceRequest struct {
 	ctx                                     context.Context
-	ApiService                              *EnvironmentsAPIService
+	ApiService                              EnvironmentsAPI
 	createEnvironmentInstanceRequestPayload *CreateEnvironmentInstanceRequestPayload
 }
 
@@ -167,7 +391,7 @@ func (a *EnvironmentsAPIService) CreateEnvironmentInstanceExecute(r ApiCreateEnv
 
 type ApiCreateEnvironmentInstanceBindingRequest struct {
 	ctx                                     context.Context
-	ApiService                              *EnvironmentsAPIService
+	ApiService                              EnvironmentsAPI
 	environmentInstanceId                   string
 	createEnvironmentInstanceBindingRequest *CreateEnvironmentInstanceBindingRequest
 }
@@ -314,7 +538,7 @@ func (a *EnvironmentsAPIService) CreateEnvironmentInstanceBindingExecute(r ApiCr
 
 type ApiCreateEnvironmentInstanceLabelsRequest struct {
 	ctx                           context.Context
-	ApiService                    *EnvironmentsAPIService
+	ApiService                    EnvironmentsAPI
 	environmentInstanceId         string
 	labelAssignmentRequestPayload *LabelAssignmentRequestPayload
 }
@@ -463,7 +687,7 @@ func (a *EnvironmentsAPIService) CreateEnvironmentInstanceLabelsExecute(r ApiCre
 
 type ApiDeleteEnvironmentInstanceRequest struct {
 	ctx                   context.Context
-	ApiService            *EnvironmentsAPIService
+	ApiService            EnvironmentsAPI
 	environmentInstanceId string
 }
 
@@ -611,7 +835,7 @@ func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceExecute(r ApiDeleteEnv
 
 type ApiDeleteEnvironmentInstanceBindingRequest struct {
 	ctx                   context.Context
-	ApiService            *EnvironmentsAPIService
+	ApiService            EnvironmentsAPI
 	environmentInstanceId string
 	bindingId             string
 }
@@ -762,7 +986,7 @@ func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceBindingExecute(r ApiDe
 
 type ApiDeleteEnvironmentInstanceLabelsRequest struct {
 	ctx                   context.Context
-	ApiService            *EnvironmentsAPIService
+	ApiService            EnvironmentsAPI
 	environmentInstanceId string
 }
 
@@ -901,7 +1125,7 @@ func (a *EnvironmentsAPIService) DeleteEnvironmentInstanceLabelsExecute(r ApiDel
 
 type ApiDeleteEnvironmentInstancesRequest struct {
 	ctx        context.Context
-	ApiService *EnvironmentsAPIService
+	ApiService EnvironmentsAPI
 }
 
 func (r ApiDeleteEnvironmentInstancesRequest) Execute() (*EnvironmentInstancesResponseCollection, *http.Response, error) {
@@ -1045,7 +1269,7 @@ func (a *EnvironmentsAPIService) DeleteEnvironmentInstancesExecute(r ApiDeleteEn
 
 type ApiGetAllEnvironmentInstanceBindingsRequest struct {
 	ctx                   context.Context
-	ApiService            *EnvironmentsAPIService
+	ApiService            EnvironmentsAPI
 	environmentInstanceId string
 }
 
@@ -1185,7 +1409,7 @@ func (a *EnvironmentsAPIService) GetAllEnvironmentInstanceBindingsExecute(r ApiG
 
 type ApiGetAvailableEnvironmentsRequest struct {
 	ctx           context.Context
-	ApiService    *EnvironmentsAPIService
+	ApiService    EnvironmentsAPI
 	authorization *string
 	xIDToken      *string
 }
@@ -1349,7 +1573,7 @@ func (a *EnvironmentsAPIService) GetAvailableEnvironmentsExecute(r ApiGetAvailab
 
 type ApiGetEnvironmentInstanceRequest struct {
 	ctx                   context.Context
-	ApiService            *EnvironmentsAPIService
+	ApiService            EnvironmentsAPI
 	environmentInstanceId string
 }
 
@@ -1485,7 +1709,7 @@ func (a *EnvironmentsAPIService) GetEnvironmentInstanceExecute(r ApiGetEnvironme
 
 type ApiGetEnvironmentInstanceBindingRequest struct {
 	ctx                   context.Context
-	ApiService            *EnvironmentsAPIService
+	ApiService            EnvironmentsAPI
 	environmentInstanceId string
 	bindingId             string
 }
@@ -1625,7 +1849,7 @@ func (a *EnvironmentsAPIService) GetEnvironmentInstanceBindingExecute(r ApiGetEn
 
 type ApiGetEnvironmentInstanceLabelsRequest struct {
 	ctx                   context.Context
-	ApiService            *EnvironmentsAPIService
+	ApiService            EnvironmentsAPI
 	environmentInstanceId string
 }
 
@@ -1763,7 +1987,7 @@ func (a *EnvironmentsAPIService) GetEnvironmentInstanceLabelsExecute(r ApiGetEnv
 
 type ApiGetEnvironmentInstancesRequest struct {
 	ctx           context.Context
-	ApiService    *EnvironmentsAPIService
+	ApiService    EnvironmentsAPI
 	authorization *string
 	xIDToken      *string
 }
@@ -1927,7 +2151,7 @@ func (a *EnvironmentsAPIService) GetEnvironmentInstancesExecute(r ApiGetEnvironm
 
 type ApiUpdateEnvironmentInstanceRequest struct {
 	ctx                                     context.Context
-	ApiService                              *EnvironmentsAPIService
+	ApiService                              EnvironmentsAPI
 	environmentInstanceId                   string
 	updateEnvironmentInstanceRequestPayload *UpdateEnvironmentInstanceRequestPayload
 }
