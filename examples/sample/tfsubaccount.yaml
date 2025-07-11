@@ -1,0 +1,11 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: TfSubaccount
+metadata:
+  name: test-12345
+spec:
+  forProvider:
+    description: description of the subaccount, maybe displayName?
+    region: eu12
+    subdomain: stephan-upjet-test12351
+  providerConfigRef:
+    name: default-canary

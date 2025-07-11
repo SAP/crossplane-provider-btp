@@ -1,0 +1,12 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: TfSubaccount
+metadata:
+  annotations:
+    meta.upbound.io/example-id: account/v1alpha1/tfsubaccount
+  labels:
+    testing.upbound.io/example-name: my_project
+  name: my-project
+spec:
+  forProvider:
+    region: eu30
+    subdomain: my-project

@@ -23,6 +23,7 @@ import (
 
 	directoryentitlement "github.com/sap/crossplane-provider-btp/internal/controller/account/directoryentitlement"
 	subaccountservicebroker "github.com/sap/crossplane-provider-btp/internal/controller/account/subaccountservicebroker"
+	tfsubaccount "github.com/sap/crossplane-provider-btp/internal/controller/account/tfsubaccount"
 	providerconfig "github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	globalaccounttrustconfiguration "github.com/sap/crossplane-provider-btp/internal/controller/security/globalaccounttrustconfiguration"
 	subaccountapicredential "github.com/sap/crossplane-provider-btp/internal/controller/security/subaccountapicredential"
@@ -35,6 +36,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		directoryentitlement.Setup,
 		subaccountservicebroker.Setup,
+		tfsubaccount.Setup,
 		providerconfig.Setup,
 		globalaccounttrustconfiguration.Setup,
 		subaccountapicredential.Setup,
