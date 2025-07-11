@@ -31,6 +31,11 @@ const (
 	errCredentialsCorrupted = "secret credentials data not in the expected format"
 )
 
+var failureStates = []string{
+	v1alpha1.SubscriptionStateSubscribeFailed,
+	v1alpha1.SubscriptionStateUnsubscribeFailed,
+}
+
 // api handler creation logic based on a bytemap extracted from a secrets data
 var newSubscriptionClientFn = func(ctx context.Context, cisSecretData map[string][]byte) (subscription.SubscriptionApiHandlerI, error) {
 	if len(cisSecretData) == 0 {
@@ -139,7 +144,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 
-	if cr.Spec.RecreateOnSubscriptionFailure && apiRes.State != nil && *apiRes.State == v1alpha1.SubscriptionStateSubscribeFailed {
+	if c.shouldRecreateOnFailure(cr, apiRes) {
 		// We observed a subscription in SUBSCRIBE_FAILED
 		// state and recreateOnSubscriptionFailure is turned
 		// on.
@@ -244,4 +249,19 @@ func (c *external) syncStatus(apiRes *subscription.SubscriptionGet, cr *v1alpha1
 // isUpToDate delegates comparision of cr data and api resource to the typemapper
 func (c *external) isUpToDate(apiRes *subscription.SubscriptionGet, cr *v1alpha1.Subscription) bool {
 	return c.typeMapper.IsUpToDate(cr, apiRes)
+}
+
+// shouldRecreateOnFailure determines if a subscription should be recreated
+// when it is in a failed state. This is the case if the spec.RecreateOnSubscriptionFailure
+// is set and the current state is SubscriptionStateSubscribeFailed.
+func (c *external) shouldRecreateOnFailure(cr *v1alpha1.Subscription, apiRes *subscription.SubscriptionGet) bool {
+	if !cr.Spec.RecreateOnSubscriptionFailure || apiRes.State == nil {
+		return false
+	}
+	for _, state := range failureStates {
+		if *apiRes.State == state {
+			return true
+		}
+	}
+	return false
 }
