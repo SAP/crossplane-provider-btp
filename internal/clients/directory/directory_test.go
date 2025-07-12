@@ -206,9 +206,9 @@ func TestNeedsUpdate(t *testing.T) {
 					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
 				mockClient: MockDirClient{
 					GetResult: &accountclient.DirectoryResponseObject{
-						Description: "desc",
-						DisplayName: "someName",
-						Labels:      &map[string][]string{"custom_label": {"custom_value"}},
+						Description:       "desc",
+						DisplayName:       "someName",
+						Labels:            &map[string][]string{"custom_label": {"custom_value"}},
 						DirectoryFeatures: []string{"DEFAULT"},
 					}},
 			},
@@ -219,6 +219,35 @@ func TestNeedsUpdate(t *testing.T) {
 						Description: "desc",
 						DisplayName: internal.Ptr("someName"),
 						Labels:      map[string][]string{"custom_label": {"custom_value"}},
+					}),
+					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
+			},
+		},
+		"UpToDateEmptyDescription": {
+			reason: "Directory with empty description should be considered up-to-date when API also has empty description",
+			args: args{
+				cr: testutils.NewDirectory("unittest-client",
+					testutils.WithData(v1alpha1.DirectoryParameters{
+						Description: "", // Empty description
+						DisplayName: internal.Ptr("test-directory"),
+						Labels:      map[string][]string{"env": {"test"}},
+					}),
+					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
+				mockClient: MockDirClient{
+					GetResult: &accountclient.DirectoryResponseObject{
+						Description:       "", // API also has empty description
+						DisplayName:       "test-directory",
+						Labels:            &map[string][]string{"env": {"test"}},
+						DirectoryFeatures: []string{"DEFAULT"},
+					}},
+			},
+			want: want{
+				o: false,
+				cr: testutils.NewDirectory("unittest-client",
+					testutils.WithData(v1alpha1.DirectoryParameters{
+						Description: "",
+						DisplayName: internal.Ptr("test-directory"),
+						Labels:      map[string][]string{"env": {"test"}},
 					}),
 					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
 			},
@@ -378,6 +407,39 @@ func TestSyncStatus(t *testing.T) {
 				})),
 			},
 		},
+		"SetGUIDSuccessEmptyDescription": {
+			reason: "Expect to properly sync status when directory has empty description (testing empty description sync)",
+			args: args{
+				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
+					Description:       "", // Empty description
+					DirectoryAdmins:   []string{"admin@example.com", "admin2@example.com"},
+					DirectoryFeatures: []string{"DEFAULT"},
+					DisplayName:       internal.Ptr("test-directory"),
+					Labels:            map[string][]string{"env": {"test"}},
+				})),
+				cachedApi: &accountclient.DirectoryResponseObject{
+					Guid:              "789",
+					Description:       "", // API also returns empty description
+					EntityState:       internal.Ptr("OK"),
+					StateMessage:      internal.Ptr("Directory created successfully"),
+					DirectoryFeatures: []string{"DEFAULT"},
+				},
+			},
+			want: want{
+				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
+					Description:       "",
+					DirectoryAdmins:   []string{"admin@example.com", "admin2@example.com"},
+					DirectoryFeatures: []string{"DEFAULT"},
+					DisplayName:       internal.Ptr("test-directory"),
+					Labels:            map[string][]string{"env": {"test"}},
+				}), testutils.WithStatus(v1alpha1.DirectoryObservation{
+					Guid:              internal.Ptr("789"),
+					EntityState:       internal.Ptr("OK"),
+					StateMessage:      internal.Ptr("Directory created successfully"),
+					DirectoryFeatures: []string{"DEFAULT"},
+				})),
+			},
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -435,7 +497,7 @@ func TestCreateDirectory(t *testing.T) {
 			},
 		},
 		"Success": {
-			reason: "With successful API call we expect to succeed the operatior",
+			reason: "With successful API call we expect to succeed the operation",
 			args: args{
 				mockClient: MockDirClient{
 					CreateResult: &accountclient.DirectoryResponseObject{
@@ -461,12 +523,48 @@ func TestCreateDirectory(t *testing.T) {
 					testutils.WithExternalName("123")),
 			},
 		},
+		"SuccessWithoutDescription": {
+			reason: "Directory creation should succeed even without description (testing empty description handling)",
+			args: args{
+				mockClient: MockDirClient{
+					CreateResult: &accountclient.DirectoryResponseObject{
+						Guid: "456",
+					},
+				},
+				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
+					Description:       "", // Empty description - should be omitted from API payload
+					DirectoryAdmins:   []string{"admin1@example.com", "admin2@example.com"},
+					DirectoryFeatures: []string{"DEFAULT"},
+					DisplayName:       internal.Ptr("directory-without-description"),
+					Labels:            map[string][]string{"env": {"test"}},
+				})),
+			},
+			want: want{
+				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
+					Description:       "",
+					DirectoryAdmins:   []string{"admin1@example.com", "admin2@example.com"},
+					DirectoryFeatures: []string{"DEFAULT"},
+					DisplayName:       internal.Ptr("directory-without-description"),
+					Labels:            map[string][]string{"env": {"test"}},
+				}),
+					testutils.WithExternalName("456")),
+			},
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			btpClient := btp.Client{AccountsServiceClient: &accountclient.APIClient{DirectoryOperationsAPI: tc.args.mockClient}}
 
 			client := NewDirectoryClient(&btpClient, tc.args.cr)
+
+			// additional test required for empty description handling
+			if name == "SuccessWithoutDescription" {
+				payload := client.toCreateApiPayload()
+				if payload.Description != nil {
+					t.Errorf("\n%s\ntoCreateApiPayload(): Expected description to be nil for empty description but got %q\n", tc.reason, *payload.Description)
+				}
+			}
+
 			got, err := client.CreateDirectory(context.Background())
 
 			if diff := cmp.Diff(tc.want.cr, got); diff != "" {
@@ -687,3 +785,5 @@ func TestDeleteDirectory(t *testing.T) {
 		})
 	}
 }
+
+
