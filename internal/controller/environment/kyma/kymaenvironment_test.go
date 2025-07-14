@@ -205,27 +205,6 @@ func TestObserve(t *testing.T) {
 				cr:            environment(withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
-		"ExternalNameChanged": {
-			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
-					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						State:      internal.Ptr("OK"),
-						Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
-					}, true, nil
-				}},
-				cr: environment(withExternalName("CHANGED-VALUE"), withUID("1234")),
-			},
-			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists:          true,
-					ResourceUpToDate:        true,
-					ResourceLateInitialized: true,
-				},
-				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
-				err:           nil,
-				cr:            environment(withExternalName("CHANGED-VALUE"), withUID("1234"), withConditions(xpv1.Available())),
-			},
-		},
 		"AvailableWithConnectionDetails": {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {

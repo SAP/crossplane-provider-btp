@@ -126,7 +126,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	} else {
 		cr.Status.SetConditions(xpv1.Unavailable())
 	}
-	
+
 	if needsCreation := c.needsCreation(cr); needsCreation {
 		return managed.ExternalObservation{
 			ResourceExists: !needsCreation,
