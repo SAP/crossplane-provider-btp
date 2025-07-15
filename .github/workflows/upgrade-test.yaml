@@ -1,14 +1,27 @@
 name: Upgrade Test Workflow
 
 on:
-  push:
-    branches:
-      - upgradeTestPipeline
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Source version"
+        required: true
+        default: ""
+      target:
+        description: "Target version"
+        required: true
+        default: ""
+
+  issue_comment:
+    types:
+      - created
 
 jobs:
   upgrade-test:
     runs-on: ubuntu-latest
-
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test'))
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
@@ -49,11 +62,34 @@ jobs:
 
           echo "All tools installed successfully."
 
+      - name: Extract params
+        run: |
+          # Set default values
+          echo "to_test_source=N/A" >> $GITHUB_ENV
+          echo "to_test_target=N/A" >> $GITHUB_ENV
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Use inputs from workflow_dispatch
+            echo "to_test_source=${{ github.event.inputs.source }}" >> $GITHUB_ENV
+            echo "to_test_target=${{ github.event.inputs.target }}" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            # Extract parameters from /upgrade-test comment
+            COMMENT_BODY="${{ github.event.comment.body }}"
+            if [[ "$COMMENT_BODY" =~ /upgrade-test ]]; then
+              # Try to parse source and target parameters from the comment (if present)
+              if [[ "$COMMENT_BODY" =~ source=([^\s]+) ]]; then
+                echo "to_test_source=${BASH_REMATCH[1]}" >> $GITHUB_ENV
+              fi
+              if [[ "$COMMENT_BODY" =~ target=([^\s]+) ]]; then
+                echo "to_test_target=${BASH_REMATCH[1]}" >> $GITHUB_ENV
+              fi
+            fi
+          fi
       - name: Run upgrade test
         run: |
           cd provider-upgrade-test
           echo "Running upgrade test..."
-           REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:v1.1.0" --target ${REGISTRY}:v1.2.0 --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
+           REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${to_test_source}" --target ${REGISTRY}:${to_test_target} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
         env: 
           CLIENT_ID: ${{ secrets.UPGRADE_TEST_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.UPGRADE_TEST_CLIENT_SECRET }}
