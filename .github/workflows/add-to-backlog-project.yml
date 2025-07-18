@@ -8,6 +8,6 @@ on:
 env:
   ACTIONS_STEP_DEBUG: true
 
-jobs:
-  call-reusable-workflow:
-    uses: openmcp-project/.github/workflows/addRefinedIssuesToBacklog.yml@main
+## jobs:
+  ## call-reusable-workflow:
+   ##  uses: openmcp-project/.github/workflows/addRefinedIssuesToBacklog.yml@main
