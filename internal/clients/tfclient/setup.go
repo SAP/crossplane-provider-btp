@@ -94,6 +94,7 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 		if err := json.Unmarshal(ServiceAccountSecretData, &userCredential); err != nil {
 			return ps, errors.Wrap(err, errCouldNotParseUserCredential)
 		}
+		ps.FrameworkProvider = config.GetProvider().TerraformPluginFrameworkProvider
 
 		ps.Configuration = map[string]any{
 			"username":       userCredential.Username,

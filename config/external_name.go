@@ -18,6 +18,10 @@ var ExternalNameConfigs = map[string]config.ExternalName{
 	"btp_subaccount_api_credential":         config.IdentifierFromProvider,
 }
 
+var TerraformPluginFrameworkExternalNameConfigs = map[string]config.ExternalName{
+	"btp_subaccount": config.IdentifierFromProvider,
+}
+
 // ExternalNameConfigurations applies all external name configs listed in the
 // table ExternalNameConfigs and sets the version of those resources to v1beta1
 // assuming they will be tested.
@@ -36,6 +40,17 @@ func ExternalNameConfigured() []string {
 	i := 0
 	for name := range ExternalNameConfigs {
 		// $ is added to match the exact string since the format is regex.
+		l[i] = name + "$"
+		i++
+	}
+	return l
+}
+
+func TerraformPluginFrameworkResourceList() []string {
+	l := make([]string, len(TerraformPluginFrameworkExternalNameConfigs))
+	i := 0
+	for name := range TerraformPluginFrameworkExternalNameConfigs {
+		// Expected format is regex, and we'd like to have exact matches.
 		l[i] = name + "$"
 		i++
 	}

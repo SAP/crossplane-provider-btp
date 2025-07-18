@@ -22,6 +22,9 @@ package v1alpha1
 func (tr *DirectoryEntitlement) Hub() {}
 
 // Hub marks this type as a conversion hub.
+func (tr *TfSubaccount) Hub() {}
+
+// Hub marks this type as a conversion hub.
 func (tr *SubaccountServiceBinding) Hub() {}
 
 // Hub marks this type as a conversion hub.
