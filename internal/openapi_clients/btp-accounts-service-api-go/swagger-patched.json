@@ -445,7 +445,6 @@
         },
         "required": [
           "createdDate",
-          "description",
           "directoryFeatures",
           "displayName",
           "globalAccountGUID",

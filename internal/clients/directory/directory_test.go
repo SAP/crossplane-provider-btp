@@ -194,6 +194,44 @@ func TestNeedsUpdate(t *testing.T) {
 					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
 			},
 		},
+		"NeedsUpdateDescription": {
+			reason: "changed description needs to be recognized as well",
+			args: args{
+				cachedAPI: &accountclient.DirectoryResponseObject{
+					DisplayName:       "someName",
+					Description:       "",
+					DirectoryFeatures: []string{"DEFAULT"},
+				},
+				cr: testutils.NewDirectory("unittest-client",
+					testutils.WithData(v1alpha1.DirectoryParameters{DisplayName: internal.Ptr("someName"), Description: "new description"}),
+					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
+			},
+			want: want{
+				o: true,
+				cr: testutils.NewDirectory("unittest-client",
+					testutils.WithData(v1alpha1.DirectoryParameters{DisplayName: internal.Ptr("someName"), Description: "new description"}),
+					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
+			},
+		},
+		"UpToDateEmptyDescription": {
+			reason: "If actual and desired description is empty, we expect no update",
+			args: args{
+				cachedAPI: &accountclient.DirectoryResponseObject{
+					DisplayName:       "someName",
+					Description:       "",
+					DirectoryFeatures: []string{"DEFAULT"},
+				},
+				cr: testutils.NewDirectory("unittest-client",
+					testutils.WithData(v1alpha1.DirectoryParameters{DisplayName: internal.Ptr("someName"), Description: ""}),
+					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
+			},
+			want: want{
+				o: false,
+				cr: testutils.NewDirectory("unittest-client",
+					testutils.WithData(v1alpha1.DirectoryParameters{DisplayName: internal.Ptr("someName"), Description: ""}),
+					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
+			},
+		},
 		"UpToDateApiRequested": {
 			reason: "If there are no changes we expect to not require an update",
 			args: args{
@@ -206,9 +244,9 @@ func TestNeedsUpdate(t *testing.T) {
 					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
 				mockClient: MockDirClient{
 					GetResult: &accountclient.DirectoryResponseObject{
-						Description: "desc",
-						DisplayName: "someName",
-						Labels:      &map[string][]string{"custom_label": {"custom_value"}},
+						Description:       "desc",
+						DisplayName:       "someName",
+						Labels:            &map[string][]string{"custom_label": {"custom_value"}},
 						DirectoryFeatures: []string{"DEFAULT"},
 					}},
 			},
@@ -435,7 +473,7 @@ func TestCreateDirectory(t *testing.T) {
 			},
 		},
 		"Success": {
-			reason: "With successful API call we expect to succeed the operatior",
+			reason: "With successful API call we expect to succeed the operation",
 			args: args{
 				mockClient: MockDirClient{
 					CreateResult: &accountclient.DirectoryResponseObject{
@@ -683,6 +721,87 @@ func TestDeleteDirectory(t *testing.T) {
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\ne.DeleteDirectory(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestDirectoryPayload(t *testing.T) {
+	type args struct {
+		cr         *v1alpha1.Directory
+		mockClient MockDirClient
+	}
+	type want struct {
+		create accountclient.CreateDirectoryRequestPayload
+		update accountclient.UpdateDirectoryRequestPayload
+		cr     resource.Managed
+	}
+	tests := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"Success": {
+			reason: "With successful API call we expect to succeed the operation",
+			args: args{
+				mockClient: MockDirClient{
+					CreateResult: &accountclient.DirectoryResponseObject{
+						Guid: "123",
+					},
+				},
+				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
+					Description:       "",
+					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryFeatures: []string{"DEFAULT"},
+					DisplayName:       internal.Ptr("created-from-unittest"),
+					Labels:            map[string][]string{"custom_label": {"custom_value"}},
+				})),
+			},
+			want: want{
+				create: accountclient.CreateDirectoryRequestPayload{
+					Description:       nil,
+					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryFeatures: []string{"DEFAULT"},
+					DisplayName:       "created-from-unittest",
+					Labels:            &map[string][]string{"custom_label": {"custom_value"}},
+				},
+				update: accountclient.UpdateDirectoryRequestPayload{
+					Description: nil,
+					Labels:      &map[string][]string{"custom_label": {"custom_value"}},
+					DisplayName: internal.Ptr("created-from-unittest"),
+				},
+				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
+					Description:       "",
+					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryFeatures: []string{"DEFAULT"},
+					DisplayName:       internal.Ptr("created-from-unittest"),
+					Labels:            map[string][]string{"custom_label": {"custom_value"}},
+				}), testutils.WithExternalName("123")),
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			btpClient := btp.Client{AccountsServiceClient: &accountclient.APIClient{DirectoryOperationsAPI: tc.args.mockClient}}
+
+			client := NewDirectoryClient(&btpClient, tc.args.cr)
+
+			createPayload := client.toCreateApiPayload()
+			updatePayload := client.toUpdateApiPayload()
+			got, _ := client.CreateDirectory(context.Background())
+
+			if diff := cmp.Diff(tc.want.create, createPayload); diff != "" {
+				t.Errorf("\n%s\ne.toCreateApiPayload(): -want, +got:\n%s\n", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.update, updatePayload); diff != "" {
+				t.Errorf("\n%s\ne.toUpdateApiPayload(): -want, +got:\n%s\n", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.cr, got); diff != "" {
+				t.Errorf("\n%s\ne.CreateDirectory(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+			// make sure changes have been applied to passed instance
+			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
+				t.Errorf("\n%s\ne.CreateDirectory(...): -want cr, +got cr:\n%s\n", tc.reason, diff)
 			}
 		})
 	}

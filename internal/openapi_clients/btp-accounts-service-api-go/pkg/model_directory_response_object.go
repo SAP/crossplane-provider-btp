@@ -31,7 +31,7 @@ type DirectoryResponseObject struct {
 	// Custom properties assigned to the directory as key-value pairs.
 	CustomProperties []PropertyResponseObject `json:"customProperties,omitempty"`
 	// A description of the directory.
-	Description string `json:"description"`
+	Description *string `json:"description,omitempty"`
 	// <b>The features to be enabled in the directory. The available features are:</b> - <b>DEFAULT</b>: (Mandatory) All directories provide the following basic features: (1) Group and filter subaccounts for reports and filters, (2) monitor usage and costs on a directory level (costs only available for contracts that use the consumption-based commercial model), and (3) set custom properties and tags to the directory for identification and reporting purposes. - <b>ENTITLEMENTS</b>: (Optional) Enables the assignment of a quota for services and applications to the directory from the global account quota for distribution to the subaccounts under this directory.  - <b>AUTHORIZATIONS</b>: (Optional) Allows you to assign users as administrators or viewers of this directory. You must apply this feature in combination with the ENTITLEMENTS feature.   IMPORTANT: Your multi-level account hierarchy can have more than one directory enabled with user authorization and/or entitlement management; however, only one directory in any directory path can have these features enabled. In other words, other directories above or below this directory in the same path can only have the default features specified. If you are not sure which features to enable, we recommend that you set only the default features, and then add features later on as they are needed.  <br/><b>Valid values:</b>  [DEFAULT] [DEFAULT,ENTITLEMENTS] [DEFAULT,ENTITLEMENTS,AUTHORIZATIONS]<br/>
 	DirectoryFeatures []string `json:"directoryFeatures"`
 	// The display name of the directory.
@@ -64,10 +64,9 @@ type _DirectoryResponseObject DirectoryResponseObject
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewDirectoryResponseObject(createdDate int64, description string, directoryFeatures []string, displayName string, globalAccountGUID string, guid string, parentGUID string) *DirectoryResponseObject {
+func NewDirectoryResponseObject(createdDate int64, directoryFeatures []string, displayName string, globalAccountGUID string, guid string, parentGUID string) *DirectoryResponseObject {
 	this := DirectoryResponseObject{}
 	this.CreatedDate = createdDate
-	this.Description = description
 	this.DirectoryFeatures = directoryFeatures
 	this.DisplayName = displayName
 	this.GlobalAccountGUID = globalAccountGUID
@@ -236,28 +235,36 @@ func (o *DirectoryResponseObject) SetCustomProperties(v []PropertyResponseObject
 	o.CustomProperties = v
 }
 
-// GetDescription returns the Description field value
+// GetDescription returns the Description field value if set, zero value otherwise.
 func (o *DirectoryResponseObject) GetDescription() string {
-	if o == nil {
+	if o == nil || IsNil(o.Description) {
 		var ret string
 		return ret
 	}
-
-	return o.Description
+	return *o.Description
 }
 
-// GetDescriptionOk returns a tuple with the Description field value
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *DirectoryResponseObject) GetDescriptionOk() (*string, bool) {
-	if o == nil {
+	if o == nil || IsNil(o.Description) {
 		return nil, false
 	}
-	return &o.Description, true
+	return o.Description, true
 }
 
-// SetDescription sets field value
+// HasDescription returns a boolean if a field has been set.
+func (o *DirectoryResponseObject) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
 func (o *DirectoryResponseObject) SetDescription(v string) {
-	o.Description = v
+	o.Description = &v
 }
 
 // GetDirectoryFeatures returns the DirectoryFeatures field value
@@ -627,7 +634,9 @@ func (o DirectoryResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.CustomProperties) {
 		toSerialize["customProperties"] = o.CustomProperties
 	}
-	toSerialize["description"] = o.Description
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
+	}
 	toSerialize["directoryFeatures"] = o.DirectoryFeatures
 	toSerialize["displayName"] = o.DisplayName
 	if !IsNil(o.EntityState) {
@@ -668,7 +677,6 @@ func (o *DirectoryResponseObject) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"createdDate",
-		"description",
 		"directoryFeatures",
 		"displayName",
 		"globalAccountGUID",

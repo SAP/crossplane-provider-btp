@@ -12,6 +12,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
+	"k8s.io/utils/ptr"
 )
 
 const errMisUse = "can not request API without GUID"
@@ -168,7 +169,8 @@ func isSynced(cr *v1alpha1.Directory, api *accountclient.DirectoryResponseObject
 	if providedDirectoryFeatures == nil {
 		providedDirectoryFeatures = []string{"DEFAULT"}
 	}
-	return cr.Spec.ForProvider.Description == api.Description &&
+
+	return cr.Spec.ForProvider.Description == ptr.Deref(api.Description, "") &&
 		internal.Val(cr.Spec.ForProvider.DisplayName) == api.DisplayName &&
 		reflect.DeepEqual(cr.Spec.ForProvider.Labels, internal.Val(api.Labels)) &&
 		reflect.DeepEqual(providedDirectoryFeatures, api.DirectoryFeatures)
@@ -176,7 +178,7 @@ func isSynced(cr *v1alpha1.Directory, api *accountclient.DirectoryResponseObject
 
 func (d *DirectoryClient) toUpdateApiPayload() accountclient.UpdateDirectoryRequestPayload {
 	payload := accountclient.UpdateDirectoryRequestPayload{
-		Description: &d.cr.Spec.ForProvider.Description,
+		Description: internal.PtrIfNotEmpty(d.cr.Spec.ForProvider.Description),
 		DisplayName: d.cr.Spec.ForProvider.DisplayName,
 		Labels:      &d.cr.Spec.ForProvider.Labels,
 	}
@@ -199,7 +201,7 @@ func (d *DirectoryClient) toCreateApiPayload() accountclient.CreateDirectoryRequ
 		displayName = *d.cr.Spec.ForProvider.DisplayName
 	}
 	payload := accountclient.CreateDirectoryRequestPayload{
-		Description:       &d.cr.Spec.ForProvider.Description,
+		Description:       internal.PtrIfNotEmpty(d.cr.Spec.ForProvider.Description),
 		DirectoryAdmins:   d.cr.Spec.ForProvider.DirectoryAdmins,
 		DirectoryFeatures: d.cr.Spec.ForProvider.DirectoryFeatures,
 		DisplayName:       displayName,

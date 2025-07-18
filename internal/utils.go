@@ -156,3 +156,13 @@ func hasPrefix(buf []byte, prefix []byte) bool {
 	trim := bytes.TrimLeftFunc(buf, unicode.IsSpace)
 	return bytes.HasPrefix(trim, prefix)
 }
+
+// PtrIfNotEmpty returns a pointer to the value if it's not the zero value, otherwise nil
+func PtrIfNotEmpty[T comparable](v T) *T {
+	var zero T
+	if v == zero {
+		return nil
+	}
+	return &v
+}
+
