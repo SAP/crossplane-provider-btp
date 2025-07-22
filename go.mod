@@ -25,7 +25,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/vladimirvivien/gexe v0.2.0
 	golang.org/x/net v0.39.0
-	golang.org/x/oauth2 v0.23.0
+	golang.org/x/oauth2 v0.27.0
 	golang.org/x/sync v0.13.0
 	gopkg.in/alecthomas/kingpin.v2 v2.4.0
 	gopkg.in/validator.v2 v2.0.1
