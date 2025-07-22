@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -209,7 +210,7 @@ func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, stri
 		return false, "", errors.Wrap(err, errParameterParsing)
 	}
 
-	current, err := internal.UnmarshalRawParameters([]byte(*cr.Status.AtProvider.Parameters))
+	current, err := internal.UnmarshalRawParameters([]byte(ptr.Deref(cr.Status.AtProvider.Parameters, "{}")))
 	if err != nil {
 		return false, "", errors.Wrap(err, errServiceParsing)
 	}
