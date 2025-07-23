@@ -5,13 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
 // Subaccounts contains a array of value filled with subaccounts
@@ -697,6 +698,10 @@ func checkIfAccountIsClean(cisBinding CisBinding, uaaAuth *UaaAuth) bool {
 	}
 
 	subaccounts, err := GetSubaccounts(uaaAuth, cisBinding)
+	if err != nil {
+		fmt.Println("error while getting subaccounts: ", err)
+		return false
+	}
 	for _, subaccount := range subaccounts.Value {
 		buildId := os.Getenv("BUILD_ID")
 		// check if the subaccounts is from the current build
@@ -759,7 +764,7 @@ func main() {
 	// delete secret for the trust configurations
 	err = deleteTokenForTrustConfiguration()
 	if err != nil {
-		fmt.Println("error getting access token:", err)
+		fmt.Println("error deleting access token:", err)
 		return
 	}
 
