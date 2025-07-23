@@ -6,15 +6,21 @@ on:
       source:
         description: "Source version"
         required: true
-        default: ""
+        default: "v1.0.3"
       target:
         description: "Target version"
         required: true
-        default: ""
+        default: "v1.1.0"
 
   issue_comment:
     types:
       - created
+
+  push:
+    branches:
+      - upgradeTestPipeline
+  
+  
 
 jobs:
   upgrade-test:
@@ -25,10 +31,43 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
+      
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
+        with:
+            version: v0.15.1
+            install: true
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: true
+      - name: Fetch History
+        run: git fetch --prune --unshallow
+
+      - name: Set up Go
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version: '1.21'
+
+      - name: Vendor Dependencies
+        run: make vendor vendor.check
+
+      - name: Set up Version
+        run: |
+          echo "BUILD_IMAGE_VERSION=$(date '+%Y-%m-%d-%H-%M-%S' | tr -d '/:')" >> $GITHUB_ENV
+          echo "version is $BUILD_IMAGE_VERSION"
+      - name: Build Images
+        run: make build --debug=v VERSION=$BUILD_IMAGE_VERSION PLATFORMS=linux_amd64
+        env:
+          # We're using docker buildx, which doesn't actually load the images it
+          # builds by default. Specifying --load does so.
+          BUILD_ARGS: "--load"
+          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
+          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
 
       - name: Clone provider-upgrade-test repo
         run: |
-          git clone https://${{ secrets.UPGRADE_TEST_GT_TOKEN }}@github.tools.sap/cloud-orchestration/provider-upgrade-test.git
+          git clone https://${{ secrets.UPGRADE_TEST_GT_TOKEN }}@${{ secrets.UPGRADE_TEST_GIT_REPO_HOST }}/cloud-orchestration/provider-upgrade-test.git
           echo "Repository provider-upgrade-test cloned successfully."
 
       - name: Install CLI Tools
@@ -64,24 +103,19 @@ jobs:
 
       - name: Extract params
         run: |
-          # Set default values
-          echo "to_test_source=N/A" >> $GITHUB_ENV
-          echo "to_test_target=N/A" >> $GITHUB_ENV
-
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            # Use inputs from workflow_dispatch
             echo "to_test_source=${{ github.event.inputs.source }}" >> $GITHUB_ENV
             echo "to_test_target=${{ github.event.inputs.target }}" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            # Extract parameters from /upgrade-test comment
             COMMENT_BODY="${{ github.event.comment.body }}"
             if [[ "$COMMENT_BODY" =~ /upgrade-test ]]; then
-              # Try to parse source and target parameters from the comment (if present)
-              if [[ "$COMMENT_BODY" =~ source=([^\s]+) ]]; then
-                echo "to_test_source=${BASH_REMATCH[1]}" >> $GITHUB_ENV
+              if [[ "$COMMENT_BODY" =~ source=([^\ ]+) ]]; then
+                  echo "to_test_source=${BASH_REMATCH[1]}" >> $GITHUB_ENV
+                  echo "to_test_source=$to_test_source"
               fi
-              if [[ "$COMMENT_BODY" =~ target=([^\s]+) ]]; then
-                echo "to_test_target=${BASH_REMATCH[1]}" >> $GITHUB_ENV
+              if [[ "$COMMENT_BODY" =~ target=([^\ ]+) ]]; then
+                  echo "to_test_target=${BASH_REMATCH[1]}" >> $GITHUB_ENV
+                  echo "to_test_target=$to_test_target"
               fi
             fi
           fi
@@ -89,7 +123,7 @@ jobs:
         run: |
           cd provider-upgrade-test
           echo "Running upgrade test..."
-           REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${to_test_source}" --target ${REGISTRY}:${to_test_target} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
+          REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${to_test_source}" --target ${REGISTRY}:${to_test_target} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
         env: 
           CLIENT_ID: ${{ secrets.UPGRADE_TEST_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.UPGRADE_TEST_CLIENT_SECRET }}
