@@ -3575,7 +3575,6 @@ components:
           type: string
       required:
       - createdDate
-      - description
       - directoryFeatures
       - displayName
       - globalAccountGUID
