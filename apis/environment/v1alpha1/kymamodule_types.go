@@ -19,7 +19,7 @@ type KymaModuleParameters struct {
 	// The channel of the module to be activated. Note: this is activated on module level and overrides the channel of the KymaEnvironment.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="regular"
-	Channel string `json:"channel,omitempty"`
+	Channel *string `json:"channel,omitempty"`
 }
 
 // A KymaModuleSpec defines the desired state of a KymaModule.
