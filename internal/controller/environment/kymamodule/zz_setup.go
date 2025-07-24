@@ -10,6 +10,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
@@ -23,7 +24,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 				mgr.GetClient(),
 				&providerv1alpha1.ProviderConfigUsage{},
 			),
-			newServiceFn:    btp.NewBTPClient,
+			newServiceFn:    kymamodule.NewKymaModuleClient,
 			resourcetracker: resourcetracker,
 		}
 	})

@@ -7,8 +7,9 @@ import (
 )
 
 type Client interface {
-	DescribeInstance(ctx context.Context, name string) (v1alpha1.KymaModuleObservation, error)
-	CreateInstance(ctx context.Context, name string, channel string) error
-	// UpdateInstance updates the channel of the KymaModule instance.
-	DeleteInstance(ctx context.Context, name string) error
+	GetDefaultKyma(ctx context.Context) (*v1alpha1.KymaCr, error)
+	EnableModule(ctx context.Context, moduleName string, moduleChannel string, customResourcePolicy string) error
+	DisableModule(ctx context.Context, moduleName string) error
+	// Does not have to be public
+	updateDefaultKyma(ctx context.Context, obj *v1alpha1.KymaCr) error
 }

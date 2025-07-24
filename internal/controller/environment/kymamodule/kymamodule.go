@@ -2,21 +2,25 @@ package kymaenvironmentbinding
 
 import (
 	"context"
-	"math"
 	"net/http"
 	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
-	kymabinding "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironmentbinding"
+	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -25,10 +29,9 @@ const (
 	errTrackPCUsage         = "cannot track ProviderConfig usage"
 	errGetPC                = "cannot get ProviderConfig"
 	errGetCreds             = "cannot get credentials"
-	errExtractSecretKey     = "No Cloud Management Secret Found"
-	errGetCredentialsSecret = "Could not get secret of local cloud management"
+	errExtractSecretKey     = "no KymaEnvironmentBinding secret found"
+	errGetCredentialsSecret = "could not get kubeconfig from KymaEnvironmentBinding secret"
 	errTrackRUsage          = "cannot track ResourceUsage"
-	errNoSecretsToPublish   = "no secrets to publish, please set the write connection secret reference or publish connection details to reference"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -38,17 +41,73 @@ type connector struct {
 	usage           resource.Tracker
 	resourcetracker tracking.ReferenceResolverTracker
 
-	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
+	newServiceFn func(dynamic dynamic.Interface) *kymamodule.KymaModuleClient
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
 // external resource to ensure it reflects the managed resource's desired state.
 type external struct {
-	client  kymabinding.Client
+	client  kymamodule.Client
 	tracker tracking.ReferenceResolverTracker
 
 	httpClient *http.Client
 	kube       client.Client
+}
+
+// This methods connects to the Kyma cluster using the kubeconfig from the KymaEnvironmentBinding
+func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
+	cr, ok := mg.(*v1alpha1.KymaModule)
+	if !ok {
+		return nil, errors.New(errNotKymaModule)
+	}
+
+	if err := c.usage.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, errTrackPCUsage)
+	}
+
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, errTrackRUsage)
+	}
+
+	if cr.Spec.KymaEnvironmentBindingSecret == "" || cr.Spec.KymaEnvironmentBindingSecretNamespace == "" {
+		return nil, errors.New(errExtractSecretKey)
+	}
+
+	secret := &corev1.Secret{}
+	if err := c.kube.Get(
+		ctx, types.NamespacedName{
+			Namespace: cr.Spec.KymaEnvironmentBindingSecretNamespace,
+			Name:      cr.Spec.KymaEnvironmentBindingSecret,
+		}, secret,
+	); err != nil {
+		return nil, errors.Wrap(err, errGetCredentialsSecret)
+	}
+
+	kubeconfigBytes := secret.Data["kubeconfig"]
+	if kubeconfigBytes == nil {
+		return nil, errors.New("kubeconfig not found in secret")
+	}
+
+	// Parse kubeconfig bytes into a rest.Config
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse kubeconfig")
+	}
+
+	// Create a dynamic client using the rest.Config
+	dynamicClient, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create dynamic client")
+	}
+
+	svc := c.newServiceFn(dynamicClient)
+	return &external{
+			client:     kymamodule.NewKymaModuleClient(*svc),
+			tracker:    c.resourcetracker,
+			httpClient: btp.DebugPrintHTTPClient(btp.WithHttpClient(&http.Client{Timeout: 10 * time.Second})),
+			kube:       c.kube,
+		},
+		err
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -57,13 +116,33 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaModule)
 	}
 
+	c.client.GetModule()
+	externalName := meta.GetExternalName(cr)
+	res, err := c.client.GetByIDOrSpec(ctx, guid, cr.Spec.ForProvider)
+	if err != nil {
+		if clients.ErrorIsNotFound(err) {
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+
+		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
+	}
+
+	lateInitialized := false
+
+	// Update external_name if it is not set or different
+	if guid != res.GUID {
+		meta.SetExternalName(cr, res.GUID)
+		lateInitialized = true
+	}
+
+	// Update the status of the resource
+	cr.Status.AtProvider = app.GenerateObservation(res)
+
 	err := c.updateBindingsFromService(ctx, cr)
+
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
-	validBindings, bindings := c.validateBindings(cr)
-	cr.Status.AtProvider.Bindings = bindings
-	_ = c.kube.Status().Update(ctx, cr)
 
 	cr.Status.SetConditions(xpv1.Available())
 
@@ -73,120 +152,21 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
-func (c *external) updateBindingsFromService(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error {
-	bindingsAtService, err := c.client.DescribeInstance(ctx, cr.Spec.KymaEnvironmentId)
-	if err != nil {
-		return err
-	}
-
-	validBindings := []v1alpha1.Binding{}
-
-	for _, b := range cr.Status.AtProvider.Bindings {
-		found := false
-		for _, bs := range bindingsAtService {
-			if b.Id == *bs.BindingId {
-				found = true
-				break
-			}
-		}
-		if found {
-			validBindings = append(validBindings, b)
-		}
-	}
-
-	// Update the bindings with the valid ones
-	cr.Status.AtProvider.Bindings = validBindings
-	return nil
-}
-
-// validateBindings checks if bindings in status are still active (did not reach rotation deadline) or not yet expired (reached time to live)
-func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, []v1alpha1.Binding) {
-	bindings := cr.Status.AtProvider.Bindings
-	if bindings == nil {
-		return false, nil
-	}
-
-	hasActiveBinding := false
-	validBindings := []v1alpha1.Binding{}
-	now := time.Now()
-
-	// First pass: deactivate bindings that need rotation or are expired
-	for i := range bindings {
-		b := &bindings[i]
-		if b.IsActive {
-			// Check if binding has expired, might happen if rotation deadline is exceeded and has not been reconciled for a while
-			if ttlIsExpired(b, now) {
-				b.IsActive = false
-				continue
-			}
-
-			// Check if rotation interval has been reached
-			if reachedRotationDeadline(now, b, cr) {
-				b.IsActive = false
-			} else {
-				hasActiveBinding = true
-			}
-		}
-	}
-
-	// Second pass: keep non-expired bindings (active or inactive)
-	for _, b := range bindings {
-		if !ttlIsExpired(&b, now) {
-			validBindings = append(validBindings, b)
-		}
-	}
-
-	return hasActiveBinding, validBindings
-}
-
-func reachedRotationDeadline(now time.Time, b *v1alpha1.Binding, cr *v1alpha1.KymaEnvironmentBinding) bool {
-	deadline := b.CreatedAt.Add(cr.Spec.ForProvider.RotationInterval.Duration)
-	return now.After(deadline)
-}
-
-func ttlIsExpired(b *v1alpha1.Binding, now time.Time) bool {
-	return b.ExpiresAt.Time.Before(now)
-}
-
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.KymaEnvironmentBinding)
+	cr, ok := mg.(*v1alpha1.KymaModule)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotKymaModule)
 	}
 
-	// Initialize status if needed
-	if cr.Status.AtProvider.Bindings == nil {
-		cr.Status.AtProvider.Bindings = []v1alpha1.Binding{}
-	}
-
-	// Create new binding only if we don't have a valid one
-	ttl := int(math.Round(cr.Spec.ForProvider.BindingTTl.Seconds()))
-	clientBinding, err := c.client.CreateInstance(ctx, cr.Spec.KymaEnvironmentId, ttl)
+	err := c.client.EnableModule(ctx, cr.Spec.ForProvider.Name, *cr.Spec.ForProvider.Channel, *cr.Spec.ForProvider.CustomResourcePolicy)
 	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
 
-	// Create new binding from client binding
-	newBinding := v1alpha1.Binding{
-		Id:        clientBinding.Metadata.Id,
-		IsActive:  true,
-		CreatedAt: metav1.NewTime(time.Now().UTC()),
-		ExpiresAt: metav1.NewTime(clientBinding.Metadata.ExpiresAt.UTC()),
-	}
+	// Enables importing existing modules by setting the external name
+	meta.SetExternalName(cr, cr.Spec.ForProvider.Name)
 
-	// Add new binding to status
-	cr.Status.AtProvider.Bindings = append(cr.Status.AtProvider.Bindings, newBinding)
-	// Prepare connection details
-	connectionDetails := managed.ConnectionDetails{
-		"binding_id": []byte(newBinding.Id),
-		"expires_at": []byte(newBinding.ExpiresAt.UTC().String()),
-		"created_at": []byte(newBinding.CreatedAt.UTC().String()),
-		"kubeconfig": []byte(clientBinding.Credentials.Kubeconfig),
-	}
-
-	return managed.ExternalCreation{
-		ConnectionDetails: connectionDetails,
-	}, c.kube.Status().Update(ctx, cr)
+	return managed.ExternalCreation{}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -195,11 +175,12 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	cr, ok := mg.(*v1alpha1.KymaEnvironmentBinding)
+	cr, ok := mg.(*v1alpha1.KymaModule)
 	if !ok {
 		return errors.New(errNotKymaModule)
 	}
 
-	err := c.client.DeleteInstances(ctx, cr.Status.AtProvider.Bindings, cr.Spec.KymaEnvironmentId)
+	err := c.client.DisableModule(ctx, cr.Spec.ForProvider.Name)
+
 	return err
 }

@@ -338,22 +338,20 @@ spec:
             description: A KymaModuleStatus represents the observed state of a KymaModule.
             properties:
               atProvider:
+                description: ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/types.go#L125
                 properties:
                   channel:
-                    description: The channel of the module.
-                    type: string
-                  description:
-                    description: The description of the module.
-                    type: string
-                  id:
-                    description: The ID of the module.
                     type: string
                   name:
-                    description: The name of the module.
                     type: string
-                  status:
-                    description: The status of the module.
+                  state:
                     type: string
+                  template:
+                    type: object
+                  version:
+                    type: string
+                required:
+                - name
                 type: object
               conditions:
                 description: Conditions of the resource.

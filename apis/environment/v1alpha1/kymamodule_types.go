@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -20,6 +21,11 @@ type KymaModuleParameters struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="regular"
 	Channel *string `json:"channel,omitempty"`
+
+	// The custom resource policy of the module to be activated.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="CreateAndDelete"
+	CustomResourcePolicy *string `json:"customResourcePolicy,omitempty"`
 }
 
 // A KymaModuleSpec defines the desired state of a KymaModule.
@@ -50,20 +56,49 @@ type KymaModuleSpec struct {
 // A KymaModuleStatus represents the observed state of a KymaModule.
 type KymaModuleStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          KymaModuleObservation `json:"atProvider,omitempty"`
+	AtProvider          ModuleStatus `json:"atProvider,omitempty"`
 }
 
-type KymaModuleObservation struct {
-	// The ID of the module.
-	ID string `json:"id,omitempty"`
-	// The name of the module.
-	Name string `json:"name,omitempty"`
-	// The channel of the module.
-	Channel string `json:"channel,omitempty"`
-	// The status of the module.
-	Status string `json:"status,omitempty"`
-	// The description of the module.
-	Description string `json:"description,omitempty"`
+// KymaCr is the Schema for the KymaCR inside the Kyma Cluster.
+// ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/types.go#L97
+type KymaCr struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   KymaSpec   `json:"spec,omitempty"`
+	Status KymaStatus `json:"status,omitempty"`
+}
+
+// KymaSpec defines the desired state of Kyma.
+// ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/types.go#L106
+type KymaSpec struct {
+	Channel string   `json:"channel"`
+	Modules []Module `json:"modules,omitempty"`
+}
+
+// Module defines the components to be installed.
+// ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/types.go#L112
+type Module struct {
+	Name                 string `json:"name"`
+	ControllerName       string `json:"controller,omitempty"`
+	Channel              string `json:"channel,omitempty"`
+	CustomResourcePolicy string `json:"customResourcePolicy,omitempty"`
+	Managed              *bool  `json:"managed,omitempty"`
+}
+
+// KymaStatus defines the observed state of Kyma
+// ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/types.go#L121
+type KymaStatus struct {
+	Modules []ModuleStatus `json:"modules,omitempty"`
+}
+
+// ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/types.go#L125
+type ModuleStatus struct {
+	Name     string                    `json:"name"`
+	Channel  string                    `json:"channel,omitempty"`
+	Version  string                    `json:"version,omitempty"`
+	State    string                    `json:"state,omitempty"`
+	Template unstructured.Unstructured `json:"template,omitempty"`
 }
 
 // +kubebuilder:object:root=true
