@@ -51,7 +51,7 @@ func (mg *RoleCollection) ResolveReferences(ctx context.Context, c client.Reader
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace,
-		Extract:      SubaccountApiCredentialSecretSecretNamespace(),
+		Extract:      SubaccountApiCredentialSecretNamespace(),
 		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
 		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
 		To: reference.To{
@@ -93,7 +93,7 @@ func (mg *RoleCollectionAssignment) ResolveReferences(ctx context.Context, c cli
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace,
-		Extract:      SubaccountApiCredentialSecretSecretNamespace(),
+		Extract:      SubaccountApiCredentialSecretNamespace(),
 		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
 		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
 		To: reference.To{
