@@ -32,6 +32,7 @@ const (
 	errExtractSecretKey     = "no KymaEnvironmentBinding secret found"
 	errGetCredentialsSecret = "could not get kubeconfig from KymaEnvironmentBinding secret"
 	errTrackRUsage          = "cannot track ResourceUsage"
+	errObserveResource      = "cannot observe KymaModule"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -83,7 +84,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errGetCredentialsSecret)
 	}
 
-	kubeconfigBytes := secret.Data["kubeconfig"]
+	kubeconfigBytes := secret.Data[v1alpha1.KymaEnvironmentBindingKey]
 	if kubeconfigBytes == nil {
 		return nil, errors.New("kubeconfig not found in secret")
 	}
@@ -116,29 +117,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaModule)
 	}
 
-	c.client.GetModule()
-	externalName := meta.GetExternalName(cr)
-	res, err := c.client.GetByIDOrSpec(ctx, guid, cr.Spec.ForProvider)
-	if err != nil {
-		if clients.ErrorIsNotFound(err) {
-			return managed.ExternalObservation{ResourceExists: false}, nil
-		}
-
-		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
-	}
-
-	lateInitialized := false
-
-	// Update external_name if it is not set or different
-	if guid != res.GUID {
-		meta.SetExternalName(cr, res.GUID)
-		lateInitialized = true
-	}
+	res, err := c.client.GetModule(ctx, meta.GetExternalName(cr))
 
 	// Update the status of the resource
-	cr.Status.AtProvider = app.GenerateObservation(res)
-
-	err := c.updateBindingsFromService(ctx, cr)
+	cr.Status.AtProvider = *res
 
 	if err != nil {
 		return managed.ExternalObservation{}, err

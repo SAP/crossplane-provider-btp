@@ -10,6 +10,10 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
+const (
+	KymaEnvironmentBindingKey = "kubeconfig"
+)
+
 // KymaModuleParameters are the configurable fields of a KymaModule.
 type KymaModuleParameters struct {
 

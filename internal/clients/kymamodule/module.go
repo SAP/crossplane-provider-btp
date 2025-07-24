@@ -35,6 +35,21 @@ func NewKymaModuleClient(dynamic dynamic.Interface) *KymaModuleClient {
 	return &KymaModuleClient{dynamic: dynamic}
 }
 
+func (c KymaModuleClient) GetModule(ctx context.Context, moduleName string) (*v1alpha1.ModuleStatus, error) {
+	kyma, err := c.getDefaultKyma(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, module := range kyma.Status.Modules {
+		if module.Name == moduleName {
+			return &module, nil
+		}
+	}
+
+	return nil, nil
+}
+
 // GVRKyma is the GroupVersionResource for Kyma CRs.
 // ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/types.go#L154
 var GVRKyma = schema.GroupVersionResource{
@@ -45,7 +60,7 @@ var GVRKyma = schema.GroupVersionResource{
 
 // GetDefaultKyma gets the default Kyma CR from the kyma-system namespace and cast it to the Kyma structure.
 // ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/kyma.go#L144
-func (c KymaModuleClient) GetDefaultKyma(ctx context.Context) (*v1alpha1.KymaCr, error) {
+func (c KymaModuleClient) getDefaultKyma(ctx context.Context) (*v1alpha1.KymaCr, error) {
 	u, err := c.dynamic.Resource(GVRKyma).
 		Namespace(DefaultKymaNamespace).
 		Get(ctx, DefaultKymaName, metav1.GetOptions{})
@@ -78,7 +93,7 @@ func (c KymaModuleClient) updateDefaultKyma(ctx context.Context, obj *v1alpha1.K
 // if moduleChannel is empty it uses default channel in the Kyma CR
 // ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/kyma.go#L212
 func (c *KymaModuleClient) EnableModule(ctx context.Context, moduleName string, moduleChannel string, customResourcePolicy string) error {
-	kymaCR, err := c.GetDefaultKyma(ctx)
+	kymaCR, err := c.getDefaultKyma(ctx)
 	if err != nil {
 		return err
 	}
@@ -91,7 +106,7 @@ func (c *KymaModuleClient) EnableModule(ctx context.Context, moduleName string, 
 // DisableModule removes module from the default Kyma CR in the kyma-system namespace
 // ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/kyma.go#L226
 func (c *KymaModuleClient) DisableModule(ctx context.Context, moduleName string) error {
-	kymaCR, err := c.GetDefaultKyma(ctx)
+	kymaCR, err := c.getDefaultKyma(ctx)
 	if err != nil {
 		return err
 	}

@@ -81,6 +81,10 @@ spec:
                       this is activated on module level and overrides the channel
                       of the KymaEnvironment.'
                     type: string
+                  customResourcePolicy:
+                    default: CreateAndDelete
+                    description: The custom resource policy of the module to be activated.
+                    type: string
                   name:
                     description: The name of the standard module to be activated.
                     type: string
