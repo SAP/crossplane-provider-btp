@@ -57,7 +57,7 @@ jobs:
           echo "BUILD_IMAGE_VERSION=draft-$(date '+%Y-%m-%d-%H-%M-%S' | tr -d '/:')" >> $GITHUB_ENV
           echo "version is $BUILD_IMAGE_VERSION"
       - name: Build Images
-        run: make build --debug=v VERSION=$BUILD_IMAGE_VERSION PLATFORMS=linux_amd64
+        run: make build VERSION=$BUILD_IMAGE_VERSION 
         env:
           # We're using docker buildx, which doesn't actually load the images it
           # builds by default. Specifying --load does so.
@@ -72,7 +72,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish Artifacts to DockerHub
-        run: make publish BRANCH_NAME=${GITHUB_REF##*/}
+        run: make publish BRANCH_NAME=${GITHUB_REF##*/} VERSION=$BUILD_IMAGE_VERSION
         env:
           DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
           BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
