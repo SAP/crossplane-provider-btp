@@ -10,30 +10,32 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/pkg/errors"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ResourcesStatus contains a summary of the status of the tf resources managed by the ITfClient
-// it uses the crossplane terminology for the external observation and enhances it with IDs of the managed instances
+// it uses the crossplane terminology for the external observation and enhances it with observation data of the managed instances
 type ResourcesStatus struct {
 	managed.ExternalObservation
-	InstanceID string
-	BindingID  string
+	Instance apisv1alpha1.SubaccountServiceInstanceObservation
+	Binding  apisv1alpha1.SubaccountServiceBindingObservation
 }
 
 // ITfClientInitializer will produce the ITfClient used by external
 type ITfClientInitializer interface {
-	ConnectResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) (ITfClient, error)
+	ConnectResources(ctx context.Context, cr *apisv1beta1.CloudManagement) (ITfClient, error)
 }
 
 // ITfClient contains domain logic for managing ServiceManager lifecycle
 type ITfClient interface {
-	ObserveResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) (ResourcesStatus, error)
-	CreateResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) (string, string, error)
-	UpdateResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) error
-	DeleteResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) error
+	ObserveResources(ctx context.Context, cr *apisv1beta1.CloudManagement) (ResourcesStatus, error)
+	CreateResources(ctx context.Context, cr *apisv1beta1.CloudManagement) (string, string, error)
+	UpdateResources(ctx context.Context, cr *apisv1beta1.CloudManagement) error
+	DeleteResources(ctx context.Context, cr *apisv1beta1.CloudManagement) error
 }
 
 func NewTfClient(sConnector managed.ExternalConnecter, sbConnector managed.ExternalConnecter) *TfClientInitializer {
@@ -50,7 +52,7 @@ type TfClientInitializer struct {
 	sbConnector managed.ExternalConnecter
 }
 
-func (tfI *TfClientInitializer) ConnectResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) (ITfClient, error) {
+func (tfI *TfClientInitializer) ConnectResources(ctx context.Context, cr *apisv1beta1.CloudManagement) (ITfClient, error) {
 	siInstance := tfI.serviceInstanceCr(cr)
 	siExternal, err := tfI.siConnector.Connect(ctx, siInstance)
 
@@ -72,7 +74,7 @@ func (tfI *TfClientInitializer) ConnectResources(ctx context.Context, cr *apisv1
 	}, nil
 }
 
-func (tfI *TfClientInitializer) serviceInstanceCr(cm *apisv1alpha1.CloudManagement) *apisv1alpha1.SubaccountServiceInstance {
+func (tfI *TfClientInitializer) serviceInstanceCr(cm *apisv1beta1.CloudManagement) *apisv1alpha1.SubaccountServiceInstance {
 	sInstance := &apisv1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       apisv1alpha1.SubaccountServiceInstance_Kind,
@@ -91,7 +93,7 @@ func (tfI *TfClientInitializer) serviceInstanceCr(cm *apisv1alpha1.CloudManageme
 				ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionAll},
 			},
 			ForProvider: apisv1alpha1.SubaccountServiceInstanceParameters{
-				Name:          &cm.Name,
+				Name:          getServiceInstanceName(cm),
 				ServiceplanID: &cm.Status.AtProvider.DataSourceLookup.CloudManagementPlanID,
 				SubaccountID:  internal.Ptr(cm.Spec.ForProvider.SubaccountGuid),
 				Parameters:    internal.Ptr(`{"grantType":"clientCredentials"}`),
@@ -105,7 +107,7 @@ func (tfI *TfClientInitializer) serviceInstanceCr(cm *apisv1alpha1.CloudManageme
 	return sInstance
 }
 
-func (tfI *TfClientInitializer) serviceBindingCr(cm *apisv1alpha1.CloudManagement) *apisv1alpha1.SubaccountServiceBinding {
+func (tfI *TfClientInitializer) serviceBindingCr(cm *apisv1beta1.CloudManagement) *apisv1alpha1.SubaccountServiceBinding {
 	sInstanceId, sBindingId := splitExternalName(meta.GetExternalName(cm))
 	sBinding := &apisv1alpha1.SubaccountServiceBinding{
 		TypeMeta: metav1.TypeMeta{
@@ -125,7 +127,7 @@ func (tfI *TfClientInitializer) serviceBindingCr(cm *apisv1alpha1.CloudManagemen
 				ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionAll},
 			},
 			ForProvider: apisv1alpha1.SubaccountServiceBindingParameters{
-				Name:              &cm.Name,
+				Name:              getServiceBindingName(cm),
 				ServiceInstanceID: internal.Ptr(sInstanceId),
 				SubaccountID:      internal.Ptr(cm.Spec.ForProvider.SubaccountGuid),
 			},
@@ -146,7 +148,7 @@ type TfClient struct {
 	sBinding  *apisv1alpha1.SubaccountServiceBinding
 }
 
-func (tf *TfClient) DeleteResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) error {
+func (tf *TfClient) DeleteResources(ctx context.Context, cr *apisv1beta1.CloudManagement) error {
 	err := tf.sbExternal.Delete(ctx, tf.sBinding)
 	if err != nil {
 		return err
@@ -158,7 +160,7 @@ func (tf *TfClient) DeleteResources(ctx context.Context, cr *apisv1alpha1.CloudM
 	return nil
 }
 
-func (tf *TfClient) UpdateResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) error {
+func (tf *TfClient) UpdateResources(ctx context.Context, cr *apisv1beta1.CloudManagement) error {
 	// currently updates are only supported for instances, not bindings
 	_, err := tf.siExternal.Update(ctx, tf.sInstance)
 	return err
@@ -166,7 +168,7 @@ func (tf *TfClient) UpdateResources(ctx context.Context, cr *apisv1alpha1.CloudM
 
 // CreateResources creates the service manager instance and binding
 // What of the resources need to be created is determined by set IDs in SM's status
-func (tf *TfClient) CreateResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) (string, string, error) {
+func (tf *TfClient) CreateResources(ctx context.Context, cr *apisv1beta1.CloudManagement) (string, string, error) {
 	// since instance and binding depend on each other and tf resources are written in Connect() we need to use 2 Create() calls to first create instance and later binding
 	// so it's expected to do either one of them here
 	//
@@ -179,7 +181,7 @@ func (tf *TfClient) CreateResources(ctx context.Context, cr *apisv1alpha1.CloudM
 	}
 }
 
-func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1alpha1.CloudManagement) (ResourcesStatus, error) {
+func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.CloudManagement) (ResourcesStatus, error) {
 	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
 	if err != nil {
 		return ResourcesStatus{}, err
@@ -196,7 +198,7 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1alpha1.Cloud
 	if !sbObs.ResourceExists {
 		return ResourcesStatus{
 			ExternalObservation: managed.ExternalObservation{ResourceExists: false},
-			InstanceID:          meta.GetExternalName(tf.sInstance),
+			Instance:            tf.sInstance.Status.AtProvider,
 		}, nil
 	}
 
@@ -208,7 +210,7 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1alpha1.Cloud
 	// the way the reconciler is implemented we need to do another observe run to actually retrieve if updates are nessecary,
 	// the first one is just used to set ready state for any reason, should be rechecked when we have the in-memory clients in place
 	// since they reimplement Observe()
-	resourceUpToDate := tf.resourcesUpToDate(ctx)
+	resourceUpToDate := tf.resourcesUpToDate(ctx, cr)
 
 	return ResourcesStatus{
 		ExternalObservation: managed.ExternalObservation{
@@ -216,15 +218,29 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1alpha1.Cloud
 			ResourceUpToDate:  resourceUpToDate,
 			ConnectionDetails: conDetails,
 		},
-		InstanceID: meta.GetExternalName(tf.sInstance),
-		BindingID:  meta.GetExternalName(tf.sBinding),
+		Instance: tf.sInstance.Status.AtProvider,
+		Binding:  tf.sBinding.Status.AtProvider,
 	}, nil
 }
 
 // ResourcesUpToDate runs another observe on instance and returns whether they are up to date, currently updates on bindings are not supported
-func (tf *TfClient) resourcesUpToDate(ctx context.Context) bool {
+func (tf *TfClient) resourcesUpToDate(ctx context.Context, cr *apisv1beta1.CloudManagement) bool {
 	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
-	return err != nil || siObs.ResourceUpToDate
+
+	// ignore errors, since its a second Observe with no changes this should never happen
+	if err != nil {
+		return true
+	}
+	// if tf detects no changes it must be up to date
+	if siObs.ResourceUpToDate {
+		return true
+	}
+	// accounts for a behaviour change, resources created as v1alpha1 in previous provider versions
+	// use metadata.name as instance Name, we don't want to change those
+	if alphaRes := tf.createdFromV1Alpha1(cr); alphaRes {
+		return true
+	}
+	return false
 }
 
 func (tf *TfClient) createInstance(ctx context.Context) (string, error) {
@@ -251,6 +267,28 @@ func splitExternalName(externalName string) (string, string) {
 	return fragments[0], ""
 }
 
+// gets the service instance name from the cloud management CR in a retrocompatible way
+func getServiceInstanceName(cm *apisv1beta1.CloudManagement) *string {
+	defaultName := apisv1beta1.DefaultCloudManagementInstanceName
+
+	if cm.Spec.ForProvider.ServiceInstanceName != "" {
+		defaultName = cm.Spec.ForProvider.ServiceInstanceName
+	}
+
+	return &defaultName
+}
+
+// gets the service binding name from the cloud management CR in a retrocompatible way
+func getServiceBindingName(cm *apisv1beta1.CloudManagement) *string {
+	defaultName := apisv1beta1.DefaultCloudManagementBindingName
+
+	if cm.Spec.ForProvider.ServiceBindingName != "" {
+		defaultName = cm.Spec.ForProvider.ServiceBindingName
+	}
+
+	return &defaultName
+}
+
 // mapTfConnectionDetails maps the connection details from the terraform output to the connection details of the CR as expected by the crossplane provider
 func mapTfConnectionDetails(conDetails map[string][]byte) (managed.ConnectionDetails, error) {
 	bindingAsBytes := conDetails["attribute.credentials"]
@@ -264,4 +302,9 @@ func mapTfConnectionDetails(conDetails map[string][]byte) (managed.ConnectionDet
 	credentials[providerv1alpha1.RawBindingKey] = raw
 
 	return credentials, nil
+}
+
+// detects whether an instance has been created from previous provider versions, those used metadata.name as instance name
+func (tf *TfClient) createdFromV1Alpha1(cr *apisv1beta1.CloudManagement) bool {
+	return cr.Spec.ForProvider.ServiceInstanceName == "" && internal.Val(tf.sInstance.Status.AtProvider.Name) == cr.GetName()
 }

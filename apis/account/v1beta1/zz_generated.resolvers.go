@@ -26,6 +26,64 @@ import (
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// ResolveReferences of this CloudManagement.
+func (mg *CloudManagement) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPIResolver(c, mg)
+
+	var rsp reference.ResolutionResponse
+	var err error
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.ForProvider.SubaccountGuid,
+		Extract:      v1alpha1.SubaccountUuid(),
+		Reference:    mg.Spec.ForProvider.SubaccountRef,
+		Selector:     mg.Spec.ForProvider.SubaccountSelector,
+		To: reference.To{
+			List:    &v1alpha1.SubaccountList{},
+			Managed: &v1alpha1.Subaccount{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.SubaccountGuid")
+	}
+	mg.Spec.ForProvider.SubaccountGuid = rsp.ResolvedValue
+	mg.Spec.ForProvider.SubaccountRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecret,
+		Extract:      v1alpha1.ServiceManagerSecret(),
+		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
+		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
+		To: reference.To{
+			List:    &v1alpha1.ServiceManagerList{},
+			Managed: &v1alpha1.ServiceManager{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ServiceManagerSecret")
+	}
+	mg.Spec.ForProvider.ServiceManagerSecret = rsp.ResolvedValue
+	mg.Spec.ForProvider.ServiceManagerRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecretNamespace,
+		Extract:      v1alpha1.ServiceManagerSecretNamespace(),
+		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
+		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
+		To: reference.To{
+			List:    &v1alpha1.ServiceManagerList{},
+			Managed: &v1alpha1.ServiceManager{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ServiceManagerSecretNamespace")
+	}
+	mg.Spec.ForProvider.ServiceManagerSecretNamespace = rsp.ResolvedValue
+	mg.Spec.ForProvider.ServiceManagerRef = rsp.ResolvedReference
+
+	return nil
+}
+
 // ResolveReferences of this ServiceManager.
 func (mg *ServiceManager) ResolveReferences(ctx context.Context, c client.Reader) error {
 	r := reference.NewAPIResolver(c, mg)

@@ -1,7 +1,7 @@
 /*
 SaaS Provisioning Service
 
-The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The SAP SaaS Provisioning service provides REST APIs that are responsible for the registration and provisioning of multitenant applications and services.   Use the APIs in this service to perform various operations related to your multitenant applications and services. For example, to get application registration details, subscribe a tenant to your application, unsubscribe a tenant from your application, retrieve all your application subscriptions, update subscription dependencies, and to get subscription job information. Note: \"Application Operations for App Providers\" APIs are intended for maintenance activities, not for runtime flows.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -21,8 +21,8 @@ var _ MappedNullable = &CreateSubscriptionRequestPayload{}
 type CreateSubscriptionRequestPayload struct {
 	// The name of the subscription plan to a multitenant application
 	PlanName *string `json:"planName,omitempty"`
-	// Additional subscription parameters determined by the application provider.
-	SubscriptionParams map[string]map[string]interface{} `json:"subscriptionParams,omitempty"`
+	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameters 'id' and 'email' are specified:  {  \"instance_name\": \"myOrg\"  } 
+	SubscriptionParams map[string]interface{} `json:"subscriptionParams,omitempty"`
 }
 
 // NewCreateSubscriptionRequestPayload instantiates a new CreateSubscriptionRequestPayload object
@@ -75,9 +75,9 @@ func (o *CreateSubscriptionRequestPayload) SetPlanName(v string) {
 }
 
 // GetSubscriptionParams returns the SubscriptionParams field value if set, zero value otherwise.
-func (o *CreateSubscriptionRequestPayload) GetSubscriptionParams() map[string]map[string]interface{} {
+func (o *CreateSubscriptionRequestPayload) GetSubscriptionParams() map[string]interface{} {
 	if o == nil || IsNil(o.SubscriptionParams) {
-		var ret map[string]map[string]interface{}
+		var ret map[string]interface{}
 		return ret
 	}
 	return o.SubscriptionParams
@@ -85,9 +85,9 @@ func (o *CreateSubscriptionRequestPayload) GetSubscriptionParams() map[string]ma
 
 // GetSubscriptionParamsOk returns a tuple with the SubscriptionParams field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CreateSubscriptionRequestPayload) GetSubscriptionParamsOk() (map[string]map[string]interface{}, bool) {
+func (o *CreateSubscriptionRequestPayload) GetSubscriptionParamsOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.SubscriptionParams) {
-		return map[string]map[string]interface{}{}, false
+		return map[string]interface{}{}, false
 	}
 	return o.SubscriptionParams, true
 }
@@ -101,8 +101,8 @@ func (o *CreateSubscriptionRequestPayload) HasSubscriptionParams() bool {
 	return false
 }
 
-// SetSubscriptionParams gets a reference to the given map[string]map[string]interface{} and assigns it to the SubscriptionParams field.
-func (o *CreateSubscriptionRequestPayload) SetSubscriptionParams(v map[string]map[string]interface{}) {
+// SetSubscriptionParams gets a reference to the given map[string]interface{} and assigns it to the SubscriptionParams field.
+func (o *CreateSubscriptionRequestPayload) SetSubscriptionParams(v map[string]interface{}) {
 	o.SubscriptionParams = v
 }
 

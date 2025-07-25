@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	cmclient "github.com/sap/crossplane-provider-btp/internal/clients/cis"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
@@ -23,10 +24,10 @@ import (
 func TestConnect(t *testing.T) {
 	type want struct {
 		err error
-		cr  *v1alpha1.CloudManagement
+		cr  *v1beta1.CloudManagement
 	}
 	type args struct {
-		cr                  *v1alpha1.CloudManagement
+		cr                  *v1beta1.CloudManagement
 		kube                test.MockClient
 		planIdResolverFn    func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error)
 		clientInitializerFn func() cmclient.ITfClientInitializer
@@ -54,7 +55,7 @@ func TestConnect(t *testing.T) {
 					MockGet: test.NewMockGetFn(errors.New("GetSecretError")),
 				},
 				cr: NewCloudManagement("test",
-					WithData(v1alpha1.CloudManagementParameters{
+					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
 						ServiceManagerSecret:          "someSecret",
 					}),
@@ -63,7 +64,7 @@ func TestConnect(t *testing.T) {
 			want: want{
 				err: errors.Wrap(errors.New("GetSecretError"), errGetCredentialsSecret),
 				cr: NewCloudManagement("test",
-					WithData(v1alpha1.CloudManagementParameters{
+					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
 						ServiceManagerSecret:          "someSecret",
 					}),
@@ -78,7 +79,7 @@ func TestConnect(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				cr: NewCloudManagement("test",
-					WithData(v1alpha1.CloudManagementParameters{
+					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
 						ServiceManagerSecret:          "someSecret",
 					}),
@@ -90,7 +91,7 @@ func TestConnect(t *testing.T) {
 			want: want{
 				err: errors.New("ResolverInitError"),
 				cr: NewCloudManagement("test",
-					WithData(v1alpha1.CloudManagementParameters{
+					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
 						ServiceManagerSecret:          "someSecret",
 					}),
@@ -105,7 +106,7 @@ func TestConnect(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				cr: NewCloudManagement("test",
-					WithData(v1alpha1.CloudManagementParameters{
+					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
 						ServiceManagerSecret:          "someSecret",
 					}),
@@ -119,7 +120,7 @@ func TestConnect(t *testing.T) {
 				},
 				clientInitializerFn: func() cmclient.ITfClientInitializer {
 					return &ClientInitializerFake{
-						ConnectResourcesFn: func(ctx context.Context, cr *v1alpha1.CloudManagement) (cmclient.ITfClient, error) {
+						ConnectResourcesFn: func(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ITfClient, error) {
 							return &TfClientFake{}, nil
 						},
 					}
@@ -128,12 +129,12 @@ func TestConnect(t *testing.T) {
 			want: want{
 				err: nil,
 				cr: NewCloudManagement("test",
-					WithData(v1alpha1.CloudManagementParameters{
+					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
 						ServiceManagerSecret:          "someSecret",
 					}),
-					WithStatus(v1alpha1.CloudManagementObservation{
-						DataSourceLookup: &v1alpha1.CloudManagementDataSourceLookup{
+					WithStatus(v1beta1.CloudManagementObservation{
+						DataSourceLookup: &v1beta1.CloudManagementDataSourceLookup{
 							CloudManagementPlanID: "planID",
 						},
 					}),
@@ -148,12 +149,12 @@ func TestConnect(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				cr: NewCloudManagement("test",
-					WithData(v1alpha1.CloudManagementParameters{
+					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
 						ServiceManagerSecret:          "someSecret",
 					}),
-					WithStatus(v1alpha1.CloudManagementObservation{
-						DataSourceLookup: &v1alpha1.CloudManagementDataSourceLookup{
+					WithStatus(v1beta1.CloudManagementObservation{
+						DataSourceLookup: &v1beta1.CloudManagementDataSourceLookup{
 							CloudManagementPlanID: "planID",
 						},
 					}),
@@ -167,7 +168,7 @@ func TestConnect(t *testing.T) {
 				},
 				clientInitializerFn: func() cmclient.ITfClientInitializer {
 					return &ClientInitializerFake{
-						ConnectResourcesFn: func(ctx context.Context, cr *v1alpha1.CloudManagement) (cmclient.ITfClient, error) {
+						ConnectResourcesFn: func(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ITfClient, error) {
 							return &TfClientFake{}, nil
 						},
 					}
@@ -176,12 +177,12 @@ func TestConnect(t *testing.T) {
 			want: want{
 				err: nil,
 				cr: NewCloudManagement("test",
-					WithData(v1alpha1.CloudManagementParameters{
+					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
 						ServiceManagerSecret:          "someSecret",
 					}),
-					WithStatus(v1alpha1.CloudManagementObservation{
-						DataSourceLookup: &v1alpha1.CloudManagementDataSourceLookup{
+					WithStatus(v1beta1.CloudManagementObservation{
+						DataSourceLookup: &v1beta1.CloudManagementDataSourceLookup{
 							CloudManagementPlanID: "planID",
 						},
 					}),
@@ -199,15 +200,15 @@ func TestConnect(t *testing.T) {
 				},
 				cr: NewCloudManagement("test",
 					WithExternalName("crName"),
-					WithData(v1alpha1.CloudManagementParameters{
+					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
 						ServiceManagerSecret:          "someSecret",
 					}),
-					WithStatus(v1alpha1.CloudManagementObservation{
-						Instance: &v1alpha1.Instance{
+					WithStatus(v1beta1.CloudManagementObservation{
+						Instance: &v1beta1.Instance{
 							Id: internal.Ptr("someID"),
 						},
-						Binding: &v1alpha1.Binding{
+						Binding: &v1beta1.Binding{
 							Id: internal.Ptr("anotherID"),
 						},
 					}),
@@ -221,7 +222,7 @@ func TestConnect(t *testing.T) {
 				},
 				clientInitializerFn: func() cmclient.ITfClientInitializer {
 					return &ClientInitializerFake{
-						ConnectResourcesFn: func(ctx context.Context, cr *v1alpha1.CloudManagement) (cmclient.ITfClient, error) {
+						ConnectResourcesFn: func(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ITfClient, error) {
 							return &TfClientFake{}, nil
 						},
 					}
@@ -231,18 +232,18 @@ func TestConnect(t *testing.T) {
 				err: nil,
 				cr: NewCloudManagement("test",
 					WithExternalName("someID/anotherID"),
-					WithData(v1alpha1.CloudManagementParameters{
+					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
 						ServiceManagerSecret:          "someSecret",
 					}),
-					WithStatus(v1alpha1.CloudManagementObservation{
-						DataSourceLookup: &v1alpha1.CloudManagementDataSourceLookup{
+					WithStatus(v1beta1.CloudManagementObservation{
+						DataSourceLookup: &v1beta1.CloudManagementDataSourceLookup{
 							CloudManagementPlanID: "planID",
 						},
-						Instance: &v1alpha1.Instance{
+						Instance: &v1beta1.Instance{
 							Id: internal.Ptr("someID"),
 						},
-						Binding: &v1alpha1.Binding{
+						Binding: &v1beta1.Binding{
 							Id: internal.Ptr("anotherID"),
 						},
 					}),
@@ -274,10 +275,10 @@ func TestObserve(t *testing.T) {
 	type want struct {
 		err error
 		obs managed.ExternalObservation
-		cr  *v1alpha1.CloudManagement
+		cr  *v1beta1.CloudManagement
 	}
 	type args struct {
-		cr       *v1alpha1.CloudManagement
+		cr       *v1beta1.CloudManagement
 		tfClient *TfClientFake
 	}
 	tests := []struct {
@@ -300,7 +301,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{},
 				err: errors.New("observeError"),
 				cr: NewCloudManagement("test",
-					WithStatus(v1alpha1.CloudManagementObservation{
+					WithStatus(v1beta1.CloudManagementObservation{
 						Status: v1alpha1.CisStatusUnbound,
 					}),
 					WithConditions(xpv1.Unavailable())),
@@ -315,7 +316,7 @@ func TestObserve(t *testing.T) {
 						// Doesn't matter what observe is returned exactly, as long as its passed through and IDs are persisted
 						return cmclient.ResourcesStatus{
 							ExternalObservation: managed.ExternalObservation{ResourceExists: false},
-							InstanceID:          "someID",
+							Instance:            v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr("someID")},
 						}, nil
 					},
 				},
@@ -324,9 +325,10 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{ResourceExists: false},
 				err: nil,
 				cr: NewCloudManagement("test",
-					WithStatus(v1alpha1.CloudManagementObservation{
+					WithStatus(v1beta1.CloudManagementObservation{
 						Status:            v1alpha1.CisStatusUnbound,
 						ServiceInstanceID: "someID",
+						Instance:          &v1beta1.Instance{Id: internal.Ptr("someID")},
 					}),
 					WithConditions(xpv1.Unavailable()),
 				),
@@ -345,8 +347,8 @@ func TestObserve(t *testing.T) {
 								ResourceUpToDate:  true,
 								ConnectionDetails: map[string][]byte{"key": []byte("value")},
 							},
-							InstanceID: "someID",
-							BindingID:  "anotherID",
+							Instance: v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr("someID")},
+							Binding:  v1alpha1.SubaccountServiceBindingObservation{ID: internal.Ptr("anotherID")},
 						}, nil
 
 					},
@@ -356,10 +358,46 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, ConnectionDetails: map[string][]byte{"key": []byte("value")}},
 				err: nil,
 				cr: NewCloudManagement("test",
-					WithStatus(v1alpha1.CloudManagementObservation{
+					WithStatus(v1beta1.CloudManagementObservation{
 						Status:            v1alpha1.CisStatusBound,
 						ServiceInstanceID: "someID",
 						ServiceBindingID:  "anotherID",
+						Instance:          &v1beta1.Instance{Id: internal.Ptr("someID")},
+						Binding:           &v1beta1.Binding{Id: internal.Ptr("anotherID")},
+					}),
+					WithConditions(xpv1.Available())),
+			},
+		},
+		{
+			name: "IsAvailableWithContext",
+			args: args{
+				cr: NewCloudManagement("test"),
+				tfClient: &TfClientFake{
+					observeFn: func() (cmclient.ResourcesStatus, error) {
+						// Doesn't matter if updated or not
+						return cmclient.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{
+								ResourceExists:    true,
+								ResourceUpToDate:  true,
+								ConnectionDetails: map[string][]byte{"key": []byte("value")},
+							},
+							Instance: v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr("someID"), Context: internal.Ptr(`{"key":"value"}`)},
+							Binding:  v1alpha1.SubaccountServiceBindingObservation{ID: internal.Ptr("anotherID")},
+						}, nil
+
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, ConnectionDetails: map[string][]byte{"key": []byte("value")}},
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithStatus(v1beta1.CloudManagementObservation{
+						Status:            v1alpha1.CisStatusBound,
+						ServiceInstanceID: "someID",
+						ServiceBindingID:  "anotherID",
+						Instance:          &v1beta1.Instance{Id: internal.Ptr("someID"), Context: &map[string]string{"key": "value"}},
+						Binding:           &v1beta1.Binding{Id: internal.Ptr("anotherID")},
 					}),
 					WithConditions(xpv1.Available())),
 			},
@@ -392,10 +430,10 @@ func TestObserve(t *testing.T) {
 func TestCreate(t *testing.T) {
 	type want struct {
 		err error
-		cr  *v1alpha1.CloudManagement
+		cr  *v1beta1.CloudManagement
 	}
 	type args struct {
-		cr       *v1alpha1.CloudManagement
+		cr       *v1beta1.CloudManagement
 		tfClient *TfClientFake
 	}
 	tests := []struct {
@@ -457,10 +495,10 @@ func TestCreate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	type want struct {
 		err error
-		cr  *v1alpha1.CloudManagement
+		cr  *v1beta1.CloudManagement
 	}
 	type args struct {
-		cr       *v1alpha1.CloudManagement
+		cr       *v1beta1.CloudManagement
 		tfClient *TfClientFake
 	}
 	tests := []struct {
@@ -517,9 +555,63 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestUpdate(t *testing.T) {
+	type want struct {
+		err error
+	}
+	type args struct {
+		tfClient *TfClientFake
+	}
+	tests := []struct {
+		name string
+		args args
+
+		want want
+	}{
+		{
+			name: "Update Error",
+			args: args{
+				tfClient: &TfClientFake{
+					updateFn: func() error {
+						return errors.New("updateError")
+					},
+				},
+			},
+			want: want{
+				err: errors.New("updateError"),
+			},
+		},
+		{
+			name: "Success",
+			args: args{
+				tfClient: &TfClientFake{
+					updateFn: func() error {
+						return nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			uua := &external{
+				tracker:  test2.NoOpReferenceResolverTracker{},
+				tfClient: tc.args.tfClient,
+			}
+			_, err := uua.Update(context.TODO(), NewCloudManagement("test", WithExternalName("someID/anotherID")))
+			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
+				t.Errorf("\ne.Update(): -want error, +got error:\n%s\n", diff)
+			}
+		})
+	}
+}
+
 // Utils
-func NewCloudManagement(name string, m ...CloudManagementModifier) *v1alpha1.CloudManagement {
-	cr := &v1alpha1.CloudManagement{
+func NewCloudManagement(name string, m ...CloudManagementModifier) *v1beta1.CloudManagement {
+	cr := &v1beta1.CloudManagement{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 	}
 	meta.SetExternalName(cr, name)
@@ -530,26 +622,26 @@ func NewCloudManagement(name string, m ...CloudManagementModifier) *v1alpha1.Clo
 }
 
 // this pattern can be potentially auto generated, its quite useful to write expressive unittests
-type CloudManagementModifier func(dirEnvironment *v1alpha1.CloudManagement)
+type CloudManagementModifier func(dirEnvironment *v1beta1.CloudManagement)
 
-func WithStatus(status v1alpha1.CloudManagementObservation) CloudManagementModifier {
-	return func(r *v1alpha1.CloudManagement) {
+func WithStatus(status v1beta1.CloudManagementObservation) CloudManagementModifier {
+	return func(r *v1beta1.CloudManagement) {
 		r.Status.AtProvider = status
 	}
 }
 
-func WithData(data v1alpha1.CloudManagementParameters) CloudManagementModifier {
-	return func(r *v1alpha1.CloudManagement) {
+func WithData(data v1beta1.CloudManagementParameters) CloudManagementModifier {
+	return func(r *v1beta1.CloudManagement) {
 		r.Spec.ForProvider = data
 	}
 }
 
 func WithConditions(c ...xpv1.Condition) CloudManagementModifier {
-	return func(r *v1alpha1.CloudManagement) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *v1beta1.CloudManagement) { r.Status.ConditionedStatus.Conditions = c }
 }
 
 func WithExternalName(externalName string) CloudManagementModifier {
-	return func(r *v1alpha1.CloudManagement) {
+	return func(r *v1beta1.CloudManagement) {
 		meta.SetExternalName(r, externalName)
 	}
 }
@@ -565,19 +657,19 @@ type TfClientFake struct {
 	deleteFn  func() error
 }
 
-func (t TfClientFake) ObserveResources(ctx context.Context, cr *v1alpha1.CloudManagement) (cmclient.ResourcesStatus, error) {
+func (t TfClientFake) ObserveResources(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ResourcesStatus, error) {
 	return t.observeFn()
 }
 
-func (t TfClientFake) CreateResources(ctx context.Context, cr *v1alpha1.CloudManagement) (string, string, error) {
+func (t TfClientFake) CreateResources(ctx context.Context, cr *v1beta1.CloudManagement) (string, string, error) {
 	return t.createFn()
 }
 
-func (t TfClientFake) UpdateResources(ctx context.Context, cr *v1alpha1.CloudManagement) error {
+func (t TfClientFake) UpdateResources(ctx context.Context, cr *v1beta1.CloudManagement) error {
 	return t.updateFn()
 }
 
-func (t TfClientFake) DeleteResources(ctx context.Context, cr *v1alpha1.CloudManagement) error {
+func (t TfClientFake) DeleteResources(ctx context.Context, cr *v1beta1.CloudManagement) error {
 	return t.deleteFn()
 }
 
@@ -594,9 +686,9 @@ func (p PlanIDFake) PlanIDByName(ctx context.Context, offeringName string, servi
 var _ cmclient.ITfClientInitializer = &ClientInitializerFake{}
 
 type ClientInitializerFake struct {
-	ConnectResourcesFn func(ctx context.Context, cr *v1alpha1.CloudManagement) (cmclient.ITfClient, error)
+	ConnectResourcesFn func(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ITfClient, error)
 }
 
-func (c ClientInitializerFake) ConnectResources(ctx context.Context, cr *v1alpha1.CloudManagement) (cmclient.ITfClient, error) {
+func (c ClientInitializerFake) ConnectResources(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ITfClient, error) {
 	return c.ConnectResourcesFn(ctx, cr)
 }

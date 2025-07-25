@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestSubscriptionApiHandler_GetSubscription(t *testing.T) {
@@ -103,6 +104,10 @@ func TestSubscriptionApiHandler_CreateSubscription(t *testing.T) {
 				appName: "name1",
 				CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
 					PlanName: internal.Ptr("plan2"),
+					SubscriptionParams: map[string]interface{}{
+						"key1": "value1",
+						"key2": "value2",
+					},
 				},
 			},
 			mockSubscriptionApi: apiMockPOST(
@@ -117,6 +122,10 @@ func TestSubscriptionApiHandler_CreateSubscription(t *testing.T) {
 				appName: "name1",
 				CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
 					PlanName: internal.Ptr("plan2"),
+					SubscriptionParams: map[string]interface{}{
+						"key1": "value1",
+						"key2": "value2",
+					},
 				},
 			},
 			mockSubscriptionApi: apiMockPOST(
@@ -246,8 +255,15 @@ func TestSubscriptionApiHandler_UpdateSubscription(t *testing.T) {
 	}
 }
 
+func rawExtension(content string) runtime.RawExtension {
+	return runtime.RawExtension{
+		Raw: []byte(content),
+	}
+}
+
 func TestSubscriptionTypeMapper_ConvertToCreatePayload(t *testing.T) {
-	cr := NewSubscription("someName", "name1", "plan2")
+	raw := rawExtension(`{"name": "John", "age": 30}`)
+	cr := NewSubscription("someName", "name1", "plan2", raw)
 
 	uut := NewSubscriptionTypeMapper()
 	mapped := uut.ConvertToCreatePayload(cr)
@@ -255,11 +271,28 @@ func TestSubscriptionTypeMapper_ConvertToCreatePayload(t *testing.T) {
 	assert.NotNil(t, mapped)
 	assert.Equal(t, "name1", mapped.appName)
 	assert.Equal(t, internal.Ptr("plan2"), mapped.PlanName)
+	assert.Equal(t, "John", mapped.SubscriptionParams["name"])
+	assert.Equal(t, float64(30), mapped.SubscriptionParams["age"])
+}
 
+func TestSubscriptionTypeMapper_ConvertToCreatePayloadYaml(t *testing.T) {
+	raw := rawExtension(`name: John
+age: 30`)
+	cr := NewSubscription("someName", "name1", "plan2", raw)
+
+	uut := NewSubscriptionTypeMapper()
+	mapped := uut.ConvertToCreatePayload(cr)
+
+	assert.NotNil(t, mapped)
+	assert.Equal(t, "name1", mapped.appName)
+	assert.Equal(t, internal.Ptr("plan2"), mapped.PlanName)
+	assert.Equal(t, "John", mapped.SubscriptionParams["name"])
+	assert.Equal(t, float64(30), mapped.SubscriptionParams["age"])
 }
 
 func TestSubscriptionTypeMapper_IsSynced(t *testing.T) {
-	cr := NewSubscription("someName", "name1", "plan2")
+	raw := rawExtension(`{"name": "John", "age": 30}`)
+	cr := NewSubscription("someName", "name1", "plan2", raw)
 	get := &SubscriptionGet{
 		AppName:  internal.Ptr("anotherName"),
 		PlanName: internal.Ptr("anotherPlan"),
@@ -310,6 +343,7 @@ func TestSubscriptionTypeMapper_IsAvailable(t *testing.T) {
 }
 
 func TestSubscriptionTypeMapper_SyncStatus(t *testing.T) {
+	raw := rawExtension(`{"name": "John", "age": 30}`)
 	tests := map[string]struct {
 		cr     *v1alpha1.Subscription
 		apiRes *SubscriptionGet
@@ -317,7 +351,7 @@ func TestSubscriptionTypeMapper_SyncStatus(t *testing.T) {
 		expectedCr *v1alpha1.Subscription
 	}{
 		"SetState": {
-			cr: NewSubscription("someName", "name1", "plan2"),
+			cr: NewSubscription("someName", "name1", "plan2", raw),
 			apiRes: &SubscriptionGet{
 				AppName:  internal.Ptr("name1"),
 				PlanName: internal.Ptr("plan2"),
@@ -374,13 +408,14 @@ func apiMockDELETE(statusCode int, apiError error) *MockSubscriptionOperationsCo
 	return apiMock
 }
 
-func NewSubscription(crName string, appName string, planName string) *v1alpha1.Subscription {
+func NewSubscription(crName string, appName string, planName string, subscriptionParameters runtime.RawExtension) *v1alpha1.Subscription {
 	cr := &v1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{Name: crName},
 		Spec: v1alpha1.SubscriptionSpec{
 			ForProvider: v1alpha1.SubscriptionParameters{
-				AppName:  appName,
-				PlanName: planName,
+				AppName:                appName,
+				PlanName:               planName,
+				SubscriptionParameters: subscriptionParameters,
 			},
 		},
 	}
