@@ -54,7 +54,7 @@ jobs:
 
       - name: Set up Version
         run: |
-          echo "BUILD_IMAGE_VERSION=draft-$(date '+%Y-%m-%d-%H-%M-%S' | tr -d '/:')" >> $GITHUB_ENV
+          echo "BUILD_IMAGE_VERSION=draft-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
           echo "version is $BUILD_IMAGE_VERSION"
       - name: Build Images
         run: make build VERSION=$BUILD_IMAGE_VERSION 
