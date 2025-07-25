@@ -54,7 +54,7 @@ jobs:
 
       - name: Set up Version
         run: |
-          echo "BUILD_IMAGE_VERSION=$(date '+%Y-%m-%d-%H-%M-%S' | tr -d '/:')" >> $GITHUB_ENV
+          echo "BUILD_IMAGE_VERSION=draft-$(date '+%Y-%m-%d-%H-%M-%S' | tr -d '/:')" >> $GITHUB_ENV
           echo "version is $BUILD_IMAGE_VERSION"
       - name: Build Images
         run: make build --debug=v VERSION=$BUILD_IMAGE_VERSION PLATFORMS=linux_amd64
@@ -62,6 +62,18 @@ jobs:
           # We're using docker buildx, which doesn't actually load the images it
           # builds by default. Specifying --load does so.
           BUILD_ARGS: "--load"
+          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
+          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
+
+      - name: Login to Container Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ${{ vars.REGISTRY_URL }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Artifacts to DockerHub
+        run: make publish BRANCH_NAME=${GITHUB_REF##*/}
+        env:
           DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
           BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
 
@@ -113,17 +125,13 @@ jobs:
                   echo "to_test_source=${BASH_REMATCH[1]}" >> $GITHUB_ENV
                   echo "to_test_source=$to_test_source"
               fi
-              if [[ "$COMMENT_BODY" =~ target=([^\ ]+) ]]; then
-                  echo "to_test_target=${BASH_REMATCH[1]}" >> $GITHUB_ENV
-                  echo "to_test_target=$to_test_target"
-              fi
             fi
           fi
       - name: Run upgrade test
         run: |
           cd provider-upgrade-test
           echo "Running upgrade test..."
-          REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${to_test_source}" --target ${REGISTRY}:${to_test_target} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
+          REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${to_test_source}" --target ${REGISTRY}:${BUILD_IMAGE_VERSION} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
         env: 
           CLIENT_ID: ${{ secrets.UPGRADE_TEST_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.UPGRADE_TEST_CLIENT_SECRET }}
