@@ -19,7 +19,7 @@ var _ MappedNullable = &NestingErrorDetailsResponseObject{}
 
 // NestingErrorDetailsResponseObject struct for NestingErrorDetailsResponseObject
 type NestingErrorDetailsResponseObject struct {
-	Code    *int32  `json:"code,omitempty"`
+	Code *int32 `json:"code,omitempty"`
 	Message *string `json:"message,omitempty"`
 }
 
@@ -105,7 +105,7 @@ func (o *NestingErrorDetailsResponseObject) SetMessage(v string) {
 }
 
 func (o NestingErrorDetailsResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -158,3 +158,5 @@ func (v *NullableNestingErrorDetailsResponseObject) UnmarshalJSON(src []byte) er
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

@@ -26,13 +26,13 @@ type ServicePlanAssignmentsResponseObject struct {
 	// The ID of the associated global account.
 	GlobalAccountId *string `json:"globalAccountId,omitempty"`
 	// The name of the plan of the provisioned quota.
-	Plan               *string `json:"plan,omitempty"`
+	Plan *string `json:"plan,omitempty"`
 	ProvisioningMethod *string `json:"provisioningMethod,omitempty"`
 	// The quantity of provisioned quota.
-	Quota     *int32                         `json:"quota,omitempty"`
+	Quota *int32 `json:"quota,omitempty"`
 	Resources []QuotaResourcesResponseObject `json:"resources,omitempty"`
 	// The name of the service of the provisioned quota.
-	Service         *string `json:"service,omitempty"`
+	Service *string `json:"service,omitempty"`
 	ServiceCategory *string `json:"serviceCategory,omitempty"`
 	// Unique ID of the subaccount for which to get quota.
 	SubaccountGUID *string `json:"subaccountGUID,omitempty"`
@@ -478,7 +478,7 @@ func (o *ServicePlanAssignmentsResponseObject) SetUnlimited(v bool) {
 }
 
 func (o ServicePlanAssignmentsResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -564,3 +564,5 @@ func (v *NullableServicePlanAssignmentsResponseObject) UnmarshalJSON(src []byte)
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

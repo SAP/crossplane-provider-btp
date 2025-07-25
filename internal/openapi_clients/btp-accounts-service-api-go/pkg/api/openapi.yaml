@@ -65,14 +65,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateDirectoryRequestPayload'
+              $ref: "#/components/schemas/CreateDirectoryRequestPayload"
         required: true
       responses:
         "201":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DirectoryResponseObject'
+                $ref: "#/components/schemas/DirectoryResponseObject"
           description: Created
           headers:
             X-CorrelationID:
@@ -85,7 +85,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -95,7 +95,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -114,7 +114,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Create a directory
       tags:
@@ -154,7 +154,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DirectoryResponseObject'
+                $ref: "#/components/schemas/DirectoryResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -167,7 +167,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -177,7 +177,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Directory not found
         "429":
           description: Rate Limit Exceeded
@@ -196,7 +196,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Delete a directory
       tags:
@@ -228,7 +228,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DirectoryResponseObject'
+                $ref: "#/components/schemas/DirectoryResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -241,7 +241,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -251,7 +251,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Directory not found
         "429":
           description: Rate Limit Exceeded
@@ -270,7 +270,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get a directory
       tags:
@@ -293,14 +293,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateDirectoryRequestPayload'
+              $ref: "#/components/schemas/UpdateDirectoryRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DirectoryResponseObject'
+                $ref: "#/components/schemas/DirectoryResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -313,7 +313,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -323,7 +323,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Directory not found
         "429":
           description: Rate Limit Exceeded
@@ -342,7 +342,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Update a directory
       tags:
@@ -375,14 +375,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateDirectoryTypeRequestPayload'
+              $ref: "#/components/schemas/UpdateDirectoryTypeRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DirectoryResponseObject'
+                $ref: "#/components/schemas/DirectoryResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -395,7 +395,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -405,7 +405,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Directory not found
         "429":
           description: Rate Limit Exceeded
@@ -424,7 +424,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Add or remove features for a directory
       tags:
@@ -452,7 +452,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResponseCollection'
+                $ref: "#/components/schemas/ResponseCollection"
           description: Ok
           headers:
             X-CorrelationID:
@@ -465,7 +465,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -475,7 +475,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -494,7 +494,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get custom properties for a directory (deprecated)
       tags:
@@ -522,13 +522,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -538,7 +538,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Directory Not Found
         "429":
           description: Rate Limit Exceeded
@@ -557,7 +557,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Delete all labels from a directory
       tags:
@@ -580,13 +580,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -596,7 +596,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Directory Not Found
         "429":
           description: Rate Limit Exceeded
@@ -615,7 +615,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get labels for a directory
       tags:
@@ -639,20 +639,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LabelAssignmentRequestPayload'
+              $ref: "#/components/schemas/LabelAssignmentRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -662,7 +662,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Directory Not Found
         "429":
           description: Rate Limit Exceeded
@@ -681,7 +681,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Assign labels to a directory
       tags:
@@ -715,7 +715,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DataResponseObject'
+                $ref: "#/components/schemas/DataResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -734,7 +734,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Directory not found
         "429":
           description: Rate Limit Exceeded
@@ -753,7 +753,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Delete directory settings
       tags:
@@ -787,7 +787,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DataResponseObject'
+                $ref: "#/components/schemas/DataResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -800,7 +800,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -810,7 +810,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Directory Not Found
         "429":
           description: Rate Limit Exceeded
@@ -829,7 +829,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get directory settings
       tags:
@@ -851,14 +851,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EntitySettingsRequestPayload'
+              $ref: "#/components/schemas/EntitySettingsRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DataResponseObject'
+                $ref: "#/components/schemas/DataResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -871,7 +871,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -881,7 +881,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Directory not found
         "429":
           description: Rate Limit Exceeded
@@ -900,7 +900,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Create or update directory settings
       tags:
@@ -927,7 +927,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GlobalAccountResponseObject'
+                $ref: "#/components/schemas/GlobalAccountResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -940,7 +940,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad Request. The request could not be understood by the server
             due to malformed syntax. Modify the request before repeating it.
         "401":
@@ -951,7 +951,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Global account not found
         "429":
           description: Rate Limit Exceeded
@@ -970,7 +970,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
         "502":
           description: Bad Gateway. Server received an invalid response from XSUAA
@@ -986,14 +986,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateGlobalAccountRequestPayload'
+              $ref: "#/components/schemas/UpdateGlobalAccountRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GlobalAccountResponseObject'
+                $ref: "#/components/schemas/GlobalAccountResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -1006,7 +1006,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1016,7 +1016,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Global account not found
         "429":
           description: Rate Limit Exceeded
@@ -1035,7 +1035,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Update a global account
       tags:
@@ -1054,13 +1054,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResponseCollection'
+                $ref: "#/components/schemas/ResponseCollection"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1070,7 +1070,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Global account not found
         "429":
           description: Rate Limit Exceeded
@@ -1089,7 +1089,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get custom properties for a global account (deprecated)
       tags:
@@ -1144,7 +1144,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResponseCollection'
+                $ref: "#/components/schemas/ResponseCollection"
           description: Ok
           headers:
             X-CorrelationID:
@@ -1157,7 +1157,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1167,7 +1167,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Global account not found
         "429":
           description: Rate Limit Exceeded
@@ -1186,7 +1186,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
         "502":
           description: Bad Gateway. Server received an invalid response from XSUAA
@@ -1214,14 +1214,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateSubaccountRequestPayload'
+              $ref: "#/components/schemas/CreateSubaccountRequestPayload"
         required: true
       responses:
         "201":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubaccountResponseObject'
+                $ref: "#/components/schemas/SubaccountResponseObject"
           description: Created
           headers:
             X-CorrelationID:
@@ -1234,7 +1234,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1244,13 +1244,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Global account or subaccount not found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subdomain already exists in this region
         "429":
           description: Rate Limit Exceeded
@@ -1269,7 +1269,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Create a subaccount
       tags:
@@ -1303,14 +1303,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CloneNeoSubaccountRequestPayload'
+              $ref: "#/components/schemas/CloneNeoSubaccountRequestPayload"
         required: true
       responses:
         "201":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubaccountResponseObject'
+                $ref: "#/components/schemas/SubaccountResponseObject"
           description: Created
           headers:
             X-CorrelationID:
@@ -1323,7 +1323,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1333,13 +1333,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Global account or subaccount not found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subdomain already exists in this region
         "429":
           description: Rate Limit Exceeded
@@ -1358,7 +1358,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Clone a Neo subaccount
       tags:
@@ -1378,14 +1378,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MoveSubaccountsRequestPayloadCollection'
+              $ref: "#/components/schemas/MoveSubaccountsRequestPayloadCollection"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResponseCollection'
+                $ref: "#/components/schemas/ResponseCollection"
           description: Ok
           headers:
             X-CorrelationID:
@@ -1398,7 +1398,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1408,13 +1408,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Global account or subaccount not found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: "Cannot move the same subaccount more than once in the same\
             \ batch move action, or the subaccount is currently being updated by another\
             \ process"
@@ -1435,7 +1435,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
         "502":
           description: Bad Gateway. Server received an invalid response from XSUAA
@@ -1480,7 +1480,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubaccountResponseObject'
+                $ref: "#/components/schemas/SubaccountResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -1493,7 +1493,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1503,13 +1503,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subaccount or Region Not Found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subdomain is currently being modified by another process
         "429":
           description: Rate Limit Exceeded
@@ -1528,7 +1528,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: 'Delete a subaccount '
       tags:
@@ -1564,7 +1564,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubaccountResponseObject'
+                $ref: "#/components/schemas/SubaccountResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -1577,7 +1577,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1602,7 +1602,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
         "502":
           description: Bad Gateway. Server received an invalid response from XSUAA
@@ -1627,14 +1627,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateSubaccountRequestPayload'
+              $ref: "#/components/schemas/UpdateSubaccountRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubaccountResponseObject'
+                $ref: "#/components/schemas/SubaccountResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -1647,7 +1647,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1657,7 +1657,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Global account or subaccount not found
         "429":
           description: Rate Limit Exceeded
@@ -1676,7 +1676,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Update a subaccount
       tags:
@@ -1703,7 +1703,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResponseCollection'
+                $ref: "#/components/schemas/ResponseCollection"
           description: Ok
           headers:
             X-CorrelationID:
@@ -1716,7 +1716,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1726,7 +1726,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subaccount or subaccount property not found
         "429":
           description: Rate Limit Exceeded
@@ -1745,7 +1745,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get custom properties for a subaccount (deprecated)
       tags:
@@ -1773,13 +1773,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1789,7 +1789,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subaccount Not Found
         "429":
           description: Rate Limit Exceeded
@@ -1808,7 +1808,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Remove all labels from a subaccount
       tags:
@@ -1831,13 +1831,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1847,7 +1847,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subaccount Not Found
         "429":
           description: Rate Limit Exceeded
@@ -1866,7 +1866,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get labels for a subaccount
       tags:
@@ -1888,20 +1888,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LabelAssignmentRequestPayload'
+              $ref: "#/components/schemas/LabelAssignmentRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1911,7 +1911,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subaccount Not Found
         "429":
           description: Rate Limit Exceeded
@@ -1930,7 +1930,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Assign labels to a subaccount
       tags:
@@ -1959,14 +1959,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MoveSubaccountRequestPayload'
+              $ref: "#/components/schemas/MoveSubaccountRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubaccountResponseObject'
+                $ref: "#/components/schemas/SubaccountResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -1979,7 +1979,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -1989,7 +1989,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Global account or subaccount not found
         "429":
           description: Rate Limit Exceeded
@@ -2008,7 +2008,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
         "502":
           description: Bad Gateway. Server received an invalid response from XSUAA
@@ -2047,7 +2047,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -2057,7 +2057,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: "Not Found<br>Reasons:<br> -The specified subaccount for which\
             \ to delete this instance and binding was not found.<br>-The specific\
             \ instance created as the result of the POST /accounts/v1/subaccounts/{subaccountGUID}/serviceManagementBinding\
@@ -2081,7 +2081,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Delete a Service Manager binding
       tags:
@@ -2106,7 +2106,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceManagerBindingResponseObject'
+                $ref: "#/components/schemas/ServiceManagerBindingResponseObject"
           description: Found a Service Manager binding (Ok)
           headers:
             X-CorrelationID:
@@ -2119,7 +2119,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -2129,7 +2129,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: "Not Found<br><br>Reasons:<br> -The specified subaccount for\
             \ which to get the binding was not found.<br>-The specific instance created\
             \ as the result of the POST /accounts/v1/subaccounts/{subaccountGUID}/serviceManagementBinding\
@@ -2153,7 +2153,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get a Service Manager binding
       tags:
@@ -2180,7 +2180,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceManagerBindingResponseObject'
+                $ref: "#/components/schemas/ServiceManagerBindingResponseObject"
           description: Created
           headers:
             X-CorrelationID:
@@ -2193,7 +2193,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -2203,14 +2203,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found<br>Reasons:<br> -The specified subaccount in which
             to create the instance and binding was not found.
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Conflict - Service Manager binding already exists for this
             subaccount
         "429":
@@ -2230,7 +2230,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Create a Service Manager binding
       tags:
@@ -2264,7 +2264,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DataResponseObject'
+                $ref: "#/components/schemas/DataResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -2277,7 +2277,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -2287,7 +2287,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subaccount not found
         "429":
           description: Rate Limit Exceeded
@@ -2306,7 +2306,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Delete subaccount settings
       tags:
@@ -2340,7 +2340,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DataResponseObject'
+                $ref: "#/components/schemas/DataResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -2353,7 +2353,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -2363,7 +2363,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subaccount Not Found
         "429":
           description: Rate Limit Exceeded
@@ -2382,7 +2382,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get subaccount settings
       tags:
@@ -2404,14 +2404,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EntitySettingsRequestPayload'
+              $ref: "#/components/schemas/EntitySettingsRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DataResponseObject'
+                $ref: "#/components/schemas/DataResponseObject"
           description: Ok
           headers:
             X-CorrelationID:
@@ -2430,7 +2430,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Subaccount not found
         "429":
           description: Rate Limit Exceeded
@@ -2449,7 +2449,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Create or update subaccount settings
       tags:
@@ -2472,7 +2472,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceManagerBindingsResponseList'
+                $ref: "#/components/schemas/ServiceManagerBindingsResponseList"
           description: Found a Service Manager bindings (Ok)
           headers:
             X-CorrelationID:
@@ -2485,7 +2485,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -2495,7 +2495,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found<br><br>Reasons:<br> -The specified subaccount for
             which to get the bindings was not found.<br> -No bindings found for the
             specified subaccount.
@@ -2516,7 +2516,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get all Service Manager bindings
       tags:
@@ -2548,14 +2548,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateServiceManagerBindingRequestPayload'
+              $ref: "#/components/schemas/CreateServiceManagerBindingRequestPayload"
         required: true
       responses:
         "201":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceManagerBindingExtendedResponseObject'
+                $ref: "#/components/schemas/ServiceManagerBindingExtendedResponseObject"
           description: Created
           headers:
             X-CorrelationID:
@@ -2568,7 +2568,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -2578,14 +2578,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found<br>Reasons:<br> -The specified subaccount in which
             to create the binding was not found.
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Conflict - Service Manager binding with the specified name
             already exists for this subaccount
         "429":
@@ -2605,7 +2605,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Create a Service Manager binding
       tags:
@@ -2646,7 +2646,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -2656,7 +2656,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found<br>Reasons:<br> -The specified subaccount for which
             to delete this binding was not found.<br>-The specific binding was not
             found.
@@ -2677,7 +2677,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Delete a Service Manager binding
       tags:
@@ -2708,7 +2708,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServiceManagerBindingExtendedResponseObject'
+                $ref: "#/components/schemas/ServiceManagerBindingExtendedResponseObject"
           description: Found a Service Manager binding (Ok)
           headers:
             X-CorrelationID:
@@ -2721,7 +2721,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -2731,7 +2731,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found<br><br>Reasons:<br> -The specified subaccount for
             which to get the binding was not found.<br>-The specific binding created
             as the result of the POST API calls was not found.
@@ -2752,7 +2752,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get a Service Manager binding
       tags:
@@ -2782,7 +2782,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -2792,7 +2792,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -2811,7 +2811,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get job status
       tags:
@@ -2854,7 +2854,7 @@ components:
           target: target
       properties:
         error:
-          $ref: '#/components/schemas/ApiExceptionResponseObject_error'
+          $ref: "#/components/schemas/ApiExceptionResponseObject_error"
       required:
       - error
       type: object
@@ -2910,7 +2910,7 @@ components:
             \ include \"customProperties\" and \"labels\" together in the same request\
             \ (customProperties will be ignored).\n"
           items:
-            $ref: '#/components/schemas/AddPropertyRequestPayload'
+            $ref: "#/components/schemas/AddPropertyRequestPayload"
           type: array
         description:
           description: A description of the subaccount for customer-facing UIs.
@@ -3038,7 +3038,7 @@ components:
             \ include \"customProperties\" and \"labels\" together in the same request\
             \ (customProperties will be ignored).\n"
           items:
-            $ref: '#/components/schemas/AddPropertyRequestPayload'
+            $ref: "#/components/schemas/AddPropertyRequestPayload"
           type: array
         description:
           description: A description of the directory.
@@ -3195,7 +3195,7 @@ components:
             \ include \"customProperties\" and \"labels\" together in the same request\
             \ (customProperties will be ignored).\n"
           items:
-            $ref: '#/components/schemas/AddPropertyRequestPayload'
+            $ref: "#/components/schemas/AddPropertyRequestPayload"
           type: array
         description:
           description: A description of the subaccount for customer-facing UIs.
@@ -3317,7 +3317,7 @@ components:
         values:
           description: The response object containing information about the data.
           items:
-            $ref: '#/components/schemas/PropertyDataResponseObject'
+            $ref: "#/components/schemas/PropertyDataResponseObject"
           type: array
       type: object
     DirectoryResponseObject:
@@ -3416,7 +3416,7 @@ components:
         children:
           description: The response object containing information about the directories.
           items:
-            $ref: '#/components/schemas/DirectoryResponseObject'
+            $ref: "#/components/schemas/DirectoryResponseObject"
           type: array
           uniqueItems: true
         contractStatus:
@@ -3441,7 +3441,7 @@ components:
         customProperties:
           description: Custom properties assigned to the directory as key-value pairs.
           items:
-            $ref: '#/components/schemas/PropertyResponseObject'
+            $ref: "#/components/schemas/PropertyResponseObject"
           type: array
         description:
           description: A description of the directory.
@@ -3548,7 +3548,7 @@ components:
             \ values per key."
           type: object
         legalLinks:
-          $ref: '#/components/schemas/LegalLinksDTO'
+          $ref: "#/components/schemas/LegalLinksDTO"
         modifiedDate:
           description: The date the directory was last modified. Dates and times are
             in UTC format.
@@ -3564,7 +3564,7 @@ components:
         subaccounts:
           description: The subaccounts contained in the directory.
           items:
-            $ref: '#/components/schemas/SubaccountResponseObject'
+            $ref: "#/components/schemas/SubaccountResponseObject"
           type: array
           uniqueItems: true
         subdomain:
@@ -3575,7 +3575,6 @@ components:
           type: string
       required:
       - createdDate
-      - description
       - directoryFeatures
       - displayName
       - globalAccountGUID
@@ -3594,7 +3593,7 @@ components:
         entitySettings:
           description: Additional properties for the settings.
           items:
-            $ref: '#/components/schemas/UpdateEntitySettingsRequestPayload'
+            $ref: "#/components/schemas/UpdateEntitySettingsRequestPayload"
           type: array
       required:
       - entitySettings
@@ -3896,7 +3895,7 @@ components:
           description: The list of directories associated with the specified global
             account.
           items:
-            $ref: '#/components/schemas/DirectoryResponseObject'
+            $ref: "#/components/schemas/DirectoryResponseObject"
           type: array
           uniqueItems: true
         commercialModel:
@@ -3964,7 +3963,7 @@ components:
             \ the first value of any label key that has multiple values assigned to\
             \ it."
           items:
-            $ref: '#/components/schemas/PropertyResponseObject'
+            $ref: "#/components/schemas/PropertyResponseObject"
           type: array
         description:
           description: A description of the global account.
@@ -4059,7 +4058,7 @@ components:
             \ values per key."
           type: object
         legalLinks:
-          $ref: '#/components/schemas/LegalLinksDTO'
+          $ref: "#/components/schemas/LegalLinksDTO"
         licenseType:
           description: |-
             The type of license for the global account. The license type affects the scope of functions of the account.
@@ -4125,7 +4124,7 @@ components:
         subaccounts:
           description: The subaccounts contained in the global account.
           items:
-            $ref: '#/components/schemas/SubaccountResponseObject'
+            $ref: "#/components/schemas/SubaccountResponseObject"
           type: array
           uniqueItems: true
         subdomain:
@@ -4323,7 +4322,7 @@ components:
           description: Provide the parameters necessary to obtain information about
             the source and the target locations.
           items:
-            $ref: '#/components/schemas/MoveSubaccountsRequestPayload'
+            $ref: "#/components/schemas/MoveSubaccountsRequestPayload"
           type: array
       required:
       - subaccountsToMoveCollection
@@ -4481,7 +4480,7 @@ components:
       properties:
         value:
           items:
-            $ref: '#/components/schemas/SubaccountResponseObject'
+            $ref: "#/components/schemas/SubaccountResponseObject"
           type: array
       type: object
     ServiceManagerBindingExtendedResponseObject:
@@ -4597,7 +4596,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/ServiceManagerBindingExtendedResponseObject'
+            $ref: "#/components/schemas/ServiceManagerBindingExtendedResponseObject"
           type: array
       type: object
     SubaccountResponseObject:
@@ -4652,7 +4651,7 @@ components:
             \ the first value of any label key that has multiple values assigned to\
             \ it."
           items:
-            $ref: '#/components/schemas/PropertyResponseObject'
+            $ref: "#/components/schemas/PropertyResponseObject"
           type: array
         description:
           description: A description of the subaccount for customer-facing UIs.
@@ -4812,7 +4811,7 @@ components:
             \ include \"customProperties\" and \"labels\" together in the same request\
             \ (customProperties will be ignored).\n"
           items:
-            $ref: '#/components/schemas/UpdatePropertyRequestPayload'
+            $ref: "#/components/schemas/UpdatePropertyRequestPayload"
           type: array
         description:
           description: The description of the directory for the customer-facing UIs.
@@ -4979,7 +4978,7 @@ components:
             \ include \"customProperties\" and \"labels\" together in the same request\
             \ (customProperties will be ignored).\n"
           items:
-            $ref: '#/components/schemas/UpdatePropertyRequestPayload'
+            $ref: "#/components/schemas/UpdatePropertyRequestPayload"
           type: array
         description:
           description: A new display of the global account.
@@ -5104,7 +5103,7 @@ components:
             \ include \"customProperties\" and \"labels\" together in the same request\
             \ (customProperties will be ignored).\n"
           items:
-            $ref: '#/components/schemas/UpdatePropertyRequestPayload'
+            $ref: "#/components/schemas/UpdatePropertyRequestPayload"
           type: array
         description:
           description: A new description of the subaccount.
