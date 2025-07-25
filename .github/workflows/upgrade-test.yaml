@@ -127,7 +127,8 @@ jobs:
             echo "to_test_source=${{ github.event.inputs.source }}" >> $GITHUB_ENV
             echo "to_test_target=${{ github.event.inputs.target }}" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            echo "COMMENT_BODY=${{ github.event.comment.body }}" >> $GITHUB_ENV
+            COMMENT_BODY="${{ github.event.comment.body }}"
+            echo "COMMENT_BODY=$COMMENT_BODY" >> $GITHUB_ENV
             if [[ "$COMMENT_BODY" =~ /upgrade-test ]]; then
               if [[ "$COMMENT_BODY" =~ source=([^\ ]+) ]]; then
                   to_test_source="${BASH_REMATCH[1]}"
