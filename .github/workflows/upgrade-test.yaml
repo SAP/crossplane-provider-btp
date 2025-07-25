@@ -127,16 +127,21 @@ jobs:
             echo "to_test_source=${{ github.event.inputs.source }}" >> $GITHUB_ENV
             echo "to_test_target=${{ github.event.inputs.target }}" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            echo "COMMENT_BODY=${{ github.event.comment.body }}" >> $GITHUB_ENV
+            COMMENT_BODY="${{ github.event.comment.body }}"
             if [[ "$COMMENT_BODY" =~ /upgrade-test ]]; then
-              if [[ "$COMMENT_BODY" =~ source=([^\ ]+) ]]; then
-                  to_test_source="${BASH_REMATCH[1]}"
-                  echo "to_test_source=$to_test_source" >> $GITHUB_ENV
-                  echo "to_test_source=$to_test_source"
+              VERSION=$(echo "$COMMENT_BODY" | awk -F'source=' '{print $2}' | awk '{print $1}')
+              if [[ -n "$VERSION" ]]; then
+                echo "Extracted version: $VERSION"
+                echo "to_test_source=$VERSION" >> $GITHUB_ENV
+                echo "to_test_source=$to_test_source"
+              else
+                echo "Error: 'source' parameter is missing or invalid." >&2
+                exit 1
               fi
-              to_test_target="${BUILD_IMAGE_VERSION}"
-              echo "to_test_target=$to_test_target" >> $GITHUB_ENV
+              echo "to_test_target=$BUILD_IMAGE_VERSION" >> $GITHUB_ENV
               echo "to_test_target=$to_test_target"
+            else
+              echo "Comment does not start with '/upgrade-test'." 
             fi
           fi
       - name: Run upgrade test
