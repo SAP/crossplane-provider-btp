@@ -156,5 +156,3 @@ jobs:
           CLIENT_ID: ${{ secrets.UPGRADE_TEST_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.UPGRADE_TEST_CLIENT_SECRET }}
           TECH_USER_PASSWORD: ${{ secrets.UPGRADE_TEST_TECH_USER_PW }}
-
-          
