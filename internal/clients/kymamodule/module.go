@@ -4,13 +4,14 @@ import (
 	"context"
 	"slices"
 
+	client "sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 )
 
 const (
@@ -21,22 +22,17 @@ const (
 )
 
 type KymaModuleClient struct {
-	dynamic dynamic.Interface
-}
-
-// Resource implements dynamic.Interface.
-func (c KymaModuleClient) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
-	panic("unimplemented")
+	kube client.Client
 }
 
 var _ Client = &KymaModuleClient{}
 
-func NewKymaModuleClient(dynamic dynamic.Interface) *KymaModuleClient {
-	return &KymaModuleClient{dynamic: dynamic}
+func NewKymaModuleClient(kube client.Client) *KymaModuleClient {
+	return &KymaModuleClient{kube: kube}
 }
 
 func (c KymaModuleClient) GetModule(ctx context.Context, moduleName string) (*v1alpha1.ModuleStatus, error) {
-	kyma, err := c.getDefaultKyma(ctx)
+	kyma, err := getAll(ctx, c)
 	if err != nil {
 		return nil, err
 	}
@@ -58,10 +54,13 @@ var GVRKyma = schema.GroupVersionResource{
 	Resource: "kymas",
 }
 
-// GetDefaultKyma gets the default Kyma CR from the kyma-system namespace and cast it to the Kyma structure.
+// GetAll gets the default Kyma CR from the kyma-system namespace and cast it to the Kyma structure.
 // ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/kyma.go#L144
-func (c KymaModuleClient) getDefaultKyma(ctx context.Context) (*v1alpha1.KymaCr, error) {
-	u, err := c.dynamic.Resource(GVRKyma).
+func getAll(ctx context.Context, c KymaModuleClient) (*v1alpha1.KymaCr, error) {
+
+	c.kube.
+		c.kube.ResourceMatches(GVRKyma, &v1alpha1.KymaCr{})
+	u, err := c.kube.
 		Namespace(DefaultKymaNamespace).
 		Get(ctx, DefaultKymaName, metav1.GetOptions{})
 	if err != nil {

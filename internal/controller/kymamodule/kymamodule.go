@@ -1,9 +1,7 @@
-package kymaenvironmentbinding
+package kymamodule
 
 import (
 	"context"
-	"net/http"
-	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,7 +17,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
@@ -50,9 +47,7 @@ type connector struct {
 type external struct {
 	client  kymamodule.Client
 	tracker tracking.ReferenceResolverTracker
-
-	httpClient *http.Client
-	kube       client.Client
+	kube    client.Client
 }
 
 // This methods connects to the Kyma cluster using the kubeconfig from the KymaEnvironmentBinding
@@ -103,10 +98,9 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	svc := c.newServiceFn(dynamicClient)
 	return &external{
-			client:     kymamodule.NewKymaModuleClient(*svc),
-			tracker:    c.resourcetracker,
-			httpClient: btp.DebugPrintHTTPClient(btp.WithHttpClient(&http.Client{Timeout: 10 * time.Second})),
-			kube:       c.kube,
+			client:  kymamodule.NewKymaModuleClient(*svc),
+			tracker: c.resourcetracker,
+			kube:    c.kube,
 		},
 		err
 }
