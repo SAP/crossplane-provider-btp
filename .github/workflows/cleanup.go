@@ -11,8 +11,6 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-
-	"gopkg.in/yaml.v2"
 )
 
 // Subaccounts contains a array of value filled with subaccounts
@@ -150,54 +148,10 @@ type BtpSecuritySecret struct {
 	ReadOnly          bool   `json:"read-only"`
 }
 
-// TrustConfigurationsList contains all trust configurations of a Globalaccount
-type TrustConfigurationsList struct {
-	Type   string `json:"type"`
-	Config struct {
-		EmailDomain             interface{} `json:"emailDomain"`
-		AdditionalConfiguration *struct {
-			Domain string `json:"domain"`
-		} `json:"additionalConfiguration"`
-		ProviderDescription     *string       `json:"providerDescription"`
-		ExternalGroupsWhitelist []interface{} `json:"externalGroupsWhitelist"`
-		AttributeMappings       struct {
-			GivenName      string   `json:"given_name"`
-			ExternalGroups []string `json:"external_groups,omitempty"`
-			FamilyName     string   `json:"family_name"`
-			UserName       string   `json:"user_name"`
-			Email          string   `json:"email"`
-		} `json:"attributeMappings"`
-		AddShadowUserOnLogin  bool        `json:"addShadowUserOnLogin"`
-		StoreCustomAttributes bool        `json:"storeCustomAttributes"`
-		AuthUrl               string      `json:"authUrl"`
-		TokenUrl              string      `json:"tokenUrl"`
-		TokenKeyUrl           string      `json:"tokenKeyUrl"`
-		LogoutUrl             *string     `json:"logoutUrl"`
-		TokenKey              interface{} `json:"tokenKey"`
-		LinkText              string      `json:"linkText"`
-		ShowLinkText          bool        `json:"showLinkText"`
-		ClientAuthInBody      bool        `json:"clientAuthInBody"`
-		SkipSslValidation     bool        `json:"skipSslValidation"`
-		RelyingPartyId        string      `json:"relyingPartyId"`
-		Scopes                []string    `json:"scopes"`
-		Issuer                string      `json:"issuer"`
-		ResponseType          string      `json:"responseType"`
-		DiscoveryUrl          *string     `json:"discoveryUrl"`
-		UserInfoUrl           string      `json:"userInfoUrl"`
-		PasswordGrantEnabled  bool        `json:"passwordGrantEnabled"`
-		SetForwardHeader      bool        `json:"setForwardHeader"`
-		PlatformIdp           bool        `json:"platformIdp"`
-		ApplicationIdp        bool        `json:"applicationIdp"`
-		NeoAuthnWithOidc      bool        `json:"neoAuthnWithOidc"`
-	} `json:"config"`
-	Id             string `json:"id"`
-	OriginKey      string `json:"originKey"`
-	Name           string `json:"name"`
-	Version        int    `json:"version"`
-	Created        int64  `json:"created"`
-	LastModified   int64  `json:"last_modified"`
-	Active         bool   `json:"active"`
-	IdentityZoneId string `json:"identityZoneId"`
+// TrustConfiguration contains a Globalaccount trust configurations (subset of relevant information)
+type TrustConfiguration struct {
+	OriginKey string `json:"originKey"`
+	Name      string `json:"name"`
 }
 
 // Children contains an array of child directories from a global account.
@@ -570,55 +524,39 @@ func findChildren(children Children) ([]string, error) {
 	return directoriesGuids, nil
 }
 
-// getTrustConfigurations uses UaaAuth and BtpSecuritySecret to get the trust configuration of the globalaccount.
-// Returns an array of TrustConfigurationsList or an error if it fails.
-func getTrustConfigurations(auth *UaaAuth, btpSecret *BtpSecuritySecret) ([]TrustConfigurationsList, error) {
-	//configure parameters etc. for api call
-	baseURL := btpSecret.Apiurl + "/sap/rest/identity-providers"
-	params := url.Values{}
-	params.Add("activeOnly", "false")
-	params.Add("rawConfig", "true")
-	req, err := http.NewRequest("GET", baseURL+"?"+params.Encode(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-	req.Header.Add("Authorization", "Bearer "+auth.AccessToken)
-	req.Header.Add("Accept", "application/json")
+// getTrustConfigurationForBuild uses btp cli to get the trust configuration of the globalaccount.
+// Returns a filtered []TrustConfiguration for the buildID (naming pattern: <buildID><name>) or an error if it fails.
+func getTrustConfigurationForBuild(buildID string) ([]TrustConfiguration, error) {
 
-	//make api call to get trust configurations
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	// Execute the BTP CLI command to get the account hierarchy
+	cmd := exec.Command("btp", "--format", "json", "list", "security/trust")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err := cmd.Run()
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
+		return nil, fmt.Errorf("command execution failed: %s, output: %s", err, out.String())
 	}
-	defer resp.Body.Close()
 
 	//parse response
-	var trustConfigurationsList []TrustConfigurationsList
-	if resp.StatusCode == http.StatusOK {
-		if err := json.NewDecoder(resp.Body).Decode(&trustConfigurationsList); err != nil {
-			return nil, fmt.Errorf("error decoding JSON response: %w", err)
-		}
-
-	} else {
-		return nil, fmt.Errorf("request failed with status code: %d\n", resp.StatusCode)
+	var trustConfigurationsList []TrustConfiguration
+	if err := json.Unmarshal(out.Bytes(), &trustConfigurationsList); err != nil {
+		return nil, fmt.Errorf("error decoding JSON response: %w", err)
 	}
-	buildID := os.Getenv("BUILD_ID")
 
-	var relevanttrustConfigurations []TrustConfigurationsList
-
-	// check if trust configurations is from current build
-	for _, trustConfiguration := range trustConfigurationsList {
-		if strings.HasPrefix(trustConfiguration.Name, buildID) {
-			relevanttrustConfigurations = append(relevanttrustConfigurations, trustConfiguration)
+	// filter for trust configurations from current test build
+	var trustConfigurationFromThisTestBuild []TrustConfiguration
+	for _, tc := range trustConfigurationsList {
+		if strings.HasPrefix(tc.Name, buildID) {
+			trustConfigurationFromThisTestBuild = append(trustConfigurationFromThisTestBuild, tc)
 		}
 	}
-	return relevanttrustConfigurations, nil
+	return trustConfigurationFromThisTestBuild, nil
 }
 
 // deleteTrustConfigurations uses an array of TrustConfigurationsList to delete the trust configurations.
 // Returns an error if it fails.
-func deleteTrustConfigurations(trustConfigurationsList []TrustConfigurationsList) error {
+func deleteTrustConfigurations(trustConfigurationsList []TrustConfiguration) error {
 	// slice it in single trust configurations
 	for _, trustConfiguration := range trustConfigurationsList {
 		// delete trust configuration
@@ -628,53 +566,9 @@ func deleteTrustConfigurations(trustConfigurationsList []TrustConfigurationsList
 		cmd.Stderr = &out
 		err := cmd.Run()
 		if err != nil {
-			return fmt.Errorf("command execution failed: %s, output: %s", err, out.String())
+			return fmt.Errorf("failed deleting security/trust with name %s: command execution failed: %s, output: %s", trustConfiguration.Name, err, out.String())
 		}
 		fmt.Printf("deleted: %s\n", trustConfiguration.Name)
-	}
-	return nil
-}
-
-// getTokenForTrustConfiguration creates a security/api-credential secret and get a UaaAuth token.
-// Returns BtpSecuritySecret with the security/api-credential secret and UaaAuth or an error if it fails.
-func getTokenForTrustConfiguration() (*BtpSecuritySecret, *UaaAuth, error) {
-	// Execute the BTP CLI command to get the account hierarchy
-	buildId := os.Getenv("BUILD_ID")
-	cmd := exec.Command("btp", "--format", "json", "create", "security/api-credential", "--name", buildId+"cleanUpAccount")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err := cmd.Run()
-	if err != nil {
-		return nil, nil, fmt.Errorf("command execution failed: %s, output: %s", err, out.String())
-	}
-
-	var btpSecuritySecret BtpSecuritySecret
-	// parse repsonse
-	err = yaml.Unmarshal(out.Bytes(), &btpSecuritySecret)
-	if err != nil {
-		return nil, nil, err
-	}
-	// get a UaaAuth token
-	uaaAuthForTrustConfiguration, err := GetUaaAuthForTrustConfiguration(btpSecuritySecret)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error getting uaa auth for trust configuration: %s", err)
-	}
-	return &btpSecuritySecret, uaaAuthForTrustConfiguration, nil
-}
-
-// deleteTokenForTrustConfiguration deletes the from getTokenForTrustConfiguration() created security/api-credential
-// secret. Returns an error if it fails.
-func deleteTokenForTrustConfiguration() error {
-	buildId := os.Getenv("BUILD_ID")
-	// make btp cli command to delete the secret
-	cmd := exec.Command("btp", "delete", "security/api-credential", buildId+"cleanUpAccount", "--confirm")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("command execution failed: %s, output: %s", err, out.String())
 	}
 	return nil
 }
@@ -713,6 +607,7 @@ func checkIfAccountIsClean(cisBinding CisBinding, uaaAuth *UaaAuth) bool {
 }
 func main() {
 	// get cis binding
+	buildID := os.Getenv("BUILD_ID")
 	cisBindingEnv := os.Getenv("CIS_CENTRAL_BINDING")
 	var cisBinding CisBinding
 	if err := json.Unmarshal([]byte(cisBindingEnv), &cisBinding); err != nil {
@@ -741,30 +636,16 @@ func main() {
 		fmt.Println(err)
 	}
 
-	// get uaa for trust configuration
-	btpSecret, auth, err := getTokenForTrustConfiguration()
-	if err != nil {
-		fmt.Println("error getting access token:", err)
-		return
-	}
-	// get trust configurations
-	trustConfigurationsList, err := getTrustConfigurations(auth, btpSecret)
+	trustConfigurationsForCurrentBuild, err := getTrustConfigurationForBuild(buildID)
 	if err != nil {
 		fmt.Println("error getting trust Configurations:", err)
 		return
 	}
 
 	// delete trust confiurations for the current build
-	err = deleteTrustConfigurations(trustConfigurationsList)
+	err = deleteTrustConfigurations(trustConfigurationsForCurrentBuild)
 	if err != nil {
 		fmt.Println("error while deleting trust configuration:", err)
-		return
-	}
-
-	// delete secret for the trust configurations
-	err = deleteTokenForTrustConfiguration()
-	if err != nil {
-		fmt.Println("error deleting access token:", err)
 		return
 	}
 
