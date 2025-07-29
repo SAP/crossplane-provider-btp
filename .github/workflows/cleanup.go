@@ -323,6 +323,7 @@ func GetSubaccounts(uaaAuth *UaaAuth, cisBinding CisBinding) (*Subaccounts, erro
 // DeleteSubaccount uses the guid, cis binding and uaa token to delete a subaccount.
 // Returns an error if it fails
 func DeleteSubaccount(guid string, cisBinding CisBinding, uaaAuth *UaaAuth) error {
+	fmt.Println("try to delete subaccount with guid: ", guid)
 	//configure parameters etc. for api call
 	baseURL := cisBinding.Endpoints.AccountsServiceUrl + "/accounts/v1/subaccounts/" + guid
 	params := url.Values{}
@@ -435,7 +436,7 @@ func DeleteDirectories(uaaAuth *UaaAuth, cisBinding CisBinding) error {
 
 	//Delete directories from this Build
 	for _, resource := range elementsToDelete {
-		fmt.Printf("try to delete: %s\n", resource.DisplayName)
+		fmt.Printf("try to delete directory: %s\n", resource.DisplayName)
 		//configure parameters etc. for api call
 		baseURL := cisBinding.Endpoints.AccountsServiceUrl + "/accounts/v1/directories/" + resource.Guid
 		params := url.Values{}
@@ -455,7 +456,7 @@ func DeleteDirectories(uaaAuth *UaaAuth, cisBinding CisBinding) error {
 			return fmt.Errorf("error making request: %w", err)
 		}
 		defer resp.Body.Close()
-		fmt.Printf("deleted: %s\n", resource.DisplayName)
+		fmt.Printf("deleted directory: %s\n", resource.DisplayName)
 	}
 	return nil
 }
@@ -560,6 +561,7 @@ func deleteTrustConfigurations(trustConfigurationsList []TrustConfiguration) err
 	// slice it in single trust configurations
 	for _, trustConfiguration := range trustConfigurationsList {
 		// delete trust configuration
+		fmt.Println("try to delete: ", trustConfiguration.Name)
 		cmd := exec.Command("btp", "delete", "security/trust", trustConfiguration.OriginKey, "--confirm")
 		var out bytes.Buffer
 		cmd.Stdout = &out
@@ -606,51 +608,62 @@ func checkIfAccountIsClean(cisBinding CisBinding, uaaAuth *UaaAuth) bool {
 	return true
 }
 func main() {
-	// get cis binding
 	buildID := os.Getenv("BUILD_ID")
+
+	fmt.Println("Get cis binding from env...")
 	cisBindingEnv := os.Getenv("CIS_CENTRAL_BINDING")
 	var cisBinding CisBinding
 	if err := json.Unmarshal([]byte(cisBindingEnv), &cisBinding); err != nil {
 		fmt.Println("error unmarshalling config JSON: ", err)
 		return
 	}
+	fmt.Println("Successfully got cis binding")
 
 	//get uaa from envs
+	fmt.Println("Get uaa auth from cis binding...")
 	uaaAuth, err := GetUaaAuth(cisBinding)
 	if err != nil {
 		fmt.Println("error getting uaa auth:", err)
 		return
 	}
+	fmt.Println("Successfully got uaa auth for cis binding")
 
-	// get technical user credentials
+	fmt.Println("Get btp technical user from env...")
 	technicalUserEnv := os.Getenv("BTP_TECHNICAL_USER")
 	var technicalUser TechnicalUser
 	if err := json.Unmarshal([]byte(technicalUserEnv), &technicalUser); err != nil {
 		fmt.Println("error unmarshalling config JSON: ", err)
 		return
 	}
+	fmt.Println("Successfully got BTP technical user")
 
-	// login to btp cli
+	fmt.Println("Logging in to BTP CLI with technical user credentials...")
 	err = btpLogin(technicalUser.Email, technicalUser.Password, cisBinding.Uaa.Identityzoneid)
 	if err != nil {
 		fmt.Println(err)
 	}
+	fmt.Println("Successfully logged in to BTP CLI")
 
+	fmt.Println("Get Trust Configuration for current build...")
 	trustConfigurationsForCurrentBuild, err := getTrustConfigurationForBuild(buildID)
 	if err != nil {
 		fmt.Println("error getting trust Configurations:", err)
 		return
 	}
+	fmt.Println("Successfully got Trust Configurations for current build")
 
 	// delete trust confiurations for the current build
+	fmt.Println("Deleting Trust Configurations for current build...")
 	err = deleteTrustConfigurations(trustConfigurationsForCurrentBuild)
 	if err != nil {
 		fmt.Println("error while deleting trust configuration:", err)
 		return
 	}
+	fmt.Println("Successfully deleted Trust Configurations for current build")
 
 	// trying to delete subaccounts and directories of current build
 	for i := 0; i < 5; i++ {
+		fmt.Println("Trying to delete subaccounts and directories of current build... Attempt:", i+1)
 
 		//delete directories for the current build
 		err = DeleteDirectories(uaaAuth, cisBinding)
