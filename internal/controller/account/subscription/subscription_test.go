@@ -275,10 +275,10 @@ func TestRecreateOnFailed(t *testing.T) {
 	mockKube := testutils.NewFakeKubeClientBuilder().Build()
 	extName := "test-ext-name"
 	ctrl := external{
-		tracker:    nil,
-		kube:       &mockKube,
+		tracker: nil,
+		kube:    &mockKube,
 		apiHandler: &MockApiHandler{
-			deleteCounter: 0,
+			deleteCounter:      0,
 			returnExternalName: extName,
 			returnGet: &subscription.SubscriptionGet{
 				State: ptr.To(v1alpha1.SubscriptionStateSubscribeFailed),
@@ -301,6 +301,10 @@ func TestRecreateOnFailed(t *testing.T) {
 		t.Errorf("initial observation returned error: %v", err)
 	}
 
+	if internal.Val(cr.Status.AtProvider.State) != v1alpha1.SubscriptionStateSubscribeFailed {
+		t.Errorf("expected subscription state to be %s, got %s", v1alpha1.SubscriptionStateSubscribeFailed, internal.Val(cr.Status.AtProvider.State))
+	}
+
 	// The controller shall trigger a deletion
 	if c := ctrl.apiHandler.(*MockApiHandler).deleteCounter; c != 1 {
 		t.Errorf("the initial observation should perform a delete operation (%v)", c)
@@ -311,7 +315,6 @@ func TestRecreateOnFailed(t *testing.T) {
 		ResourceExists:    true,
 		ResourceUpToDate:  true,
 		ConnectionDetails: managed.ConnectionDetails{},
-
 	}, got); diff != "" {
 		t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", "initial observation", diff)
 	}
@@ -341,20 +344,19 @@ func TestRecreateOnFailed(t *testing.T) {
 		ResourceExists:    true,
 		ResourceUpToDate:  true,
 		ConnectionDetails: managed.ConnectionDetails{},
-
 	}, got); diff != "" {
 		t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", "initial observation", diff)
 	}
 
 	// The external resource is deleted
 	ctrl.typeMapper = &MockTypeMapper{
-			synced:    false,
-			available: false,
-			deletable: false,
+		synced:    false,
+		available: false,
+		deletable: false,
 	}
 	// The API does not return SUBSCRIBE_FAILED anymore
 	ctrl.apiHandler = &MockApiHandler{
-		deleteCounter: 0,
+		deleteCounter:      0,
 		returnExternalName: extName,
 		// returnGet: &subscription.SubscriptionGet{
 		// 	State: ptr.To(v1alpha1.SubscriptionStateSubscribeFailed),
@@ -374,8 +376,7 @@ func TestRecreateOnFailed(t *testing.T) {
 
 	// The resource shall be created
 	if diff := cmp.Diff(managed.ExternalObservation{
-		ResourceExists:    false,
-
+		ResourceExists: false,
 	}, got); diff != "" {
 		t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", "initial observation", diff)
 	}
@@ -620,9 +621,9 @@ func TestConnect(t *testing.T) {
 				AddResources(tc.args.kubeObjects...).
 				Build()
 			c := connector{
-				kube:         &kube,
-				usage:        tracking_test.NoOpReferenceResolverTracker{},
-				newServiceFn: newSubscriptionClientFn,
+				kube:            &kube,
+				usage:           tracking_test.NoOpReferenceResolverTracker{},
+				newServiceFn:    newSubscriptionClientFn,
 				resourcetracker: tracking.NewDefaultReferenceResolverTracker(&kube),
 			}
 
