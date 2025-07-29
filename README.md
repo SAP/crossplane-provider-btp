@@ -182,7 +182,7 @@ Name of created kind cluster, if not set will be randomly generated
 
 0 or 1, default is 0
 
-## Setting up the Provider COnfiguration
+## Setting up the Provider Configuration
 
 ### About
 
