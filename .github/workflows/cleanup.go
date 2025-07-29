@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -378,6 +379,21 @@ func btpLogin(username string, password string, globalAccount string) error {
 	return nil
 }
 
+// btpLogout logs out the user from the cli.
+// returns error if it fails
+func btpLogout() error {
+	// run command to login
+	cmd := exec.Command("btp", "logout")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("logout command failed: %s, output: %s", err, out.String())
+	}
+	return nil
+}
+
 // GetDirectoriesOfBuild uses an array of directory guids, CisBinding and UaaAuth to get directories of the current build.
 // Returns array of DirectoryResponse and an error if it fails
 func GetDirectoriesOfBuild(directoriesGuids []string, cisBinding CisBinding, uaaAuth UaaAuth) ([]DirectoryResponse, error) {
@@ -607,15 +623,16 @@ func checkIfAccountIsClean(cisBinding CisBinding, uaaAuth *UaaAuth) bool {
 	}
 	return true
 }
-func main() {
+
+func cleanup() (errs error) {
 	buildID := os.Getenv("BUILD_ID")
 
 	fmt.Println("Get cis binding from env...")
 	cisBindingEnv := os.Getenv("CIS_CENTRAL_BINDING")
 	var cisBinding CisBinding
 	if err := json.Unmarshal([]byte(cisBindingEnv), &cisBinding); err != nil {
-		fmt.Println("error unmarshalling config JSON: ", err)
-		return
+		errs = errors.Join(errs, fmt.Errorf("error unmarshalling config JSON: %w", err))
+		return errs
 	}
 	fmt.Println("Successfully got cis binding")
 
@@ -623,8 +640,8 @@ func main() {
 	fmt.Println("Get uaa auth from cis binding...")
 	uaaAuth, err := GetUaaAuth(cisBinding)
 	if err != nil {
-		fmt.Println("error getting uaa auth:", err)
-		return
+		errs = errors.Join(errs, fmt.Errorf("error getting uaa auth: %w", err))
+		return errs
 	}
 	fmt.Println("Successfully got uaa auth for cis binding")
 
@@ -632,23 +649,30 @@ func main() {
 	technicalUserEnv := os.Getenv("BTP_TECHNICAL_USER")
 	var technicalUser TechnicalUser
 	if err := json.Unmarshal([]byte(technicalUserEnv), &technicalUser); err != nil {
-		fmt.Println("error unmarshalling config JSON: ", err)
-		return
+		errs = errors.Join(errs, fmt.Errorf("error unmarshalling config JSON: %w", err))
+		return errs
+
 	}
 	fmt.Println("Successfully got BTP technical user")
 
 	fmt.Println("Logging in to BTP CLI with technical user credentials...")
 	err = btpLogin(technicalUser.Email, technicalUser.Password, cisBinding.Uaa.Identityzoneid)
 	if err != nil {
-		fmt.Println(err)
+		errs = errors.Join(errs, fmt.Errorf("error logging into BTP CLI: %w", err))
+		return errs
 	}
+	defer func() {
+		if tempErr := btpLogout(); tempErr != nil {
+			errs = errors.Join(errs, fmt.Errorf("error logging out from BTP CLI: %w", tempErr))
+		}
+	}()
 	fmt.Println("Successfully logged in to BTP CLI")
 
 	fmt.Println("Get Trust Configuration for current build...")
 	trustConfigurationsForCurrentBuild, err := getTrustConfigurationForBuild(buildID)
 	if err != nil {
-		fmt.Println("error getting trust Configurations:", err)
-		return
+		errs = errors.Join(errs, fmt.Errorf("error getting trust Configurations: %w", err))
+		return errs
 	}
 	fmt.Println("Successfully got Trust Configurations for current build")
 
@@ -656,8 +680,8 @@ func main() {
 	fmt.Println("Deleting Trust Configurations for current build...")
 	err = deleteTrustConfigurations(trustConfigurationsForCurrentBuild)
 	if err != nil {
-		fmt.Println("error while deleting trust configuration:", err)
-		return
+		errs = errors.Join(errs, fmt.Errorf("error while deleting trust configuration: %w", err))
+		return errs
 	}
 	fmt.Println("Successfully deleted Trust Configurations for current build")
 
@@ -680,10 +704,19 @@ func main() {
 		time.Sleep(45 * time.Second)
 		if checkIfAccountIsClean(cisBinding, uaaAuth) {
 			fmt.Println("Globalaccount has been cleaned")
-			os.Exit(0)
+			return errs
 		}
 	}
-	fmt.Println("Globalaccount can not be cleaned in time")
-	os.Exit(1)
+	errs = errors.Join(errs, fmt.Errorf("globalaccount can not be cleaned in time"))
+	return errs
+}
 
+func main() {
+	if err := cleanup(); err != nil {
+		fmt.Println("Cleanup failed:", err)
+		os.Exit(1)
+	} else {
+		fmt.Println("Cleanup completed successfully")
+		os.Exit(0)
+	}
 }
