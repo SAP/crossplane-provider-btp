@@ -144,6 +144,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 
+	c.syncStatus(apiRes, cr)
+
 	if c.shouldRecreateOnFailure(cr, apiRes) {
 		// We observed a subscription in SUBSCRIBE_FAILED
 		// state and recreateOnSubscriptionFailure is turned
@@ -161,7 +163,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			ConnectionDetails: managed.ConnectionDetails{},
 		}, err
 	}
-	c.syncStatus(apiRes, cr)
 
 	if c.typeMapper.IsAvailable(cr) {
 		cr.SetConditions(xpv1.Available())

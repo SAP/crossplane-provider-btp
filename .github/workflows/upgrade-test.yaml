@@ -1,0 +1,152 @@
+name: Upgrade Test Workflow
+
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Source version"
+        required: true
+        default: "v1.0.3"
+      target:
+        description: "Target version"
+        required: true
+        default: "v1.1.0"
+
+  issue_comment:
+    types:
+      - created
+  
+
+jobs:
+  upgrade-test:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test'))
+    steps:
+      - name: Setup Docker Buildx
+        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
+        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
+        with:
+            version: v0.15.1
+            install: true
+      - name: Checkout code
+        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: true
+      - name: Fetch History
+        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
+        run: git fetch --prune --unshallow
+
+      - name: Set up Go
+        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version: '1.21'
+
+      - name: Vendor Dependencies
+        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
+        run: make vendor vendor.check
+
+      - name: Set up Version
+        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
+        run: |
+          echo "BUILD_IMAGE_VERSION=v0.0.0-draft-${{ github.event.issue.number }}" >> $GITHUB_ENV
+          echo "version is $BUILD_IMAGE_VERSION"
+      - name: Build Images
+        if:  github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
+        run: make build VERSION=$BUILD_IMAGE_VERSION 
+        env:
+          # We're using docker buildx, which doesn't actually load the images it
+          # builds by default. Specifying --load does so.
+          BUILD_ARGS: "--load"
+          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
+          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
+
+      - name: Login to Container Registry
+        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ${{ vars.REGISTRY_URL }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Artifacts to DockerHub
+        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
+        run: make publish BRANCH_NAME=${GITHUB_REF##*/} VERSION=$BUILD_IMAGE_VERSION
+        env:
+          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
+          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
+
+      - name: Clone provider-upgrade-test repo
+        run: |
+          git clone https://${{ secrets.UPGRADE_TEST_GT_TOKEN }}@${{ secrets.UPGRADE_TEST_GIT_REPO_HOST }}/cloud-orchestration/provider-upgrade-test.git
+          echo "Repository provider-upgrade-test cloned successfully."
+
+      - name: Install CLI Tools
+        run: |
+          echo "Installing Kind..."
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+          echo "Installing Kubectl..."
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+          echo "Installing Chainsaw..."
+          curl -LO https://github.com/kyverno/chainsaw/releases/download/v0.2.12/chainsaw_linux_amd64.tar.gz && \
+          tar -xzvf chainsaw_linux_amd64.tar.gz && \
+          chmod +x chainsaw && \
+          sudo mv chainsaw /usr/local/bin/chainsaw && \
+          chainsaw version
+
+          echo "Installing sed..."
+          sudo apt-get update && sudo apt-get install -y sed
+
+          echo "Installing jq..."
+          sudo apt-get install -y jq
+
+          echo "Installing yq..."
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+
+          echo "All tools installed successfully."
+      - name: Run upgrade test
+        if: github.event_name == 'workflow_dispatch' 
+        run: |
+          cd provider-upgrade-test
+          echo "Running upgrade test..."
+          REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${to_test_source}" --target ${REGISTRY}:${to_test_target} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
+        env: 
+          CLIENT_ID: ${{ secrets.UPGRADE_TEST_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.UPGRADE_TEST_CLIENT_SECRET }}
+          TECH_USER_PASSWORD: ${{ secrets.UPGRADE_TEST_TECH_USER_PW }}
+
+      - name: Run upgrade test from the last versions
+        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
+        run: |
+          cd provider-upgrade-test
+          echo "Running upgrade test..."
+          latest_versions=$(ls -d providers/provider-btp/v* 2>/dev/null | sort -V | tail -n 3 | xargs -n 1 basename)
+          if [[ -z "$latest_versions" ]]; then
+            echo "Error: No versions found in providers/provider-btp." >&2
+            exit 1
+          fi
+          echo "Latest three versions supports upgrade test are: $latest_versions"
+          for source_version in $latest_versions; do
+            echo "Running upgrade test from version: $source_version"
+            REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${source_version}" --target ${REGISTRY}:${BUILD_IMAGE_VERSION} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
+            echo "Upgrade test finished for version: $source_version"
+          done
+        env: 
+          CLIENT_ID: ${{ secrets.UPGRADE_TEST_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.UPGRADE_TEST_CLIENT_SECRET }}
+          TECH_USER_PASSWORD: ${{ secrets.UPGRADE_TEST_TECH_USER_PW }}
