@@ -14,6 +14,7 @@
 - Service Manager
 - Cloud Management
 - Environments
+- Service Instances & Bindings
 
 Have a look on all available CRDs in the [API reference](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp).
 Check the documentation for more detailed information on available capabilities for different kinds.
