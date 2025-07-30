@@ -24,7 +24,7 @@ type BusinessEnvironmentInstanceResponseObject struct {
 	// The commercial type of the environment broker.
 	CommercialType *string `json:"commercialType,omitempty"`
 	// Details about the user that created this environment instance.
-	CreatedBy   *string  `json:"createdBy,omitempty"`
+	CreatedBy *string `json:"createdBy,omitempty"`
 	CreatedDate *float32 `json:"createdDate,omitempty"`
 	// Custom labels that are defined by a user and assigned as key-value pairs in a JSON array to the environment instance.  Example: {   \"Cost Center\": [\"19700626\"],   \"Department\": [\"Sales\"],   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],   \"EMEA\":[] } NOTE: Custom labels apply only to SAP BTP. They are not the same labels that might be defined by your environment broker (see \"labels\" field).
 	CustomLabels *map[string][]string `json:"customLabels,omitempty"`
@@ -43,7 +43,7 @@ type BusinessEnvironmentInstanceResponseObject struct {
 	// The name of the landscape within the logged-in region on which the environment instance is created.
 	LandscapeLabel *string `json:"landscapeLabel,omitempty"`
 	// Details about the user that last modified this environment instance.
-	ModifiedBy   *string  `json:"modifiedBy,omitempty"`
+	ModifiedBy *string `json:"modifiedBy,omitempty"`
 	ModifiedDate *float32 `json:"modifiedDate,omitempty"`
 	// Name of the environment instance.
 	Name *string `json:"name,omitempty"`
@@ -955,7 +955,7 @@ func (o *BusinessEnvironmentInstanceResponseObject) SetType(v string) {
 }
 
 func (o BusinessEnvironmentInstanceResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -1083,3 +1083,5 @@ func (v *NullableBusinessEnvironmentInstanceResponseObject) UnmarshalJSON(src []
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

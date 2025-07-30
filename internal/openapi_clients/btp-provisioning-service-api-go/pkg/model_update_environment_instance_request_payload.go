@@ -11,8 +11,8 @@ API version: 1.0
 package openapi
 
 import (
-	"bytes"
 	"encoding/json"
+	"bytes"
 	"fmt"
 )
 
@@ -21,7 +21,7 @@ var _ MappedNullable = &UpdateEnvironmentInstanceRequestPayload{}
 
 // UpdateEnvironmentInstanceRequestPayload JSON object with configuration parameters specific to environment instance.
 type UpdateEnvironmentInstanceRequestPayload struct {
-	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameter 'instance_name' is specified:  {  \"instance_name\": \"myOrg\"  }
+	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameter 'instance_name' is specified:  {  \"instance_name\": \"myOrg\"  } 
 	Parameters map[string]interface{} `json:"parameters,omitempty"`
 	// Name of the service plan for the environment instance. Must match the name in the corresponding service broker's catalog. (for example: Subscription)
 	PlanName string `json:"planName"`
@@ -104,7 +104,7 @@ func (o *UpdateEnvironmentInstanceRequestPayload) SetPlanName(v string) {
 }
 
 func (o UpdateEnvironmentInstanceRequestPayload) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -133,10 +133,10 @@ func (o *UpdateEnvironmentInstanceRequestPayload) UnmarshalJSON(data []byte) (er
 	err = json.Unmarshal(data, &allProperties)
 
 	if err != nil {
-		return err
+		return err;
 	}
 
-	for _, requiredProperty := range requiredProperties {
+	for _, requiredProperty := range(requiredProperties) {
 		if _, exists := allProperties[requiredProperty]; !exists {
 			return fmt.Errorf("no value given for required property %v", requiredProperty)
 		}
@@ -192,3 +192,5 @@ func (v *NullableUpdateEnvironmentInstanceRequestPayload) UnmarshalJSON(src []by
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+
