@@ -6,15 +6,16 @@ import (
 	"fmt"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -26,8 +27,6 @@ const (
 	errTrackRUsage     = "cannot track ResourceUsage"
 	errTrackPCUsage    = "cannot track ProviderConfig usage"
 
-	errExtractSecretKey     = "no Cloud Management Secret Found"
-	errGetCredentialsSecret = "could not get secret of local cloud management"
 	errCredentialsCorrupted = "secret credentials data not in the expected format"
 )
 
@@ -82,7 +81,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	secretName := cr.Spec.CloudManagementSecret
 	namespace := cr.Spec.CloudManagementSecretNamespace
-	creds, errGet := c.loadSecret(ctx, secretName, namespace)
+	creds, errGet := internal.LoadSecret(ctx, c.kube, secretName, namespace)
 	if errGet != nil {
 		return nil, errGet
 	}
@@ -97,23 +96,6 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		apiHandler: svc,
 		typeMapper: subscription.NewSubscriptionTypeMapper(),
 	}, nil
-}
-
-func (c *connector) loadSecret(ctx context.Context, name string, namespace string) (map[string][]byte, error) {
-	if name == "" || namespace == "" {
-		return nil, errors.New(errExtractSecretKey)
-	}
-
-	secret := &corev1.Secret{}
-	if err := c.kube.Get(
-		ctx, types.NamespacedName{
-			Namespace: namespace,
-			Name:      name,
-		}, secret,
-	); err != nil {
-		return nil, errors.Wrap(err, errGetCredentialsSecret)
-	}
-	return secret.Data, nil
 }
 
 type external struct {
