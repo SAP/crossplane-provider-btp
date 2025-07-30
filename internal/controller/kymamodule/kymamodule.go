@@ -4,12 +4,8 @@ import (
 	"context"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	corev1 "k8s.io/api/core/v1"
 
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -17,6 +13,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
@@ -30,6 +27,7 @@ const (
 	errGetCredentialsSecret = "could not get kubeconfig from KymaEnvironmentBinding secret"
 	errTrackRUsage          = "cannot track ResourceUsage"
 	errObserveResource      = "cannot observe KymaModule"
+	errCredentialsCorrupted = "secret credentials data not in the expected format"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -39,7 +37,7 @@ type connector struct {
 	usage           resource.Tracker
 	resourcetracker tracking.ReferenceResolverTracker
 
-	newServiceFn func(dynamic dynamic.Interface) *kymamodule.KymaModuleClient
+	newServiceFn func(kymaEnvironmentKubeconfig []byte) (*kymamodule.KymaModuleClient, error)
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
@@ -65,40 +63,20 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrackRUsage)
 	}
 
-	if cr.Spec.KymaEnvironmentBindingSecret == "" || cr.Spec.KymaEnvironmentBindingSecretNamespace == "" {
-		return nil, errors.New(errExtractSecretKey)
+	secretName := cr.Spec.KymaEnvironmentBindingSecret
+	namespace := cr.Spec.KymaEnvironmentBindingSecretNamespace
+
+	secret, errGet := internal.LoadSecret(ctx, c.kube, secretName, namespace)
+	if errGet != nil {
+		return nil, errGet
 	}
 
-	secret := &corev1.Secret{}
-	if err := c.kube.Get(
-		ctx, types.NamespacedName{
-			Namespace: cr.Spec.KymaEnvironmentBindingSecretNamespace,
-			Name:      cr.Spec.KymaEnvironmentBindingSecret,
-		}, secret,
-	); err != nil {
-		return nil, errors.Wrap(err, errGetCredentialsSecret)
-	}
+	kymaCreds := secret[v1alpha1.KymaEnvironmentBindingKey]
 
-	kubeconfigBytes := secret.Data[v1alpha1.KymaEnvironmentBindingKey]
-	if kubeconfigBytes == nil {
-		return nil, errors.New("kubeconfig not found in secret")
-	}
+	svc, err := c.newServiceFn(kymaCreds)
 
-	// Parse kubeconfig bytes into a rest.Config
-	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigBytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse kubeconfig")
-	}
-
-	// Create a dynamic client using the rest.Config
-	dynamicClient, err := dynamic.NewForConfig(restConfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create dynamic client")
-	}
-
-	svc := c.newServiceFn(dynamicClient)
 	return &external{
-			client:  kymamodule.NewKymaModuleClient(*svc),
+			client:  svc,
 			tracker: c.resourcetracker,
 			kube:    c.kube,
 		},
@@ -111,7 +89,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaModule)
 	}
 
-	res, err := c.client.GetModule(ctx, meta.GetExternalName(cr))
+	res, err := c.client.Observe(ctx, meta.GetExternalName(cr))
 
 	// Update the status of the resource
 	cr.Status.AtProvider = *res
@@ -134,7 +112,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotKymaModule)
 	}
 
-	err := c.client.EnableModule(ctx, cr.Spec.ForProvider.Name, *cr.Spec.ForProvider.Channel, *cr.Spec.ForProvider.CustomResourcePolicy)
+	err := c.client.Create(ctx, cr.Spec.ForProvider.Name, *cr.Spec.ForProvider.Channel, *cr.Spec.ForProvider.CustomResourcePolicy)
 	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
@@ -156,7 +134,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotKymaModule)
 	}
 
-	err := c.client.DisableModule(ctx, cr.Spec.ForProvider.Name)
+	err := c.client.Delete(ctx, cr.Spec.ForProvider.Name)
 
 	return err
 }

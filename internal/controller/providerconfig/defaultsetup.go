@@ -10,7 +10,6 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
 	"github.com/sap/crossplane-provider-btp/internal/features"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -26,50 +25,15 @@ type ConnectorFn func(
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error),
 ) managed.ExternalConnecter
 
-func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, kind string, gvk schema.GroupVersionKind, connectorFn ConnectorFn) error {
-	name := managed.ControllerName(kind)
-
-	referenceTracker := tracking.NewDefaultReferenceResolverTracker(
-		mgr.GetClient(),
-	)
-	usageTracker :=
-		resource.NewProviderConfigUsageTracker(
-			mgr.GetClient(),
-			&providerv1alpha1.ProviderConfigUsage{},
-		)
-	r := managed.NewReconciler(
-		mgr,
-		resource.ManagedKind(gvk),
-		managed.WithExternalConnecter(connectorFn(mgr.GetClient(), usageTracker, referenceTracker, btp.NewBTPClient)),
-		managed.WithLogger(o.Logger.WithValues("controller", name)),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
-		connectionPublishers(mgr, o),
-		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
-	)
-
-	return ctrl.NewControllerManagedBy(mgr).
-		Named(name).
-		WithOptions(o.ForControllerRuntime()).
-		For(object).
-		WithEventFilter(resource.DesiredStateChanged()).
-		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
-}
-
 type KymaModuleConnectorFn func(
 	kube client.Client,
 	usage resource.Tracker,
 	resourcetracker tracking.ReferenceResolverTracker,
-	newServiceFn func(dynamic dynamic.Interface) *kymamodule.KymaModuleClient,
+	newServiceFn func(kymaEnvironmentKubeconfig []byte) (*kymamodule.KymaModuleClient, error), // this is necessary to decouple KymaModules from the BTP client
 ) managed.ExternalConnecter
 
-func DefaultKymaModuleSetup(
-	mgr ctrl.Manager,
-	o controller.Options,
-	object client.Object,
-	kind string,
-	gvk schema.GroupVersionKind,
-	connectorFn KymaModuleConnectorFn,
-) error {
+// DefaultSetup supports the creation of a controller for a given managed resource type. Accepts any type that implements the ConnectorFn or KymaModuleConnectorFn signature.
+func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, kind string, gvk schema.GroupVersionKind, connectorFn any) error {
 	name := managed.ControllerName(kind)
 
 	referenceTracker := tracking.NewDefaultReferenceResolverTracker(
@@ -80,10 +44,21 @@ func DefaultKymaModuleSetup(
 			mgr.GetClient(),
 			&providerv1alpha1.ProviderConfigUsage{},
 		)
+
+	var externalConnector managed.ExternalConnecter
+
+	switch fn := connectorFn.(type) {
+	case ConnectorFn:
+		externalConnector = fn(mgr.GetClient(), usageTracker, referenceTracker, btp.NewBTPClient)
+	case KymaModuleConnectorFn:
+		externalConnector = fn(mgr.GetClient(), usageTracker, referenceTracker, kymamodule.NewKymaModuleClient)
+
+	}
+
 	r := managed.NewReconciler(
 		mgr,
 		resource.ManagedKind(gvk),
-		managed.WithExternalConnecter(connectorFn(mgr.GetClient(), usageTracker, referenceTracker, kymamodule.NewKymaModuleClient)),
+		managed.WithExternalConnecter(externalConnector),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 		connectionPublishers(mgr, o),
