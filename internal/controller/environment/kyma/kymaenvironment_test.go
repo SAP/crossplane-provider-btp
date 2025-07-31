@@ -277,10 +277,11 @@ func TestObserve(t *testing.T) {
 			want: want{
 				o: managed.ExternalObservation{
 					ResourceExists:   true,
-					ResourceUpToDate: true,
+					ResourceUpToDate: false,
 				},
-				err: nil,
-				cr:  environment(withConditions(xpv1.Available())),
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           nil,
+				cr:            environment(withConditions(xpv1.Available())),
 			},
 		},
 		"Update with Json Parameters": {
@@ -429,10 +430,11 @@ func TestObserve(t *testing.T) {
 			want: want{
 				o: managed.ExternalObservation{
 					ResourceExists:   true,
-					ResourceUpToDate: true,
+					ResourceUpToDate: false,
 				},
-				err: nil,
-				cr:  environment(withConditions(xpv1.Deleting())),
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           nil,
+				cr:            environment(withConditions(xpv1.Deleting())),
 			},
 		},
 		"Creating": {
@@ -447,10 +449,11 @@ func TestObserve(t *testing.T) {
 			want: want{
 				o: managed.ExternalObservation{
 					ResourceExists:   true,
-					ResourceUpToDate: true,
+					ResourceUpToDate: false,
 				},
-				err: nil,
-				cr:  environment(withConditions(xpv1.Creating())),
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           nil,
+				cr:            environment(withConditions(xpv1.Creating())),
 			},
 		},
 		"CircuitBreakerOn": {
