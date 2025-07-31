@@ -2,7 +2,7 @@ module github.com/sap/crossplane-provider-btp
 
 go 1.23.0
 
-toolchain go1.24.1
+toolchain go1.24.5
 
 require (
 	dario.cat/mergo v1.0.1
