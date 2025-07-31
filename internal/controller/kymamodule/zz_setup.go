@@ -8,7 +8,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
-	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -16,13 +15,10 @@ import (
 
 // Setup adds a controller that reconciles KymaModule managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	return providerconfig.KymaSetup(mgr, o, &v1alpha1.KymaModule{}, v1alpha1.KymaModuleKind, v1alpha1.KymaModuleGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker, newServiceFn func(kymaEnvironmentKubeconfig []byte) (*kymamodule.KymaModuleClient, error)) managed.ExternalConnecter {
+	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.KymaModule{}, v1alpha1.KymaModuleKind, v1alpha1.KymaModuleGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 		return &connector{
-			kube: mgr.GetClient(),
-			usage: resource.NewProviderConfigUsageTracker(
-				mgr.GetClient(),
-				&providerv1alpha1.ProviderConfigUsage{},
-			),
+			kube:            kube,
+			usage:           usage,
 			newServiceFn:    kymamodule.NewKymaModuleClient,
 			resourcetracker: resourcetracker,
 		}
