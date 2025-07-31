@@ -114,7 +114,7 @@ func (c KymaModuleClient) updateDefaultKyma(ctx context.Context, obj *v1alpha1.K
 	err = c.kube.Update(
 		ctx,
 		&unstructured.Unstructured{Object: u},
-		nil,
+		&client.UpdateOptions{},
 	)
 
 	return err

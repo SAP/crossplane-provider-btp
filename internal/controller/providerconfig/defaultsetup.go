@@ -29,11 +29,10 @@ type KymaModuleConnectorFn func(
 	kube client.Client,
 	usage resource.Tracker,
 	resourcetracker tracking.ReferenceResolverTracker,
-	newServiceFn func(kymaEnvironmentKubeconfig []byte) (*kymamodule.KymaModuleClient, error), // this is necessary to decouple KymaModules from the BTP client
+	newServiceFn func(kymaEnvironmentKubeconfig []byte) (*kymamodule.KymaModuleClient, error),
 ) managed.ExternalConnecter
 
-// DefaultSetup supports the creation of a controller for a given managed resource type. Accepts any type that implements the ConnectorFn or KymaModuleConnectorFn signature.
-func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, kind string, gvk schema.GroupVersionKind, connectorFn any) error {
+func KymaSetup(mgr ctrl.Manager, o controller.Options, object client.Object, kind string, gvk schema.GroupVersionKind, connectorFn KymaModuleConnectorFn) error {
 	name := managed.ControllerName(kind)
 
 	referenceTracker := tracking.NewDefaultReferenceResolverTracker(
@@ -45,20 +44,40 @@ func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, 
 			&providerv1alpha1.ProviderConfigUsage{},
 		)
 
-	var externalConnector managed.ExternalConnecter
+	r := managed.NewReconciler(
+		mgr,
+		resource.ManagedKind(gvk),
+		managed.WithExternalConnecter(connectorFn(mgr.GetClient(), usageTracker, referenceTracker, kymamodule.NewKymaModuleClient)),
+		managed.WithLogger(o.Logger.WithValues("controller", name)),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		connectionPublishers(mgr, o),
+		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
+	)
 
-	switch fn := connectorFn.(type) {
-	case ConnectorFn:
-		externalConnector = fn(mgr.GetClient(), usageTracker, referenceTracker, btp.NewBTPClient)
-	case KymaModuleConnectorFn:
-		externalConnector = fn(mgr.GetClient(), usageTracker, referenceTracker, kymamodule.NewKymaModuleClient)
+	return ctrl.NewControllerManagedBy(mgr).
+		Named(name).
+		WithOptions(o.ForControllerRuntime()).
+		For(object).
+		WithEventFilter(resource.DesiredStateChanged()).
+		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
+}
 
-	}
+func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, kind string, gvk schema.GroupVersionKind, connectorFn ConnectorFn) error {
+	name := managed.ControllerName(kind)
+
+	referenceTracker := tracking.NewDefaultReferenceResolverTracker(
+		mgr.GetClient(),
+	)
+	usageTracker :=
+		resource.NewProviderConfigUsageTracker(
+			mgr.GetClient(),
+			&providerv1alpha1.ProviderConfigUsage{},
+		)
 
 	r := managed.NewReconciler(
 		mgr,
 		resource.ManagedKind(gvk),
-		managed.WithExternalConnecter(externalConnector),
+		managed.WithExternalConnecter(connectorFn(mgr.GetClient(), usageTracker, referenceTracker, btp.NewBTPClient)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 		connectionPublishers(mgr, o),

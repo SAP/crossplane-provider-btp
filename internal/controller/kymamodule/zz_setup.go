@@ -16,7 +16,7 @@ import (
 
 // Setup adds a controller that reconciles KymaModule managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.KymaModule{}, v1alpha1.KymaModuleKind, v1alpha1.KymaModuleGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker, newServiceFn func(kymaEnvironmentKubeconfig []byte) (*kymamodule.KymaModuleClient, error)) managed.ExternalConnecter {
+	return providerconfig.KymaSetup(mgr, o, &v1alpha1.KymaModule{}, v1alpha1.KymaModuleKind, v1alpha1.KymaModuleGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker, newServiceFn func(kymaEnvironmentKubeconfig []byte) (*kymamodule.KymaModuleClient, error)) managed.ExternalConnecter {
 		return &connector{
 			kube: mgr.GetClient(),
 			usage: resource.NewProviderConfigUsageTracker(

@@ -91,11 +91,14 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	res, err := c.client.Observe(ctx, meta.GetExternalName(cr))
 
-	// Update the status of the resource
-	cr.Status.AtProvider = *res
-
 	if err != nil {
 		return managed.ExternalObservation{}, err
+	}
+
+	if res == nil {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
 	}
 
 	cr.Status.SetConditions(xpv1.Available())
@@ -112,12 +115,13 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotKymaModule)
 	}
 
+	cr.Status.SetConditions(xpv1.Creating())
+
 	err := c.client.Create(ctx, cr.Spec.ForProvider.Name, *cr.Spec.ForProvider.Channel, *cr.Spec.ForProvider.CustomResourcePolicy)
 	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
 
-	// Enables importing existing modules by setting the external name
 	meta.SetExternalName(cr, cr.Spec.ForProvider.Name)
 
 	return managed.ExternalCreation{}, nil
