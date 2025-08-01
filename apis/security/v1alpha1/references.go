@@ -21,7 +21,7 @@ type XSUAACredentialsReference struct {
 	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredential
 	// +crossplane:generate:reference:refFieldName=SubaccountApiCredentialRef
 	// +crossplane:generate:reference:selectorFieldName=SubaccountApiCredentialSelector
-	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredentialSecretSecretNamespace()
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredentialSecretNamespace()
 	SubaccountApiCredentialSecretNamespace string `json:"subaccountApiCredentialSecretNamespace,omitempty"`
 }
 

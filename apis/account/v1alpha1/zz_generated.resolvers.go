@@ -412,7 +412,7 @@ func (mg *Subscription) ResolveReferences(ctx context.Context, c client.Reader) 
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSecretNamespace,
-		Extract:      CloudManagementSecretSecretNamespace(),
+		Extract:      CloudManagementSecretNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
