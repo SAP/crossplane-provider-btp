@@ -89,7 +89,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaModule)
 	}
 
-	res, err := c.client.Observe(ctx, meta.GetExternalName(cr))
+	res, err := c.client.ObserveModule(ctx, cr)
 
 	if err != nil {
 		return managed.ExternalObservation{}, err
@@ -117,7 +117,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.Status.SetConditions(xpv1.Creating())
 
-	err := c.client.Create(ctx, cr.Spec.ForProvider.Name, *cr.Spec.ForProvider.Channel, *cr.Spec.ForProvider.CustomResourcePolicy)
+	err := c.client.CreateModule(ctx, cr.Spec.ForProvider.Name, *cr.Spec.ForProvider.Channel, *cr.Spec.ForProvider.CustomResourcePolicy)
 	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
@@ -138,7 +138,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotKymaModule)
 	}
 
-	err := c.client.Delete(ctx, cr.Spec.ForProvider.Name)
+	err := c.client.DeleteModule(ctx, cr.Spec.ForProvider.Name)
 
 	return err
 }
