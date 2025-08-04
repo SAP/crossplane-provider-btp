@@ -58,7 +58,7 @@ jobs:
       - name: Set up Version
         if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
         run: |
-          echo "BUILD_IMAGE_VERSION=draft-${{ github.event.issue.number }}" >> $GITHUB_ENV
+          echo "BUILD_IMAGE_VERSION=v0.0.0-draft-${{ github.event.issue.number }}" >> $GITHUB_ENV
           echo "version is $BUILD_IMAGE_VERSION"
       - name: Build Images
         if:  github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
