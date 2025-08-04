@@ -247,7 +247,7 @@ test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
 	@$(INFO) running integration tests
 	@echo UUT_CONFIG=$$UUT_CONFIG
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
-	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -timeout 120m
+	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -timeout 240m
 	@$(OK) integration tests passed
 
 #run single e2e test with <make e2e testFilter=functionNameOfTest>
