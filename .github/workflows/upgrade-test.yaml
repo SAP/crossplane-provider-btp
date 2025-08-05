@@ -18,9 +18,10 @@ on:
         required: true
         default: "v1.1.0"
 
-  issue_comment:
-    types:
-      - created
+  # disabled for better authoration added, only certain people should be able to trigger this 
+  # issue_comment:
+  #   types:
+  #     - created
   
 
 jobs:
