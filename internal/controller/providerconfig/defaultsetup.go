@@ -41,6 +41,7 @@ func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, 
 		managed.WithExternalConnecter(connectorFn(mgr.GetClient(), usageTracker, referenceTracker, btp.NewBTPClient)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		managed.WithPollInterval(o.PollInterval),
 		connectionPublishers(mgr, o),
 		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
 	)
