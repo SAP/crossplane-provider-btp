@@ -2,14 +2,14 @@ apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: Subaccount
 metadata:
   namespace: default
-  name:  kyma-test-subaccount
+  name: kyma-test-subaccount
 spec:
   forProvider:
     displayName: "$BUILD_ID-Created while test: Kyma Environment setup"
     labels:
       safe-to-delete: ["yes"]
-      BUILD_ID: [ "$BUILD_ID" ]
-    region: eu10
+      BUILD_ID: ["$BUILD_ID"]
+    region: eu20
     subdomain: $BUILD_ID-co-e2e-test-kyma-case
     subaccountAdmins:
       - $TECHNICAL_USER_EMAIL

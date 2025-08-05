@@ -5,8 +5,9 @@ metadata:
   namespace: default
 spec:
   forProvider:
-    planName: aws
+    planName: azure
     parameters:
+      region: westeurope
       administrators:
         - $TECHNICAL_USER_EMAIL
   subaccountRef:
