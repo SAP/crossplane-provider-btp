@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	KymaEnvironmentBindingKey = "kubeconfig"
+	KymaEnvironmentBindingKey           = "kubeconfig"
+	KymaEnvironmentBindingExpirationKey = "expires_at"
 )
 
 // KymaModuleParameters are the configurable fields of a KymaModule.
