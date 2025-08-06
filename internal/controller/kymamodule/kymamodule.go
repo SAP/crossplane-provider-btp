@@ -19,13 +19,9 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
-const (
+var (
 	errNotKymaModule        = "managed resource is not a KymaModule custom resource"
 	errTrackPCUsage         = "cannot track ProviderConfig usage"
-	errGetPC                = "cannot get ProviderConfig"
-	errGetCreds             = "cannot get credentials"
-	errExtractSecretKey     = "no KymaEnvironmentBinding secret found"
-	errGetCredentialsSecret = "could not get kubeconfig from KymaEnvironmentBinding secret"
 	errTrackRUsage          = "cannot track ResourceUsage"
 	errObserveResource      = "cannot observe KymaModule"
 	errCredentialsCorrupted = "secret credentials data not in the expected format"
@@ -97,13 +93,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	err := c.fetchRotatingSecret(cr, ctx)
 
 	if err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
 	}
 
 	res, err := c.client.ObserveModule(ctx, cr)
 
 	if err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
 	}
 
 	if res == nil {
@@ -164,49 +160,49 @@ func (c *external) fetchRotatingSecret(cr *v1alpha1.KymaModule, ctx context.Cont
 	}
 
 	// Check if the secret contains valid kubeconfig data that is not expired
-	isValid, kymaCreds, err := getValidKubeconfig(secret)
+	kymaCreds, err := getKubeconfig(secret)
 
-	// If the kubeconfig is not valid we wait for the secret to be updated
-	// If the kymaCreds are empty, we asume the secret is corrupted
-	// If the parsing fails we return an error
-	if !isValid {
-		return nil
-	}
-	if len(kymaCreds) == 0 {
-		return errors.New(errGetCredentialsSecret)
-	}
 	if err != nil {
 		return err
 	}
 
-	// Generate a new KymaModuleClient with the kubeconfig from the secret
-	client, err := kymamodule.NewKymaModuleClient(kymaCreds)
-	if err != nil {
-		return errors.Wrap(err, errFailedCreateClient)
+	// Renews the client if kymaCreds are provided
+	if kymaCreds != nil {
+		client, err := kymamodule.NewKymaModuleClient(kymaCreds)
+		if err != nil {
+			return errors.Wrap(err, errFailedCreateClient)
+		}
+
+		c.client = client
 	}
 
-	// Set the new client to the external client
-	c.client = client
 	return nil
 }
 
-// getValidKubeconfig checks if the secret contains valid kubeconfig data and is not expired
-func getValidKubeconfig(secret map[string][]byte) (bool, []byte, error) {
+// getKubeconfig checks if the secret contains valid kubeconfig data and is not expired
+func getKubeconfig(secret map[string][]byte) ([]byte, error) {
 
-	// Check expiration if present
 	expirationBytes := secret[v1alpha1.KymaEnvironmentBindingExpirationKey]
+	if len(expirationBytes) == 0 {
+		// No expiration time found
+		return nil, errors.New(errCredentialsCorrupted)
+	}
+
 	expiration, err := time.Parse(kymaExpirationLayout, string(expirationBytes))
 	if err != nil {
 		// Parsing has failed
-		return false, nil, errors.Wrap(err, errTimeParser)
+		return nil, errors.New(errTimeParser)
 	}
 	if expiration.Before(time.Now()) {
 		// Secret has expired
-		return false, nil, nil
+		return nil, nil
 	}
 
-	// Get credentials
 	creds := secret[v1alpha1.KymaEnvironmentBindingKey]
+	if len(creds) == 0 {
+		// No kubeconfig data found
+		return nil, errors.New(errCredentialsCorrupted)
+	}
 
-	return true, creds, nil
+	return creds, nil
 }
