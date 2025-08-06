@@ -65,7 +65,7 @@ func WithHttpClient(client *http.Client) Option {
 // The debug client uses the default http.Client if no client is set with the WithHttpClient option, otherwise the set client is used and the Transport RoundTripper wrapped.
 func DebugPrintHTTPClient(opts ...Option) *http.Client {
 	debugClient := &debugHttpClient{
-		client: http.DefaultClient,
+		client: &http.Client{},
 	}
 
 	for _, applyOpt := range opts {
@@ -73,13 +73,14 @@ func DebugPrintHTTPClient(opts ...Option) *http.Client {
 	}
 
 	//Set Own RoundTripper Interceptor with RoundTripper from client in case it is set
-	var transport http.RoundTripper
-	if debugClient.client.Transport != nil {
-		transport = debugClient.client.Transport
+
+	if debugClient.client.Transport == nil {
+		// If no Transport is set, we wrap the default transport in our RoundTripDebugger.
+		debugClient.client.Transport = &RoundTripDebugger{base: http.DefaultTransport}
 	} else {
-		transport = http.DefaultTransport
+		// otherwise, we wrap the existing Transport in our RoundTripDebugger.
+		debugClient.client.Transport = &RoundTripDebugger{base: debugClient.client.Transport}
 	}
-	debugClient.client.Transport = &RoundTripDebugger{base: transport}
 
 	return debugClient.client
 }
@@ -111,6 +112,7 @@ func constructRequestLogMessage(req *http.Request) []any {
 	method := req.Method
 	host := req.URL.Host
 	path := req.URL.Path
+	parameters := req.URL.Query().Encode()
 
 	var bodyCopy io.ReadCloser
 	var err error
@@ -120,7 +122,7 @@ func constructRequestLogMessage(req *http.Request) []any {
 	}
 	bodyBytes, _ := io.ReadAll(bodyCopy)
 	bodyRedacted := string(redactJwtTokensFromBody(redactSensitiveBodyBasedOnKeywords(bodyBytes)))
-	return []any{"proto", proto, "host", host, "method", method, "path", path, "headers", fmt.Sprintf("%v\n", redactedHeader), "body", bodyRedacted}
+	return []any{"type", "REQUEST", "proto", proto, "host", host, "method", method, "path", path, "parameters", parameters, "headers", fmt.Sprintf("%v", redactedHeader), "body", bodyRedacted}
 }
 
 func constructResponseLogMessage(resp *http.Response) []any {
@@ -139,7 +141,7 @@ func constructResponseLogMessage(resp *http.Response) []any {
 	}
 	bodyBytes, _ := io.ReadAll(bodyCopy)
 	bodyRedacted := string(redactJwtTokensFromBody(redactSensitiveBodyBasedOnKeywords(bodyBytes)))
-	return []any{"proto", proto, "status", status, "headers", fmt.Sprintf("%v\n", redactedHeader), "body", bodyRedacted}
+	return []any{"type", "RESPONSE", "proto", proto, "status", status, "headers", fmt.Sprintf("%v", redactedHeader), "body", bodyRedacted}
 }
 
 // redactSensitiveBodyBasedOnKeywords redacts the whole body if certain keywords are present.

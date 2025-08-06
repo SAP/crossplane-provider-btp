@@ -18,9 +18,10 @@ on:
         required: true
         default: "v1.1.0"
 
-  issue_comment:
-    types:
-      - created
+  # disabled for better authoration added, only certain people should be able to trigger this 
+  # issue_comment:
+  #   types:
+  #     - created
   
 
 jobs:
@@ -47,7 +48,7 @@ jobs:
 
       - name: Set up Go
         if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
-        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: '1.21'
 
@@ -124,7 +125,7 @@ jobs:
         run: |
           cd provider-upgrade-test
           echo "Running upgrade test..."
-          REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${to_test_source}" --target ${REGISTRY}:${to_test_target} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
+          REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${{ github.event.inputs.source }}" --target ${REGISTRY}:${{ github.event.inputs.target }} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
         env: 
           CLIENT_ID: ${{ secrets.UPGRADE_TEST_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.UPGRADE_TEST_CLIENT_SECRET }}
