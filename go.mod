@@ -6,6 +6,7 @@ toolchain go1.24.1
 
 require (
 	dario.cat/mergo v1.0.1
+	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.9
 	github.com/crossplane-contrib/xp-testing v1.3.4
 	github.com/crossplane/crossplane-runtime v1.15.1
@@ -27,7 +28,6 @@ require (
 	golang.org/x/net v0.39.0
 	golang.org/x/oauth2 v0.27.0
 	golang.org/x/sync v0.13.0
-	gopkg.in/alecthomas/kingpin.v2 v2.4.0
 	gopkg.in/validator.v2 v2.0.1
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.29.1
@@ -45,6 +45,7 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
+	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/antchfx/htmlquery v1.2.4 // indirect
 	github.com/antchfx/xpath v1.2.0 // indirect
@@ -174,6 +175,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect
 	google.golang.org/grpc v1.61.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
+	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apiextensions-apiserver v0.29.1 // indirect
@@ -182,5 +184,3 @@ require (
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
-
-replace gopkg.in/alecthomas/kingpin.v2 => github.com/alecthomas/kingpin/v2 v2.4.0
