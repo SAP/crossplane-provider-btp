@@ -4,7 +4,7 @@ import (
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -99,11 +99,11 @@ type KymaStatus struct {
 
 // ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/types.go#L125
 type ModuleStatus struct {
-	Name     string                    `json:"name"`
-	Channel  string                    `json:"channel,omitempty"`
-	Version  string                    `json:"version,omitempty"`
-	State    string                    `json:"state,omitempty"`
-	Template unstructured.Unstructured `json:"template,omitempty"`
+	Name     string               `json:"name"`
+	Channel  string               `json:"channel,omitempty"`
+	Version  string               `json:"version,omitempty"`
+	State    string               `json:"state,omitempty"`
+	Template runtime.RawExtension `json:"template,omitempty"`
 }
 
 // +kubebuilder:object:root=true
