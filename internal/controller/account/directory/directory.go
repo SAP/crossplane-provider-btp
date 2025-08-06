@@ -61,6 +61,12 @@ type external struct {
 	tracker tracking.ReferenceResolverTracker
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.Directory)
 	if !ok {
@@ -144,15 +150,15 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.Directory)
 	if !ok {
-		return errors.New(errNotDirectory)
+		return managed.ExternalDelete{}, errors.New(errNotDirectory)
 	}
 
 	cr.SetConditions(xpv1.Deleting())
 
-	return c.handler(cr).DeleteDirectory(ctx)
+	return managed.ExternalDelete{}, c.handler(cr).DeleteDirectory(ctx)
 }
 
 func (c *external) handler(cr *v1alpha1.Directory) directory.DirectoryClientI {

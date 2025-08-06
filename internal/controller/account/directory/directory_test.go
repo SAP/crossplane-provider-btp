@@ -488,7 +488,7 @@ func TestDelete(t *testing.T) {
 				tracker: nil,
 				kube:    &mockKube,
 			}
-			err := ctrl.Delete(context.Background(), tc.args.cr)
+			_, err := ctrl.Delete(context.Background(), tc.args.cr)
 
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\ne.Delete(...): -want error, +got error:\n%s\n", tc.reason, diff)
