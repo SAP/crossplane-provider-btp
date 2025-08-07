@@ -42,7 +42,7 @@ func waitForResource(res k8s.Object, cfg *envconf.Config, t *testing.T, opts ...
 		condition := d.GetCondition(xpv1.Available().Type)
 		result := condition.Status == v1.ConditionTrue
 		klog.V(4).Infof(
-			"Checking %s on %s. result=%v",
+			"Checking %s on %v. result=%v",
 			resources.Identifier(res),
 			condition,
 			condition.Status == v1.ConditionTrue,
