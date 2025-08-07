@@ -88,6 +88,7 @@ func SetupClusterWithCrossplane(namespace string) {
 		Spec: vendored.DeploymentRuntimeConfigSpec{
 			DeploymentTemplate: &vendored.DeploymentTemplate{
 				Spec: &appsv1.DeploymentSpec{
+					Selector: &metav1.LabelSelector{},
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
