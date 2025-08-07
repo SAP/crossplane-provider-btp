@@ -295,7 +295,7 @@ func checkNoResourceUsagesExist(t *testing.T) func(
 		if err != nil {
 			return err
 		}
-		if diff := cmp.Diff(list.Items, []providerv1alpha1.ResourceUsage(nil)); diff != "" {
+		if diff := cmp.Diff(list.Items, []providerv1alpha1.ResourceUsage{}); diff != "" {
 			t.Errorf("\n%s\ne.Track(...): -want, +got:\n%s\n", testname, diff)
 		}
 		return nil

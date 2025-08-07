@@ -17,18 +17,19 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
 
 	"github.com/pkg/errors"
+	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/vladimirvivien/gexe"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
-	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
-
-	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 
 var (
@@ -84,21 +85,35 @@ func SetupClusterWithCrossplane(namespace string) {
 	// Setup uses pre-defined funcs to create kind cluster
 	// and create a namespace for the environment
 
-	controllerConfig := vendored.ControllerConfig{
-		Spec: vendored.ControllerConfigSpec{
-			Args: []string{"--debug", "--sync=10s"},
+	deploymentRuntimeConfig := vendored.DeploymentRuntimeConfig{
+		Spec: vendored.DeploymentRuntimeConfigSpec{
+			DeploymentTemplate: &vendored.DeploymentTemplate{
+				Spec: &appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "package-runtime",
+									Args: []string{"--debug", "--sync=10s"},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
+
 	testenv.Setup(
 		envfuncs.CreateKindCluster(kindClusterName),
 		xpenvfuncs.Conditional(xpenvfuncs.InstallCrossplane(kindClusterName, xpenvfuncs.Registry(setup.DockerRegistry)), firstSetup),
 		xpenvfuncs.Conditional(
 			xpenvfuncs.InstallCrossplaneProvider(
 				kindClusterName, xpenvfuncs.InstallCrossplaneProviderOptions{
-					Name:             "btp-account",
-					Package:          uutConfig,
-					ControllerImage:  &uutController,
-					ControllerConfig: &controllerConfig,
+					Name:                    "btp-account",
+					Package:                 uutConfig,
+					ControllerImage:         &uutController,
+					DeploymentRuntimeConfig: &deploymentRuntimeConfig,
 				},
 			), firstSetup,
 		),
