@@ -82,6 +82,9 @@ func SetupClusterWithCrossplane(namespace string) {
 	// and create a namespace for the environment
 
 	deploymentRuntimeConfig := vendored.DeploymentRuntimeConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "btp-provider-runtime-config",
+		},
 		Spec: vendored.DeploymentRuntimeConfigSpec{
 			DeploymentTemplate: &vendored.DeploymentTemplate{
 				Spec: &appsv1.DeploymentSpec{
