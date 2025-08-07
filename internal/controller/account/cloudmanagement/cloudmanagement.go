@@ -159,6 +159,12 @@ type external struct {
 	tfClient cmclient.ITfClient
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*apisv1beta1.CloudManagement)
 	if !ok {
@@ -206,10 +212,10 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalUpdate{}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*apisv1beta1.CloudManagement)
 	if !ok {
-		return errors.New(errNotCloudManagement)
+		return managed.ExternalDelete{}, errors.New(errNotCloudManagement)
 	}
 
 	cr.SetConditions(xpv1.Deleting())
@@ -217,10 +223,10 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	c.tracker.SetConditions(ctx, cr)
 
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
-		return errors.New(providerv1alpha1.ErrResourceInUse)
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
-	return c.tfClient.DeleteResources(ctx, cr)
+	return managed.ExternalDelete{}, c.tfClient.DeleteResources(ctx, cr)
 }
 
 func (c *external) setStatus(ctx context.Context, status cmclient.ResourcesStatus, cr *apisv1beta1.CloudManagement) error {

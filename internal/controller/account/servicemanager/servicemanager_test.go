@@ -309,7 +309,7 @@ func TestDelete(t *testing.T) {
 				tracker:  test2.NoOpReferenceResolverTracker{},
 				tfClient: tc.args.tfClient,
 			}
-			err := uua.Delete(context.TODO(), tc.args.cr)
+			_, err := uua.Delete(context.TODO(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Delete(): -want error, +got error:\n%s\n", diff)
 			}

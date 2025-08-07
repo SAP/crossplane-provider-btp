@@ -6,9 +6,10 @@ package e2e
 
 import (
 	"context"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"testing"
 	"time"
+
+	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
@@ -40,7 +41,7 @@ func Test_DirectoryEntitlement_v1alpha1(t *testing.T) {
 	)
 	fB.Assess("create",
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			if err := resources.WaitForResourcesToBeSynced(ctx, cfg, resource.ResourceDirectory, wait.WithTimeout(time.Minute*7)); err != nil {
+			if err := resources.WaitForResourcesToBeSynced(ctx, cfg, resource.ResourceDirectory, nil, wait.WithTimeout(time.Minute*7)); err != nil {
 				resources.DumpManagedResources(ctx, t, cfg)
 				t.Fatal(err)
 			}

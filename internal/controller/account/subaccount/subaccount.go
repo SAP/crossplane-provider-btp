@@ -75,6 +75,12 @@ type external struct {
 	accountsAccessor AccountsApiAccessor
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	desiredCR, ok := mg.(*apisv1alpha1.Subaccount)
 	if !ok {
@@ -251,26 +257,26 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*apisv1alpha1.Subaccount)
 	if !ok {
-		return errors.New(errNotSubaccount)
+		return managed.ExternalDelete{}, errors.New(errNotSubaccount)
 	}
 
 	c.tracker.SetConditions(ctx, cr)
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
-		return errors.New(providerv1alpha1.ErrResourceInUse)
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
 	if cr.Status.AtProvider.Status != nil && *cr.Status.AtProvider.Status == subaccountStateDeleting {
-		return nil
+		return managed.ExternalDelete{}, nil
 	}
 
 	cr.SetConditions(xpv1.Deleting())
 
 	subaccount := cr
 
-	return deleteBTPSubaccount(ctx, subaccount, c.btp)
+	return managed.ExternalDelete{}, deleteBTPSubaccount(ctx, subaccount, c.btp)
 }
 
 func deleteBTPSubaccount(

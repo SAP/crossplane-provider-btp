@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: directories.account.btp.sap.crossplane.io
 spec:
   group: account.btp.sap.crossplane.io
@@ -101,7 +101,7 @@ spec:
                       for distribution to the subaccounts under this directory.\n-\t<b>AUTHORIZATIONS</b>:
                       (Optional) Allows you to assign users as administrators or viewers
                       of this directory. You must apply this feature in combination
-                      with the ENTITLEMENTS feature.\n\n\nIMPORTANT: Your multi-level
+                      with the ENTITLEMENTS feature.\n\nIMPORTANT: Your multi-level
                       account hierarchy can have more than one directory enabled with
                       user authorization and/or entitlement management; however, only
                       one directory in any directory path can have these features
@@ -205,7 +205,6 @@ spec:
                       JSON array of up to 10 user-defined labels to assign as key-value pairs to the directory. Each label has a name (key) that you specify, and to which you can assign up to 10 corresponding values or leave empty.
                       Keys and values are each limited to 63 characters.
                       Label keys and values are case-sensitive. Try to avoid creating duplicate variants of the same keys or values with a different casing (example: "myValue" and "MyValue").
-
 
                       Example:
                       {
@@ -437,6 +436,13 @@ spec:
                         A Message containing details about this condition's last transition from
                         one status to another, if any.
                       type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
                     reason:
                       description: A Reason for this condition's last transition from
                         one status to another.
@@ -460,6 +466,13 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the latest metadata.generation
+                  which resulted in either a ready state, or stalled due to error
+                  it can not recover from without human intervention.
+                format: int64
+                type: integer
             type: object
         required:
         - spec

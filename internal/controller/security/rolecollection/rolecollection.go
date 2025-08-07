@@ -96,6 +96,12 @@ type external struct {
 	client RoleCollectionMaintainer
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.RoleCollection)
 	if !ok {
@@ -169,19 +175,19 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.RoleCollection)
 	if !ok {
-		return errors.New(errNotRoleCollection)
+		return managed.ExternalDelete{}, errors.New(errNotRoleCollection)
 	}
 
 	cr.Status.SetConditions(xpv1.Deleting())
 
 	if err := c.client.Delete(ctx, meta.GetExternalName(cr)); err != nil {
-		return errors.Wrap(err, errDeleteRolecollection)
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRolecollection)
 	}
 
-	return nil
+	return managed.ExternalDelete{}, nil
 }
 
 // setObservation sets the observation within the CR

@@ -508,11 +508,17 @@ func (t *TfControllerMock) Create(ctx context.Context, mg resource.Managed) (man
 }
 
 // Delete implements managed.ExternalClient.
-func (t *TfControllerMock) Delete(ctx context.Context, mg resource.Managed) error {
+func (t *TfControllerMock) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	t.CalledWithMg = mg
 	if t.err != nil {
-		return t.err
+		return managed.ExternalDelete{}, t.err
 	}
+	return managed.ExternalDelete{}, nil
+}
+
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (t *TfControllerMock) Disconnect(ctx context.Context) error {
 	return nil
 }
 

@@ -987,7 +987,7 @@ func Test_external_Delete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &external{kube: test.NewMockClient(), client: tt.client}
-			err := c.Delete(tt.args.ctx, tt.args.mg)
+			_, err := c.Delete(tt.args.ctx, tt.args.mg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Delete() error = %v, wantErr %v", err, tt.wantErr)
 			}

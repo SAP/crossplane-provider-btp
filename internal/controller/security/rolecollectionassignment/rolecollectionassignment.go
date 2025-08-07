@@ -104,6 +104,12 @@ type external struct {
 	client RoleAssigner
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.RoleCollectionAssignment)
 	if !ok {
@@ -152,19 +158,19 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalUpdate{}, errors.New(errNotImplemented)
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.RoleCollectionAssignment)
 	if !ok {
-		return errors.New(errNotRoleCollectionAssignment)
+		return managed.ExternalDelete{}, errors.New(errNotRoleCollectionAssignment)
 	}
 
 	cr.Status.SetConditions(xpv1.Deleting())
 	err := c.client.RevokeRole(ctx, cr.Spec.ForProvider.Origin, IdentifierName(cr), cr.Spec.ForProvider.RoleCollectionName)
 	if err != nil {
-		return errors.Wrap(err, errRevokeRole)
+		return managed.ExternalDelete{}, errors.Wrap(err, errRevokeRole)
 	}
 
-	return nil
+	return managed.ExternalDelete{}, nil
 }
 
 // newService chooses one of the serviceCreation functions based on the type of the RoleCollectionAssignment

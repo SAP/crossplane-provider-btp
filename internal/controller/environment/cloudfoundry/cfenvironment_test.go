@@ -222,7 +222,7 @@ func TestCreate(t *testing.T) {
 		"Successful": {
 			args: args{
 				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
-					return "test-org",nil
+					return "test-org", nil
 				},
 				},
 				cr: environment(withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", EnvironmentName: "test-env"})),
@@ -230,10 +230,10 @@ func TestCreate(t *testing.T) {
 			want: want{
 				o:   managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}},
 				err: nil,
-				cr:  environment(withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", EnvironmentName: "test-env"}),
-								withAnnotaions(map[string]string{
-									"crossplane.io/external-name": "test-org",
-								}),),
+				cr: environment(withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", EnvironmentName: "test-env"}),
+					withAnnotaions(map[string]string{
+						"crossplane.io/external-name": "test-org",
+					})),
 			},
 		},
 	}
@@ -307,7 +307,7 @@ func TestDelete(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			e := external{client: tc.args.client}
-			err := e.Delete(context.Background(), tc.args.cr)
+			_, err := e.Delete(context.Background(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Observe(...): -want error, +got error:\n%s\n", diff)
 			}

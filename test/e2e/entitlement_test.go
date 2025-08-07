@@ -145,7 +145,7 @@ func waitForEntitlementResource(cfg *envconf.Config, t *testing.T, entitlementNa
 				condition := d.GetCondition(xpv1.Available().Type)
 				result := condition.Status == v1.ConditionTrue
 				klog.V(4).Infof(
-					"Checking %s on %s. result=%v",
+					"Checking %s on %v. result=%v",
 					resources.Identifier(d),
 					condition,
 					condition.Status == v1.ConditionTrue,

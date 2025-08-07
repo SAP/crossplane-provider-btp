@@ -78,6 +78,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	return &external{service: svc, kube: c.kube}, nil
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.CertBasedOIDCLogin)
 	if !ok {
@@ -161,14 +167,14 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.CertBasedOIDCLogin)
 	if !ok {
-		return errors.New(errNotCertBasedOIDCLogin)
+		return managed.ExternalDelete{}, errors.New(errNotCertBasedOIDCLogin)
 	}
 	cr.Status.SetConditions(xpv1.Deleting())
 
-	return cleanupPublishedTokens(ctx, cr, c.kube)
+	return managed.ExternalDelete{}, cleanupPublishedTokens(ctx, cr, c.kube)
 }
 
 func createCertLoginService(ctx context.Context, cr *v1alpha1.CertBasedOIDCLogin, cert []byte, pw string) (*oidc.CertLogin, error) {

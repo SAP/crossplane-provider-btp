@@ -1238,7 +1238,7 @@ func TestDelete(t *testing.T) {
 				},
 				tracker: tc.args.tracker,
 			}
-			err := ctrl.Delete(context.Background(), tc.args.cr)
+			_, err := ctrl.Delete(context.Background(), tc.args.cr)
 			if contained := testutils.ContainsError(err, tc.want.err); !contained {
 				t.Errorf("\n%s\ne.Delete(...): error \"%v\" not part of \"%v\"", tc.reason, err, tc.want.err)
 			}
