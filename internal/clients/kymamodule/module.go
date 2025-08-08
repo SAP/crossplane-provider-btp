@@ -107,7 +107,7 @@ func (c *KymaModuleClient) DeleteModule(ctx context.Context, moduleName string) 
 func getDefaultKyma(ctx context.Context, c *KymaModuleClient) (*KymaCr, error) {
 
 	// Note: This is a workaround to get the default Kyma CR.
-	// The Kyma CR is not registered in the scheme & no Crossplane CR, so we have to use unstructured.Unstructured to get it.
+	// The Kyma CR is not registered in the schema & no Crossplane CR, so we have to use unstructured.Unstructured to get it.
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(GVKKyma)
 	obj.SetName(DefaultKymaName)
