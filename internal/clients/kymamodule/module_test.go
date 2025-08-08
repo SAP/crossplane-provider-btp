@@ -7,7 +7,6 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
-	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,12 +15,12 @@ import (
 func TestGetDefaultKyma(t *testing.T) {
 
 	type args struct {
-		obj    *v1alpha1.KymaCr
+		obj    *KymaCr
 		client *KymaModuleClient
 	}
 
 	type want struct {
-		payload *v1alpha1.KymaCr
+		payload *KymaCr
 		err     error
 	}
 
@@ -31,7 +30,7 @@ func TestGetDefaultKyma(t *testing.T) {
 	}{
 		"Happy Path": {
 			args: args{
-				obj: kymaCr(withSpec(v1alpha1.KymaSpec{})),
+				obj: kymaCr(withSpec(KymaSpec{})),
 				client: &KymaModuleClient{
 					kube: &test.MockClient{MockGet: test.NewMockGetFn(nil)},
 				},
@@ -41,16 +40,16 @@ func TestGetDefaultKyma(t *testing.T) {
 				err:     nil,
 			},
 		},
-		"Boom!": {
+		"Api Not Available": {
 			args: args{
-				obj: kymaCr(withSpec(v1alpha1.KymaSpec{})),
+				obj: kymaCr(withSpec(KymaSpec{})),
 				client: &KymaModuleClient{
-					kube: &test.MockClient{MockGet: test.NewMockGetFn(errors.New("BOOM"))},
+					kube: &test.MockClient{MockGet: test.NewMockGetFn(errors.New("CRASH"))},
 				},
 			},
 			want: want{
 				payload: nil,
-				err:     errors.New("BOOM"),
+				err:     errors.New("CRASH"),
 			},
 		},
 	}
@@ -59,7 +58,7 @@ func TestGetDefaultKyma(t *testing.T) {
 		t.Run(
 			name, func(t *testing.T) {
 
-				kymaCR, err := getDefaultKyma(context.TODO(), tc.args.client)
+				kymaCR, err := getDefaultKyma(context.Background(), tc.args.client)
 
 				if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 					t.Errorf("\nKymaModuleClient\n.getDefaultKyma(...): -want error, +got error:\n%s\n", diff)
@@ -74,10 +73,10 @@ func TestGetDefaultKyma(t *testing.T) {
 
 }
 
-type kymaModifier func(kymaModule *v1alpha1.KymaCr)
+type kymaModifier func(kymaModule *KymaCr)
 
-func kymaCr(m ...kymaModifier) *v1alpha1.KymaCr {
-	cr := &v1alpha1.KymaCr{
+func kymaCr(m ...kymaModifier) *KymaCr {
+	cr := &KymaCr{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultKymaName,
 			Namespace: DefaultKymaNamespace,
@@ -90,13 +89,13 @@ func kymaCr(m ...kymaModifier) *v1alpha1.KymaCr {
 }
 
 func withGVK(gvk schema.GroupVersionKind) kymaModifier {
-	return func(r *v1alpha1.KymaCr) {
+	return func(r *KymaCr) {
 		r.SetGroupVersionKind(gvk)
 	}
 }
 
-func withSpec(spec v1alpha1.KymaSpec) kymaModifier {
-	return func(r *v1alpha1.KymaCr) {
+func withSpec(spec KymaSpec) kymaModifier {
+	return func(r *KymaCr) {
 		r.Spec = spec
 	}
 }

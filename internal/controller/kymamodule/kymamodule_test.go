@@ -5,9 +5,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -21,8 +19,10 @@ import (
 func TestObserve(t *testing.T) {
 
 	type args struct {
-		cr     resource.Managed
-		client kymamodule.Client
+		cr            resource.Managed
+		client        kymamodule.Client
+		secretfetcher SecretFetcherInterface
+		newService    func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error)
 	}
 
 	type want struct {
@@ -32,9 +32,8 @@ func TestObserve(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		args       args
-		want       want
-		secretData map[string][]byte
+		args args
+		want want
 	}{
 		"Happy Path": {
 			args: args{
@@ -42,13 +41,18 @@ func TestObserve(t *testing.T) {
 				client: &fake.MockKymaModuleClient{MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
 					return &v1alpha1.ModuleStatus{}, nil
 				}},
+				newService: func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error) {
+					return nil, nil
+				},
+				secretfetcher: &fake.MockSecretFetcher{MockFetchSecret: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+					return []byte("VALID KUBECONFIG"), nil
+				}},
 			},
 			want: want{
 				cr:  module(),
 				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
 				err: nil,
 			},
-			secretData: expiredSecretData(),
 		},
 		"Needs Creation": {
 			args: args{
@@ -56,40 +60,64 @@ func TestObserve(t *testing.T) {
 				client: &fake.MockKymaModuleClient{MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
 					return nil, nil
 				}},
+				newService: func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error) {
+					return nil, nil
+				},
+				secretfetcher: &fake.MockSecretFetcher{MockFetchSecret: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+					return []byte("VALID KUBECONFIG"), nil
+				}},
 			},
 			want: want{
 				cr:  module(),
 				obs: managed.ExternalObservation{ResourceExists: false},
 				err: nil,
 			},
-			secretData: expiredSecretData(),
 		},
-		"Boom!": {
+		"Api Not Available": {
 			args: args{
 				cr: module(),
 				client: &fake.MockKymaModuleClient{MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
-					return nil, errors.New("BOOM")
+					return nil, errors.New("CRASH")
+				}},
+				newService: func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error) {
+					return nil, nil
+				},
+				secretfetcher: &fake.MockSecretFetcher{MockFetchSecret: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+					return []byte("VALID KUBECONFIG"), nil
 				}},
 			},
 			want: want{
 				cr:  module(),
 				obs: managed.ExternalObservation{},
-				err: errors.Wrap(errors.New("BOOM"), errObserveResource),
+				err: errors.Wrap(errors.New("CRASH"), errObserveResource),
 			},
-			secretData: expiredSecretData(),
+		},
+		"Re-create client in Observe": {
+			args: args{
+				cr:     module(),
+				client: nil,
+				newService: func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error) {
+					return &fake.MockKymaModuleClient{MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
+						return &v1alpha1.ModuleStatus{}, nil
+					}}, nil
+				},
+				secretfetcher: &fake.MockSecretFetcher{MockFetchSecret: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+					return []byte("VALID KUBECONFIG"), nil
+				}},
+			},
+			want: want{
+				cr:  module(),
+				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+			},
 		},
 	}
-
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			mockGet := func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
-				secret, _ := obj.(*corev1.Secret)
-				secret.Data = tc.secretData
-				return nil
-			}
 			e := external{
-				client: tc.args.client,
-				kube:   &test.MockClient{MockGet: mockGet},
+				client:        tc.args.client,
+				secretfetcher: tc.args.secretfetcher,
+				newServiceFn:  tc.args.newService,
 			}
 			got, err := e.Observe(context.Background(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
@@ -131,17 +159,17 @@ func TestCreate(t *testing.T) {
 				err: nil,
 			},
 		},
-		"Boom!": {
+		"Api Not Available": {
 			args: args{
 				cr: module(),
 				client: &fake.MockKymaModuleClient{MockCreate: func(moduleName string, moduleChannel string, customResourcePolicy string) error {
-					return errors.New("BOOM")
+					return errors.New("CRASH")
 				}},
 			},
 			want: want{
 				cr:  module(),
 				obs: managed.ExternalCreation{},
-				err: errors.New("BOOM"),
+				err: errors.New("CRASH"),
 			},
 		},
 	}
@@ -187,16 +215,16 @@ func TestDelete(t *testing.T) {
 				err: nil,
 			},
 		},
-		"Boom!": {
+		"Api Not Available": {
 			args: args{
 				cr: module(),
 				client: &fake.MockKymaModuleClient{MockDelete: func(moduleName string) error {
-					return errors.New("BOOM")
+					return errors.New("CRASH")
 				}},
 			},
 			want: want{
 				cr:  module(),
-				err: errors.New("BOOM"),
+				err: errors.New("CRASH"),
 			},
 		},
 	}
@@ -231,7 +259,10 @@ func TestGetKubeconfig(t *testing.T) {
 		{
 			name: "Happy Path",
 			args: args{
-				secret: validSecretData(),
+				secret: map[string][]byte{
+					v1alpha1.KymaEnvironmentBindingKey:           []byte("VALID KUBECONFIG DATA"),
+					v1alpha1.KymaEnvironmentBindingExpirationKey: []byte("9999-09-09 00:00:00 +0000 UTC"),
+				},
 			},
 			want: want{
 				wantErr:    nil,
@@ -241,7 +272,10 @@ func TestGetKubeconfig(t *testing.T) {
 		{
 			name: "Expired Secret",
 			args: args{
-				secret: expiredSecretData(),
+				secret: map[string][]byte{
+					v1alpha1.KymaEnvironmentBindingKey:           []byte("VALID KUBECONFIG DATA"),
+					v1alpha1.KymaEnvironmentBindingExpirationKey: []byte("2020-01-01 00:00:00 +0000 UTC"),
+				},
 			},
 			want: want{
 				wantErr:    nil,
@@ -315,20 +349,6 @@ func module(m ...moduleModifier) *v1alpha1.KymaModule {
 		f(cr)
 	}
 	return cr
-}
-
-func expiredSecretData() map[string][]byte {
-	return map[string][]byte{
-		v1alpha1.KymaEnvironmentBindingKey:           []byte("VALID KUBECONFIG DATA"),
-		v1alpha1.KymaEnvironmentBindingExpirationKey: []byte("2020-01-01 00:00:00 +0000 UTC"),
-	}
-}
-
-func validSecretData() map[string][]byte {
-	return map[string][]byte{
-		v1alpha1.KymaEnvironmentBindingKey:           []byte("VALID KUBECONFIG DATA"),
-		v1alpha1.KymaEnvironmentBindingExpirationKey: []byte("9999-09-09 00:00:00 +0000 UTC"),
-	}
 }
 
 func ptrString(s string) *string {

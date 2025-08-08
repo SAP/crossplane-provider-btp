@@ -43,8 +43,8 @@ var GVKKyma = schema.GroupVersionKind{
 	Kind:    "Kyma",
 }
 
-// Takes a Kubeconfig and creates a authenticated Kubernetes client
-func NewKymaModuleClient(kymaEnvironmentKubeconfig []byte) (*KymaModuleClient, error) {
+// Takes a Kubeconfig and creates an authenticated Kubernetes client
+func NewKymaModuleClient(kymaEnvironmentKubeconfig []byte) (Client, error) {
 	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kymaEnvironmentKubeconfig)
 	if err != nil {
 		return nil, errors.Wrap(err, errFailedParse)
@@ -104,7 +104,7 @@ func (c *KymaModuleClient) DeleteModule(ctx context.Context, moduleName string) 
 }
 
 // getDefaultKyma gets the default Kyma CR from the kyma-system namespace and cast it to the Kyma structure.
-func getDefaultKyma(ctx context.Context, c *KymaModuleClient) (*v1alpha1.KymaCr, error) {
+func getDefaultKyma(ctx context.Context, c *KymaModuleClient) (*KymaCr, error) {
 
 	// Note: This is a workaround to get the default Kyma CR.
 	// The Kyma CR is not registered in the scheme & no Crossplane CR, so we have to use unstructured.Unstructured to get it.
@@ -125,7 +125,7 @@ func getDefaultKyma(ctx context.Context, c *KymaModuleClient) (*v1alpha1.KymaCr,
 		return nil, err
 	}
 
-	mg := &v1alpha1.KymaCr{}
+	mg := &KymaCr{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, mg); err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func getDefaultKyma(ctx context.Context, c *KymaModuleClient) (*v1alpha1.KymaCr,
 
 // UpdateDefaultKyma updates the default Kyma CR from the kyma-system namespace based on the Kyma CR from arguments
 // adapted from https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/kyma.go#L169
-func updateDefaultKyma(ctx context.Context, c *KymaModuleClient, obj *v1alpha1.KymaCr) error {
+func updateDefaultKyma(ctx context.Context, c *KymaModuleClient, obj *KymaCr) error {
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func updateDefaultKyma(ctx context.Context, c *KymaModuleClient, obj *v1alpha1.K
 
 // Adds the specified module to the Kyma CR.
 // ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/kyma.go#L302
-func enableModule(kymaCR *v1alpha1.KymaCr, moduleName string, moduleChannel string, customResourcePolicy string) *v1alpha1.KymaCr {
+func enableModule(kymaCR *KymaCr, moduleName string, moduleChannel string, customResourcePolicy string) *KymaCr {
 	for i, m := range kymaCR.Spec.Modules {
 		if m.Name == moduleName {
 			// module already exists, update channel
@@ -162,7 +162,7 @@ func enableModule(kymaCR *v1alpha1.KymaCr, moduleName string, moduleChannel stri
 		}
 	}
 
-	kymaCR.Spec.Modules = append(kymaCR.Spec.Modules, v1alpha1.Module{
+	kymaCR.Spec.Modules = append(kymaCR.Spec.Modules, Module{
 		Name:                 moduleName,
 		Channel:              moduleChannel,
 		CustomResourcePolicy: customResourcePolicy,
@@ -173,8 +173,8 @@ func enableModule(kymaCR *v1alpha1.KymaCr, moduleName string, moduleChannel stri
 
 // Removes the specified module from the Kyma CR.
 // ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/kyma.go#L321
-func disableModule(kymaCR *v1alpha1.KymaCr, moduleName string) *v1alpha1.KymaCr {
-	kymaCR.Spec.Modules = slices.DeleteFunc(kymaCR.Spec.Modules, func(m v1alpha1.Module) bool {
+func disableModule(kymaCR *KymaCr, moduleName string) *KymaCr {
+	kymaCR.Spec.Modules = slices.DeleteFunc(kymaCR.Spec.Modules, func(m Module) bool {
 		return m.Name == moduleName
 	})
 
