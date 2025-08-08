@@ -88,8 +88,8 @@ func CloudManagementSecret() reference.ExtractValueFn {
 	}
 }
 
-// CloudManagementSecretSecretNamespace extracts the Reference of a cis instance to the namespace of secret
-func CloudManagementSecretSecretNamespace() reference.ExtractValueFn {
+// CloudManagementSecretNamespace extracts the Reference of a cis instance to the namespace of secret
+func CloudManagementSecretNamespace() reference.ExtractValueFn {
 	return func(mg resource.Managed) string {
 		sg, ok := mg.(*CloudManagement)
 		if !ok {

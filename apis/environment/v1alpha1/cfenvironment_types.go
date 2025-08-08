@@ -98,7 +98,7 @@ type CfEnvironmentSpec struct {
 	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.CloudManagement
 	// +crossplane:generate:reference:refFieldName=CloudManagementRef
 	// +crossplane:generate:reference:selectorFieldName=CloudManagementSelector
-	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.CloudManagementSecretSecretNamespace()
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.CloudManagementSecretNamespace()
 	CloudManagementSecretNamespace string `json:"cloudManagementSecretNamespace,omitempty"`
 	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.CloudManagement
 	// +crossplane:generate:reference:refFieldName=CloudManagementRef

@@ -5,10 +5,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 )
 
-// SubaccountApiCredentialSecret extracts the Reference of a cis instance to a secret name
-func SubaccountApiCredentialSecret() reference.ExtractValueFn {
+// KymaEnvironmentBindingSecret extracts the Reference of some Kyma credentials to a secret name
+func KymaEnvironmentBindingSecret() reference.ExtractValueFn {
 	return func(mg resource.Managed) string {
-		sg, ok := mg.(*SubaccountApiCredential)
+		sg, ok := mg.(*KymaEnvironmentBinding)
 		if !ok {
 			return ""
 		}
@@ -19,10 +19,10 @@ func SubaccountApiCredentialSecret() reference.ExtractValueFn {
 	}
 }
 
-// SubaccountApiCredentialSecretNamespace extracts the Reference of a cis instance to the namespace of secret
-func SubaccountApiCredentialSecretNamespace() reference.ExtractValueFn {
+// KymaEnvironmentBindingSecretNamespace extracts the Reference of some Kyma credentials to the namespace of secret
+func KymaEnvironmentBindingSecretNamespace() reference.ExtractValueFn {
 	return func(mg resource.Managed) string {
-		sg, ok := mg.(*SubaccountApiCredential)
+		sg, ok := mg.(*KymaEnvironmentBinding)
 		if !ok {
 			return ""
 		}

@@ -1,7 +1,7 @@
 apiVersion: environment.btp.sap.crossplane.io/v1alpha1
 kind: KymaEnvironmentBinding
 metadata:
-  name: kyma-environment
+  name: kyma-environment-binding
   namespace: default
 spec:
   kymaEnvironmentRef:

@@ -2,8 +2,13 @@ package internal
 
 import (
 	"bytes"
+	"context"
 
 	json "github.com/json-iterator/go"
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"fmt"
 	"strconv"
@@ -13,6 +18,11 @@ import (
 	yamlv3 "gopkg.in/yaml.v3"
 
 	"sigs.k8s.io/yaml"
+)
+
+const (
+	errExtractSecretKey     = "no Secret Found"
+	errGetCredentialsSecret = "could not get Secret data"
 )
 
 func Default[T any](object *T, defaultValue T) T {
@@ -155,4 +165,21 @@ func hasJSONPrefix(buf []byte) bool {
 func hasPrefix(buf []byte, prefix []byte) bool {
 	trim := bytes.TrimLeftFunc(buf, unicode.IsSpace)
 	return bytes.HasPrefix(trim, prefix)
+}
+
+func LoadSecret(ctx context.Context, kube client.Client, name string, namespace string) (map[string][]byte, error) {
+	if name == "" || namespace == "" {
+		return nil, errors.New(errExtractSecretKey)
+	}
+
+	secret := &corev1.Secret{}
+	if err := kube.Get(
+		ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}, secret,
+	); err != nil {
+		return nil, errors.Wrap(err, errGetCredentialsSecret)
+	}
+	return secret.Data, nil
 }
