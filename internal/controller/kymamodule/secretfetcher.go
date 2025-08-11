@@ -23,18 +23,18 @@ func NewSecretFetcher(kube client.Client) *SecretFetcher {
 }
 
 type SecretFetcherInterface interface {
-	FetchSecret(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error)
+	Fetch(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error)
 }
 
 type SecretFetcher struct {
 	kube client.Client
 }
 
-func (c *SecretFetcher) FetchSecret(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+func (c *SecretFetcher) Fetch(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
 	secretName := cr.Spec.KymaEnvironmentBindingSecret
 	namespace := cr.Spec.KymaEnvironmentBindingSecretNamespace
 
-	secret, errGet := internal.LoadSecret(ctx, c.kube, secretName, namespace)
+	secret, errGet := internal.LoadSecretData(ctx, c.kube, secretName, namespace)
 	if errGet != nil {
 		return nil, errGet
 	}
@@ -54,13 +54,11 @@ func getKubeconfig(secret map[string][]byte) ([]byte, error) {
 
 	expirationBytes := secret[v1alpha1.KymaEnvironmentBindingExpirationKey]
 	if len(expirationBytes) == 0 {
-		// No expiration time found
 		return nil, errors.New(errCredentialsCorrupted)
 	}
 
 	expiration, err := time.Parse(kymaExpirationLayout, string(expirationBytes))
 	if err != nil {
-		// Parsing has failed
 		return nil, errors.New(errTimeParser)
 	}
 	if expiration.Before(time.Now()) {

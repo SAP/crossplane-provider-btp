@@ -81,7 +81,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	secretName := cr.Spec.CloudManagementSecret
 	namespace := cr.Spec.CloudManagementSecretNamespace
-	creds, errGet := internal.LoadSecret(ctx, c.kube, secretName, namespace)
+	creds, errGet := internal.LoadSecretData(ctx, c.kube, secretName, namespace)
 	if errGet != nil {
 		return nil, errGet
 	}

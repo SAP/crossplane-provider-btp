@@ -31,7 +31,7 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 	tests := map[string]struct {
 		mg              resource.Managed
 		kube            client.Client
-		loadSecretFn    func(client.Client, context.Context, string, string) (map[string][]byte, error)
+		loadSecretFn    func(context.Context, client.Client, string, string) (map[string][]byte, error)
 		newIdResolverFn func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error)
 		want            want
 	}{
@@ -46,7 +46,7 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 		},
 		"loadSecret fails": {
 			mg: &v1alpha1.ServiceInstance{},
-			loadSecretFn: func(kube client.Client, ctx context.Context, name, ns string) (map[string][]byte, error) {
+			loadSecretFn: func(ctx context.Context, kube client.Client, name, ns string) (map[string][]byte, error) {
 				return nil, errSecret
 			},
 			want: want{
@@ -55,7 +55,7 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 		},
 		"idResolver fails": {
 			mg: &v1alpha1.ServiceInstance{},
-			loadSecretFn: func(kube client.Client, ctx context.Context, name, ns string) (map[string][]byte, error) {
+			loadSecretFn: func(ctx context.Context, kube client.Client, name, ns string) (map[string][]byte, error) {
 				return map[string][]byte{}, nil
 			},
 			newIdResolverFn: func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error) {
@@ -71,7 +71,7 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 					ForProvider: v1alpha1.ServiceInstanceParameters{},
 				},
 			},
-			loadSecretFn: func(kube client.Client, ctx context.Context, name, ns string) (map[string][]byte, error) {
+			loadSecretFn: func(ctx context.Context, kube client.Client, name, ns string) (map[string][]byte, error) {
 				return map[string][]byte{}, nil
 			},
 			newIdResolverFn: func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error) {
@@ -87,7 +87,7 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 					ForProvider: v1alpha1.ServiceInstanceParameters{},
 				},
 			},
-			loadSecretFn: func(kube client.Client, ctx context.Context, name, ns string) (map[string][]byte, error) {
+			loadSecretFn: func(ctx context.Context, kube client.Client, name, ns string) (map[string][]byte, error) {
 				return map[string][]byte{}, nil
 			},
 			newIdResolverFn: func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error) {
@@ -109,7 +109,7 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 					ForProvider: v1alpha1.ServiceInstanceParameters{},
 				},
 			},
-			loadSecretFn: func(kube client.Client, ctx context.Context, name, ns string) (map[string][]byte, error) {
+			loadSecretFn: func(ctx context.Context, kube client.Client, name, ns string) (map[string][]byte, error) {
 				return map[string][]byte{}, nil
 			},
 			newIdResolverFn: func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error) {
@@ -130,9 +130,9 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			init := &servicePlanInitializer{
-				loadSecretFn: func(kube client.Client, ctx context.Context, name, ns string) (map[string][]byte, error) {
+				loadSecretFn: func(ctx context.Context, kube client.Client, name, ns string) (map[string][]byte, error) {
 					if tc.loadSecretFn != nil {
-						return tc.loadSecretFn(kube, ctx, name, ns)
+						return tc.loadSecretFn(ctx, kube, name, ns)
 					}
 					return map[string][]byte{}, nil
 				},

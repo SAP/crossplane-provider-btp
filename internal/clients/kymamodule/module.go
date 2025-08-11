@@ -16,12 +16,12 @@ import (
 )
 
 const (
-	errKymaModuleCreateFailed = "Could not create KymaModule"
-	errKymaModuleDeleteFailed = "Could not delete KymaModule"
-	errFailedParse            = "failed to parse kubeconfig"
-	errFailedCreateClient     = "failed to create Kubernetes client"
-	DefaultKymaName           = "default"
-	DefaultKymaNamespace      = "kyma-system"
+	errFailedParse                 = "failed to parse kubeconfig"
+	errFailedCreateClient          = "failed to create Kubernetes client"
+	errFailedGetDefaultKyma        = "failed to get default Kyma CR"
+	errFailedConvertToUnstructured = "failed to convert Kyma CR to unstructured"
+	DefaultKymaName                = "default"
+	DefaultKymaNamespace           = "kyma-system"
 )
 
 type Client interface {
@@ -64,10 +64,11 @@ func (c *KymaModuleClient) ObserveModule(ctx context.Context, moduleCr *v1alpha1
 		return nil, err
 	}
 
-	// Loops through each module from the KymaCR and returns the status of the specified moduleCr
+	// Find the module we use in the list of all activated modules from the kyma resource.
+	// Reason: we use one managed resource per module while kyma bundles it all in one cr.
+	// To resolve this many to one mapping, for every one of our module managed resource, we query the same kyma cr and find the correct name in it.
 	for _, module := range kyma.Status.Modules {
 		if module.Name == moduleCr.Name {
-			// Set status to display in the managed resource
 			moduleCr.Status.AtProvider = module
 			return &module, nil
 		}
@@ -122,12 +123,12 @@ func getDefaultKyma(ctx context.Context, c *KymaModuleClient) (*KymaCr, error) {
 		obj,
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errFailedGetDefaultKyma)
 	}
 
 	mg := &KymaCr{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, mg); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errFailedConvertToUnstructured)
 	}
 
 	return mg, nil

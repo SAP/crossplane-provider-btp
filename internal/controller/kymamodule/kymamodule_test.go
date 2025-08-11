@@ -44,7 +44,7 @@ func TestObserve(t *testing.T) {
 				newService: func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error) {
 					return nil, nil
 				},
-				secretfetcher: &fake.MockSecretFetcher{MockFetchSecret: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+				secretfetcher: &fake.MockSecretFetcher{MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
 					return []byte("VALID KUBECONFIG"), nil
 				}},
 			},
@@ -63,7 +63,7 @@ func TestObserve(t *testing.T) {
 				newService: func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error) {
 					return nil, nil
 				},
-				secretfetcher: &fake.MockSecretFetcher{MockFetchSecret: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+				secretfetcher: &fake.MockSecretFetcher{MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
 					return []byte("VALID KUBECONFIG"), nil
 				}},
 			},
@@ -82,7 +82,7 @@ func TestObserve(t *testing.T) {
 				newService: func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error) {
 					return nil, nil
 				},
-				secretfetcher: &fake.MockSecretFetcher{MockFetchSecret: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+				secretfetcher: &fake.MockSecretFetcher{MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
 					return []byte("VALID KUBECONFIG"), nil
 				}},
 			},
@@ -101,7 +101,7 @@ func TestObserve(t *testing.T) {
 						return &v1alpha1.ModuleStatus{}, nil
 					}}, nil
 				},
-				secretfetcher: &fake.MockSecretFetcher{MockFetchSecret: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+				secretfetcher: &fake.MockSecretFetcher{MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
 					return []byte("VALID KUBECONFIG"), nil
 				}},
 			},
@@ -339,9 +339,6 @@ func module(m ...moduleModifier) *v1alpha1.KymaModule {
 				Channel:              ptrString("regular"),
 				CustomResourcePolicy: ptrString("createdelete"),
 			},
-
-			KymaEnvironmentBindingSecret:          "test-binding-secret",
-			KymaEnvironmentBindingSecretNamespace: "test-namespace",
 		},
 	}
 

@@ -21,8 +21,7 @@ import (
 )
 
 const (
-	errExtractSecretKey     = "no Secret Found"
-	errGetCredentialsSecret = "could not get Secret data"
+	errExtractSecretKey = "no secret found"
 )
 
 func Default[T any](object *T, defaultValue T) T {
@@ -167,19 +166,16 @@ func hasPrefix(buf []byte, prefix []byte) bool {
 	return bytes.HasPrefix(trim, prefix)
 }
 
-func LoadSecret(ctx context.Context, kube client.Client, name string, namespace string) (map[string][]byte, error) {
-	if name == "" || namespace == "" {
+func LoadSecretData(ctx context.Context, kube client.Client, secretName string, secretNamespace string) (map[string][]byte, error) {
+	if secretName == "" || secretNamespace == "" {
 		return nil, errors.New(errExtractSecretKey)
 	}
-
 	secret := &corev1.Secret{}
-	if err := kube.Get(
-		ctx, types.NamespacedName{
-			Namespace: namespace,
-			Name:      name,
-		}, secret,
-	); err != nil {
-		return nil, errors.Wrap(err, errGetCredentialsSecret)
+	if err := kube.Get(ctx, types.NamespacedName{
+		Namespace: secretNamespace,
+		Name:      secretName,
+	}, secret); err != nil {
+		return nil, err
 	}
 	return secret.Data, nil
 }

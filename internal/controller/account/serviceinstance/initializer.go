@@ -24,7 +24,7 @@ var _ Initializer = &servicePlanInitializer{}
 
 type servicePlanInitializer struct {
 	newIdResolverFn func(ctx context.Context, secretData map[string][]byte) (smClient.PlanIdResolver, error)
-	loadSecretFn    func(kube client.Client, ctx context.Context, secretName, secretNamespace string) (map[string][]byte, error)
+	loadSecretFn    func(ctx context.Context, kube client.Client, secretName, secretNamespace string) (map[string][]byte, error)
 }
 
 // Initialize implements managed.Initializer, initializes an implementation of IdResolver and uses it to resolve the plan ID
@@ -38,7 +38,7 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 		return nil
 	}
 
-	secretData, err := s.loadSecretFn(kube, ctx, cr.Spec.ForProvider.ServiceManagerSecret, cr.Spec.ForProvider.ServiceManagerSecretNamespace)
+	secretData, err := s.loadSecretFn(ctx, kube, cr.Spec.ForProvider.ServiceManagerSecret, cr.Spec.ForProvider.ServiceManagerSecretNamespace)
 	if err != nil {
 		return errors.Wrap(err, errLoadSmBinding)
 	}

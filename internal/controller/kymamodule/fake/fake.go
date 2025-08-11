@@ -29,12 +29,12 @@ func (m *MockKymaModuleClient) DeleteModule(ctx context.Context, moduleName stri
 }
 
 type MockSecretFetcher struct {
-	MockFetchSecret func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error)
+	MockFetch func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error)
 }
 
-// FetchSecret implements SecretFetcherInterface.FetchSecret
-func (m *MockSecretFetcher) FetchSecret(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
-	return m.MockFetchSecret(ctx, cr)
+// Fetch implements SecretFetcherInterface.Fetch
+func (m *MockSecretFetcher) Fetch(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+	return m.MockFetch(ctx, cr)
 }
 
 var Client kymamodule.Client = &MockKymaModuleClient{}

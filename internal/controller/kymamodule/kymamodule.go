@@ -31,7 +31,6 @@ type connector struct {
 	kube            client.Client
 	usage           resource.Tracker
 	resourcetracker tracking.ReferenceResolverTracker
-	secretfetcher   SecretFetcherInterface
 
 	newServiceFn func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error)
 }
@@ -62,7 +61,10 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrackRUsage)
 	}
 
-	creds, err := c.secretfetcher.FetchSecret(ctx, cr)
+	secretfetcher := &SecretFetcher{
+		kube: c.kube,
+	}
+	creds, err := secretfetcher.Fetch(ctx, cr)
 
 	if err != nil {
 		return nil, errors.Wrap(err, errSetupClient)
@@ -74,7 +76,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 			client:        svc,
 			tracker:       c.resourcetracker,
 			kube:          c.kube,
-			secretfetcher: c.secretfetcher,
+			secretfetcher: secretfetcher,
 			newServiceFn:  c.newServiceFn,
 		},
 		err
@@ -87,8 +89,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// Check if the secret is valid and fetch the current kubeconfig
-	creds, err := c.secretfetcher.FetchSecret(ctx, cr)
-
+	creds, err := c.secretfetcher.Fetch(ctx, cr)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
 	}
@@ -99,7 +100,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Renews the client if creds are provided
 	client, err := c.newServiceFn(creds)
-
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
 	}
@@ -109,7 +109,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	res, err := c.client.ObserveModule(ctx, cr)
-
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
 	}
