@@ -240,7 +240,7 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func TestGetKubeconfig(t *testing.T) {
+func TestGetValidKubeconfig(t *testing.T) {
 	type args struct {
 		secret map[string][]byte
 	}
@@ -313,13 +313,13 @@ func TestGetKubeconfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			kubeconfig, err := getKubeconfig(tt.args.secret)
+			kubeconfig, err := getValidKubeconfig(tt.args.secret)
 
 			if diff := cmp.Diff(tt.want.wantErr, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\ngetKubeconfig(...): -want error, +got error:\n%s\n", diff)
+				t.Errorf("\ngetValidKubeconfig(...): -want error, +got error:\n%s\n", diff)
 			}
 			if diff := cmp.Diff(tt.want.wantConfig, kubeconfig); diff != "" {
-				t.Errorf("\ngetKubeconfig(...): -want kubeconfig, +got kubeconfig:\n%s\n", diff)
+				t.Errorf("\ngetValidKubeconfig(...): -want kubeconfig, +got kubeconfig:\n%s\n", diff)
 			}
 		})
 	}

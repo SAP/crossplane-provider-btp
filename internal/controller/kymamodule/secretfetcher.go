@@ -40,7 +40,7 @@ func (c *SecretFetcher) Fetch(ctx context.Context, cr *v1alpha1.KymaModule) ([]b
 	}
 
 	// Check if the secret contains valid kubeconfig data that is not expired
-	kymaCreds, err := getKubeconfig(secret)
+	kymaCreds, err := getValidKubeconfig(secret)
 
 	if err != nil {
 		return nil, err
@@ -49,8 +49,8 @@ func (c *SecretFetcher) Fetch(ctx context.Context, cr *v1alpha1.KymaModule) ([]b
 	return kymaCreds, nil
 }
 
-// getKubeconfig checks if the secret contains valid kubeconfig data and is not expired
-func getKubeconfig(secret map[string][]byte) ([]byte, error) {
+// getValidKubeconfig checks if the secret contains valid kubeconfig data and is not expired
+func getValidKubeconfig(secret map[string][]byte) ([]byte, error) {
 
 	expirationBytes := secret[v1alpha1.KymaEnvironmentBindingExpirationKey]
 	if len(expirationBytes) == 0 {
