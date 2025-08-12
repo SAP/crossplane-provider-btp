@@ -12,5 +12,5 @@ spec:
   cloudManagementRef:
     name: kyma-cis-local
   forProvider:
-    rotationInterval: 1m
+    rotationInterval: 3m
     ttl: 10m
