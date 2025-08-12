@@ -91,7 +91,7 @@ func SetupClusterWithCrossplane(namespace string) {
 	}
 	testenv.Setup(
 		envfuncs.CreateKindCluster(kindClusterName),
-		xpenvfuncs.Conditional(xpenvfuncs.InstallCrossplane(kindClusterName, xpenvfuncs.Registry(setup.DockerRegistry)), firstSetup),
+		xpenvfuncs.Conditional(xpenvfuncs.InstallCrossplane(kindClusterName, xpenvfuncs.Registry(setup.DockerRegistry), xpenvfuncs.Version("1.20.1")), firstSetup),
 		xpenvfuncs.Conditional(
 			xpenvfuncs.InstallCrossplaneProvider(
 				kindClusterName, xpenvfuncs.InstallCrossplaneProviderOptions{
