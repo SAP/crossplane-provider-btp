@@ -206,10 +206,12 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	if !ok {
 		return errors.New(errNotKymaEnvironmentBinding)
 	}
+
 	c.tracker.SetConditions(ctx, cr)
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
 		return errors.New(providerv1alpha1.ErrResourceInUse)
 	}
+
 	err := c.client.DeleteInstances(ctx, cr.Status.AtProvider.Bindings, cr.Spec.KymaEnvironmentId)
 	return err
 }

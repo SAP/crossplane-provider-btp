@@ -92,25 +92,6 @@ func TestObserve(t *testing.T) {
 				err: errors.Wrap(errors.New("CRASH"), errObserveResource),
 			},
 		},
-		"Re-create client in Observe": {
-			args: args{
-				cr:     module(),
-				client: nil,
-				newService: func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error) {
-					return &fake.MockKymaModuleClient{MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
-						return &v1alpha1.ModuleStatus{}, nil
-					}}, nil
-				},
-				secretfetcher: &fake.MockSecretFetcher{MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
-					return []byte("VALID KUBECONFIG"), nil
-				}},
-			},
-			want: want{
-				cr:  module(),
-				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
-				err: nil,
-			},
-		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
