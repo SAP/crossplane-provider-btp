@@ -4,6 +4,10 @@ name: Long E2E Test
 
 on:
   workflow_dispatch:
+    inputs:
+      testFilter:
+        description: 'testFilter string that will be passed to make e2e-long testFilter=functionNameOfTest.'
+        required: false
   schedule:
     - cron: '10 1 * * 1-5'  # every weekday at 1:10 AM
 
@@ -53,7 +57,11 @@ jobs:
       - name: Run long e2e test
         timeout-minutes: 180
         run: |
-          make test-e2e-long
+          if [ -n "${{ github.event.inputs.testFilter }}" ]; then
+            make test-e2e-long testFilter=${{ github.event.inputs.testFilter }};
+          else
+            make test-e2e-long;
+          fi
         env:
           BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
