@@ -42,8 +42,6 @@ type external struct {
 	tracker       tracking.ReferenceResolverTracker
 	kube          client.Client
 	secretfetcher SecretFetcherInterface
-
-	newServiceFn func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error)
 }
 
 // This methods connects to the Kyma cluster using the kubeconfig from the KymaEnvironmentBinding
@@ -77,7 +75,6 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 			tracker:       c.resourcetracker,
 			kube:          c.kube,
 			secretfetcher: secretfetcher,
-			newServiceFn:  c.newServiceFn,
 		},
 		err
 }

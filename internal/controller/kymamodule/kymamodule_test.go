@@ -41,9 +41,6 @@ func TestObserve(t *testing.T) {
 				client: &fake.MockKymaModuleClient{MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
 					return &v1alpha1.ModuleStatus{}, nil
 				}},
-				newService: func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error) {
-					return nil, nil
-				},
 				secretfetcher: &fake.MockSecretFetcher{MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
 					return []byte("VALID KUBECONFIG"), nil
 				}},
@@ -60,9 +57,6 @@ func TestObserve(t *testing.T) {
 				client: &fake.MockKymaModuleClient{MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
 					return nil, nil
 				}},
-				newService: func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error) {
-					return nil, nil
-				},
 				secretfetcher: &fake.MockSecretFetcher{MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
 					return []byte("VALID KUBECONFIG"), nil
 				}},
@@ -98,7 +92,6 @@ func TestObserve(t *testing.T) {
 			e := external{
 				client:        tc.args.client,
 				secretfetcher: tc.args.secretfetcher,
-				newServiceFn:  tc.args.newService,
 			}
 			got, err := e.Observe(context.Background(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
