@@ -1,7 +1,7 @@
 apiVersion: environment.btp.sap.crossplane.io/v1alpha1
 kind: KymaEnvironmentBinding
 metadata:
-  name: kyma-environment
+  name: kyma-environment-binding
   namespace: default
 spec:
   kymaEnvironmentRef:
@@ -12,5 +12,5 @@ spec:
   cloudManagementRef:
     name: kyma-cis-local
   forProvider:
-    rotationInterval: 1m
+    rotationInterval: 3m
     ttl: 10m
