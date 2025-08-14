@@ -249,6 +249,12 @@ test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
 	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '$(testFilter)' -timeout 240m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
+	@echo "===========Test Summary==========="
+	@grep -E "PASS|FAIL" test-output.log
+	@case `tail -n 1 test-output.log` in \
+     		*FAIL*) echo "❌ Error: Test failed"; exit 1 ;; \
+     		*) echo "✅ All tests passed"; $(OK) integration tests passed ;; \
+     esac
 
 #run single e2e test with <make e2e testFilter=functionNameOfTest>
 .PHONY: test-acceptance
