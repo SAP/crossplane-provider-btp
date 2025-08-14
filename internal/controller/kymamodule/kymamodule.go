@@ -83,29 +83,10 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
+
 	cr, ok := mg.(*v1alpha1.KymaModule)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotKymaModule)
-	}
-
-	// Check if the secret is valid and fetch the current kubeconfig
-	creds, err := c.secretfetcher.Fetch(ctx, cr)
-	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
-	}
-
-	if creds == nil {
-		return managed.ExternalObservation{}, errors.New(errCredentialsCorrupted)
-	}
-
-	// Renews the client if creds are provided
-	client, err := c.newServiceFn(creds)
-	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
-	}
-
-	if client != nil {
-		c.client = client
 	}
 
 	res, err := c.client.ObserveModule(ctx, cr)
