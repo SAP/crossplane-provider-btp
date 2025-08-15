@@ -13,6 +13,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -210,6 +211,11 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	cr, ok := mg.(*v1alpha1.KymaEnvironmentBinding)
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotKymaEnvironmentBinding)
+	}
+
+	c.tracker.SetConditions(ctx, cr)
+	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
+		return errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
 	err := c.client.DeleteInstances(ctx, cr.Status.AtProvider.Bindings, cr.Spec.KymaEnvironmentId)

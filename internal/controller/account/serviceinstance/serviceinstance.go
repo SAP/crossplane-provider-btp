@@ -13,6 +13,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/di"
@@ -41,7 +42,7 @@ var newClientCreatorFn = func(kube client.Client) tfClient.TfProxyConnectorI[*v1
 var newServicePlanInitializerFn = func() Initializer {
 	return &servicePlanInitializer{
 		newIdResolverFn: di.NewPlanIdResolverFn,
-		loadSecretFn:    di.LoadSecretData,
+		loadSecretFn:    internal.LoadSecretData,
 	}
 }
 

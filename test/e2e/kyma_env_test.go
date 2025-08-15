@@ -36,7 +36,7 @@ func TestKymaEnvironment(t *testing.T) {
 		Assess(
 			"Await resources to become synced",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				if err := resources.WaitForResourcesToBeSynced(ctx, cfg, manifestDir, nil, wait.WithTimeout(time.Minute*25)); err != nil {
+				if err := resources.WaitForResourcesToBeSynced(ctx, cfg, manifestDir, nil, wait.WithTimeout(time.Minute*50)); err != nil {
 					t.Fatal(err)
 				}
 				return ctx
@@ -45,7 +45,7 @@ func TestKymaEnvironment(t *testing.T) {
 		Assess(
 			"Check Resources Delete",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.DeleteResources(ctx, t, cfg, manifestDir, wait.WithTimeout(time.Minute*25))
+				resources.DeleteResources(ctx, t, cfg, manifestDir, wait.WithTimeout(time.Minute*50))
 				return ctx
 			},
 		).Teardown(

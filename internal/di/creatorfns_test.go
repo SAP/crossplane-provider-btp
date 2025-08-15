@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,7 +59,7 @@ func TestLoadSecretData(t *testing.T) {
 				objs[i] = &obj
 			}
 			fakeClient := fake.NewClientBuilder().WithObjects(objs...).Build()
-			data, err := LoadSecretData(fakeClient, ctx, tt.secret, tt.namespace)
+			data, err := internal.LoadSecretData(ctx, fakeClient, tt.secret, tt.namespace)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

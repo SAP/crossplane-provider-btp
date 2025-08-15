@@ -568,7 +568,7 @@ func TestConnect(t *testing.T) {
 				kubeObjects: []client.Object{},
 			},
 			want: want{
-				err: errors.New("no Cloud Management Secret Found"),
+				err: errors.New("no secret found"),
 			},
 		},
 		"NoCISSecretFound": {
@@ -581,7 +581,7 @@ func TestConnect(t *testing.T) {
 				kubeObjects: []client.Object{},
 			},
 			want: want{
-				err: errors.New("could not get secret of local cloud management"),
+				err: errors.New("No resource with name cis-test available"),
 			},
 		},
 		"NewServiceFnError": {
