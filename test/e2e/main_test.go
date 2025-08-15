@@ -11,24 +11,30 @@ import (
 	"encoding/json"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
+	"github.com/crossplane-contrib/xp-testing/pkg/images"
 	"github.com/crossplane-contrib/xp-testing/pkg/logging"
 	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
+	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
+
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/third_party/kind"
 
 	"github.com/pkg/errors"
+	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/vladimirvivien/gexe"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
-	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
-
-	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 
 var (
@@ -65,15 +71,6 @@ func SetupClusterWithCrossplane(namespace string) {
 	uutImages := envvar.GetOrPanic(UUT_IMAGES_KEY)
 	uutConfig, uutController := GetImagesFromJsonOrPanic(uutImages)
 
-	reuseCluster := checkEnvVarExists("TEST_REUSE_CLUSTER")
-
-	kindClusterName := envvar.GetOrDefault("CLUSTER_NAME", envconf.RandomName("btpa-e2e", 10))
-
-	firstSetup := true
-	if reuseCluster && clusterExists(kindClusterName) {
-		firstSetup = false
-	}
-
 	testenv = env.New()
 
 	bindingSecretData := getBindingSecretOrPanic()
@@ -84,44 +81,48 @@ func SetupClusterWithCrossplane(namespace string) {
 	// Setup uses pre-defined funcs to create kind cluster
 	// and create a namespace for the environment
 
-	controllerConfig := vendored.ControllerConfig{
-		Spec: vendored.ControllerConfigSpec{
-			Args: []string{"--debug", "--sync=10s"},
+	deploymentRuntimeConfig := vendored.DeploymentRuntimeConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "btp-provider-runtime-config",
+		},
+		Spec: vendored.DeploymentRuntimeConfigSpec{
+			DeploymentTemplate: &vendored.DeploymentTemplate{
+				Spec: &appsv1.DeploymentSpec{
+					Selector: &metav1.LabelSelector{},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "package-runtime",
+									Args: []string{"--debug", "--sync=10s"},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
-	testenv.Setup(
-		envfuncs.CreateKindCluster(kindClusterName),
-		xpenvfuncs.Conditional(xpenvfuncs.InstallCrossplane(kindClusterName, xpenvfuncs.Registry(setup.DockerRegistry), xpenvfuncs.Version("1.20.1")), firstSetup),
-		xpenvfuncs.Conditional(
-			xpenvfuncs.InstallCrossplaneProvider(
-				kindClusterName, xpenvfuncs.InstallCrossplaneProviderOptions{
-					Name:             "btp-account",
-					Package:          uutConfig,
-					ControllerImage:  &uutController,
-					ControllerConfig: &controllerConfig,
-				},
-			), firstSetup,
-		),
-		envfuncs.CreateNamespace(namespace),
-		xpenvfuncs.Conditional(
-			xpenvfuncs.ApplySecretInCrossplaneNamespace(CIS_SECRET_NAME, bindingSecretData),
-			firstSetup,
-		),
-		xpenvfuncs.Conditional(
-			xpenvfuncs.ApplySecretInCrossplaneNamespace(SERVICE_USER_SECRET_NAME, userSecretData),
-			firstSetup,
-		),
-		xpenvfuncs.Conditional(
-			createProviderConfigFn(namespace, globalAccount, cliServerUrl),
-			firstSetup,
-		),
-	)
 
-	// Finish uses pre-defined funcs to
-	// remove namespace, then delete cluster
-	testenv.Finish(
-		envfuncs.DeleteNamespace(namespace),
-		xpenvfuncs.Conditional(envfuncs.DestroyKindCluster(kindClusterName), !reuseCluster),
+	cfg := setup.ClusterSetup{
+		ProviderName: "btp-account",
+		Images: images.ProviderImages{
+			Package:         uutConfig,
+			ControllerImage: &uutController,
+		},
+		CrossplaneSetup: setup.CrossplaneSetup{
+			Version:  "1.20.1",
+			Registry: setup.DockerRegistry,
+		},
+		DeploymentRuntimeConfig: &deploymentRuntimeConfig,
+	}
+
+	cfg.Configure(testenv, &kind.Cluster{})
+
+	testenv.Setup(
+		ApplySecretInCrossplaneNamespace(CIS_SECRET_NAME, bindingSecretData),
+		ApplySecretInCrossplaneNamespace(SERVICE_USER_SECRET_NAME, userSecretData),
+		createProviderConfigFn(namespace, globalAccount, cliServerUrl),
 	)
 }
 
@@ -140,8 +141,11 @@ func createProviderConfigFn(namespace string, globalAccount string, cliServerUrl
 		r, _ := res.New(cfg.Client().RESTConfig())
 		_ = meta_api.AddToScheme(r.GetScheme())
 
-		err := r.Create(ctx, providerConfig(namespace, globalAccount, cliServerUrl))
-
+		obj := providerConfig(namespace, globalAccount, cliServerUrl)
+		err := r.Create(ctx, obj)
+		if kubeErrors.IsAlreadyExists(err) {
+			return ctx, r.Update(ctx, obj)
+		}
 		return ctx, err
 	}
 }
@@ -247,4 +251,29 @@ func setupLogging(verbosity int) {
 	logging.EnableVerboseLogging(&verbosity)
 	zl := zap.New(zap.UseDevMode(true))
 	ctrl.SetLogger(zl)
+}
+
+func ApplySecretInCrossplaneNamespace(name string, data map[string]string) env.Func {
+	return xpenvfuncs.Compose(
+		func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+			r, err := resources.New(cfg.Client().RESTConfig())
+
+			if err != nil {
+				klog.Error(err)
+				return ctx, err
+			}
+
+			secret := xpenvfuncs.SimpleSecret(name, xpenvfuncs.CrossplaneNamespace, data)
+
+			if err := r.Create(ctx, secret); err != nil {
+				if kubeErrors.IsAlreadyExists(err) {
+					return ctx, r.Update(ctx, secret)
+				}
+				klog.Error(err)
+				return ctx, err
+			}
+
+			return ctx, nil
+		},
+	)
 }

@@ -105,6 +105,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr, ok := mg.(*v1alpha1.KymaModule)
 	if !ok {
@@ -128,17 +134,17 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalUpdate{}, errors.New("Update is not implemented - should not be called, only create")
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.KymaModule)
 	if !ok {
-		return errors.New(errNotKymaModule)
+		return managed.ExternalDelete{}, errors.New(errNotKymaModule)
 	}
 
 	if cr.Status.AtProvider.State == v1alpha1.ModuleStateDeleting {
-		return nil
+		return managed.ExternalDelete{}, nil
 	}
 
 	err := c.client.DeleteModule(ctx, cr.Spec.ForProvider.Name)
 
-	return err
+	return managed.ExternalDelete{}, err
 }

@@ -112,6 +112,12 @@ func subscriptionBeingDeleted(cr *v1alpha1.Subscription) bool {
 	return readyCondition.Status == corev1.ConditionFalse && readyCondition.Reason == xpv1.ReasonDeleting
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.Subscription)
 	if !ok {
@@ -136,7 +142,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		if !subscriptionBeingDeleted(cr) {
 			// The resource is not being deleted. So let's
 			// delete it now.
-			err = c.Delete(ctx, mg)
+			_, err = c.Delete(ctx, mg)
 		}
 		// Abort the Observe step
 		return managed.ExternalObservation{
@@ -198,19 +204,19 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.Subscription)
 	if !ok {
-		return errors.New(errNotSubscription)
+		return managed.ExternalDelete{}, errors.New(errNotSubscription)
 	}
 
 	cr.SetConditions(xpv1.Deleting())
 
 	if !c.typeMapper.IsDeletable(cr) {
 		// api will return 500 if called multiple times, so we will ensure to call it only once
-		return nil
+		return managed.ExternalDelete{}, nil
 	}
-	return c.apiHandler.DeleteSubscription(ctx, meta.GetExternalName(cr))
+	return managed.ExternalDelete{}, c.apiHandler.DeleteSubscription(ctx, meta.GetExternalName(cr))
 }
 
 // loadSubscription gets a Subscription using the APIHandler if a proper externalName has been set, otherwise returns nil

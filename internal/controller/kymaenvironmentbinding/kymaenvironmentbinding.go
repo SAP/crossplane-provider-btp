@@ -52,6 +52,12 @@ type external struct {
 	kube       client.Client
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironmentBinding)
 	if !ok {
@@ -201,17 +207,17 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalUpdate{}, errors.New("Update is not implemented - should not be called, only create")
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironmentBinding)
 	if !ok {
-		return errors.New(errNotKymaEnvironmentBinding)
+		return managed.ExternalDelete{}, errors.New(errNotKymaEnvironmentBinding)
 	}
 
 	c.tracker.SetConditions(ctx, cr)
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
-		return errors.New(providerv1alpha1.ErrResourceInUse)
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
 	err := c.client.DeleteInstances(ctx, cr.Status.AtProvider.Bindings, cr.Spec.KymaEnvironmentId)
-	return err
+	return managed.ExternalDelete{}, err
 }
