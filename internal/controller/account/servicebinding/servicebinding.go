@@ -73,6 +73,12 @@ type external struct {
 	kube     client.Client
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
@@ -140,16 +146,16 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
-		return errors.New(errNotServiceBinding)
+		return managed.ExternalDelete{}, errors.New(errNotServiceBinding)
 	}
 	cr.SetConditions(xpv1.Deleting())
 	if err := c.tfClient.Delete(ctx); err != nil {
-		return errors.Wrap(err, "cannot delete servicebinding")
+		return managed.ExternalDelete{}, errors.Wrap(err, "cannot delete servicebinding")
 	}
-	return nil
+	return managed.ExternalDelete{}, nil
 }
 
 func (e *external) saveBindingData(ctx context.Context, cr *v1alpha1.ServiceBinding, sid tfClient.ObservationData) error {

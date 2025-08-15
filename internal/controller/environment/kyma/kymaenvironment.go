@@ -68,6 +68,12 @@ type external struct {
 	log        logr.Logger
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironment)
 	if !ok {
@@ -181,21 +187,21 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironment)
 	if !ok {
-		return errors.New(errNotKymaEnvironment)
+		return managed.ExternalDelete{}, errors.New(errNotKymaEnvironment)
 	}
 	c.tracker.SetConditions(ctx, cr)
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
-		return errors.New(providerv1alpha1.ErrResourceInUse)
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
 	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateDeleting {
-		return nil
+		return managed.ExternalDelete{}, nil
 	}
 
-	return c.client.DeleteInstance(ctx, *cr)
+	return managed.ExternalDelete{}, c.client.DeleteInstance(ctx, *cr)
 }
 
 func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {

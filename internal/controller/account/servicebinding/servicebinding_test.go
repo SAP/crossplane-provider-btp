@@ -439,7 +439,7 @@ func TestDelete(t *testing.T) {
 				},
 			}
 
-			err := e.Delete(context.Background(), tc.args.mg)
+			_, err := e.Delete(context.Background(), tc.args.mg)
 			expectedErrorBehaviour(t, tc.want.err, err)
 
 			// Verify the entire CR

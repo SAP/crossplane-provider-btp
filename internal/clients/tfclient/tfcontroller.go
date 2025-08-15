@@ -115,7 +115,7 @@ func (t *TfProxyController[UPJETTED]) Update(ctx context.Context) error {
 }
 
 func (t *TfProxyController[UPJETTED]) Delete(ctx context.Context) error {
-	err := t.tfClient.Delete(ctx, t.tfResource)
+	_, err := t.tfClient.Delete(ctx, t.tfResource)
 	return err
 }
 

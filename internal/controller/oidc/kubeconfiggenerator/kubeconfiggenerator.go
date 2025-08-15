@@ -64,6 +64,12 @@ type external struct {
 	kube    client.Client
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.KubeConfigGenerator)
 	if !ok {
@@ -178,15 +184,15 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.KubeConfigGenerator)
 	if !ok {
-		return errors.New(errNotKubeConfigGenerator)
+		return managed.ExternalDelete{}, errors.New(errNotKubeConfigGenerator)
 	}
 
 	cr.Status.SetConditions(xpv1.Deleting())
 
-	return cleanupCreatedKubeConfig(ctx, cr, c.kube)
+	return managed.ExternalDelete{}, cleanupCreatedKubeConfig(ctx, cr, c.kube)
 }
 
 func newService(c *connector, cr *v1alpha1.KubeConfigGenerator) (oidc.KubeConfigClient, error) {
