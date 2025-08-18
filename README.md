@@ -91,7 +91,6 @@ kind delete cluster --name=<cluster-name>
 
 #### Required Configuration
 
-
 In order for the tests to perform successfully some configuration need to be present as environment variables:
 
 **BTP_TECHNICAL_USER**
@@ -130,7 +129,6 @@ Contents from the service binding of a `cis-central` service in the same globala
   }
 }
 ```
-
 
 **CLI_SERVER_URL**
 
