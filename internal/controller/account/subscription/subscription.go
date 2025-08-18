@@ -6,15 +6,16 @@ import (
 	"fmt"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -23,12 +24,16 @@ import (
 
 const (
 	errNotSubscription = "managed resource is not a Subscription custom resource"
+	errTrackRUsage     = "cannot track ResourceUsage"
 	errTrackPCUsage    = "cannot track ProviderConfig usage"
 
-	errExtractSecretKey     = "no Cloud Management Secret Found"
-	errGetCredentialsSecret = "could not get secret of local cloud management"
 	errCredentialsCorrupted = "secret credentials data not in the expected format"
 )
+
+var failureStates = []string{
+	v1alpha1.SubscriptionStateSubscribeFailed,
+	v1alpha1.SubscriptionStateUnsubscribeFailed,
+}
 
 // api handler creation logic based on a bytemap extracted from a secrets data
 var newSubscriptionClientFn = func(ctx context.Context, cisSecretData map[string][]byte) (subscription.SubscriptionApiHandlerI, error) {
@@ -54,9 +59,10 @@ var newSubscriptionClientFn = func(ctx context.Context, cisSecretData map[string
 }
 
 type connector struct {
-	kube         client.Client
-	usage        resource.Tracker
-	newServiceFn func(ctx context.Context, cisSecretData map[string][]byte) (subscription.SubscriptionApiHandlerI, error)
+	kube            client.Client
+	usage           resource.Tracker
+	resourcetracker tracking.ReferenceResolverTracker
+	newServiceFn    func(ctx context.Context, cisSecretData map[string][]byte) (subscription.SubscriptionApiHandlerI, error)
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -69,9 +75,13 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, errTrackRUsage)
+	}
+
 	secretName := cr.Spec.CloudManagementSecret
 	namespace := cr.Spec.CloudManagementSecretNamespace
-	creds, errGet := c.loadSecret(ctx, secretName, namespace)
+	creds, errGet := internal.LoadSecretData(ctx, c.kube, secretName, namespace)
 	if errGet != nil {
 		return nil, errGet
 	}
@@ -88,28 +98,24 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}, nil
 }
 
-func (c *connector) loadSecret(ctx context.Context, name string, namespace string) (map[string][]byte, error) {
-	if name == "" || namespace == "" {
-		return nil, errors.New(errExtractSecretKey)
-	}
-
-	secret := &corev1.Secret{}
-	if err := c.kube.Get(
-		ctx, types.NamespacedName{
-			Namespace: namespace,
-			Name:      name,
-		}, secret,
-	); err != nil {
-		return nil, errors.Wrap(err, errGetCredentialsSecret)
-	}
-	return secret.Data, nil
-}
-
 type external struct {
 	kube       client.Client
 	apiHandler subscription.SubscriptionApiHandlerI
 	typeMapper subscription.SubscriptionTypeMapperI
 	tracker    tracking.ReferenceResolverTracker
+}
+
+// subscriptionBeingDeleted returns true if the resource conditions
+// indicate that the resource is being deleted.
+func subscriptionBeingDeleted(cr *v1alpha1.Subscription) bool {
+	readyCondition := cr.GetCondition(xpv1.TypeReady)
+	return readyCondition.Status == corev1.ConditionFalse && readyCondition.Reason == xpv1.ReasonDeleting
+}
+
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -127,6 +133,24 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	c.syncStatus(apiRes, cr)
+
+	if c.shouldRecreateOnFailure(cr, apiRes) {
+		// We observed a subscription in SUBSCRIBE_FAILED
+		// state and recreateOnSubscriptionFailure is turned
+		// on.
+		var err error
+		if !subscriptionBeingDeleted(cr) {
+			// The resource is not being deleted. So let's
+			// delete it now.
+			_, err = c.Delete(ctx, mg)
+		}
+		// Abort the Observe step
+		return managed.ExternalObservation{
+			ResourceExists:    true, // Don't create any new resource
+			ResourceUpToDate:  true, // Don't update the existing resource
+			ConnectionDetails: managed.ConnectionDetails{},
+		}, err
+	}
 
 	if c.typeMapper.IsAvailable(cr) {
 		cr.SetConditions(xpv1.Available())
@@ -180,19 +204,19 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.Subscription)
 	if !ok {
-		return errors.New(errNotSubscription)
+		return managed.ExternalDelete{}, errors.New(errNotSubscription)
 	}
 
 	cr.SetConditions(xpv1.Deleting())
 
-	if !c.typeMapper.IsAvailable(cr) {
+	if !c.typeMapper.IsDeletable(cr) {
 		// api will return 500 if called multiple times, so we will ensure to call it only once
-		return nil
+		return managed.ExternalDelete{}, nil
 	}
-	return c.apiHandler.DeleteSubscription(ctx, meta.GetExternalName(cr))
+	return managed.ExternalDelete{}, c.apiHandler.DeleteSubscription(ctx, meta.GetExternalName(cr))
 }
 
 // loadSubscription gets a Subscription using the APIHandler if a proper externalName has been set, otherwise returns nil
@@ -214,4 +238,19 @@ func (c *external) syncStatus(apiRes *subscription.SubscriptionGet, cr *v1alpha1
 // isUpToDate delegates comparision of cr data and api resource to the typemapper
 func (c *external) isUpToDate(apiRes *subscription.SubscriptionGet, cr *v1alpha1.Subscription) bool {
 	return c.typeMapper.IsUpToDate(cr, apiRes)
+}
+
+// shouldRecreateOnFailure determines if a subscription should be recreated
+// when it is in a failed state. This is the case if the spec.RecreateOnSubscriptionFailure
+// is set and the current state is SubscriptionStateSubscribeFailed.
+func (c *external) shouldRecreateOnFailure(cr *v1alpha1.Subscription, apiRes *subscription.SubscriptionGet) bool {
+	if !cr.Spec.RecreateOnSubscriptionFailure || apiRes.State == nil {
+		return false
+	}
+	for _, state := range failureStates {
+		if *apiRes.State == state {
+			return true
+		}
+	}
+	return false
 }

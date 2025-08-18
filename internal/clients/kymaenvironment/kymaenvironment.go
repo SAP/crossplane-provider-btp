@@ -1,14 +1,12 @@
 package environments
 
 import (
-	"bytes"
 	"context"
-	"unicode"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	json "github.com/json-iterator/go"
-	"sigs.k8s.io/yaml"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 
+	"github.com/sap/crossplane-provider-btp/internal"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
@@ -32,27 +30,34 @@ func NewKymaEnvironments(btp btp.Client) *KymaEnvironments {
 func (c KymaEnvironments) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.KymaEnvironment,
-) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
-	environment, err := c.btp.GetEnvironmentByNameAndType(ctx, cr.Name, btp.KymaEnvironmentType())
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
+	environment, err := c.btp.GetEnvironment(ctx, meta.GetExternalName(&cr), cr.Name, btp.KymaEnvironmentType())
+
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	if environment == nil {
-		return nil, nil
+		return nil, false, nil
 	}
 
-	return environment, nil
+	// If the external name is not set yet, we set it to the ID of the environment. And force an update.
+	if *environment.Id != meta.GetExternalName(&cr) {
+		meta.SetExternalName(&cr, *environment.Id)
+		return environment, true, nil
+	}
+
+	return environment, false, nil
 }
 
-func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error {
+func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error) {
 
-	parameters, err := UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
+	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
 	parameters = AddKymaDefaultParameters(parameters, cr.Name, string(cr.UID))
 	if err != nil {
-		return err
+		return "", err
 	}
-	err = c.btp.CreateKymaEnvironment(
+	guid, err := c.btp.CreateKymaEnvironment(
 		ctx,
 		cr.Name,
 		cr.Spec.ForProvider.PlanName,
@@ -60,8 +65,10 @@ func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEn
 		string(cr.UID),
 		c.btp.Credential.UserCredential.Email,
 	)
-
-	return errors.Wrap(err, errKymaInstanceCreateFailed)
+	if err != nil {
+		return "", errors.Wrap(err, errKymaInstanceCreateFailed)
+	}
+	return guid, nil
 }
 
 func (c KymaEnvironments) DeleteInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error {
@@ -77,7 +84,7 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 		return errors.New(errInstanceIdNotFound)
 	}
 
-	parameters, err := UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
+	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
 	parameters = AddKymaDefaultParameters(parameters, cr.Name, string(cr.UID))
 	if err != nil {
 		return err
@@ -91,40 +98,6 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 	)
 
 	return errors.Wrap(err, errKymaInstanceUpdateFailed)
-}
-
-// UnmarshalRawParameters produces a map structure from a given raw YAML/JSON input
-func UnmarshalRawParameters(in []byte) (map[string]interface{}, error) {
-	parameters := make(map[string]interface{})
-
-	if len(in) == 0 {
-		return parameters, nil
-
-	}
-	if hasJSONPrefix(in) {
-		if err := json.Unmarshal(in, &parameters); err != nil {
-			return parameters, err
-		}
-		return parameters, nil
-	}
-
-	err := yaml.Unmarshal(in, &parameters)
-	return parameters, err
-
-}
-
-var jsonPrefix = []byte("{")
-
-// hasJSONPrefix returns true if the provided buffer appears to start with
-// a JSON open brace.
-func hasJSONPrefix(buf []byte) bool {
-	return hasPrefix(buf, jsonPrefix)
-}
-
-// Return true if the first non-whitespace bytes in buf is prefix.
-func hasPrefix(buf []byte, prefix []byte) bool {
-	trim := bytes.TrimLeftFunc(buf, unicode.IsSpace)
-	return bytes.HasPrefix(trim, prefix)
 }
 
 func AddKymaDefaultParameters(parameters btp.InstanceParameters, instanceName string, resourceUID string) btp.InstanceParameters {

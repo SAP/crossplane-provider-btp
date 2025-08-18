@@ -8,7 +8,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
-	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
@@ -28,19 +27,14 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		apisv1beta1.ServiceManagerGroupVersionKind,
 		func(kube client.Client,
 			usage resource.Tracker,
-			resourcetracker tracking.ReferenceResolverTracker,
-			newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)) managed.ExternalConnecter {
-			tracker := resource.NewProviderConfigUsageTracker(
-				mgr.GetClient(),
-				&providerv1alpha1.ProviderConfigUsage{},
-			)
+			resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 			return &connector{
-				kube:            mgr.GetClient(),
+				kube:            kube,
 				newServiceFn:    btp.NewBTPClient,
 				resourcetracker: resourcetracker,
 
 				newPlanIdInitializerFn: func(ctx context.Context, cr *apisv1beta1.ServiceManager) (ServiceManagerPlanIdInitializer, error) {
-					btpclient, err := providerconfig.CreateClient(ctx, cr, mgr.GetClient(), tracker, btp.NewBTPClient, resourcetracker)
+					btpclient, err := providerconfig.CreateClient(ctx, cr, mgr.GetClient(), usage, btp.NewBTPClient, resourcetracker)
 					if err != nil {
 						return nil, err
 					}
@@ -51,8 +45,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 				newClientInitalizerFn: func() servicemanager.ITfClientInitializer {
 					return servicemanager.NewServiceManagerTfClient(
-						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind),
-						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind),
+						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil),
+						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil),
 
 						servicemanager.Defaults{
 							InstanceName: apisv1beta1.DefaultServiceInstanceName,

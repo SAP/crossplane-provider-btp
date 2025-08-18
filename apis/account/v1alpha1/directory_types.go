@@ -16,7 +16,7 @@ type DirectoryParameters struct {
 
 	// Description of the Directory
 	// +optional
-	Description string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty"`
 
 	// Additional admins of the directory. Applies only to directories that have the user authorization management feature enabled. Do not add yourself as you are assigned as a directory admin by default. Example: ["admin1@example.com", "admin2@example.com"]
 	// +kubebuilder:validation:MinItems=2

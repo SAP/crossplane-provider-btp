@@ -1,0 +1,10 @@
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: KymaModule
+metadata:
+  name: cloud-manager-module
+spec:
+  kymaEnvironmentBindingRef:
+    name: kyma-environment-binding
+  forProvider:
+    name: cloud-manager
+    channel: regular

@@ -166,11 +166,11 @@ type TfClient struct {
 }
 
 func (tf *TfClient) DeleteResources(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
-	err := tf.sbExternal.Delete(ctx, tf.sBinding)
+	_, err := tf.sbExternal.Delete(ctx, tf.sBinding)
 	if err != nil {
 		return err
 	}
-	err = tf.siExternal.Delete(ctx, tf.sInstance)
+	_, err = tf.siExternal.Delete(ctx, tf.sInstance)
 	if err != nil {
 		return err
 	}

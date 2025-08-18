@@ -13,6 +13,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -49,6 +50,12 @@ type external struct {
 
 	httpClient *http.Client
 	kube       client.Client
+}
+
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -200,12 +207,17 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalUpdate{}, errors.New("Update is not implemented - should not be called, only create")
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironmentBinding)
 	if !ok {
-		return errors.New(errNotKymaEnvironmentBinding)
+		return managed.ExternalDelete{}, errors.New(errNotKymaEnvironmentBinding)
+	}
+
+	c.tracker.SetConditions(ctx, cr)
+	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
 	err := c.client.DeleteInstances(ctx, cr.Status.AtProvider.Bindings, cr.Spec.KymaEnvironmentId)
-	return err
+	return managed.ExternalDelete{}, err
 }

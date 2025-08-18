@@ -2,17 +2,19 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/alecthomas/kingpin/v2"
 	tjcontroller "github.com/crossplane/upjet/pkg/controller"
 	"github.com/crossplane/upjet/pkg/terraform"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/config"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/features"
-	"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/sap/crossplane-provider-btp/internal/version"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -89,6 +91,10 @@ func main() {
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
+
+	// Set custom user agent for terraform http calls via env variable
+	envErr := os.Setenv("BTP_APPEND_USER_AGENT", fmt.Sprintf("crossplane/%s", version.ProviderVersion))
+	kingpin.FatalIfError(envErr, "Cannot set environment variable BTP_APPEND_USER_AGENT")
 
 	mgr, err := ctrl.NewManager(
 		ratelimiter.LimitRESTConfig(cfg, *maxReconcileRate), ctrl.Options{

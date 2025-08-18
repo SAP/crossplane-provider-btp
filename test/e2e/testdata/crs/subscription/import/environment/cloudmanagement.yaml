@@ -1,4 +1,4 @@
-apiVersion: account.btp.sap.crossplane.io/v1alpha1
+apiVersion: account.btp.sap.crossplane.io/v1beta1
 kind: CloudManagement
 metadata:
   name: e2e-sub-import-cis-local

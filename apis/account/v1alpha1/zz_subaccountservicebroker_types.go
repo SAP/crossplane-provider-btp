@@ -35,6 +35,10 @@ type SubaccountServiceBrokerInitParameters struct {
 	// The name of the service broker.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
 
+	// (String, Sensitive) The password for basic authentication against the service broker.
+	// The password for basic authentication against the service broker.
+	PasswordSecretRef v1.SecretKeySelector `json:"passwordSecretRef" tf:"-"`
+
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
 	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
@@ -171,8 +175,8 @@ type SubaccountServiceBrokerStatus struct {
 // +kubebuilder:storageversion
 
 // SubaccountServiceBroker is the Schema for the SubaccountServiceBrokers API. Registers a service service broker in a subaccount. Tip: You must be assigned to the admin role of the subaccount.
-// +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
+// +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:resource:scope=Cluster,categories={crossplane,managed,account}

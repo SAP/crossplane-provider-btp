@@ -22,8 +22,8 @@ type EnvironmentInstanceResponseObject struct {
 	// The ID of the associated environment broker.
 	BrokerId *string `json:"brokerId,omitempty"`
 	// The commercial type of the environment broker.
-	CommercialType *string  `json:"commercialType,omitempty"`
-	CreatedDate    *float32 `json:"createdDate,omitempty"`
+	CommercialType *string `json:"commercialType,omitempty"`
+	CreatedDate *float32 `json:"createdDate,omitempty"`
 	// Custom labels that are defined by a user and assigned as key-value pairs in a JSON array to the environment instance.  Example: {   \"Cost Center\": [\"19700626\"],   \"Department\": [\"Sales\"],   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],   \"EMEA\":[] } NOTE: Custom labels apply only to SAP BTP. They are not the same labels that might be defined by your environment broker (see \"labels\" field).
 	CustomLabels *map[string][]string `json:"customLabels,omitempty"`
 	// The URL of the service dashboard, which is a web-based management user interface for the service instances.
@@ -39,8 +39,8 @@ type EnvironmentInstanceResponseObject struct {
 	// Broker-specified key-value pairs that specify attributes of an environment instance.
 	Labels *string `json:"labels,omitempty"`
 	// The name of the landscape within the logged-in region on which the environment instance is created.
-	LandscapeLabel *string  `json:"landscapeLabel,omitempty"`
-	ModifiedDate   *float32 `json:"modifiedDate,omitempty"`
+	LandscapeLabel *string `json:"landscapeLabel,omitempty"`
+	ModifiedDate *float32 `json:"modifiedDate,omitempty"`
 	// Name of the environment instance.
 	Name *string `json:"name,omitempty"`
 	// An identifier that represents the last operation. This ID is returned by the environment brokers.
@@ -887,7 +887,7 @@ func (o *EnvironmentInstanceResponseObject) SetType(v string) {
 }
 
 func (o EnvironmentInstanceResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -1009,3 +1009,5 @@ func (v *NullableEnvironmentInstanceResponseObject) UnmarshalJSON(src []byte) er
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

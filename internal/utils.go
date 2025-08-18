@@ -1,11 +1,27 @@
 package internal
 
 import (
+	"bytes"
+	"context"
+
+	json "github.com/json-iterator/go"
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 
-	"gopkg.in/yaml.v3"
+	yamlv3 "gopkg.in/yaml.v3"
+
+	"sigs.k8s.io/yaml"
+)
+
+const (
+	errExtractSecretKey = "no secret found"
 )
 
 func Default[T any](object *T, defaultValue T) T {
@@ -89,7 +105,7 @@ func Float32PtrToIntPtr(float *float32) *int {
 // ParseConnectionDetailsFromKubeYaml extracts server Url and certificate bundle from kubeconfig and returns it, if parsing fails empty strings are returned
 func ParseConnectionDetailsFromKubeYaml(kubeConfig []byte) (string, string) {
 	kubeYaml := &kubeConfigYaml{}
-	yamlErr := yaml.Unmarshal(kubeConfig, kubeYaml)
+	yamlErr := yamlv3.Unmarshal(kubeConfig, kubeYaml)
 
 	// gracefully ignore if format isn't matching for now
 	if yamlErr != nil || len(kubeYaml.Clusters) == 0 {
@@ -116,3 +132,50 @@ type clusterYaml struct {
 	Server              string `yaml:"server"`
 }
 
+// UnmarshalRawParameters produces a map structure from a given raw YAML/JSON input
+func UnmarshalRawParameters(in []byte) (map[string]interface{}, error) {
+	parameters := make(map[string]interface{})
+
+	if len(in) == 0 {
+		return parameters, nil
+
+	}
+	if hasJSONPrefix(in) {
+		if err := json.Unmarshal(in, &parameters); err != nil {
+			return parameters, err
+		}
+		return parameters, nil
+	}
+
+	err := yaml.Unmarshal(in, &parameters)
+	return parameters, err
+
+}
+
+var jsonPrefix = []byte("{")
+
+// hasJSONPrefix returns true if the provided buffer appears to start with
+// a JSON open brace.
+func hasJSONPrefix(buf []byte) bool {
+	return hasPrefix(buf, jsonPrefix)
+}
+
+// Return true if the first non-whitespace bytes in buf is prefix.
+func hasPrefix(buf []byte, prefix []byte) bool {
+	trim := bytes.TrimLeftFunc(buf, unicode.IsSpace)
+	return bytes.HasPrefix(trim, prefix)
+}
+
+func LoadSecretData(ctx context.Context, kube client.Client, secretName string, secretNamespace string) (map[string][]byte, error) {
+	if secretName == "" || secretNamespace == "" {
+		return nil, errors.New(errExtractSecretKey)
+	}
+	secret := &corev1.Secret{}
+	if err := kube.Get(ctx, types.NamespacedName{
+		Namespace: secretNamespace,
+		Name:      secretName,
+	}, secret); err != nil {
+		return nil, err
+	}
+	return secret.Data, nil
+}

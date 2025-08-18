@@ -72,7 +72,7 @@ func (o *CreateEnvironmentInstanceBindingRequest) SetParameters(v map[string]int
 }
 
 func (o CreateEnvironmentInstanceBindingRequest) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -122,3 +122,5 @@ func (v *NullableCreateEnvironmentInstanceBindingRequest) UnmarshalJSON(src []by
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

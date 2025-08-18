@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"net/http"
 	"net/url"
 	"os"
@@ -149,54 +149,10 @@ type BtpSecuritySecret struct {
 	ReadOnly          bool   `json:"read-only"`
 }
 
-// TrustConfigurationsList contains all trust configurations of a Globalaccount
-type TrustConfigurationsList struct {
-	Type   string `json:"type"`
-	Config struct {
-		EmailDomain             interface{} `json:"emailDomain"`
-		AdditionalConfiguration *struct {
-			Domain string `json:"domain"`
-		} `json:"additionalConfiguration"`
-		ProviderDescription     *string       `json:"providerDescription"`
-		ExternalGroupsWhitelist []interface{} `json:"externalGroupsWhitelist"`
-		AttributeMappings       struct {
-			GivenName      string   `json:"given_name"`
-			ExternalGroups []string `json:"external_groups,omitempty"`
-			FamilyName     string   `json:"family_name"`
-			UserName       string   `json:"user_name"`
-			Email          string   `json:"email"`
-		} `json:"attributeMappings"`
-		AddShadowUserOnLogin  bool        `json:"addShadowUserOnLogin"`
-		StoreCustomAttributes bool        `json:"storeCustomAttributes"`
-		AuthUrl               string      `json:"authUrl"`
-		TokenUrl              string      `json:"tokenUrl"`
-		TokenKeyUrl           string      `json:"tokenKeyUrl"`
-		LogoutUrl             *string     `json:"logoutUrl"`
-		TokenKey              interface{} `json:"tokenKey"`
-		LinkText              string      `json:"linkText"`
-		ShowLinkText          bool        `json:"showLinkText"`
-		ClientAuthInBody      bool        `json:"clientAuthInBody"`
-		SkipSslValidation     bool        `json:"skipSslValidation"`
-		RelyingPartyId        string      `json:"relyingPartyId"`
-		Scopes                []string    `json:"scopes"`
-		Issuer                string      `json:"issuer"`
-		ResponseType          string      `json:"responseType"`
-		DiscoveryUrl          *string     `json:"discoveryUrl"`
-		UserInfoUrl           string      `json:"userInfoUrl"`
-		PasswordGrantEnabled  bool        `json:"passwordGrantEnabled"`
-		SetForwardHeader      bool        `json:"setForwardHeader"`
-		PlatformIdp           bool        `json:"platformIdp"`
-		ApplicationIdp        bool        `json:"applicationIdp"`
-		NeoAuthnWithOidc      bool        `json:"neoAuthnWithOidc"`
-	} `json:"config"`
-	Id             string `json:"id"`
-	OriginKey      string `json:"originKey"`
-	Name           string `json:"name"`
-	Version        int    `json:"version"`
-	Created        int64  `json:"created"`
-	LastModified   int64  `json:"last_modified"`
-	Active         bool   `json:"active"`
-	IdentityZoneId string `json:"identityZoneId"`
+// TrustConfiguration contains a Globalaccount trust configurations (subset of relevant information)
+type TrustConfiguration struct {
+	OriginKey string `json:"originKey"`
+	Name      string `json:"name"`
 }
 
 // Children contains an array of child directories from a global account.
@@ -368,6 +324,7 @@ func GetSubaccounts(uaaAuth *UaaAuth, cisBinding CisBinding) (*Subaccounts, erro
 // DeleteSubaccount uses the guid, cis binding and uaa token to delete a subaccount.
 // Returns an error if it fails
 func DeleteSubaccount(guid string, cisBinding CisBinding, uaaAuth *UaaAuth) error {
+	fmt.Println("try to delete subaccount with guid: ", guid)
 	//configure parameters etc. for api call
 	baseURL := cisBinding.Endpoints.AccountsServiceUrl + "/accounts/v1/subaccounts/" + guid
 	params := url.Values{}
@@ -418,6 +375,21 @@ func btpLogin(username string, password string, globalAccount string) error {
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("login command failed: %s, output: %s", err, out.String())
+	}
+	return nil
+}
+
+// btpLogout logs out the user from the cli.
+// returns error if it fails
+func btpLogout() error {
+	// run command to login
+	cmd := exec.Command("btp", "logout")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("logout command failed: %s, output: %s", err, out.String())
 	}
 	return nil
 }
@@ -480,7 +452,7 @@ func DeleteDirectories(uaaAuth *UaaAuth, cisBinding CisBinding) error {
 
 	//Delete directories from this Build
 	for _, resource := range elementsToDelete {
-		fmt.Printf("try to delete: %s\n", resource.DisplayName)
+		fmt.Printf("try to delete directory: %s\n", resource.DisplayName)
 		//configure parameters etc. for api call
 		baseURL := cisBinding.Endpoints.AccountsServiceUrl + "/accounts/v1/directories/" + resource.Guid
 		params := url.Values{}
@@ -500,7 +472,7 @@ func DeleteDirectories(uaaAuth *UaaAuth, cisBinding CisBinding) error {
 			return fmt.Errorf("error making request: %w", err)
 		}
 		defer resp.Body.Close()
-		fmt.Printf("deleted: %s\n", resource.DisplayName)
+		fmt.Printf("deleted directory: %s\n", resource.DisplayName)
 	}
 	return nil
 }
@@ -569,111 +541,52 @@ func findChildren(children Children) ([]string, error) {
 	return directoriesGuids, nil
 }
 
-// getTrustConfigurations uses UaaAuth and BtpSecuritySecret to get the trust configuration of the globalaccount.
-// Returns an array of TrustConfigurationsList or an error if it fails.
-func getTrustConfigurations(auth *UaaAuth, btpSecret *BtpSecuritySecret) ([]TrustConfigurationsList, error) {
-	//configure parameters etc. for api call
-	baseURL := btpSecret.Apiurl + "/sap/rest/identity-providers"
-	params := url.Values{}
-	params.Add("activeOnly", "false")
-	params.Add("rawConfig", "true")
-	req, err := http.NewRequest("GET", baseURL+"?"+params.Encode(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-	req.Header.Add("Authorization", "Bearer "+auth.AccessToken)
-	req.Header.Add("Accept", "application/json")
+// getTrustConfigurationForBuild uses btp cli to get the trust configuration of the globalaccount.
+// Returns a filtered []TrustConfiguration for the buildID (naming pattern: <buildID><name>) or an error if it fails.
+func getTrustConfigurationForBuild(buildID string) ([]TrustConfiguration, error) {
 
-	//make api call to get trust configurations
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	// Execute the BTP CLI command to get the account hierarchy
+	cmd := exec.Command("btp", "--format", "json", "list", "security/trust")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err := cmd.Run()
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
+		return nil, fmt.Errorf("command execution failed: %s, output: %s", err, out.String())
 	}
-	defer resp.Body.Close()
 
 	//parse response
-	var trustConfigurationsList []TrustConfigurationsList
-	if resp.StatusCode == http.StatusOK {
-		if err := json.NewDecoder(resp.Body).Decode(&trustConfigurationsList); err != nil {
-			return nil, fmt.Errorf("error decoding JSON response: %w", err)
-		}
-
-	} else {
-		return nil, fmt.Errorf("request failed with status code: %d\n", resp.StatusCode)
+	var trustConfigurationsList []TrustConfiguration
+	if err := json.Unmarshal(out.Bytes(), &trustConfigurationsList); err != nil {
+		return nil, fmt.Errorf("error decoding JSON response: %w", err)
 	}
-	buildID := os.Getenv("BUILD_ID")
 
-	var relevanttrustConfigurations []TrustConfigurationsList
-
-	// check if trust configurations is from current build
-	for _, trustConfiguration := range trustConfigurationsList {
-		if strings.HasPrefix(trustConfiguration.Name, buildID) {
-			relevanttrustConfigurations = append(relevanttrustConfigurations, trustConfiguration)
+	// filter for trust configurations from current test build
+	var trustConfigurationFromThisTestBuild []TrustConfiguration
+	for _, tc := range trustConfigurationsList {
+		if strings.HasPrefix(tc.Name, buildID) {
+			trustConfigurationFromThisTestBuild = append(trustConfigurationFromThisTestBuild, tc)
 		}
 	}
-	return relevanttrustConfigurations, nil
+	return trustConfigurationFromThisTestBuild, nil
 }
 
 // deleteTrustConfigurations uses an array of TrustConfigurationsList to delete the trust configurations.
 // Returns an error if it fails.
-func deleteTrustConfigurations(trustConfigurationsList []TrustConfigurationsList) error {
+func deleteTrustConfigurations(trustConfigurationsList []TrustConfiguration) error {
 	// slice it in single trust configurations
 	for _, trustConfiguration := range trustConfigurationsList {
 		// delete trust configuration
+		fmt.Println("try to delete: ", trustConfiguration.Name)
 		cmd := exec.Command("btp", "delete", "security/trust", trustConfiguration.OriginKey, "--confirm")
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		cmd.Stderr = &out
 		err := cmd.Run()
 		if err != nil {
-			return fmt.Errorf("command execution failed: %s, output: %s", err, out.String())
+			return fmt.Errorf("failed deleting security/trust with name %s: command execution failed: %s, output: %s", trustConfiguration.Name, err, out.String())
 		}
 		fmt.Printf("deleted: %s\n", trustConfiguration.Name)
-	}
-	return nil
-}
-
-// getTokenForTrustConfiguration creates a security/api-credential secret and get a UaaAuth token.
-// Returns BtpSecuritySecret with the security/api-credential secret and UaaAuth or an error if it fails.
-func getTokenForTrustConfiguration() (*BtpSecuritySecret, *UaaAuth, error) {
-	// Execute the BTP CLI command to get the account hierarchy
-	buildId := os.Getenv("BUILD_ID")
-	cmd := exec.Command("btp", "--format", "json", "create", "security/api-credential", "--name", buildId+"cleanUpAccount")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err := cmd.Run()
-	if err != nil {
-		return nil, nil, fmt.Errorf("command execution failed: %s, output: %s", err, out.String())
-	}
-
-	var btpSecuritySecret BtpSecuritySecret
-	// parse repsonse
-	err = yaml.Unmarshal(out.Bytes(), &btpSecuritySecret)
-	if err != nil {
-		return nil, nil, err
-	}
-	// get a UaaAuth token
-	uaaAuthForTrustConfiguration, err := GetUaaAuthForTrustConfiguration(btpSecuritySecret)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error getting uaa auth for trust configuration: %s", err)
-	}
-	return &btpSecuritySecret, uaaAuthForTrustConfiguration, nil
-}
-
-// deleteTokenForTrustConfiguration deletes the from getTokenForTrustConfiguration() created security/api-credential
-// secret. Returns an error if it fails.
-func deleteTokenForTrustConfiguration() error {
-	buildId := os.Getenv("BUILD_ID")
-	// make btp cli command to delete the secret
-	cmd := exec.Command("btp", "delete", "security/api-credential", buildId+"cleanUpAccount", "--confirm")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("command execution failed: %s, output: %s", err, out.String())
 	}
 	return nil
 }
@@ -697,6 +610,10 @@ func checkIfAccountIsClean(cisBinding CisBinding, uaaAuth *UaaAuth) bool {
 	}
 
 	subaccounts, err := GetSubaccounts(uaaAuth, cisBinding)
+	if err != nil {
+		fmt.Println("error while getting subaccounts: ", err)
+		return false
+	}
 	for _, subaccount := range subaccounts.Value {
 		buildId := os.Getenv("BUILD_ID")
 		// check if the subaccounts is from the current build
@@ -706,65 +623,71 @@ func checkIfAccountIsClean(cisBinding CisBinding, uaaAuth *UaaAuth) bool {
 	}
 	return true
 }
-func main() {
-	// get cis binding
+
+func cleanup() (errs error) {
+	buildID := os.Getenv("BUILD_ID")
+
+	fmt.Println("Get cis binding from env...")
 	cisBindingEnv := os.Getenv("CIS_CENTRAL_BINDING")
 	var cisBinding CisBinding
 	if err := json.Unmarshal([]byte(cisBindingEnv), &cisBinding); err != nil {
-		fmt.Println("error unmarshalling config JSON: ", err)
-		return
+		errs = errors.Join(errs, fmt.Errorf("error unmarshalling config JSON: %w", err))
+		return errs
 	}
+	fmt.Println("Successfully got cis binding")
 
 	//get uaa from envs
+	fmt.Println("Get uaa auth from cis binding...")
 	uaaAuth, err := GetUaaAuth(cisBinding)
 	if err != nil {
-		fmt.Println("error getting uaa auth:", err)
-		return
+		errs = errors.Join(errs, fmt.Errorf("error getting uaa auth: %w", err))
+		return errs
 	}
+	fmt.Println("Successfully got uaa auth for cis binding")
 
-	// get technical user credentials
+	fmt.Println("Get btp technical user from env...")
 	technicalUserEnv := os.Getenv("BTP_TECHNICAL_USER")
 	var technicalUser TechnicalUser
 	if err := json.Unmarshal([]byte(technicalUserEnv), &technicalUser); err != nil {
-		fmt.Println("error unmarshalling config JSON: ", err)
-		return
-	}
+		errs = errors.Join(errs, fmt.Errorf("error unmarshalling config JSON: %w", err))
+		return errs
 
-	// login to btp cli
+	}
+	fmt.Println("Successfully got BTP technical user")
+
+	fmt.Println("Logging in to BTP CLI with technical user credentials...")
 	err = btpLogin(technicalUser.Email, technicalUser.Password, cisBinding.Uaa.Identityzoneid)
 	if err != nil {
-		fmt.Println(err)
+		errs = errors.Join(errs, fmt.Errorf("error logging into BTP CLI: %w", err))
+		return errs
 	}
+	defer func() {
+		if tempErr := btpLogout(); tempErr != nil {
+			errs = errors.Join(errs, fmt.Errorf("error logging out from BTP CLI: %w", tempErr))
+		}
+	}()
+	fmt.Println("Successfully logged in to BTP CLI")
 
-	// get uaa for trust configuration
-	btpSecret, auth, err := getTokenForTrustConfiguration()
+	fmt.Println("Get Trust Configuration for current build...")
+	trustConfigurationsForCurrentBuild, err := getTrustConfigurationForBuild(buildID)
 	if err != nil {
-		fmt.Println("error getting access token:", err)
-		return
+		errs = errors.Join(errs, fmt.Errorf("error getting trust Configurations: %w", err))
+		return errs
 	}
-	// get trust configurations
-	trustConfigurationsList, err := getTrustConfigurations(auth, btpSecret)
-	if err != nil {
-		fmt.Println("error getting trust Configurations:", err)
-		return
-	}
+	fmt.Println("Successfully got Trust Configurations for current build")
 
 	// delete trust confiurations for the current build
-	err = deleteTrustConfigurations(trustConfigurationsList)
+	fmt.Println("Deleting Trust Configurations for current build...")
+	err = deleteTrustConfigurations(trustConfigurationsForCurrentBuild)
 	if err != nil {
-		fmt.Println("error while deleting trust configuration:", err)
-		return
+		errs = errors.Join(errs, fmt.Errorf("error while deleting trust configuration: %w", err))
+		return errs
 	}
-
-	// delete secret for the trust configurations
-	err = deleteTokenForTrustConfiguration()
-	if err != nil {
-		fmt.Println("error getting access token:", err)
-		return
-	}
+	fmt.Println("Successfully deleted Trust Configurations for current build")
 
 	// trying to delete subaccounts and directories of current build
 	for i := 0; i < 5; i++ {
+		fmt.Println("Trying to delete subaccounts and directories of current build... Attempt:", i+1)
 
 		//delete directories for the current build
 		err = DeleteDirectories(uaaAuth, cisBinding)
@@ -781,10 +704,19 @@ func main() {
 		time.Sleep(45 * time.Second)
 		if checkIfAccountIsClean(cisBinding, uaaAuth) {
 			fmt.Println("Globalaccount has been cleaned")
-			os.Exit(0)
+			return errs
 		}
 	}
-	fmt.Println("Globalaccount can not be cleaned in time")
-	os.Exit(1)
+	errs = errors.Join(errs, fmt.Errorf("globalaccount can not be cleaned in time"))
+	return errs
+}
 
+func main() {
+	if err := cleanup(); err != nil {
+		fmt.Println("Cleanup failed:", err)
+		os.Exit(1)
+	} else {
+		fmt.Println("Cleanup completed successfully")
+		os.Exit(0)
+	}
 }

@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -21,9 +20,9 @@ type ConnectorFn func(
 	kube client.Client,
 	usage resource.Tracker,
 	resourcetracker tracking.ReferenceResolverTracker,
-	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error),
 ) managed.ExternalConnecter
 
+// DefaultSetup supports the creation of a controller for a given managed resource type. Accepts any type that implements the ConnectorFn or KymaModuleConnectorFn signature.
 func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, kind string, gvk schema.GroupVersionKind, connectorFn ConnectorFn) error {
 	name := managed.ControllerName(kind)
 
@@ -35,12 +34,14 @@ func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, 
 			mgr.GetClient(),
 			&providerv1alpha1.ProviderConfigUsage{},
 		)
+
 	r := managed.NewReconciler(
 		mgr,
 		resource.ManagedKind(gvk),
-		managed.WithExternalConnecter(connectorFn(mgr.GetClient(), usageTracker, referenceTracker, btp.NewBTPClient)),
+		managed.WithExternalConnecter(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		managed.WithPollInterval(o.PollInterval),
 		connectionPublishers(mgr, o),
 		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
 	)

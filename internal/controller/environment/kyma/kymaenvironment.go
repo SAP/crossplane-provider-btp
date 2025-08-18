@@ -14,11 +14,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
+	"github.com/sap/crossplane-provider-btp/internal"
 	environments "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
@@ -65,16 +68,24 @@ type external struct {
 	log        logr.Logger
 }
 
+// Disconnect is a no-op for the external client to close its connection.
+// Since we dont need this, we only have it to fullfil the interface.
+func (c *external) Disconnect(ctx context.Context) error {
+	return nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironment)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotKymaEnvironment)
 	}
 
-	instance, err := c.client.DescribeInstance(ctx, *cr)
+	instance, hasUpdate, err := c.client.DescribeInstance(ctx, *cr)
+
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errCantDescribe)
 	}
+
 	lastModified := cr.Status.AtProvider.ModifiedDate
 	cr.Status.AtProvider = kymaenv.GenerateObservation(instance)
 
@@ -116,15 +127,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			}, errors.Wrap(readErr, "can not obtain kubeConfig")
 		}
 		return managed.ExternalObservation{
-			ResourceExists:    true,
-			ResourceUpToDate:  true,
-			ConnectionDetails: details,
+			ResourceExists:          true,
+			ResourceUpToDate:        true,
+			ConnectionDetails:       details,
+			ResourceLateInitialized: hasUpdate,
 		}, nil
 	}
 
 	return managed.ExternalObservation{
-		ResourceExists:   true,
-		ResourceUpToDate: true,
+		ResourceExists:          true,
+		ResourceUpToDate:        true,
+		ResourceLateInitialized: hasUpdate,
 	}, nil
 }
 
@@ -138,10 +151,12 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotKymaEnvironment)
 	}
 
-	err := c.client.CreateInstance(ctx, *cr)
+	guid, err := c.client.CreateInstance(ctx, *cr)
 	if err != nil {
 		return managed.ExternalCreation{}, err
 	}
+
+	meta.SetExternalName(cr, guid)
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
@@ -172,21 +187,21 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironment)
 	if !ok {
-		return errors.New(errNotKymaEnvironment)
+		return managed.ExternalDelete{}, errors.New(errNotKymaEnvironment)
 	}
 	c.tracker.SetConditions(ctx, cr)
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
-		return errors.New(providerv1alpha1.ErrResourceInUse)
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
 	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateDeleting {
-		return nil
+		return managed.ExternalDelete{}, nil
 	}
 
-	return c.client.DeleteInstance(ctx, *cr)
+	return managed.ExternalDelete{}, c.client.DeleteInstance(ctx, *cr)
 }
 
 func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {
@@ -194,17 +209,14 @@ func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {
 }
 
 func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, string, error) {
-	if *cr.Status.AtProvider.State != v1alpha1.InstanceStateOk {
-		return false, "", nil
-	}
 
-	desired, err := kymaenv.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
+	desired, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
 	desired = kymaenv.AddKymaDefaultParameters(desired, cr.Name, string(cr.UID))
 	if err != nil {
 		return false, "", errors.Wrap(err, errParameterParsing)
 	}
 
-	current, err := kymaenv.UnmarshalRawParameters([]byte(*cr.Status.AtProvider.Parameters))
+	current, err := internal.UnmarshalRawParameters([]byte(ptr.Deref(cr.Status.AtProvider.Parameters, "{}")))
 	if err != nil {
 		return false, "", errors.Wrap(err, errServiceParsing)
 	}

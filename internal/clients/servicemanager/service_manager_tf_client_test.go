@@ -591,8 +591,8 @@ func TestDeleteResources(t *testing.T) {
 			args: args{
 				cr: testSMCr("subaccountId", "planId", "someID/anotherID", "", "", ""),
 				sbExternal: ExternalClientFake{
-					deleteFn: func() error {
-						return errors.New("bindingDeleteError")
+					deleteFn: func() (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, errors.New("bindingDeleteError")
 					},
 				},
 			},
@@ -605,13 +605,13 @@ func TestDeleteResources(t *testing.T) {
 			args: args{
 				cr: testSMCr("subaccountId", "planId", "someID/anotherID", "", "", ""),
 				sbExternal: ExternalClientFake{
-					deleteFn: func() error {
-						return nil
+					deleteFn: func() (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, nil
 					},
 				},
 				siExternal: ExternalClientFake{
-					deleteFn: func() error {
-						return errors.New("instanceDeleteError")
+					deleteFn: func() (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, errors.New("instanceDeleteError")
 					},
 				},
 			},
@@ -624,13 +624,13 @@ func TestDeleteResources(t *testing.T) {
 			args: args{
 				cr: testSMCr("subaccountId", "planId", "someID/anotherID", "", "", ""),
 				sbExternal: ExternalClientFake{
-					deleteFn: func() error {
-						return nil
+					deleteFn: func() (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, nil
 					},
 				},
 				siExternal: ExternalClientFake{
-					deleteFn: func() error {
-						return nil
+					deleteFn: func() (managed.ExternalDelete, error) {
+						return managed.ExternalDelete{}, nil
 					},
 				},
 			},
@@ -729,7 +729,7 @@ type ExternalClientFake struct {
 	observeFn func() (managed.ExternalObservation, error)
 	createFn  func(mg resource.Managed) (managed.ExternalCreation, error)
 	updateFn  func() (managed.ExternalUpdate, error)
-	deleteFn  func() error
+	deleteFn  func() (managed.ExternalDelete, error)
 }
 
 func (e ExternalClientFake) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -744,8 +744,12 @@ func (e ExternalClientFake) Update(ctx context.Context, mg resource.Managed) (ma
 	return e.updateFn()
 }
 
-func (e ExternalClientFake) Delete(ctx context.Context, mg resource.Managed) error {
+func (e ExternalClientFake) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	return e.deleteFn()
+}
+func (e ExternalClientFake) Disconnect(ctx context.Context) error {
+	// This is not used in tests, but required by the interface
+	return nil
 }
 
 func setExternalName(mg resource.Managed, name string) {

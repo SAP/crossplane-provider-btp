@@ -2,6 +2,9 @@ package controller
 
 import (
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
+	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding"
+	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
+	"github.com/sap/crossplane-provider-btp/internal/controller/kymamodule"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/cloudmanagement"
@@ -13,6 +16,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/subaccount"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/cloudfoundry"
+
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/kyma"
 	"github.com/sap/crossplane-provider-btp/internal/controller/kymaenvironmentbinding"
 	"github.com/sap/crossplane-provider-btp/internal/controller/oidc/certbasedoidclogin"
@@ -39,7 +43,10 @@ func CustomSetup(mgr ctrl.Manager, o controller.Options) error {
 		subscription.Setup,
 		rolecollectionassignment.Setup,
 		rolecollection.Setup,
+		serviceinstance.Setup,
+		servicebinding.Setup,
 		kymaenvironmentbinding.Setup,
+		kymamodule.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err
