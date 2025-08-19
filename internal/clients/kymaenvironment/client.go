@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 
@@ -68,7 +69,30 @@ func GenerateObservation(
 	return observation
 }
 
+
+func InvalidateConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject) {
+	connDetailsMemoizationMap.invalidate(instance)
+}
+
 func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject, httpClient *http.Client) (managed.ConnectionDetails, error) {
+	// Let's check, if we have the ConnectionDetails in the
+	// memoization map
+	cd, found := connDetailsMemoizationMap.get(instance)
+	if !found {
+		// It's not in the map, so let's generate it
+		cd, err := getConnectionDetails(instance, httpClient)
+		if err != nil {
+			// Here, we store the ConenctionDetails in the
+			// memoization map
+			connDetailsMemoizationMap.set(instance, &cd)
+		}
+		return cd, err
+	}
+	// we return the value from the map
+	return *cd, nil
+}
+
+func getConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject, httpClient *http.Client) (managed.ConnectionDetails, error) {
 	labelMap := map[string]string{}
 
 	var iLabel string
