@@ -119,6 +119,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	if connectionDetailsNeedUpdate(lastModified, cr) {
+		// remove the connection details from memoization map
+		// to force fetching a new ConnectionDetails object
 		environments.InvalidateConnectionDetails(instance)
 	}
 	details, readErr := environments.GetConnectionDetails(instance, c.httpClient)

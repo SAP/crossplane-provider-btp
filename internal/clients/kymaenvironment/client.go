@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/memoize"
 )
 
 type Client interface {
@@ -69,22 +69,35 @@ func GenerateObservation(
 	return observation
 }
 
+type memoizedBusinessEnvironmentInstanceResponseObject struct {
+	*provisioningclient.BusinessEnvironmentInstanceResponseObject
+}
 
+func (instance memoizedBusinessEnvironmentInstanceResponseObject)GetMemoKey() *string {
+	if instance.BusinessEnvironmentInstanceResponseObject == nil {
+		return nil
+	}
+	return instance.BusinessEnvironmentInstanceResponseObject.Labels
+}
+
+var connDetailsMemoizationMap = memoize.New[managed.ConnectionDetails](context.Background())
+
+// InvalidateConnectionDetails removed the key from the memoization map.
 func InvalidateConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject) {
-	connDetailsMemoizationMap.invalidate(instance)
+	connDetailsMemoizationMap.Invalidate(memoizedBusinessEnvironmentInstanceResponseObject{instance})
 }
 
 func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject, httpClient *http.Client) (managed.ConnectionDetails, error) {
 	// Let's check, if we have the ConnectionDetails in the
 	// memoization map
-	cd, found := connDetailsMemoizationMap.get(instance)
+	cd, found := connDetailsMemoizationMap.Get(memoizedBusinessEnvironmentInstanceResponseObject{instance})
 	if !found {
 		// It's not in the map, so let's generate it
 		cd, err := getConnectionDetails(instance, httpClient)
 		if err != nil {
 			// Here, we store the ConenctionDetails in the
 			// memoization map
-			connDetailsMemoizationMap.set(instance, &cd)
+			connDetailsMemoizationMap.Set(memoizedBusinessEnvironmentInstanceResponseObject{instance}, &cd)
 		}
 		return cd, err
 	}
