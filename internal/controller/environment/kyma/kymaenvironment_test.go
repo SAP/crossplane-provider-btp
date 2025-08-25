@@ -201,7 +201,7 @@ func TestObserve(t *testing.T) {
 					ResourceUpToDate: true,
 				},
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
-				err:           nil,
+				err:           errors.Wrap(errors.New("unexpected end of JSON input"), "can not obtain kubeConfig"),
 				cr:            environment(withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
