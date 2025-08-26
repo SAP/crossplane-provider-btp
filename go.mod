@@ -23,7 +23,7 @@ require (
 	github.com/muvaf/typewriter v0.0.0-20240614220100-70f9d4a54ea0
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.51.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	github.com/vladimirvivien/gexe v0.4.1
 	golang.org/x/net v0.41.0
 	golang.org/x/oauth2 v0.28.0
