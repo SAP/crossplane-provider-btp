@@ -8,6 +8,7 @@ import (
 	// Note(turkenh): we are importing this to embed provider schema document
 	_ "embed"
 
+	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
 	ujconfig "github.com/crossplane/upjet/pkg/config"
 	apicredentials "github.com/sap/crossplane-provider-btp/config/btp_subaccount_api_credential"
 	directoryentitlement "github.com/sap/crossplane-provider-btp/config/directory_entitlement"
@@ -33,8 +34,10 @@ var providerMetadata string
 func GetProvider() *ujconfig.Provider {
 	pc := ujconfig.NewProvider([]byte(providerSchema), resourcePrefix, modulePath, []byte(providerMetadata),
 		ujconfig.WithRootGroup("btp.sap.crossplane.io"),
-		ujconfig.WithIncludeList(ExternalNameConfigured()),
+		ujconfig.WithIncludeList(CLIReconciledResourceList()),
 		ujconfig.WithFeaturesPackage("internal/features"),
+		ujconfig.WithTerraformPluginFrameworkIncludeList(TerraformPluginFrameworkReconciledResourceList()),
+		ujconfig.WithTerraformPluginFrameworkProvider(tfprovider.New()),
 		ujconfig.WithDefaultResourceOptions(
 			ExternalNameConfigurations(),
 		))
