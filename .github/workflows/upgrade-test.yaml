@@ -1,10 +1,10 @@
 name: Upgrade Test Workflow
 
+# triggered on workflow dispatch
 
 permissions:
   contents: read
   packages: write
-  pull-requests: write
 
 on:
   workflow_dispatch:
@@ -15,55 +15,40 @@ on:
         default: "v1.0.3"
       target:
         description: "Target version"
-        required: true
-        default: "v1.1.0"
-
-  # disabled for better authoration added, only certain people should be able to trigger this 
-  # issue_comment:
-  #   types:
-  #     - created
-  
+        required: false
 
 jobs:
-  upgrade-test:
+  # if the target is not set, we want to take the latest git commit of the branch and build the image with that.
+  build-test-version:
+    if: ${{ github.event.inputs.target == '' }}
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' || 
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test'))
     steps:
       - name: Setup Docker Buildx
-        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
         uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
         with:
-            version: v0.15.1
-            install: true
+          version: v0.15.1
+          install: true
       - name: Checkout code
-        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           submodules: true
       - name: Fetch History
-        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
         run: git fetch --prune --unshallow
 
       - name: Set up Go
-        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
-          go-version: '1.21'
+          go-version: "1.21"
 
       - name: Vendor Dependencies
-        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
         run: make vendor vendor.check
 
       - name: Set up Version
-        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
         run: |
-          echo "BUILD_IMAGE_VERSION=v0.0.0-draft-${{ github.event.issue.number }}" >> $GITHUB_ENV
+          echo "BUILD_IMAGE_VERSION=v0.0.0-draft-${{ github.sha }}" >> $GITHUB_ENV
           echo "version is $BUILD_IMAGE_VERSION"
       - name: Build Images
-        if:  github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
-        run: make build VERSION=$BUILD_IMAGE_VERSION 
+        run: make build VERSION=$BUILD_IMAGE_VERSION
         env:
           # We're using docker buildx, which doesn't actually load the images it
           # builds by default. Specifying --load does so.
@@ -72,22 +57,34 @@ jobs:
           BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
 
       - name: Login to Container Registry
-        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
           registry: ${{ vars.REGISTRY_URL }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish Artifacts to DockerHub
-        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
         run: make publish BRANCH_NAME=${GITHUB_REF##*/} VERSION=$BUILD_IMAGE_VERSION
         env:
           DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
           BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
 
+  upgrade-test:
+    needs: [build-test-version]
+    runs-on: ubuntu-latest
+    steps:
+      # if the target is not set, use the version built in the build-test-version job
+      # if triggered with source and target we just use these to versions for the test
+      - name: Set TARGET_IMAGE_VERSION
+        run: |
+          if [ -z "${{ github.event.inputs.target }}" ]; then
+            echo "TARGET_IMAGE_VERSION=$BUILD_IMAGE_VERSION" >> $GITHUB_ENV
+          else
+            echo "TARGET_IMAGE_VERSION=${{ github.event.inputs.target }}" >> $GITHUB_ENV
+          fi
+
       - name: Clone provider-upgrade-test repo
         run: |
-          git clone https://${{ secrets.UPGRADE_TEST_GT_TOKEN }}@${{ secrets.UPGRADE_TEST_GIT_REPO_HOST }}/cloud-orchestration/provider-upgrade-test.git
+          git clone https://github.com/openmcp-project/provider-upgrade-test.git
           echo "Repository provider-upgrade-test cloned successfully."
 
       - name: Install CLI Tools
@@ -121,33 +118,12 @@ jobs:
 
           echo "All tools installed successfully."
       - name: Run upgrade test
-        if: github.event_name == 'workflow_dispatch' 
+        if: github.event_name == 'workflow_dispatch'
         run: |
           cd provider-upgrade-test
           echo "Running upgrade test..."
-          REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${{ github.event.inputs.source }}" --target ${REGISTRY}:${{ github.event.inputs.target }} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
-        env: 
-          CLIENT_ID: ${{ secrets.UPGRADE_TEST_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.UPGRADE_TEST_CLIENT_SECRET }}
-          TECH_USER_PASSWORD: ${{ secrets.UPGRADE_TEST_TECH_USER_PW }}
-
-      - name: Run upgrade test from the last versions
-        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/upgrade-test')
-        run: |
-          cd provider-upgrade-test
-          echo "Running upgrade test..."
-          latest_versions=$(ls -d providers/provider-btp/v* 2>/dev/null | sort -V | tail -n 3 | xargs -n 1 basename)
-          if [[ -z "$latest_versions" ]]; then
-            echo "Error: No versions found in providers/provider-btp." >&2
-            exit 1
-          fi
-          echo "Latest three versions supports upgrade test are: $latest_versions"
-          for source_version in $latest_versions; do
-            echo "Running upgrade test from version: $source_version"
-            REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${source_version}" --target ${REGISTRY}:${BUILD_IMAGE_VERSION} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
-            echo "Upgrade test finished for version: $source_version"
-          done
-        env: 
+          REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${{ github.event.inputs.source }}" --target ${REGISTRY}:${TARGET_IMAGE_VERSION} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
+        env:
           CLIENT_ID: ${{ secrets.UPGRADE_TEST_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.UPGRADE_TEST_CLIENT_SECRET }}
           TECH_USER_PASSWORD: ${{ secrets.UPGRADE_TEST_TECH_USER_PW }}
