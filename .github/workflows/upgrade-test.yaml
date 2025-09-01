@@ -126,8 +126,8 @@ jobs:
           REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${{ github.event.inputs.source }}" --target ${REGISTRY}:${TARGET_IMAGE_VERSION} --provider provider-btp   --initialize providers/provider-btp/scripts/initialize.sh --cleanup  providers/provider-btp/scripts/cleanup.sh
         env:
           TECH_USER_PASSWORD: ${{ secrets.UPGRADE_TEST_TECH_USER_PW }}
-          TECHNICAL_USER_EMAIL: ${{ secrets.CLI_SERVER_URL }}
-          CLI_SERVER_URL: ${{ secrets.TECHNICAL_USER_EMAIL }}
+          TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
+          CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
           GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
