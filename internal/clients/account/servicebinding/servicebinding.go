@@ -3,16 +3,16 @@ package servicebindingclient
 import (
 	"context"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	instanceClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // NewServiceBindingConnector creates a connector for the service binding client using the generic TfProxyConnector

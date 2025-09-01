@@ -3,6 +3,7 @@ package tfclient
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -35,6 +36,9 @@ type TfProxyControllerI interface {
 	Delete(ctx context.Context) error
 	// QueryUpdatedData returns the relevant status data once the async creation is done
 	QueryAsyncData(ctx context.Context) *ObservationData
+
+	TfClient() managed.ExternalClient
+	TfResource() ujresource.Terraformed
 }
 
 type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
@@ -43,6 +47,7 @@ type ObservationData struct {
 	ExternalName string `json:"externalName"`
 	ID           string `json:"id"`
 	Conditions   []xpv1.Condition
+	CreationTime time.Time
 }
 
 // TfMapper is a generic interface to map a native resource to an upjet resource that will be used for applying to terraform
@@ -91,6 +96,14 @@ type TfProxyController[UPJETTED ujresource.Terraformed] struct {
 	tfResource UPJETTED
 }
 
+func (t *TfProxyController[UPJETTED]) TfClient() managed.ExternalClient {
+	return t.tfClient
+}
+
+func (t *TfProxyController[UPJETTED]) TfResource() ujresource.Terraformed {
+	return t.tfResource
+}
+
 // QueryUpdatedData returns the relevant status data once the async creation is done
 func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *ObservationData {
 	// only query the async data if the operation is finished
@@ -99,6 +112,7 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 		sid.ID = t.tfResource.GetID()
 		sid.ExternalName = meta.GetExternalName(t.tfResource)
 		sid.Conditions = []xpv1.Condition{xpv1.Available(), ujresource.AsyncOperationFinishedCondition()}
+		sid.CreationTime = t.tfResource.GetCreationTimestamp().Time
 		return sid
 	}
 	return nil

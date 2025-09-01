@@ -106,6 +106,26 @@ spec:
                       keys from secrets
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
+                  rotation:
+                    description: Rotation defines the parameters for rotating the
+                      service credential binding.
+                    properties:
+                      frequency:
+                        description: Frequency defines how often the active key should
+                          be rotated.
+                        type: string
+                      ttl:
+                        description: |-
+                          TTL (Time-To-Live) defines the total time a credential is valid for before it is deleted.
+                          Must be >= frequency
+                        type: string
+                    required:
+                    - frequency
+                    type: object
+                    x-kubernetes-validations:
+                    - message: ttl must be greater than or equal to frequency
+                      rule: '!has(self.ttl) || (has(self.frequency) && duration(self.ttl)
+                        >= duration(self.frequency))'
                   serviceInstanceId:
                     description: |-
                       (String) The ID of the service instance associated with the binding.
@@ -446,8 +466,32 @@ spec:
                 description: ServiceBindingObservation are the observable fields of
                   a ServiceBinding.
                 properties:
-                  id:
+                  createdAt:
+                    description: The date and time when the resource was created.
+                    format: date-time
                     type: string
+                  id:
+                    description: The ID of the service binding resource
+                    type: string
+                  name:
+                    type: string
+                  retiredKeys:
+                    description: If the binding is rotated, `retiredBindings` stores
+                      resources that have been rotated out but are still transitionally
+                      retained due to `rotation.ttl` setting
+                    items:
+                      properties:
+                        createdAt:
+                          description: The date and time when the resource was created.
+                          format: date-time
+                          type: string
+                        id:
+                          description: The ID of the service binding resource
+                          type: string
+                        name:
+                          type: string
+                      type: object
+                    type: array
                 type: object
               conditions:
                 description: Conditions of the resource.

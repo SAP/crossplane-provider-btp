@@ -20,7 +20,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			kube:  kube,
 			usage: usage,
 
-			clientConnector: sbClient.NewServiceBindingConnector(saveCallback, kube),
+			client: sbClient.NewServiceBindingConnector(saveCallback, kube),
 		}
 	})
 }
