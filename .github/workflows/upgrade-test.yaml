@@ -128,3 +128,8 @@ jobs:
           CLIENT_ID: ${{ secrets.UPGRADE_TEST_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.UPGRADE_TEST_CLIENT_SECRET }}
           TECH_USER_PASSWORD: ${{ secrets.UPGRADE_TEST_TECH_USER_PW }}
+          TECHNICAL_USER_EMAIL: ${{ secrets.CLI_SERVER_URL }}
+          CLI_SERVER_URL: ${{ secrets.TECHNICAL_USER_EMAIL }}
+          SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
+          GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
+          CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
