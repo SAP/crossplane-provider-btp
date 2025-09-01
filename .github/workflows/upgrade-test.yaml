@@ -71,8 +71,7 @@ jobs:
   upgrade-test:
     needs: [build-test-version]
     runs-on: ubuntu-latest
-    if: |
-      needs.build-test-version.result == 'success' || needs.build-test-version.result == 'skipped'
+    if: always() # would also run if build-test-version fails but we just fail too
     steps:
       # if the target is not set, use the version built in the build-test-version job
       # if triggered with source and target we just use these to versions for the test
