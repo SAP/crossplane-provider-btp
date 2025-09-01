@@ -127,7 +127,7 @@ func (m *Map[V]) Get(key Key) (*V, bool) {
 	cdAt, found := m.m[*k]
 	m.lock.RUnlock()
 	if !found {
-		// There is no ConnectionDetails in the hash
+		// There is no ConnectionDetails in the hashmap
 		return nil, false
 	}
 	if time.Since(cdAt.createdAt) > m.keyExpiration {
