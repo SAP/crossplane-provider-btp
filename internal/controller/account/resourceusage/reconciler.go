@@ -169,11 +169,24 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 			log.Debug(msg)
 			r.record.Event(ru, event.Warning(reasonAccount, errors.New(msg)))
 
+			// Set the Terminating condition to indicate deletion is blocked
+			ru.SetConditions(Terminating())
+			if err := r.client.Status().Update(ctx, ru); err != nil {
+				r.log.Debug(errUpdateStatus, "error", err)
+				return reconcile.Result{RequeueAfter: shortWait}, nil
+			}
+
 			// We're watching our usages, so we'll be requeued when they go.
 			return reconcile.Result{Requeue: false}, nil
 		}
-		// Deletion and removal of finalizer must happen before
-		return reconcile.Result{Requeue: true}, errors.New("inconsistent state, do requeue")
+		// target has been deleted, remove finalizer and allow deletion
+		meta.RemoveFinalizer(ru, v1alpha1.Finalizer)
+		if err := r.client.Update(ctx, ru); err != nil {
+			r.log.Debug(errUpdate, "error", err)
+			return reconcile.Result{RequeueAfter: shortWait}, nil
+		}
+		// ResourceUsage will be deleted by garbage collection
+		return reconcile.Result{Requeue: false}, nil
 	}
 	if !meta.FinalizerExists(ru, v1alpha1.Finalizer) {
 		meta.AddFinalizer(ru, v1alpha1.Finalizer)

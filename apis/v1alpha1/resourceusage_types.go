@@ -27,12 +27,14 @@ const (
 // +kubebuilder:printcolumn:name="TARGET-KIND",type="string",JSONPath=".spec.targetRef.kind"
 // +kubebuilder:printcolumn:name="TARGET",type="string",JSONPath=".spec.targetRef.name"
 // +kubebuilder:resource:scope=Cluster,categories={crossplane,provider,template}
+// +kubebuilder:subresource:status
 type ResourceUsage struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	//Spec ResourceUsageSpec `json:"spec"`
-	Spec ResourceUsageSpec `json:"spec"`
+	Spec   ResourceUsageSpec   `json:"spec"`
+	Status ResourceUsageStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -55,6 +57,11 @@ type ResourceUsageSpec struct {
 	TargetReference xpv1.TypedReference `json:"targetRef"`
 }
 
+// ResourceUsageStatus represents the observed state of a ResourceUsage.
+type ResourceUsageStatus struct {
+	xpv1.ConditionedStatus `json:",inline"`
+}
+
 // ResourceUsage type metadata.
 var (
 	ResourceUsageKind             = reflect.TypeOf(ResourceUsage{}).Name()
@@ -70,6 +77,16 @@ var (
 
 func init() {
 	SchemeBuilder.Register(&ResourceUsage{}, &ResourceUsageList{})
+}
+
+// GetCondition of this ResourceUsage.
+func (ru *ResourceUsage) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+	return ru.Status.GetCondition(ct)
+}
+
+// SetConditions of this ResourceUsage.
+func (ru *ResourceUsage) SetConditions(c ...xpv1.Condition) {
+	ru.Status.SetConditions(c...)
 }
 
 const UseCondition xpv1.ConditionType = "ResourceUsage"
