@@ -1,3 +1,22 @@
+// Memoization helper package. It defines the Map type that can be
+// used for memoization purposes.
+//
+// When a function is pure, you can use the Map type to memoize it.
+//
+// Let's say, the function has the following declaration:
+//
+//  func(input InputType) OutputType
+//
+// This func can be memoized like this:
+//
+//  func(input InputType) OutputType {
+//    result, found := map.Get(input)
+//    if !found {
+//      result := calculateResult(input)
+//      map.Set(input, result)
+//    }
+//    return result
+//  }
 package memoize
 
 import (
@@ -68,7 +87,9 @@ func (m *Map[V]) WithGCFrequency(frequency time.Duration) *Map[V] {
 	return m
 }
 
-// WithKeyLilmit method sets the key limit of a map value.
+// WithKeyLimit method sets the key limit of a map value. If the key
+// limit gets lower than the number of keys in the map, new elements
+// will not be added to the map until some old keys get purged out.
 func (m *Map[V]) WithKeyLimit(limit int) *Map[V] {
 	m.keyLimit = limit
 	return m
@@ -119,8 +140,7 @@ func (m *Map[V]) Get(key Key) (*V, bool) {
 	}
 	k := key.GetMemoKey()
 	if k == nil {
-		// If the instance has no Labels, we haven't stored
-		// its connectection details before.
+		// The map has no such key
 		return nil, false
 	}
 	m.lock.RLock()
@@ -143,7 +163,8 @@ func (m *Map[V]) Get(key Key) (*V, bool) {
 }
 
 // Set method stores a value for the provided key. If the value is
-// nil, the key is deleted.
+// nil, the key is deleted. If the map is full (the number of stored
+// keys has reached the key limit), the Set operation is a no-op.
 func (m *Map[V]) Set(key Key, value *V) {
 	if m.stopped {
 		return
@@ -155,23 +176,17 @@ func (m *Map[V]) Set(key Key, value *V) {
 	}
 	m.lock.Lock()
 	defer m.lock.Unlock()
-if value == nil {
+	if value == nil {
 		// value == nil indicates that we want to delete the key
 		delete(m.m, *k)
 		return
-}
-if len(m.m) >= m.keyLimit {
-			return
-}
-//...
-	} else {
-		if len(m.m) >= m.keyLimit {
-			return
-		}
-		m.m[*k] = mapValue[V]{
-			v:         value,
-			createdAt: time.Now(),
-		}
+	}
+	if len(m.m) >= m.keyLimit {
+		return
+	}
+	m.m[*k] = mapValue[V]{
+		v:         value,
+		createdAt: time.Now(),
 	}
 }
 
@@ -186,8 +201,8 @@ func (m *Map[V]) Invalidate(key Key) {
 		return
 	}
 	m.lock.Lock()
-	defer m.lock.Unlock()
 	delete(m.m, *k)
+	m.lock.Unlock()
 }
 
 // DefaultKeyExpiration sets the default key expiration value for
