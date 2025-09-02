@@ -119,24 +119,21 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	if connectionDetailsNeedUpdate(lastModified, cr) {
-		details, readErr := environments.GetConnectionDetails(instance, c.httpClient)
-		if readErr != nil {
-			return managed.ExternalObservation{
-				ResourceExists:   true,
-				ResourceUpToDate: true,
-			}, errors.Wrap(readErr, "can not obtain kubeConfig")
-		}
-		return managed.ExternalObservation{
-			ResourceExists:          true,
-			ResourceUpToDate:        true,
-			ConnectionDetails:       details,
-			ResourceLateInitialized: hasUpdate,
-		}, nil
+		// remove the connection details from memoization map
+		// to force fetching a new ConnectionDetails object
+		environments.InvalidateConnectionDetails(instance)
 	}
-
+	details, readErr := environments.GetConnectionDetails(instance, c.httpClient)
+	if readErr != nil {
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: true,
+		}, errors.Wrap(readErr, "can not obtain kubeConfig")
+	}
 	return managed.ExternalObservation{
 		ResourceExists:          true,
 		ResourceUpToDate:        true,
+		ConnectionDetails:       details,
 		ResourceLateInitialized: hasUpdate,
 	}, nil
 }
