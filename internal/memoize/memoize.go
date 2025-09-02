@@ -155,9 +155,15 @@ func (m *Map[V]) Set(key Key, value *V) {
 	}
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	if value == nil {
+if value == nil {
 		// value == nil indicates that we want to delete the key
 		delete(m.m, *k)
+		return
+}
+if len(m.m) >= m.keyLimit {
+			return
+}
+//...
 	} else {
 		if len(m.m) >= m.keyLimit {
 			return
