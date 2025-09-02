@@ -125,7 +125,7 @@ jobs:
           echo "Running upgrade test..."
           REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${{ github.event.inputs.source }}" --target ${REGISTRY}:${TARGET_IMAGE_VERSION} --provider provider-btp 
         env:
-          TECH_USER_PASSWORD: ${{ secrets.UPGRADE_TEST_TECH_USER_PW }}
+          TECHNICAL_USER_PASSWORD: ${{ secrets.UPGRADE_TEST_TECH_USER_PW }}
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
