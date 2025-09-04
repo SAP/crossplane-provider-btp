@@ -207,6 +207,10 @@ spec:
                             type: string
                         type: object
                     type: object
+                  serviceManagerSecret:
+                    type: string
+                  serviceManagerSecretNamespace:
+                    type: string
                   subaccountId:
                     description: |-
                       (String) The ID of the subaccount.
@@ -473,7 +477,21 @@ spec:
                   id:
                     description: The ID of the service binding resource
                     type: string
+                  lastOperation:
+                    properties:
+                      description:
+                        type: string
+                      id:
+                        type: string
+                      ready:
+                        type: boolean
+                      state:
+                        type: string
+                      type:
+                        type: string
+                    type: object
                   name:
+                    description: The name of the service binding resource
                     type: string
                   retiredKeys:
                     description: If the binding is rotated, `retiredBindings` stores
@@ -489,6 +507,7 @@ spec:
                           description: The ID of the service binding resource
                           type: string
                         name:
+                          description: The name of the service binding resource
                           type: string
                       type: object
                     type: array

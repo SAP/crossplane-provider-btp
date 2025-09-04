@@ -10,6 +10,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+type ServiceBindingOperationType string
+
+type ServiceBindingOperationState string
+
+const (
+	ServiceBindingLastOperationTypeCreate ServiceBindingOperationType = "create"
+	ServiceBindingLastOperationTypeDelete ServiceBindingOperationType = "delete"
+
+	ServiceBindingLastOperationStatePending   ServiceBindingOperationState = "pending"
+	ServiceBindingLastOperationStateSucceeded ServiceBindingOperationState = "succeeded"
+)
+
 // ServiceBindingParameters are the configurable fields of a ServiceBinding.
 type ServiceBindingParameters struct {
 	// Name of the service instance in btp, required
@@ -56,6 +68,17 @@ type ServiceBindingParameters struct {
 	// +kubebuilder:validation:Optional
 	ServiceInstanceSelector *v1.Selector `json:"serviceInstanceSelector,omitempty" tf:"-"`
 
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceInstance
+	// +crossplane:generate:reference:refFieldName=ServiceInstanceRef
+	// +crossplane:generate:reference:selectorFieldName=ServiceInstanceSelector
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceInstanceServiceManagerSecretName()
+	ServiceManagerSecret string `json:"serviceManagerSecret,omitempty"`
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceInstance
+	// +crossplane:generate:reference:refFieldName=ServiceInstanceRef
+	// +crossplane:generate:reference:selectorFieldName=ServiceInstanceSelector
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.ServiceInstanceServiceManagerSecretNamespace()
+	ServiceManagerSecretNamespace string `json:"serviceManagerSecretNamespace,omitempty"`
+
 	// Rotation defines the parameters for rotating the service credential binding.
 	// +kubebuilder:validation:Optional
 	Rotation *RotationParameters `json:"rotation,omitempty"`
@@ -79,12 +102,23 @@ type ServiceBindingObservation struct {
 
 	// If the binding is rotated, `retiredBindings` stores resources that have been rotated out but are still transitionally retained due to `rotation.ttl` setting
 	// +kubebuilder:validation:Optional
-	RetiredKeys []*SBResource `json:"retiredKeys,omitempty"`
+	RetiredKeys   []*SBResource `json:"retiredKeys,omitempty"`
+	LastOperation LastOperation `json:"lastOperation,omitempty"`
+}
+
+type LastOperation struct {
+	Id          string                       `json:"id,omitempty"`
+	Ready       bool                         `json:"ready,omitempty"`
+	Description string                       `json:"description,omitempty"`
+	Type        ServiceBindingOperationType  `json:"type,omitempty"`
+	State       ServiceBindingOperationState `json:"state,omitempty"`
 }
 
 type SBResource struct {
 	// The ID of the service binding resource
-	ID   string `json:"id,omitempty"`
+	ID string `json:"id,omitempty"`
+
+	// The name of the service binding resource
 	Name string `json:"name,omitempty"`
 
 	// The date and time when the resource was created.

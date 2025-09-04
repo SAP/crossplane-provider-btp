@@ -11,12 +11,11 @@ import (
 	httptransport "github.com/go-openapi/runtime/client"
 	"golang.org/x/oauth2/clientcredentials"
 
+	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	entitlementsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
-
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
 
 const (
@@ -26,6 +25,7 @@ const (
 )
 
 type InstanceParameters = map[string]interface{}
+
 type EnvironmentType struct {
 	Identifier  string
 	ServiceName string
@@ -52,6 +52,7 @@ type Client struct {
 	AuthInfo                  runtime.ClientAuthInfoWriter
 	Credential                *Credentials
 }
+
 type Credentials struct {
 	UserCredential *UserCredential
 	CISCredential  *CISCredential
@@ -584,3 +585,4 @@ func specifyAPIError(err error) error {
 	}
 	return err
 }
+

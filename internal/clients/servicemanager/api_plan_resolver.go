@@ -7,19 +7,26 @@ import (
 	"net/url"
 
 	"github.com/pkg/errors"
+	"golang.org/x/oauth2/clientcredentials"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	servicemanager "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-service-manager-api-go/pkg"
-	"golang.org/x/oauth2/clientcredentials"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const ErrUnmarshalToBindingCredentials = "JSON can not be unmarshalled to BindingCredentials"
+
 const ErrJsonMarshal = "Error marshalling secret data"
+
 const ErrMissingClientId = "Client ID (clientid) is missing"
+
 const ErrMissingClientSecret = "Client Secret (clientsecret) is missing"
+
 const ErrMissingSmUrl = "Service Manager URL (sm_url) is missing"
+
 const ErrMissingUrl = "Token URL (tokenurl) is missing"
+
 const ErrMissingXsappname = "Xsappname (xsappname) is missing"
 
 // PlanIdResolver used as its own resolval implementation downstream
@@ -85,7 +92,7 @@ type ServiceManagerClient struct {
 	servicemanager.ServicePlansAPI
 }
 
-func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*ServiceManagerClient, error) {
+func NewServiceManagerClientI(ctx context.Context, creds *BindingCredentials) (*servicemanager.APIClient, error) {
 	const oauthTokenUrlPath = "/oauth/token"
 
 	log := log.FromContext(ctx)
@@ -112,6 +119,15 @@ func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*S
 	apiClientConfig.HTTPClient = config.Client(ctx)
 
 	apiClient := servicemanager.NewAPIClient(apiClientConfig)
+
+	return apiClient, nil
+}
+
+func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*ServiceManagerClient, error) {
+	apiClient, err := NewServiceManagerClientI(ctx, creds)
+	if err != nil {
+		return nil, err
+	}
 
 	return &ServiceManagerClient{
 		apiClient.ServiceOfferingsAPI,

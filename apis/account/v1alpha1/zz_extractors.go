@@ -123,3 +123,25 @@ func ServiceInstanceUuid() reference.ExtractValueFn {
 		return sg.Status.AtProvider.ID
 	}
 }
+
+// ServiceInstanceServiceManagerSecretName extracts the service manager connection details secret ref name for the binding
+func ServiceInstanceServiceManagerSecretName() reference.ExtractValueFn {
+	return func(mg resource.Managed) string {
+		sg, ok := mg.(*ServiceInstance)
+		if !ok {
+			return ""
+		}
+		return sg.Spec.ForProvider.ServiceManagerSecret
+	}
+}
+
+// ServiceInstanceServiceManagerSecretNamespace extracts the service manager connection details secret ref namespace for the binding
+func ServiceInstanceServiceManagerSecretNamespace() reference.ExtractValueFn {
+	return func(mg resource.Managed) string {
+		sg, ok := mg.(*ServiceInstance)
+		if !ok {
+			return ""
+		}
+		return sg.Spec.ForProvider.ServiceManagerSecretNamespace
+	}
+}

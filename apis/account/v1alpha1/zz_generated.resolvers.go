@@ -216,6 +216,38 @@ func (mg *ServiceBinding) ResolveReferences(ctx context.Context, c client.Reader
 	mg.Spec.ForProvider.ServiceInstanceID = reference.ToPtrValue(rsp.ResolvedValue)
 	mg.Spec.ForProvider.ServiceInstanceRef = rsp.ResolvedReference
 
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecret,
+		Extract:      ServiceInstanceServiceManagerSecretName(),
+		Reference:    mg.Spec.ForProvider.ServiceInstanceRef,
+		Selector:     mg.Spec.ForProvider.ServiceInstanceSelector,
+		To: reference.To{
+			List:    &ServiceInstanceList{},
+			Managed: &ServiceInstance{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ServiceManagerSecret")
+	}
+	mg.Spec.ForProvider.ServiceManagerSecret = rsp.ResolvedValue
+	mg.Spec.ForProvider.ServiceInstanceRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecretNamespace,
+		Extract:      ServiceInstanceServiceManagerSecretNamespace(),
+		Reference:    mg.Spec.ForProvider.ServiceInstanceRef,
+		Selector:     mg.Spec.ForProvider.ServiceInstanceSelector,
+		To: reference.To{
+			List:    &ServiceInstanceList{},
+			Managed: &ServiceInstance{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ServiceManagerSecretNamespace")
+	}
+	mg.Spec.ForProvider.ServiceManagerSecretNamespace = rsp.ResolvedValue
+	mg.Spec.ForProvider.ServiceInstanceRef = rsp.ResolvedReference
+
 	return nil
 }
 
