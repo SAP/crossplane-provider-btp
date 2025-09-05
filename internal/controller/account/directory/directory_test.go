@@ -118,7 +118,7 @@ func TestConnect(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("CF Secret is empty or nil, please check config & secrets referenced in provider config"),
+				err: errors.New("CIS Secret is empty or nil, please check config & secrets referenced in provider config"),
 			},
 		},
 		"NewServiceFnError": {

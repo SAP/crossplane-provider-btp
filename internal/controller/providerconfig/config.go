@@ -29,7 +29,6 @@ const (
 	errNewClient          = "cannot create new Service"
 	errCisSecretEmpty     = "CIS Secret is empty or nil, please check config & secrets referenced in provider config"
 	errCisSecretCorrupted = "CIS Secret does not match expected format"
-	errCFSecretEmpty      = "CF Secret is empty or nil, please check config & secrets referenced in provider config"
 )
 
 // Setup adds a controller that reconciles ProviderConfigs by accounting for
@@ -95,7 +94,7 @@ func CreateClient(
 		return nil, errors.Wrap(err, errGetCFCreds)
 	}
 	if ServiceAccountSecretData == nil {
-		return nil, errors.New(errCFSecretEmpty)
+		return nil, errors.New(errCisSecretEmpty)
 
 	}
 
