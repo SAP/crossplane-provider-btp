@@ -546,7 +546,7 @@ type TfProxyMock struct {
 	details map[string][]byte
 }
 
-func (t *TfProxyMock) QueryAsyncData(ctx context.Context) *tfClient.ObservationData {
+func (t *TfProxyMock) QueryAsyncData(ctx context.Context) interface{} {
 	return t.data
 }
 
