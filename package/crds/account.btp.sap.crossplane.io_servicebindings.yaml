@@ -106,6 +106,26 @@ spec:
                       keys from secrets
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
+                  rotation:
+                    description: Rotation defines the parameters for rotating the
+                      service credential binding.
+                    properties:
+                      frequency:
+                        description: Frequency defines how often the active key should
+                          be rotated.
+                        type: string
+                      ttl:
+                        description: |-
+                          TTL (Time-To-Live) defines the total time a credential is valid for before it is deleted.
+                          Must be >= frequency
+                        type: string
+                    required:
+                    - frequency
+                    type: object
+                    x-kubernetes-validations:
+                    - message: ttl must be greater than or equal to frequency
+                      rule: '!has(self.ttl) || (has(self.frequency) && duration(self.ttl)
+                        >= duration(self.frequency))'
                   serviceInstanceId:
                     description: |-
                       (String) The ID of the service instance associated with the binding.
@@ -446,7 +466,78 @@ spec:
                 description: ServiceBindingObservation are the observable fields of
                   a ServiceBinding.
                 properties:
+                  createdDate:
+                    description: |-
+                      Additional TF resource fields from SubaccountServiceBinding for the current active binding
+                      The date and time when the resource was created in RFC3339 format from TF
+                    type: string
                   id:
+                    description: The ID of the service binding resource
+                    type: string
+                  instanceName:
+                    description: The instance name used for the underlying TF resource
+                    type: string
+                  instanceUID:
+                    description: The instance UID used for the underlying TF resource
+                    type: string
+                  lastModified:
+                    description: The date and time when the resource was last modified
+                      in RFC3339 format
+                    type: string
+                  lastOperation:
+                    properties:
+                      description:
+                        type: string
+                      id:
+                        type: string
+                      ready:
+                        type: boolean
+                      state:
+                        type: string
+                      type:
+                        type: string
+                    type: object
+                  name:
+                    description: The name of the service binding resource
+                    type: string
+                  parameters:
+                    description: The parameters of the service binding as a valid
+                      JSON object
+                    type: string
+                  ready:
+                    description: Shows whether the service binding is ready
+                    type: boolean
+                  retiredKeys:
+                    description: If the binding is rotated, `retiredBindings` stores
+                      resources that have been rotated out but are still transitionally
+                      retained due to `rotation.ttl` setting
+                    items:
+                      description: RetiredSBResource contains only the essential tracking
+                        information for retired service binding instances
+                      properties:
+                        createdDate:
+                          description: The date and time when the resource was created
+                            in RFC3339 format from TF
+                          type: string
+                        id:
+                          description: The ID of the service binding resource
+                          type: string
+                        instanceName:
+                          description: The instance name used for the underlying TF
+                            resource
+                          type: string
+                        instanceUID:
+                          description: The instance UID used for the underlying TF
+                            resource
+                          type: string
+                        name:
+                          description: The name of the service binding resource
+                          type: string
+                      type: object
+                    type: array
+                  state:
+                    description: The current state of the service binding (in progress,
+                      failed, succeeded)
                     type: string
                 type: object
               conditions:
