@@ -10,6 +10,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -127,7 +128,7 @@ func TestObserve(t *testing.T) {
 		"LookupError": {
 			reason: "error should be returned",
 			fields: fields{
-				client: &TfProxyMock{err: errClient},
+				client: &TfProxyMock{err: errClient, tfResource: nil},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -140,7 +141,7 @@ func TestObserve(t *testing.T) {
 		"NotFound": {
 			reason: "should return not existing",
 			fields: fields{
-				client: &TfProxyMock{status: tfclient.NotExisting},
+				client: &TfProxyMock{status: tfclient.NotExisting, tfResource: nil},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -157,8 +158,9 @@ func TestObserve(t *testing.T) {
 			reason: "should return existing, not up to date",
 			fields: fields{
 				client: &TfProxyMock{
-					status:  tfclient.Drift,
-					details: map[string][]byte{},
+					status:     tfclient.Drift,
+					tfResource: nil, // No async data for drift case
+					details:    map[string][]byte{},
 				},
 			},
 			args: args{
@@ -180,6 +182,7 @@ func TestObserve(t *testing.T) {
 				client: &TfProxyMock{
 					status:  tfclient.UpToDate,
 					details: map[string][]byte{},
+					// tfResource is not set, so it will be nil
 				},
 			},
 			args: args{
@@ -200,9 +203,17 @@ func TestObserve(t *testing.T) {
 			fields: fields{
 				client: &TfProxyMock{
 					status: tfclient.UpToDate,
-					data: &tfclient.ObservationData{
-						ExternalName: "some-ext-name",
-						ID:           "some-id",
+					tfResource: &v1alpha1.SubaccountServiceInstance{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								"crossplane.io/external-name": "some-ext-name",
+							},
+						},
+						Status: v1alpha1.SubaccountServiceInstanceStatus{
+							AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
+								ID: strPtr("some-id"),
+							},
+						},
 					},
 					details: map[string][]byte{
 						"some-key": []byte("some-value"),
@@ -574,14 +585,17 @@ func (i *InitializerMock) Initialize(kube client.Client, ctx context.Context, mg
 var _ tfclient.TfProxyControllerI = &TfProxyMock{}
 
 type TfProxyMock struct {
-	status  tfclient.Status
-	data    *tfclient.ObservationData
-	err     error
-	details map[string][]byte
+	status     tfclient.Status
+	tfResource *v1alpha1.SubaccountServiceInstance
+	err        error
+	details    map[string][]byte
 }
 
 func (t *TfProxyMock) QueryAsyncData(ctx context.Context) interface{} {
-	return t.data
+	if t.tfResource == nil {
+		return nil
+	}
+	return t.tfResource
 }
 
 func (t *TfProxyMock) Create(ctx context.Context) error {
@@ -647,4 +661,9 @@ func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceInstance
 	return func(cr *v1alpha1.ServiceInstance) {
 		cr.Status.Conditions = conditions
 	}
+}
+
+// Helper function to create string pointer
+func strPtr(s string) *string {
+	return &s
 }
