@@ -45,7 +45,7 @@ type ServiceBindingParameters struct {
 
 	// Reference to a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-" reference-group:"account.btp.sap.crossplane.io" reference-kind:"Subaccount" reference-apiversion:"v1alpha1"`
 
 	// Selector for a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
@@ -62,7 +62,7 @@ type ServiceBindingParameters struct {
 
 	// Reference to a ServiceInstance in account to populate serviceInstanceId.
 	// +kubebuilder:validation:Optional
-	ServiceInstanceRef *v1.Reference `json:"serviceInstanceRef,omitempty" tf:"-"`
+	ServiceInstanceRef *v1.Reference `json:"serviceInstanceRef,omitempty" tf:"-" reference-group:"account.btp.sap.crossplane.io" reference-kind:"ServiceInstance" reference-apiversion:"v1alpha1"`
 
 	// Selector for a ServiceInstance in account to populate serviceInstanceId.
 	// +kubebuilder:validation:Optional
