@@ -1,4 +1,4 @@
-package servicebinding
+package servicebindingclient
 
 import (
 	"math/rand"
@@ -22,7 +22,7 @@ var (
 	srcMutex sync.Mutex
 )
 
-func randomString(n int) string {
+func RandomString(n int) string {
 	sb := strings.Builder{}
 	sb.Grow(n)
 
@@ -44,17 +44,16 @@ func randomString(n int) string {
 	return sb.String()
 }
 
-func randomName(name string) string {
+func GenerateRandomName(name string) string {
 	if len(name) > 0 && name[len(name)-1] == '-' {
 		name = name[:len(name)-1]
 	}
-	newName := name + "-" + randomString(5)
+	newName := name + "-" + RandomString(5)
 	return newName
 }
 
-// generateInstanceUID creates a deterministic UID by combining the original ServiceBinding UID with the instance name
-func generateInstanceUID(originalUID types.UID, instanceName string) types.UID {
+// GenerateInstanceUID creates a deterministic UID by combining the original ServiceBinding UID with the instance name
+func GenerateInstanceUID(originalUID types.UID, instanceName string) types.UID {
 	combined := string(originalUID) + "-" + instanceName
 	return types.UID(combined)
 }
-

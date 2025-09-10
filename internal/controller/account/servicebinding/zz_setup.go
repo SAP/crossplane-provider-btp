@@ -5,7 +5,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	sbClient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,8 +18,6 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		return &connector{
 			kube:  kube,
 			usage: usage,
-
-			clientConnector: sbClient.NewServiceBindingConnector(saveCallback, kube),
 		}
 	})
 }

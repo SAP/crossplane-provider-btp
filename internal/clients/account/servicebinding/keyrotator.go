@@ -1,4 +1,4 @@
-package servicebinding
+package servicebindingclient
 
 import (
 	"context"
@@ -18,6 +18,11 @@ const (
 	errDeleteRetiredKey = "cannot delete retired key"
 )
 
+// InstanceDeleter provides the interface for deleting service binding instances
+type InstanceDeleter interface {
+	DeleteInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error
+}
+
 type KeyRotator interface {
 	// RetireBinding checks if the binding should be retired based on the rotation frequency
 	// and the force rotation annotation. If it should be retired, it adds the retired key to the status.
@@ -35,7 +40,13 @@ type KeyRotator interface {
 }
 
 type SBKeyRotator struct {
-	external *external
+	instanceDeleter InstanceDeleter
+}
+
+func NewSBKeyRotator(instanceDeleter InstanceDeleter) *SBKeyRotator {
+	return &SBKeyRotator{
+		instanceDeleter: instanceDeleter,
+	}
 }
 
 func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
@@ -111,7 +122,7 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 			continue
 		}
 
-		if err := r.external.deleteInstance(ctx, cr, key.Name, key.ID); err != nil {
+		if err := r.instanceDeleter.DeleteInstance(ctx, cr, key.Name, key.ID); err != nil {
 			// If we cannot delete the key, keep it in the list
 			newRetiredKeys = append(newRetiredKeys, key)
 			errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteExpiredKey, key.ID, err))
@@ -123,7 +134,7 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 
 func (r *SBKeyRotator) DeleteRetiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
 	for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
-		if err := r.external.deleteInstance(ctx, cr, retiredKey.Name, retiredKey.ID); err != nil {
+		if err := r.instanceDeleter.DeleteInstance(ctx, cr, retiredKey.Name, retiredKey.ID); err != nil {
 			return fmt.Errorf("%s %s: %w", errDeleteRetiredKey, retiredKey.ID, err)
 		}
 	}
