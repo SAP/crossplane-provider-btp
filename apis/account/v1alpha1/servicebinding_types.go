@@ -87,20 +87,34 @@ type RotationParameters struct {
 
 // ServiceBindingObservation are the observable fields of a ServiceBinding.
 type ServiceBindingObservation struct {
-	SBResource `json:",inline"`
+	// The ID of the service binding resource
+	ID string `json:"id,omitempty"`
+
+	// The name of the service binding resource
+	Name string `json:"name,omitempty"`
+
+	// The instance name used for the underlying TF resource
+	InstanceName string `json:"instanceName,omitempty"`
+
+	// Additional TF resource fields from SubaccountServiceBinding for the current active binding
+	// The date and time when the resource was created in ISO8601 format from TF
+	CreatedDate *string `json:"createdDate,omitempty"`
+
+	// The date and time when the resource was last modified in ISO8601 format
+	LastModified *string `json:"lastModified,omitempty"`
+
+	// Shows whether the service binding is ready
+	Ready *bool `json:"ready,omitempty"`
+
+	// The current state of the service binding (in progress, failed, succeeded)
+	State *string `json:"state,omitempty"`
+
+	// The parameters of the service binding as a valid JSON object
+	Parameters *string `json:"parameters,omitempty"`
 
 	// If the binding is rotated, `retiredBindings` stores resources that have been rotated out but are still transitionally retained due to `rotation.ttl` setting
 	// +kubebuilder:validation:Optional
-	RetiredKeys   []*RetiredSBResource `json:"retiredKeys,omitempty"`
-	LastOperation LastOperation `json:"lastOperation,omitempty"`
-}
-
-type LastOperation struct {
-	Id          string                       `json:"id,omitempty"`
-	Ready       bool                         `json:"ready,omitempty"`
-	Description string                       `json:"description,omitempty"`
-	Type        ServiceBindingOperationType  `json:"type,omitempty"`
-	State       ServiceBindingOperationState `json:"state,omitempty"`
+	RetiredKeys []*RetiredSBResource `json:"retiredKeys,omitempty"`
 }
 
 // RetiredSBResource contains only the essential tracking information for retired service binding instances
@@ -114,42 +128,6 @@ type RetiredSBResource struct {
 
 	// The date and time when the resource was created in RFC3339 format from TF
 	CreatedDate *string `json:"createdDate,omitempty"`
-
-	// The instance name used for the underlying TF resource
-	InstanceName string `json:"instanceName,omitempty"`
-
-	// The instance UID used for the underlying TF resource
-	InstanceUID string `json:"instanceUID,omitempty"`
-}
-
-type SBResource struct {
-	// The ID of the service binding resource
-	ID string `json:"id,omitempty"`
-
-	// The name of the service binding resource
-	Name string `json:"name,omitempty"`
-
-	// The instance name used for the underlying TF resource
-	InstanceName string `json:"instanceName,omitempty"`
-
-	// The instance UID used for the underlying TF resource
-	InstanceUID string `json:"instanceUID,omitempty"`
-
-	// Additional TF resource fields from SubaccountServiceBinding for the current active binding
-	// The date and time when the resource was created in RFC3339 format from TF
-	CreatedDate *string `json:"createdDate,omitempty"`
-
-	// The date and time when the resource was last modified in RFC3339 format
-	LastModified *string `json:"lastModified,omitempty"`
-
-	// Shows whether the service binding is ready
-	Ready *bool `json:"ready,omitempty"`
-
-	// The current state of the service binding (in progress, failed, succeeded)
-	State *string `json:"state,omitempty"`
-
-	// The parameters of the service binding as a valid JSON object
-	Parameters *string `json:"parameters,omitempty"`
 }
 
 // A ServiceBindingSpec defines the desired state of a ServiceBinding.

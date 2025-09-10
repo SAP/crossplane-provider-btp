@@ -2,9 +2,6 @@ package servicebinding
 
 import (
 	"context"
-	"math/rand"
-	"strings"
-	"sync"
 	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -22,15 +19,18 @@ import (
 )
 
 const (
-	errNotServiceBinding = "managed resource is not a ServiceBinding custom resource"
-	errTrackPCUsage      = "cannot track ProviderConfig usage"
-	errGetPC             = "cannot get ProviderConfig"
-	errGetCreds          = "cannot get credentials"
-
-	errObserveBinding = "cannot observe servicebinding"
-	errCreateBinding  = "cannot create servicebinding"
-	errSaveData       = "cannot update cr data"
-	errGetBinding     = "cannot get servicebinding"
+	errNotServiceBinding    = "managed resource is not a ServiceBinding custom resource"
+	errCreateBinding        = "cannot create servicebinding"
+	errObserveSaveBinding   = "cannot save observed data"
+	errUpdateStatus         = "cannot update status"
+	errGetBinding           = "cannot get servicebinding"
+	errDeleteExpiredKeys    = "cannot delete expired keys"
+	errDeleteRetiredKeys    = "cannot delete retired keys"
+	errDeleteServiceBinding = "cannot delete servicebinding"
+	errConnectTfController  = "failed to connect TF controller"
+	errCreateTfResource     = "failed to create TF resource"
+	errDeleteTfResource     = "failed to delete TF resource"
+	errObserveTfResource    = "failed to observe TF resource"
 )
 
 // SaveConditionsFn Callback for persisting conditions in the CR
@@ -47,7 +47,7 @@ var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube clie
 
 	uErr := kube.Status().Update(ctx, si)
 
-	return errors.Wrap(uErr, errSaveData)
+	return errors.Wrap(uErr, errObserveSaveBinding)
 }
 
 type connector struct {
@@ -63,16 +63,8 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotServiceBinding)
 	}
 
-	// when working with tf proxy resources we want to keep the Connect() logic as part of the delgating Connect calls of the native resources to
-	// deal with errors in the part of process that they belong to
-	client, err := c.clientConnector.Connect(ctx, mg.(*v1alpha1.ServiceBinding))
-	if err != nil {
-		return nil, err
-	}
-
 	ext := &external{
-		tfClient: client,
-		kube:     c.kube,
+		kube: c.kube,
 		sbConnector: tfClient.NewInternalTfConnector(
 			c.kube,
 			"btp_subaccount_service_binding",
@@ -86,7 +78,6 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 }
 
 type external struct {
-	tfClient    tfClient.TfProxyControllerI
 	kube        client.Client
 	keyRotator  KeyRotator
 	sbConnector managed.ExternalConnecter
@@ -104,42 +95,36 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceBinding)
 	}
 
-	// Determine instance name and UID (use stored values or fall back to CR values for old instances)
+	// Determine instance name (use stored value or fall back to CR name for old instances)
 	instanceName := cr.Status.AtProvider.InstanceName
-	instanceUID := cr.Status.AtProvider.InstanceUID
 	if instanceName == "" {
 		instanceName = cr.Name
 	}
-	if instanceUID == "" {
-		instanceUID = string(cr.UID)
-	}
 
-	observation, tfResource, err := e.observeInstance(ctx, cr, instanceName, types.UID(instanceUID), cr.Status.AtProvider.ID)
+	observation, tfResource, err := e.observeInstance(ctx, cr, instanceName, cr.Status.AtProvider.ID)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
 	}
 
-	// Only check rotation if resource exists
 	if observation.ResourceExists {
 
 		// Extract and update data from TF resource if available and up-to-date
 		if observation.ResourceUpToDate && tfResource != nil && internal.Val(tfResource.Status.AtProvider.State) == "succeeded" {
-			if err := e.updateServiceBindingFromTfResource(ctx, cr, tfResource); err != nil {
-				return managed.ExternalObservation{}, errors.Wrap(err, "cannot update AtProvider data from TF resource")
+			if err := e.updateServiceBindingFromTfResource(cr, tfResource); err != nil {
+				return managed.ExternalObservation{}, errors.Wrap(err, errObserveSaveBinding)
 			} else {
 				if err := e.kube.Status().Update(ctx, cr); err != nil {
-					return managed.ExternalObservation{}, errors.Wrap(err, "cannot update status")
+					return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
 				}
 			}
 		}
 
-		// Update ResourceUpToDate based on expired keys
 		observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
 
-		// Check if binding should be retired for rotation
+		// Retire binding conditionally
 		if e.keyRotator.RetireBinding(cr) {
 			if err := e.kube.Status().Update(ctx, cr); err != nil {
-				return managed.ExternalObservation{}, errors.Wrap(err, "cannot update status after retiring binding")
+				return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
 			}
 			return managed.ExternalObservation{ResourceExists: false}, nil
 		}
@@ -156,19 +141,15 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.SetConditions(xpv1.Creating())
 
-	// Use our createInstance function to create a new binding with random name/UID
-	instanceName, instanceUID, creation, err := e.createInstance(ctx, cr)
+	instanceName, _, creation, err := e.createInstance(ctx, cr)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
-	// Store the generated instance info in the CR status for tracking
 	cr.Status.AtProvider.InstanceName = instanceName
-	cr.Status.AtProvider.InstanceUID = string(instanceUID)
 
-	// Explicitly persist the status changes immediately
 	if err := e.kube.Status().Update(ctx, cr); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, "cannot update status with instance tracking info")
+		return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
 	}
 
 	// Remove force rotation annotation after successful creation
@@ -199,7 +180,12 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	// Only update if the current binding is not retired (service bindings are immutable in BTP)
 	var updateResult managed.ExternalUpdate
 	if !currentBindingRetired {
-		update, err := e.updateInstance(ctx, cr, cr.Status.AtProvider.InstanceName, types.UID(cr.Status.AtProvider.InstanceUID), cr.Status.AtProvider.ID)
+		instanceName := cr.Status.AtProvider.InstanceName
+		if instanceName == "" {
+			instanceName = cr.Name
+		}
+
+		update, err := e.updateInstance(ctx, cr, instanceName, cr.Status.AtProvider.ID)
 		if err != nil {
 			return managed.ExternalUpdate{}, err
 		}
@@ -209,12 +195,11 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	// Clean up expired keys if there are any retired keys
 	if cr.Status.AtProvider.RetiredKeys != nil {
 		if newRetiredKeys, err := e.keyRotator.DeleteExpiredKeys(ctx, cr); err != nil {
-			return managed.ExternalUpdate{}, errors.Wrap(err, "cannot delete expired keys")
+			return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteExpiredKeys)
 		} else {
 			cr.Status.AtProvider.RetiredKeys = newRetiredKeys
-			// Explicitly persist the updated retired keys list immediately
 			if err := e.kube.Status().Update(ctx, cr); err != nil {
-				return managed.ExternalUpdate{}, errors.Wrap(err, "cannot update status with retired keys changes")
+				return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
 			}
 		}
 	}
@@ -229,38 +214,68 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	cr.SetConditions(xpv1.Deleting())
 
-	// Clean up all retired keys before deleting the main binding
 	if err := e.keyRotator.DeleteRetiredKeys(ctx, cr); err != nil {
-		return managed.ExternalDelete{}, errors.Wrap(err, "cannot delete retired keys")
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
 	}
 
-	if err := e.deleteInstance(ctx, cr, cr.Status.AtProvider.InstanceName, types.UID(cr.Status.AtProvider.InstanceUID), cr.Status.AtProvider.ID); err != nil {
-		return managed.ExternalDelete{}, errors.Wrap(err, "cannot delete servicebinding")
+	instanceName := cr.Status.AtProvider.InstanceName
+	if instanceName == "" {
+		instanceName = cr.Name
+	}
+
+	if err := e.deleteInstance(ctx, cr, instanceName, cr.Status.AtProvider.ID); err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
 	return managed.ExternalDelete{}, nil
 }
 
-// createInstance creates a new service binding instance with randomly generated name and UID
+// isRotationEnabled checks if rotation is currently enabled for the service binding
+func (e *external) isRotationEnabled(cr *v1alpha1.ServiceBinding) bool {
+	// Check for force rotation annotation
+	if cr.ObjectMeta.Annotations != nil {
+		if _, ok := cr.ObjectMeta.Annotations[ForceRotationKey]; ok {
+			return true
+		}
+	}
+
+	// Check if rotation frequency is configured
+	if cr.Spec.ForProvider.Rotation != nil && cr.Spec.ForProvider.Rotation.Frequency != nil {
+		return true
+	}
+
+	return false
+}
+
+// createInstance creates a new service binding instance with conditional name generation
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client create command
 // Returns the generated instance name, UID, and ExternalCreation for tracking
 func (e *external) createInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding) (string, types.UID, managed.ExternalCreation, error) {
-	// Generate random name and UID for the instance
-	instanceName := randomName(publicCR.Spec.ForProvider.Name)
-	instanceUID := randomUID()
+	var instanceName string
 
-	// Create a SubaccountServiceBinding resource with the random name and UID
-	subaccountBinding := e.buildSubaccountServiceBinding(publicCR, instanceName, instanceUID, "")
+	hasRetiredKeys := len(publicCR.Status.AtProvider.RetiredKeys) > 0
 
-	// Connect using the stored connector
-	tfController, err := e.sbConnector.Connect(ctx, subaccountBinding)
-	if err != nil {
-		return "", "", managed.ExternalCreation{}, errors.Wrap(err, "failed to connect TF controller")
+	if e.isRotationEnabled(publicCR) || hasRetiredKeys {
+		// Use random suffix in these cases:
+		// 1. Rotation is currently enabled
+		// 2. There are retired keys (rotation was enabled before -> avoid conflicts)
+		instanceName = randomName(publicCR.Spec.ForProvider.Name)
+	} else {
+		// No rotation enabled and no history of rotation - use original name without suffix
+		instanceName = publicCR.Spec.ForProvider.Name
 	}
 
-	// Create the TF resource using the TF client
+	instanceUID := generateInstanceUID(publicCR.UID, instanceName)
+
+	subaccountBinding := e.buildSubaccountServiceBinding(publicCR, instanceName, instanceUID, "")
+
+	tfController, err := e.sbConnector.Connect(ctx, subaccountBinding)
+	if err != nil {
+		return "", "", managed.ExternalCreation{}, errors.Wrap(err, errConnectTfController)
+	}
+
 	creation, err := tfController.Create(ctx, subaccountBinding)
 	if err != nil {
-		return "", "", managed.ExternalCreation{}, errors.Wrap(err, "failed to create TF resource")
+		return "", "", managed.ExternalCreation{}, errors.Wrap(err, errCreateTfResource)
 	}
 
 	return instanceName, instanceUID, creation, nil
@@ -268,23 +283,20 @@ func (e *external) createInstance(ctx context.Context, publicCR *v1alpha1.Servic
 
 // deleteInstance deletes a service binding instance with a different name and UID
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client delete command
-func (e *external) deleteInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetUID types.UID, targetExternalName string) error {
-	// Create a SubaccountServiceBinding resource with the target name and UID
+func (e *external) deleteInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
+	targetUID := generateInstanceUID(publicCR.UID, targetName)
 	subaccountBinding := e.buildSubaccountServiceBinding(publicCR, targetName, targetUID, targetExternalName)
-	subaccountBinding.SetDeletionTimestamp(internal.Ptr(metav1.NewTime(time.Now())))
 
-	// Set the deleting condition on the SubaccountServiceBinding
+	subaccountBinding.SetDeletionTimestamp(internal.Ptr(metav1.NewTime(time.Now())))
 	subaccountBinding.SetConditions(xpv1.Deleting())
 
-	// Connect using the stored connector
 	tfController, err := e.sbConnector.Connect(ctx, subaccountBinding)
 	if err != nil {
-		return errors.Wrap(err, "failed to connect TF controller")
+		return errors.Wrap(err, errConnectTfController)
 	}
 
-	// Delete the TF resource using the TF client
 	if _, err := tfController.Delete(ctx, subaccountBinding); err != nil {
-		return errors.Wrap(err, "failed to delete TF resource")
+		return errors.Wrap(err, errDeleteTfResource)
 	}
 
 	return nil
@@ -292,40 +304,35 @@ func (e *external) deleteInstance(ctx context.Context, publicCR *v1alpha1.Servic
 
 // updateInstance updates a service binding instance with a different name and UID
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client update command
-func (e *external) updateInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetUID types.UID, targetExternalName string) (managed.ExternalUpdate, error) {
-	// Create a SubaccountServiceBinding resource with the target name and UID
+func (e *external) updateInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalUpdate, error) {
+	targetUID := generateInstanceUID(publicCR.UID, targetName)
 	subaccountBinding := e.buildSubaccountServiceBinding(publicCR, targetName, targetUID, targetExternalName)
 
-	// Connect using the stored connector
 	tfController, err := e.sbConnector.Connect(ctx, subaccountBinding)
 	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, "failed to connect TF controller")
+		return managed.ExternalUpdate{}, errors.Wrap(err, errConnectTfController)
 	}
 
-	// Update the TF resource using the TF client
 	return tfController.Update(ctx, subaccountBinding)
 }
 
 // observeInstance observes a service binding instance with a different name and UID
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client observe command
 // Returns the observation and the TF resource for data extraction
-func (e *external) observeInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetUID types.UID, targetExternalName string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
-	// Create a SubaccountServiceBinding resource with the target name and UID
+func (e *external) observeInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
+	targetUID := generateInstanceUID(publicCR.UID, targetName)
 	subaccountBinding := e.buildSubaccountServiceBinding(publicCR, targetName, targetUID, targetExternalName)
 
-	// Connect using the stored connector
 	tfController, err := e.sbConnector.Connect(ctx, subaccountBinding)
 	if err != nil {
-		return managed.ExternalObservation{}, nil, errors.Wrap(err, "failed to connect TF controller")
+		return managed.ExternalObservation{}, nil, errors.Wrap(err, errConnectTfController)
 	}
 
-	// Observe the TF resource using the TF client
 	observation, err := tfController.Observe(ctx, subaccountBinding)
 	if err != nil {
-		return managed.ExternalObservation{}, nil, errors.Wrap(err, "failed to observe TF resource")
+		return managed.ExternalObservation{}, nil, errors.Wrap(err, errObserveTfResource)
 	}
 
-	// If this is the current instance (not a retired one), set available condition
 	if observation.ResourceExists && observation.ResourceUpToDate &&
 		(targetName == publicCR.Status.AtProvider.InstanceName ||
 			(publicCR.Status.AtProvider.InstanceName == "" && targetName == publicCR.Name)) {
@@ -336,62 +343,10 @@ func (e *external) observeInstance(ctx context.Context, publicCR *v1alpha1.Servi
 	return observation, subaccountBinding, nil
 }
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyz1234567890"
-
-const (
-	letterIdxBits = 6                    // 6 bits to represent a letter index
-	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
-)
-
-var (
-	src      = rand.NewSource(time.Now().UnixNano())
-	srcMutex sync.Mutex
-)
-
-func randomString(n int) string {
-	sb := strings.Builder{}
-	sb.Grow(n)
-
-	srcMutex.Lock()
-	defer srcMutex.Unlock()
-
-	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
-		if remain == 0 {
-			cache, remain = src.Int63(), letterIdxMax
-		}
-		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-			sb.WriteByte(letterBytes[idx])
-			i--
-		}
-		cache >>= letterIdxBits
-		remain--
-	}
-
-	return sb.String()
-}
-
-func randomName(name string) string {
-	if len(name) > 0 && name[len(name)-1] == '-' {
-		name = name[:len(name)-1]
-	}
-	newName := name + "-" + randomString(5)
-	return newName
-}
-
-func randomUID() types.UID {
-	return types.UID(randomString(8))
-}
-
 // updateServiceBindingFromTfResource extracts data from SubaccountServiceBinding and updates the public ServiceBinding CR
-func (e *external) updateServiceBindingFromTfResource(ctx context.Context, publicCR *v1alpha1.ServiceBinding, tfResource *v1alpha1.SubaccountServiceBinding) error {
-	// Update external name if different
-	tfExternalName := meta.GetExternalName(tfResource)
-	if meta.GetExternalName(publicCR) != tfExternalName {
-		meta.SetExternalName(publicCR, tfExternalName)
-	}
+func (e *external) updateServiceBindingFromTfResource(publicCR *v1alpha1.ServiceBinding, tfResource *v1alpha1.SubaccountServiceBinding) error {
+	meta.SetExternalName(publicCR, meta.GetExternalName(tfResource))
 
-	// Extract and update AtProvider data from TF resource status
 	publicCR.Status.AtProvider.ID = internal.Val(tfResource.Status.AtProvider.ID)
 	publicCR.Status.AtProvider.Name = internal.Val(tfResource.Status.AtProvider.Name)
 	publicCR.Status.AtProvider.Ready = tfResource.Status.AtProvider.Ready
