@@ -19,3 +19,4 @@ kubeconfig
 dist/
 *.local.yaml
 
+*~
