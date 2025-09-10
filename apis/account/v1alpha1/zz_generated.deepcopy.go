@@ -1516,6 +1516,11 @@ func (in *ServiceBindingParameters) DeepCopy() *ServiceBindingParameters {
 func (in *ServiceBindingSpec) DeepCopyInto(out *ServiceBindingSpec) {
 	*out = *in
 	in.ResourceSpec.DeepCopyInto(&out.ResourceSpec)
+	if in.BtpName != nil {
+		in, out := &in.BtpName, &out.BtpName
+		*out = new(string)
+		**out = **in
+	}
 	in.ForProvider.DeepCopyInto(&out.ForProvider)
 }
 
