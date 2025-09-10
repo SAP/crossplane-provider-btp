@@ -12,9 +12,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
@@ -50,14 +52,20 @@ var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube clie
 }
 
 type connector struct {
-	kube  client.Client
-	usage resource.Tracker
+	kube            client.Client
+	usage           resource.Tracker
+	resourcetracker tracking.ReferenceResolverTracker
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	_, ok := mg.(*v1alpha1.ServiceBinding)
+	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
 		return nil, errors.New(errNotServiceBinding)
+	}
+
+	// Track resource references for dependency management
+	if err := c.resourcetracker.Track(ctx, cr); err != nil {
+		return nil, errors.Wrap(err, "cannot track resource references")
 	}
 
 	sbConnector := tfClient.NewInternalTfConnector(
@@ -73,6 +81,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	ext := &external{
 		kube:            c.kube,
 		instanceManager: instanceManager,
+		tracker:         c.resourcetracker,
 	}
 
 	// Create key rotator with the external client as instance deleter
@@ -85,6 +94,7 @@ type external struct {
 	kube            client.Client
 	keyRotator      servicebindingclient.KeyRotator
 	instanceManager *servicebindingclient.InstanceManager
+	tracker         tracking.ReferenceResolverTracker
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -239,6 +249,14 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotServiceBinding)
 	}
 	cr.SetConditions(xpv1.Deleting())
+
+	// Set resource usage conditions to check dependencies
+	e.tracker.SetConditions(ctx, cr)
+
+	// Block deletion if other resources are still using this ServiceBinding
+	if blocked := e.tracker.DeleteShouldBeBlocked(mg); blocked {
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
+	}
 
 	if err := e.keyRotator.DeleteRetiredKeys(ctx, cr); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
