@@ -16,8 +16,9 @@ import (
 func Setup(mgr ctrl.Manager, o controller.Options) error {
 	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.ServiceBinding{}, v1alpha1.ServiceBindingGroupKind, v1alpha1.ServiceBindingGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 		return &connector{
-			kube:  kube,
-			usage: usage,
+			kube:            kube,
+			usage:           usage,
+			resourcetracker: resourcetracker,
 		}
 	})
 }
