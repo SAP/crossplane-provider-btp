@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
 
 const ForceRotationKey = "servicebinding.account.btp.crossplane.io/force-rotation"
 
 const iso8601Date = "2006-01-02T15:04:05Z0700"
+
+const (
+	errDeleteExpiredKey = "cannot delete expired key"
+	errDeleteRetiredKey = "cannot delete retired key"
+)
 
 type KeyRotator interface {
 	// RetireBinding checks if the binding should be retired based on the rotation frequency
@@ -51,32 +54,17 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 	}
 
 	if forceRotation || rotationDue {
-		// If the binding was created before the rotation frequency, retire it.
 		for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
-			if retiredKey.InstanceUID == cr.Status.AtProvider.InstanceUID {
+			if retiredKey.ID == cr.Status.AtProvider.ID {
 				// If the binding is already retired, do not retire it again.
 				return true
 			}
 		}
 
-		// Store current binding instance info for tracking
-		currentInstanceName := cr.Status.AtProvider.InstanceName
-		currentInstanceUID := cr.Status.AtProvider.InstanceUID
-
-		// If not set, use default values for backward compatibility
-		if currentInstanceName == "" {
-			currentInstanceName = cr.Name
-		}
-		if currentInstanceUID == "" {
-			currentInstanceUID = string(cr.UID)
-		}
-
 		retiredKey := &v1alpha1.RetiredSBResource{
-			ID:           cr.Status.AtProvider.ID,
-			Name:         cr.Status.AtProvider.Name,
-			CreatedDate:  cr.Status.AtProvider.CreatedDate,
-			InstanceName: currentInstanceName,
-			InstanceUID:  currentInstanceUID,
+			ID:          cr.Status.AtProvider.ID,
+			Name:        cr.Status.AtProvider.Name,
+			CreatedDate: cr.Status.AtProvider.CreatedDate,
 		}
 		cr.Status.AtProvider.RetiredKeys = append(cr.Status.AtProvider.RetiredKeys, retiredKey)
 		cr.Status.AtProvider.CreatedDate = nil
@@ -118,18 +106,16 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 			}
 		}
 
-		if !expired || key.InstanceName == "" || key.InstanceUID == "" {
+		if !expired || key.Name == "" {
 			newRetiredKeys = append(newRetiredKeys, key)
 			continue
 		}
 
-		// Try to delete the expired key using our deleteInstance function
-		if err := r.external.deleteInstance(ctx, cr, key.InstanceName, types.UID(key.InstanceUID), key.ID); err != nil {
+		if err := r.external.deleteInstance(ctx, cr, key.Name, key.ID); err != nil {
 			// If we cannot delete the key, keep it in the list
 			newRetiredKeys = append(newRetiredKeys, key)
-			errs = append(errs, fmt.Errorf("cannot delete expired key %s: %w", key.ID, err))
+			errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteExpiredKey, key.ID, err))
 		}
-		// If deletion successful, don't add to newRetiredKeys (it gets removed)
 	}
 
 	return newRetiredKeys, errors.Join(errs...)
@@ -137,12 +123,8 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 
 func (r *SBKeyRotator) DeleteRetiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
 	for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
-		if retiredKey.InstanceName == "" || retiredKey.InstanceUID == "" {
-			continue // Skip keys without proper instance tracking
-		}
-
-		if err := r.external.deleteInstance(ctx, cr, retiredKey.InstanceName, types.UID(retiredKey.InstanceUID), retiredKey.ID); err != nil {
-			return fmt.Errorf("cannot delete retired key %s: %w", retiredKey.ID, err)
+		if err := r.external.deleteInstance(ctx, cr, retiredKey.Name, retiredKey.ID); err != nil {
+			return fmt.Errorf("%s %s: %w", errDeleteRetiredKey, retiredKey.ID, err)
 		}
 	}
 	return nil
