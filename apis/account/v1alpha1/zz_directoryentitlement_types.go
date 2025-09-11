@@ -63,6 +63,7 @@ type DirectoryEntitlementInitParameters struct {
 	// The name of the entitled service plan.
 	PlanName *string `json:"planName,omitempty" tf:"plan_name,omitempty"`
 
+	// (String) The unique identifier of the service plan.
 	// The unique identifier of the service plan.
 	PlanUniqueIdentifier *string `json:"planUniqueIdentifier,omitempty" tf:"plan_unique_identifier,omitempty"`
 
@@ -118,6 +119,7 @@ type DirectoryEntitlementObservation struct {
 	// The name of the entitled service plan.
 	PlanName *string `json:"planName,omitempty" tf:"plan_name,omitempty"`
 
+	// (String) The unique identifier of the service plan.
 	// The unique identifier of the service plan.
 	PlanUniqueIdentifier *string `json:"planUniqueIdentifier,omitempty" tf:"plan_unique_identifier,omitempty"`
 
@@ -170,6 +172,7 @@ type DirectoryEntitlementParameters struct {
 	// +kubebuilder:validation:Optional
 	PlanName *string `json:"planName,omitempty" tf:"plan_name,omitempty"`
 
+	// (String) The unique identifier of the service plan.
 	// The unique identifier of the service plan.
 	// +kubebuilder:validation:Optional
 	PlanUniqueIdentifier *string `json:"planUniqueIdentifier,omitempty" tf:"plan_unique_identifier,omitempty"`

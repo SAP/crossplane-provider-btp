@@ -183,7 +183,9 @@ spec:
                       The name of the entitled service plan.
                     type: string
                   planUniqueIdentifier:
-                    description: The unique identifier of the service plan.
+                    description: |-
+                      (String) The unique identifier of the service plan.
+                      The unique identifier of the service plan.
                     type: string
                   serviceName:
                     description: |-
@@ -309,7 +311,9 @@ spec:
                       The name of the entitled service plan.
                     type: string
                   planUniqueIdentifier:
-                    description: The unique identifier of the service plan.
+                    description: |-
+                      (String) The unique identifier of the service plan.
+                      The unique identifier of the service plan.
                     type: string
                   serviceName:
                     description: |-
@@ -553,7 +557,9 @@ spec:
                       The name of the entitled service plan.
                     type: string
                   planUniqueIdentifier:
-                    description: The unique identifier of the service plan.
+                    description: |-
+                      (String) The unique identifier of the service plan.
+                      The unique identifier of the service plan.
                     type: string
                   serviceName:
                     description: |-
