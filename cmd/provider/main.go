@@ -87,7 +87,7 @@ func main() {
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	ctrl.SetLogger(zl)
 	btp.SetLogger(log)
-	btp.SetDebug(*debug)
+	btp.Debug = *debug
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
