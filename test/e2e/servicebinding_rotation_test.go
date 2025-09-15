@@ -25,6 +25,7 @@ var (
 )
 
 func TestServiceBinding_RotationLifecycle(t *testing.T) {
+	// When watchting the test, it took around 600s (10 min). So for now only running it if in "long mode"
 	if testing.Short() {
 		t.Skip("skipping rotation tests in short mode - use 'make e2e-long' to run rotation tests")
 		return
