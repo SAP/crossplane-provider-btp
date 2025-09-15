@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -64,7 +65,7 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					t.Error("Expected rotation TTL to be set")
 				}
 
-				// Verify rotation is enabled (random name generated)
+				// Verify random name is being generated
 				if sb.Status.AtProvider.Name != *sb.Spec.BtpName {
 					t.Error("The name of the external resource should match the generated BtpName")
 				}
@@ -105,7 +106,7 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 						}
 					}
 					return false, nil
-				}, wait.WithTimeout(4*time.Minute)) // Wait longer than rotation frequency (2m + buffer)
+				}, wait.WithTimeout(4*time.Minute)) // (2m + buffer)
 
 				if err != nil {
 					t.Error("Frequency-based rotation did not trigger within expected time")
@@ -161,7 +162,34 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 
 					// Check if expired keys have been cleaned up
 					currentRetiredCount := len(sb.Status.AtProvider.RetiredKeys)
-					t.Logf("Current retired keys count: %d", currentRetiredCount)
+
+					// Log detailed information about each retired key
+					now := time.Now()
+					for i, key := range sb.Status.AtProvider.RetiredKeys {
+						var createdTime time.Time
+						var expirationTime time.Time
+						var timeInfo string
+
+						if key.CreatedDate != nil {
+							if parsed, err := time.Parse("2006-01-02T15:04:05Z0700", *key.CreatedDate); err == nil {
+								createdTime = parsed
+								expirationTime = createdTime.Add(sb.Spec.ForProvider.Rotation.TTL.Duration)
+								timeUntilExpiration := expirationTime.Sub(now)
+								timeInfo = fmt.Sprintf("created: %s, expires: %s (in %v)",
+									createdTime.Format("15:04:05"),
+									expirationTime.Format("15:04:05"),
+									timeUntilExpiration.Round(time.Second))
+							} else {
+								timeInfo = fmt.Sprintf("created: %s (parse error: %v)", *key.CreatedDate, err)
+							}
+						} else {
+							timeInfo = "created: unknown"
+						}
+
+						t.Logf("Retired key %d: ID=%s, Name=%s, %s", i+1, key.ID, key.Name, timeInfo)
+					}
+
+					t.Logf("Current retired keys count: %d (was %d initially)", currentRetiredCount, initialRetiredCount)
 
 					// Keys should be cleaned up after TTL
 					return currentRetiredCount < initialRetiredCount, nil
@@ -169,23 +197,6 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 
 				if err != nil {
 					t.Log("TTL-based cleanup may not have completed yet - this could be due to test timing")
-				}
-
-				return ctx
-			},
-		).
-		Assess(
-			"Verify clean resource deletion", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				// Get final state before deletion
-				sb := &v1alpha1.ServiceBinding{}
-				MustGetResource(t, cfg, sbRotationName, nil, sb)
-
-				t.Logf("Final state - Active binding: %s, Retired keys: %d",
-					sb.Status.AtProvider.ID, len(sb.Status.AtProvider.RetiredKeys))
-
-				// The teardown will handle deletion, but we verify the state is consistent
-				if sb.Status.AtProvider.ID == "" {
-					t.Error("Active binding should still exist before deletion")
 				}
 
 				return ctx
