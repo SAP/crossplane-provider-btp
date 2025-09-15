@@ -1,0 +1,18 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceBinding
+metadata:
+  name: e2e-destination-binding-rotation
+  namespace: default
+spec:
+  forProvider:
+    name: e2e-destination-binding-rotation
+    serviceInstanceRef:
+      name: e2e-destination-instance
+    subaccountRef:
+      name: e2e-test-servicebinding
+    rotation:
+      frequency: 2m  # 2 minutes - interval for creating new keys and retiring old ones
+      ttl: 5m        # 5 minutes - TTL for deleting expired retired keys
+  writeConnectionSecretToRef:
+    name: e2e-destination-binding-rotation
+    namespace: default
