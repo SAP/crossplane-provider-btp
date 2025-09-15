@@ -414,6 +414,11 @@ func (in *DirectoryEntitlementInitParameters) DeepCopyInto(out *DirectoryEntitle
 		*out = new(string)
 		**out = **in
 	}
+	if in.PlanUniqueIdentifier != nil {
+		in, out := &in.PlanUniqueIdentifier, &out.PlanUniqueIdentifier
+		*out = new(string)
+		**out = **in
+	}
 	if in.ServiceName != nil {
 		in, out := &in.ServiceName, &out.ServiceName
 		*out = new(string)
@@ -511,6 +516,11 @@ func (in *DirectoryEntitlementObservation) DeepCopyInto(out *DirectoryEntitlemen
 		*out = new(string)
 		**out = **in
 	}
+	if in.PlanUniqueIdentifier != nil {
+		in, out := &in.PlanUniqueIdentifier, &out.PlanUniqueIdentifier
+		*out = new(string)
+		**out = **in
+	}
 	if in.ServiceName != nil {
 		in, out := &in.ServiceName, &out.ServiceName
 		*out = new(string)
@@ -568,6 +578,11 @@ func (in *DirectoryEntitlementParameters) DeepCopyInto(out *DirectoryEntitlement
 	}
 	if in.PlanName != nil {
 		in, out := &in.PlanName, &out.PlanName
+		*out = new(string)
+		**out = **in
+	}
+	if in.PlanUniqueIdentifier != nil {
+		in, out := &in.PlanUniqueIdentifier, &out.PlanUniqueIdentifier
 		*out = new(string)
 		**out = **in
 	}
