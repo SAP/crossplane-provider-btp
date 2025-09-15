@@ -10,9 +10,8 @@ import (
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/e2e-framework/klient/wait"
-
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 
@@ -23,7 +22,6 @@ import (
 var (
 	sbRotationName = "e2e-destination-binding-rotation"
 )
-
 
 func TestServiceBinding_RotationLifecycle(t *testing.T) {
 	if testing.Short() {
@@ -203,5 +201,3 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 
 	testenv.Test(t, rotationLifecycleFeature)
 }
-
-
