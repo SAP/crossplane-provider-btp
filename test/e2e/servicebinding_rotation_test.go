@@ -50,8 +50,8 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 				MustGetResource(t, cfg, sbRotationName, nil, sb)
 
 				// Check that the binding is fully initialized
-				if sb.Status.AtProvider.ID == "" {
-					t.Error("ServiceBinding not fully initialized")
+				if sb.Spec.BtpName == nil || sb.Status.AtProvider.Name != *sb.Spec.BtpName {
+					t.Error("ServiceBinding not fully initialized - BtpName does not match AtProvider.Name")
 				}
 
 				// Check that rotation configuration exists
@@ -87,8 +87,8 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 				// Store the original ID and creation time
 				originalID := sb.Status.AtProvider.ID
 				originalName := sb.Status.AtProvider.Name
-				if originalID == "" {
-					t.Fatal("Original binding ID is empty")
+				if sb.Spec.BtpName == nil || sb.Status.AtProvider.Name != *sb.Spec.BtpName {
+					t.Fatal("Original binding not ready - BtpName does not match AtProvider.Name")
 				}
 
 				t.Logf("Waiting for rotation of binding ID: %s after 2 minutes...", originalID)
@@ -126,7 +126,7 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					MustGetResource(t, cfg, sbRotationName, nil, sb)
 
 					// New binding should exist and be ready
-					if sb.Status.AtProvider.ID != "" && len(sb.Status.AtProvider.RetiredKeys) > 0 {
+					if sb.Spec.BtpName != nil && sb.Status.AtProvider.Name == *sb.Spec.BtpName && len(sb.Status.AtProvider.RetiredKeys) > 0 {
 						t.Logf("New binding created: %s", sb.Status.AtProvider.ID)
 						return true, nil
 					}
