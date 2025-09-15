@@ -11,8 +11,8 @@ spec:
     subaccountRef:
       name: e2e-test-servicebinding
     rotation:
-      frequency: 2m  # 2 minutes - interval for creating new keys and retiring old ones
-      ttl: 5m        # 5 minutes - TTL for deleting expired retired keys
+      frequency: 2m
+      ttl: 5m
   writeConnectionSecretToRef:
     name: e2e-destination-binding-rotation
     namespace: default
