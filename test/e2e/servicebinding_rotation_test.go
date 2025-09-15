@@ -145,7 +145,6 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 				// Wait and observe TTL expiration behavior
 				t.Logf("Monitoring TTL expiration behavior...")
 
-				var hasSeenExpiredKeyCleanup bool
 				var maxRetiredKeysObserved int
 
 				err := wait.For(func(ctx context.Context) (bool, error) {
@@ -202,7 +201,6 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					// Success condition: We've seen keys accumulate and then get cleaned up
 					// This indicates TTL cleanup is working
 					if maxRetiredKeysObserved >= 2 && currentRetiredCount < maxRetiredKeysObserved {
-						hasSeenExpiredKeyCleanup = true
 						t.Logf("✅ TTL cleanup observed: max keys was %d, now %d", maxRetiredKeysObserved, currentRetiredCount)
 						return true, nil
 					}
@@ -212,6 +210,9 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 				}, wait.WithTimeout(10*time.Minute)) // Extended timeout to observe full rotation + TTL cycle
 
 				if err != nil {
+					// Get final state for logging
+					sb := &v1alpha1.ServiceBinding{}
+					MustGetResource(t, cfg, sbRotationName, nil, sb)
 					t.Logf("TTL monitoring completed after timeout. Max keys observed: %d, Final count: %d", maxRetiredKeysObserved, len(sb.Status.AtProvider.RetiredKeys))
 					if maxRetiredKeysObserved >= 2 {
 						t.Log("✅ Key accumulation observed - rotation is working correctly")
