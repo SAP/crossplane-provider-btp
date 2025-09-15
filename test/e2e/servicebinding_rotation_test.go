@@ -18,7 +18,6 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 )
 
 var (
