@@ -10,9 +10,8 @@ import (
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/e2e-framework/klient/wait"
-
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 
@@ -46,6 +45,9 @@ func TestServiceBinding_CreationFlow(t *testing.T) {
 				// Status bound?
 				if sb.Status.AtProvider.ID == "" {
 					t.Error("ServiceBinding not fully initialized")
+				}
+				if sb.Status.AtProvider.Name != sb.Spec.ForProvider.Name {
+					t.Error("ServiceBinding status name is not the name as the spec says. Maybe it got generated like if rotation is enabled? (It is not)")
 				}
 				return ctx
 			},
