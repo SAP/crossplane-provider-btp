@@ -33,7 +33,8 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 	rotationLifecycleFeature := features.New("ServiceBinding Complete Rotation Lifecycle").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding")
+				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/env")
+				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/rotation")
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
@@ -224,10 +225,20 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 				return ctx
 			},
 		).
+		Assess(
+			"Properly delete all resources", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				// k8s resource cleaned up?
+				sb := &v1alpha1.ServiceBinding{}
+				MustGetResource(t, cfg, sbRotationName, nil, sb)
+
+				AwaitResourceDeletionOrFail(ctx, t, cfg, sb, wait.WithTimeout(time.Minute*5))
+
+				return ctx
+			},
+		).
 		Teardown(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				t.Log("Cleaning up ServiceBinding and verifying all keys are deleted...")
-				DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*5))
+				DeleteResourcesIgnoreMissing(ctx, t, cfg, "servicebinding/env", wait.WithTimeout(time.Minute*5))
 				return ctx
 			},
 		).Feature()

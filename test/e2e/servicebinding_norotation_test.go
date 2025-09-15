@@ -27,7 +27,8 @@ func TestServiceBinding_CreationFlow(t *testing.T) {
 	crudFeatureSuite := features.New("ServiceBinding Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding")
+				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/env")
+				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/no-rotation")
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
@@ -63,7 +64,7 @@ func TestServiceBinding_CreationFlow(t *testing.T) {
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*5))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "servicebinding/env", wait.WithTimeout(time.Minute*5))
 			return ctx
 		},
 	).Feature()
