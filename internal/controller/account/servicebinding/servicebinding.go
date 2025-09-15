@@ -273,6 +273,14 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err := e.instanceManager.DeleteInstance(ctx, cr, btpName, cr.Status.AtProvider.ID); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
+
+	// Verify the resource is actually gone by attempting to observe it
+	if observation, _, err := e.instanceManager.ObserveInstance(ctx, cr, btpName, cr.Status.AtProvider.ID); err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errObserveTfResource)
+	} else if observation.ResourceExists {
+		return managed.ExternalDelete{}, errors.New("resource still exists after deletion attempt")
+	}
+
 	return managed.ExternalDelete{}, nil
 }
 
