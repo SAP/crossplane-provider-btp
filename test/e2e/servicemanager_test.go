@@ -191,8 +191,7 @@ func TestServiceManagerImport(t *testing.T) {
 
 			// Allow resource to be deleted for teardown
 			sm.Spec.ResourceSpec.ManagementPolicies = []xpv1.ManagementAction{xpv1.ManagementActionDelete, xpv1.ManagementActionObserve}
-			err = cfg.Client().Resources().Update(ctx, sm)
-			if err != nil {
+			if err := cfg.Client().Resources().Update(ctx, sm); err != nil {
 				t.Errorf("Failed to update ServiceManager deletion policy: %v", err)
 			}
 
