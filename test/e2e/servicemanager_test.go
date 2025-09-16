@@ -7,23 +7,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/klient/wait"
+	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/pkg/features"
+
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/e2e-framework/klient/wait"
-
-	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
-	"sigs.k8s.io/e2e-framework/pkg/envconf"
-	"sigs.k8s.io/e2e-framework/pkg/features"
 )
 
 var (
-	smCreateName             = "e2e-sm-servicemanager"
-	smImportName             = "sm-import-test"
+	smCreateName = "e2e-sm-servicemanager"
+	smImportName = "sm-import-test"
 )
 
 func TestServiceManagerCreationFlow(t *testing.T) {
@@ -154,7 +154,7 @@ func TestServiceManagerImport(t *testing.T) {
 					},
 					Spec: v1beta1.ServiceManagerSpec{
 						ResourceSpec: xpv1.ResourceSpec{
-							ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve, xpv1.ManagementActionUpdate},
+							ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve},
 							WriteConnectionSecretToReference: &xpv1.SecretReference{
 								Name:      smImportName,
 								Namespace: cfg.Namespace(),
@@ -188,6 +188,13 @@ func TestServiceManagerImport(t *testing.T) {
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			sm := &v1beta1.ServiceManager{}
 			MustGetResource(t, cfg, smImportName, nil, sm)
+
+			// Allow resource to be deleted for teardown
+			sm.Spec.ResourceSpec.ManagementPolicies = []xpv1.ManagementAction{xpv1.ManagementActionDelete, xpv1.ManagementActionObserve}
+			err = cfg.Client().Resources().Update(ctx, sm)
+			if err != nil {
+				t.Errorf("Failed to update ServiceManager deletion policy: %v", err)
+			}
 
 			resources.AwaitResourceDeletionOrFail(ctx, t, cfg, sm)
 
