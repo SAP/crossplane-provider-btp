@@ -151,7 +151,7 @@ type SubaccountApiCredentialStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 
-// SubaccountApiCredential is the Schema for the SubaccountApiCredentials API. Manage API Credentials at the Subaccount level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted subaccount. Tip: You must be assigned to the subaccount admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/managing-api-credentials-for-calling-rest-apis-of-sap-authorization-and-trust-management-service
+// SubaccountApiCredential is the Schema for the SubaccountApiCredentials API. Manage API Credentials at the Subaccount level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted subaccount. Tip: You must be assigned to the subaccount admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

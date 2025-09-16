@@ -68,7 +68,7 @@ resources:
         importStatements: []
     btp_directory_api_credential:
         subCategory: ""
-        description: 'Manage API Credentials at the Directory level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted directory. Tip: You must be assigned to directory admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/managing-api-credentials-for-calling-rest-apis-of-sap-authorization-and-trust-management-service'
+        description: 'Manage API Credentials at the Directory level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted directory. Tip: You must be assigned to directory admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
         name: btp_directory_api_credential
         title: btp_directory_api_credential Resource - terraform-provider-btp
         examples:
@@ -82,11 +82,13 @@ resources:
             - name: with-certificate
               manifest: |-
                 {
-                  "certificate_passed": "-----BEGIN CERTIFICATE-----\n-not-a-valid-certificate-\n-----END CERTIFICATE----\n",
+                  "certificate_passed": "${data.external.values.result[\"certificate\"]}",
                   "directory_id": "d1298936-ddaf-4a82-b1d7-3ad29a732b61",
                   "name": "directory-api-credential-with-certificate",
                   "read_only": false
                 }
+              references:
+                certificate_passed: data.external.values.result["certificate"]
             - name: read-only
               manifest: |-
                 {
@@ -155,7 +157,6 @@ resources:
             id: (String) The ID of the entitled service plan.
             plan_id: (String) The ID of the entitled service plan.
             plan_name: (String) The name of the entitled service plan.
-            plan_unique_identifier: (String) The unique identifier of the service plan.
             service_name: (String) The name of the entitled service.
         importStatements: []
     btp_directory_role:
@@ -247,7 +248,7 @@ resources:
         importStatements: []
     btp_globalaccount_api_credential:
         subCategory: ""
-        description: 'Manage API Credentials at the Global Account level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted global account. Tip: You must be assigned to the global account admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/managing-api-credentials-for-calling-rest-apis-of-sap-authorization-and-trust-management-service'
+        description: 'Manage API Credentials at the Global Account level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted global account. Tip: You must be assigned to the global account admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
         name: btp_globalaccount_api_credential
         title: btp_globalaccount_api_credential Resource - terraform-provider-btp
         examples:
@@ -260,10 +261,12 @@ resources:
             - name: with-certificate
               manifest: |-
                 {
-                  "certificate_passed": "-----BEGIN CERTIFICATE-----\n-not-a-valid-certificate-\n-----END CERTIFICATE----\n",
+                  "certificate_passed": "${data.external.values.result[\"certificate\"]}",
                   "name": "globalaccount-api-credential-with-certificate",
                   "read_only": false
                 }
+              references:
+                certificate_passed: data.external.values.result["certificate"]
             - name: read-only
               manifest: |-
                 {
@@ -292,20 +295,16 @@ resources:
             - name: azure
               manifest: |-
                 {
-                  "configuration": "${jsonencode({\n    region              = \"westeurope\"\n    client_id           = \"AZURECLIENTID\"\n    client_secret       = \"AZURECLIENTSECRET\"\n    tenant_id           = \"42x7676x-f455-423x-82x6-xx2d99791xx7\"\n    subscription_id     = \"x1x9567x-8560-44xx-x4fx-741xx0x08x58\"\n    resource_group_name = \"rg-landscape-azure-example\"\n  })}",
-                  "description": "My Azure Resource Provider",
-                  "display_name": "my_azure_provider",
-                  "provider_type": "AZURE",
-                  "technical_name": "AZURE"
+                  "id": "my_azure_provider",
+                  "parameters": "${jsonencode({\n    region              = \"westeurope\"\n    client_id           = \"AZURECLIENTID\"\n    client_secret       = \"AZURECLIENTSECRET\"\n    tenant_id           = \"42x7676x-f455-423x-82x6-xx2d99791xx7\"\n    subscription_id     = \"x1x9567x-8560-44xx-x4fx-741xx0x08x58\"\n    resource_group_name = \"rg-landscape-azure-example\"\n  })}",
+                  "resource_provider": "AZURE"
                 }
             - name: aws
               manifest: |-
                 {
-                  "configuration": "${jsonencode({\n    access_key_id     = \"AWSACCESSKEY\"\n    secret_access_key = \"AWSSECRETKEY\"\n    vpc_id            = \"vpc-test\"\n    region            = \"eu-central-1\"\n  })}",
-                  "description": "My AWS Resource Provider",
-                  "display_name": "my_aws_provider",
-                  "provider_type": "AWS",
-                  "technical_name": "AWS"
+                  "id": "my_aws_provider",
+                  "parameters": "${jsonencode({\n    access_key_id     = \"AWSACCESSKEY\"\n    secret_access_key = \"AWSSECRETKEY\"\n    vpc_id            = \"vpc-test\"\n    region            = \"eu-central-1\"\n  })}",
+                  "resource_provider": "AWS"
                 }
         argumentDocs:
             AWS: |-
@@ -515,14 +514,13 @@ resources:
             parent_features: (Set of String) The features of parent entity of the subaccount.
             parent_id: (String) The ID of the subaccount’s parent entity. If the subaccount is located directly in the global account (not in a directory), then this is the ID of the global account.
             region: (String) The region in which the subaccount was created.
-            skip_auto_entitlement: (Boolean) Specifies if the subaccount creation excludes the auto-assignment of base entitlements, allowing quicker setup with potentially reduced resource consumption. When not set or set to 'false' the standard auto-assigned plans are included.
             state: '(String) The current state of the subaccount. Possible values are:'
             subdomain: (String) The subdomain that becomes part of the path used to access the authorization tenant of the subaccount. Must be unique within the defined region and cannot be changed after the subaccount has been created.
             usage: '(String) Shows whether the subaccount is used for production purposes. This flag can help your cloud operator to take appropriate action when handling incidents that are related to mission-critical accounts in production systems. Do not apply for subaccounts that are used for nonproduction purposes, such as development, testing, and demos. Applying this setting this does not modify the subaccount. Possible values are:'
         importStatements: []
     btp_subaccount_api_credential:
         subCategory: ""
-        description: 'Manage API Credentials at the Subaccount level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted subaccount. Tip: You must be assigned to the subaccount admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/managing-api-credentials-for-calling-rest-apis-of-sap-authorization-and-trust-management-service'
+        description: 'Manage API Credentials at the Subaccount level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted subaccount. Tip: You must be assigned to the subaccount admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
         name: btp_subaccount_api_credential
         title: btp_subaccount_api_credential Resource - terraform-provider-btp
         examples:
@@ -536,11 +534,13 @@ resources:
             - name: with-certificate
               manifest: |-
                 {
-                  "certificate_passed": "-----BEGIN CERTIFICATE-----\n-not-a-valid-certificate-\n-----END CERTIFICATE----\n",
+                  "certificate_passed": "${data.external.values.result[\"certificate\"]}",
                   "name": "subaccount-api-credential-with-certificate",
                   "read_only": false,
                   "subaccount_id": "77395f6a-a601-4c9e-8cd0-c1fcefc7f60f"
                 }
+              references:
+                certificate_passed: data.external.values.result["certificate"]
             - name: read-only
               manifest: |-
                 {
@@ -603,7 +603,6 @@ resources:
             last_modified: (String) The date and time when the resource was last modified in RFC3339 format.
             plan_id: (String) The ID of the entitled service plan.
             plan_name: (String) The name of the entitled service plan.
-            plan_unique_identifier: (String) The unique identifier of the service plan.
             service_name: (String) The name of the entitled service.
             state: '(String) The current state of the entitlement. Possible values are:'
             subaccount_id: (String) The ID of the subaccount.
@@ -719,36 +718,14 @@ resources:
                   "role_template_name": "xsuaa_auditor",
                   "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
                 }
-            - name: custom
-              manifest: |-
-                {
-                  "app_id": "eu12-appfront!b390135",
-                  "attribute_list": [
-                    {
-                      "attribute_name": "namespace",
-                      "attribute_value_origin": "saml",
-                      "attribute_values": [
-                        "custom value"
-                      ]
-                    }
-                  ],
-                  "name": "Custom Role with Attributes",
-                  "role_template_name": "Application_Frontend_Developer",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
-                }
         argumentDocs:
             app_id: (String) The ID of the xsuaa application.
-            attribute_list: (Attributes List) The attributes assigned to this role. (see below for nested schema)
-            attribute_name: (String) The name of the role attribute.
-            attribute_value_origin: (String) The origin of the attribute value.
-            attribute_values: (Set of String)
             description: (String) The role description.
             id: (String, Deprecated) The combined unique ID of the role.
             name: (String) The name of the role.
             read_only: (Boolean) Shows whether the role can be modified or not.
             role_template_name: (String) The name of the role template.
             subaccount_id: (String) The ID of the subaccount.
-            value_required: (Boolean) Shows whether the value is required.
         importStatements: []
     btp_subaccount_role_collection:
         subCategory: ""
@@ -833,8 +810,7 @@ resources:
             custom_email_domains: (Set of String) Set of domains that are allowed to be used for user authentication.
             default_identity_provider: (String) The subaccount's default identity provider for business application users.
             id: (String, Deprecated) The ID of the security settings used for import operations.
-            iframe_domains: (String, Deprecated) The new domains of the iframe. Enter as string. To provide multiple domains, separate them by spaces.
-            iframe_domains_list: (List of String) The new domains of the iframe. Enter as list. It is recommended to use in place of iframe_domains as list of iframes is better managed by this parameter.
+            iframe_domains: (String) The new domains of the iframe. Enter as string. To provide multiple domains, separate them by spaces.
             refresh_token_validity: (Number) The validity of the refresh token.
             subaccount_id: (String) The ID of the subaccount.
             treat_users_with_same_email_as_same_user: (Boolean) If set to true, users with the same email are treated as same users.
@@ -1025,7 +1001,6 @@ resources:
             supports_plan_updates: (Boolean) Specifies whether a consumer, whose subaccount is subscribed to the application, can change the subscription to a different plan that is available for this application and subaccount.
             tenant_id: (String) The tenant ID of the application provider.
             timeouts: (Attributes) (see below for nested schema)
-            update: (String) Timeout for updating the subscription.
         importStatements: []
     btp_subaccount_trust_configuration:
         subCategory: ""
