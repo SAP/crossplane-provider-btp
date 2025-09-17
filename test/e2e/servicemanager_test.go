@@ -120,18 +120,11 @@ func TestServiceManagerImport(t *testing.T) {
 				waitForResource(sm, cfg, t, wait.WithTimeout(7*time.Minute))
 
 				createdSM := &v1beta1.ServiceManager{}
-				err = cfg.Client().Resources().Get(ctx, smImportName+"-create", cfg.Namespace(), createdSM)
-				if err != nil {
-					t.Errorf("Failed to get created ServiceManager: %v", err)
-				}
+
+				MustGetResource(t, cfg, smImportName+"-create", nil, createdSM)
 
 				actualExternalName := createdSM.GetAnnotations()["crossplane.io/external-name"]
 				t.Logf("Using external name for import: %s", actualExternalName)
-
-				err = cfg.Client().Resources().Delete(ctx, createdSM)
-				if err != nil {
-					t.Errorf("Failed to delete ServiceManager: %v", err)
-				}
 
 				AwaitResourceDeletionOrFail(ctx, t, cfg, createdSM, wait.WithTimeout(time.Minute*2))
 
@@ -195,7 +188,7 @@ func TestServiceManagerImport(t *testing.T) {
 				t.Errorf("Failed to update ServiceManager deletion policy: %v", err)
 			}
 
-			resources.AwaitResourceDeletionOrFail(ctx, t, cfg, sm)
+			AwaitResourceDeletionOrFail(ctx, t, cfg, sm, wait.WithTimeout(time.Minute*5))
 
 			DeleteResourcesIgnoreMissing(ctx, t, cfg, "servicemanager/import/environment", wait.WithTimeout(time.Minute*15))
 			return ctx
