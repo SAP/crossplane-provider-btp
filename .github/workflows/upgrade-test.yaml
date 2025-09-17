@@ -21,6 +21,8 @@ jobs:
   # if the target is not set, we want to take the latest git commit of the branch and build the image with that.
   build-test-version:
     if: ${{ github.event.inputs.target == '' }}
+    outputs:
+      target_version: ${{ steps.set-target-version.outputs.BUILD_IMAGE_VERSION }}
     runs-on: ubuntu-latest
     steps:
       - name: Setup Docker Buildx
@@ -44,9 +46,16 @@ jobs:
         run: make vendor vendor.check
 
       - name: Set up Version
+        id: set-target-version
         run: |
+          echo "setting version to v0.0.0-draft-${{ github.sha }}" 
           echo "BUILD_IMAGE_VERSION=v0.0.0-draft-${{ github.sha }}" >> $GITHUB_ENV
-          echo "version is $BUILD_IMAGE_VERSION"
+          echo "BUILD_IMAGE_VERSION=v0.0.0-draft-${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Print Version Number
+        run: |
+          echo "BUILD_IMAGE_VERSION is $BUILD_IMAGE_VERSION"
+
       - name: Build Images
         run: make build VERSION=$BUILD_IMAGE_VERSION
         env:
@@ -78,10 +87,13 @@ jobs:
       - name: Set TARGET_IMAGE_VERSION
         run: |
           if [ -z "${{ github.event.inputs.target }}" ]; then
-            echo "TARGET_IMAGE_VERSION=$BUILD_IMAGE_VERSION" >> $GITHUB_ENV
+            echo "TARGET_IMAGE_VERSION=${{ needs.build-test-version.outputs.target_version }}" >> $GITHUB_ENV
           else
             echo "TARGET_IMAGE_VERSION=${{ github.event.inputs.target }}" >> $GITHUB_ENV
           fi
+      - name: Print TARGET_IMAGE_VERSION
+        run: |
+          echo "TARGET_IMAGE_VERSION is $TARGET_IMAGE_VERSION"
 
       - name: Clone provider-upgrade-test repo
         run: |
