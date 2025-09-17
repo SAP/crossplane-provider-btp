@@ -111,7 +111,7 @@ func AwaitResourceDeletionOrFail(ctx context.Context, t *testing.T, cfg *envconf
 
 	err := res.Delete(ctx, object)
 	if err != nil {
-		t.Fatalf("Failed to delete object %s.", identifier(object))
+		t.Fatalf("Failed to delete object %s: %s.", identifier(object), err)
 	}
 
 	err = wait.For(conditions.New(res).ResourceDeleted(object), opts...)
