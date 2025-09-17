@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/sap/crossplane-provider-btp/apis"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"sigs.k8s.io/e2e-framework/klient/wait"
