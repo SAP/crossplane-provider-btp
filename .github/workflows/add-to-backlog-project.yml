@@ -4,10 +4,11 @@ on:
   schedule:
     - cron: "0 7 * * *"  # Runs at 07:00 UTC every day
   workflow_dispatch:  # Allows manual trigger
+  pull_request:  # Runs on PRs for debug purposes
 
 env:
   ACTIONS_STEP_DEBUG: true
 
 jobs:
   call-reusable-workflow:
-    uses: openmcp-project/.github/workflows/addRefinedIssuesToBacklog.yml@main
+    uses: openmcp-project/.github/.github/workflows/addRefinedIssuesToBacklog.yml@main
