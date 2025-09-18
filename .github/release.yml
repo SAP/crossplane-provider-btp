@@ -1,0 +1,17 @@
+changelog:
+  exclude:
+    labels:
+      - release-notes/ignore
+  categories:
+    - title: New Features 🚀
+      labels:
+        - release-notes/new-feature
+    - title: Bug Fixes 🐞
+      labels:
+        - release-notes/bugfix
+    - title: Dependencies 🔗
+      labels:
+        - release-notes/dependencies
+    - title: Other Changes
+      labels:
+        - "*"
