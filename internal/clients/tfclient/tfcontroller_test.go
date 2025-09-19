@@ -402,7 +402,7 @@ func TestQueryAsyncData(t *testing.T) {
 		cr *fake.Terraformed
 	}
 	type want struct {
-		data interface{}
+		data *ObservationData
 	}
 	tests := map[string]struct {
 		reason string
@@ -430,10 +430,14 @@ func TestQueryAsyncData(t *testing.T) {
 				}),
 			},
 			want: want{
-				data: terraformedCrWithData("test-external-name", "test-id", []xpv1.Condition{
-					xpv1.Available(),
-					ujresource.AsyncOperationFinishedCondition(),
-				}),
+				data: &ObservationData{
+					Conditions: []xpv1.Condition{
+						xpv1.Available(),
+						ujresource.AsyncOperationFinishedCondition(),
+					},
+					ExternalName: "test-external-name",
+					ID:           "test-id",
+				},
 			},
 		},
 	}
