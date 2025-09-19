@@ -31,6 +31,9 @@ type KeyRotator interface {
 	// HasExpiredKeys checks if there are any retired keys that have expired based on the rotation TTL.
 	HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool
 
+	// IsCurrentBindingRetired checks if the current binding is already marked as retired.
+	IsCurrentBindingRetired(cr *v1alpha1.ServiceBinding) bool
+
 	// DeleteExpiredKeys deletes the expired keys from the status and the external system.
 	// It returns the new list of retired keys and any error encountered during deletion.
 	DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) ([]*v1alpha1.RetiredSBResource, error)
@@ -101,6 +104,15 @@ func (r *SBKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
 		}
 	}
 
+	return false
+}
+
+func (r *SBKeyRotator) IsCurrentBindingRetired(cr *v1alpha1.ServiceBinding) bool {
+	for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
+		if retiredKey.ID == cr.Status.AtProvider.ID {
+			return true
+		}
+	}
 	return false
 }
 

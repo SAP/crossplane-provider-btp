@@ -60,7 +60,7 @@ func (m *InstanceManager) CreateInstance(ctx context.Context, publicCR *v1alpha1
 	return btpName, instanceUID, creation, nil
 }
 
-// DeleteInstance deletes a service binding instance with a different name and UID
+// DeleteInstance deletes a the actual service binding instance in the BTP. This is done by deleting the virtual SubaccountServiceBinding CR (the TF CR)
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client delete command
 func (m *InstanceManager) DeleteInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
 	targetUID := GenerateInstanceUID(publicCR.UID, targetName)

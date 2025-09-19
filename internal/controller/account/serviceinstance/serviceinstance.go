@@ -126,21 +126,13 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			ConnectionDetails: managed.ConnectionDetails{},
 		}, nil
 	case tfClient.UpToDate:
-		tfResource := e.tfClient.QueryAsyncData(ctx)
+		data := e.tfClient.QueryAsyncData(ctx)
 
-		if tfResource != nil {
-			// Convert TF resource back to ObservationData for compatibility
-			if ssiResource, ok := tfResource.(*v1alpha1.SubaccountServiceInstance); ok {
-				observationData := tfClient.ObservationData{
-					ExternalName: meta.GetExternalName(ssiResource),
-					ID:           ssiResource.GetID(),
-					Conditions:   []xpv1.Condition{xpv1.Available()},
-				}
-				if err := e.saveInstanceData(ctx, cr, observationData); err != nil {
-					return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
-				}
-				cr.SetConditions(xpv1.Available())
+		if data != nil {
+			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
+				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 			}
+			cr.SetConditions(xpv1.Available())
 		}
 		return managed.ExternalObservation{
 			ResourceExists:    true,

@@ -8,6 +8,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -114,14 +115,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceBinding)
 	}
 
-	// Use btpName from spec, fall back to name for backward compatibility
-	var btpName string
-	if cr.Spec.BtpName != nil {
-		btpName = *cr.Spec.BtpName
-	} else {
-		// Backward compatibility: use the original name
-		btpName = cr.Spec.ForProvider.Name
-	}
+	btpName := getBtpName(cr)
 
 	observation, tfResource, err := e.instanceManager.ObserveInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
 	if err != nil {
@@ -185,12 +179,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
 	}
 
-	// Remove force rotation annotation after successful creation
-	if cr.ObjectMeta.Annotations != nil {
-		if _, ok := cr.ObjectMeta.Annotations[servicebindingclient.ForceRotationKey]; ok {
-			meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
-		}
-	}
+	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
 
 	return creation, nil
 }
@@ -201,25 +190,10 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotServiceBinding)
 	}
 
-	// Check if current binding is already retired - if so, skip update as service bindings are immutable
-	currentBindingRetired := false
-	for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
-		if retiredKey.ID == cr.Status.AtProvider.ID {
-			currentBindingRetired = true
-			break
-		}
-	}
-
 	// Only update if the current binding is not retired (service bindings are immutable in BTP)
-	var updateResult managed.ExternalUpdate
-	if !currentBindingRetired {
-		// Use btpName from spec, fall back to name for backward compatibility
-		var btpName string
-		if cr.Spec.BtpName != nil {
-			btpName = *cr.Spec.BtpName
-		} else {
-			btpName = cr.Spec.ForProvider.Name
-		}
+	updateResult := managed.ExternalUpdate{}
+	if !e.keyRotator.IsCurrentBindingRetired(cr) {
+		btpName := getBtpName(cr)
 
 		update, err := e.instanceManager.UpdateInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
 		if err != nil {
@@ -230,13 +204,15 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	// Clean up expired keys if there are any retired keys
 	if cr.Status.AtProvider.RetiredKeys != nil {
-		if newRetiredKeys, err := e.keyRotator.DeleteExpiredKeys(ctx, cr); err != nil {
+		newRetiredKeys, err := e.keyRotator.DeleteExpiredKeys(ctx, cr)
+		if err != nil {
 			return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteExpiredKeys)
-		} else {
-			cr.Status.AtProvider.RetiredKeys = newRetiredKeys
-			if err := e.kube.Status().Update(ctx, cr); err != nil {
-				return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
-			}
+		}
+
+		cr.Status.AtProvider.RetiredKeys = newRetiredKeys
+
+		if err := e.kube.Status().Update(ctx, cr); err != nil {
+			return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
 		}
 	}
 
@@ -262,19 +238,14 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
 	}
 
-	// Use btpName from spec, fall back to name for backward compatibility
-	var btpName string
-	if cr.Spec.BtpName != nil {
-		btpName = *cr.Spec.BtpName
-	} else {
-		btpName = cr.Spec.ForProvider.Name
-	}
+	btpName := getBtpName(cr)
 
 	if err := e.instanceManager.DeleteInstance(ctx, cr, btpName, cr.Status.AtProvider.ID); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
 
-	// Verify the resource is actually gone by attempting to observe it
+	// Verify the resource is actually gone by attempting to observe it.
+	// For some unclear reason (maybe race condition?) in rare cases the external resource does not get deleted with the delete call. In this case, just use the exponential backoff and try again.
 	if observation, _, err := e.instanceManager.ObserveInstance(ctx, cr, btpName, cr.Status.AtProvider.ID); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errObserveTfResource)
 	} else if observation.ResourceExists {
@@ -287,10 +258,9 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 // isRotationEnabled checks if rotation is currently enabled for the service binding
 func (e *external) isRotationEnabled(cr *v1alpha1.ServiceBinding) bool {
 	// Check for force rotation annotation
-	if cr.ObjectMeta.Annotations != nil {
-		if _, ok := cr.ObjectMeta.Annotations[servicebindingclient.ForceRotationKey]; ok {
-			return true
-		}
+	if metav1.HasAnnotation(cr.ObjectMeta, servicebindingclient.ForceRotationKey) {
+		return true
+
 	}
 
 	// Check if rotation frequency is configured
@@ -299,6 +269,14 @@ func (e *external) isRotationEnabled(cr *v1alpha1.ServiceBinding) bool {
 	}
 
 	return false
+}
+
+// getBtpName returns the btpName from spec, falling back to name for backward compatibility
+func getBtpName(cr *v1alpha1.ServiceBinding) string {
+	if cr.Spec.BtpName != nil {
+		return *cr.Spec.BtpName
+	}
+	return cr.Spec.ForProvider.Name
 }
 
 // updateServiceBindingFromTfResource extracts data from SubaccountServiceBinding and updates the public ServiceBinding CR
