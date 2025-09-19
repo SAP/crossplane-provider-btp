@@ -3,29 +3,36 @@ package servicebinding
 import (
 	"context"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
+	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
-	errNotServiceBinding = "managed resource is not a ServiceBinding custom resource"
-	errTrackPCUsage      = "cannot track ProviderConfig usage"
-	errGetPC             = "cannot get ProviderConfig"
-	errGetCreds          = "cannot get credentials"
-
-	errObserveBinding = "cannot observe servicebinding"
-	errCreateBinding  = "cannot create servicebinding"
-	errSaveData       = "cannot update cr data"
-	errGetBinding     = "cannot get servicebinding"
+	errNotServiceBinding    = "managed resource is not a ServiceBinding custom resource"
+	errCreateBinding        = "cannot create servicebinding"
+	errObserveSaveBinding   = "cannot save observed data"
+	errUpdateStatus         = "cannot update status"
+	errGetBinding           = "cannot get servicebinding"
+	errDeleteExpiredKeys    = "cannot delete expired keys"
+	errDeleteRetiredKeys    = "cannot delete retired keys"
+	errDeleteServiceBinding = "cannot delete servicebinding"
+	errConnectTfController  = "failed to connect TF controller"
+	errCreateTfResource     = "failed to create TF resource"
+	errDeleteTfResource     = "failed to delete TF resource"
+	errObserveTfResource    = "failed to observe TF resource"
 )
 
 // SaveConditionsFn Callback for persisting conditions in the CR
@@ -42,35 +49,53 @@ var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube clie
 
 	uErr := kube.Status().Update(ctx, si)
 
-	return errors.Wrap(uErr, errSaveData)
+	return errors.Wrap(uErr, errObserveSaveBinding)
 }
 
 type connector struct {
-	kube  client.Client
-	usage resource.Tracker
-
-	clientConnector tfClient.TfProxyConnectorI[*v1alpha1.ServiceBinding]
+	kube            client.Client
+	usage           resource.Tracker
+	resourcetracker tracking.ReferenceResolverTracker
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	_, ok := mg.(*v1alpha1.ServiceBinding)
+	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
 		return nil, errors.New(errNotServiceBinding)
 	}
 
-	// when working with tf proxy resources we want to keep the Connect() logic as part of the delgating Connect calls of the native resources to
-	// deal with errors in the part of process that they belong to
-	client, err := c.clientConnector.Connect(ctx, mg.(*v1alpha1.ServiceBinding))
-	if err != nil {
-		return nil, err
+	// Track resource references for dependency management
+	if err := c.resourcetracker.Track(ctx, cr); err != nil {
+		return nil, errors.Wrap(err, "cannot track resource references")
 	}
 
-	return &external{tfClient: client, kube: c.kube}, nil
+	sbConnector := tfClient.NewInternalTfConnector(
+		c.kube,
+		"btp_subaccount_service_binding",
+		v1alpha1.SubaccountServiceBinding_GroupVersionKind,
+		false,
+		nil,
+	)
+
+	instanceManager := servicebindingclient.NewInstanceManager(sbConnector)
+
+	ext := &external{
+		kube:            c.kube,
+		instanceManager: instanceManager,
+		tracker:         c.resourcetracker,
+	}
+
+	// Create key rotator with the external client as instance deleter
+	ext.keyRotator = servicebindingclient.NewSBKeyRotator(ext)
+
+	return ext, nil
 }
 
 type external struct {
-	tfClient tfClient.TfProxyControllerI
-	kube     client.Client
+	kube            client.Client
+	keyRotator      servicebindingclient.KeyRotator
+	instanceManager *servicebindingclient.InstanceManager
+	tracker         tracking.ReferenceResolverTracker
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -79,42 +104,48 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
+// DeleteInstance implements the InstanceDeleter interface for the key rotator
+func (e *external) DeleteInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
+	return e.instanceManager.DeleteInstance(ctx, cr, targetName, targetExternalName)
+}
+
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotServiceBinding)
 	}
 
-	status, details, err := e.tfClient.Observe(ctx)
+	btpName := getBtpName(cr)
+
+	observation, tfResource, err := e.instanceManager.ObserveInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
 	}
-	switch status {
-	case tfClient.NotExisting:
-		return managed.ExternalObservation{ResourceExists: false}, nil
-	case tfClient.Drift:
-		return managed.ExternalObservation{
-			ResourceExists:    true,
-			ResourceUpToDate:  false,
-			ConnectionDetails: managed.ConnectionDetails{},
-		}, nil
-	case tfClient.UpToDate:
-		data := e.tfClient.QueryAsyncData(ctx)
 
-		if data != nil {
-			if err := e.saveBindingData(ctx, cr, *data); err != nil {
-				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
+	// Extract and update data from TF resource if available and up-to-date
+	if observation.ResourceExists {
+		if observation.ResourceUpToDate && tfResource != nil && internal.Val(tfResource.Status.AtProvider.State) == "succeeded" {
+			if err := e.updateServiceBindingFromTfResource(cr, tfResource); err != nil {
+				return managed.ExternalObservation{}, errors.Wrap(err, errObserveSaveBinding)
+			} else {
+				if err := e.kube.Status().Update(ctx, cr); err != nil {
+					return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
+				}
 			}
-			cr.SetConditions(xpv1.Available())
 		}
 
-		return managed.ExternalObservation{
-			ResourceExists:    true,
-			ResourceUpToDate:  true,
-			ConnectionDetails: details,
-		}, nil
+		observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
+
+		// Retire binding conditionally
+		if e.keyRotator.RetireBinding(cr) {
+			if err := e.kube.Status().Update(ctx, cr); err != nil {
+				return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
+			}
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
 	}
-	return managed.ExternalObservation{}, errors.New(errObserveBinding)
+
+	return observation, nil
 }
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -124,49 +155,141 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	cr.SetConditions(xpv1.Creating())
-	if err := e.tfClient.Create(ctx); err != nil {
+
+	// Generate btpName if not already set in spec
+	var btpName string
+	if e.isRotationEnabled(cr) {
+		btpName = servicebindingclient.GenerateRandomName(cr.Spec.ForProvider.Name)
+	} else {
+		btpName = cr.Spec.ForProvider.Name
+	}
+	cr.Spec.BtpName = &btpName
+
+	// Update the spec with the generated btpName
+	if err := e.kube.Update(ctx, cr); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
+	}
+
+	_, _, creation, err := e.instanceManager.CreateInstance(ctx, cr, *cr.Spec.BtpName)
+	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
-	return managed.ExternalCreation{
-		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+	if err := e.kube.Status().Update(ctx, cr); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
+	}
+
+	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
+
+	return creation, nil
 }
 
-func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	_, ok := mg.(*v1alpha1.ServiceBinding)
+func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
+	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotServiceBinding)
 	}
-	if err := c.tfClient.Update(ctx); err != nil {
-		return managed.ExternalUpdate{}, err
+
+	// Only update if the current binding is not retired (service bindings are immutable in BTP)
+	updateResult := managed.ExternalUpdate{}
+	if !e.keyRotator.IsCurrentBindingRetired(cr) {
+		btpName := getBtpName(cr)
+
+		update, err := e.instanceManager.UpdateInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
+		if err != nil {
+			return managed.ExternalUpdate{}, err
+		}
+		updateResult = update
 	}
-	return managed.ExternalUpdate{
-		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+
+	// Clean up expired keys if there are any retired keys
+	if cr.Status.AtProvider.RetiredKeys != nil {
+		newRetiredKeys, err := e.keyRotator.DeleteExpiredKeys(ctx, cr)
+		if err != nil {
+			return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteExpiredKeys)
+		}
+
+		cr.Status.AtProvider.RetiredKeys = newRetiredKeys
+
+		if err := e.kube.Status().Update(ctx, cr); err != nil {
+			return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
+		}
+	}
+
+	return updateResult, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
+func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotServiceBinding)
 	}
 	cr.SetConditions(xpv1.Deleting())
-	if err := c.tfClient.Delete(ctx); err != nil {
-		return managed.ExternalDelete{}, errors.Wrap(err, "cannot delete servicebinding")
+
+	// Set resource usage conditions to check dependencies
+	e.tracker.SetConditions(ctx, cr)
+
+	// Block deletion if other resources are still using this ServiceBinding
+	if blocked := e.tracker.DeleteShouldBeBlocked(mg); blocked {
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
+
+	if err := e.keyRotator.DeleteRetiredKeys(ctx, cr); err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
+	}
+
+	btpName := getBtpName(cr)
+
+	if err := e.instanceManager.DeleteInstance(ctx, cr, btpName, cr.Status.AtProvider.ID); err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
+	}
+
+	// Verify the resource is actually gone by attempting to observe it.
+	// For some unclear reason (maybe race condition?) in rare cases the external resource does not get deleted with the delete call. In this case, just use the exponential backoff and try again.
+	if observation, _, err := e.instanceManager.ObserveInstance(ctx, cr, btpName, cr.Status.AtProvider.ID); err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errObserveTfResource)
+	} else if observation.ResourceExists {
+		return managed.ExternalDelete{}, errors.New("resource still exists after deletion attempt")
+	}
+
 	return managed.ExternalDelete{}, nil
 }
 
-func (e *external) saveBindingData(ctx context.Context, cr *v1alpha1.ServiceBinding, sid tfClient.ObservationData) error {
-	if meta.GetExternalName(cr) != sid.ExternalName {
-		meta.SetExternalName(cr, sid.ExternalName)
-		// manually saving external-name, since crossplane reconciler won't update spec and status in one loop
-		if err := e.kube.Update(ctx, cr); err != nil {
-			return err
-		}
+// isRotationEnabled checks if rotation is currently enabled for the service binding
+func (e *external) isRotationEnabled(cr *v1alpha1.ServiceBinding) bool {
+	// Check for force rotation annotation
+	if metav1.HasAnnotation(cr.ObjectMeta, servicebindingclient.ForceRotationKey) {
+		return true
+
 	}
-	// we rely on status being saved in crossplane reconciler here
-	cr.Status.AtProvider.ID = sid.ID
+
+	// Check if rotation frequency is configured
+	if cr.Spec.ForProvider.Rotation != nil && cr.Spec.ForProvider.Rotation.Frequency != nil {
+		return true
+	}
+
+	return false
+}
+
+// getBtpName returns the btpName from spec, falling back to name for backward compatibility
+func getBtpName(cr *v1alpha1.ServiceBinding) string {
+	if cr.Spec.BtpName != nil {
+		return *cr.Spec.BtpName
+	}
+	return cr.Spec.ForProvider.Name
+}
+
+// updateServiceBindingFromTfResource extracts data from SubaccountServiceBinding and updates the public ServiceBinding CR
+func (e *external) updateServiceBindingFromTfResource(publicCR *v1alpha1.ServiceBinding, tfResource *v1alpha1.SubaccountServiceBinding) error {
+	meta.SetExternalName(publicCR, meta.GetExternalName(tfResource))
+
+	publicCR.Status.AtProvider.ID = internal.Val(tfResource.Status.AtProvider.ID)
+	publicCR.Status.AtProvider.Name = internal.Val(tfResource.Status.AtProvider.Name)
+	publicCR.Status.AtProvider.Ready = tfResource.Status.AtProvider.Ready
+	publicCR.Status.AtProvider.State = tfResource.Status.AtProvider.State
+	publicCR.Status.AtProvider.CreatedDate = tfResource.Status.AtProvider.CreatedDate
+	publicCR.Status.AtProvider.LastModified = tfResource.Status.AtProvider.LastModified
+	publicCR.Status.AtProvider.Parameters = tfResource.Status.AtProvider.Parameters
+
 	return nil
 }
