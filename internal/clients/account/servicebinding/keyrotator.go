@@ -55,42 +55,39 @@ func NewSBKeyRotator(instanceDeleter InstanceDeleter) *SBKeyRotator {
 }
 
 func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
-	forceRotation := false
-	if cr.ObjectMeta.Annotations != nil {
-		_, forceRotation = cr.ObjectMeta.Annotations[ForceRotationKey]
-	}
+	forceRotation := v1.HasAnnotation(cr.ObjectMeta, ForceRotationKey)
 
 	var rotationDue bool
 	if cr.Spec.ForProvider.Rotation != nil && cr.Status.AtProvider.CreatedDate != nil {
 		rotationDue = cr.Status.AtProvider.CreatedDate.Add(cr.Spec.ForProvider.Rotation.Frequency.Duration).Before(time.Now())
 	}
 
-	if forceRotation || rotationDue {
-		for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
-			if retiredKey.ID == cr.Status.AtProvider.ID {
-				// If the binding is already retired, do not retire it again.
-				return true
-			}
-		}
-
-		var createdDate v1.Time
-		if cr.Status.AtProvider.CreatedDate != nil {
-			createdDate = *cr.Status.AtProvider.CreatedDate
-		}
-
-		retiredKey := &v1alpha1.RetiredSBResource{
-			ID:          cr.Status.AtProvider.ID,
-			Name:        cr.Status.AtProvider.Name,
-			CreatedDate: createdDate,
-			RetiredDate: v1.Now(),
-		}
-		cr.Status.AtProvider.RetiredKeys = append(cr.Status.AtProvider.RetiredKeys, retiredKey)
-		cr.Status.AtProvider.CreatedDate = nil
-
-		return true
+	if !forceRotation && !rotationDue {
+		return false
 	}
 
-	return false
+	// If the binding is already retired, do not retire it again.
+	for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
+		if retiredKey.ID == cr.Status.AtProvider.ID {
+			return true
+		}
+	}
+
+	var createdDate v1.Time
+	if cr.Status.AtProvider.CreatedDate != nil {
+		createdDate = *cr.Status.AtProvider.CreatedDate
+	}
+
+	retiredKey := &v1alpha1.RetiredSBResource{
+		ID:          cr.Status.AtProvider.ID,
+		Name:        cr.Status.AtProvider.Name,
+		CreatedDate: createdDate,
+		RetiredDate: v1.Now(),
+	}
+	cr.Status.AtProvider.RetiredKeys = append(cr.Status.AtProvider.RetiredKeys, retiredKey)
+	cr.Status.AtProvider.CreatedDate = nil
+
+	return true
 }
 
 func (r *SBKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
