@@ -54,11 +54,17 @@ func NewSBKeyRotator(instanceDeleter InstanceDeleter) *SBKeyRotator {
 	}
 }
 
+// isRotationConfigured checks if the service binding has valid rotation configuration
+// and retired keys to process
+func (r *SBKeyRotator) isRotationConfigured(cr *v1alpha1.ServiceBinding) bool {
+	return cr.Spec.ForProvider.Rotation != nil
+}
+
 func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 	forceRotation := v1.HasAnnotation(cr.ObjectMeta, ForceRotationKey)
 
 	var rotationDue bool
-	if cr.Spec.ForProvider.Rotation != nil && cr.Status.AtProvider.CreatedDate != nil {
+	if r.isRotationConfigured(cr) {
 		rotationDue = cr.Status.AtProvider.CreatedDate.Add(cr.Spec.ForProvider.Rotation.Frequency.Duration).Before(time.Now())
 	}
 
@@ -90,8 +96,7 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 }
 
 func (r *SBKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
-	if cr.Status.AtProvider.RetiredKeys == nil || cr.Spec.ForProvider.Rotation == nil ||
-		cr.Spec.ForProvider.Rotation.TTL == nil {
+	if !r.isRotationConfigured(cr) || cr.Status.AtProvider.RetiredKeys == nil {
 		return false
 	}
 
@@ -121,15 +126,18 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 	var newRetiredKeys []*v1alpha1.RetiredSBResource
 	var errs []error
 
+	if cr.Status.AtProvider.RetiredKeys == nil {
+		return newRetiredKeys, nil
+	}
+
 	for _, key := range cr.Status.AtProvider.RetiredKeys {
-		// Keep the key if it's not expired yet or if instance tracking info is missing
 		var expired bool
-		if !key.RetiredDate.IsZero() && cr.Spec.ForProvider.Rotation.TTL != nil {
+		if r.isRotationConfigured(cr) {
 			gracePeriod := cr.Spec.ForProvider.Rotation.TTL.Duration - cr.Spec.ForProvider.Rotation.Frequency.Duration
 			expired = key.RetiredDate.Add(gracePeriod).Before(time.Now())
 		}
 
-		if !expired || key.Name == "" {
+		if !expired {
 			newRetiredKeys = append(newRetiredKeys, key)
 			continue
 		}

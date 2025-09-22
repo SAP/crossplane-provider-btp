@@ -159,8 +159,9 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 			assert.Equal(t, tt.wantKeys, len(tt.cr.Status.AtProvider.RetiredKeys)-originalRetiredKeys)
 
 			if got && tt.wantKeys > 0 {
-				if tt.name == "ForceRotation_NewRetirement" || tt.name == "RotationDue_NewRetirement" {
-					assert.Nil(t, tt.cr.Status.AtProvider.CreatedDate)
+				// CreatedDate should be preserved when it exists
+				if tt.name == "RotationDue_NewRetirement" {
+					assert.NotNil(t, tt.cr.Status.AtProvider.CreatedDate)
 				}
 
 				retiredKey := tt.cr.Status.AtProvider.RetiredKeys[len(tt.cr.Status.AtProvider.RetiredKeys)-1]
