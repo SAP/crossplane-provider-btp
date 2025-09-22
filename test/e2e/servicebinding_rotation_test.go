@@ -163,35 +163,33 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					expiredKeysCount := 0
 
 					for i, key := range sb.Status.AtProvider.RetiredKeys {
-						var createdTime time.Time
+						var retiredTime time.Time
 						var expirationTime time.Time
 						var timeInfo string
 						var isExpired bool
 
-						if key.CreatedDate != nil {
-							if parsed, err := time.Parse("2006-01-02T15:04:05Z0700", *key.CreatedDate); err == nil {
-								createdTime = parsed
-								if sb.Spec.ForProvider.Rotation != nil && sb.Spec.ForProvider.Rotation.TTL != nil {
-									expirationTime = createdTime.Add(sb.Spec.ForProvider.Rotation.TTL.Duration)
-									timeUntilExpiration := expirationTime.Sub(now)
-									isExpired = timeUntilExpiration <= 0
-									if isExpired {
-										expiredKeysCount++
-									}
-
-									timeInfo = fmt.Sprintf("created: %s, expires: %s (in %v) %s",
-										createdTime.Format("15:04:05"),
-										expirationTime.Format("15:04:05"),
-										timeUntilExpiration.Round(time.Second),
-										map[bool]string{true: "[EXPIRED]", false: ""}[isExpired])
-								} else {
-									timeInfo = fmt.Sprintf("created: %s, TTL not configured", createdTime.Format("15:04:05"))
+						if key.RetiredDate != nil && !key.RetiredDate.IsZero() {
+							retiredTime = key.RetiredDate.Time
+							if sb.Spec.ForProvider.Rotation != nil && sb.Spec.ForProvider.Rotation.TTL != nil && sb.Spec.ForProvider.Rotation.Frequency != nil {
+								// Use new expiration logic: RetiredDate + (TTL - Frequency)
+								gracePeriod := sb.Spec.ForProvider.Rotation.TTL.Duration - sb.Spec.ForProvider.Rotation.Frequency.Duration
+								expirationTime = retiredTime.Add(gracePeriod)
+								timeUntilExpiration := expirationTime.Sub(now)
+								isExpired = timeUntilExpiration <= 0
+								if isExpired {
+									expiredKeysCount++
 								}
+
+								timeInfo = fmt.Sprintf("retired: %s, expires: %s (in %v) %s",
+									retiredTime.Format("15:04:05"),
+									expirationTime.Format("15:04:05"),
+									timeUntilExpiration.Round(time.Second),
+									map[bool]string{true: "[EXPIRED]", false: ""}[isExpired])
 							} else {
-								timeInfo = fmt.Sprintf("created: %s (parse error: %v)", *key.CreatedDate, err)
+								timeInfo = fmt.Sprintf("retired: %s, rotation config incomplete", retiredTime.Format("15:04:05"))
 							}
 						} else {
-							timeInfo = "created: unknown"
+							timeInfo = "retired: unknown"
 						}
 
 						t.Logf("Retired key %d: ID=%s, Name=%s, %s", i+1, key.ID, key.Name, timeInfo)

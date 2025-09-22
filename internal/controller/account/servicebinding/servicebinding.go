@@ -2,6 +2,7 @@ package servicebinding
 
 import (
 	"context"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -9,6 +10,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -29,11 +31,10 @@ const (
 	errDeleteExpiredKeys    = "cannot delete expired keys"
 	errDeleteRetiredKeys    = "cannot delete retired keys"
 	errDeleteServiceBinding = "cannot delete servicebinding"
-	errConnectTfController  = "failed to connect TF controller"
-	errCreateTfResource     = "failed to create TF resource"
-	errDeleteTfResource     = "failed to delete TF resource"
 	errObserveTfResource    = "failed to observe TF resource"
 )
+
+const iso8601Date = "2006-01-02T15:04:05Z0700"
 
 // SaveConditionsFn Callback for persisting conditions in the CR
 var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error {
@@ -283,13 +284,45 @@ func getBtpName(cr *v1alpha1.ServiceBinding) string {
 func (e *external) updateServiceBindingFromTfResource(publicCR *v1alpha1.ServiceBinding, tfResource *v1alpha1.SubaccountServiceBinding) error {
 	meta.SetExternalName(publicCR, meta.GetExternalName(tfResource))
 
+	var createdDate *v1.Time = nil
+	if tfResource.Status.AtProvider.CreatedDate != nil {
+		// The date is in the iso8601 format, which is not the same as the RFC3339 format the parameter claims to have
+		cd, err := parseIso8601Date(*tfResource.Status.AtProvider.CreatedDate)
+		if err != nil {
+			return err
+		}
+
+		createdDate = &cd
+	}
+	var lastModified *v1.Time = nil
+	if tfResource.Status.AtProvider.LastModified != nil {
+		// The date is in the iso8601 format, which is not the same as the RFC3339 format the parameter claims to have
+		lm, err := parseIso8601Date(*tfResource.Status.AtProvider.LastModified)
+		if err != nil {
+			return err
+		}
+
+		lastModified = &lm
+	}
+
 	publicCR.Status.AtProvider.ID = internal.Val(tfResource.Status.AtProvider.ID)
 	publicCR.Status.AtProvider.Name = internal.Val(tfResource.Status.AtProvider.Name)
 	publicCR.Status.AtProvider.Ready = tfResource.Status.AtProvider.Ready
 	publicCR.Status.AtProvider.State = tfResource.Status.AtProvider.State
-	publicCR.Status.AtProvider.CreatedDate = tfResource.Status.AtProvider.CreatedDate
-	publicCR.Status.AtProvider.LastModified = tfResource.Status.AtProvider.LastModified
+	publicCR.Status.AtProvider.CreatedDate = createdDate
+	publicCR.Status.AtProvider.LastModified = lastModified
 	publicCR.Status.AtProvider.Parameters = tfResource.Status.AtProvider.Parameters
 
 	return nil
+}
+
+func parseIso8601Date(t string) (v1.Time, error) {
+	iTime, err := time.Parse(iso8601Date, t)
+	if err != nil {
+		return v1.Time{}, err
+	}
+
+	return v1.Time{
+		Time: iTime,
+	}, nil
 }
