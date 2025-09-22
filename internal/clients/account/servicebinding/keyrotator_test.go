@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/internal"
 )
 
 var (
@@ -60,8 +59,9 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 						Name: "current-name",
 						RetiredKeys: []*v1alpha1.RetiredSBResource{
 							{
-								ID:   "current-id",
-								Name: "current-name",
+								ID:          "current-id",
+								Name:        "current-name",
+								RetiredDate: metav1.Time{Time: time.Now().Add(-time.Hour)},
 							},
 						},
 					},
@@ -84,7 +84,7 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 					AtProvider: v1alpha1.ServiceBindingObservation{
 						ID:          "current-id",
 						Name:        "current-name",
-						CreatedDate: internal.Ptr(pastTime.Format(iso8601Date)),
+						CreatedDate: &metav1.Time{Time: pastTime},
 					},
 				},
 			},
@@ -105,7 +105,7 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 					AtProvider: v1alpha1.ServiceBindingObservation{
 						ID:          "current-id",
 						Name:        "current-name",
-						CreatedDate: internal.Ptr(futureTime.Format(iso8601Date)),
+						CreatedDate: &metav1.Time{Time: futureTime},
 					},
 				},
 			},
@@ -139,7 +139,7 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 					AtProvider: v1alpha1.ServiceBindingObservation{
 						ID:          "current-id",
 						Name:        "current-name",
-						CreatedDate: internal.Ptr("invalid-date"),
+						CreatedDate: nil, // invalid date case
 					},
 				},
 			},
@@ -187,7 +187,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 				Spec: v1alpha1.ServiceBindingSpec{
 					ForProvider: v1alpha1.ServiceBindingParameters{
 						Rotation: &v1alpha1.RotationParameters{
-							TTL: &metav1.Duration{Duration: time.Hour},
+							TTL:       &metav1.Duration{Duration: time.Hour},
+							Frequency: &metav1.Duration{Duration: 30 * time.Minute},
 						},
 					},
 				},
@@ -197,7 +198,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 							{
 								ID:          "expired-key",
 								Name:        "expired-name",
-								CreatedDate: internal.Ptr(expiredTime.Format(iso8601Date)),
+								CreatedDate: metav1.Time{Time: expiredTime},
+								RetiredDate: metav1.Time{Time: expiredTime},
 							},
 						},
 					},
@@ -211,7 +213,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 				Spec: v1alpha1.ServiceBindingSpec{
 					ForProvider: v1alpha1.ServiceBindingParameters{
 						Rotation: &v1alpha1.RotationParameters{
-							TTL: &metav1.Duration{Duration: time.Hour},
+							TTL:       &metav1.Duration{Duration: time.Hour},
+							Frequency: &metav1.Duration{Duration: 30 * time.Minute},
 						},
 					},
 				},
@@ -221,7 +224,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 							{
 								ID:          "valid-key",
 								Name:        "valid-name",
-								CreatedDate: internal.Ptr(validTime.Format(iso8601Date)),
+								CreatedDate: metav1.Time{Time: validTime},
+								RetiredDate: metav1.Time{Time: time.Now()},
 							},
 						},
 					},
@@ -235,7 +239,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 				Spec: v1alpha1.ServiceBindingSpec{
 					ForProvider: v1alpha1.ServiceBindingParameters{
 						Rotation: &v1alpha1.RotationParameters{
-							TTL: &metav1.Duration{Duration: time.Hour},
+							TTL:       &metav1.Duration{Duration: time.Hour},
+							Frequency: &metav1.Duration{Duration: 30 * time.Minute},
 						},
 					},
 				},
@@ -254,7 +259,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 							{
 								ID:          "some-key",
 								Name:        "some-name",
-								CreatedDate: internal.Ptr(expiredTime.Format(iso8601Date)),
+								CreatedDate: metav1.Time{Time: expiredTime},
+								RetiredDate: metav1.Time{Time: expiredTime},
 							},
 						},
 					},
@@ -268,7 +274,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 				Spec: v1alpha1.ServiceBindingSpec{
 					ForProvider: v1alpha1.ServiceBindingParameters{
 						Rotation: &v1alpha1.RotationParameters{
-							TTL: &metav1.Duration{Duration: time.Hour},
+							TTL:       &metav1.Duration{Duration: time.Hour},
+							Frequency: &metav1.Duration{Duration: 30 * time.Minute},
 						},
 					},
 				},
@@ -278,7 +285,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 							{
 								ID:          "invalid-key",
 								Name:        "invalid-name",
-								CreatedDate: internal.Ptr("invalid-date"),
+								CreatedDate: metav1.Time{}, // invalid date case
+								RetiredDate: metav1.Time{}, // invalid date case
 							},
 						},
 					},
@@ -316,7 +324,8 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 				Spec: v1alpha1.ServiceBindingSpec{
 					ForProvider: v1alpha1.ServiceBindingParameters{
 						Rotation: &v1alpha1.RotationParameters{
-							TTL: &metav1.Duration{Duration: time.Hour},
+							TTL:       &metav1.Duration{Duration: time.Hour},
+							Frequency: &metav1.Duration{Duration: 30 * time.Minute},
 						},
 					},
 				},
@@ -326,12 +335,14 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 							{
 								ID:          "expired-key",
 								Name:        "expired-name",
-								CreatedDate: internal.Ptr(expiredTime.Format(iso8601Date)),
+								CreatedDate: metav1.Time{Time: expiredTime},
+								RetiredDate: metav1.Time{Time: expiredTime},
 							},
 							{
 								ID:          "valid-key",
 								Name:        "valid-name",
-								CreatedDate: internal.Ptr(validTime.Format(iso8601Date)),
+								CreatedDate: metav1.Time{Time: validTime},
+								RetiredDate: metav1.Time{Time: time.Now()},
 							},
 						},
 					},
@@ -348,7 +359,8 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 				Spec: v1alpha1.ServiceBindingSpec{
 					ForProvider: v1alpha1.ServiceBindingParameters{
 						Rotation: &v1alpha1.RotationParameters{
-							TTL: &metav1.Duration{Duration: time.Hour},
+							TTL:       &metav1.Duration{Duration: time.Hour},
+							Frequency: &metav1.Duration{Duration: 30 * time.Minute},
 						},
 					},
 				},
@@ -358,7 +370,8 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 							{
 								ID:          "expired-key",
 								Name:        "expired-name",
-								CreatedDate: internal.Ptr(expiredTime.Format(iso8601Date)),
+								CreatedDate: metav1.Time{Time: expiredTime},
+								RetiredDate: metav1.Time{Time: expiredTime},
 							},
 						},
 					},
@@ -377,7 +390,8 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 				Spec: v1alpha1.ServiceBindingSpec{
 					ForProvider: v1alpha1.ServiceBindingParameters{
 						Rotation: &v1alpha1.RotationParameters{
-							TTL: &metav1.Duration{Duration: time.Hour},
+							TTL:       &metav1.Duration{Duration: time.Hour},
+							Frequency: &metav1.Duration{Duration: 30 * time.Minute},
 						},
 					},
 				},
@@ -387,7 +401,8 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 							{
 								ID:          "expired-key",
 								Name:        "", // Empty name should be kept
-								CreatedDate: internal.Ptr(expiredTime.Format(iso8601Date)),
+								CreatedDate: metav1.Time{Time: expiredTime},
+								RetiredDate: metav1.Time{Time: expiredTime},
 							},
 						},
 					},
@@ -404,7 +419,8 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 				Spec: v1alpha1.ServiceBindingSpec{
 					ForProvider: v1alpha1.ServiceBindingParameters{
 						Rotation: &v1alpha1.RotationParameters{
-							TTL: &metav1.Duration{Duration: time.Hour},
+							TTL:       &metav1.Duration{Duration: time.Hour},
+							Frequency: &metav1.Duration{Duration: 30 * time.Minute},
 						},
 					},
 				},
@@ -414,7 +430,8 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 							{
 								ID:          "valid-key",
 								Name:        "valid-name",
-								CreatedDate: internal.Ptr(validTime.Format(iso8601Date)),
+								CreatedDate: metav1.Time{Time: validTime},
+								RetiredDate: metav1.Time{Time: time.Now()},
 							},
 						},
 					},
@@ -460,8 +477,9 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 					AtProvider: v1alpha1.ServiceBindingObservation{
 						RetiredKeys: []*v1alpha1.RetiredSBResource{
 							{
-								ID:   "key1",
-								Name: "name1",
+								ID:          "key1",
+								Name:        "name1",
+								RetiredDate: metav1.Time{Time: time.Now().Add(-time.Hour)},
 							},
 							{
 								ID:   "key2",
@@ -481,8 +499,9 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 					AtProvider: v1alpha1.ServiceBindingObservation{
 						RetiredKeys: []*v1alpha1.RetiredSBResource{
 							{
-								ID:   "key1",
-								Name: "name1",
+								ID:          "key1",
+								Name:        "name1",
+								RetiredDate: metav1.Time{Time: time.Now().Add(-time.Hour)},
 							},
 						},
 					},

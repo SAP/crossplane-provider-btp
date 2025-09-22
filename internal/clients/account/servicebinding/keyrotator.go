@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
 
@@ -59,12 +61,8 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 	}
 
 	var rotationDue bool
-	if cr.Spec.ForProvider.Rotation != nil && cr.Spec.ForProvider.Rotation.Frequency != nil {
-		if cr.Status.AtProvider.CreatedDate != nil {
-			if createdTime, err := time.Parse(iso8601Date, *cr.Status.AtProvider.CreatedDate); err == nil {
-				rotationDue = createdTime.Add(cr.Spec.ForProvider.Rotation.Frequency.Duration).Before(time.Now())
-			}
-		}
+	if cr.Spec.ForProvider.Rotation != nil && cr.Status.AtProvider.CreatedDate != nil {
+		rotationDue = cr.Status.AtProvider.CreatedDate.Add(cr.Spec.ForProvider.Rotation.Frequency.Duration).Before(time.Now())
 	}
 
 	if forceRotation || rotationDue {
@@ -75,10 +73,16 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 			}
 		}
 
+		var createdDate v1.Time
+		if cr.Status.AtProvider.CreatedDate != nil {
+			createdDate = *cr.Status.AtProvider.CreatedDate
+		}
+
 		retiredKey := &v1alpha1.RetiredSBResource{
 			ID:          cr.Status.AtProvider.ID,
 			Name:        cr.Status.AtProvider.Name,
-			CreatedDate: cr.Status.AtProvider.CreatedDate,
+			CreatedDate: createdDate,
+			RetiredDate: v1.Now(),
 		}
 		cr.Status.AtProvider.RetiredKeys = append(cr.Status.AtProvider.RetiredKeys, retiredKey)
 		cr.Status.AtProvider.CreatedDate = nil
@@ -96,11 +100,12 @@ func (r *SBKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
 	}
 
 	for _, key := range cr.Status.AtProvider.RetiredKeys {
-		if key.CreatedDate != nil {
-			if createdTime, err := time.Parse(iso8601Date, *key.CreatedDate); err == nil &&
-				createdTime.Add(cr.Spec.ForProvider.Rotation.TTL.Duration).Before(time.Now()) {
-				return true
-			}
+		if key.RetiredDate.IsZero() {
+			continue
+		}
+		gracePeriod := cr.Spec.ForProvider.Rotation.TTL.Duration - cr.Spec.ForProvider.Rotation.Frequency.Duration
+		if key.RetiredDate.Add(gracePeriod).Before(time.Now()) {
+			return true
 		}
 	}
 
@@ -123,10 +128,9 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 	for _, key := range cr.Status.AtProvider.RetiredKeys {
 		// Keep the key if it's not expired yet or if instance tracking info is missing
 		var expired bool
-		if key.CreatedDate != nil && cr.Spec.ForProvider.Rotation.TTL != nil {
-			if createdTime, err := time.Parse(iso8601Date, *key.CreatedDate); err == nil {
-				expired = createdTime.Add(cr.Spec.ForProvider.Rotation.TTL.Duration).Before(time.Now())
-			}
+		if !key.RetiredDate.IsZero() && cr.Spec.ForProvider.Rotation.TTL != nil {
+			gracePeriod := cr.Spec.ForProvider.Rotation.TTL.Duration - cr.Spec.ForProvider.Rotation.Frequency.Duration
+			expired = key.RetiredDate.Add(gracePeriod).Before(time.Now())
 		}
 
 		if !expired || key.Name == "" {

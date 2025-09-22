@@ -475,14 +475,15 @@ spec:
                   createdDate:
                     description: |-
                       Additional TF resource fields from SubaccountServiceBinding for the current active binding
-                      The date and time when the resource was created in ISO8601 format from TF
+                      The date and time when the resource was created
+                    format: date-time
                     type: string
                   id:
                     description: The ID of the service binding resource
                     type: string
                   lastModified:
                     description: The date and time when the resource was last modified
-                      in ISO8601 format
+                    format: date-time
                     type: string
                   name:
                     description: The name of the service binding resource
@@ -505,12 +506,16 @@ spec:
                         createdDate:
                           description: The date and time when the resource was created
                             in RFC3339 format from TF
+                          format: date-time
                           type: string
                         id:
                           description: The ID of the service binding resource
                           type: string
                         name:
                           description: The name of the service binding resource
+                          type: string
+                        retiredDate:
+                          format: date-time
                           type: string
                       type: object
                     type: array
