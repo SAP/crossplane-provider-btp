@@ -31,7 +31,6 @@ const (
 	errDeleteExpiredKeys    = "cannot delete expired keys"
 	errDeleteRetiredKeys    = "cannot delete retired keys"
 	errDeleteServiceBinding = "cannot delete servicebinding"
-	errObserveTfResource    = "failed to observe TF resource"
 )
 
 const iso8601Date = "2006-01-02T15:04:05Z0700"
@@ -250,14 +249,11 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 // isRotationEnabled checks if rotation is currently enabled for the service binding
 func (e *external) isRotationEnabled(cr *v1alpha1.ServiceBinding) bool {
-	// Check for force rotation annotation
 	if metav1.HasAnnotation(cr.ObjectMeta, servicebindingclient.ForceRotationKey) {
 		return true
-
 	}
 
-	// Check if rotation frequency is configured
-	if cr.Spec.ForProvider.Rotation != nil && cr.Spec.ForProvider.Rotation.Frequency != nil {
+	if cr.Spec.ForProvider.Rotation != nil {
 		return true
 	}
 
