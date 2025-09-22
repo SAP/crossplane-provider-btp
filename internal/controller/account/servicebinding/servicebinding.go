@@ -124,29 +124,32 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// Extract and update data from TF resource if available and up-to-date
-	if observation.ResourceExists {
-		if observation.ResourceUpToDate && tfResource != nil && internal.Val(tfResource.Status.AtProvider.State) == "succeeded" {
-			if err := e.updateServiceBindingFromTfResource(cr, tfResource); err != nil {
-				return managed.ExternalObservation{}, errors.Wrap(err, errObserveSaveBinding)
-			} else {
-				if err := e.kube.Status().Update(ctx, cr); err != nil {
-					return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
-				}
-			}
+	if !observation.ResourceExists {
+		return observation, nil
+	}
+
+	if observation.ResourceUpToDate && tfResource != nil && internal.Val(tfResource.Status.AtProvider.State) == "succeeded" {
+		if err := e.updateServiceBindingFromTfResource(cr, tfResource); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errObserveSaveBinding)
 		}
 
-		observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
+		if err := e.kube.Status().Update(ctx, cr); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
 
-		// Retire binding conditionally
-		if e.keyRotator.RetireBinding(cr) {
-			if err := e.kube.Status().Update(ctx, cr); err != nil {
-				return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
-			}
-			return managed.ExternalObservation{ResourceExists: false}, nil
 		}
 	}
 
-	return observation, nil
+	observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
+
+	// Retire binding conditionally
+	if !e.keyRotator.RetireBinding(cr) {
+		return observation, nil
+	}
+
+	if err := e.kube.Status().Update(ctx, cr); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
+	}
+	return managed.ExternalObservation{ResourceExists: false}, nil
 }
 
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -166,7 +169,6 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	cr.Spec.BtpName = &btpName
 
-	// Update the spec with the generated btpName
 	if err := e.kube.Update(ctx, cr); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
 	}
@@ -204,17 +206,15 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	// Clean up expired keys if there are any retired keys
-	if cr.Status.AtProvider.RetiredKeys != nil {
-		newRetiredKeys, err := e.keyRotator.DeleteExpiredKeys(ctx, cr)
-		if err != nil {
-			return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteExpiredKeys)
-		}
+	newRetiredKeys, err := e.keyRotator.DeleteExpiredKeys(ctx, cr)
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteExpiredKeys)
+	}
 
-		cr.Status.AtProvider.RetiredKeys = newRetiredKeys
+	cr.Status.AtProvider.RetiredKeys = newRetiredKeys
 
-		if err := e.kube.Status().Update(ctx, cr); err != nil {
-			return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
-		}
+	if err := e.kube.Status().Update(ctx, cr); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
 	}
 
 	return updateResult, nil
@@ -243,14 +243,6 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	if err := e.instanceManager.DeleteInstance(ctx, cr, btpName, cr.Status.AtProvider.ID); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
-	}
-
-	// Verify the resource is actually gone by attempting to observe it.
-	// For some unclear reason (maybe race condition?) in rare cases the external resource does not get deleted with the delete call. In this case, just use the exponential backoff and try again.
-	if observation, _, err := e.instanceManager.ObserveInstance(ctx, cr, btpName, cr.Status.AtProvider.ID); err != nil {
-		return managed.ExternalDelete{}, errors.Wrap(err, errObserveTfResource)
-	} else if observation.ResourceExists {
-		return managed.ExternalDelete{}, errors.New("resource still exists after deletion attempt")
 	}
 
 	return managed.ExternalDelete{}, nil
