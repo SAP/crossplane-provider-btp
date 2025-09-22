@@ -168,7 +168,7 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 						var timeInfo string
 						var isExpired bool
 
-						if key.RetiredDate != nil && !key.RetiredDate.IsZero() {
+						if !key.RetiredDate.IsZero() {
 							retiredTime = key.RetiredDate.Time
 							if sb.Spec.ForProvider.Rotation != nil && sb.Spec.ForProvider.Rotation.TTL != nil && sb.Spec.ForProvider.Rotation.Frequency != nil {
 								// Use new expiration logic: RetiredDate + (TTL - Frequency)
