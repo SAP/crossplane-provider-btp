@@ -85,7 +85,6 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 		RetiredDate: v1.Now(),
 	}
 	cr.Status.AtProvider.RetiredKeys = append(cr.Status.AtProvider.RetiredKeys, retiredKey)
-	cr.Status.AtProvider.CreatedDate = nil
 
 	return true
 }
