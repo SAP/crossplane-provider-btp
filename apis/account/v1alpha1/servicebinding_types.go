@@ -94,11 +94,11 @@ type ServiceBindingObservation struct {
 	Name string `json:"name,omitempty"`
 
 	// Additional TF resource fields from SubaccountServiceBinding for the current active binding
-	// The date and time when the resource was created in ISO8601 format from TF
-	CreatedDate *string `json:"createdDate,omitempty"`
+	// The date and time when the resource was created
+	CreatedDate *metav1.Time `json:"createdDate,omitempty"`
 
-	// The date and time when the resource was last modified in ISO8601 format
-	LastModified *string `json:"lastModified,omitempty"`
+	// The date and time when the resource was last modified
+	LastModified *metav1.Time `json:"lastModified,omitempty"`
 
 	// Shows whether the service binding is ready
 	Ready *bool `json:"ready,omitempty"`
@@ -124,7 +124,9 @@ type RetiredSBResource struct {
 	Name string `json:"name,omitempty"`
 
 	// The date and time when the resource was created in RFC3339 format from TF
-	CreatedDate *string `json:"createdDate,omitempty"`
+	CreatedDate metav1.Time `json:"createdDate,omitempty"`
+
+	RetiredDate metav1.Time `json:"retiredDate,omitempty"`
 }
 
 // A ServiceBindingSpec defines the desired state of a ServiceBinding.
