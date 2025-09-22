@@ -44,6 +44,7 @@ func RandomString(n int) string {
 	return sb.String()
 }
 
+// Trailing dashes in the source name are ignored
 func GenerateRandomName(name string) string {
 	if len(name) > 0 && name[len(name)-1] == '-' {
 		name = name[:len(name)-1]
