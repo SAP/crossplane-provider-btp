@@ -836,3 +836,173 @@ func (e *MockExternal) Delete(ctx context.Context, mg resource.Managed) (managed
 	}
 	return managed.ExternalDelete{}, nil
 }
+
+func TestFlattenSecretData(t *testing.T) {
+	type args struct {
+		secretData map[string][]byte
+	}
+
+	type want struct {
+		result map[string][]byte
+		err    error
+	}
+
+	cases := map[string]struct {
+		reason string
+		args   args
+		want   want
+	}{
+		"EmptyInput": {
+			reason: "should return empty map for empty input",
+			args: args{
+				secretData: map[string][]byte{},
+			},
+			want: want{
+				result: map[string][]byte{},
+				err:    nil,
+			},
+		},
+		"NonJSONValue": {
+			reason: "should keep non-JSON values as-is",
+			args: args{
+				secretData: map[string][]byte{
+					"simple-key": []byte("simple-value"),
+					"binary-key": []byte{0x01, 0x02, 0x03},
+				},
+			},
+			want: want{
+				result: map[string][]byte{
+					"simple-key": []byte("simple-value"),
+					"binary-key": []byte{0x01, 0x02, 0x03},
+				},
+				err: nil,
+			},
+		},
+		"JSONObjectValue": {
+			reason: "should flatten JSON object into top-level keys",
+			args: args{
+				secretData: map[string][]byte{
+					"credentials": []byte(`{"username":"user1","password":"pass123","endpoint":"https://api.example.com"}`),
+				},
+			},
+			want: want{
+				result: map[string][]byte{
+					"username": []byte("user1"),
+					"password": []byte("pass123"),
+					"endpoint": []byte("https://api.example.com"),
+				},
+				err: nil,
+			},
+		},
+		"MixedJSONAndNonJSON": {
+			reason: "should handle mix of JSON and non-JSON values",
+			args: args{
+				secretData: map[string][]byte{
+					"config":      []byte(`{"host":"localhost","port":8080}`),
+					"simple-text": []byte("not-json"),
+					"empty":       []byte(""),
+				},
+			},
+			want: want{
+				result: map[string][]byte{
+					"host":        []byte("localhost"),
+					"port":        []byte("8080"),
+					"simple-text": []byte("not-json"),
+					"empty":       []byte(""),
+				},
+				err: nil,
+			},
+		},
+		"JSONWithNestedObject": {
+			reason: "should marshal nested objects as JSON strings",
+			args: args{
+				secretData: map[string][]byte{
+					"complex": []byte(`{"simple":"value","nested":{"key":"value","number":42}}`),
+				},
+			},
+			want: want{
+				result: map[string][]byte{
+					"simple": []byte("value"),
+					"nested": []byte(`{"key":"value","number":42}`),
+				},
+				err: nil,
+			},
+		},
+		"JSONWithArray": {
+			reason: "should marshal arrays as JSON strings",
+			args: args{
+				secretData: map[string][]byte{
+					"data": []byte(`{"items":[1,2,3],"name":"test"}`),
+				},
+			},
+			want: want{
+				result: map[string][]byte{
+					"items": []byte("[1,2,3]"),
+					"name":  []byte("test"),
+				},
+				err: nil,
+			},
+		},
+		"JSONWithNullValue": {
+			reason: "should handle null values in JSON",
+			args: args{
+				secretData: map[string][]byte{
+					"data": []byte(`{"nullable":null,"string":"value"}`),
+				},
+			},
+			want: want{
+				result: map[string][]byte{
+					"nullable": []byte("null"),
+					"string":   []byte("value"),
+				},
+				err: nil,
+			},
+		},
+		"JSONWithBooleanAndNumber": {
+			reason: "should handle boolean and number values in JSON",
+			args: args{
+				secretData: map[string][]byte{
+					"data": []byte(`{"enabled":true,"count":123,"rate":45.67}`),
+				},
+			},
+			want: want{
+				result: map[string][]byte{
+					"enabled": []byte("true"),
+					"count":   []byte("123"),
+					"rate":    []byte("45.67"),
+				},
+				err: nil,
+			},
+		},
+		"MultipleJSONObjects": {
+			reason: "should flatten multiple JSON objects",
+			args: args{
+				secretData: map[string][]byte{
+					"auth":   []byte(`{"token":"abc123","expires":"2024-01-01"}`),
+					"config": []byte(`{"debug":true,"timeout":30}`),
+					"plain":  []byte("plain-value"),
+				},
+			},
+			want: want{
+				result: map[string][]byte{
+					"token":   []byte("abc123"),
+					"expires": []byte("2024-01-01"),
+					"debug":   []byte("true"),
+					"timeout": []byte("30"),
+					"plain":   []byte("plain-value"),
+				},
+				err: nil,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := flattenSecretData(tc.args.secretData)
+			expectedErrorBehaviour(t, tc.want.err, err)
+			if diff := cmp.Diff(tc.want.result, got); diff != "" {
+				t.Errorf("\n%s\nflattenSecretData(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
