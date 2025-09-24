@@ -62,7 +62,7 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 	forceRotation := v1.HasAnnotation(cr.ObjectMeta, ForceRotationKey)
 
 	var rotationDue bool
-	if r.isRotationConfigured(cr) {
+	if r.isRotationConfigured(cr) && !cr.Status.AtProvider.CreatedDate.IsZero() {
 		rotationDue = cr.Status.AtProvider.CreatedDate.Add(cr.Spec.ForProvider.Rotation.Frequency.Duration).Before(time.Now())
 	}
 
