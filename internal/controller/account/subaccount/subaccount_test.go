@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -104,9 +105,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -161,9 +169,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -218,9 +233,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -275,9 +297,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -332,9 +361,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -389,9 +425,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				}},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -450,9 +493,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -509,9 +559,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -568,9 +625,16 @@ func TestObserve(t *testing.T) {
 					},
 				},
 
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -627,9 +691,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				}},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -687,9 +758,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				}},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -747,9 +825,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				}},
-				mockKube: testutils.NewFakeKubeClientBuilder().
-					AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
-					Build(),
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -807,6 +892,16 @@ func TestObserve(t *testing.T) {
 						},
 					},
 				},
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -827,6 +922,130 @@ func TestObserve(t *testing.T) {
 					cr.Status.AtProvider.BetaEnabled = internal.Ptr(false)
 					cr.Status.AtProvider.ParentGuid = internal.Ptr("")
 					cr.Status.AtProvider.GlobalAccountGUID = internal.Ptr("")
+				},
+			},
+		},
+		"ExternalNameMigrationSuccess": {
+			reason: "Resource with name as external-name should be found by subdomain+region and external-name should be updated to GUID",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("unittest-sa"), // Old behavior: external name = resource name
+					WithData(v1alpha1.SubaccountParameters{
+						Subdomain: "unittest-sa",
+						Region:    "eu10",
+					})),
+				mockAPIClient: &MockSubaccountClient{
+					// GetSubaccount (by GUID) will fail because external name is not a GUID
+					getSubaccountErr: errors.New("not found"),
+					// GetSubaccounts (fallback) will succeed
+					returnSubaccounts: &accountclient.ResponseCollection{
+						Value: []accountclient.SubaccountResponseObject{
+							{
+								Guid:       "subaccount-guid-123",
+								Subdomain:  "unittest-sa",
+								Region:     "eu10",
+								ParentGUID: "global-123",
+							},
+						},
+					},
+				},
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic during external name migration
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  false,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				crChanges: func(cr *v1alpha1.Subaccount) {
+					// External name should be updated to GUID during migration
+					meta.SetExternalName(cr, "subaccount-guid-123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("subaccount-guid-123")
+					cr.Status.AtProvider.ParentGuid = internal.Ptr("global-123")
+				},
+			},
+		},
+		"ExternalNameDirectLookupSuccess": {
+			reason: "Resource with GUID as external-name should be found directly without fallback",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("subaccount-guid-123"), // New behavior: external name = GUID
+					WithData(v1alpha1.SubaccountParameters{
+						Subdomain: "unittest-sa",
+						Region:    "eu10",
+					})),
+				mockAPIClient: &MockSubaccountClient{
+					// GetSubaccount (by GUID) will succeed
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:       "subaccount-guid-123",
+						Subdomain:  "unittest-sa",
+						Region:     "eu10",
+						ParentGUID: "global-123",
+					},
+				},
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  false,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				crChanges: func(cr *v1alpha1.Subaccount) {
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("subaccount-guid-123")
+					cr.Status.AtProvider.ParentGuid = internal.Ptr("global-123")
+				},
+			},
+		},
+		"ExternalNameMigrationNotFound": {
+			reason: "Resource with name as external-name should fallback to subdomain+region lookup and not find anything",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("unittest-sa"), // Old behavior: external name = resource name
+					WithData(v1alpha1.SubaccountParameters{
+						Subdomain: "unittest-sa",
+						Region:    "eu10",
+					})),
+				mockAPIClient: &MockSubaccountClient{
+					// GetSubaccount (by GUID) will fail because external name is not a GUID
+					getSubaccountErr: errors.New("not found"),
+					// GetSubaccounts (fallback) will return empty result
+					returnSubaccounts: &accountclient.ResponseCollection{
+						Value: []accountclient.SubaccountResponseObject{},
+					},
+				},
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					// Mock the Update function to not panic
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
 				},
 			},
 		},
@@ -930,7 +1149,8 @@ func TestCreate(t *testing.T) {
 					Status:         internal.Ptr("Success"),
 					ParentGuid:     internal.Ptr(""),
 				}),
-					WithConditions(xpv1.Creating())),
+					WithConditions(xpv1.Creating()),
+					WithExternalName("123")),
 				o: managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}},
 			},
 		},
@@ -955,6 +1175,7 @@ func TestCreate(t *testing.T) {
 					}),
 					WithConditions(xpv1.Creating()),
 					WithData(v1alpha1.SubaccountParameters{DirectoryGuid: "234"}),
+					WithExternalName("123"),
 				),
 				o: managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}},
 			},
@@ -1469,6 +1690,7 @@ func TestUpdate(t *testing.T) {
 					WithStatus(v1alpha1.SubaccountObservation{
 						Labels: &map[string][]string{"somekey": {"somevalue"}},
 					}),
+					WithExternalName("123"),
 				),
 				mockClient:   &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{}},
 				mockAccessor: &MockAccountsApiAccessor{},
@@ -1480,7 +1702,8 @@ func TestUpdate(t *testing.T) {
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
 						Labels: &map[string][]string{"somekey": {"somevalue"}},
-					})),
+					}),
+					WithExternalName("123")),
 				o: managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{}},
 			},
 		},
@@ -1541,4 +1764,10 @@ func WithProviderConfig(pc xpv1.Reference) SubaccountModifier {
 
 func WithConditions(c ...xpv1.Condition) SubaccountModifier {
 	return func(r *v1alpha1.Subaccount) { r.Status.ConditionedStatus.Conditions = c }
+}
+
+func WithExternalName(externalName string) SubaccountModifier {
+	return func(r *v1alpha1.Subaccount) {
+		meta.SetExternalName(r, externalName)
+	}
 }

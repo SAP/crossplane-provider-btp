@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
-	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -19,6 +19,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
+	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -165,6 +166,24 @@ func (c *external) needsCreation(cr *apisv1alpha1.Subaccount) bool {
 	return false
 }
 
+// getSubaccountGUID returns the subaccount GUID, using external name as primary source
+// and falling back to status field if needed for backwards compatability
+func getSubaccountGUID(subaccount *apisv1alpha1.Subaccount) (string, error) {
+	// Use external name (GUID) as the primary identifier
+	subaccountId := meta.GetExternalName(subaccount)
+
+	// Fallback to status field if external name is not set
+	if subaccountId == "" || subaccountId == subaccount.Name {
+		if subaccount.Status.AtProvider.SubaccountGuid != nil {
+			subaccountId = *subaccount.Status.AtProvider.SubaccountGuid
+		} else {
+			return "", errors.New("subaccount GUID not available")
+		}
+	}
+
+	return subaccountId, nil
+}
+
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr, ok := mg.(*apisv1alpha1.Subaccount)
 	if !ok {
@@ -286,7 +305,10 @@ func deleteBTPSubaccount(
 ) error {
 	subaccount.SetConditions(xpv1.Deleting())
 
-	subaccountId := *subaccount.Status.AtProvider.SubaccountGuid
+	subaccountId, err := getSubaccountGUID(subaccount)
+	if err != nil {
+		return errors.Wrap(err, "subaccount GUID not available for deletion")
+	}
 
 	_, raw, err := accountsServiceClient.AccountsServiceClient.SubaccountOperationsAPI.DeleteSubaccount(ctx, subaccountId).Execute()
 	if raw.StatusCode == 404 {
@@ -312,14 +334,18 @@ func (c *external) updateBTPSubaccount(
 }
 
 func (c *external) moveSubaccountAPI(ctx context.Context, subaccount *apisv1alpha1.Subaccount) error {
-	guid := subaccount.Status.AtProvider.SubaccountGuid
+	guid, err := getSubaccountGUID(subaccount)
+	if err != nil {
+		return errors.Wrap(err, "subaccount GUID not available for move operation")
+	}
+
 	targetID := subaccount.Spec.ForProvider.DirectoryGuid
 	// if not specified we need to set the global account as parent
 	if emptyDirectoryRef(&subaccount.Spec.ForProvider) {
 		targetID = internal.Val(subaccount.Status.AtProvider.GlobalAccountGUID)
 	}
 
-	err := c.accountsAccessor.MoveSubaccount(ctx, internal.Val(guid), targetID)
+	err = c.accountsAccessor.MoveSubaccount(ctx, guid, targetID)
 	if err != nil {
 		return errors.Wrap(err, "moving subaccount failed")
 	}
@@ -327,7 +353,10 @@ func (c *external) moveSubaccountAPI(ctx context.Context, subaccount *apisv1alph
 }
 
 func (c *external) updateSubaccountAPI(ctx context.Context, subaccount *apisv1alpha1.Subaccount) error {
-	guid := subaccount.Status.AtProvider.SubaccountGuid
+	guid, err := getSubaccountGUID(subaccount)
+	if err != nil {
+		return errors.Wrap(err, "subaccount GUID not available for update operation")
+	}
 
 	label := addOperatorLabel(subaccount)
 
@@ -339,7 +368,7 @@ func (c *external) updateSubaccountAPI(ctx context.Context, subaccount *apisv1al
 		UsedForProduction: &subaccount.Spec.ForProvider.UsedForProduction,
 	}
 
-	err := c.accountsAccessor.UpdateSubaccount(ctx, internal.Val(guid), params)
+	err = c.accountsAccessor.UpdateSubaccount(ctx, guid, params)
 	if err != nil {
 		return errors.Wrap(err, "update of subaccount failed")
 	}
@@ -364,12 +393,27 @@ func (c *external) createBTPSubaccount(
 	subaccount.Status.AtProvider.Status = createdSubaccount.StateMessage
 	subaccount.Status.AtProvider.ParentGuid = &createdSubaccount.ParentGUID
 
+	meta.SetExternalName(subaccount, guid)
+
 	return nil
 }
 
 func (c *external) findBTPSubaccount(
 	ctx context.Context, subaccount *apisv1alpha1.Subaccount,
 ) (*accountclient.SubaccountResponseObject, error) {
+	// In earlier versions, the name of the subaccoung was used as the external-name.
+	// Currently it is the id of the subaccount.
+	// To be able to upgrade from this earlier version, if the external-name value is
+	// equal to the name of the subaccoung, update it to the id.
+	externalName := meta.GetExternalName(subaccount)
+	if externalName != "" && externalName != subaccount.Name {
+		response, _, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccount(ctx, externalName).Execute()
+		if err == nil {
+			return response, nil
+		}
+	}
+
+	// Fallback: find by subdomain and region (for backward compatibility)
 	response, _, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccounts(ctx).Execute()
 	if err != nil {
 		ctrl.Log.Error(err, "could not get BTP subaccounts")
@@ -381,6 +425,10 @@ func (c *external) findBTPSubaccount(
 	for _, account := range btpSubaccounts {
 		if isRelatedAccount(subaccount, &account) {
 			foundAccount = &account
+			meta.SetExternalName(subaccount, account.Guid)
+			if err := c.Client.Update(ctx, subaccount); err != nil {
+				return nil, err
+			}
 			break
 		}
 	}
