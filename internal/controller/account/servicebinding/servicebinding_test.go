@@ -615,6 +615,7 @@ type MockInstanceManager struct {
 	createErr     error
 	updateResult  managed.ExternalUpdate
 	updateErr     error
+	deleteResult  managed.ExternalDelete
 	deleteErr     error
 }
 
@@ -630,8 +631,8 @@ func (m *MockInstanceManager) UpdateInstance(ctx context.Context, cr *v1alpha1.S
 	return m.updateResult, m.updateErr
 }
 
-func (m *MockInstanceManager) DeleteInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, btpName string, id string) error {
-	return m.deleteErr
+func (m *MockInstanceManager) DeleteInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, btpName string, id string) (managed.ExternalDelete, error) {
+	return m.deleteResult, m.deleteErr
 }
 
 type MockKeyRotator struct {
@@ -831,10 +832,11 @@ func (e *MockExternal) Delete(ctx context.Context, mg resource.Managed) (managed
 		btpName = cr.Spec.ForProvider.Name
 	}
 
-	if err := e.instanceManager.DeleteInstance(ctx, cr, btpName, cr.Status.AtProvider.ID); err != nil {
+	deletion, err := e.instanceManager.DeleteInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
+	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
-	return managed.ExternalDelete{}, nil
+	return deletion, nil
 }
 
 func TestFlattenSecretData(t *testing.T) {

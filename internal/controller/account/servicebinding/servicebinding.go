@@ -108,7 +108,8 @@ func (c *external) Disconnect(ctx context.Context) error {
 
 // DeleteInstance implements the InstanceDeleter interface for the key rotator
 func (e *external) DeleteInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
-	return e.instanceManager.DeleteInstance(ctx, cr, targetName, targetExternalName)
+	_, err := e.instanceManager.DeleteInstance(ctx, cr, targetName, targetExternalName)
+	return err
 }
 
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -190,6 +191,11 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
 
+	creation.ConnectionDetails, err = flattenSecretData(creation.ConnectionDetails)
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errFlattenSecret)
+	}
+
 	return creation, nil
 }
 
@@ -223,6 +229,11 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
 	}
 
+	updateResult.ConnectionDetails, err = flattenSecretData(updateResult.ConnectionDetails)
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errFlattenSecret)
+	}
+
 	return updateResult, nil
 }
 
@@ -247,11 +258,12 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	btpName := getBtpName(cr)
 
-	if err := e.instanceManager.DeleteInstance(ctx, cr, btpName, cr.Status.AtProvider.ID); err != nil {
+	deletion, err := e.instanceManager.DeleteInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
+	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
 
-	return managed.ExternalDelete{}, nil
+	return deletion, nil
 }
 
 // isRotationEnabled checks if rotation is currently enabled for the service binding

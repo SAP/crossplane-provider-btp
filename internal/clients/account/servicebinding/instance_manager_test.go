@@ -164,7 +164,8 @@ func TestInstanceManager_DeleteInstance(t *testing.T) {
 		targetExternalName string
 	}
 	type want struct {
-		err error
+		deletion managed.ExternalDelete
+		err      error
 	}
 
 	publicCR := &v1alpha1.ServiceBinding{
@@ -182,6 +183,8 @@ func TestInstanceManager_DeleteInstance(t *testing.T) {
 			},
 		},
 	}
+
+	expectedDeletion := managed.ExternalDelete{}
 
 	tests := []struct {
 		name   string
@@ -203,7 +206,8 @@ func TestInstanceManager_DeleteInstance(t *testing.T) {
 				targetExternalName: "external-123",
 			},
 			want: want{
-				err: nil,
+				deletion: expectedDeletion,
+				err:      nil,
 			},
 		},
 		{
@@ -220,7 +224,8 @@ func TestInstanceManager_DeleteInstance(t *testing.T) {
 				targetExternalName: "external-123",
 			},
 			want: want{
-				err: errMockConnect,
+				deletion: managed.ExternalDelete{},
+				err:      errMockConnect,
 			},
 		},
 		{
@@ -239,7 +244,8 @@ func TestInstanceManager_DeleteInstance(t *testing.T) {
 				targetExternalName: "external-123",
 			},
 			want: want{
-				err: errMockDelete,
+				deletion: managed.ExternalDelete{},
+				err:      errMockDelete,
 			},
 		},
 	}
@@ -247,13 +253,17 @@ func TestInstanceManager_DeleteInstance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := NewInstanceManager(tt.fields.sbConnector)
-			err := m.DeleteInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
+			gotDeletion, err := m.DeleteInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
 
 			if tt.want.err != nil {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.want.err.Error())
 			} else {
 				assert.NoError(t, err)
+			}
+
+			if diff := cmp.Diff(tt.want.deletion, gotDeletion); diff != "" {
+				t.Errorf("DeleteInstance deletion mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
