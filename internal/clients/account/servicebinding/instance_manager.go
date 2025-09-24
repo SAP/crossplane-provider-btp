@@ -62,7 +62,7 @@ func (m *InstanceManager) CreateInstance(ctx context.Context, publicCR *v1alpha1
 
 // DeleteInstance deletes a the actual service binding instance in the BTP. This is done by deleting the virtual SubaccountServiceBinding CR (the TF CR)
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client delete command
-func (m *InstanceManager) DeleteInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
+func (m *InstanceManager) DeleteInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalDelete, error) {
 	targetUID := GenerateInstanceUID(publicCR.UID, targetName)
 	subaccountBinding := m.buildSubaccountServiceBinding(publicCR, targetName, targetUID, targetExternalName)
 
@@ -71,14 +71,15 @@ func (m *InstanceManager) DeleteInstance(ctx context.Context, publicCR *v1alpha1
 
 	tfController, err := m.sbConnector.Connect(ctx, subaccountBinding)
 	if err != nil {
-		return errors.Wrap(err, errConnectTfController)
+		return managed.ExternalDelete{}, errors.Wrap(err, errConnectTfController)
 	}
 
-	if _, err := tfController.Delete(ctx, subaccountBinding); err != nil {
-		return errors.Wrap(err, errDeleteTfResource)
+	deletion, err := tfController.Delete(ctx, subaccountBinding)
+	if err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteTfResource)
 	}
 
-	return nil
+	return deletion, nil
 }
 
 // UpdateInstance updates a service binding instance with a different name and UID
