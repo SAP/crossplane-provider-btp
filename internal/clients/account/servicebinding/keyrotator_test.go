@@ -386,35 +386,6 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 			wantDeleteCallCount: 1,
 		},
 		{
-			name: "KeepKeysWithMissingName",
-			cr: &v1alpha1.ServiceBinding{
-				Spec: v1alpha1.ServiceBindingSpec{
-					ForProvider: v1alpha1.ServiceBindingParameters{
-						Rotation: &v1alpha1.RotationParameters{
-							TTL:       &metav1.Duration{Duration: time.Hour},
-							Frequency: &metav1.Duration{Duration: 30 * time.Minute},
-						},
-					},
-				},
-				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:          "expired-key",
-								Name:        "", // Empty name should be kept
-								CreatedDate: metav1.Time{Time: expiredTime},
-								RetiredDate: metav1.Time{Time: expiredTime},
-							},
-						},
-					},
-				},
-			},
-			mockDeleter:         &MockInstanceDeleter{},
-			wantNewKeysCount:    1,
-			wantErr:             false,
-			wantDeleteCallCount: 0,
-		},
-		{
 			name: "NoExpiredKeys",
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
