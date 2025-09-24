@@ -2,6 +2,7 @@ package servicebinding
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -31,6 +32,7 @@ const (
 	errDeleteExpiredKeys    = "cannot delete expired keys"
 	errDeleteRetiredKeys    = "cannot delete retired keys"
 	errDeleteServiceBinding = "cannot delete servicebinding"
+	errFlattenSecret        = "cannot flatten secret"
 )
 
 const iso8601Date = "2006-01-02T15:04:05Z0700"
@@ -136,6 +138,11 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
 
 		}
+	}
+
+	observation.ConnectionDetails, err = flattenSecretData(observation.ConnectionDetails)
+	if err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errFlattenSecret)
 	}
 
 	observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
@@ -313,4 +320,31 @@ func parseIso8601Date(t string) (v1.Time, error) {
 	return v1.Time{
 		Time: iTime,
 	}, nil
+}
+
+// flattenSecretData takes a map[string][]byte and flattens any JSON object values into the result map.
+// For each key whose value is a JSON object, its keys/values are added to the result map as top-level entries.
+// Non-JSON values are kept as-is.
+func flattenSecretData(secretData map[string][]byte) (map[string][]byte, error) {
+	result := make(map[string][]byte)
+	for k, v := range secretData {
+		var jsonMap map[string]any
+		if err := json.Unmarshal(v, &jsonMap); err == nil {
+			for jk, jv := range jsonMap {
+				switch val := jv.(type) {
+				case string:
+					result[jk] = []byte(val)
+				default:
+					b, err := json.Marshal(val)
+					if err != nil {
+						return nil, err
+					}
+					result[jk] = b
+				}
+			}
+		} else {
+			result[k] = v
+		}
+	}
+	return result, nil
 }
