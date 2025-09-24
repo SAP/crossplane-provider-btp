@@ -13,8 +13,6 @@ import (
 
 const ForceRotationKey = "servicebinding.account.btp.crossplane.io/force-rotation"
 
-const iso8601Date = "2006-01-02T15:04:05Z0700"
-
 const (
 	errDeleteExpiredKey = "cannot delete expired key"
 	errDeleteRetiredKey = "cannot delete retired key"
