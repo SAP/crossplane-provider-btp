@@ -256,9 +256,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
 	}
 
-	btpName := getBtpName(cr)
-
-	deletion, err := e.instanceManager.DeleteInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
+	deletion, err := e.instanceManager.DeleteInstance(ctx, cr, cr.Status.AtProvider.Name, cr.Status.AtProvider.ID)
 	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
