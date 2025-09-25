@@ -20,6 +20,8 @@ import (
 )
 
 func Test_DirectoryEntitlement_v1alpha1(t *testing.T) {
+	t.Parallel()
+
 	resource := resources.ResourceTestConfig{
 		Kind:              "DirectoryEntitlement",
 		ResourceDirectory: "testdata/crs/DirectoryEntitlement",
