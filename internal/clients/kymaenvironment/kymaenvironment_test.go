@@ -10,6 +10,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/clients/fakes"
 	client "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -17,7 +18,7 @@ import (
 func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 	tests := []struct {
 		name                string
-		mockEnvironmentsApi *MockProvisioningServiceClient
+		mockEnvironmentsApi *fakes.MockProvisioningServiceClient
 		mockCr              v1alpha1.KymaEnvironment
 
 		wantErr        error
@@ -26,18 +27,18 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 	}{
 		{
 			name: "APIerror",
-			mockEnvironmentsApi: &MockProvisioningServiceClient{
-				err:         errors.New("apiError"),
-				apiResponse: nil,
+			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
+				Err:         errors.New("apiError"),
+				ApiResponse: nil,
 			},
 
 			wantErr: errors.New("apiError"),
 		},
 		{
 			name: "EmptyResponse",
-			mockEnvironmentsApi: &MockProvisioningServiceClient{
-				err:         nil,
-				apiResponse: &client.BusinessEnvironmentInstancesResponseCollection{},
+			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
+				Err:         nil,
+				ApiResponse: &client.BusinessEnvironmentInstancesResponseCollection{},
 			},
 			wantErr:      nil,
 			wantResponse: nil,
@@ -49,9 +50,9 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 					Annotations: map[string]string{"crossplane.io/external-name": "1234"},
 				},
 			},
-			mockEnvironmentsApi: &MockProvisioningServiceClient{
-				err: nil,
-				apiResponse: &client.BusinessEnvironmentInstancesResponseCollection{
+			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
+				Err: nil,
+				ApiResponse: &client.BusinessEnvironmentInstancesResponseCollection{
 					EnvironmentInstances: []client.BusinessEnvironmentInstanceResponseObject{
 						{
 							Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
@@ -75,9 +76,9 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 					Annotations: map[string]string{"crossplane.io/external-name": "kyma"},
 				},
 			},
-			mockEnvironmentsApi: &MockProvisioningServiceClient{
-				err: nil,
-				apiResponse: &client.BusinessEnvironmentInstancesResponseCollection{
+			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
+				Err: nil,
+				ApiResponse: &client.BusinessEnvironmentInstancesResponseCollection{
 					EnvironmentInstances: []client.BusinessEnvironmentInstanceResponseObject{
 						{
 							Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
