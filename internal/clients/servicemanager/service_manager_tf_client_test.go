@@ -108,7 +108,7 @@ func TestConnectResources(t *testing.T) {
 				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
 					SubaccountID:      internal.Ptr("subaccountId"),
 					Name:              internal.Ptr("another-custom-name"),
-					ServiceInstanceID: internal.Ptr("instanceID/bindingID"),
+					ServiceInstanceID: internal.Ptr("instanceID"),
 				},
 			},
 		},
