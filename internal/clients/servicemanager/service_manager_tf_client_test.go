@@ -22,11 +22,13 @@ const DefaultBindingName = "test-default-binding"
 
 func TestConnectResources(t *testing.T) {
 	type want struct {
-		err          error
-		subaccountId string
-		planId       string
-		instanceSpec v1alpha1.SubaccountServiceInstanceParameters
-		bindingSpec  v1alpha1.SubaccountServiceBindingParameters
+		err                  error
+		subaccountId         string
+		planId               string
+		instanceExternalName string
+		instanceSpec         v1alpha1.SubaccountServiceInstanceParameters
+		bindingExternalName  string
+		bindingSpec          v1alpha1.SubaccountServiceBindingParameters
 	}
 	tests := []struct {
 		name string
@@ -70,8 +72,9 @@ func TestConnectResources(t *testing.T) {
 				return ExternalClientFake{}, nil
 			},
 			want: want{
-				subaccountId: "subaccountId",
-				planId:       "planId",
+				subaccountId:         "subaccountId",
+				planId:               "planId",
+				instanceExternalName: "instanceID",
 				instanceSpec: v1alpha1.SubaccountServiceInstanceParameters{
 					Name:          internal.Ptr(DefaultServiceName),
 					ServiceplanID: internal.Ptr("planId"),
@@ -94,8 +97,9 @@ func TestConnectResources(t *testing.T) {
 				return ExternalClientFake{}, nil
 			},
 			want: want{
-				subaccountId: "subaccountId",
-				planId:       "planId",
+				subaccountId:         "subaccountId",
+				planId:               "planId",
+				instanceExternalName: "instanceID",
 				instanceSpec: v1alpha1.SubaccountServiceInstanceParameters{
 					Name:          internal.Ptr("custom-name"),
 					ServiceplanID: internal.Ptr("planId"),
@@ -104,7 +108,33 @@ func TestConnectResources(t *testing.T) {
 				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
 					SubaccountID:      internal.Ptr("subaccountId"),
 					Name:              internal.Ptr("another-custom-name"),
-					ServiceInstanceID: internal.Ptr("instanceID"),
+					ServiceInstanceID: internal.Ptr("instanceID/bindingID"),
+				},
+			},
+		},
+		{
+			name: "SuccessExternalNamesSplitAndSet",
+			cr:   testSMCr("subaccountId", "planId", "instanceID/bindingID", "instanceID", "custom-name", "another-custom-name"),
+			instanceConnectorMock: func() (managed.ExternalClient, error) {
+				return ExternalClientFake{}, nil
+			},
+			bindingConnectorMock: func() (managed.ExternalClient, error) {
+				return ExternalClientFake{}, nil
+			},
+			want: want{
+				subaccountId:         "subaccountId",
+				planId:               "planId",
+				instanceExternalName: "instanceID",
+				instanceSpec: v1alpha1.SubaccountServiceInstanceParameters{
+					Name:          internal.Ptr("custom-name"),
+					ServiceplanID: internal.Ptr("planId"),
+					SubaccountID:  internal.Ptr("subaccountId"),
+				},
+				bindingExternalName: "bindingID",
+				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
+					SubaccountID:      internal.Ptr("subaccountId"),
+					Name:              internal.Ptr("another-custom-name"),
+					ServiceInstanceID: internal.Ptr("instanceID/bindingID"),
 				},
 			},
 		},
@@ -129,8 +159,14 @@ func TestConnectResources(t *testing.T) {
 					t.Errorf("ConnectResources() didn't return a result, but its expected")
 				}
 				tfClient := resources.(*TfClient)
+				if diff := cmp.Diff(tc.want.instanceExternalName, meta.GetExternalName(tfClient.sInstance)); diff != "" {
+					t.Errorf("\ne.ConnectResources() binding spec: -want, +got:\n%s\n", diff)
+				}
 				if diff := cmp.Diff(tc.want.instanceSpec, tfClient.sInstance.Spec.ForProvider); diff != "" {
 					t.Errorf("\ne.ConnectResources() instance spec: -want, +got:\n%s\n", diff)
+				}
+				if diff := cmp.Diff(tc.want.bindingExternalName, meta.GetExternalName(tfClient.sBinding)); diff != "" {
+					t.Errorf("\ne.ConnectResources() binding spec: -want, +got:\n%s\n", diff)
 				}
 				if diff := cmp.Diff(tc.want.bindingSpec, tfClient.sBinding.Spec.ForProvider); diff != "" {
 					t.Errorf("\ne.ConnectResources() binding spec: -want, +got:\n%s\n", diff)
