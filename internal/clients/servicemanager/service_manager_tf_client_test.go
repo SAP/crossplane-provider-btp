@@ -160,13 +160,13 @@ func TestConnectResources(t *testing.T) {
 				}
 				tfClient := resources.(*TfClient)
 				if diff := cmp.Diff(tc.want.instanceExternalName, meta.GetExternalName(tfClient.sInstance)); diff != "" {
-					t.Errorf("\ne.ConnectResources() binding spec: -want, +got:\n%s\n", diff)
+					t.Errorf("\ne.ConnectResources() instance externalName: -want, +got:\n%s\n", diff)
 				}
 				if diff := cmp.Diff(tc.want.instanceSpec, tfClient.sInstance.Spec.ForProvider); diff != "" {
 					t.Errorf("\ne.ConnectResources() instance spec: -want, +got:\n%s\n", diff)
 				}
 				if diff := cmp.Diff(tc.want.bindingExternalName, meta.GetExternalName(tfClient.sBinding)); diff != "" {
-					t.Errorf("\ne.ConnectResources() binding spec: -want, +got:\n%s\n", diff)
+					t.Errorf("\ne.ConnectResources() binding externalName: -want, +got:\n%s\n", diff)
 				}
 				if diff := cmp.Diff(tc.want.bindingSpec, tfClient.sBinding.Spec.ForProvider); diff != "" {
 					t.Errorf("\ne.ConnectResources() binding spec: -want, +got:\n%s\n", diff)
