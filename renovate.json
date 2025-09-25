@@ -6,6 +6,7 @@
   "postUpdateOptions": [
     "gomodTidy"
   ],
+  "labels": ["release-notes/dependencies"],
   "customManagers": [
     {
       "fileMatch": [

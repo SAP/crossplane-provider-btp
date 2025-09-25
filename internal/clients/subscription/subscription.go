@@ -90,7 +90,10 @@ func (s *SubscriptionApiHandler) CreateSubscription(ctx context.Context, subPost
 }
 
 func (s *SubscriptionApiHandler) UpdateSubscription(ctx context.Context, externalName string, subPut SubscriptionPut) error {
-	appName, _ := splitExternalName(externalName)
+	appName, _, err := splitExternalName(externalName)
+	if err != nil {
+		return fmt.Errorf("invalid external name %s: %w", externalName, err)
+	}
 
 	if _, err := s.client.SubscriptionOperationsForAppConsumersAPI.
 		UpdateSubscriptionParametersAsync(ctx, appName).
@@ -102,7 +105,10 @@ func (s *SubscriptionApiHandler) UpdateSubscription(ctx context.Context, externa
 }
 
 func (s *SubscriptionApiHandler) DeleteSubscription(ctx context.Context, externalName string) error {
-	appName, _ := splitExternalName(externalName)
+	appName, _, err := splitExternalName(externalName)
+	if err != nil {
+		return fmt.Errorf("invalid external name %s: %w", externalName, err)
+	}
 
 	if _, err := s.client.SubscriptionOperationsForAppConsumersAPI.
 		DeleteSubscriptionAsync(ctx, appName).
@@ -113,7 +119,10 @@ func (s *SubscriptionApiHandler) DeleteSubscription(ctx context.Context, externa
 }
 
 func (s *SubscriptionApiHandler) GetSubscription(ctx context.Context, externalName string) (*SubscriptionGet, error) {
-	appName, planName := splitExternalName(externalName)
+	appName, planName, err := splitExternalName(externalName)
+	if err != nil {
+		return nil, fmt.Errorf("invalid external name %s: %w", externalName, err)
+	}
 
 	res, raw, err := s.client.SubscriptionOperationsForAppConsumersAPI.
 		GetEntitledApplication(ctx, appName).
@@ -192,10 +201,13 @@ func (s *SubscriptionTypeMapper) IsUpToDate(cr *v1alpha1.Subscription, get *Subs
 	return true
 }
 
-// splitExternalName splits an externalName into its to part, requires form <appName>/<planName>, returns segments as empty strings, does not protect against misusage
-func splitExternalName(externalName string) (string, string) {
+// splitExternalName splits an externalName into its to part, requires form <appName>/<planName>, returns segments as empty strings. Throws error if format is not correct
+func splitExternalName(externalName string) (string, string, error) {
 	fragments := strings.Split(externalName, "/")
-	return fragments[0], fragments[1]
+	if len(fragments) != 2 {
+		return "", "", errors.New("incorrect format, should be <appName>/<planName>")
+	}
+	return fragments[0], fragments[1], nil
 }
 
 // formExternalName combines appName and planName into a single string of the form <appName>/<planName>

@@ -1,4 +1,4 @@
-package environments
+package fakes
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 )
 
 type MockProvisioningServiceClient struct {
-	err         error
-	apiResponse *client.BusinessEnvironmentInstancesResponseCollection
+	Err         error
+	ApiResponse *client.BusinessEnvironmentInstancesResponseCollection
 }
 
 // CreateEnvironmentInstance implements openapi.EnvironmentsAPI.
@@ -139,7 +139,7 @@ func (m *MockProvisioningServiceClient) GetEnvironmentInstances(ctx context.Cont
 
 // GetEnvironmentInstancesExecute implements openapi.EnvironmentsAPI.
 func (m *MockProvisioningServiceClient) GetEnvironmentInstancesExecute(r client.ApiGetEnvironmentInstancesRequest) (*client.BusinessEnvironmentInstancesResponseCollection, *http.Response, error) {
-	return m.apiResponse, &http.Response{}, m.err
+	return m.ApiResponse, &http.Response{}, m.Err
 }
 
 // UpdateEnvironmentInstance implements openapi.EnvironmentsAPI.

@@ -50,34 +50,50 @@ func (c CloudFoundryOrganization) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.CloudFoundryEnvironment,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-	name := meta.GetExternalName(&cr)
-	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
-	environment, err := c.btp.GetCFEnvironmentByNameAndOrg(ctx, name, orgName)
+	environment, err := c.getEnvironmentByNameAndOrg(ctx, cr)
 	if err != nil {
 		return nil, nil, err
 	}
-
 	if environment == nil {
 		return nil, nil, nil
 	}
 
-	cloudFoundryClient, err := c.createClient(environment)
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if cloudFoundryClient == nil {
-		return environment, nil, nil
-	}
-
-	managers, err := cloudFoundryClient.getManagerUsernames(ctx)
+	managers, err := c.getManagers(ctx, environment)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	return environment, managers, nil
+}
 
+func (c CloudFoundryOrganization) getEnvironmentByNameAndOrg(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	name := meta.GetExternalName(&cr)
+	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	environment, err := c.btp.GetCFEnvironmentByNameAndOrg(ctx, name, orgName)
+	if err != nil {
+		return nil, err
+	}
+	if environment == nil {
+		return nil, nil
+	}
+	return environment, nil
+}
+
+func (c CloudFoundryOrganization) getManagers(ctx context.Context, environment *provisioningclient.BusinessEnvironmentInstanceResponseObject) ([]v1alpha1.User, error) {
+	cloudFoundryClient, err := c.createClient(environment)
+	if err != nil {
+		return nil, err
+	}
+
+	if cloudFoundryClient == nil {
+		return nil, nil
+	}
+
+	managers, err := cloudFoundryClient.getManagerUsernames(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return managers, nil
 }
 
 func (c CloudFoundryOrganization) createClient(environment *provisioningclient.BusinessEnvironmentInstanceResponseObject) (
@@ -112,7 +128,7 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	org, err := c.btp.CreateCloudFoundryOrgIfNotExists(
 		ctx, cr.Name, adminServiceAccountEmail, string(cr.UID),
-		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName, 
+		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName,
 	)
 	if err != nil {
 		return "", errors.Wrap(err, instanceCreateFailed)
@@ -133,12 +149,12 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 }
 
 func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
-	name := meta.GetExternalName(&cr) 
+	name := meta.GetExternalName(&cr)
 	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	return c.btp.DeleteCloudFoundryEnvironment(ctx, name, orgName)
 }
 
-func formOrgName (orgName string, subaccountId string, crName string) string {
+func formOrgName(orgName string, subaccountId string, crName string) string {
 	if orgName == "" {
 		return subaccountId + "-" + crName
 	}
