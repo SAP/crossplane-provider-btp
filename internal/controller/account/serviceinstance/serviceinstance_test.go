@@ -600,6 +600,13 @@ func (t *TfProxyMock) Update(ctx context.Context) error {
 	return t.err
 }
 
+func (t *TfProxyMock) TfResourceExternalName() string {
+	if t.data == nil {
+		return ""
+	}
+	return t.data.ExternalName
+}
+
 func expectedErrorBehaviour(t *testing.T, expectedErr error, gotErr error) {
 	if gotErr != nil {
 		assert.Truef(t, errors.Is(gotErr, expectedErr), "expected error %v, got %v", expectedErr, gotErr)

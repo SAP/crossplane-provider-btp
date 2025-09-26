@@ -6,16 +6,21 @@ package config
 
 import "github.com/crossplane/upjet/pkg/config"
 
-// ExternalNameConfigs contains all external name configurations for this
-// provider.
-var ExternalNameConfigs = map[string]config.ExternalName{
+// CLIReconciledExternalNameConfigs contains all external name configurations
+// that belong to resources reconciled with the default external client (CLI architecture).
+var CLIReconciledExternalNameConfigs = map[string]config.ExternalName{
 	"btp_subaccount_trust_configuration":    config.IdentifierFromProvider,
 	"btp_globalaccount_trust_configuration": config.IdentifierFromProvider,
 	"btp_directory_entitlement":             config.IdentifierFromProvider,
-	"btp_subaccount_service_instance":       config.IdentifierFromProvider,
-	"btp_subaccount_service_binding":        config.IdentifierFromProvider,
 	"btp_subaccount_service_broker":         config.IdentifierFromProvider,
 	"btp_subaccount_api_credential":         config.IdentifierFromProvider,
+}
+
+// TerraformPluginFrameworkExternalNameConfigs contains all external name configurations
+// that belong to resources reconciled with the tfplugin framework clients (no-fork architecture).
+var TerraformPluginFrameworkExternalNameConfigs = map[string]config.ExternalName{
+	"btp_subaccount_service_instance": config.IdentifierFromProvider,
+	"btp_subaccount_service_binding":  config.IdentifierFromProvider,
 }
 
 // ExternalNameConfigurations applies all external name configs listed in the
@@ -23,18 +28,38 @@ var ExternalNameConfigs = map[string]config.ExternalName{
 // assuming they will be tested.
 func ExternalNameConfigurations() config.ResourceOption {
 	return func(r *config.Resource) {
-		if e, ok := ExternalNameConfigs[r.Name]; ok {
-			r.ExternalName = e
+		e, configured := TerraformPluginFrameworkExternalNameConfigs[r.Name]
+		// if an external name is configured for multiple architectures,
+		// Terraform Plugin Framework is preferred over Terraform CLI architecture
+		if !configured {
+			e, configured = CLIReconciledExternalNameConfigs[r.Name]
 		}
+		if !configured {
+			return
+		}
+		r.ExternalName = e
 	}
 }
 
-// ExternalNameConfigured returns the list of all resources whose external name
+// CLIReconciledResourceList returns the list of all resources whose external name
 // is configured manually.
-func ExternalNameConfigured() []string {
-	l := make([]string, len(ExternalNameConfigs))
+func CLIReconciledResourceList() []string {
+	l := make([]string, len(CLIReconciledExternalNameConfigs))
 	i := 0
-	for name := range ExternalNameConfigs {
+	for name := range CLIReconciledExternalNameConfigs {
+		// $ is added to match the exact string since the format is regex.
+		l[i] = name + "$"
+		i++
+	}
+	return l
+}
+
+// TerraformPluginFrameworkReconciledResourceList returns the list of all resources whose external name
+// is configured manually.
+func TerraformPluginFrameworkReconciledResourceList() []string {
+	l := make([]string, len(TerraformPluginFrameworkExternalNameConfigs))
+	i := 0
+	for name := range TerraformPluginFrameworkExternalNameConfigs {
 		// $ is added to match the exact string since the format is regex.
 		l[i] = name + "$"
 		i++
