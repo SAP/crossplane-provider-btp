@@ -31,12 +31,13 @@ var (
 )
 
 func TestSubscriptionCRUDFlow(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("Subscription Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/subscription/create_flow")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta_api.AddToScheme(r.GetScheme())
+				_ = meta_api.AddToSchemeConcurrent(r.GetScheme())
 
 				cm := v1alpha1.Subscription{
 					ObjectMeta: metav1.ObjectMeta{Name: subscriptionCreateName, Namespace: cfg.Namespace()},

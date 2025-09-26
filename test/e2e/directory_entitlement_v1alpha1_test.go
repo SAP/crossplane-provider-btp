@@ -20,6 +20,8 @@ import (
 )
 
 func Test_DirectoryEntitlement_v1alpha1(t *testing.T) {
+	t.Parallel()
+
 	resource := resources.ResourceTestConfig{
 		Kind:              "DirectoryEntitlement",
 		ResourceDirectory: "testdata/crs/DirectoryEntitlement",
@@ -31,7 +33,7 @@ func Test_DirectoryEntitlement_v1alpha1(t *testing.T) {
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			// as soon as we move to use the xp-testing framework, we can remove this manually setup and use the preconfigured one
 			r, _ := res.New(cfg.Client().RESTConfig())
-			_ = meta_api.AddToScheme(r.GetScheme())
+			_ = meta_api.AddToSchemeConcurrent(r.GetScheme())
 
 			t.Logf("Apply %s", resource.Kind)
 			resources.ImportResources(ctx, t, cfg, resource.ResourceDirectory)

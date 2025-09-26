@@ -25,12 +25,13 @@ var (
 )
 
 func TestServiceInstance_CreationFlow(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("ServiceInstance Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/serviceinstance")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = apis.AddToScheme(r.GetScheme())
+				_ = apis.AddToSchemeConcurrent(r.GetScheme())
 
 				sm := v1alpha1.ServiceInstance{
 					ObjectMeta: metav1.ObjectMeta{Name: siCreateName, Namespace: cfg.Namespace()},
