@@ -10,9 +10,8 @@ import (
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/e2e-framework/klient/wait"
-
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 
@@ -28,7 +27,8 @@ func TestServiceBinding_CreationFlow(t *testing.T) {
 	crudFeatureSuite := features.New("ServiceBinding Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding")
+				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/env")
+				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/no-rotation")
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
@@ -47,6 +47,9 @@ func TestServiceBinding_CreationFlow(t *testing.T) {
 				if sb.Status.AtProvider.ID == "" {
 					t.Error("ServiceBinding not fully initialized")
 				}
+				if sb.Status.AtProvider.Name != sb.Spec.ForProvider.Name {
+					t.Error("ServiceBinding status name is not the name as the spec says. Maybe it got generated like if rotation is enabled? (It is not)")
+				}
 				return ctx
 			},
 		).Assess(
@@ -61,7 +64,7 @@ func TestServiceBinding_CreationFlow(t *testing.T) {
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*5))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "servicebinding/env", wait.WithTimeout(time.Minute*5))
 			return ctx
 		},
 	).Feature()
