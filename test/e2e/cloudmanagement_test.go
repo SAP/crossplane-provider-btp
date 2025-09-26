@@ -27,12 +27,13 @@ var (
 )
 
 func TestCloudManagemen(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("CloudManagement Controller Test").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/cloudmanagement/env")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = apis.AddToScheme(r.GetScheme())
+				_ = apis.AddToSchemeConcurrent(r.GetScheme())
 				return ctx
 			},
 		).

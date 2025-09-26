@@ -27,13 +27,14 @@ var (
 )
 
 func TestSubaccountApiCredentialsStandalone(t *testing.T) {
+	t.Parallel()
 	var manifestDir = "testdata/crs/SubaccountApiCredentialsStandalone"
 	crudFeature := features.New("SubaccountApiCredentials Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, manifestDir)
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta.AddToScheme(r.GetScheme())
+				_ = meta.AddToSchemeConcurrent(r.GetScheme())
 
 				sac := v1alpha1.SubaccountApiCredential{
 					ObjectMeta: metav1.ObjectMeta{Name: sacCreateName, Namespace: cfg.Namespace()},

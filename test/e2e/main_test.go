@@ -139,7 +139,7 @@ func checkEnvVarExists(existsKey string) bool {
 func createProviderConfigFn(namespace string, globalAccount string, cliServerUrl string) func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 		r, _ := res.New(cfg.Client().RESTConfig())
-		_ = meta_api.AddToScheme(r.GetScheme())
+		_ = meta_api.AddToSchemeConcurrent(r.GetScheme())
 
 		obj := providerConfig(namespace, globalAccount, cliServerUrl)
 		err := r.Create(ctx, obj)

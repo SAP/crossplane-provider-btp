@@ -34,6 +34,7 @@ var (
 )
 
 func TestAccount(t *testing.T) {
+	t.Parallel()
 	subaccountNameE2e = NewID(saK8sResName, BUILD_ID)
 	subaccountDirectoryNameE2e = NewID("e2e-test-directory-sa", BUILD_ID)
 
@@ -42,7 +43,7 @@ func TestAccount(t *testing.T) {
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta.AddToScheme(r.GetScheme())
+				_ = meta.AddToSchemeConcurrent(r.GetScheme())
 
 				mutateResource := mutateSubAccResource()
 				createK8sResources(ctx, t, cfg, r, "subaccount", "*", mutateResource)

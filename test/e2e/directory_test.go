@@ -34,7 +34,7 @@ func TestDirectory(t *testing.T) {
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta.AddToSchmeConcurrent(r.GetScheme())
+				_ = meta.AddToSchemeConcurrent(r.GetScheme())
 
 				mutateDirResource := newMutateDirFunc(directoryNameE2e)
 				createK8sResources(ctx, t, cfg, r, "directory", "*", mutateDirResource)

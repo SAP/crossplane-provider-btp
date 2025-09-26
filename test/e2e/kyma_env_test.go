@@ -23,13 +23,15 @@ func TestKymaEnvironment(t *testing.T) {
 		t.Skip("skipping kyma in short mode")
 		return
 	}
+	t.Parallel()
+
 	var manifestDir = "testdata/crs/kyma_env"
 	crudFeature := features.New("BTP Kyma Environment Controller").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, manifestDir)
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta.AddToScheme(r.GetScheme())
+				_ = meta.AddToSchemeConcurrent(r.GetScheme())
 				return ctx
 			},
 		).

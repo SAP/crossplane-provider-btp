@@ -25,12 +25,13 @@ var (
 )
 
 func TestServiceManagerCreationFlow(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("ServiceManager Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicemanager/create_flow")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = apis.AddToScheme(r.GetScheme())
+				_ = apis.AddToSchemeConcurrent(r.GetScheme())
 
 				sm := v1beta1.ServiceManager{
 					ObjectMeta: metav1.ObjectMeta{Name: smCreateName, Namespace: cfg.Namespace()},
