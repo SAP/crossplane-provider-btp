@@ -123,10 +123,15 @@ type RetiredSBResource struct {
 	// The name of the service binding resource
 	Name string `json:"name,omitempty"`
 
-	// The date and time when the resource was created in RFC3339 format from TF
-	CreatedDate metav1.Time `json:"createdDate,omitempty"`
+	// The date and time when the resource was created
+	CreatedDate metav1.Time `json:"createdDate"`
 
-	RetiredDate metav1.Time `json:"retiredDate,omitempty"`
+	// The date and time when the resource was retired
+	RetiredDate metav1.Time `json:"retiredDate"`
+
+	// The date and time when the resource will be deleted.
+	// May change if the rotation settings change
+	DeletionDate *metav1.Time `json:"deletionDate"`
 }
 
 // A ServiceBindingSpec defines the desired state of a ServiceBinding.
