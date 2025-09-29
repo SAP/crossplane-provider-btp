@@ -78,7 +78,9 @@ func TestObserve(t *testing.T) {
 		"DontUpdateEmptyDescription": {
 			reason: "Empty description should NOT require Update",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174000"),
+					WithData(v1alpha1.SubaccountParameters{
 					Subdomain:         "sub1",
 					Region:            "eu12",
 					DisplayName:       "unittest-sa",
@@ -88,21 +90,17 @@ func TestObserve(t *testing.T) {
 					Name: "unittest-pc",
 				})),
 				mockAPIClient: &MockSubaccountClient{
-					returnSubaccounts: &accountclient.ResponseCollection{
-						Value: []accountclient.SubaccountResponseObject{
-							{
-								Guid:              "123",
-								Description:       "",
-								Subdomain:         "sub1",
-								Region:            "eu12",
-								State:             "OK",
-								Labels:            &map[string][]string{},
-								StateMessage:      internal.Ptr("OK"),
-								DisplayName:       "unittest-sa",
-								UsedForProduction: "",
-								BetaEnabled:       false,
-							},
-						},
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:              "123e4567-e89b-12d3-a456-426614174000",
+						Description:       "",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						State:             "OK",
+						Labels:            &map[string][]string{},
+						StateMessage:      internal.Ptr("OK"),
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
 					},
 				},
 				mockKube: func() test.MockClient {
@@ -123,7 +121,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174000")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -141,7 +139,9 @@ func TestObserve(t *testing.T) {
 		"NeedsUpdateDescription": {
 			reason: "Changed description should require Update",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174012"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -152,21 +152,17 @@ func TestObserve(t *testing.T) {
 					Name: "unittest-pc",
 				})),
 				mockAPIClient: &MockSubaccountClient{
-					returnSubaccounts: &accountclient.ResponseCollection{
-						Value: []accountclient.SubaccountResponseObject{
-							{
-								Guid:              "123",
-								Description:       "anotherDesc",
-								Subdomain:         "sub1",
-								Region:            "eu12",
-								State:             "OK",
-								Labels:            &map[string][]string{},
-								StateMessage:      internal.Ptr("OK"),
-								DisplayName:       "unittest-sa",
-								UsedForProduction: "",
-								BetaEnabled:       false,
-							},
-						},
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:              "123e4567-e89b-12d3-a456-426614174012",
+						Description:       "anotherDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						State:             "OK",
+						Labels:            &map[string][]string{},
+						StateMessage:      internal.Ptr("OK"),
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
 					},
 				},
 				mockKube: func() test.MockClient {
@@ -187,7 +183,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174012")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -205,7 +201,9 @@ func TestObserve(t *testing.T) {
 		"NeedsUpdateDisplayName": {
 			reason: "Changed display name should require Update",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174006"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -216,21 +214,17 @@ func TestObserve(t *testing.T) {
 					Name: "unittest-pc",
 				})),
 				mockAPIClient: &MockSubaccountClient{
-					returnSubaccounts: &accountclient.ResponseCollection{
-						Value: []accountclient.SubaccountResponseObject{
-							{
-								Guid:              "123",
-								Description:       "someDesc",
-								Subdomain:         "sub1",
-								Region:            "eu12",
-								State:             "OK",
-								Labels:            &map[string][]string{},
-								StateMessage:      internal.Ptr("OK"),
-								DisplayName:       "changed-unittest-sa",
-								UsedForProduction: "",
-								BetaEnabled:       false,
-							},
-						},
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:              "123e4567-e89b-12d3-a456-426614174006",
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						State:             "OK",
+						Labels:            &map[string][]string{},
+						StateMessage:      internal.Ptr("OK"),
+						DisplayName:       "changed-unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
 					},
 				},
 				mockKube: func() test.MockClient {
@@ -251,7 +245,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174006")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -269,7 +263,9 @@ func TestObserve(t *testing.T) {
 		"NeedsUpdateBetaEnabled": {
 			reason: "Changed beta enabled toggle should require Update",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174001"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -280,21 +276,17 @@ func TestObserve(t *testing.T) {
 					Name: "unittest-pc",
 				})),
 				mockAPIClient: &MockSubaccountClient{
-					returnSubaccounts: &accountclient.ResponseCollection{
-						Value: []accountclient.SubaccountResponseObject{
-							{
-								Guid:              "123",
-								Description:       "someDesc",
-								Subdomain:         "sub1",
-								Region:            "eu12",
-								State:             "OK",
-								Labels:            &map[string][]string{},
-								StateMessage:      internal.Ptr("OK"),
-								DisplayName:       "unittest-sa",
-								UsedForProduction: "",
-								BetaEnabled:       true,
-							},
-						},
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:              "123e4567-e89b-12d3-a456-426614174001",
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						State:             "OK",
+						Labels:            &map[string][]string{},
+						StateMessage:      internal.Ptr("OK"),
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       true,
 					},
 				},
 				mockKube: func() test.MockClient {
@@ -315,7 +307,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174001")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -333,7 +325,9 @@ func TestObserve(t *testing.T) {
 		"NeedsUpdateUsedForProduction": {
 			reason: "Changed UsedForProduction toggle should require Update",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174009"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -344,21 +338,17 @@ func TestObserve(t *testing.T) {
 					Name: "unittest-pc",
 				})),
 				mockAPIClient: &MockSubaccountClient{
-					returnSubaccounts: &accountclient.ResponseCollection{
-						Value: []accountclient.SubaccountResponseObject{
-							{
-								Guid:              "123",
-								Description:       "someDesc",
-								Subdomain:         "sub1",
-								Region:            "eu12",
-								State:             "OK",
-								Labels:            &map[string][]string{},
-								StateMessage:      internal.Ptr("OK"),
-								DisplayName:       "unittest-sa",
-								UsedForProduction: "USED_FOR_PRODUCTION",
-								BetaEnabled:       true,
-							},
-						},
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:              "123e4567-e89b-12d3-a456-426614174009",
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						State:             "OK",
+						Labels:            &map[string][]string{},
+						StateMessage:      internal.Ptr("OK"),
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "USED_FOR_PRODUCTION",
+						BetaEnabled:       true,
 					},
 				},
 				mockKube: func() test.MockClient {
@@ -379,7 +369,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174009")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -397,7 +387,9 @@ func TestObserve(t *testing.T) {
 		"NeedsUpdateBetweenDirectories": {
 			reason: "Changed Directory GUID should require Update",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174011"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -408,22 +400,18 @@ func TestObserve(t *testing.T) {
 				}), WithProviderConfig(xpv1.Reference{
 					Name: "unittest-pc",
 				})),
-				mockAPIClient: &MockSubaccountClient{returnSubaccounts: &accountclient.ResponseCollection{
-					Value: []accountclient.SubaccountResponseObject{
-						{
-							Guid:              "123",
-							Description:       "someDesc",
-							Subdomain:         "sub1",
-							Region:            "eu12",
-							State:             "OK",
-							DisplayName:       "unittest-sa",
-							Labels:            &map[string][]string{},
-							StateMessage:      internal.Ptr("OK"),
-							UsedForProduction: "",
-							BetaEnabled:       false,
-							ParentGUID:        "345",
-						},
-					},
+				mockAPIClient: &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{
+					Guid:              "123e4567-e89b-12d3-a456-426614174011",
+					Description:       "someDesc",
+					Subdomain:         "sub1",
+					Region:            "eu12",
+					State:             "OK",
+					DisplayName:       "unittest-sa",
+					Labels:            &map[string][]string{},
+					StateMessage:      internal.Ptr("OK"),
+					UsedForProduction: "",
+					BetaEnabled:       false,
+					ParentGUID:        "345",
 				}},
 				mockKube: func() test.MockClient {
 					mockClient := testutils.NewFakeKubeClientBuilder().
@@ -443,7 +431,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174011")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -461,7 +449,9 @@ func TestObserve(t *testing.T) {
 		"NeedsUpdateFromGlobalToDirectory": {
 			reason: "Changed Directory GUID from global account needs update",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174002"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -474,23 +464,19 @@ func TestObserve(t *testing.T) {
 					Name: "unittest-pc",
 				})),
 				mockAPIClient: &MockSubaccountClient{
-					returnSubaccounts: &accountclient.ResponseCollection{
-						Value: []accountclient.SubaccountResponseObject{
-							{
-								Guid:              "123",
-								Description:       "someDesc",
-								Subdomain:         "sub1",
-								Region:            "eu12",
-								State:             "OK",
-								DisplayName:       "unittest-sa",
-								Labels:            &map[string][]string{},
-								StateMessage:      internal.Ptr("OK"),
-								UsedForProduction: "",
-								BetaEnabled:       false,
-								ParentGUID:        "global-123",
-								GlobalAccountGUID: "global-123",
-							},
-						},
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:              "123e4567-e89b-12d3-a456-426614174002",
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						State:             "OK",
+						DisplayName:       "unittest-sa",
+						Labels:            &map[string][]string{},
+						StateMessage:      internal.Ptr("OK"),
+						UsedForProduction: "",
+						BetaEnabled:       false,
+						ParentGUID:        "global-123",
+						GlobalAccountGUID: "global-123",
 					},
 				},
 				mockKube: func() test.MockClient {
@@ -511,7 +497,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174002")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -529,7 +515,9 @@ func TestObserve(t *testing.T) {
 		"NeedsUpdateFromDirectoryToGlobal": {
 			reason: "Changed Directory GUID directory to global",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174007"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -540,23 +528,19 @@ func TestObserve(t *testing.T) {
 					Name: "unittest-pc",
 				})),
 				mockAPIClient: &MockSubaccountClient{
-					returnSubaccounts: &accountclient.ResponseCollection{
-						Value: []accountclient.SubaccountResponseObject{
-							{
-								Guid:              "123",
-								Description:       "someDesc",
-								Subdomain:         "sub1",
-								Region:            "eu12",
-								State:             "OK",
-								DisplayName:       "unittest-sa",
-								Labels:            &map[string][]string{},
-								StateMessage:      internal.Ptr("OK"),
-								UsedForProduction: "",
-								BetaEnabled:       false,
-								ParentGUID:        "456",
-								GlobalAccountGUID: "global-123",
-							},
-						},
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:              "123e4567-e89b-12d3-a456-426614174007",
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						State:             "OK",
+						DisplayName:       "unittest-sa",
+						Labels:            &map[string][]string{},
+						StateMessage:      internal.Ptr("OK"),
+						UsedForProduction: "",
+						BetaEnabled:       false,
+						ParentGUID:        "456",
+						GlobalAccountGUID: "global-123",
 					},
 				},
 				mockKube: func() test.MockClient {
@@ -577,7 +561,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174007")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -594,7 +578,9 @@ func TestObserve(t *testing.T) {
 		},
 		"UpToDateNoDirectory": {
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174003"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -605,23 +591,19 @@ func TestObserve(t *testing.T) {
 					Name: "unittest-pc",
 				})),
 				mockAPIClient: &MockSubaccountClient{
-					returnSubaccounts: &accountclient.ResponseCollection{
-						Value: []accountclient.SubaccountResponseObject{
-							{
-								Guid:              "123",
-								Description:       "someDesc",
-								Subdomain:         "sub1",
-								Region:            "eu12",
-								State:             "OK",
-								DisplayName:       "unittest-sa",
-								Labels:            &map[string][]string{},
-								StateMessage:      internal.Ptr("OK"),
-								UsedForProduction: "",
-								BetaEnabled:       false,
-								ParentGUID:        "global-123",
-								GlobalAccountGUID: "global-123",
-							},
-						},
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:              "123e4567-e89b-12d3-a456-426614174003",
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						State:             "OK",
+						DisplayName:       "unittest-sa",
+						Labels:            &map[string][]string{},
+						StateMessage:      internal.Ptr("OK"),
+						UsedForProduction: "",
+						BetaEnabled:       false,
+						ParentGUID:        "global-123",
+						GlobalAccountGUID: "global-123",
 					},
 				},
 
@@ -643,7 +625,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174003")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -662,7 +644,9 @@ func TestObserve(t *testing.T) {
 		},
 		"UpToDateWithinDirectory": {
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174010"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -674,22 +658,18 @@ func TestObserve(t *testing.T) {
 				}), WithProviderConfig(xpv1.Reference{
 					Name: "unittest-pc",
 				})),
-				mockAPIClient: &MockSubaccountClient{returnSubaccounts: &accountclient.ResponseCollection{
-					Value: []accountclient.SubaccountResponseObject{
-						{
-							Guid:              "123",
-							Description:       "someDesc",
-							Subdomain:         "sub1",
-							Region:            "eu12",
-							State:             "OK",
-							DisplayName:       "unittest-sa",
-							Labels:            &map[string][]string{},
-							StateMessage:      internal.Ptr("OK"),
-							UsedForProduction: "",
-							BetaEnabled:       false,
-							ParentGUID:        "234",
-						},
-					},
+				mockAPIClient: &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{
+					Guid:              "123e4567-e89b-12d3-a456-426614174010",
+					Description:       "someDesc",
+					Subdomain:         "sub1",
+					Region:            "eu12",
+					State:             "OK",
+					DisplayName:       "unittest-sa",
+					Labels:            &map[string][]string{},
+					StateMessage:      internal.Ptr("OK"),
+					UsedForProduction: "",
+					BetaEnabled:       false,
+					ParentGUID:        "234",
 				}},
 				mockKube: func() test.MockClient {
 					mockClient := testutils.NewFakeKubeClientBuilder().
@@ -709,7 +689,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174010")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -729,7 +709,9 @@ func TestObserve(t *testing.T) {
 		"UpToDateWithDirectoryGUID": {
 			reason: "Directly referencing a directory via GUID should also work (without name ref)",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174008"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -740,23 +722,19 @@ func TestObserve(t *testing.T) {
 				}), WithProviderConfig(xpv1.Reference{
 					Name: "unittest-pc",
 				})),
-				mockAPIClient: &MockSubaccountClient{returnSubaccounts: &accountclient.ResponseCollection{
-					Value: []accountclient.SubaccountResponseObject{
-						{
-							Guid:              "123",
-							Description:       "someDesc",
-							Subdomain:         "sub1",
-							Region:            "eu12",
-							State:             "OK",
-							DisplayName:       "unittest-sa",
-							Labels:            &map[string][]string{},
-							StateMessage:      internal.Ptr("OK"),
-							UsedForProduction: "",
-							BetaEnabled:       false,
-							ParentGUID:        "234",
-							GlobalAccountGUID: "123",
-						},
-					},
+				mockAPIClient: &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{
+					Guid:              "123e4567-e89b-12d3-a456-426614174008",
+					Description:       "someDesc",
+					Subdomain:         "sub1",
+					Region:            "eu12",
+					State:             "OK",
+					DisplayName:       "unittest-sa",
+					Labels:            &map[string][]string{},
+					StateMessage:      internal.Ptr("OK"),
+					UsedForProduction: "",
+					BetaEnabled:       false,
+					ParentGUID:        "234",
+					GlobalAccountGUID: "123",
 				}},
 				mockKube: func() test.MockClient {
 					mockClient := testutils.NewFakeKubeClientBuilder().
@@ -776,7 +754,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174008")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -796,7 +774,9 @@ func TestObserve(t *testing.T) {
 		"UpToDateDespiteDifferentLabelNilTypes": {
 			reason: "Labels pointer type mismatch should not lead to unexpected comparison results",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174004"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -808,22 +788,18 @@ func TestObserve(t *testing.T) {
 				}), WithProviderConfig(xpv1.Reference{
 					Name: "unittest-pc",
 				})),
-				mockAPIClient: &MockSubaccountClient{returnSubaccounts: &accountclient.ResponseCollection{
-					Value: []accountclient.SubaccountResponseObject{
-						{
-							Guid:              "123",
-							Description:       "someDesc",
-							Subdomain:         "sub1",
-							Region:            "eu12",
-							State:             "OK",
-							DisplayName:       "unittest-sa",
-							Labels:            nil,
-							StateMessage:      internal.Ptr("OK"),
-							UsedForProduction: "",
-							BetaEnabled:       false,
-							ParentGUID:        "234",
-						},
-					},
+				mockAPIClient: &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{
+					Guid:              "123e4567-e89b-12d3-a456-426614174004",
+					Description:       "someDesc",
+					Subdomain:         "sub1",
+					Region:            "eu12",
+					State:             "OK",
+					DisplayName:       "unittest-sa",
+					Labels:            nil,
+					StateMessage:      internal.Ptr("OK"),
+					UsedForProduction: "",
+					BetaEnabled:       false,
+					ParentGUID:        "234",
 				}},
 				mockKube: func() test.MockClient {
 					mockClient := testutils.NewFakeKubeClientBuilder().
@@ -843,7 +819,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174004")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -863,7 +839,9 @@ func TestObserve(t *testing.T) {
 		"NeedsUpdateLabel": {
 			reason: "Adding label to an existing subaacount should require Update",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithData(v1alpha1.SubaccountParameters{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174005"),
+					WithData(v1alpha1.SubaccountParameters{
 					Description:       "someDesc",
 					Subdomain:         "sub1",
 					Region:            "eu12",
@@ -875,21 +853,17 @@ func TestObserve(t *testing.T) {
 					Name: "unittest-pc",
 				})),
 				mockAPIClient: &MockSubaccountClient{
-					returnSubaccounts: &accountclient.ResponseCollection{
-						Value: []accountclient.SubaccountResponseObject{
-							{
-								Guid:              "123",
-								Description:       "someDesc",
-								Subdomain:         "sub1",
-								Region:            "eu12",
-								State:             "OK",
-								Labels:            nil,
-								StateMessage:      internal.Ptr("OK"),
-								DisplayName:       "unittest-sa",
-								UsedForProduction: "",
-								BetaEnabled:       false,
-							},
-						},
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:              "123e4567-e89b-12d3-a456-426614174005",
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						State:             "OK",
+						Labels:            nil,
+						StateMessage:      internal.Ptr("OK"),
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
 					},
 				},
 				mockKube: func() test.MockClient {
@@ -910,7 +884,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174005")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -935,18 +909,39 @@ func TestObserve(t *testing.T) {
 						Region:    "eu10",
 					})),
 				mockAPIClient: &MockSubaccountClient{
-					// GetSubaccount (by GUID) will fail because external name is not a GUID
-					getSubaccountErr: errors.New("not found"),
-					// GetSubaccounts (fallback) will succeed
+					// GetSubaccounts (fallback) will succeed during migration
 					returnSubaccounts: &accountclient.ResponseCollection{
 						Value: []accountclient.SubaccountResponseObject{
 							{
-								Guid:       "subaccount-guid-123",
-								Subdomain:  "unittest-sa",
-								Region:     "eu10",
-								ParentGUID: "global-123",
+								Guid:              "subaccount-guid-123",
+								Subdomain:         "unittest-sa",
+								Region:            "eu10",
+								ParentGUID:        "global-123",
+								State:             "OK",
+								DisplayName:       "unittest-sa",
+								Description:       "",
+								BetaEnabled:       false,
+								UsedForProduction: "",
+								Labels:            &map[string][]string{},
+								StateMessage:      internal.Ptr("OK"),
+								GlobalAccountGUID: "global-123",
 							},
 						},
+					},
+					// GetSubaccount (direct lookup after migration) will succeed
+					returnSubaccount: &accountclient.SubaccountResponseObject{
+						Guid:              "subaccount-guid-123",
+						Subdomain:         "unittest-sa",
+						Region:            "eu10",
+						ParentGUID:        "global-123",
+						State:             "OK",
+						DisplayName:       "unittest-sa",
+						Description:       "",
+						BetaEnabled:       false,
+						UsedForProduction: "",
+						Labels:            &map[string][]string{},
+						StateMessage:      internal.Ptr("OK"),
+						GlobalAccountGUID: "global-123",
 					},
 				},
 				mockKube: func() test.MockClient {
@@ -970,7 +965,17 @@ func TestObserve(t *testing.T) {
 					// External name should be updated to GUID during migration
 					meta.SetExternalName(cr, "subaccount-guid-123")
 					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("subaccount-guid-123")
+					cr.Status.AtProvider.Status = internal.Ptr("OK")
+					cr.Status.AtProvider.Region = internal.Ptr("eu10")
+					cr.Status.AtProvider.Subdomain = internal.Ptr("unittest-sa")
+					cr.Status.AtProvider.Labels = &map[string][]string{}
+					cr.Status.AtProvider.Description = internal.Ptr("")
+					cr.Status.AtProvider.StatusMessage = internal.Ptr("OK")
+					cr.Status.AtProvider.DisplayName = internal.Ptr("unittest-sa")
+					cr.Status.AtProvider.UsedForProduction = internal.Ptr("")
+					cr.Status.AtProvider.BetaEnabled = internal.Ptr(false)
 					cr.Status.AtProvider.ParentGuid = internal.Ptr("global-123")
+					cr.Status.AtProvider.GlobalAccountGUID = internal.Ptr("global-123")
 				},
 			},
 		},
@@ -978,7 +983,7 @@ func TestObserve(t *testing.T) {
 			reason: "Resource with GUID as external-name should be found directly without fallback",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
-					WithExternalName("subaccount-guid-123"), // New behavior: external name = GUID
+					WithExternalName("123e4567-e89b-12d3-a456-426614174000"), // New behavior: external name = GUID (proper UUID format)
 					WithData(v1alpha1.SubaccountParameters{
 						Subdomain: "unittest-sa",
 						Region:    "eu10",
@@ -986,7 +991,7 @@ func TestObserve(t *testing.T) {
 				mockAPIClient: &MockSubaccountClient{
 					// GetSubaccount (by GUID) will succeed
 					returnSubaccount: &accountclient.SubaccountResponseObject{
-						Guid:       "subaccount-guid-123",
+						Guid:       "123e4567-e89b-12d3-a456-426614174000",
 						Subdomain:  "unittest-sa",
 						Region:     "eu10",
 						ParentGUID: "global-123",
@@ -1010,7 +1015,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("subaccount-guid-123")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174000")
 					cr.Status.AtProvider.ParentGuid = internal.Ptr("global-123")
 				},
 			},
