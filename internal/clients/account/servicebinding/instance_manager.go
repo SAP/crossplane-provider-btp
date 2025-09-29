@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -63,6 +64,10 @@ func (m *InstanceManager) CreateInstance(ctx context.Context, publicCR *v1alpha1
 // DeleteInstance deletes a the actual service binding instance in the BTP. This is done by deleting the virtual SubaccountServiceBinding CR (the TF CR)
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client delete command
 func (m *InstanceManager) DeleteInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalDelete, error) {
+	log := log.FromContext(ctx)
+
+	log.Info("DELETE_INSTANCE: Now deleting a service binding", "targetName", targetName, "targetExternalName", targetExternalName)
+
 	targetUID := GenerateInstanceUID(publicCR.UID, targetName)
 	subaccountBinding := m.buildSubaccountServiceBinding(publicCR, targetName, targetUID, targetExternalName)
 
@@ -78,6 +83,8 @@ func (m *InstanceManager) DeleteInstance(ctx context.Context, publicCR *v1alpha1
 	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteTfResource)
 	}
+
+	log.Info("DELETE_INSTANCE: finished deleting a service binding", "targetName", targetName, "targetExternalName", targetExternalName)
 
 	return deletion, nil
 }

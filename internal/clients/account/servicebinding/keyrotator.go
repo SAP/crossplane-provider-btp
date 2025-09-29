@@ -9,6 +9,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 )
 
 const ForceRotationKey = "servicebinding.account.btp.crossplane.io/force-rotation"
@@ -83,18 +84,23 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 	}
 
 	retiredKey := &v1alpha1.RetiredSBResource{
-		ID:          cr.Status.AtProvider.ID,
-		Name:        cr.Status.AtProvider.Name,
-		CreatedDate: createdDate,
-		RetiredDate: v1.Now(),
+		ID:           cr.Status.AtProvider.ID,
+		Name:         cr.Status.AtProvider.Name,
+		CreatedDate:  createdDate,
+		RetiredDate:  v1.Now(),
+		DeletionDate: deletionDate(time.Now(), cr.Spec.ForProvider.Rotation),
 	}
 	cr.Status.AtProvider.RetiredKeys = append(cr.Status.AtProvider.RetiredKeys, retiredKey)
 
 	return true
 }
 
+func deletionDate(base time.Time, r *v1alpha1.RotationParameters) *v1.Time {
+	return internal.Ptr(v1.NewTime(base.Add(r.TTL.Duration - r.Frequency.Duration)))
+}
+
 func (r *SBKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
-	if !r.isRotationConfigured(cr) || cr.Status.AtProvider.RetiredKeys == nil {
+	if cr.Status.AtProvider.RetiredKeys == nil {
 		return false
 	}
 
@@ -102,8 +108,13 @@ func (r *SBKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
 		if key.RetiredDate.IsZero() {
 			continue
 		}
-		gracePeriod := cr.Spec.ForProvider.Rotation.TTL.Duration - cr.Spec.ForProvider.Rotation.Frequency.Duration
-		if key.RetiredDate.Add(gracePeriod).Before(time.Now()) {
+
+		// update DeletionDate in case rotation settings were changed
+		if r.isRotationConfigured(cr) {
+			key.DeletionDate = deletionDate(key.RetiredDate.Time, cr.Spec.ForProvider.Rotation)
+		}
+
+		if key.DeletionDate.Before(internal.Ptr(v1.Now())) {
 			return true
 		}
 	}
@@ -129,13 +140,12 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 	}
 
 	for _, key := range cr.Status.AtProvider.RetiredKeys {
-		var expired bool
+		// update DeletionDate in case rotation settings were changed
 		if r.isRotationConfigured(cr) {
-			gracePeriod := cr.Spec.ForProvider.Rotation.TTL.Duration - cr.Spec.ForProvider.Rotation.Frequency.Duration
-			expired = key.RetiredDate.Add(gracePeriod).Before(time.Now())
+			key.DeletionDate = deletionDate(key.RetiredDate.Time, cr.Spec.ForProvider.Rotation)
 		}
 
-		if !expired {
+		if !key.DeletionDate.Before(internal.Ptr(v1.Now())) {
 			newRetiredKeys = append(newRetiredKeys, key)
 			continue
 		}
