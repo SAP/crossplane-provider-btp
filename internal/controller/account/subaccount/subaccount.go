@@ -128,12 +128,16 @@ func (c *external) generateObservation(
 	ctx context.Context,
 	desiredState *apisv1alpha1.Subaccount,
 ) error {
-	externalName := meta.GetExternalName(desiredState)
-	subaccount, _, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccount(ctx, externalName).Execute()
+
+	subaccount, _, err := c.btp.
+		AccountsServiceClient.
+		SubaccountOperationsAPI.
+		GetSubaccount(ctx, meta.GetExternalName(desiredState)).
+		Execute()
+
 	if err != nil {
 		resetRemoteState(desiredState)
-		// If external name is not a valid UUID, ignore the error as it's expected
-		if !isValidUUID(externalName) {
+		if strings.Contains(err.Error(), "404") {
 			return nil
 		}
 		return err
