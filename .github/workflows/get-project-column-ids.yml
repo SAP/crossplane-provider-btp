@@ -2,6 +2,8 @@ name: Fetch Project & Column IDs
 
 on:
   workflow_dispatch:
+permissions:
+  contents: read
 
 env:
   ACTIONS_STEP_DEBUG: true
