@@ -14,7 +14,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -239,7 +238,6 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
-	log := log.FromContext(ctx)
 	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotServiceBinding)
@@ -254,20 +252,14 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
-	log.Info("DELETE_CONTROLLER: deleting retired keys", "name", cr.GetName())
-
 	if err := e.keyRotator.DeleteRetiredKeys(ctx, cr); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
 	}
 
-	log.Info("DELETE_CONTROLLER: deleting current key", "name", cr.GetName())
 	deletion, err := e.instanceManager.DeleteInstance(ctx, cr, cr.Status.AtProvider.Name, cr.Status.AtProvider.ID)
 	if err != nil {
-		log.Info("DELETE_CONTROLLER: error deleting current key!", "name", cr.GetName())
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
-
-	log.Info("DELETE_CONTROLLER: finished deleting current key", "name", cr.GetName())
 
 	return deletion, nil
 }
