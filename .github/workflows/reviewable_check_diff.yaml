@@ -1,6 +1,8 @@
 # This workflow will run make reviewable and make check-diff as checks
 
 name: Reviewable&Check-Diff
+permissions:
+  contents: read
 
 on:
   workflow_call: 
