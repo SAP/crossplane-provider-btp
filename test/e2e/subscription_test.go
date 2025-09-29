@@ -111,6 +111,7 @@ func TestSubscriptionCRUDFlow(t *testing.T) {
 }
 
 func TestSubscriptionImport(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("Subscription Import Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
