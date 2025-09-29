@@ -247,7 +247,7 @@ test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
 	@$(INFO) running integration tests
 	@echo UUT_CONFIG=$$UUT_CONFIG
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
-	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '$(testFilter)' -timeout 240m 2>&1 | tee test-output.log
+	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -parallel=24 -count=1 -test.v -run '$(testFilter)' -timeout 240m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
@@ -264,7 +264,7 @@ test-acceptance: $(KIND) $(HELM3) build generate-test-crs
 	@echo UUT_CONFIG=$$UUT_CONFIG
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
 	@echo "UUT_IMAGES=$$UUT_IMAGES"
-	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -parallel=6 -count=1 -test.v -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
+	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -parallel=24 -count=1 -test.v -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
