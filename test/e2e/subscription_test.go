@@ -117,7 +117,7 @@ func TestSubscriptionImport(t *testing.T) {
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/subscription/import/environment")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta_api.AddToScheme(r.GetScheme())
+				_ = meta_api.AddToSchemeConcurrent(r.GetScheme())
 
 				// The local cloudmanagement instance is the requirement for the next steps, so we wait for it to be healthy
 				waitForResource(&v1alpha1.CloudManagement{
