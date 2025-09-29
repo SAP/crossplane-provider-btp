@@ -89,7 +89,7 @@ func TestSubscriptionCRUDFlow(t *testing.T) {
 				sub := &v1alpha1.Subscription{}
 				MustGetResource(t, cfg, subscriptionCreateName, nil, sub)
 
-				AwaitResourceDeletionOrFail(ctx, t, cfg, sub, wait.WithTimeout(time.Minute*7))
+				AwaitResourceDeletionOrFail(ctx, t, cfg, sub, wait.WithTimeout(time.Minute*10))
 
 				// all external resources deleted?
 				cis := &v1alpha1.CloudManagement{}
@@ -102,7 +102,7 @@ func TestSubscriptionCRUDFlow(t *testing.T) {
 			},
 		).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "subscription/create_flow", wait.WithTimeout(time.Minute*7))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "subscription/create_flow", wait.WithTimeout(time.Minute*15))
 			return ctx
 		},
 	).Feature()

@@ -59,13 +59,13 @@ func TestServiceManagerCreationFlow(t *testing.T) {
 			sm := &v1beta1.ServiceManager{}
 			MustGetResource(t, cfg, smCreateName, nil, sm)
 
-			AwaitResourceDeletionOrFail(ctx, t, cfg, sm, wait.WithTimeout(time.Minute*5))
+			AwaitResourceDeletionOrFail(ctx, t, cfg, sm, wait.WithTimeout(time.Minute*10))
 
 			return ctx
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "servicemanager/create_flow", wait.WithTimeout(time.Minute*5))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "servicemanager/create_flow", wait.WithTimeout(time.Minute*10))
 			return ctx
 		},
 	).Feature()

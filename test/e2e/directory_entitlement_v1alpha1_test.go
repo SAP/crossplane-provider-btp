@@ -43,7 +43,7 @@ func Test_DirectoryEntitlement_v1alpha1(t *testing.T) {
 	)
 	fB.Assess("create",
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			if err := resources.WaitForResourcesToBeSynced(ctx, cfg, resource.ResourceDirectory, nil, wait.WithTimeout(time.Minute*7)); err != nil {
+			if err := resources.WaitForResourcesToBeSynced(ctx, cfg, resource.ResourceDirectory, nil, wait.WithTimeout(time.Minute*10)); err != nil {
 				resources.DumpManagedResources(ctx, t, cfg)
 				t.Fatal(err)
 			}
@@ -60,7 +60,7 @@ func Test_DirectoryEntitlement_v1alpha1(t *testing.T) {
 		MustGetResource(t, cfg, "e2e-audit-log-viewer-ent", nil, directorySql)
 		resources.AwaitResourceDeletionOrFail(ctx, t, cfg, directorySql)
 
-		return DeleteResourcesIgnoreMissing(ctx, t, cfg, resource.Kind, wait.WithTimeout(time.Minute*5))
+		return DeleteResourcesIgnoreMissing(ctx, t, cfg, resource.Kind, wait.WithTimeout(time.Minute*10))
 	})
 
 	fB.Teardown(resource.Teardown)

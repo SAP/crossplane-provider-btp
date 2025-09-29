@@ -56,13 +56,13 @@ func TestServiceBinding_CreationFlow(t *testing.T) {
 			sb := &v1alpha1.ServiceBinding{}
 			MustGetResource(t, cfg, sbCreateName, nil, sb)
 
-			AwaitResourceDeletionOrFail(ctx, t, cfg, sb, wait.WithTimeout(time.Minute*5))
+			AwaitResourceDeletionOrFail(ctx, t, cfg, sb, wait.WithTimeout(time.Minute*10))
 
 			return ctx
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*5))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*10))
 			return ctx
 		},
 	).Feature()

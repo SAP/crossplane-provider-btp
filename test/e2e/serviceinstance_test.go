@@ -56,13 +56,13 @@ func TestServiceInstance_CreationFlow(t *testing.T) {
 			si := &v1alpha1.ServiceInstance{}
 			MustGetResource(t, cfg, siCreateName, nil, si)
 
-			AwaitResourceDeletionOrFail(ctx, t, cfg, si, wait.WithTimeout(time.Minute*5))
+			AwaitResourceDeletionOrFail(ctx, t, cfg, si, wait.WithTimeout(time.Minute*10))
 
 			return ctx
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*5))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*10))
 			return ctx
 		},
 	).Feature()

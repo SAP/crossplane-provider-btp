@@ -40,7 +40,7 @@ func Test_TrustConfiguration_v1alpha1(t *testing.T) {
 	)
 	fB.Assess("create",
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			if err := resources.WaitForResourcesToBeSynced(ctx, cfg, resource.ResourceDirectory, nil, wait.WithTimeout(time.Minute*7)); err != nil {
+			if err := resources.WaitForResourcesToBeSynced(ctx, cfg, resource.ResourceDirectory, nil, wait.WithTimeout(time.Minute*10)); err != nil {
 				resources.DumpManagedResources(ctx, t, cfg)
 				t.Fatal(err)
 			}

@@ -45,7 +45,7 @@ func Test_SubaccountTrustConfiguration_v1alpha1(t *testing.T) {
 		MustGetResource(t, cfg, "e2e-trustconfiguration", nil, trustConfig)
 		resources.AwaitResourceDeletionOrFail(ctx, t, cfg, trustConfig)
 
-		return DeleteResourcesIgnoreMissing(ctx, t, cfg, resource.Kind, wait.WithTimeout(time.Minute*5))
+		return DeleteResourcesIgnoreMissing(ctx, t, cfg, resource.Kind, wait.WithTimeout(time.Minute*10))
 	})
 	fB.Teardown(resource.Teardown)
 

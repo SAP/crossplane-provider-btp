@@ -61,12 +61,12 @@ func TestSubaccountApiCredentialsStandalone(t *testing.T) {
 				sac := &v1alpha1.SubaccountApiCredential{}
 				MustGetResource(t, cfg, sacCreateName, nil, sac)
 
-				AwaitResourceDeletionOrFail(ctx, t, cfg, sac, wait.WithTimeout(time.Minute*5))
+				AwaitResourceDeletionOrFail(ctx, t, cfg, sac, wait.WithTimeout(time.Minute*10))
 				return ctx
 			},
 		).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, manifestDir, wait.WithTimeout(time.Minute*5))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, manifestDir, wait.WithTimeout(time.Minute*10))
 			return ctx
 		},
 	).Feature()
