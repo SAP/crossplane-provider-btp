@@ -31,12 +31,13 @@ var (
 )
 
 func TestSubscriptionCRUDFlow(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("Subscription Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/subscription/create_flow")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta_api.AddToScheme(r.GetScheme())
+				_ = meta_api.AddToSchemeConcurrent(r.GetScheme())
 
 				cm := v1alpha1.Subscription{
 					ObjectMeta: metav1.ObjectMeta{Name: subscriptionCreateName, Namespace: cfg.Namespace()},
@@ -88,7 +89,7 @@ func TestSubscriptionCRUDFlow(t *testing.T) {
 				sub := &v1alpha1.Subscription{}
 				MustGetResource(t, cfg, subscriptionCreateName, nil, sub)
 
-				AwaitResourceDeletionOrFail(ctx, t, cfg, sub, wait.WithTimeout(time.Minute*7))
+				AwaitResourceDeletionOrFail(ctx, t, cfg, sub, wait.WithTimeout(time.Minute*10))
 
 				// all external resources deleted?
 				cis := &v1alpha1.CloudManagement{}
@@ -101,7 +102,7 @@ func TestSubscriptionCRUDFlow(t *testing.T) {
 			},
 		).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "subscription/create_flow", wait.WithTimeout(time.Minute*7))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "subscription/create_flow", wait.WithTimeout(time.Minute*15))
 			return ctx
 		},
 	).Feature()
@@ -110,12 +111,13 @@ func TestSubscriptionCRUDFlow(t *testing.T) {
 }
 
 func TestSubscriptionImport(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("Subscription Import Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/subscription/import/environment")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta_api.AddToScheme(r.GetScheme())
+				_ = meta_api.AddToSchemeConcurrent(r.GetScheme())
 
 				// The local cloudmanagement instance is the requirement for the next steps, so we wait for it to be healthy
 				waitForResource(&v1alpha1.CloudManagement{

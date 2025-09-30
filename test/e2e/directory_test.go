@@ -27,13 +27,14 @@ import (
 // TODO: separate the k8s resource name and the external resource name
 
 func TestDirectory(t *testing.T) {
+	t.Parallel()
 	dirK8sResName := "e2e-test-directory"
 	directoryNameE2e := NewID(dirK8sResName, BUILD_ID)
 	crudFeature := features.New("BTP Directory Controller").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta.AddToScheme(r.GetScheme())
+				_ = meta.AddToSchemeConcurrent(r.GetScheme())
 
 				mutateDirResource := newMutateDirFunc(directoryNameE2e)
 				createK8sResources(ctx, t, cfg, r, "directory", "*", mutateDirResource)
