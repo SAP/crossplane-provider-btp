@@ -12,6 +12,9 @@ on:
     paths-ignore:
       - '*.md'
 
+permissions:
+  contents: read
+
 jobs:
   run-go-license-check:
     uses: ./.github/workflows/check-go-licenses.yaml
