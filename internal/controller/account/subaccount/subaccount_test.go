@@ -1031,7 +1031,7 @@ func TestObserve(t *testing.T) {
 					})),
 				mockAPIClient: &MockSubaccountClient{
 					// GetSubaccount (by GUID) will fail because external name is not a GUID
-					getSubaccountErr: errors.New("not found"),
+					getSubaccountErr: errors.New("404 not found"),
 					// GetSubaccounts (fallback) will return empty result
 					returnSubaccounts: &accountclient.ResponseCollection{
 						Value: []accountclient.SubaccountResponseObject{},
