@@ -79,7 +79,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		nil,
 	)
 
-	instanceManager := servicebindingclient.NewInstanceManager(sbConnector)
+	instanceManager := servicebindingclient.NewInstanceManager(sbConnector, c.kube)
 
 	ext := &external{
 		kube:            c.kube,
