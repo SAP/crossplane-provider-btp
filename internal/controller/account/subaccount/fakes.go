@@ -29,6 +29,7 @@ type MockSubaccountClient struct {
 	returnSubaccount  *accountclient.SubaccountResponseObject
 	mockDeleteSubaccountExecute  func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error)
 	returnErr         error
+	getSubaccountErr  error
 }
 
 var _ accountclient.SubaccountOperationsAPI = &MockSubaccountClient{}
@@ -195,13 +196,14 @@ func (m *MockSubaccountClient) GetServiceManagerBindingV2Execute(r accountclient
 }
 
 func (m *MockSubaccountClient) GetSubaccount(ctx context.Context, subaccountGUID string) accountclient.ApiGetSubaccountRequest {
-	//TODO implement me
-	panic("implement me")
+	return accountclient.ApiGetSubaccountRequest{ApiService: m}
 }
 
 func (m *MockSubaccountClient) GetSubaccountExecute(r accountclient.ApiGetSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
-	//TODO implement me
-	panic("implement me")
+	if m.getSubaccountErr != nil {
+		return nil, nil, m.getSubaccountErr
+	}
+	return m.returnSubaccount, nil, m.returnErr
 }
 
 func (m *MockSubaccountClient) GetSubaccountCustomProperties(ctx context.Context, subaccountGUID string) accountclient.ApiGetSubaccountCustomPropertiesRequest {
