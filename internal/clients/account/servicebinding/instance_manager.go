@@ -11,17 +11,21 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
+	instanceClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 )
 
 const (
-	errConnectTfController = "failed to connect TF controller"
-	errCreateTfResource    = "failed to create TF resource"
-	errDeleteTfResource    = "failed to delete TF resource"
-	errObserveTfResource   = "failed to observe TF resource"
+	errConnectTfController  = "failed to connect TF controller"
+	errCreateTfResource     = "failed to create TF resource"
+	errDeleteTfResource     = "failed to delete TF resource"
+	errObserveTfResource    = "failed to observe TF resource"
+	errBuildTfResource      = "failed to build TF resource"
+	errBuildParametersField = "failed to build parameters field"
 )
 
 // TfConnector provides the interface for connecting to TF controllers
@@ -32,11 +36,13 @@ type TfConnector interface {
 // InstanceManager handles the lifecycle of service binding instances
 type InstanceManager struct {
 	sbConnector TfConnector
+	kube        client.Client
 }
 
-func NewInstanceManager(sbConnector TfConnector) *InstanceManager {
+func NewInstanceManager(sbConnector TfConnector, kube client.Client) *InstanceManager {
 	return &InstanceManager{
 		sbConnector: sbConnector,
+		kube:        kube,
 	}
 }
 
@@ -46,7 +52,10 @@ func NewInstanceManager(sbConnector TfConnector) *InstanceManager {
 func (m *InstanceManager) CreateInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, btpName string) (string, types.UID, managed.ExternalCreation, error) {
 	instanceUID := GenerateInstanceUID(publicCR.UID, btpName)
 
-	subaccountBinding := m.buildSubaccountServiceBinding(publicCR, btpName, instanceUID, "")
+	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, btpName, instanceUID, "")
+	if err != nil {
+		return "", "", managed.ExternalCreation{}, errors.Wrap(err, errBuildTfResource)
+	}
 
 	tfController, err := m.sbConnector.Connect(ctx, subaccountBinding)
 	if err != nil {
@@ -69,7 +78,10 @@ func (m *InstanceManager) DeleteInstance(ctx context.Context, publicCR *v1alpha1
 	log.Info("DELETE_INSTANCE: Now deleting a service binding", "targetName", targetName, "targetExternalName", targetExternalName)
 
 	targetUID := GenerateInstanceUID(publicCR.UID, targetName)
-	subaccountBinding := m.buildSubaccountServiceBinding(publicCR, targetName, targetUID, targetExternalName)
+	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
+	if err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errBuildTfResource)
+	}
 
 	subaccountBinding.SetDeletionTimestamp(internal.Ptr(metav1.NewTime(time.Now())))
 	subaccountBinding.SetConditions(xpv1.Deleting())
@@ -93,7 +105,10 @@ func (m *InstanceManager) DeleteInstance(ctx context.Context, publicCR *v1alpha1
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client update command
 func (m *InstanceManager) UpdateInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalUpdate, error) {
 	targetUID := GenerateInstanceUID(publicCR.UID, targetName)
-	subaccountBinding := m.buildSubaccountServiceBinding(publicCR, targetName, targetUID, targetExternalName)
+	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errBuildTfResource)
+	}
 
 	tfController, err := m.sbConnector.Connect(ctx, subaccountBinding)
 	if err != nil {
@@ -108,7 +123,10 @@ func (m *InstanceManager) UpdateInstance(ctx context.Context, publicCR *v1alpha1
 // Returns the observation and the TF resource for data extraction
 func (m *InstanceManager) ObserveInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
 	targetUID := GenerateInstanceUID(publicCR.UID, targetName)
-	subaccountBinding := m.buildSubaccountServiceBinding(publicCR, targetName, targetUID, targetExternalName)
+	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
+	if err != nil {
+		return managed.ExternalObservation{}, nil, errors.Wrap(err, errBuildTfResource)
+	}
 
 	tfController, err := m.sbConnector.Connect(ctx, subaccountBinding)
 	if err != nil {
@@ -128,7 +146,13 @@ func (m *InstanceManager) ObserveInstance(ctx context.Context, publicCR *v1alpha
 }
 
 // buildSubaccountServiceBinding creates a SubaccountServiceBinding resource from a ServiceBinding
-func (m *InstanceManager) buildSubaccountServiceBinding(sb *v1alpha1.ServiceBinding, name string, uid types.UID, externalName string) *v1alpha1.SubaccountServiceBinding {
+func (m *InstanceManager) buildSubaccountServiceBinding(ctx context.Context, sb *v1alpha1.ServiceBinding, name string, uid types.UID, externalName string) (*v1alpha1.SubaccountServiceBinding, error) {
+
+	parameterJson, err := instanceClient.BuildComplexParameterJson(ctx, m.kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters.Raw)
+	if err != nil {
+		return nil, errors.Wrap(err, errBuildParametersField)
+	}
+
 	sBinding := &v1alpha1.SubaccountServiceBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha1.SubaccountServiceBinding_Kind,
@@ -150,6 +174,7 @@ func (m *InstanceManager) buildSubaccountServiceBinding(sb *v1alpha1.ServiceBind
 				SubaccountID:      sb.Spec.ForProvider.SubaccountID,
 				ServiceInstanceID: sb.Spec.ForProvider.ServiceInstanceID,
 				Name:              &name,
+				Parameters:        internal.Ptr(string(parameterJson)),
 			},
 		},
 		Status: v1alpha1.SubaccountServiceBindingStatus{},
@@ -158,5 +183,5 @@ func (m *InstanceManager) buildSubaccountServiceBinding(sb *v1alpha1.ServiceBind
 	if externalName != "" {
 		meta.SetExternalName(sBinding, externalName)
 	}
-	return sBinding
+	return sBinding, nil
 }
