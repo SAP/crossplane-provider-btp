@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -17,6 +19,11 @@ const ForceRotationKey = "servicebinding.account.btp.crossplane.io/force-rotatio
 const (
 	errDeleteExpiredKey = "cannot delete expired key"
 	errDeleteRetiredKey = "cannot delete retired key"
+)
+
+// Condition types for ServiceBinding
+const (
+	TypeRotationStatus xpv1.ConditionType = "RotationStatus"
 )
 
 // InstanceDeleter provides the interface for deleting service binding instances
@@ -60,6 +67,9 @@ func (r *SBKeyRotator) isRotationConfigured(cr *v1alpha1.ServiceBinding) bool {
 }
 
 func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
+	// Validate rotation settings and warn if potentially problematic
+	r.validateRotationSettings(cr)
+
 	forceRotation := v1.HasAnnotation(cr.ObjectMeta, ForceRotationKey)
 
 	var rotationDue bool
@@ -97,6 +107,53 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 
 func deletionDate(base time.Time, r *v1alpha1.RotationParameters) *v1.Time {
 	return internal.Ptr(v1.NewTime(base.Add(r.TTL.Duration - r.Frequency.Duration)))
+}
+
+// validateRotationSettings checks the current rotation configuration and sets
+// the rotation status condition accordingly. This provides visibility into
+// whether rotation is enabled, disabled, or has potentially problematic settings.
+func (r *SBKeyRotator) validateRotationSettings(cr *v1alpha1.ServiceBinding) {
+	if !r.isRotationConfigured(cr) {
+		cr.Status.SetConditions(xpv1.Condition{
+			Type:               TypeRotationStatus,
+			Status:             corev1.ConditionFalse,
+			LastTransitionTime: v1.Now(),
+			Reason:             "Disabled",
+			Message:            "Key rotation is not configured for this service binding",
+		})
+		return
+	}
+
+	rotation := cr.Spec.ForProvider.Rotation
+	ttl := rotation.TTL.Duration
+	frequency := rotation.Frequency.Duration
+
+	// Calculate potential maximum instances: TTL / frequency
+	// We allow some floating point imprecision, so we check if it would result in more than 2 instances
+	maxInstances := float64(ttl) / float64(frequency)
+
+	if maxInstances > 2.0 {
+		cr.Status.SetConditions(xpv1.Condition{
+			Type:               TypeRotationStatus,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: v1.Now(),
+			Reason:             "EnabledWithWarning",
+			Message: fmt.Sprintf(
+				"Key rotation is enabled but current settings (TTL=%s, frequency=%s) may result in up to %d parallel service binding instances. "+
+					"Consider reducing TTL or increasing frequency to avoid resource overhead.",
+				ttl.String(),
+				frequency.String(),
+				int(maxInstances),
+			),
+		})
+	} else {
+		cr.Status.SetConditions(xpv1.Condition{
+			Type:               TypeRotationStatus,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: v1.Now(),
+			Reason:             "Enabled",
+		})
+	}
 }
 
 func (r *SBKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
