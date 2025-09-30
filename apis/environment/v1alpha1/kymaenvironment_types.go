@@ -20,7 +20,8 @@ const (
 // KymaEnvironmentParameters are the configurable fields of a KymaEnvironment.
 type KymaEnvironmentParameters struct {
 	PlanName string `json:"planName"`
-
+	// +kubebuilder:validation:Optional
+	Name string `json:"name,omitempty"`
 	// Provisioning parameters for the instance.
 	//
 	// The Parameters field is NOT secret or secured in any way and should

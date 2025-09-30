@@ -31,7 +31,7 @@ func (c KymaEnvironments) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.KymaEnvironment,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
-	environment, err := c.btp.GetEnvironment(ctx, meta.GetExternalName(&cr), cr.Name, btp.KymaEnvironmentType())
+	environment, err := c.btp.GetEnvironment(ctx, meta.GetExternalName(&cr), cr.Spec.ForProvider.Name, btp.KymaEnvironmentType())
 
 	if err != nil {
 		return nil, false, err
@@ -53,13 +53,13 @@ func (c KymaEnvironments) DescribeInstance(
 func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error) {
 
 	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
-	parameters = AddKymaDefaultParameters(parameters, cr.Name, string(cr.UID))
+	parameters = AddKymaDefaultParameters(parameters, cr.Spec.ForProvider.Name, string(cr.UID))
 	if err != nil {
 		return "", err
 	}
 	guid, err := c.btp.CreateKymaEnvironment(
 		ctx,
-		cr.Name,
+		cr.Spec.ForProvider.Name,
 		cr.Spec.ForProvider.PlanName,
 		parameters,
 		string(cr.UID),
@@ -85,7 +85,7 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 	}
 
 	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
-	parameters = AddKymaDefaultParameters(parameters, cr.Name, string(cr.UID))
+	parameters = AddKymaDefaultParameters(parameters, cr.Spec.ForProvider.Name, string(cr.UID))
 	if err != nil {
 		return err
 	}
