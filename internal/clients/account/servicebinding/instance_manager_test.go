@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
@@ -28,6 +29,8 @@ var (
 )
 
 func TestInstanceManager_CreateInstance(t *testing.T) {
+	mockClient := fake.NewClientBuilder().Build()
+
 	type fields struct {
 		sbConnector TfConnector
 	}
@@ -134,7 +137,7 @@ func TestInstanceManager_CreateInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewInstanceManager(tt.fields.sbConnector)
+			m := NewInstanceManager(tt.fields.sbConnector, mockClient)
 			gotName, gotUID, gotCreation, err := m.CreateInstance(tt.args.ctx, tt.args.publicCR, tt.args.btpName)
 
 			if tt.want.err != nil {
@@ -154,6 +157,8 @@ func TestInstanceManager_CreateInstance(t *testing.T) {
 }
 
 func TestInstanceManager_DeleteInstance(t *testing.T) {
+	mockClient := fake.NewClientBuilder().Build()
+
 	type fields struct {
 		sbConnector TfConnector
 	}
@@ -252,7 +257,7 @@ func TestInstanceManager_DeleteInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewInstanceManager(tt.fields.sbConnector)
+			m := NewInstanceManager(tt.fields.sbConnector, mockClient)
 			gotDeletion, err := m.DeleteInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
 
 			if tt.want.err != nil {
@@ -270,6 +275,8 @@ func TestInstanceManager_DeleteInstance(t *testing.T) {
 }
 
 func TestInstanceManager_UpdateInstance(t *testing.T) {
+	mockClient := fake.NewClientBuilder().Build()
+
 	type fields struct {
 		sbConnector TfConnector
 	}
@@ -374,7 +381,7 @@ func TestInstanceManager_UpdateInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewInstanceManager(tt.fields.sbConnector)
+			m := NewInstanceManager(tt.fields.sbConnector, mockClient)
 			gotUpdate, err := m.UpdateInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
 
 			if tt.want.err != nil {
@@ -392,6 +399,8 @@ func TestInstanceManager_UpdateInstance(t *testing.T) {
 }
 
 func TestInstanceManager_ObserveInstance(t *testing.T) {
+	mockClient := fake.NewClientBuilder().Build()
+
 	type fields struct {
 		sbConnector TfConnector
 	}
@@ -528,7 +537,7 @@ func TestInstanceManager_ObserveInstance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			originalCR := publicCR.DeepCopy()
-			m := NewInstanceManager(tt.fields.sbConnector)
+			m := NewInstanceManager(tt.fields.sbConnector, mockClient)
 			gotObservation, gotResource, err := m.ObserveInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
 
 			if tt.want.err != nil {
@@ -572,6 +581,7 @@ func TestInstanceManager_ObserveInstance(t *testing.T) {
 }
 
 func TestInstanceManager_buildSubaccountServiceBinding(t *testing.T) {
+	mockClient := fake.NewClientBuilder().Build()
 	publicCR := &v1alpha1.ServiceBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:               "test-uid-123",
@@ -589,12 +599,13 @@ func TestInstanceManager_buildSubaccountServiceBinding(t *testing.T) {
 		},
 	}
 
-	m := NewInstanceManager(nil)
+	m := NewInstanceManager(nil, mockClient)
 	name := "test-name"
 	uid := types.UID("test-uid")
 	externalName := "external-123"
 
-	result := m.buildSubaccountServiceBinding(publicCR, name, uid, externalName)
+	result, err := m.buildSubaccountServiceBinding(context.Background(), publicCR, name, uid, externalName)
+	assert.NoError(t, err)
 
 	// Verify basic structure
 	assert.Equal(t, v1alpha1.SubaccountServiceBinding_Kind, result.Kind)
@@ -612,7 +623,8 @@ func TestInstanceManager_buildSubaccountServiceBinding(t *testing.T) {
 	assert.Equal(t, externalName, meta.GetExternalName(result))
 
 	// Test without external name
-	resultNoExt := m.buildSubaccountServiceBinding(publicCR, name, uid, "")
+	resultNoExt, err := m.buildSubaccountServiceBinding(context.Background(), publicCR, name, uid, "")
+	assert.NoError(t, err)
 	assert.Equal(t, "", meta.GetExternalName(resultNoExt))
 }
 
