@@ -59,7 +59,28 @@ jobs:
     environment: ${{ inputs.environment }}
     strategy:
       matrix:
-        testName: ['TestDirectory', 'TestAccount']
+        testName: 
+        ['TestCloudFoundryEnvironment',
+        'TestEntitlements',
+        'TestKymaEnvironment',
+        'TestServiceManagerCreationFlow',
+        'TestAccount',
+        'TestSubaccountApiCredentialsIntegration',
+        'TestSubaccountApiCredentialsStandalone',
+        'Test_SubaccountServiceBinding_v1alpha1',
+        'Test_SubaccountServiceBroker_v1alpha1',
+        'Test_SubaccountTrustConfiguration_v1alpha1',
+        'Test_TrustConfiguration_v1alpha1',
+        'Test_SubaccountServiceInstance_v1alpha1',
+        'TestServiceBinding_CreationFlow',
+        'Test_DirectoryEntitlement_v1alpha1',
+        'TestDirectory',
+        'TestCloudManagemen',
+        'TestCloudManagementImport',
+        'TestServiceInstance_CreationFlow',
+        'TestSubscriptionCRUDFlow',
+        'TestSubscriptionImport'
+        ]
     steps:
       - name: checkout repo
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
