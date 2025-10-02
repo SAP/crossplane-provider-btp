@@ -120,7 +120,7 @@ jobs:
       - name: Run e2e test
         timeout-minutes: 120
         run: |
-          make e2e testFilter=${{ matrix.testName }}
+          make test-e2e-long testFilter=${{ matrix.testName }}
         env:
           BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
