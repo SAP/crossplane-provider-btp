@@ -80,6 +80,11 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaEnvironment)
 	}
 
+	if cr.Spec.ForProvider.Name == "" {
+		cr.Spec.ForProvider.Name = cr.Name
+		return managed.ExternalObservation{ResourceLateInitialized: true}, nil
+	}
+
 	instance, hasUpdate, err := c.client.DescribeInstance(ctx, *cr)
 
 	if err != nil {
