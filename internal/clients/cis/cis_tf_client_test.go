@@ -65,13 +65,15 @@ func TestConnectResources(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		cr                *v1beta1.CloudManagement
-		instanceConnector func() (managed.ExternalClient, error)
-		bindingConnector  func() (managed.ExternalClient, error)
-		wantErr           error
-		expectedInstance  v1alpha1.SubaccountServiceInstanceParameters
-		expectedBinding   v1alpha1.SubaccountServiceBindingParameters
+		name                         string
+		cr                           *v1beta1.CloudManagement
+		instanceConnector            func() (managed.ExternalClient, error)
+		bindingConnector             func() (managed.ExternalClient, error)
+		wantErr                      error
+		expectedInstanceExternalName string
+		expectedInstance             v1alpha1.SubaccountServiceInstanceParameters
+		expectedBindingExternalName  string
+		expectedBinding              v1alpha1.SubaccountServiceBindingParameters
 	}{
 		{
 			name:              "BindingError",
@@ -81,36 +83,50 @@ func TestConnectResources(t *testing.T) {
 			wantErr:           errors.New("bindingConnectError"),
 		},
 		{
-			name:              "Success",
-			cr:                defaultCR,
-			instanceConnector: successInstanceMock,
-			bindingConnector:  successBindingMock,
-			expectedInstance:  getExpectedInstanceSpec(defaultInstanceName),
-			expectedBinding:   getExpectedBindingSpec(defaultBindingName, defaultExtName),
+			name:                         "Success",
+			cr:                           defaultCR,
+			instanceConnector:            successInstanceMock,
+			bindingConnector:             successBindingMock,
+			expectedInstanceExternalName: defaultExtName,
+			expectedInstance:             getExpectedInstanceSpec(defaultInstanceName),
+			expectedBinding:              getExpectedBindingSpec(defaultBindingName, defaultExtName),
 		},
 		{
-			name:              "Success with default instance name",
-			cr:                testCMCr(utilCloudManagementParams{extName: defaultExtName, sbName: defaultBindingName}),
-			instanceConnector: successInstanceMock,
-			bindingConnector:  successBindingMock,
-			expectedInstance:  getExpectedInstanceSpec(v1beta1.DefaultCloudManagementInstanceName),
-			expectedBinding:   getExpectedBindingSpec(defaultBindingName, defaultExtName),
+			name:                         "Success with default instance name",
+			cr:                           testCMCr(utilCloudManagementParams{extName: defaultExtName, sbName: defaultBindingName}),
+			instanceConnector:            successInstanceMock,
+			bindingConnector:             successBindingMock,
+			expectedInstanceExternalName: defaultExtName,
+			expectedInstance:             getExpectedInstanceSpec(v1beta1.DefaultCloudManagementInstanceName),
+			expectedBinding:              getExpectedBindingSpec(defaultBindingName, defaultExtName),
 		},
 		{
-			name:              "Success with default binding name",
-			cr:                testCMCr(utilCloudManagementParams{extName: defaultExtName, siName: defaultInstanceName}),
-			instanceConnector: successInstanceMock,
-			bindingConnector:  successBindingMock,
-			expectedInstance:  getExpectedInstanceSpec(defaultInstanceName),
-			expectedBinding:   getExpectedBindingSpec(v1beta1.DefaultCloudManagementBindingName, defaultExtName),
+			name:                         "Success with default binding name",
+			cr:                           testCMCr(utilCloudManagementParams{extName: defaultExtName, siName: defaultInstanceName}),
+			instanceConnector:            successInstanceMock,
+			bindingConnector:             successBindingMock,
+			expectedInstanceExternalName: defaultExtName,
+			expectedInstance:             getExpectedInstanceSpec(defaultInstanceName),
+			expectedBinding:              getExpectedBindingSpec(v1beta1.DefaultCloudManagementBindingName, defaultExtName),
 		},
 		{
-			name:              "Success with default instance and binding name",
-			cr:                testCMCr(utilCloudManagementParams{extName: defaultExtName}),
-			instanceConnector: successInstanceMock,
-			bindingConnector:  successBindingMock,
-			expectedInstance:  getExpectedInstanceSpec(v1beta1.DefaultCloudManagementInstanceName),
-			expectedBinding:   getExpectedBindingSpec(v1beta1.DefaultCloudManagementBindingName, defaultExtName),
+			name:                         "Success with default instance and binding name",
+			cr:                           testCMCr(utilCloudManagementParams{extName: defaultExtName}),
+			instanceConnector:            successInstanceMock,
+			bindingConnector:             successBindingMock,
+			expectedInstanceExternalName: defaultExtName,
+			expectedInstance:             getExpectedInstanceSpec(v1beta1.DefaultCloudManagementInstanceName),
+			expectedBinding:              getExpectedBindingSpec(v1beta1.DefaultCloudManagementBindingName, defaultExtName),
+		},
+		{
+			name:                         "Success with split external name",
+			cr:                           testCMCr(utilCloudManagementParams{extName: "instanceID/bindingID"}),
+			instanceConnector:            successInstanceMock,
+			bindingConnector:             successBindingMock,
+			expectedInstanceExternalName: "instanceID",
+			expectedInstance:             getExpectedInstanceSpec(v1beta1.DefaultCloudManagementInstanceName),
+			expectedBindingExternalName:  "bindingID",
+			expectedBinding:              getExpectedBindingSpec(v1beta1.DefaultCloudManagementBindingName, "instanceID"),
 		},
 	}
 
@@ -130,9 +146,14 @@ func TestConnectResources(t *testing.T) {
 					t.Errorf("ConnectResources() returned nil, expected a result")
 				}
 				tfClient := resources.(*TfClient)
-
+				if diff := cmp.Diff(tc.expectedInstanceExternalName, meta.GetExternalName(tfClient.sInstance)); diff != "" {
+					t.Errorf("Instance external-name mismatch (-want +got):\n%s", diff)
+				}
 				if diff := cmp.Diff(tc.expectedInstance, tfClient.sInstance.Spec.ForProvider); diff != "" {
 					t.Errorf("Instance spec mismatch (-want +got):\n%s", diff)
+				}
+				if diff := cmp.Diff(tc.expectedBindingExternalName, meta.GetExternalName(tfClient.sBinding)); diff != "" {
+					t.Errorf("Binding external-name mismatch (-want +got):\n%s", diff)
 				}
 				if diff := cmp.Diff(tc.expectedBinding, tfClient.sBinding.Spec.ForProvider); diff != "" {
 					t.Errorf("Binding spec mismatch (-want +got):\n%s", diff)

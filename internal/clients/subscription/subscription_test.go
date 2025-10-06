@@ -376,6 +376,49 @@ func TestSubscriptionTypeMapper_SyncStatus(t *testing.T) {
 
 }
 
+func TestSplitExternalName(t *testing.T) {
+	tests := map[string]struct {
+		externalName string
+		wantAppName  string
+		wantPlanName string
+		wantErr      bool
+	}{
+		"ValidName": {
+			externalName: "name1/plan2",
+			wantAppName:  "name1",
+			wantPlanName: "plan2",
+			wantErr:      false,
+		},
+		"InvalidNameNoSlash": {
+			externalName: "name1plan2",
+			wantAppName:  "",
+			wantPlanName: "",
+			wantErr:      true,
+		},
+		"InvalidNameTooManySlashes": {
+			externalName: "name1/plan2/extra",
+			wantAppName:  "",
+			wantPlanName: "",
+			wantErr:      true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			appName, planName, err := splitExternalName(tc.externalName)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("splitExternalName() error = %v, wantErr %v", err, tc.wantErr)
+				return
+			}
+			if appName != tc.wantAppName {
+				t.Errorf("splitExternalName() appName = %v, want %v", appName, tc.wantAppName)
+			}
+			if planName != tc.wantPlanName {
+				t.Errorf("splitExternalName() planName = %v, want %v", planName, tc.wantPlanName)
+			}
+		})
+	}
+}
+
 func apiMockGET(response *saas_client.EntitledApplicationsResponseObject, statusCode int, apiError error) *MockSubscriptionOperationsConsumer {
 	apiMock := &MockSubscriptionOperationsConsumer{}
 	apiMock.
