@@ -137,7 +137,6 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 		if err := e.kube.Status().Update(ctx, cr); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
-
 		}
 	}
 
@@ -147,6 +146,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
+
+	// Validate rotation settings and set status condition
+	e.keyRotator.ValidateRotationSettings(cr)
 
 	// Retire binding conditionally
 	if !e.keyRotator.RetireBinding(cr) {
@@ -176,16 +178,13 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	cr.Spec.BtpName = &btpName
 
-	if err := e.kube.Update(ctx, cr); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
-	}
-
 	_, _, creation, err := e.instanceManager.CreateInstance(ctx, cr, *cr.Spec.BtpName)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
-	if err := e.kube.Status().Update(ctx, cr); err != nil {
+	// Update both spec and status in a single call to avoid version conflicts
+	if err := e.kube.Update(ctx, cr); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
 	}
 
@@ -250,6 +249,12 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	// Block deletion if other resources are still using this ServiceBinding
 	if blocked := e.tracker.DeleteShouldBeBlocked(mg); blocked {
 		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
+	}
+
+	// Block deletion if rotation is in progress (new binding not yet active)
+	btpName := getBtpName(cr)
+	if cr.Status.AtProvider.Name != "" && btpName != cr.Status.AtProvider.Name {
+		return managed.ExternalDelete{}, errors.New("Deletion blocked: service binding not yet active, waiting for it to be ready first.")
 	}
 
 	if err := e.keyRotator.DeleteRetiredKeys(ctx, cr); err != nil {
