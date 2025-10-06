@@ -48,6 +48,10 @@ type KeyRotator interface {
 
 	// DeleteRetiredKeys deletes all retired keys from the external system.
 	DeleteRetiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) error
+
+	// ValidateRotationSettings checks the current rotation configuration and sets
+	// the rotation status condition accordingly.
+	ValidateRotationSettings(cr *v1alpha1.ServiceBinding)
 }
 
 type SBKeyRotator struct {
@@ -67,10 +71,13 @@ func (r *SBKeyRotator) isRotationConfigured(cr *v1alpha1.ServiceBinding) bool {
 }
 
 func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
-	// Validate rotation settings and warn if potentially problematic
-	r.validateRotationSettings(cr)
-
 	forceRotation := v1.HasAnnotation(cr.ObjectMeta, ForceRotationKey)
+
+	// If force rotation is requested but rotation is not configured, ignore the request
+	// This prevents creating retired keys without proper deletion dates
+	if forceRotation && !r.isRotationConfigured(cr) {
+		return false
+	}
 
 	var rotationDue bool
 	if r.isRotationConfigured(cr) && !cr.Status.AtProvider.CreatedDate.IsZero() {
@@ -109,17 +116,23 @@ func deletionDate(base time.Time, r *v1alpha1.RotationParameters) *v1.Time {
 	return internal.Ptr(v1.NewTime(base.Add(r.TTL.Duration - r.Frequency.Duration)))
 }
 
-// validateRotationSettings checks the current rotation configuration and sets
+// ValidateRotationSettings checks the current rotation configuration and sets
 // the rotation status condition accordingly. This provides visibility into
 // whether rotation is enabled, disabled, or has potentially problematic settings.
-func (r *SBKeyRotator) validateRotationSettings(cr *v1alpha1.ServiceBinding) {
+func (r *SBKeyRotator) ValidateRotationSettings(cr *v1alpha1.ServiceBinding) {
+	forceRotation := v1.HasAnnotation(cr.ObjectMeta, ForceRotationKey)
+
 	if !r.isRotationConfigured(cr) {
+		message := "Key rotation is not configured for this service binding"
+		if forceRotation {
+			message += ". Force rotation annotation ignored - rotation parameters required to determine deletion schedule"
+		}
 		cr.Status.SetConditions(xpv1.Condition{
 			Type:               TypeRotationStatus,
 			Status:             corev1.ConditionFalse,
 			LastTransitionTime: v1.Now(),
 			Reason:             "Disabled",
-			Message:            "Key rotation is not configured for this service binding",
+			Message:            message,
 		})
 		return
 	}
