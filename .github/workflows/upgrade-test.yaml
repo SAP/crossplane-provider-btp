@@ -143,3 +143,4 @@ jobs:
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
+          IDP_URL: ${{ secrets.IDP_URL }}
