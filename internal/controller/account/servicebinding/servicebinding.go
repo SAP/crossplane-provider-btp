@@ -251,12 +251,6 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
-	// Block deletion if rotation is in progress (new binding not yet active)
-	btpName := getBtpName(cr)
-	if cr.Status.AtProvider.Name != "" && btpName != cr.Status.AtProvider.Name {
-		return managed.ExternalDelete{}, errors.New("Deletion blocked: service binding not yet active, waiting for it to be ready first.")
-	}
-
 	if err := e.keyRotator.DeleteRetiredKeys(ctx, cr); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
 	}
