@@ -24,7 +24,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.51.0
 	github.com/stretchr/testify v1.11.1
-	github.com/vladimirvivien/gexe v0.4.1
+	github.com/vladimirvivien/gexe v0.5.0
 	golang.org/x/net v0.43.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sync v0.16.0
