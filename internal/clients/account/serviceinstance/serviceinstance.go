@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	ujresource "github.com/crossplane/upjet/pkg/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -62,9 +63,11 @@ func (s *ServiceInstanceMapper) TfResource(ctx context.Context, si *v1alpha1.Ser
 		sInstance.Spec.ForProvider.ServiceplanID = &si.Status.AtProvider.ServiceplanID
 	}
 
-	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
-	condition := si.GetCondition(xpv1.TypeReady)
-	sInstance.SetConditions(condition)
+	// in order for the tf reconciler to properly work we need to mimic the ready and async operation condition as well
+	// the (upjet) tfplugin framework client does not set the async condition as part of its observe operation unlike the default cli client
+	readyCondition := si.GetCondition(xpv1.TypeReady)
+	asyncOperationCondition := si.GetCondition(ujresource.TypeAsyncOperation)
+	sInstance.SetConditions(readyCondition, asyncOperationCondition)
 
 	return sInstance, nil
 }
