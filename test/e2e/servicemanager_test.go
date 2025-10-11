@@ -27,12 +27,13 @@ var (
 )
 
 func TestServiceManagerCreationFlow(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("ServiceManager Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicemanager/create_flow")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = apis.AddToScheme(r.GetScheme())
+				_ = apis.AddToSchemeConcurrent(r.GetScheme())
 
 				sm := v1beta1.ServiceManager{
 					ObjectMeta: metav1.ObjectMeta{Name: smCreateName, Namespace: cfg.Namespace()},
@@ -60,13 +61,13 @@ func TestServiceManagerCreationFlow(t *testing.T) {
 			sm := &v1beta1.ServiceManager{}
 			MustGetResource(t, cfg, smCreateName, nil, sm)
 
-			AwaitResourceDeletionOrFail(ctx, t, cfg, sm, wait.WithTimeout(time.Minute*5))
+			AwaitResourceDeletionOrFail(ctx, t, cfg, sm, wait.WithTimeout(time.Minute*10))
 
 			return ctx
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "servicemanager/create_flow", wait.WithTimeout(time.Minute*5))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "servicemanager/create_flow", wait.WithTimeout(time.Minute*10))
 			return ctx
 		},
 	).Feature()

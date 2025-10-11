@@ -25,12 +25,13 @@ var (
 )
 
 func TestServiceBinding_CreationFlow(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("ServiceBinding Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = apis.AddToScheme(r.GetScheme())
+				_ = apis.AddToSchemeConcurrent(r.GetScheme())
 
 				sb := v1alpha1.ServiceBinding{
 					ObjectMeta: metav1.ObjectMeta{Name: sbCreateName, Namespace: cfg.Namespace()},
@@ -55,13 +56,13 @@ func TestServiceBinding_CreationFlow(t *testing.T) {
 			sb := &v1alpha1.ServiceBinding{}
 			MustGetResource(t, cfg, sbCreateName, nil, sb)
 
-			AwaitResourceDeletionOrFail(ctx, t, cfg, sb, wait.WithTimeout(time.Minute*5))
+			AwaitResourceDeletionOrFail(ctx, t, cfg, sb, wait.WithTimeout(time.Minute*10))
 
 			return ctx
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*5))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*10))
 			return ctx
 		},
 	).Feature()

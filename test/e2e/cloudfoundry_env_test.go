@@ -18,6 +18,7 @@ import (
 )
 
 func TestCloudFoundryEnvironment(t *testing.T) {
+	t.Parallel()
 	var manifestDir = "testdata/crs/cloudfoundry_env"
 
 	crudFeature := features.New("BTP CF Environment Controller").
@@ -25,7 +26,7 @@ func TestCloudFoundryEnvironment(t *testing.T) {
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, manifestDir)
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta.AddToScheme(r.GetScheme())
+				_ = meta.AddToSchemeConcurrent(r.GetScheme())
 				return ctx
 			},
 		).
