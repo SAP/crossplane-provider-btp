@@ -686,7 +686,7 @@ func cleanup() (errs error) {
 	fmt.Println("Successfully deleted Trust Configurations for current build")
 
 	// trying to delete subaccounts and directories of current build
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 30; i++ {
 		fmt.Println("Trying to delete subaccounts and directories of current build... Attempt:", i+1)
 
 		//delete directories for the current build
