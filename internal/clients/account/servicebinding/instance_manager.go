@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -50,7 +49,11 @@ func NewInstanceManager(sbConnector TfConnector, kube client.Client) *InstanceMa
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client create command
 // Returns the instance name, UID, and ExternalCreation for tracking
 func (m *InstanceManager) CreateInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, btpName string) (string, types.UID, managed.ExternalCreation, error) {
-	instanceUID := GenerateInstanceUID(publicCR.UID, btpName)
+	// use a random name once for the creation. Afterwards, the external name sets a
+	// reasonable name. This means that when observing the resource for the first time after
+	// creating, another store for this resource will be created. This will create a dangling
+	// TF workspace, but this way no new name collisions will occur.
+	instanceUID := GenerateInstanceUID(publicCR.UID, GenerateRandomName(btpName))
 
 	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, btpName, instanceUID, "")
 	if err != nil {
@@ -67,17 +70,14 @@ func (m *InstanceManager) CreateInstance(ctx context.Context, publicCR *v1alpha1
 		return "", "", managed.ExternalCreation{}, errors.Wrap(err, errCreateTfResource)
 	}
 
-	return btpName, instanceUID, creation, nil
+	return meta.GetExternalName(subaccountBinding), instanceUID, creation, nil
 }
 
 // DeleteInstance deletes a the actual service binding instance in the BTP. This is done by deleting the virtual SubaccountServiceBinding CR (the TF CR)
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client delete command
 func (m *InstanceManager) DeleteInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalDelete, error) {
-	log := log.FromContext(ctx)
 
-	log.Info("DELETE_INSTANCE: Now deleting a service binding", "targetName", targetName, "targetExternalName", targetExternalName)
-
-	targetUID := GenerateInstanceUID(publicCR.UID, targetName)
+	targetUID := GenerateInstanceUID(publicCR.UID, targetExternalName)
 	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
 	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errBuildTfResource)
@@ -96,15 +96,13 @@ func (m *InstanceManager) DeleteInstance(ctx context.Context, publicCR *v1alpha1
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteTfResource)
 	}
 
-	log.Info("DELETE_INSTANCE: finished deleting a service binding", "targetName", targetName, "targetExternalName", targetExternalName)
-
 	return deletion, nil
 }
 
 // UpdateInstance updates a service binding instance with a different name and UID
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client update command
 func (m *InstanceManager) UpdateInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalUpdate, error) {
-	targetUID := GenerateInstanceUID(publicCR.UID, targetName)
+	targetUID := GenerateInstanceUID(publicCR.UID, targetExternalName)
 	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errBuildTfResource)
@@ -122,7 +120,7 @@ func (m *InstanceManager) UpdateInstance(ctx context.Context, publicCR *v1alpha1
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client observe command
 // Returns the observation and the TF resource for data extraction
 func (m *InstanceManager) ObserveInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
-	targetUID := GenerateInstanceUID(publicCR.UID, targetName)
+	targetUID := GenerateInstanceUID(publicCR.UID, targetExternalName)
 	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
 	if err != nil {
 		return managed.ExternalObservation{}, nil, errors.Wrap(err, errBuildTfResource)
@@ -136,10 +134,6 @@ func (m *InstanceManager) ObserveInstance(ctx context.Context, publicCR *v1alpha
 	observation, err := tfController.Observe(ctx, subaccountBinding)
 	if err != nil {
 		return managed.ExternalObservation{}, nil, errors.Wrap(err, errObserveTfResource)
-	}
-
-	if observation.ResourceExists && observation.ResourceUpToDate {
-		publicCR.SetConditions(xpv1.Available())
 	}
 
 	return observation, subaccountBinding, nil
