@@ -11,7 +11,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -52,6 +51,7 @@ var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube clie
 	uErr := kube.Status().Update(ctx, si)
 
 	return errors.Wrap(uErr, errObserveSaveBinding)
+	// return nil
 }
 
 type connector struct {
@@ -106,12 +106,6 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-// DeleteInstance implements the InstanceDeleter interface for the key rotator
-func (e *external) DeleteInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
-	_, err := e.instanceManager.DeleteInstance(ctx, cr, targetName, targetExternalName)
-	return err
-}
-
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
@@ -120,7 +114,12 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	btpName := getBtpName(cr)
 
-	observation, tfResource, err := e.instanceManager.ObserveInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
+	// During the first rotation, the btpName may be empty. Using the forProvider.Name as a placeholder
+	if btpName == "" {
+		btpName = cr.Spec.ForProvider.Name
+	}
+
+	observation, tfResource, err := e.instanceManager.ObserveInstance(ctx, cr, btpName, meta.GetExternalName(cr))
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
 	}
@@ -130,7 +129,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return observation, nil
 	}
 
-	if observation.ResourceUpToDate && tfResource != nil && internal.Val(tfResource.Status.AtProvider.State) == "succeeded" {
+	if observation.ResourceUpToDate && tfResource != nil {
 		if err := e.updateServiceBindingFromTfResource(cr, tfResource); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, errObserveSaveBinding)
 		}
@@ -152,11 +151,18 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Retire binding conditionally
 	if !e.keyRotator.RetireBinding(cr) {
+		if !cr.GetDeletionTimestamp().IsZero() {
+			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
+		}
 		return observation, nil
 	}
 
 	if err := e.kube.Status().Update(ctx, cr); err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
+	}
+
+	if !cr.GetDeletionTimestamp().IsZero() {
+		return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 	}
 	return managed.ExternalObservation{ResourceExists: false}, nil
 }
@@ -176,23 +182,18 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	} else {
 		btpName = cr.Spec.ForProvider.Name
 	}
-	cr.Spec.BtpName = &btpName
 
-	_, _, creation, err := e.instanceManager.CreateInstance(ctx, cr, *cr.Spec.BtpName)
+	externalName, _, creation, err := e.instanceManager.CreateInstance(ctx, cr, btpName)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
-	// Update both spec and status in a single call to avoid version conflicts
-	if err := e.kube.Update(ctx, cr); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
-	}
-
+	meta.SetExternalName(cr, externalName)
 	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
 
-	creation.ConnectionDetails, err = flattenSecretData(creation.ConnectionDetails)
-	if err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errFlattenSecret)
+	// Call the kube client to update the external-name and force-rotation annotations
+	if err := e.kube.Update(ctx, cr); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
 	return creation, nil
@@ -209,7 +210,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !e.keyRotator.IsCurrentBindingRetired(cr) {
 		btpName := getBtpName(cr)
 
-		update, err := e.instanceManager.UpdateInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
+		update, err := e.instanceManager.UpdateInstance(ctx, cr, btpName, meta.GetExternalName(cr))
 		if err != nil {
 			return managed.ExternalUpdate{}, err
 		}
@@ -241,6 +242,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotServiceBinding)
 	}
+
 	cr.SetConditions(xpv1.Deleting())
 
 	// Set resource usage conditions to check dependencies
@@ -255,12 +257,18 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
 	}
 
-	deletion, err := e.instanceManager.DeleteInstance(ctx, cr, cr.Status.AtProvider.Name, cr.Status.AtProvider.ID)
+	deletion, err := e.instanceManager.DeleteInstance(ctx, cr, cr.Status.AtProvider.Name, meta.GetExternalName(cr))
 	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
 
 	return deletion, nil
+}
+
+// DeleteInstance implements the InstanceDeleter interface for the key rotator
+func (e *external) DeleteInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
+	_, err := e.instanceManager.DeleteInstance(ctx, cr, targetName, targetExternalName)
+	return err
 }
 
 // isRotationEnabled checks if rotation is currently enabled for the service binding
@@ -278,17 +286,14 @@ func (e *external) isRotationEnabled(cr *v1alpha1.ServiceBinding) bool {
 
 // getBtpName returns the btpName from spec, falling back to name for backward compatibility
 func getBtpName(cr *v1alpha1.ServiceBinding) string {
-	if cr.Spec.BtpName != nil {
-		return *cr.Spec.BtpName
-	}
-	return cr.Spec.ForProvider.Name
+	return cr.Status.AtProvider.Name
 }
 
 // updateServiceBindingFromTfResource extracts data from SubaccountServiceBinding and updates the public ServiceBinding CR
 func (e *external) updateServiceBindingFromTfResource(publicCR *v1alpha1.ServiceBinding, tfResource *v1alpha1.SubaccountServiceBinding) error {
 	meta.SetExternalName(publicCR, meta.GetExternalName(tfResource))
 
-	var createdDate *v1.Time = nil
+	var createdDate *metav1.Time = nil
 	if tfResource.Status.AtProvider.CreatedDate != nil {
 		// The date is in the iso8601 format, which is not the same as the RFC3339 format the parameter claims to have
 		cd, err := parseIso8601Date(*tfResource.Status.AtProvider.CreatedDate)
@@ -298,7 +303,8 @@ func (e *external) updateServiceBindingFromTfResource(publicCR *v1alpha1.Service
 
 		createdDate = &cd
 	}
-	var lastModified *v1.Time = nil
+
+	var lastModified *metav1.Time = nil
 	if tfResource.Status.AtProvider.LastModified != nil {
 		// The date is in the iso8601 format, which is not the same as the RFC3339 format the parameter claims to have
 		lm, err := parseIso8601Date(*tfResource.Status.AtProvider.LastModified)
@@ -317,16 +323,20 @@ func (e *external) updateServiceBindingFromTfResource(publicCR *v1alpha1.Service
 	publicCR.Status.AtProvider.LastModified = lastModified
 	publicCR.Status.AtProvider.Parameters = tfResource.Status.AtProvider.Parameters
 
+	if *tfResource.Status.AtProvider.State == "succeeded" {
+		publicCR.SetConditions(xpv1.Available())
+	}
+
 	return nil
 }
 
-func parseIso8601Date(t string) (v1.Time, error) {
+func parseIso8601Date(t string) (metav1.Time, error) {
 	iTime, err := time.Parse(iso8601Date, t)
 	if err != nil {
-		return v1.Time{}, err
+		return metav1.Time{}, err
 	}
 
-	return v1.Time{
+	return metav1.Time{
 		Time: iTime,
 	}, nil
 }
