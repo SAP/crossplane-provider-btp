@@ -74,96 +74,96 @@ jobs:
         run: | 
           echo "Test names: ${{ steps.set-matrix.outputs.test-names }}"
 
-  # e2e-test:
-  #   runs-on: ubuntu-latest
-  #   needs: prepare-matrix
-  #   environment: ${{ inputs.environment }}
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       testName: ${{ fromJson(needs.prepare-matrix.outputs.test-names) }}
-  #   steps:
-  #     - name: checkout repo
-  #       uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
-  #       with:
-  #         #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
-  #         ref: ${{ inputs.checkout-ref }}
-  #         submodules: true
+  e2e-test:
+    runs-on: ubuntu-latest
+    needs: prepare-matrix
+    environment: ${{ inputs.environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        testName: ${{ fromJson(needs.prepare-matrix.outputs.test-names) }}
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
+          ref: ${{ inputs.checkout-ref }}
+          submodules: true
 
-  #     - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-  #       with:
-  #         go-version: '1.21'
-  #     - run: go version
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: '1.21'
+      - run: go version
 
-  #     - name: Install Helm
-  #       run: |
-  #         curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-  #         sudo apt-get install apt-transport-https --yes
-  #         echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-  #         sudo apt-get update
-  #         sudo apt-get install -y helm
+      - name: Install Helm
+        run: |
+          curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+          sudo apt-get install apt-transport-https --yes
+          echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+          sudo apt-get update
+          sudo apt-get install -y helm
 
-  #     - name: Install BTP CLI
-  #     #hardcoded version
-  #       run: |
-  #         curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-  #         tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
-  #         cd linux-amd64
-  #         mv btp /usr/local/bin
+      - name: Install BTP CLI
+      #hardcoded version
+        run: |
+          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+          cd linux-amd64
+          mv btp /usr/local/bin
 
-  #     - name: Set BUILD_ID
-  #       run: |
-  #         echo "BUILD_ID=${{github.run_number}}" >> $GITHUB_ENV
+      - name: Set BUILD_ID
+        run: |
+          echo "BUILD_ID=${{github.run_number}}" >> $GITHUB_ENV
 
-  #     - name: Install gettext for envsubst
-  #       run: sudo apt-get update && sudo apt-get install -y gettext
+      - name: Install gettext for envsubst
+        run: sudo apt-get update && sudo apt-get install -y gettext
 
-  #     - name: Run e2e test
-  #       timeout-minutes: 120
-  #       run: |
-  #         make test-e2e-long testFilter=${{ matrix.testName }}
-  #       env:
-  #         BUILD_ID: ${{ env.BUILD_ID }}
-  #         CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
-  #         BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
-  #         CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
-  #         GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
-  #         TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
-  #         SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
-  #         IDP_URL: ${{ secrets.IDP_URL }}
+      - name: Run e2e test
+        timeout-minutes: 120
+        run: |
+          make test-e2e-long testFilter=${{ matrix.testName }}
+        env:
+          BUILD_ID: ${{ env.BUILD_ID }}
+          CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
+          BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
+          CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
+          GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
+          TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
+          SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
+          IDP_URL: ${{ secrets.IDP_URL }}
 
-  # cleanup-e2e:
-  #   runs-on: ubuntu-latest
-  #   needs: e2e-test
-  #   if: always()
-  #   environment: ${{ inputs.environment }}
-  #   steps:
-  #     - name: checkout repo
-  #       uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
-  #       with:
-  #         ref: ${{ inputs.checkout-ref }}
-  #         submodules: true
+  cleanup-e2e:
+    runs-on: ubuntu-latest
+    needs: e2e-test
+    if: always()
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        with:
+          ref: ${{ inputs.checkout-ref }}
+          submodules: true
 
-  #     - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
-  #       with:
-  #         go-version: '1.21'
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version: '1.21'
 
-  #     - name: Install BTP CLI
-  #       run: |
-  #         curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-  #         tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
-  #         cd linux-amd64
-  #         mv btp /usr/local/bin
+      - name: Install BTP CLI
+        run: |
+          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+          cd linux-amd64
+          mv btp /usr/local/bin
 
-  #     - name: Set BUILD_ID
-  #       run: echo "BUILD_ID=${{ github.run_number }}" >> $GITHUB_ENV
+      - name: Set BUILD_ID
+        run: echo "BUILD_ID=${{ github.run_number }}" >> $GITHUB_ENV
 
-  #     - name: clean up cluster
-  #       run: |
-  #         go run .github/workflows/cleanup.go
-  #       env:
-  #         BUILD_ID: ${{ env.BUILD_ID }}
-  #         CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
-  #         BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
-  #         CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
-  #         GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
+      - name: clean up cluster
+        run: |
+          go run .github/workflows/cleanup.go
+        env:
+          BUILD_ID: ${{ env.BUILD_ID }}
+          CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
+          BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
+          CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
+          GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
