@@ -64,16 +64,11 @@ jobs:
         with:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
-          submodules: true
-
-      - name: Get test names
-        run: |
-          make list-e2e-tests
           
       - name: Set matrix with test names
         id: set-matrix
         run: |
-          TEST_NAMES=$(grep -r --include='**_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/e2e | sed 's/func //;s/(t \*testing.T)//' | jq -R . | jq -s .)
+          TEST_NAMES=$(grep -rh --include='**_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/e2e | sed 's/func //;s/(t \*testing.T)//' | jq -R . | jq -s .)
           echo "test-names=${TEST_NAMES}" >> $GITHUB_OUTPUT
 
       - name: Print test names
