@@ -74,20 +74,17 @@ jobs:
       - name: Get test names
         id: set-matrix
         run: |
-          cd test/e2e
-          # 1. `go test -list . -tags=e2e`: Lists all tests in the current directory with the 'e2e' build tag.
-          # 2. `grep '^Test'`: Filters for lines that are test names.
-          # 3. `jq -R . | jq -s .`: Converts the list of test names into a JSON array.
-          echo "test-names=$(go test -list . -tags=e2e | grep '^Test' | jq -R . | jq -s .)" >> $GITHUB_OUTPUT
+          make list-e2e-tests
+          
+      - name: Set matrix output
+        id: set-matrix
+        run: |
+          TEST_NAMES=$(cat list-tests.txt | grep '^Test' | jq -R . | jq -s .)
+          echo "test-names=${TEST_NAMES}" >> $GITHUB_OUTPUT
 
       - name: Print test names
-        run: |
-          echo "Found tests: ${{ steps.set-matrix.outputs.test-names }}"
-
-      - name: Original go test list output
-        run: |
-          cd test/e2e
-          go test -list . -tags=e2e
+        run: | 
+          echo "Test names: ${{ steps.set-matrix.outputs.test-names }}"
 
   # e2e-test:
   #   runs-on: ubuntu-latest
