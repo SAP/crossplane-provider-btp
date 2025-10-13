@@ -68,7 +68,7 @@ jobs:
       - name: Set matrix with test names
         id: set-matrix
         run: |
-          echo "test-names=$(grep -rh --include='**_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/e2e | sed 's/func //;s/(t \*testing.T)//' | jq -R . | jq -s .)" >> $GITHUB_OUTPUT
+          echo "test-names=$(grep -rh --include='**_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/e2e | sed 's/func //;s/(t \*testing.T)//' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
 
       - name: Print test names
         run: | 
