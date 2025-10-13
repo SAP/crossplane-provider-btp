@@ -72,7 +72,6 @@ jobs:
       - run: go version
 
       - name: Get test names
-        id: set-matrix
         run: |
           make list-e2e-tests
           
