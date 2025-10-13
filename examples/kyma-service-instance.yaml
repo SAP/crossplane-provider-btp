@@ -1,0 +1,15 @@
+# KymaServiceInstance Examples
+
+⚠️ **Experimental Feature** - Work in Progress
+
+Examples for using KymaServiceInstance will be added here.
+
+See PR #[PR_NUMBER] for implementation status.
+EOF
+
+git add examples/kymaserviceinstance/
+git commit -m "feat: Add KymaServiceInstance example structure
+
+Placeholder for upcoming KymaServiceInstance examples.
+
+Related to #271"
