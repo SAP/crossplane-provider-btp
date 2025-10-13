@@ -1,0 +1,38 @@
+{
+  "name": "SAP BTP Provider Dev",
+  "image": "mcr.microsoft.com/devcontainers/go:1.21-bullseye",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "helm": "latest",
+      "minikube": "none"
+    },
+    "ghcr.io/devcontainers/features/terraform:1": {
+      "version": "latest",
+      "tflint": "latest",
+      "terragrunt": "none"
+    }
+  },
+  "postStartCommand": "bash .devcontainer/setup.sh",
+  
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "redhat.vscode-yaml",
+        "hashicorp.terraform",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "go.toolsManagement.checkForUpdates": "local",
+        "go.useLanguageServer": true,
+        "terraform.languageServer.enable": true
+      }
+    }
+  },
+  
+  "remoteUser": "vscode"
+}
