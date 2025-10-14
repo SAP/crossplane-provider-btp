@@ -4,12 +4,7 @@
 
 Examples for using KymaServiceInstance will be added here.
 
-See PR #[PR_NUMBER] for implementation status.
-EOF
+See PR #366
 
-git add examples/kymaserviceinstance/
-git commit -m "feat: Add KymaServiceInstance example structure
-
-Placeholder for upcoming KymaServiceInstance examples.
 
 Related to #271"
