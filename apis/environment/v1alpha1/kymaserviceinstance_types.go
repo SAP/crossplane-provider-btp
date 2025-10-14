@@ -55,7 +55,6 @@ type KymaServiceInstanceSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 	ForProvider       KymaServiceInstanceParameters `json:"forProvider"`
 
-	// ADD THIS ENTIRE BLOCK HERE (before KymaEnvironmentBindingRef):
 	// +crossplane:generate:reference:type=KymaEnvironmentBinding
 	// +crossplane:generate:reference:refFieldName=KymaEnvironmentBindingRef
 	// +crossplane:generate:reference:selectorFieldName=KymaEnvironmentBindingSelector
