@@ -36,7 +36,6 @@ type KymaServiceInstanceParameters struct {
 	// Service configuration parameters (inline JSON/YAML).
 	// These are typically merged with values discovered or from secrets by the controller.
 	// +kubebuilder:pruning:PreserveUnknownFields
-	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Optional
 	Parameters *runtime.RawExtension `json:"parameters,omitempty"`
 }
