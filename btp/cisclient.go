@@ -493,9 +493,14 @@ func (c *Client) GetCFEnvironmentByNameAndOrg(
 	if err != nil {
 		return nil, err
 	}
+
 	for _, instance := range envInstances {
 		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
 			continue
+		}
+		if instance.Id != nil && *instance.Id == instanceName {
+			environmentInstance = &instance
+			break
 		}
 
 		var parameters string
