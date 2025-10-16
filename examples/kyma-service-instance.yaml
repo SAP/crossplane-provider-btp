@@ -1,10 +1,16 @@
-# KymaServiceInstance Examples
-
-⚠️ **Experimental Feature** - Work in Progress
-
-Examples for using KymaServiceInstance will be added here.
-
-See PR #366
-
-
-Related to #271"
+# examples/kymaserviceinstance.yaml
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: KymaServiceInstance
+metadata:
+  name: test-destination-service
+spec:
+  kymaEnvironmentBindingRef:
+    name: test-kyma-binding  
+  forProvider:
+    name: destination-service
+    namespace: default
+    serviceOfferingName: destination
+    servicePlanName: lite
+    externalName: my-test-destination
+  providerConfigRef:
+    name: account-provider-config
