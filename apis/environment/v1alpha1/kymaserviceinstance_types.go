@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // KymaServiceInstanceParameters are the configurable fields of a KymaServiceInstance.
@@ -43,7 +44,7 @@ type KymaServiceInstanceParameters struct {
 // KymaServiceInstanceObservation are the observable fields of a KymaServiceInstance.
 type KymaServiceInstanceObservation struct {
 	// Ready status from Kyma ServiceInstance
-	Ready bool `json:"ready,omitempty"`
+	Ready corev1.ConditionStatus `json:"ready,omitempty"`
 
 	// Instance ID from BTP
 	InstanceID string `json:"instanceID,omitempty"`

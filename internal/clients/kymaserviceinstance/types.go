@@ -1,6 +1,7 @@
 package kymaserviceinstance
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -21,7 +22,7 @@ type ServiceInstanceSpec struct {
 }
 
 type ServiceInstanceStatus struct {
-	Ready      bool   `json:"ready"`
-	InstanceID string `json:"instanceID,omitempty"`
+	Ready      corev1.ConditionStatus `json:"ready"`
+	InstanceID string                 `json:"instanceID,omitempty"`
 	// ... more fields
 }

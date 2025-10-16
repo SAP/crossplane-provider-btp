@@ -12,6 +12,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymaserviceinstance"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -102,7 +103,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.Status.AtProvider = *observation
 
 	// Set conditions
-	if observation.Ready {
+	if observation.Ready == corev1.ConditionTrue {
 		cr.SetConditions(xpv1.Available())
 	} else {
 		cr.SetConditions(xpv1.Creating())

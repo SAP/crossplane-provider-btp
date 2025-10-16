@@ -19,8 +19,7 @@ const (
 	errKubeconfigExpired   = "kubeconfig has expired"
 
 	// Layout for parsing expiration time from secret
-	// Format: "2006-01-02T15:04:05Z07:00" (ISO 8601)
-	kymaExpirationLayout = time.RFC3339
+	kymaExpirationLayout = "2006-01-02 15:04:05 -0700 MST"
 )
 
 // SecretFetcher fetches and validates kubeconfig from KymaEnvironmentBinding secrets
