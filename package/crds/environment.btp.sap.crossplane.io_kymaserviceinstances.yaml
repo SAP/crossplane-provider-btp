@@ -367,7 +367,7 @@ spec:
                     type: string
                   ready:
                     description: Ready status from Kyma ServiceInstance
-                    type: boolean
+                    type: string
                 type: object
               conditions:
                 description: Conditions of the resource.
