@@ -161,6 +161,11 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 	return nil
 }
 
+// TfResourceExternalName returns the external name of the wrapped terraform resource once the async creation is done
+func (t *TfProxyController[UPJETTED]) TfResourceExternalName() string {
+	return meta.GetExternalName(t.tfResource)
+}
+
 func (t *TfProxyController[UPJETTED]) Create(ctx context.Context) error {
 	_, err := t.tfClient.Create(ctx, t.tfResource)
 	return err

@@ -162,7 +162,6 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
 	}
-
 	switch status {
 	case tfClient.NotExisting:
 		return managed.ExternalObservation{ResourceExists: false}, nil

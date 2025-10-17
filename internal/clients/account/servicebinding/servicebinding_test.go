@@ -1,8 +1,7 @@
-package serviceinstanceclient
+package servicebindingclient
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -10,6 +9,7 @@ import (
 	"github.com/crossplane/upjet/pkg/resource"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	corev1 "k8s.io/api/core/v1"
@@ -33,12 +33,12 @@ var (
 func TestTfResource(t *testing.T) {
 
 	type args struct {
-		si   *v1alpha1.ServiceInstance
+		si   *v1alpha1.ServiceBinding
 		kube client.Client
 	}
 
 	type want struct {
-		tfResource *v1alpha1.SubaccountServiceInstance
+		tfResource *v1alpha1.SubaccountServiceBinding
 		hasErr     bool
 	}
 
@@ -48,9 +48,9 @@ func TestTfResource(t *testing.T) {
 		want   want
 	}{
 		"Corrupted parameters": {
-			reason: "Throw error if parameters are neither valid as json nor yaml",
+			reason: "Throw error if are neither valid as json nor yaml",
 			args: args{
-				si: expectedServiceInstance(withParameters(`{invalid}`)),
+				si: expectedServiceBinding(withParameters(`{invalid}`)),
 			},
 			want: want{
 				hasErr: true,
@@ -59,14 +59,14 @@ func TestTfResource(t *testing.T) {
 		"Not set parameters": {
 			reason: "Gracefully handle unset parameters",
 			args: args{
-				si: expectedServiceInstance(
+				si: expectedServiceBinding(
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
 				),
 			},
 			want: want{
-				tfResource: expectedTfSerivceInstance(
+				tfResource: expectedTfServiceBinding(
 					withTfParameters(`{}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
@@ -79,7 +79,7 @@ func TestTfResource(t *testing.T) {
 		"Simply parameters mapping": {
 			reason: "Transfer json parameters from spec to tf resource if valid",
 			args: args{
-				si: expectedServiceInstance(
+				si: expectedServiceBinding(
 					withParameters(`{"key": "value"}`),
 					withExternalName("123"),
 					withProviderConfigRef("default"),
@@ -87,7 +87,7 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 			want: want{
-				tfResource: expectedTfSerivceInstance(
+				tfResource: expectedTfServiceBinding(
 					withTfParameters(`{"key":"value"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
@@ -100,7 +100,7 @@ func TestTfResource(t *testing.T) {
 		"Simply yaml parameters mapping": {
 			reason: "Transfer yaml parameters from spec to tf resource if valid",
 			args: args{
-				si: expectedServiceInstance(
+				si: expectedServiceBinding(
 					withParameters(`key: value`),
 					withExternalName("123"),
 					withProviderConfigRef("default"),
@@ -108,7 +108,7 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 			want: want{
-				tfResource: expectedTfSerivceInstance(
+				tfResource: expectedTfServiceBinding(
 					withTfParameters(`{"key":"value"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
@@ -118,34 +118,10 @@ func TestTfResource(t *testing.T) {
 				hasErr: false,
 			},
 		},
-		"Resolved ServicePlanID": {
-			reason: "If no service plan ID is set, it should be resolved from the status",
-			args: args{
-				si: expectedServiceInstance(
-					withExternalName("123"),
-					withProviderConfigRef("default"),
-					withManagementPolicies(),
-					withObservation(v1alpha1.ServiceInstanceObservation{
-						ServiceplanID: "resolved-plan-id",
-					}),
-				),
-			},
-			want: want{
-				tfResource: expectedTfSerivceInstance(
-					withTfParameters(`{}`),
-					withTfExternalName("123"),
-					withTfProviderConfigRef("default"),
-					withTfManagementPolicies(),
-					withTfServicePlanID("resolved-plan-id"),
-					withTfConditions(readyUnknown, asyncUnknown),
-				),
-				hasErr: false,
-			},
-		},
 		"Secret Lookup failed": {
 			reason: "Error should be returned if at least one secret lookup fails",
 			args: args{
-				si: expectedServiceInstance(withParameters(`{"key": "value"}`), withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"})),
+				si: expectedServiceBinding(withParameters(`{"key": "value"}`), withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"})),
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						if key.Name == "secret1" {
@@ -162,16 +138,15 @@ func TestTfResource(t *testing.T) {
 		"Corrupted Secret Parameters": {
 			reason: "Error should be returned if at least one secret is corrupted in its json structure",
 			args: args{
-				si: expectedServiceInstance(withParameters(`{"key": "value"}`), withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"})),
+				si: expectedServiceBinding(withParameters(`{"key": "value"}`), withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"})),
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						s := obj.(*corev1.Secret)
-						switch key.Name {
-						case "secret1":
+						if key.Name == "secret1" {
 							s.Data = map[string][]byte{
 								"secret-key1": []byte(`{"key2": "value2"}`),
 							}
-						case "secret2":
+						} else if key.Name == "secret2" {
 							s.Data = map[string][]byte{
 								"secret-key2": []byte(`{no-json}`),
 							}
@@ -184,11 +159,10 @@ func TestTfResource(t *testing.T) {
 				hasErr: true,
 			},
 		},
-
 		"Successful Combined Parameters mapping": {
 			reason: "Parameters from secret and plain spec should be combined in the tf resource",
 			args: args{
-				si: expectedServiceInstance(
+				si: expectedServiceBinding(
 					withParameters(`{"key": "value"}`),
 					withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"}),
 					withExternalName("123"),
@@ -199,12 +173,11 @@ func TestTfResource(t *testing.T) {
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						s := obj.(*corev1.Secret)
-						switch key.Name {
-						case "secret1":
+						if key.Name == "secret1" {
 							s.Data = map[string][]byte{
 								"secret-key1": []byte(`{"key2": "value2"}`),
 							}
-						case "secret2":
+						} else if key.Name == "secret2" {
 							s.Data = map[string][]byte{
 								"secret-key2": []byte(`{"key3": "value3"}`),
 							}
@@ -215,7 +188,7 @@ func TestTfResource(t *testing.T) {
 			},
 			want: want{
 				hasErr: false,
-				tfResource: expectedTfSerivceInstance(
+				tfResource: expectedTfServiceBinding(
 					withTfParameters(`{"key":"value","key2":"value2","key3":"value3"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
@@ -227,7 +200,7 @@ func TestTfResource(t *testing.T) {
 		"Successful Combined yaml parameters mapping": {
 			reason: "Parameters from secret and plain spec as yaml should be combined in the tf resource",
 			args: args{
-				si: expectedServiceInstance(
+				si: expectedServiceBinding(
 					withParameters(`key: value`),
 					withParameterSecrets(map[string]string{"secret1": "secret-key1", "secret2": "secret-key2"}),
 					withExternalName("123"),
@@ -238,12 +211,11 @@ func TestTfResource(t *testing.T) {
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						s := obj.(*corev1.Secret)
-						switch key.Name {
-						case "secret1":
+						if key.Name == "secret1" {
 							s.Data = map[string][]byte{
 								"secret-key1": []byte(`{"key2": "value2"}`),
 							}
-						case "secret2":
+						} else if key.Name == "secret2" {
 							s.Data = map[string][]byte{
 								"secret-key2": []byte(`{"key3": "value3"}`),
 							}
@@ -254,7 +226,7 @@ func TestTfResource(t *testing.T) {
 			},
 			want: want{
 				hasErr: false,
-				tfResource: expectedTfSerivceInstance(
+				tfResource: expectedTfServiceBinding(
 					withTfParameters(`{"key":"value","key2":"value2","key3":"value3"}`),
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
@@ -266,7 +238,7 @@ func TestTfResource(t *testing.T) {
 		"Recurring Successful Reconciliation": {
 			reason: "Ready state should be preserved during reconciliation",
 			args: args{
-				si: expectedServiceInstance(
+				si: expectedServiceBinding(
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
@@ -275,7 +247,7 @@ func TestTfResource(t *testing.T) {
 			},
 			want: want{
 				hasErr: false,
-				tfResource: expectedTfSerivceInstance(
+				tfResource: expectedTfServiceBinding(
 					withTfExternalName("123"),
 					withTfParameters(`{}`),
 					withTfProviderConfigRef("default"),
@@ -284,21 +256,20 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 		},
-		"TfResource_ManagementPolicies_AlwaysSetToAll": {
-			reason: "ADR: ManagementPolicies on the TfResource must always be '*' regardless of the native CR's policies, so that tf does use refresh instead of import",
+		"Without ManagementPolicies": {
+			reason: "Make sure ManagementPolicies transfered to tf resource",
 			args: args{
-				si: expectedServiceInstance(
+				si: expectedServiceBinding(
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 				),
 			},
 			want: want{
 				hasErr: false,
-				tfResource: expectedTfSerivceInstance(
+				tfResource: expectedTfServiceBinding(
 					withTfExternalName("123"),
 					withTfParameters(`{}`),
 					withTfProviderConfigRef("default"),
-					withTfManagementPolicies(),
 					withTfConditions(readyUnknown, asyncUnknown),
 				),
 			},
@@ -308,12 +279,12 @@ func TestTfResource(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 
-			sim := &ServiceInstanceMapper{}
+			sim := &ServiceBindingMapper{}
 
 			// Call the function under test
 			tfResource, err := sim.TfResource(context.Background(), tc.args.si, tc.args.kube)
 
-			if diff := cmp.Diff(tc.want.tfResource, tfResource, cmpopts.IgnoreFields(v1alpha1.SubaccountServiceInstance{}, "TypeMeta", "ObjectMeta.UID")); diff != "" {
+			if diff := cmp.Diff(tc.want.tfResource, tfResource, cmpopts.IgnoreFields(v1alpha1.SubaccountServiceBinding{}, "TypeMeta", "ObjectMeta.UID")); diff != "" {
 				t.Errorf("TfResource() mismatch (-want +got):\n%s", diff)
 			}
 			// Only check if error presence matches, not the error value itself
@@ -325,9 +296,9 @@ func TestTfResource(t *testing.T) {
 	}
 }
 
-// Helper function to build a complete ServiceInstance CR dynamically
-func expectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.ServiceInstance {
-	cr := &v1alpha1.ServiceInstance{}
+// Helper function to build a complete ServiceBinding CR dynamically
+func expectedServiceBinding(opts ...func(*v1alpha1.ServiceBinding)) *v1alpha1.ServiceBinding {
+	cr := &v1alpha1.ServiceBinding{}
 
 	// Apply each option to modify the CR
 	for _, opt := range opts {
@@ -337,10 +308,9 @@ func expectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.
 	return cr
 }
 
-// Helper function to build a complete SubaccountServiceInstance CR dynamically
-func expectedTfSerivceInstance(opts ...func(*v1alpha1.SubaccountServiceInstance)) *v1alpha1.SubaccountServiceInstance {
-	cr := &v1alpha1.SubaccountServiceInstance{}
-	cr.Name = "TF-"
+// Helper function to build a complete SubaccountServiceBinding CR dynamically
+func expectedTfServiceBinding(opts ...func(*v1alpha1.SubaccountServiceBinding)) *v1alpha1.SubaccountServiceBinding {
+	cr := &v1alpha1.SubaccountServiceBinding{}
 	cr.Spec.ForProvider.Name = internal.Ptr("")
 
 	// Apply each option to modify the CR
@@ -352,8 +322,8 @@ func expectedTfSerivceInstance(opts ...func(*v1alpha1.SubaccountServiceInstance)
 }
 
 // Option to set the external name annotation
-func withExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
+func withExternalName(externalName string) func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
 		if cr.GetAnnotations() == nil {
 			cr.SetAnnotations(map[string]string{})
 		}
@@ -362,8 +332,8 @@ func withExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
 }
 
 // Option to set the external name annotation
-func withTfExternalName(externalName string) func(*v1alpha1.SubaccountServiceInstance) {
-	return func(cr *v1alpha1.SubaccountServiceInstance) {
+func withTfExternalName(externalName string) func(*v1alpha1.SubaccountServiceBinding) {
+	return func(cr *v1alpha1.SubaccountServiceBinding) {
 		if cr.GetAnnotations() == nil {
 			cr.SetAnnotations(map[string]string{})
 		}
@@ -371,64 +341,52 @@ func withTfExternalName(externalName string) func(*v1alpha1.SubaccountServiceIns
 	}
 }
 
-func withProviderConfigRef(providerConfigName string) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Spec.ProviderConfigReference = &xpv1.Reference{
+func withProviderConfigRef(providerConfigName string) func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
+		cr.Spec.ResourceSpec.ProviderConfigReference = &xpv1.Reference{
 			Name: providerConfigName,
 		}
 	}
 }
 
-func withTfProviderConfigRef(providerConfigName string) func(*v1alpha1.SubaccountServiceInstance) {
-	return func(cr *v1alpha1.SubaccountServiceInstance) {
-		cr.Spec.ProviderConfigReference = &xpv1.Reference{
+func withTfProviderConfigRef(providerConfigName string) func(*v1alpha1.SubaccountServiceBinding) {
+	return func(cr *v1alpha1.SubaccountServiceBinding) {
+		cr.Spec.ResourceSpec.ProviderConfigReference = &xpv1.Reference{
 			Name: providerConfigName,
 		}
 	}
 }
 
-func withManagementPolicies() func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Spec.ManagementPolicies = []xpv1.ManagementAction{
+func withManagementPolicies() func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
+		cr.Spec.ResourceSpec.ManagementPolicies = []xpv1.ManagementAction{
 			xpv1.ManagementActionAll,
 		}
 	}
 }
 
-func withTfManagementPolicies() func(*v1alpha1.SubaccountServiceInstance) {
-	return func(cr *v1alpha1.SubaccountServiceInstance) {
-		cr.Spec.ManagementPolicies = []xpv1.ManagementAction{
+func withTfManagementPolicies() func(*v1alpha1.SubaccountServiceBinding) {
+	return func(cr *v1alpha1.SubaccountServiceBinding) {
+		cr.Spec.ResourceSpec.ManagementPolicies = []xpv1.ManagementAction{
 			xpv1.ManagementActionAll,
 		}
 	}
 }
 
-func withParameters(jsonParams string) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Spec.ForProvider.Parameters = runtime.RawExtension{Raw: []byte(jsonParams)}
+func withParameters(specParams string) func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
+		cr.Spec.ForProvider.Parameters = runtime.RawExtension{Raw: []byte(specParams)}
 	}
 }
 
-func withTfParameters(jsonParams string) func(*v1alpha1.SubaccountServiceInstance) {
-	return func(cr *v1alpha1.SubaccountServiceInstance) {
+func withTfParameters(jsonParams string) func(*v1alpha1.SubaccountServiceBinding) {
+	return func(cr *v1alpha1.SubaccountServiceBinding) {
 		cr.Spec.ForProvider.Parameters = &jsonParams
 	}
 }
 
-func withConditions(condition ...xpv1.Condition) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Status.SetConditions(condition...)
-	}
-}
-
-func withTfConditions(condition ...xpv1.Condition) func(*v1alpha1.SubaccountServiceInstance) {
-	return func(cr *v1alpha1.SubaccountServiceInstance) {
-		cr.Status.SetConditions(condition...)
-	}
-}
-
-func withParameterSecrets(parameterSecrets map[string]string) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
+func withParameterSecrets(parameterSecrets map[string]string) func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
 		cr.Spec.ForProvider.ParameterSecretRefs = make([]xpv1.SecretKeySelector, 0)
 		for k, v := range parameterSecrets {
 			cr.Spec.ForProvider.ParameterSecretRefs = append(cr.Spec.ForProvider.ParameterSecretRefs, xpv1.SecretKeySelector{
@@ -441,14 +399,14 @@ func withParameterSecrets(parameterSecrets map[string]string) func(*v1alpha1.Ser
 	}
 }
 
-func withObservation(obs v1alpha1.ServiceInstanceObservation) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Status.AtProvider = obs
+func withConditions(condition ...xpv1.Condition) func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
+		cr.Status.SetConditions(condition...)
 	}
 }
 
-func withTfServicePlanID(servicePlanID string) func(*v1alpha1.SubaccountServiceInstance) {
-	return func(cr *v1alpha1.SubaccountServiceInstance) {
-		cr.Spec.ForProvider.ServiceplanID = &servicePlanID
+func withTfConditions(condition ...xpv1.Condition) func(*v1alpha1.SubaccountServiceBinding) {
+	return func(cr *v1alpha1.SubaccountServiceBinding) {
+		cr.Status.SetConditions(condition...)
 	}
 }
