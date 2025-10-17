@@ -33,8 +33,8 @@ type TfProxyControllerI interface {
 	Create(ctx context.Context) error
 	Update(ctx context.Context) error
 	Delete(ctx context.Context) error
-	// QueryUpdatedData returns the relevant status data once the async creation is done
-	QueryAsyncData(ctx context.Context) *ObservationData
+	// QueryAsyncData returns the full TF resource once the async operation is finished
+	QueryAsyncData(ctx context.Context) interface{}
 	// expose external name of the wrapped resource for syncing native and tfresource
 	// this is a workaround for the missing conditions setting of the terraform plugin framwork external client
 	// compared to the default cli external client
@@ -95,15 +95,11 @@ type TfProxyController[UPJETTED ujresource.Terraformed] struct {
 	tfResource UPJETTED
 }
 
-// QueryUpdatedData returns the relevant status data once the async creation is done
-func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *ObservationData {
+// QueryAsyncData returns the full TF resource once the async operation is finished
+func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) interface{} {
 	// only query the async data if the operation is finished
 	if t.tfResource.GetCondition(ujresource.TypeAsyncOperation).Reason == ujresource.ReasonFinished {
-		sid := &ObservationData{}
-		sid.ID = t.tfResource.GetID()
-		sid.ExternalName = meta.GetExternalName(t.tfResource)
-		sid.Conditions = []xpv1.Condition{xpv1.Available(), ujresource.AsyncOperationFinishedCondition()}
-		return sid
+		return t.tfResource
 	}
 	return nil
 }
