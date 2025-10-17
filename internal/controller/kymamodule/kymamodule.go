@@ -27,10 +27,9 @@ var (
 	errSetupClient                    = "cannot setup KymaModule client"
 	errObserveResource                = "cannot observe KymaModule"
 	errKymaEnvironmentBindingNotFound = "cannot get referenced KymaEnvironmentBinding"
-	errFailedToAddFinalizer           = "failed to add finalizer to KymaModule"
-	errCannotRemoveFinalizer          = "failed to remove finalizer from KymaModule"
+	errFailedToAddFinalizer           = "failed to add finalizer to KymaEnvironmentBinding"
+	errCannotRemoveFinalizer          = "failed to remove finalizer from KymaEnvironmentBinding"
 	errCannotCleanupEnvironment       = "cannot get KymaEnvironmentBinding for cleanup"
-	errCannotUntrackResourceUsage     = "cannot untrack ResourceUsage"
 )
 
 const (
@@ -63,12 +62,26 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotKymaModule)
 	}
 
-	if err := c.usage.Track(ctx, mg); err != nil {
-		return nil, errors.Wrap(err, errTrackPCUsage)
-	}
-
 	if err := c.resourcetracker.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, errTrackRUsage)
+	}
+
+	// Check if binding exists before trying to track it
+	binding := &v1alpha1.KymaEnvironmentBinding{}
+	bindingName := types.NamespacedName{
+		Name:      cr.Spec.KymaEnvironmentBindingRef.Name,
+		Namespace: cr.GetNamespace(),
+	}
+	bindingErr := c.kube.Get(ctx, bindingName, binding)
+	if bindingErr != nil && !kerrors.IsNotFound(bindingErr) {
+		// Unexpected error
+		return nil, errors.Wrap(bindingErr, errKymaEnvironmentBindingNotFound)
+	}
+	// Only track if binding exists
+	if bindingErr == nil {
+		if err := c.usage.Track(ctx, mg); err != nil {
+			return nil, errors.Wrap(err, errTrackPCUsage)
+		}
 	}
 
 	secretfetcher := &SecretFetcher{
@@ -77,7 +90,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	creds, err := secretfetcher.Fetch(ctx, cr)
 
 	if err != nil {
-		return nil, errors.Wrap(err, errSetupClient)
+		return &external{
+			client:        nil, // No client available
+			tracker:       c.resourcetracker,
+			kube:          c.kube,
+			secretfetcher: secretfetcher,
+		}, nil
 	}
 
 	svc, err := c.newServiceFn(creds)
@@ -113,14 +131,20 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errKymaEnvironmentBindingNotFound)
 
 	}
+	// Check if the binding is being deleted
+	if binding.GetDeletionTimestamp() != nil {
+		cr.SetConditions(xpv1.Unavailable().WithMessage(fmt.Sprintf("Referenced Kyma Environment Binding %s is being deleted", binding.Name)))
+		return managed.ExternalObservation{ResourceExists: false}, nil
+
+	}
 	// Add finalizer
-	finalizerName := "finalizer.environment.btp.sap.crossplane.io/kyma-module"
 	if !meta.FinalizerExists(binding, finalizerName) {
 		meta.AddFinalizer(binding, finalizerName)
 		if err := c.kube.Update(ctx, binding); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, errFailedToAddFinalizer)
 		}
 	}
+
 	// Track Resource Usage
 	if err := c.tracker.Track(ctx, cr); err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errTrackRUsage)
@@ -183,13 +207,14 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if cr.Status.AtProvider.State == v1alpha1.ModuleStateDeleting {
 		return managed.ExternalDelete{}, nil
 	}
-
-	err := c.client.DeleteModule(ctx, cr.Spec.ForProvider.Name)
-	if err != nil {
-		return managed.ExternalDelete{}, err
+	if c.client != nil {
+		err := c.client.DeleteModule(ctx, cr.Spec.ForProvider.Name)
+		if err != nil {
+			return managed.ExternalDelete{}, err
+		}
 	}
 
-	// Clean up finalizer
+	// Clean up finalizer from referenced KymaEnvironmentBinding
 
 	binding := &v1alpha1.KymaEnvironmentBinding{}
 	bindingName := types.NamespacedName{
@@ -200,16 +225,15 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	bindingErr := c.kube.Get(ctx, bindingName, binding)
 	if bindingErr == nil {
 		// Binding exists remove finalizer
-		finalizerName := "finalizer.environment.btp.sap.crossplane.io/kyma-module"
 		if meta.FinalizerExists(binding, finalizerName) {
 			meta.RemoveFinalizer(binding, finalizerName)
 			if err := c.kube.Update(ctx, binding); err != nil {
 				return managed.ExternalDelete{}, errors.Wrap(err, errCannotRemoveFinalizer)
 			}
 		}
-	} else if !kerrors.IsNotFound(err) {
+	} else if !kerrors.IsNotFound(bindingErr) {
 		// Unexpected error
-		return managed.ExternalDelete{}, errors.Wrap(err, errCannotCleanupEnvironment)
+		return managed.ExternalDelete{}, errors.Wrap(bindingErr, errCannotCleanupEnvironment)
 	}
 
 	return managed.ExternalDelete{}, nil
