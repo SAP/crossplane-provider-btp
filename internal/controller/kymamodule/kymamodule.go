@@ -2,6 +2,7 @@ package kymamodule
 
 import (
 	"context"
+	"fmt"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 
@@ -15,14 +16,25 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
-	errNotKymaModule   = "managed resource is not a KymaModule custom resource"
-	errTrackPCUsage    = "cannot track ProviderConfig usage"
-	errTrackRUsage     = "cannot track ResourceUsage"
-	errSetupClient     = "cannot setup KymaModule client"
-	errObserveResource = "cannot observe KymaModule"
+	errNotKymaModule                  = "managed resource is not a KymaModule custom resource"
+	errTrackPCUsage                   = "cannot track ProviderConfig usage"
+	errTrackRUsage                    = "cannot track ResourceUsage"
+	errSetupClient                    = "cannot setup KymaModule client"
+	errObserveResource                = "cannot observe KymaModule"
+	errKymaEnvironmentBindingNotFound = "cannot get referenced KymaEnvironmentBinding"
+	errFailedToAddFinalizer           = "failed to add finalizer to KymaModule"
+	errCannotRemoveFinalizer          = "failed to remove finalizer from KymaModule"
+	errCannotCleanupEnvironment       = "cannot get KymaEnvironmentBinding for cleanup"
+	errCannotUntrackResourceUsage     = "cannot untrack ResourceUsage"
+)
+
+const (
+	finalizerName = "finalizer.kymamodule.module.btp.sap.crossplane.io"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -85,6 +97,34 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotKymaModule)
 	}
+	// Get the reference for the kyma environment binding
+	binding := &v1alpha1.KymaEnvironmentBinding{}
+	bindingName := types.NamespacedName{
+		Name:      cr.Spec.KymaEnvironmentBindingRef.Name,
+		Namespace: cr.GetNamespace(),
+	}
+
+	if err := c.kube.Get(ctx, bindingName, binding); err != nil {
+		if kerrors.IsNotFound(err) {
+			// Reference is gone - can't be processed
+			cr.SetConditions(xpv1.Unavailable().WithMessage(fmt.Sprintf("Referenced Kyma Environment Binding %s doesn't exist", binding.Name)))
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errKymaEnvironmentBindingNotFound)
+
+	}
+	// Add finalizer
+	finalizerName := "finalizer.environment.btp.sap.crossplane.io/kyma-module"
+	if !meta.FinalizerExists(binding, finalizerName) {
+		meta.AddFinalizer(binding, finalizerName)
+		if err := c.kube.Update(ctx, binding); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errFailedToAddFinalizer)
+		}
+	}
+	// Track Resource Usage
+	if err := c.tracker.Track(ctx, cr); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errTrackRUsage)
+	}
 
 	res, err := c.client.ObserveModule(ctx, cr)
 	if err != nil {
@@ -145,6 +185,32 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	err := c.client.DeleteModule(ctx, cr.Spec.ForProvider.Name)
+	if err != nil {
+		return managed.ExternalDelete{}, err
+	}
 
-	return managed.ExternalDelete{}, err
+	// Clean up finalizer
+
+	binding := &v1alpha1.KymaEnvironmentBinding{}
+	bindingName := types.NamespacedName{
+		Name:      cr.Spec.KymaEnvironmentBindingRef.Name,
+		Namespace: cr.GetNamespace(),
+	}
+
+	bindingErr := c.kube.Get(ctx, bindingName, binding)
+	if bindingErr == nil {
+		// Binding exists remove finalizer
+		finalizerName := "finalizer.environment.btp.sap.crossplane.io/kyma-module"
+		if meta.FinalizerExists(binding, finalizerName) {
+			meta.RemoveFinalizer(binding, finalizerName)
+			if err := c.kube.Update(ctx, binding); err != nil {
+				return managed.ExternalDelete{}, errors.Wrap(err, errCannotRemoveFinalizer)
+			}
+		}
+	} else if !kerrors.IsNotFound(err) {
+		// Unexpected error
+		return managed.ExternalDelete{}, errors.Wrap(err, errCannotCleanupEnvironment)
+	}
+
+	return managed.ExternalDelete{}, nil
 }
