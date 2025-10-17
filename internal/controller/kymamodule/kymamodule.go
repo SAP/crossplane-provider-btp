@@ -2,6 +2,7 @@ package kymamodule
 
 import (
 	"context"
+	"fmt"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 
@@ -15,14 +16,17 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
-	errNotKymaModule   = "managed resource is not a KymaModule custom resource"
-	errTrackPCUsage    = "cannot track ProviderConfig usage"
-	errTrackRUsage     = "cannot track ResourceUsage"
-	errSetupClient     = "cannot setup KymaModule client"
-	errObserveResource = "cannot observe KymaModule"
+	errNotKymaModule                  = "managed resource is not a KymaModule custom resource"
+	errTrackPCUsage                   = "cannot track ProviderConfig usage"
+	errTrackRUsage                    = "cannot track ResourceUsage"
+	errSetupClient                    = "cannot setup KymaModule client"
+	errObserveResource                = "cannot observe KymaModule"
+	errKymaEnvironmentBindingNotFound = "cannot get referenced KymaEnvironmentBinding"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -44,19 +48,33 @@ type external struct {
 	secretfetcher SecretFetcherInterface
 }
 
-// This methods connects to the Kyma cluster using the kubeconfig from the KymaEnvironmentBinding
+// Connect connects to the Kyma cluster using the kubeconfig from the KymaEnvironmentBinding
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 	cr, ok := mg.(*v1alpha1.KymaModule)
 	if !ok {
 		return nil, errors.New(errNotKymaModule)
 	}
 
-	if err := c.usage.Track(ctx, mg); err != nil {
-		return nil, errors.Wrap(err, errTrackPCUsage)
-	}
-
 	if err := c.resourcetracker.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, errTrackRUsage)
+	}
+
+	// Check if binding exists before trying to track it
+	binding := &v1alpha1.KymaEnvironmentBinding{}
+	bindingName := types.NamespacedName{
+		Name:      cr.Spec.KymaEnvironmentBindingRef.Name,
+		Namespace: cr.GetNamespace(),
+	}
+	bindingErr := c.kube.Get(ctx, bindingName, binding)
+	if bindingErr != nil && !kerrors.IsNotFound(bindingErr) {
+		// Unexpected error
+		return nil, errors.Wrap(bindingErr, errKymaEnvironmentBindingNotFound)
+	}
+	// Only track if binding exists
+	if bindingErr == nil {
+		if err := c.usage.Track(ctx, mg); err != nil {
+			return nil, errors.Wrap(err, errTrackPCUsage)
+		}
 	}
 
 	secretfetcher := &SecretFetcher{
@@ -65,7 +83,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	creds, err := secretfetcher.Fetch(ctx, cr)
 
 	if err != nil {
-		return nil, errors.Wrap(err, errSetupClient)
+		return &external{
+			client:        nil, // No client available
+			tracker:       c.resourcetracker,
+			kube:          c.kube,
+			secretfetcher: secretfetcher,
+		}, nil
 	}
 
 	svc, err := c.newServiceFn(creds)
@@ -84,6 +107,34 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr, ok := mg.(*v1alpha1.KymaModule)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotKymaModule)
+	}
+
+	// Get the reference for the kyma environment binding
+	binding := &v1alpha1.KymaEnvironmentBinding{}
+	bindingName := types.NamespacedName{
+		Name:      cr.Spec.KymaEnvironmentBindingRef.Name,
+		Namespace: cr.GetNamespace(),
+	}
+
+	if err := c.kube.Get(ctx, bindingName, binding); err != nil {
+		if kerrors.IsNotFound(err) {
+			// Reference is gone - can't be processed
+			cr.SetConditions(xpv1.Unavailable().WithMessage(fmt.Sprintf("Referenced KymaEnvironmentBinding %s doesn't exist", binding.Name)))
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errKymaEnvironmentBindingNotFound)
+	}
+
+	// Check if the binding is being deleted
+	if binding.GetDeletionTimestamp() != nil {
+		cr.SetConditions(xpv1.ReconcileSuccess().WithMessage(
+			"KymaEnvironmentBinding is pending deletion. Delete this KymaModule to allow binding deletion.",
+		))
+	}
+
+	// Track Resource Usage - Crossplane will automatically prevent binding deletion
+	if err := c.tracker.Track(ctx, cr); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errTrackRUsage)
 	}
 
 	res, err := c.client.ObserveModule(ctx, cr)
@@ -106,7 +157,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 // Disconnect is a no-op for the external client to close its connection.
-// Since we dont need this, we only have it to fullfil the interface.
+// Since we dont need this, we only have it to fulfill the interface.
 func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
@@ -130,7 +181,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-
 	return managed.ExternalUpdate{}, errors.New("Update is not implemented - should not be called, only create")
 }
 
@@ -144,7 +194,16 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, nil
 	}
 
-	err := c.client.DeleteModule(ctx, cr.Spec.ForProvider.Name)
+	// Delete the module from Kyma cluster
+	if c.client != nil {
+		err := c.client.DeleteModule(ctx, cr.Spec.ForProvider.Name)
+		if err != nil {
+			return managed.ExternalDelete{}, err
+		}
+	}
 
-	return managed.ExternalDelete{}, err
+	// ResourceUsage cleanup is handled automatically by Kubernetes garbage collection
+	// No manual untracking or finalizer cleanup needed
+
+	return managed.ExternalDelete{}, nil
 }
