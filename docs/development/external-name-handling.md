@@ -75,7 +75,7 @@ We use external-name to perform DELETE request.
 
 If the response is 404 – not found (or the equivalent API response for this API), we do NOT treat this as an error. This only happens when the resource was externally removed in the meantime since after Observe(), Delete() is not called if the resource does not exist. Technically we have a drift in here but it can be safely ignored since the drift already covers the desired state.
 
-If our delete request is successful, we return EVEN IF the deletion operation is performed async by the external system (in the next reconcile Observe(), the resourceExist field will be checked by crossplane-runtime and Delete() is called again if the resource still exists). Should the resource still exist in next reconcile, Delete() is triggered again but we check for the deletion state in the external system (= observation) so we dont perform another Delete(). If this is not possible, we have to to perform another DELETE api call, treat a possible error response as error and return it. Once the resource is deleted in the external system, the Observe() function will determine resourceExist: false and crossplane-runtime removed the MR. 
+If our delete request is successful, we return EVEN IF the deletion operation is performed async by the external system (in the next reconcile Observe(), the resourceExist field will be checked by crossplane-runtime and Delete() is called again if the resource still exists). Should the resource still exist in next reconcile, Delete() is triggered again but we check for the deletion state in the external system (= status.observation being something like `DELETING` or so) so we dont perform another Delete(). If this is not possible, we have to to perform another DELETE api call, treat a possible error response as error and return it. Once the resource is deleted in the external system, the Observe() function will determine resourceExist: false and crossplane-runtime removed the MR. 
 
 Else, if we have an error in our request, return with error.
 
@@ -89,7 +89,23 @@ This is not super important for us right now since we plan to have an export cli
 
 Since the matching between MR and external resource is done based on external-name, a wrongly filled spec would result in Update() calls to the resource changing it. To prevent this, the user would not set the managementPolicy to Update. If there is then a missmatch, the Observe() method would determines this, sets the externalObservation.Diff and it would be visible in the debug log. TODO: this should be put as a warning event on the resource maybe, because crossplane-runtime only does a log.Debug with the Diff. As a user adopting existing landscapes it would be good to know if the current spec WOULD trigger an update/diff for confidence.
 
+## Open Questions, Things not considered
 
+These might not be important for our APIs if we dont have this sceanrios.
+
+### ID cant be determined in Create()
+
+Maybe the ID can not be determined in Create() after the API request, maybe it only has a job id/temporal id and later gets a real guid, the external name needs to be swapped.
+
+### external-name compound key
+
+The delimiter can collide with the field values if they can be in there too. Case sensitive/insensitive matching, leading/trailing spaces. Length limit of annotation, maybe base64 encoded parts of the compound key to avoid delimiter collisions (or escaping of the delimiter character)
+
+Also error case if the compound key matches more than one external resource needs to be handled if a List API is used.
+
+### External-name annotation manually edited
+
+Observe() would return a not found and the resource would be created again with the same `spec.forProvider`. This would probably lead to a creation error. Is this what we want?
 
 
 ## References
