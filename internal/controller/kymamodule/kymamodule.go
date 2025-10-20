@@ -120,11 +120,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		))
 	}
 
-	// Track Resource Usage - Crossplane will automatically prevent binding deletion
-	if err := c.tracker.Track(ctx, cr); err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errTrackRUsage)
-	}
-
 	if c.client == nil {
 		cr.SetConditions(xpv1.Unavailable().WithMessage(
 			"Cannot connect to Kyma cluster - kubeconfig may be unavailable or expired",
