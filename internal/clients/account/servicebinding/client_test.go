@@ -139,7 +139,7 @@ func TestServiceBindingClient_CreateInstance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
-			gotName, gotUID, gotCreation, err := m.CreateInstance(tt.args.ctx, tt.args.publicCR, tt.args.btpName)
+			gotName, gotUID, gotCreation, err := m.Create(tt.args.ctx, tt.args.publicCR, tt.args.btpName)
 
 			if tt.want.err != nil {
 				assert.Error(t, err)
@@ -270,7 +270,7 @@ func TestServiceBindingClient_DeleteInstance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
-			gotDeletion, err := m.DeleteInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
+			gotDeletion, err := m.Delete(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
 
 			if tt.want.err != nil {
 				assert.Error(t, err)
@@ -394,7 +394,7 @@ func TestServiceBindingClient_UpdateInstance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
-			gotUpdate, err := m.UpdateInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
+			gotUpdate, err := m.Update(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
 
 			if tt.want.err != nil {
 				assert.Error(t, err)
@@ -550,7 +550,7 @@ func TestServiceBindingClient_ObserveInstance(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			originalCR := publicCR.DeepCopy()
 			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
-			gotObservation, gotResource, err := m.ObserveInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
+			gotObservation, gotResource, err := m.Observe(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
 
 			if tt.want.err != nil {
 				assert.Error(t, err)

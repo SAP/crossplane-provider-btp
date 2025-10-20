@@ -339,7 +339,7 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 	tests := []struct {
 		name                string
 		cr                  *v1alpha1.ServiceBinding
-		mockDeleter         InstanceDeleter
+		mockDeleter         BindingDeleter
 		wantNewKeysCount    int
 		wantErr             bool
 		wantDeleteCallCount int
@@ -468,7 +468,7 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 	tests := []struct {
 		name        string
 		cr          *v1alpha1.ServiceBinding
-		mockDeleter InstanceDeleter
+		mockDeleter BindingDeleter
 		wantErr     bool
 	}{
 		{
@@ -555,14 +555,14 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 }
 
 // Mock implementation for InstanceDeleter
-var _ InstanceDeleter = &MockInstanceDeleter{}
+var _ BindingDeleter = &MockInstanceDeleter{}
 
 type MockInstanceDeleter struct {
 	err             error
 	deleteCallCount int
 }
 
-func (m *MockInstanceDeleter) DeleteInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
+func (m *MockInstanceDeleter) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
 	m.deleteCallCount++
 	return m.err
 }

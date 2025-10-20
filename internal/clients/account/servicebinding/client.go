@@ -45,10 +45,10 @@ func NewServiceBindingClient(sbConnector TfConnector, kube client.Client) *Servi
 	}
 }
 
-// CreateInstance creates a new service binding instance using the btpName from spec
+// Create creates a new service binding instance using the btpName from spec
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client create command
 // Returns the instance name, UID, and ExternalCreation for tracking
-func (m *ServiceBindingClient) CreateInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, btpName string) (string, types.UID, managed.ExternalCreation, error) {
+func (m *ServiceBindingClient) Create(ctx context.Context, publicCR *v1alpha1.ServiceBinding, btpName string) (string, types.UID, managed.ExternalCreation, error) {
 	// use a random name once for the creation. Afterwards, the external name sets a
 	// reasonable name. This means that when observing the resource for the first time after
 	// creating, another store for this resource will be created. This will create a dangling
@@ -73,9 +73,9 @@ func (m *ServiceBindingClient) CreateInstance(ctx context.Context, publicCR *v1a
 	return meta.GetExternalName(subaccountBinding), instanceUID, creation, nil
 }
 
-// DeleteInstance deletes a the actual service binding instance in the BTP. This is done by deleting the virtual SubaccountServiceBinding CR (the TF CR)
+// Delete deletes a the actual service binding instance in the BTP. This is done by deleting the virtual SubaccountServiceBinding CR (the TF CR)
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client delete command
-func (m *ServiceBindingClient) DeleteInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalDelete, error) {
+func (m *ServiceBindingClient) Delete(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalDelete, error) {
 
 	targetUID := GenerateInstanceUID(publicCR.UID, targetExternalName)
 	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
@@ -99,9 +99,9 @@ func (m *ServiceBindingClient) DeleteInstance(ctx context.Context, publicCR *v1a
 	return deletion, nil
 }
 
-// UpdateInstance updates a service binding instance with a different name and UID
+// Update updates a service binding instance with a different name and UID
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client update command
-func (m *ServiceBindingClient) UpdateInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalUpdate, error) {
+func (m *ServiceBindingClient) Update(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalUpdate, error) {
 	targetUID := GenerateInstanceUID(publicCR.UID, targetExternalName)
 	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
 	if err != nil {
@@ -116,10 +116,10 @@ func (m *ServiceBindingClient) UpdateInstance(ctx context.Context, publicCR *v1a
 	return tfController.Update(ctx, subaccountBinding)
 }
 
-// ObserveInstance observes a service binding instance with a different name and UID
+// Observe observes a service binding instance with a different name and UID
 // by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client observe command
 // Returns the observation and the TF resource for data extraction
-func (m *ServiceBindingClient) ObserveInstance(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
+func (m *ServiceBindingClient) Observe(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
 	targetUID := GenerateInstanceUID(publicCR.UID, targetExternalName)
 	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
 	if err != nil {
