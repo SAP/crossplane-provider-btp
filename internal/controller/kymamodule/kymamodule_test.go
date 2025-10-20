@@ -222,6 +222,50 @@ func TestObserve(t *testing.T) {
 				err: errors.Wrap(errors.New("tracker failed"), errTrackRUsage),
 			},
 		},
+		"TrackerCalledWithCorrectResource": {
+			args: args{
+				cr: module(withBindingRef("test-binding")),
+				client: &fake.MockKymaModuleClient{
+					MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
+						return &v1alpha1.ModuleStatus{}, nil
+					},
+				},
+				kube: &test.MockClient{
+					MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+						if binding, ok := obj.(*v1alpha1.KymaEnvironmentBinding); ok {
+							binding.SetName("test-binding")
+							binding.SetNamespace("default")
+						}
+						return nil
+					}),
+				},
+				tracker: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						// Verify Track is called with the correct resource
+						km, ok := mg.(*v1alpha1.KymaModule)
+						if !ok {
+							return errors.New("expected KymaModule, got different type")
+						}
+						if km.GetName() != "kymaModule" {
+							return errors.New("unexpected KymaModule name")
+						}
+						return nil
+					},
+				},
+				secretfetcher: &fake.MockSecretFetcher{
+					MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+						return []byte("VALID KUBECONFIG"), nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+				},
+				err: nil,
+			},
+		},
 	}
 
 	for name, tc := range cases {
