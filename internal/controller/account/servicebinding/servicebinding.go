@@ -11,8 +11,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -36,26 +35,8 @@ const (
 
 const iso8601Date = "2006-01-02T15:04:05Z0700"
 
-// SaveConditionsFn Callback for persisting conditions in the CR
-var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error {
-
-	si := &v1alpha1.ServiceBinding{}
-
-	nn := types.NamespacedName{Name: name}
-	if kErr := kube.Get(ctx, nn, si); kErr != nil {
-		return errors.Wrap(kErr, errGetBinding)
-	}
-
-	si.SetConditions(conditions...)
-
-	uErr := kube.Status().Update(ctx, si)
-
-	return errors.Wrap(uErr, errObserveSaveBinding)
-	// return nil
-}
-
 type connector struct {
-	kube            client.Client
+	kube            kubeclient.Client
 	usage           resource.Tracker
 	resourcetracker tracking.ReferenceResolverTracker
 }
@@ -79,25 +60,25 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		nil,
 	)
 
-	instanceManager := servicebindingclient.NewInstanceManager(sbConnector, c.kube)
+	client := servicebindingclient.NewServiceBindingClient(sbConnector, c.kube)
 
 	ext := &external{
-		kube:            c.kube,
-		instanceManager: instanceManager,
-		tracker:         c.resourcetracker,
+		kube:    c.kube,
+		client:  client,
+		tracker: c.resourcetracker,
 	}
 
-	// Create key rotator with the external client as instance deleter
+	// Create key rotator with the external client as binding deleter
 	ext.keyRotator = servicebindingclient.NewSBKeyRotator(ext)
 
 	return ext, nil
 }
 
 type external struct {
-	kube            client.Client
-	keyRotator      servicebindingclient.KeyRotator
-	instanceManager *servicebindingclient.InstanceManager
-	tracker         tracking.ReferenceResolverTracker
+	kube       kubeclient.Client
+	keyRotator servicebindingclient.KeyRotator
+	client     *servicebindingclient.ServiceBindingClient
+	tracker    tracking.ReferenceResolverTracker
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -119,7 +100,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		btpName = cr.Spec.ForProvider.Name
 	}
 
-	observation, tfResource, err := e.instanceManager.ObserveInstance(ctx, cr, btpName, meta.GetExternalName(cr))
+	observation, tfResource, err := e.client.Observe(ctx, cr, btpName, meta.GetExternalName(cr))
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
 	}
@@ -183,7 +164,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		btpName = cr.Spec.ForProvider.Name
 	}
 
-	externalName, _, creation, err := e.instanceManager.CreateInstance(ctx, cr, btpName)
+	externalName, _, creation, err := e.client.Create(ctx, cr, btpName)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
@@ -210,7 +191,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !e.keyRotator.IsCurrentBindingRetired(cr) {
 		btpName := getBtpName(cr)
 
-		update, err := e.instanceManager.UpdateInstance(ctx, cr, btpName, meta.GetExternalName(cr))
+		update, err := e.client.Update(ctx, cr, btpName, meta.GetExternalName(cr))
 		if err != nil {
 			return managed.ExternalUpdate{}, err
 		}
@@ -257,7 +238,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
 	}
 
-	deletion, err := e.instanceManager.DeleteInstance(ctx, cr, cr.Status.AtProvider.Name, meta.GetExternalName(cr))
+	deletion, err := e.client.Delete(ctx, cr, cr.Status.AtProvider.Name, meta.GetExternalName(cr))
 	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
@@ -265,9 +246,9 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	return deletion, nil
 }
 
-// DeleteInstance implements the InstanceDeleter interface for the key rotator
-func (e *external) DeleteInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
-	_, err := e.instanceManager.DeleteInstance(ctx, cr, targetName, targetExternalName)
+// DeleteBinding implements the BindingDeleter interface for the key rotator
+func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
+	_, err := e.client.Delete(ctx, cr, targetName, targetExternalName)
 	return err
 }
 

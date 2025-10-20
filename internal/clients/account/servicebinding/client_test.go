@@ -29,7 +29,7 @@ var (
 	errMockObserve = errors.New("mock observe error")
 )
 
-func TestInstanceManager_CreateInstance(t *testing.T) {
+func TestServiceBindingClient_CreateInstance(t *testing.T) {
 	mockClient := fake.NewClientBuilder().Build()
 
 	type fields struct {
@@ -138,7 +138,7 @@ func TestInstanceManager_CreateInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewInstanceManager(tt.fields.sbConnector, mockClient)
+			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
 			gotName, gotUID, gotCreation, err := m.CreateInstance(tt.args.ctx, tt.args.publicCR, tt.args.btpName)
 
 			if tt.want.err != nil {
@@ -168,7 +168,7 @@ func TestInstanceManager_CreateInstance(t *testing.T) {
 	}
 }
 
-func TestInstanceManager_DeleteInstance(t *testing.T) {
+func TestServiceBindingClient_DeleteInstance(t *testing.T) {
 	mockClient := fake.NewClientBuilder().Build()
 
 	type fields struct {
@@ -269,7 +269,7 @@ func TestInstanceManager_DeleteInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewInstanceManager(tt.fields.sbConnector, mockClient)
+			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
 			gotDeletion, err := m.DeleteInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
 
 			if tt.want.err != nil {
@@ -286,7 +286,7 @@ func TestInstanceManager_DeleteInstance(t *testing.T) {
 	}
 }
 
-func TestInstanceManager_UpdateInstance(t *testing.T) {
+func TestServiceBindingClient_UpdateInstance(t *testing.T) {
 	mockClient := fake.NewClientBuilder().Build()
 
 	type fields struct {
@@ -393,7 +393,7 @@ func TestInstanceManager_UpdateInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewInstanceManager(tt.fields.sbConnector, mockClient)
+			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
 			gotUpdate, err := m.UpdateInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
 
 			if tt.want.err != nil {
@@ -410,7 +410,7 @@ func TestInstanceManager_UpdateInstance(t *testing.T) {
 	}
 }
 
-func TestInstanceManager_ObserveInstance(t *testing.T) {
+func TestServiceBindingClient_ObserveInstance(t *testing.T) {
 	mockClient := fake.NewClientBuilder().Build()
 
 	type fields struct {
@@ -549,7 +549,7 @@ func TestInstanceManager_ObserveInstance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			originalCR := publicCR.DeepCopy()
-			m := NewInstanceManager(tt.fields.sbConnector, mockClient)
+			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
 			gotObservation, gotResource, err := m.ObserveInstance(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
 
 			if tt.want.err != nil {
@@ -597,7 +597,7 @@ func TestInstanceManager_ObserveInstance(t *testing.T) {
 	}
 }
 
-func TestInstanceManager_buildSubaccountServiceBinding(t *testing.T) {
+func TestServiceBindingClient_buildSubaccountServiceBinding(t *testing.T) {
 	mockClient := fake.NewClientBuilder().Build()
 	publicCR := &v1alpha1.ServiceBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -616,7 +616,7 @@ func TestInstanceManager_buildSubaccountServiceBinding(t *testing.T) {
 		},
 	}
 
-	m := NewInstanceManager(nil, mockClient)
+	m := NewServiceBindingClient(nil, mockClient)
 	name := "test-name"
 	uid := types.UID("test-uid")
 	externalName := "external-123"
