@@ -25,30 +25,30 @@ Common interpretations of the external name:
 ### Definition
 External-name represents the unique identifier given by the external-system. If this does not exist, it is a compound key of values from spec.forProvider that uniquely identify the external resource. This annotation is used for API Get requests (or filter List requests).
 
-In Create(), the external name is set based on the response of the API (if possible). Observe() use the external-name to match the external resource, Update() and Delete() also use the external-name. [4]  
-This is easy in the case of a unique identifier. If we have a compound key, we deconstruct the compound key to perform the API requests. 
+In Create(), the external name is set based on the response of the API (if possible). Observe() use the external-name to match the external resource, Update() and Delete() also use the external-name. [4]
+This is easy in the case of a unique identifier. If we have a compound key, we deconstruct the compound key to perform the API requests.
 
 ### Special Case: defaulting of external-name
 If external-name is unset, crossplane-runtime will run a default initializer that will set the external name to metadata.name before the first Observe() is called.
 
 This poses two problems:
 - If we set any kind of initializer ourselves later, we don’t get the default initializer automatically and therefore might run into bugs if we don’t check for empty initializer
-- At this moment, the finalizer would break our definition as the metadata.name is only an identifier within the Kubernetes cluster, not external system. 
+- At this moment, the finalizer would break our definition as the metadata.name is only an identifier within the Kubernetes cluster, not external system.
 
 **TODO: how do we handle this?**
 
 ### Implementation guideline
 
 #### Observe()
-1. Check if external-name is empty.  
-   - If we need backwards compatibility, we create our API query from the spec.forProvider fields.  
-     - If resource exists we perform the normal needsCreation/needsUpdate and set the external name to the correct value.  
-     - If resource does not exist, it needsCreation.  
+1. Check if external-name is empty.
+   - If we need backwards compatibility, we create our API query from the spec.forProvider fields.
+     - If resource exists we perform the normal needsCreation/needsUpdate and set the external name to the correct value.
+     - If resource does not exist, it needsCreation.
    - Else no backwards compatibility needed, return resourceExist: false.
-2. External-name is set, we check its format.  
+2. External-name is set, we check its format.
    - If format is not correct (not a valid GUID or not a valid compound key): return error.
-3. Build the Get API Request from the external-name (by either parsing the compound key or using the GUID directly, do not use the spec.forProvider).  
-   - If resource is not found, that is a drift, not an error case, we therefore return resourceExist: false to trigger a Create() call.  
+3. Build the Get API Request from the external-name (by either parsing the compound key or using the GUID directly, do not use the spec.forProvider).
+   - If resource is not found, that is a drift, not an error case, we therefore return resourceExist: false to trigger a Create() call.
    - Else, updateObservation and perform needsCreate()/needsUpdate() check as usual.
 
 #### Create()
@@ -66,16 +66,16 @@ If the external-name is a compound key, update the compound key. This is necessa
 #### Delete()
 If our external resource has a field indicating it is in deletion state, we return.
 
-We use external-name to perform DELETE request. 
+We use external-name to perform DELETE request.
 
 If the response is 404 – not found (or the equivalent API response for this API), we do NOT treat this as an error. This only happens when the resource was externally removed in the meantime since after Observe(), Delete() is not called if the resource does not exist. Technically we have a drift in here but it can be safely ignored since the drift already covers the desired state.
 
-If our delete request is successful, we return EVEN IF the deletion operation is performed async by the external system (in the next reconcile Observe(), the resourceExist field will be checked by crossplane-runtime and Delete() is called again if the resource still exists). Should the resource still exist in next reconcile, Delete() is triggered again but we check for the deletion state in the external system (= status.observation being something like `DELETING` or so) so we don’t perform another Delete(). If this is not possible, we have to perform another DELETE API call, treat a possible error response as error and return it. Once the resource is deleted in the external system, the Observe() function will determine resourceExist: false and crossplane-runtime removed the MR. 
+If our delete request is successful, we return EVEN IF the deletion operation is performed async by the external system (in the next reconcile Observe(), the resourceExist field will be checked by crossplane-runtime and Delete() is called again if the resource still exists). Should the resource still exist in next reconcile, Delete() is triggered again but we check for the deletion state in the external system (= status.observation being something like `DELETING` or so) so we don’t perform another Delete(). If this is not possible, we have to perform another DELETE API call, treat a possible error response as error and return it. Once the resource is deleted in the external system, the Observe() function will determine resourceExist: false and crossplane-runtime removed the MR.
 
 Else, if we have an error in our request, return with error.
 
 ### Importing of existing external resources
-For importing, setting the right external-name will match the external resource no matter the values in `spec.ForProvider`. 
+For importing, setting the right external-name will match the external resource no matter the values in `spec.ForProvider`.
 
 If we set the `spec.forProvider` as required, the user can not create managed resources without those values and therefore must also set the required fields. The official import guide [3] talks about setting fields that are required for unique matching but the validation rules might require more fields. On the other hand, setting it as optional would allow to Observe an external resource and deleting them (using the managementPolicies: Observe, Delete) without having to fill out the spec.
 
@@ -97,8 +97,14 @@ Also error case if the compound key matches more than one external resource need
 ### External-name annotation manually edited
 Observe() would return a not found and the resource would be created again with the same `spec.forProvider`. This would probably lead to a creation error. Is this what we want?
 
+### Export tool considerations
+
+The export tool must generate managed resource definitions based on external resource state retrieved through the external system API. To ensure these definitions can be imported successfully, the tool must generate proper `crossplane.io/external-name` annotations.
+
+The export tool **must** be able to derive the `crossplane.io/external-name` annotation value from information obtained through standard API operations (GET, LIST) on external resources.
+
 ## References
-[1] https://github.com/crossplane/crossplane/blob/main/design/one-pager-managed-resource-api-design.md?plain=1#L151  
-[2] https://github.com/crossplane/crossplane/issues/1640  
-[3] https://docs.crossplane.io/latest/guides/import-existing-resources/  
+[1] https://github.com/crossplane/crossplane/blob/main/design/one-pager-managed-resource-api-design.md?plain=1#L151
+[2] https://github.com/crossplane/crossplane/issues/1640
+[3] https://docs.crossplane.io/latest/guides/import-existing-resources/
 [4] https://github.com/SAP/crossplane-provider-cloudfoundry/blob/main/docs/resource-names.md#crossplaneioexternal-name-annotation
