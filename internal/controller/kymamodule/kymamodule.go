@@ -125,6 +125,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errTrackRUsage)
 	}
 
+	if c.client == nil {
+		cr.SetConditions(xpv1.Unavailable().WithMessage(
+			"Cannot connect to Kyma cluster - kubeconfig may be unavailable or expired",
+		))
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: false,
+		}, nil
+	}
+
 	res, err := c.client.ObserveModule(ctx, cr)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
