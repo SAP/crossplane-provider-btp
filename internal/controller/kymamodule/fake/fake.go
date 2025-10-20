@@ -42,7 +42,7 @@ func (m *MockSecretFetcher) Fetch(ctx context.Context, cr *v1alpha1.KymaModule) 
 
 var Client kymamodule.Client = &MockKymaModuleClient{}
 
-// MockTracker allows you to mock tracker behavior with custom functions
+// MockTracker allows mock tracker behavior to be mocked with custom functions
 // If mock functions are not set, it returns success/no-op by default
 type MockTracker struct {
 	MockTrack                    func(ctx context.Context, mg resource.Managed) error

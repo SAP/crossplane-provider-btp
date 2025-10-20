@@ -59,24 +59,6 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrackRUsage)
 	}
 
-	// Check if binding exists before trying to track it
-	binding := &v1alpha1.KymaEnvironmentBinding{}
-	bindingName := types.NamespacedName{
-		Name:      cr.Spec.KymaEnvironmentBindingRef.Name,
-		Namespace: cr.GetNamespace(),
-	}
-	bindingErr := c.kube.Get(ctx, bindingName, binding)
-	if bindingErr != nil && !kerrors.IsNotFound(bindingErr) {
-		// Unexpected error
-		return nil, errors.Wrap(bindingErr, errKymaEnvironmentBindingNotFound)
-	}
-	// Only track if binding exists
-	if bindingErr == nil {
-		if err := c.usage.Track(ctx, mg); err != nil {
-			return nil, errors.Wrap(err, errTrackPCUsage)
-		}
-	}
-
 	secretfetcher := &SecretFetcher{
 		kube: c.kube,
 	}
@@ -110,6 +92,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// Get the reference for the kyma environment binding
+	if cr.Spec.KymaEnvironmentBindingRef == nil {
+		cr.SetConditions(xpv1.Unavailable().WithMessage(
+			"KymaEnvironmentBindingRef must be specified",
+		))
+		return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
+	}
 	binding := &v1alpha1.KymaEnvironmentBinding{}
 	bindingName := types.NamespacedName{
 		Name:      cr.Spec.KymaEnvironmentBindingRef.Name,
