@@ -1,1010 +1,1520 @@
 package servicebinding
-//
-// import (
-// 	"context"
-// 	stderrors "errors"
-// 	"testing"
-// 	"time"
-//
-// 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-// 	"github.com/crossplane/crossplane-runtime/pkg/meta"
-// 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-// 	"github.com/crossplane/crossplane-runtime/pkg/resource"
-// 	"github.com/crossplane/crossplane-runtime/pkg/test"
-// 	"github.com/google/go-cmp/cmp"
-// 	"github.com/pkg/errors"
-// 	"github.com/stretchr/testify/assert"
-// 	"k8s.io/apimachinery/pkg/types"
-// 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-// 	"sigs.k8s.io/controller-runtime/pkg/client"
-//
-// 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-// 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
-// 	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
-// 	trackingtest "github.com/sap/crossplane-provider-btp/internal/tracking/test"
-// )
-//
-// var (
-// 	errKube          = stderrors.New("kubeError")
-// 	errInstanceMgr   = stderrors.New("instanceManagerError")
-// 	errDependentUse  = stderrors.New(providerv1alpha1.ErrResourceInUse)
-// )
-//
-// func TestConnect(t *testing.T) {
-// 	type args struct {
-// 		mg resource.Managed
-// 	}
-//
-// 	type want struct {
-// 		err            error
-// 		externalExists bool
-// 	}
-//
-// 	cases := map[string]struct {
-// 		reason string
-// 		args   args
-// 		want   want
-// 	}{
-// 		"WrongType": {
-// 			reason: "should return an error when the managed resource is not a ServiceBinding",
-// 			args: args{
-// 				mg: &v1alpha1.ServiceInstance{}, // Wrong type
-// 			},
-// 			want: want{
-// 				err: stderrors.New(errNotServiceBinding),
-// 			},
-// 		},
-// 		"ConnectSuccess": {
-// 			reason: "should return an external client when connection succeeds",
-// 			args: args{
-// 				mg: &v1alpha1.ServiceBinding{},
-// 			},
-// 			want: want{
-// 				err:            nil,
-// 				externalExists: true,
-// 			},
-// 		},
-// 	}
-//
-// 	for name, tc := range cases {
-// 		t.Run(name, func(t *testing.T) {
-// 			c := connector{
-// 				kube:            &test.MockClient{},
-// 				resourcetracker: trackingtest.NoOpReferenceResolverTracker{},
-// 			}
-//
-// 			got, err := c.Connect(context.Background(), tc.args.mg)
-// 			if tc.want.externalExists && got == nil {
-// 				t.Errorf("expected external client, got nil")
-// 			}
-// 			expectedErrorBehaviour(t, tc.want.err, err)
-// 		})
-// 	}
-// }
-//
-// func TestObserve(t *testing.T) {
-// 	type fields struct {
-// 		instanceManager *MockInstanceManager
-// 		keyRotator      *MockKeyRotator
-// 		kube            client.Client
-// 	}
-//
-// 	type args struct {
-// 		mg resource.Managed
-// 	}
-//
-// 	type want struct {
-// 		o   managed.ExternalObservation
-// 		err error
-// 	}
-//
-// 	cases := map[string]struct {
-// 		reason string
-// 		fields fields
-// 		args   args
-// 		want   want
-// 	}{
-// 		"WrongType": {
-// 			reason: "should return an error when the managed resource is not a ServiceBinding",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{},
-// 				keyRotator:      &MockKeyRotator{},
-// 				kube:            &test.MockClient{},
-// 			},
-// 			args: args{
-// 				mg: &v1alpha1.ServiceInstance{}, // Wrong type
-// 			},
-// 			want: want{
-// 				err: stderrors.New(errNotServiceBinding),
-// 			},
-// 		},
-// 		"ObserveError": {
-// 			reason: "should return an error when instance manager observation fails",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{observeErr: errInstanceMgr},
-// 				keyRotator:      &MockKeyRotator{},
-// 				kube:            &test.MockClient{},
-// 			},
-// 			args: args{
-// 				mg: expectedServiceBinding(),
-// 			},
-// 			want: want{
-// 				err: errInstanceMgr,
-// 			},
-// 		},
-// 		"NotFound": {
-// 			reason: "should return not existing when resource doesn't exist",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{
-// 					observeResult: managed.ExternalObservation{ResourceExists: false},
-// 				},
-// 				keyRotator: &MockKeyRotator{},
-// 				kube:       &test.MockClient{},
-// 			},
-// 			args: args{
-// 				mg: expectedServiceBinding(),
-// 			},
-// 			want: want{
-// 				err: nil,
-// 				o: managed.ExternalObservation{
-// 					ResourceExists: false,
-// 				},
-// 			},
-// 		},
-// 		"ExistsUpToDate": {
-// 			reason: "should return existing and up to date when resource exists and is current",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{
-// 					observeResult: managed.ExternalObservation{
-// 						ResourceExists:   true,
-// 						ResourceUpToDate: true,
-// 					},
-// 					tfResource: &v1alpha1.SubaccountServiceBinding{
-// 						Status: v1alpha1.SubaccountServiceBindingStatus{
-// 							AtProvider: v1alpha1.SubaccountServiceBindingObservation{
-// 								State: strPtr("succeeded"),
-// 								ID:    strPtr("test-id"),
-// 								Name:  strPtr("test-name"),
-// 							},
-// 						},
-// 					},
-// 				},
-// 				keyRotator: &MockKeyRotator{hasExpiredKeys: false},
-// 				kube: &test.MockClient{
-// 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-// 				},
-// 			},
-// 			args: args{
-// 				mg: expectedServiceBinding(),
-// 			},
-// 			want: want{
-// 				err: nil,
-// 				o: managed.ExternalObservation{
-// 					ResourceExists:   true,
-// 					ResourceUpToDate: true,
-// 				},
-// 			},
-// 		},
-// 	}
-//
-// 	for name, tc := range cases {
-// 		t.Run(name, func(t *testing.T) {
-// 			e := &MockExternal{
-// 				instanceManager: tc.fields.instanceManager,
-// 				keyRotator:      tc.fields.keyRotator,
-// 				kube:            tc.fields.kube,
-// 			}
-//
-// 			got, err := e.Observe(context.Background(), tc.args.mg)
-// 			expectedErrorBehaviour(t, tc.want.err, err)
-// 			if diff := cmp.Diff(tc.want.o, got); diff != "" {
-// 				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
-// 			}
-// 		})
-// 	}
-// }
-//
-// func TestCreate(t *testing.T) {
-// 	type fields struct {
-// 		instanceManager *MockInstanceManager
-// 		kube            client.Client
-// 	}
-//
-// 	type args struct {
-// 		mg resource.Managed
-// 	}
-//
-// 	type want struct {
-// 		err error
-// 	}
-//
-// 	cases := map[string]struct {
-// 		reason string
-// 		fields fields
-// 		args   args
-// 		want   want
-// 	}{
-// 		"WrongType": {
-// 			reason: "should return an error when the managed resource is not a ServiceBinding",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{},
-// 				kube:            &test.MockClient{},
-// 			},
-// 			args: args{
-// 				mg: &v1alpha1.ServiceInstance{},
-// 			},
-// 			want: want{
-// 				err: stderrors.New(errNotServiceBinding),
-// 			},
-// 		},
-// 		"CreateError": {
-// 			reason: "should return an error when instance manager creation fails",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{createErr: errInstanceMgr},
-// 				kube: &test.MockClient{
-// 					MockUpdate: test.NewMockUpdateFn(nil),
-// 				},
-// 			},
-// 			args: args{
-// 				mg: expectedServiceBinding(),
-// 			},
-// 			want: want{
-// 				err: errInstanceMgr,
-// 			},
-// 		},
-// 		"HappyPath": {
-// 			reason: "should create the resource successfully and set Creating condition",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{
-// 					createResult: managed.ExternalCreation{},
-// 				},
-// 				kube: &test.MockClient{
-// 					MockUpdate:       test.NewMockUpdateFn(nil),
-// 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-// 				},
-// 			},
-// 			args: args{
-// 				mg: expectedServiceBinding(),
-// 			},
-// 			want: want{
-// 				err: nil,
-// 			},
-// 		},
-// 	}
-//
-// 	for name, tc := range cases {
-// 		t.Run(name, func(t *testing.T) {
-// 			e := &MockExternal{
-// 				instanceManager: tc.fields.instanceManager,
-// 				kube:            tc.fields.kube,
-// 			}
-//
-// 			_, err := e.Create(context.Background(), tc.args.mg)
-// 			expectedErrorBehaviour(t, tc.want.err, err)
-// 		})
-// 	}
-// }
-//
-// func TestUpdate(t *testing.T) {
-// 	type fields struct {
-// 		instanceManager *MockInstanceManager
-// 		keyRotator      *MockKeyRotator
-// 		kube            client.Client
-// 	}
-//
-// 	type args struct {
-// 		mg resource.Managed
-// 	}
-//
-// 	type want struct {
-// 		err error
-// 	}
-//
-// 	cases := map[string]struct {
-// 		reason string
-// 		fields fields
-// 		args   args
-// 		want   want
-// 	}{
-// 		"WrongType": {
-// 			reason: "should return an error when the managed resource is not a ServiceBinding",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{},
-// 				keyRotator:      &MockKeyRotator{},
-// 				kube:            &test.MockClient{},
-// 			},
-// 			args: args{
-// 				mg: &v1alpha1.ServiceInstance{},
-// 			},
-// 			want: want{
-// 				err: stderrors.New(errNotServiceBinding),
-// 			},
-// 		},
-// 		"UpdateError": {
-// 			reason: "should return an error when instance manager update fails",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{updateErr: errInstanceMgr},
-// 				keyRotator:      &MockKeyRotator{},
-// 				kube:            &test.MockClient{},
-// 			},
-// 			args: args{
-// 				mg: expectedServiceBinding(),
-// 			},
-// 			want: want{
-// 				err: errInstanceMgr,
-// 			},
-// 		},
-// 		"HappyPath": {
-// 			reason: "should update the resource successfully",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{
-// 					updateResult: managed.ExternalUpdate{},
-// 				},
-// 				keyRotator: &MockKeyRotator{},
-// 				kube:       &test.MockClient{},
-// 			},
-// 			args: args{
-// 				mg: expectedServiceBinding(),
-// 			},
-// 			want: want{
-// 				err: nil,
-// 			},
-// 		},
-// 	}
-//
-// 	for name, tc := range cases {
-// 		t.Run(name, func(t *testing.T) {
-// 			e := &MockExternal{
-// 				instanceManager: tc.fields.instanceManager,
-// 				keyRotator:      tc.fields.keyRotator,
-// 				kube:            tc.fields.kube,
-// 			}
-//
-// 			_, err := e.Update(context.Background(), tc.args.mg)
-// 			expectedErrorBehaviour(t, tc.want.err, err)
-// 		})
-// 	}
-// }
-//
-// func TestDelete(t *testing.T) {
-// 	type fields struct {
-// 		instanceManager *MockInstanceManager
-// 		keyRotator      *MockKeyRotator
-// 		tracker         trackingtest.NoOpReferenceResolverTracker
-// 		kube            client.Client
-// 	}
-//
-// 	type args struct {
-// 		mg resource.Managed
-// 	}
-//
-// 	type want struct {
-// 		err error
-// 	}
-//
-// 	cases := map[string]struct {
-// 		reason string
-// 		fields fields
-// 		args   args
-// 		want   want
-// 	}{
-// 		"WrongType": {
-// 			reason: "should return an error when the managed resource is not a ServiceBinding",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{},
-// 				keyRotator:      &MockKeyRotator{},
-// 				tracker:         trackingtest.NoOpReferenceResolverTracker{},
-// 				kube:            &test.MockClient{},
-// 			},
-// 			args: args{
-// 				mg: &v1alpha1.ServiceInstance{}, // Wrong type
-// 			},
-// 			want: want{
-// 				err: stderrors.New(errNotServiceBinding),
-// 			},
-// 		},
-// 		"ResourceInUse": {
-// 			reason: "should return an error when resource is in use by other resources",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{},
-// 				keyRotator:      &MockKeyRotator{},
-// 				tracker:         trackingtest.NoOpReferenceResolverTracker{IsResourceBlocked: true},
-// 				kube:            &test.MockClient{},
-// 			},
-// 			args: args{
-// 				mg: expectedServiceBinding(),
-// 			},
-// 			want: want{
-// 				err: errDependentUse,
-// 			},
-// 		},
-// 		"HappyPath": {
-// 			reason: "should delete the resource successfully and set Deleting condition",
-// 			fields: fields{
-// 				instanceManager: &MockInstanceManager{},
-// 				keyRotator:      &MockKeyRotator{},
-// 				tracker:         trackingtest.NoOpReferenceResolverTracker{},
-// 				kube:            &test.MockClient{},
-// 			},
-// 			args: args{
-// 				mg: expectedServiceBinding(),
-// 			},
-// 			want: want{
-// 				err: nil,
-// 			},
-// 		},
-// 	}
-//
-// 	for name, tc := range cases {
-// 		t.Run(name, func(t *testing.T) {
-// 			e := &MockExternal{
-// 				instanceManager: tc.fields.instanceManager,
-// 				keyRotator:      tc.fields.keyRotator,
-// 				tracker:         tc.fields.tracker,
-// 				kube:            tc.fields.kube,
-// 			}
-//
-// 			_, err := e.Delete(context.Background(), tc.args.mg)
-// 			expectedErrorBehaviour(t, tc.want.err, err)
-// 		})
-// 	}
-// }
-//
-// func TestSaveCallback(t *testing.T) {
-// 	type args struct {
-// 		kube       client.Client
-// 		name       string
-// 		conditions []xpv1.Condition
-// 	}
-//
-// 	type want struct {
-// 		err error
-// 	}
-//
-// 	cases := map[string]struct {
-// 		reason string
-// 		args   args
-// 		want   want
-// 	}{
-// 		"GetError": {
-// 			reason: "should return an error if the ServiceBinding cannot be retrieved",
-// 			args: args{
-// 				kube: &test.MockClient{MockGet: test.NewMockGetFn(errKube)},
-// 				name: "test-binding",
-// 			},
-// 			want: want{
-// 				err: errKube,
-// 			},
-// 		},
-// 		"Success": {
-// 			reason: "should successfully save conditions to the ServiceBinding",
-// 			args: args{
-// 				kube: &test.MockClient{
-// 					MockGet:          test.NewMockGetFn(nil),
-// 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-// 				},
-// 				name:       "test-binding",
-// 				conditions: []xpv1.Condition{xpv1.Available()},
-// 			},
-// 			want: want{
-// 				err: nil,
-// 			},
-// 		},
-// 	}
-//
-// 	for name, tc := range cases {
-// 		t.Run(name, func(t *testing.T) {
-// 			err := saveCallback(context.Background(), tc.args.kube, tc.args.name, tc.args.conditions...)
-// 			expectedErrorBehaviour(t, tc.want.err, err)
-// 		})
-// 	}
-// }
-//
-// func TestIsRotationEnabled(t *testing.T) {
-// 	type args struct {
-// 		cr *v1alpha1.ServiceBinding
-// 	}
-//
-// 	type want struct {
-// 		enabled bool
-// 	}
-//
-// 	cases := map[string]struct {
-// 		reason string
-// 		args   args
-// 		want   want
-// 	}{
-// 		"NoRotation": {
-// 			reason: "should return false when no rotation is configured",
-// 			args: args{
-// 				cr: expectedServiceBinding(),
-// 			},
-// 			want: want{
-// 				enabled: false,
-// 			},
-// 		},
-// 		"ForceRotationAnnotation": {
-// 			reason: "should return true when force rotation annotation is present",
-// 			args: args{
-// 				cr: withForceRotationAnnotation(expectedServiceBinding()),
-// 			},
-// 			want: want{
-// 				enabled: true,
-// 			},
-// 		},
-// 		"RotationFrequencyConfigured": {
-// 			reason: "should return true when rotation frequency is configured",
-// 			args: args{
-// 				cr: withRotationConfig(expectedServiceBinding()),
-// 			},
-// 			want: want{
-// 				enabled: true,
-// 			},
-// 		},
-// 	}
-//
-// 	for name, tc := range cases {
-// 		t.Run(name, func(t *testing.T) {
-// 			e := &external{}
-// 			got := e.isRotationEnabled(tc.args.cr)
-// 			if got != tc.want.enabled {
-// 				t.Errorf("\n%s\ne.isRotationEnabled(...): got %v, want %v\n", tc.reason, got, tc.want.enabled)
-// 			}
-// 		})
-// 	}
-// }
-//
-// // Helper functions and mocks
-// func expectedErrorBehaviour(t *testing.T, expectedErr error, gotErr error) {
-// 	if expectedErr == nil && gotErr == nil {
-// 		return
-// 	}
-// 	if expectedErr == nil && gotErr != nil {
-// 		t.Errorf("expected no error, got %v", gotErr)
-// 		return
-// 	}
-// 	if expectedErr != nil && gotErr == nil {
-// 		t.Errorf("expected error %v, got nil", expectedErr)
-// 		return
-// 	}
-// 	// Both errors exist, check if messages contain expected content
-// 	if expectedErr != nil && gotErr != nil {
-// 		expectedMsg := expectedErr.Error()
-// 		gotMsg := gotErr.Error()
-// 		if !assert.Contains(t, gotMsg, expectedMsg) {
-// 			t.Errorf("expected error containing %q, got %q", expectedMsg, gotMsg)
-// 		}
-// 	}
-// }
-//
-// func expectedServiceBinding() *v1alpha1.ServiceBinding {
-// 	return &v1alpha1.ServiceBinding{
-// 		Spec: v1alpha1.ServiceBindingSpec{
-// 			ForProvider: v1alpha1.ServiceBindingParameters{
-// 				Name: "test-name",
-// 			},
-// 		},
-// 	}
-// }
-//
-// func withForceRotationAnnotation(cr *v1alpha1.ServiceBinding) *v1alpha1.ServiceBinding {
-// 	if cr.ObjectMeta.Annotations == nil {
-// 		cr.ObjectMeta.Annotations = make(map[string]string)
-// 	}
-// 	cr.ObjectMeta.Annotations[servicebindingclient.ForceRotationKey] = "true"
-// 	return cr
-// }
-//
-// func withRotationConfig(cr *v1alpha1.ServiceBinding) *v1alpha1.ServiceBinding {
-// 	cr.Spec.ForProvider.Rotation = &v1alpha1.RotationParameters{
-// 		Frequency: &metav1.Duration{Duration: 24 * time.Hour},
-// 	}
-// 	return cr
-// }
-//
-// func strPtr(s string) *string {
-// 	return &s
-// }
-//
-// // Mock implementations
-// type MockInstanceManager struct {
-// 	observeResult managed.ExternalObservation
-// 	observeErr    error
-// 	tfResource    *v1alpha1.SubaccountServiceBinding
-// 	createResult  managed.ExternalCreation
-// 	createErr     error
-// 	updateResult  managed.ExternalUpdate
-// 	updateErr     error
-// 	deleteResult  managed.ExternalDelete
-// 	deleteErr     error
-// }
-//
-// func (m *MockInstanceManager) ObserveInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, btpName string, id string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
-// 	return m.observeResult, m.tfResource, m.observeErr
-// }
-//
-// func (m *MockInstanceManager) CreateInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, btpName string) (string, types.UID, managed.ExternalCreation, error) {
-// 	return btpName, types.UID("test-uid"), m.createResult, m.createErr
-// }
-//
-// func (m *MockInstanceManager) UpdateInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, btpName string, id string) (managed.ExternalUpdate, error) {
-// 	return m.updateResult, m.updateErr
-// }
-//
-// func (m *MockInstanceManager) DeleteInstance(ctx context.Context, cr *v1alpha1.ServiceBinding, btpName string, id string) (managed.ExternalDelete, error) {
-// 	return m.deleteResult, m.deleteErr
-// }
-//
-// type MockKeyRotator struct {
-// 	hasExpiredKeys          bool
-// 	retireBinding           bool
-// 	deleteExpiredKeysResult []*v1alpha1.RetiredSBResource
-// 	deleteExpiredKeysErr    error
-// 	deleteRetiredKeysErr    error
-// }
-//
-// func (m *MockKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
-// 	return m.hasExpiredKeys
-// }
-//
-// func (m *MockKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
-// 	return m.retireBinding
-// }
-//
-// func (m *MockKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) ([]*v1alpha1.RetiredSBResource, error) {
-// 	return m.deleteExpiredKeysResult, m.deleteExpiredKeysErr
-// }
-//
-// func (m *MockKeyRotator) DeleteRetiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
-// 	return m.deleteRetiredKeysErr
-// }
-//
-// // MockExternal implements the main CRUD operations with mocked dependencies
-// type MockExternal struct {
-// 	instanceManager *MockInstanceManager
-// 	keyRotator      *MockKeyRotator
-// 	tracker         trackingtest.NoOpReferenceResolverTracker
-// 	kube            client.Client
-// }
-//
-// func (e *MockExternal) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-// 	cr, ok := mg.(*v1alpha1.ServiceBinding)
-// 	if !ok {
-// 		return managed.ExternalObservation{}, stderrors.New(errNotServiceBinding)
-// 	}
-//
-// 	var btpName string
-// 	if cr.Spec.BtpName != nil {
-// 		btpName = *cr.Spec.BtpName
-// 	} else {
-// 		btpName = cr.Spec.ForProvider.Name
-// 	}
-//
-// 	observation, tfResource, err := e.instanceManager.ObserveInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
-// 	if err != nil {
-// 		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
-// 	}
-//
-// 	if observation.ResourceExists {
-// 		if observation.ResourceUpToDate && tfResource != nil {
-// 			// Update CR from TF resource would go here
-// 			if e.kube != nil {
-// 				if err := e.kube.Status().Update(ctx, cr); err != nil {
-// 					return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
-// 				}
-// 			}
-// 		}
-// 		observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
-//
-// 		if e.keyRotator.RetireBinding(cr) {
-// 			if e.kube != nil {
-// 				if err := e.kube.Status().Update(ctx, cr); err != nil {
-// 					return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
-// 				}
-// 			}
-// 			return managed.ExternalObservation{ResourceExists: false}, nil
-// 		}
-// 	}
-//
-// 	return observation, nil
-// }
-//
-// func (e *MockExternal) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-// 	cr, ok := mg.(*v1alpha1.ServiceBinding)
-// 	if !ok {
-// 		return managed.ExternalCreation{}, stderrors.New(errNotServiceBinding)
-// 	}
-//
-// 	cr.SetConditions(xpv1.Creating())
-//
-// 	var btpName string
-// 	if cr.ObjectMeta.Annotations != nil {
-// 		if _, hasForceRotation := cr.ObjectMeta.Annotations[servicebindingclient.ForceRotationKey]; hasForceRotation {
-// 			btpName = servicebindingclient.GenerateRandomName(cr.Spec.ForProvider.Name)
-// 		} else {
-// 			btpName = cr.Spec.ForProvider.Name
-// 		}
-// 	} else if cr.Spec.ForProvider.Rotation != nil && cr.Spec.ForProvider.Rotation.Frequency != nil {
-// 		btpName = servicebindingclient.GenerateRandomName(cr.Spec.ForProvider.Name)
-// 	} else {
-// 		btpName = cr.Spec.ForProvider.Name
-// 	}
-// 	cr.Spec.BtpName = &btpName
-//
-// 	if e.kube != nil {
-// 		if err := e.kube.Update(ctx, cr); err != nil {
-// 			return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
-// 		}
-// 	}
-//
-// 	_, _, creation, err := e.instanceManager.CreateInstance(ctx, cr, *cr.Spec.BtpName)
-// 	if err != nil {
-// 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
-// 	}
-//
-// 	if e.kube != nil {
-// 		if err := e.kube.Status().Update(ctx, cr); err != nil {
-// 			return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
-// 		}
-// 	}
-//
-// 	// Remove force rotation annotation after successful creation
-// 	if cr.ObjectMeta.Annotations != nil {
-// 		if _, ok := cr.ObjectMeta.Annotations[servicebindingclient.ForceRotationKey]; ok {
-// 			meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
-// 		}
-// 	}
-//
-// 	return creation, nil
-// }
-//
-// func (e *MockExternal) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-// 	cr, ok := mg.(*v1alpha1.ServiceBinding)
-// 	if !ok {
-// 		return managed.ExternalUpdate{}, stderrors.New(errNotServiceBinding)
-// 	}
-//
-// 	// Check if current binding is already retired
-// 	currentBindingRetired := false
-// 	for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
-// 		if retiredKey.ID == cr.Status.AtProvider.ID {
-// 			currentBindingRetired = true
-// 			break
-// 		}
-// 	}
-//
-// 	var updateResult managed.ExternalUpdate
-// 	if !currentBindingRetired {
-// 		var btpName string
-// 		if cr.Spec.BtpName != nil {
-// 			btpName = *cr.Spec.BtpName
-// 		} else {
-// 			btpName = cr.Spec.ForProvider.Name
-// 		}
-//
-// 		update, err := e.instanceManager.UpdateInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
-// 		if err != nil {
-// 			return managed.ExternalUpdate{}, err
-// 		}
-// 		updateResult = update
-// 	}
-//
-// 	// Clean up expired keys if there are any retired keys
-// 	if cr.Status.AtProvider.RetiredKeys != nil {
-// 		if newRetiredKeys, err := e.keyRotator.DeleteExpiredKeys(ctx, cr); err != nil {
-// 			return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteExpiredKeys)
-// 		} else {
-// 			cr.Status.AtProvider.RetiredKeys = newRetiredKeys
-// 			if e.kube != nil {
-// 				if err := e.kube.Status().Update(ctx, cr); err != nil {
-// 					return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
-// 				}
-// 			}
-// 		}
-// 	}
-//
-// 	return updateResult, nil
-// }
-//
-// func (e *MockExternal) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
-// 	cr, ok := mg.(*v1alpha1.ServiceBinding)
-// 	if !ok {
-// 		return managed.ExternalDelete{}, stderrors.New(errNotServiceBinding)
-// 	}
-// 	cr.SetConditions(xpv1.Deleting())
-//
-// 	// Set resource usage conditions to check dependencies
-// 	e.tracker.SetConditions(ctx, cr)
-//
-// 	// Block deletion if other resources are still using this ServiceBinding
-// 	if blocked := e.tracker.DeleteShouldBeBlocked(mg); blocked {
-// 		return managed.ExternalDelete{}, stderrors.New(providerv1alpha1.ErrResourceInUse)
-// 	}
-//
-// 	if err := e.keyRotator.DeleteRetiredKeys(ctx, cr); err != nil {
-// 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
-// 	}
-//
-// 	var btpName string
-// 	if cr.Spec.BtpName != nil {
-// 		btpName = *cr.Spec.BtpName
-// 	} else {
-// 		btpName = cr.Spec.ForProvider.Name
-// 	}
-//
-// 	deletion, err := e.instanceManager.DeleteInstance(ctx, cr, btpName, cr.Status.AtProvider.ID)
-// 	if err != nil {
-// 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
-// 	}
-// 	return deletion, nil
-// }
-//
-// func TestFlattenSecretData(t *testing.T) {
-// 	type args struct {
-// 		secretData map[string][]byte
-// 	}
-//
-// 	type want struct {
-// 		result map[string][]byte
-// 		err    error
-// 	}
-//
-// 	cases := map[string]struct {
-// 		reason string
-// 		args   args
-// 		want   want
-// 	}{
-// 		"EmptyInput": {
-// 			reason: "should return empty map for empty input",
-// 			args: args{
-// 				secretData: map[string][]byte{},
-// 			},
-// 			want: want{
-// 				result: map[string][]byte{},
-// 				err:    nil,
-// 			},
-// 		},
-// 		"NonJSONValue": {
-// 			reason: "should keep non-JSON values as-is",
-// 			args: args{
-// 				secretData: map[string][]byte{
-// 					"simple-key": []byte("simple-value"),
-// 					"binary-key": []byte{0x01, 0x02, 0x03},
-// 				},
-// 			},
-// 			want: want{
-// 				result: map[string][]byte{
-// 					"simple-key": []byte("simple-value"),
-// 					"binary-key": []byte{0x01, 0x02, 0x03},
-// 				},
-// 				err: nil,
-// 			},
-// 		},
-// 		"JSONObjectValue": {
-// 			reason: "should flatten JSON object into top-level keys",
-// 			args: args{
-// 				secretData: map[string][]byte{
-// 					"credentials": []byte(`{"username":"user1","password":"pass123","endpoint":"https://api.example.com"}`),
-// 				},
-// 			},
-// 			want: want{
-// 				result: map[string][]byte{
-// 					"username": []byte("user1"),
-// 					"password": []byte("pass123"),
-// 					"endpoint": []byte("https://api.example.com"),
-// 				},
-// 				err: nil,
-// 			},
-// 		},
-// 		"MixedJSONAndNonJSON": {
-// 			reason: "should handle mix of JSON and non-JSON values",
-// 			args: args{
-// 				secretData: map[string][]byte{
-// 					"config":      []byte(`{"host":"localhost","port":8080}`),
-// 					"simple-text": []byte("not-json"),
-// 					"empty":       []byte(""),
-// 				},
-// 			},
-// 			want: want{
-// 				result: map[string][]byte{
-// 					"host":        []byte("localhost"),
-// 					"port":        []byte("8080"),
-// 					"simple-text": []byte("not-json"),
-// 					"empty":       []byte(""),
-// 				},
-// 				err: nil,
-// 			},
-// 		},
-// 		"JSONWithNestedObject": {
-// 			reason: "should marshal nested objects as JSON strings",
-// 			args: args{
-// 				secretData: map[string][]byte{
-// 					"complex": []byte(`{"simple":"value","nested":{"key":"value","number":42}}`),
-// 				},
-// 			},
-// 			want: want{
-// 				result: map[string][]byte{
-// 					"simple": []byte("value"),
-// 					"nested": []byte(`{"key":"value","number":42}`),
-// 				},
-// 				err: nil,
-// 			},
-// 		},
-// 		"JSONWithArray": {
-// 			reason: "should marshal arrays as JSON strings",
-// 			args: args{
-// 				secretData: map[string][]byte{
-// 					"data": []byte(`{"items":[1,2,3],"name":"test"}`),
-// 				},
-// 			},
-// 			want: want{
-// 				result: map[string][]byte{
-// 					"items": []byte("[1,2,3]"),
-// 					"name":  []byte("test"),
-// 				},
-// 				err: nil,
-// 			},
-// 		},
-// 		"JSONWithNullValue": {
-// 			reason: "should handle null values in JSON",
-// 			args: args{
-// 				secretData: map[string][]byte{
-// 					"data": []byte(`{"nullable":null,"string":"value"}`),
-// 				},
-// 			},
-// 			want: want{
-// 				result: map[string][]byte{
-// 					"nullable": []byte("null"),
-// 					"string":   []byte("value"),
-// 				},
-// 				err: nil,
-// 			},
-// 		},
-// 		"JSONWithBooleanAndNumber": {
-// 			reason: "should handle boolean and number values in JSON",
-// 			args: args{
-// 				secretData: map[string][]byte{
-// 					"data": []byte(`{"enabled":true,"count":123,"rate":45.67}`),
-// 				},
-// 			},
-// 			want: want{
-// 				result: map[string][]byte{
-// 					"enabled": []byte("true"),
-// 					"count":   []byte("123"),
-// 					"rate":    []byte("45.67"),
-// 				},
-// 				err: nil,
-// 			},
-// 		},
-// 		"MultipleJSONObjects": {
-// 			reason: "should flatten multiple JSON objects",
-// 			args: args{
-// 				secretData: map[string][]byte{
-// 					"auth":   []byte(`{"token":"abc123","expires":"2024-01-01"}`),
-// 					"config": []byte(`{"debug":true,"timeout":30}`),
-// 					"plain":  []byte("plain-value"),
-// 				},
-// 			},
-// 			want: want{
-// 				result: map[string][]byte{
-// 					"token":   []byte("abc123"),
-// 					"expires": []byte("2024-01-01"),
-// 					"debug":   []byte("true"),
-// 					"timeout": []byte("30"),
-// 					"plain":   []byte("plain-value"),
-// 				},
-// 				err: nil,
-// 			},
-// 		},
-// 	}
-//
-// 	for name, tc := range cases {
-// 		t.Run(name, func(t *testing.T) {
-// 			got, err := flattenSecretData(tc.args.secretData)
-// 			expectedErrorBehaviour(t, tc.want.err, err)
-// 			if diff := cmp.Diff(tc.want.result, got); diff != "" {
-// 				t.Errorf("\n%s\nflattenSecretData(...): -want, +got:\n%s\n", tc.reason, diff)
-// 			}
-// 		})
-// 	}
-// }
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
+	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
+	tracking_test "github.com/sap/crossplane-provider-btp/internal/tracking/test"
+)
+
+var (
+	errMockTracking = errors.New("mock tracking error")
+)
+
+// Mock TF Connector
+var _ servicebindingclient.TfConnector = &MockTfConnector{}
+
+type MockTfConnector struct {
+	connectErr error
+	external   managed.ExternalClient
+}
+
+func (m *MockTfConnector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
+	if m.connectErr != nil {
+		return nil, m.connectErr
+	}
+	if m.external != nil {
+		return m.external, nil
+	}
+	return &MockExternalClient{}, nil
+}
+
+// Mock Key Rotator
+var _ servicebindingclient.KeyRotator = &MockKeyRotator{}
+
+type MockKeyRotator struct {
+	hasExpiredKeysResult           bool
+	validateRotationSettingsCalled bool
+	retireBindingResult            bool
+	deleteExpiredKeysResult        []*v1alpha1.RetiredSBResource
+	deleteExpiredKeysErr           error
+	deleteRetiredKeysErr           error
+	isCurrentBindingRetiredResult  bool
+}
+
+func (m *MockKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
+	return m.hasExpiredKeysResult
+}
+
+func (m *MockKeyRotator) ValidateRotationSettings(cr *v1alpha1.ServiceBinding) {
+	m.validateRotationSettingsCalled = true
+}
+
+func (m *MockKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
+	return m.retireBindingResult
+}
+
+func (m *MockKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) ([]*v1alpha1.RetiredSBResource, error) {
+	if m.deleteExpiredKeysErr != nil {
+		return nil, m.deleteExpiredKeysErr
+	}
+	return m.deleteExpiredKeysResult, nil
+}
+
+func (m *MockKeyRotator) DeleteRetiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
+	return m.deleteRetiredKeysErr
+}
+
+func (m *MockKeyRotator) IsCurrentBindingRetired(cr *v1alpha1.ServiceBinding) bool {
+	return m.isCurrentBindingRetiredResult
+}
+
+// Mock External Client (for TF Connector)
+type MockExternalClient struct {
+	observeErr error
+	createErr  error
+	updateErr  error
+	deleteErr  error
+}
+
+func (m *MockExternalClient) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
+	return managed.ExternalObservation{}, m.observeErr
+}
+
+func (m *MockExternalClient) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
+	return managed.ExternalCreation{}, m.createErr
+}
+
+func (m *MockExternalClient) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
+	return managed.ExternalUpdate{}, m.updateErr
+}
+
+func (m *MockExternalClient) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
+	return managed.ExternalDelete{}, m.deleteErr
+}
+
+func (m *MockExternalClient) Disconnect(ctx context.Context) error {
+	return nil
+}
+
+// Mock Tracker for testing tracking errors
+type MockTracker struct {
+	trackErr      error
+	deleteBlocked bool
+}
+
+func (m *MockTracker) Track(ctx context.Context, mg resource.Managed) error {
+	return m.trackErr
+}
+
+func (m *MockTracker) SetConditions(ctx context.Context, mg resource.Managed) {}
+
+func (m *MockTracker) DeleteShouldBeBlocked(mg resource.Managed) bool {
+	return m.deleteBlocked
+}
+
+func (m *MockTracker) ResolveSource(ctx context.Context, ru providerv1alpha1.ResourceUsage) (*metav1.PartialObjectMetadata, error) {
+	return nil, nil
+}
+
+func (m *MockTracker) ResolveTarget(ctx context.Context, ru providerv1alpha1.ResourceUsage) (*metav1.PartialObjectMetadata, error) {
+	return nil, nil
+}
+
+// Mock ServiceBindingClient for testing main controller logic
+var _ servicebindingclient.ServiceBindingClientInterface = &MockServiceBindingClient{}
+
+type MockServiceBindingClient struct {
+	observation managed.ExternalObservation
+	creation     managed.ExternalCreation
+	update       managed.ExternalUpdate
+	deletion     managed.ExternalDelete
+	tfResource   *v1alpha1.SubaccountServiceBinding
+	observeErr   error
+	createErr    error
+	updateErr    error
+	deleteErr    error
+}
+
+func (m *MockServiceBindingClient) Create(ctx context.Context, publicCR *v1alpha1.ServiceBinding, btpName string) (string, types.UID, managed.ExternalCreation, error) {
+	if m.createErr != nil {
+		return "", "", managed.ExternalCreation{}, m.createErr
+	}
+	// Generate mock UUID-like external name and UID
+	externalName := "12345678-1234-5678-9abc-123456789012" // Mock UUID
+	instanceUID := types.UID("uid-12345678-1234-5678-9abc-123456789012")
+	return externalName, instanceUID, m.creation, nil
+}
+
+func (m *MockServiceBindingClient) Delete(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalDelete, error) {
+	if m.deleteErr != nil {
+		return managed.ExternalDelete{}, m.deleteErr
+	}
+	return m.deletion, nil
+}
+
+func (m *MockServiceBindingClient) Update(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalUpdate, error) {
+	if m.updateErr != nil {
+		return managed.ExternalUpdate{}, m.updateErr
+	}
+	return m.update, nil
+}
+
+func (m *MockServiceBindingClient) Observe(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
+	if m.observeErr != nil {
+		return managed.ExternalObservation{}, nil, m.observeErr
+	}
+	return m.observation, m.tfResource, nil
+}
+
+// Test Connect method - This is the main test that validates our dependency injection implementation
+func TestConnect(t *testing.T) {
+	type fields struct {
+		tfConnectorErr          error
+		serviceBindingClientErr error
+		keyRotatorErr           error
+		trackingErr             error
+	}
+
+	type args struct {
+		mg resource.Managed
+	}
+
+	type want struct {
+		err            error
+		externalExists bool
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"WrongResourceType": {
+			reason: "should return error for wrong resource type",
+			fields: fields{},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{}, // Wrong type
+			},
+			want: want{
+				err: errors.New(errNotServiceBinding),
+			},
+		},
+		"TrackingError": {
+			reason: "should return error when tracking fails",
+			fields: fields{
+				trackingErr: errMockTracking,
+			},
+			args: args{
+				mg: expectedServiceBinding(),
+			},
+			want: want{
+				err: errMockTracking,
+			},
+		},
+		"Success": {
+			reason: "should successfully create external client",
+			fields: fields{},
+			args: args{
+				mg: expectedServiceBinding(),
+			},
+			want: want{
+				err:            nil,
+				externalExists: true,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Store original functions
+			originalTfConnectorFn := newTfConnectorFn
+			originalServiceBindingClientFn := newServiceBindingClientFn
+			originalKeyRotatorFn := newSBKeyRotatorFn
+
+			// Set up mocks
+			newTfConnectorFn = func(kube kubeclient.Client) servicebindingclient.TfConnector {
+				return &MockTfConnector{connectErr: tc.fields.tfConnectorErr}
+			}
+
+			newServiceBindingClientFn = func(sbConnector servicebindingclient.TfConnector, kube kubeclient.Client) *servicebindingclient.ServiceBindingClient {
+				if tc.fields.serviceBindingClientErr != nil {
+					panic(tc.fields.serviceBindingClientErr) // Simulate creation failure
+				}
+				return nil // Mock return for successful creation
+			}
+
+			newSBKeyRotatorFn = func(bindingDeleter servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator {
+				if tc.fields.keyRotatorErr != nil {
+					panic(tc.fields.keyRotatorErr) // Simulate creation failure
+				}
+				return &MockKeyRotator{}
+			}
+
+			// Restore original functions after test
+			defer func() {
+				newTfConnectorFn = originalTfConnectorFn
+				newServiceBindingClientFn = originalServiceBindingClientFn
+				newSBKeyRotatorFn = originalKeyRotatorFn
+			}()
+
+			// Set up connector
+			var tracker tracking.ReferenceResolverTracker = tracking_test.NoOpReferenceResolverTracker{}
+			if tc.fields.trackingErr != nil {
+				tracker = &MockTracker{trackErr: tc.fields.trackingErr}
+			}
+
+			c := connector{
+				kube:                      &test.MockClient{},
+				usage:                     resource.TrackerFn(func(ctx context.Context, mg resource.Managed) error { return nil }),
+				resourcetracker:           tracker,
+				tfConnector:               newTfConnectorFn(&test.MockClient{}),
+				newServiceBindingClientFn: newServiceBindingClientFn,
+				newSBKeyRotatorFn:         newSBKeyRotatorFn,
+			}
+
+			// Handle panics from mock creation failures
+			defer func() {
+				if r := recover(); r != nil {
+					if tc.fields.serviceBindingClientErr != nil && r == tc.fields.serviceBindingClientErr {
+						// Expected panic, convert to error for test
+						if diff := cmp.Diff(tc.want.err, tc.fields.serviceBindingClientErr, test.EquateErrors()); diff != "" {
+							t.Errorf("\n%s\nc.Connect(...): -want error, +got error:\n%s\n", tc.reason, diff)
+						}
+						return
+					}
+					if tc.fields.keyRotatorErr != nil && r == tc.fields.keyRotatorErr {
+						// Expected panic, convert to error for test
+						if diff := cmp.Diff(tc.want.err, tc.fields.keyRotatorErr, test.EquateErrors()); diff != "" {
+							t.Errorf("\n%s\nc.Connect(...): -want error, +got error:\n%s\n", tc.reason, diff)
+						}
+						return
+					}
+					panic(r) // Re-panic if unexpected
+				}
+			}()
+
+			got, err := c.Connect(context.Background(), tc.args.mg)
+
+			if tc.want.externalExists && got == nil {
+				t.Errorf("expected external client, got nil")
+			}
+
+			// Check error expectations with better error handling
+			if tc.want.err != nil {
+				if err == nil {
+					t.Errorf("\n%s\nc.Connect(...): expected error, got nil\n", tc.reason)
+				} else {
+					// Check if the error message contains the expected text
+					expectedMsg := tc.want.err.Error()
+					gotMsg := err.Error()
+					if !containsError(gotMsg, expectedMsg) {
+						t.Errorf("\n%s\nc.Connect(...): expected error containing %q, got %q\n", tc.reason, expectedMsg, gotMsg)
+					}
+				}
+			} else if err != nil {
+				t.Errorf("\n%s\nc.Connect(...): expected no error, got %v\n", tc.reason, err)
+			}
+		})
+	}
+}
+
+// Test flattenSecretData function
+func TestFlattenSecretData(t *testing.T) {
+	cases := map[string]struct {
+		reason string
+		input  map[string][]byte
+		want   map[string][]byte
+		err    error
+	}{
+		"EmptyInput": {
+			reason: "should handle empty input",
+			input:  map[string][]byte{},
+			want:   map[string][]byte{},
+		},
+		"NonJSONValue": {
+			reason: "should keep non-JSON values as-is",
+			input: map[string][]byte{
+				"simple": []byte("value"),
+			},
+			want: map[string][]byte{
+				"simple": []byte("value"),
+			},
+		},
+		"JSONObjectValue": {
+			reason: "should flatten JSON object values",
+			input: map[string][]byte{
+				"json_obj": []byte(`{"key1": "value1", "key2": "value2"}`),
+			},
+			want: map[string][]byte{
+				"key1": []byte("value1"),
+				"key2": []byte("value2"),
+			},
+		},
+		"MixedValues": {
+			reason: "should handle mixed JSON and non-JSON values",
+			input: map[string][]byte{
+				"simple":   []byte("simple_value"),
+				"json_obj": []byte(`{"nested_key": "nested_value"}`),
+			},
+			want: map[string][]byte{
+				"simple":     []byte("simple_value"),
+				"nested_key": []byte("nested_value"),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := flattenSecretData(tc.input)
+
+			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nflattenSecretData(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			}
+
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("\n%s\nflattenSecretData(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
+
+// Test helper function validation
+func TestServiceBindingHelpers(t *testing.T) {
+	t.Run("expectedServiceBinding creates valid CR", func(t *testing.T) {
+		cr := expectedServiceBinding()
+
+		if cr == nil {
+			t.Errorf("expectedServiceBinding() returned nil")
+		}
+
+		// Should create an empty ServiceBinding by default
+		if cr.Name != "" || len(cr.GetAnnotations()) > 0 {
+			t.Errorf("expectedServiceBinding() should create empty CR by default")
+		}
+	})
+
+	t.Run("withMetadata sets external name and annotations", func(t *testing.T) {
+		annotations := map[string]string{"test": "value"}
+		cr := expectedServiceBinding(
+			withMetadata("test-external-name", annotations),
+		)
+
+		if meta.GetExternalName(cr) != "test-external-name" {
+			t.Errorf("withMetadata() failed to set external name, got: %s", meta.GetExternalName(cr))
+		}
+
+		if cr.GetAnnotations()["test"] != "value" {
+			t.Errorf("withMetadata() failed to set annotations")
+		}
+	})
+
+	t.Run("withConditions sets status conditions", func(t *testing.T) {
+		cr := expectedServiceBinding(
+			withConditions(xpv1.Available(), xpv1.Creating()),
+		)
+
+		if len(cr.Status.Conditions) != 2 {
+			t.Errorf("withConditions() failed to set conditions")
+		}
+	})
+}
+
+// Test parseIso8601Date function
+func TestParseIso8601Date(t *testing.T) {
+	cases := map[string]struct {
+		reason string
+		input  string
+		want   string // Expected formatted time
+		err    error
+	}{
+		"ValidDate": {
+			reason: "should parse valid ISO8601 date",
+			input:  "2023-01-15T10:30:00Z",
+			want:   "2023-01-15T10:30:00Z",
+		},
+		"ValidDateWithTimezone": {
+			reason: "should parse valid ISO8601 date with timezone",
+			input:  "2023-01-15T10:30:00+0200",
+			want:   "2023-01-15T08:30:00Z", // Converted to UTC
+		},
+		"InvalidDate": {
+			reason: "should return error for invalid date",
+			input:  "invalid-date",
+			err:    errors.New("parsing time"),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := parseIso8601Date(tc.input)
+
+			if tc.err != nil {
+				if err == nil {
+					t.Errorf("\n%s\nparseIso8601Date(...): expected error, got nil\n", tc.reason)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("\n%s\nparseIso8601Date(...): unexpected error: %v\n", tc.reason, err)
+				return
+			}
+
+			// Convert to UTC for comparison if we expect UTC
+			gotTime := got.Time
+			if strings.HasSuffix(tc.want, "Z") {
+				gotTime = gotTime.UTC()
+			}
+			gotStr := gotTime.Format("2006-01-02T15:04:05Z07:00")
+			if gotStr != tc.want {
+				t.Errorf("\n%s\nparseIso8601Date(...): want %s, got %s\n", tc.reason, tc.want, gotStr)
+			}
+		})
+	}
+}
+
+// Helper functions for building test ServiceBinding CRs
+func expectedServiceBinding(opts ...func(*v1alpha1.ServiceBinding)) *v1alpha1.ServiceBinding {
+	cr := &v1alpha1.ServiceBinding{}
+
+	// Apply each option to modify the CR
+	for _, opt := range opts {
+		opt(cr)
+	}
+
+	return cr
+}
+
+// Essential helper functions for ServiceBinding test construction
+
+func withMetadata(externalName string, annotations map[string]string) func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
+		if annotations != nil {
+			cr.SetAnnotations(annotations)
+		}
+		if externalName != "" {
+			meta.SetExternalName(cr, externalName)
+		}
+	}
+}
+
+func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
+		cr.Status.Conditions = conditions
+	}
+}
+
+// Test Observe method - This validates the main observation logic
+func TestObserve(t *testing.T) {
+	type fields struct {
+		client     servicebindingclient.ServiceBindingClientInterface
+		keyRotator servicebindingclient.KeyRotator
+		tracker    *MockTracker
+		kube       *test.MockClient
+	}
+
+	type args struct {
+		mg resource.Managed
+	}
+
+	type want struct {
+		err error
+		o   managed.ExternalObservation
+		cr  *v1alpha1.ServiceBinding // Expected complete CR after observe
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"WrongResourceType": {
+			reason: "should return error for wrong resource type",
+			fields: fields{
+				client:     &MockServiceBindingClient{},
+				keyRotator: &MockKeyRotator{},
+				tracker:    &MockTracker{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{}, // Wrong type
+			},
+			want: want{
+				err: errors.New(errNotServiceBinding),
+			},
+		},
+		"ClientObserveError": {
+			reason: "should return error when client observe fails",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					observeErr: errors.New("client observe error"),
+				},
+				keyRotator: &MockKeyRotator{},
+				tracker:    &MockTracker{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+				),
+			},
+			want: want{
+				err: errors.New("client observe error"),
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+				),
+			},
+		},
+		"ResourceNotExists": {
+			reason: "should return ResourceExists=false when resource doesn't exist",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					observation: managed.ExternalObservation{
+						ResourceExists: false,
+					},
+				},
+				keyRotator: &MockKeyRotator{},
+				tracker:    &MockTracker{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+				),
+			},
+		},
+		"ResourceExistsNotUpToDate": {
+			reason: "should return ResourceUpToDate=false when resource needs update",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					observation: managed.ExternalObservation{
+						ResourceExists:   true,
+						ResourceUpToDate: false,
+						ConnectionDetails: managed.ConnectionDetails{
+							"key": []byte("value"),
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: false,
+				},
+				tracker: &MockTracker{},
+				kube:    &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+					ConnectionDetails: managed.ConnectionDetails{
+						"key": []byte("value"),
+					},
+				},
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+				),
+			},
+		},
+		"ResourceUpToDateButExpiredKeys": {
+			reason: "should return ResourceUpToDate=false when resource has expired keys",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					observation: managed.ExternalObservation{
+						ResourceExists:   true,
+						ResourceUpToDate: true,
+						ConnectionDetails: managed.ConnectionDetails{
+							"key": []byte("value"),
+						},
+					},
+					tfResource: &v1alpha1.SubaccountServiceBinding{
+						Status: v1alpha1.SubaccountServiceBindingStatus{
+							AtProvider: v1alpha1.SubaccountServiceBindingObservation{
+								ID:    internal.Ptr("test-id"),
+								State: internal.Ptr("succeeded"),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: true, // Has expired keys
+				},
+				tracker: &MockTracker{},
+				kube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false, // Should be false due to expired keys
+					ConnectionDetails: managed.ConnectionDetails{
+						"key": []byte("value"),
+					},
+				},
+				cr: expectedServiceBinding(
+					withMetadata("", map[string]string{"crossplane.io/external-name": ""}), // External name gets set from tfResource
+					withConditions(xpv1.Available()), // Available condition gets set
+					func(cr *v1alpha1.ServiceBinding) {
+						// AtProvider gets updated with tfResource data
+						cr.Status.AtProvider.ID = "test-id"
+						cr.Status.AtProvider.State = internal.Ptr("succeeded")
+					},
+				),
+			},
+		},
+		"ResourceUpToDateNoExpiredKeys": {
+			reason: "should return ResourceUpToDate=true when resource is current and no expired keys",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					observation: managed.ExternalObservation{
+						ResourceExists:   true,
+						ResourceUpToDate: true,
+						ConnectionDetails: managed.ConnectionDetails{
+							"key": []byte("value"),
+						},
+					},
+					tfResource: &v1alpha1.SubaccountServiceBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								"crossplane.io/external-name": "tf-external-uuid-123",
+							},
+						},
+						Status: v1alpha1.SubaccountServiceBindingStatus{
+							AtProvider: v1alpha1.SubaccountServiceBindingObservation{
+								ID:           internal.Ptr("tf-binding-id-456"),
+								Name:         internal.Ptr("tf-binding-name-789"),
+								Ready:        internal.Ptr(true),
+								State:        internal.Ptr("succeeded"),
+								CreatedDate:  internal.Ptr("2023-10-21T10:30:00Z"),
+								LastModified: internal.Ptr("2023-10-21T15:45:00Z"),
+								Parameters:   internal.Ptr(`{"param1":"value1","param2":"value2"}`),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: false,
+					retireBindingResult:  false,
+				},
+				tracker: &MockTracker{},
+				kube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+					ConnectionDetails: managed.ConnectionDetails{
+						"key": []byte("value"),
+					},
+				},
+				cr: expectedServiceBinding(
+					withMetadata("tf-external-uuid-123", map[string]string{"crossplane.io/external-name": "tf-external-uuid-123"}), // External name gets set from tfResource
+					withConditions(xpv1.Available()), // Available condition gets set when State="succeeded"
+					func(cr *v1alpha1.ServiceBinding) {
+						// All AtProvider fields should be populated from tfResource via updateServiceBindingFromTfResource
+						cr.Status.AtProvider.ID = "tf-binding-id-456"
+						cr.Status.AtProvider.Name = "tf-binding-name-789"
+						cr.Status.AtProvider.Ready = internal.Ptr(true)
+						cr.Status.AtProvider.State = internal.Ptr("succeeded")
+						cr.Status.AtProvider.Parameters = internal.Ptr(`{"param1":"value1","param2":"value2"}`)
+						// CreatedDate and LastModified should be parsed from ISO8601 to metav1.Time
+						createdTime, _ := time.Parse(time.RFC3339, "2023-10-21T10:30:00Z")
+						cr.Status.AtProvider.CreatedDate = &metav1.Time{Time: createdTime}
+						lastModifiedTime, _ := time.Parse(time.RFC3339, "2023-10-21T15:45:00Z")
+						cr.Status.AtProvider.LastModified = &metav1.Time{Time: lastModifiedTime}
+					},
+				),
+			},
+		},
+		"RetireBindingTriggered": {
+			reason: "should return ResourceExists=false when binding needs retirement",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					observation: managed.ExternalObservation{
+						ResourceExists:   true,
+						ResourceUpToDate: true,
+						ConnectionDetails: managed.ConnectionDetails{
+							"key": []byte("value"),
+						},
+					},
+					tfResource: &v1alpha1.SubaccountServiceBinding{
+						Status: v1alpha1.SubaccountServiceBindingStatus{
+							AtProvider: v1alpha1.SubaccountServiceBindingObservation{
+								ID:    internal.Ptr("test-id"),
+								State: internal.Ptr("succeeded"),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: false,
+					retireBindingResult:  true, // Triggers retirement
+				},
+				tracker: &MockTracker{},
+				kube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false, // Should be false due to retirement
+				},
+				cr: expectedServiceBinding(
+					withMetadata("", map[string]string{"crossplane.io/external-name": ""}), // External name gets set from tfResource
+					withConditions(xpv1.Available()), // Available condition gets set
+					func(cr *v1alpha1.ServiceBinding) {
+						// AtProvider gets updated with tfResource data
+						cr.Status.AtProvider.ID = "test-id"
+						cr.Status.AtProvider.State = internal.Ptr("succeeded")
+					},
+				),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				kube:       tc.fields.kube,
+				client:     tc.fields.client,
+				keyRotator: tc.fields.keyRotator,
+				tracker:    tc.fields.tracker,
+			}
+
+			got, err := e.Observe(context.Background(), tc.args.mg)
+
+			if tc.want.err != nil {
+				if err == nil {
+					t.Errorf("\n%s\ne.Observe(...): expected error, got nil\n", tc.reason)
+				} else {
+					expectedMsg := tc.want.err.Error()
+					gotMsg := err.Error()
+					if !containsError(gotMsg, expectedMsg) {
+						t.Errorf("\n%s\ne.Observe(...): expected error containing %q, got %q\n", tc.reason, expectedMsg, gotMsg)
+					}
+				}
+			} else if err != nil {
+				t.Errorf("\n%s\ne.Observe(...): expected no error, got %v\n", tc.reason, err)
+			}
+
+			if diff := cmp.Diff(tc.want.o, got); diff != "" {
+				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+
+			// Verify the entire CR state
+			if tc.want.cr != nil {
+				cr, ok := tc.args.mg.(*v1alpha1.ServiceBinding)
+				if !ok {
+					t.Fatalf("expected *v1alpha1.ServiceBinding, got %T", tc.args.mg)
+				}
+				if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+					t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+				}
+			}
+		})
+	}
+}
+
+// Test Create method - This validates the main creation logic
+func TestCreate(t *testing.T) {
+	type fields struct {
+		client     servicebindingclient.ServiceBindingClientInterface
+		keyRotator servicebindingclient.KeyRotator
+		kube       *test.MockClient
+	}
+
+	type args struct {
+		mg resource.Managed
+	}
+
+	type want struct {
+		err error
+		cr  *v1alpha1.ServiceBinding // Expected complete CR after creation
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"WrongResourceType": {
+			reason: "should return error for wrong resource type",
+			fields: fields{
+				client:     &MockServiceBindingClient{},
+				keyRotator: &MockKeyRotator{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{}, // Wrong type
+			},
+			want: want{
+				err: errors.New(errNotServiceBinding),
+			},
+		},
+		"ClientCreateError": {
+			reason: "should return error when client create fails",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					createErr: errors.New("client create error"),
+				},
+				keyRotator: &MockKeyRotator{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				err: errors.New("client create error"),
+				cr: expectedServiceBinding(
+					withConditions(xpv1.Creating()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.Name = "test-binding"
+						// AtProvider.Name should remain empty when client create fails
+						// because btpName is not set until after successful create
+					},
+				),
+			},
+		},
+		"SuccessWithoutRotation": {
+			reason: "should create successfully when rotation is disabled",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					creation: managed.ExternalCreation{
+						ConnectionDetails: managed.ConnectionDetails{
+							"test-key": []byte("test-value"),
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{},
+				kube: &test.MockClient{
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				cr: expectedServiceBinding(
+					withMetadata("12345678-1234-5678-9abc-123456789012", nil), // External name gets set to UUID returned by client
+					withConditions(xpv1.Creating()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.Name = "test-binding"
+						// ALL AtProvider fields should remain empty after Create - only external name is set
+						cr.Status.AtProvider.Name = ""
+						cr.Status.AtProvider.ID = ""
+						cr.Status.AtProvider.CreatedDate = nil
+						cr.Status.AtProvider.LastModified = nil
+						cr.Status.AtProvider.Ready = nil
+						cr.Status.AtProvider.State = nil
+					},
+				),
+			},
+		},
+		"SuccessWithRotation": {
+			reason: "should create successfully when rotation is enabled",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					creation: managed.ExternalCreation{
+						ConnectionDetails: managed.ConnectionDetails{
+							"test-key": []byte("test-value"),
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{},
+				kube: &test.MockClient{
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("old-external-name-uuid", map[string]string{servicebindingclient.ForceRotationKey: "true"}),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.Name = "test-binding"
+						cr.Spec.ForProvider.Rotation = &v1alpha1.RotationParameters{
+							Frequency: &metav1.Duration{Duration: time.Hour * 24},
+						}
+						// Simulate existing status from previous binding (before rotation)
+						cr.Status.AtProvider.ID = "old-binding-id"
+						cr.Status.AtProvider.Name = "test-binding-old123"
+						cr.Status.AtProvider.State = internal.Ptr("succeeded")
+						cr.Status.AtProvider.Ready = internal.Ptr(true)
+					},
+				),
+			},
+			want: want{
+				cr: expectedServiceBinding(
+					withMetadata("12345678-1234-5678-9abc-123456789012", nil), // External name updated, force-rotation annotation removed
+					withConditions(xpv1.Creating()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.Name = "test-binding"
+						cr.Spec.ForProvider.Rotation = &v1alpha1.RotationParameters{
+							Frequency: &metav1.Duration{Duration: time.Hour * 24},
+						}
+						// Existing status should be preserved during rotation Create
+						cr.Status.AtProvider.ID = "old-binding-id"
+						cr.Status.AtProvider.Name = "test-binding-old123"
+						cr.Status.AtProvider.State = internal.Ptr("succeeded")
+						cr.Status.AtProvider.Ready = internal.Ptr(true)
+						// Other fields remain as they were
+						cr.Status.AtProvider.CreatedDate = nil
+						cr.Status.AtProvider.LastModified = nil
+					},
+				),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				kube:       tc.fields.kube,
+				client:     tc.fields.client,
+				keyRotator: tc.fields.keyRotator,
+			}
+
+			got, err := e.Create(context.Background(), tc.args.mg)
+
+			if tc.want.err != nil {
+				if err == nil {
+					t.Errorf("\n%s\ne.Create(...): expected error, got nil\n", tc.reason)
+				} else {
+					expectedMsg := tc.want.err.Error()
+					gotMsg := err.Error()
+					if !containsError(gotMsg, expectedMsg) {
+						t.Errorf("\n%s\ne.Create(...): expected error containing %q, got %q\n", tc.reason, expectedMsg, gotMsg)
+					}
+				}
+			} else if err != nil {
+				t.Errorf("\n%s\ne.Create(...): expected no error, got %v\n", tc.reason, err)
+			}
+
+			if tc.want.err == nil {
+				expectedCreation := tc.fields.client.(*MockServiceBindingClient).creation
+				if diff := cmp.Diff(expectedCreation, got); diff != "" {
+					t.Errorf("\n%s\ne.Create(...): -want creation, +got creation:\n%s\n", tc.reason, diff)
+				}
+			}
+
+			// Check final CR state - simple want/got comparison
+			if tc.want.cr != nil {
+				cr, ok := tc.args.mg.(*v1alpha1.ServiceBinding)
+				if !ok {
+					t.Fatalf("expected *v1alpha1.ServiceBinding, got %T", tc.args.mg)
+				}
+				if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+					t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	type fields struct {
+		client     servicebindingclient.ServiceBindingClientInterface
+		keyRotator servicebindingclient.KeyRotator
+		kube       *test.MockClient
+	}
+
+	type args struct {
+		mg resource.Managed
+	}
+
+	type want struct {
+		err error
+		cr  *v1alpha1.ServiceBinding // Expected complete CR after update
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"WrongResourceType": {
+			reason: "should return error for wrong resource type",
+			fields: fields{
+				client:     &MockServiceBindingClient{},
+				keyRotator: &MockKeyRotator{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{}, // Wrong type
+			},
+			want: want{
+				err: errors.New(errNotServiceBinding),
+			},
+		},
+		"ClientUpdateError": {
+			reason: "should return error when client update fails",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					updateErr: errors.New("client update error"),
+				},
+				keyRotator: &MockKeyRotator{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				err: errors.New("client update error"),
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+		},
+		"DeleteExpiredKeysError": {
+			reason: "should return error when deleting expired keys fails",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					update: managed.ExternalUpdate{
+						ConnectionDetails: managed.ConnectionDetails{
+							"test-key": []byte("test-value"),
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					deleteExpiredKeysErr: errors.New("delete expired keys error"),
+				},
+				kube: &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				err: errors.New("delete expired keys error"),
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+		},
+		"SuccessWithCurrentBindingRetired": {
+			reason: "should skip update when current binding is retired",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					update: managed.ExternalUpdate{
+						ConnectionDetails: managed.ConnectionDetails{
+							"test-key": []byte("test-value"),
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					isCurrentBindingRetiredResult: true,
+					deleteExpiredKeysResult:       []*v1alpha1.RetiredSBResource{},
+				},
+				kube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+						cr.Status.AtProvider.RetiredKeys = []*v1alpha1.RetiredSBResource{}
+					},
+				),
+			},
+		},
+		"SuccessWithUpdate": {
+			reason: "should update successfully when binding is not retired",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					update: managed.ExternalUpdate{
+						ConnectionDetails: managed.ConnectionDetails{
+							"updated-key": []byte("updated-value"),
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					isCurrentBindingRetiredResult: false,
+					deleteExpiredKeysResult: []*v1alpha1.RetiredSBResource{
+						{
+							ID:   "retired-id-1",
+							Name: "retired-binding-1",
+						},
+					},
+				},
+				kube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+						cr.Status.AtProvider.RetiredKeys = []*v1alpha1.RetiredSBResource{
+							{
+								ID:   "retired-id-1",
+								Name: "retired-binding-1",
+							},
+						}
+					},
+				),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				kube:       tc.fields.kube,
+				client:     tc.fields.client,
+				keyRotator: tc.fields.keyRotator,
+			}
+
+			got, err := e.Update(context.Background(), tc.args.mg)
+
+			if tc.want.err != nil {
+				if err == nil {
+					t.Errorf("\n%s\ne.Update(...): expected error, got nil\n", tc.reason)
+				} else {
+					expectedMsg := tc.want.err.Error()
+					gotMsg := err.Error()
+					if !containsError(gotMsg, expectedMsg) {
+						t.Errorf("\n%s\ne.Update(...): expected error containing %q, got %q\n", tc.reason, expectedMsg, gotMsg)
+					}
+				}
+			} else if err != nil {
+				t.Errorf("\n%s\ne.Update(...): expected no error, got %v\n", tc.reason, err)
+			}
+
+			// Verify the update result
+			if tc.want.err == nil {
+				// For the retired binding case, we expect empty connection details since update is skipped
+				if name == "SuccessWithCurrentBindingRetired" {
+					if len(got.ConnectionDetails) != 0 {
+						t.Errorf("\n%s\ne.Update(...): expected empty connection details for retired binding, got: %v\n", tc.reason, got.ConnectionDetails)
+					}
+				} else {
+					expectedUpdate := tc.fields.client.(*MockServiceBindingClient).update
+					// Check if connection details were flattened correctly
+					if len(expectedUpdate.ConnectionDetails) > 0 {
+						// For successful updates, the connection details should be flattened
+						if diff := cmp.Diff(expectedUpdate.ConnectionDetails, got.ConnectionDetails); diff != "" {
+							t.Errorf("\n%s\ne.Update(...): -want connection details, +got connection details:\n%s\n", tc.reason, diff)
+						}
+					}
+				}
+			}
+
+			if tc.want.cr != nil {
+				cr, ok := tc.args.mg.(*v1alpha1.ServiceBinding)
+				if !ok {
+					t.Fatalf("expected *v1alpha1.ServiceBinding, got %T", tc.args.mg)
+				}
+				if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+					t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+				}
+			}
+		})
+	}
+}
+
+func TestDelete(t *testing.T) {
+	type fields struct {
+		client     servicebindingclient.ServiceBindingClientInterface
+		keyRotator servicebindingclient.KeyRotator
+		tracker    *MockTracker
+		kube       *test.MockClient
+	}
+
+	type args struct {
+		mg resource.Managed
+	}
+
+	type want struct {
+		err error
+		cr  *v1alpha1.ServiceBinding // Expected complete CR after deletion
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"WrongResourceType": {
+			reason: "should return error for wrong resource type",
+			fields: fields{
+				client:     &MockServiceBindingClient{},
+				keyRotator: &MockKeyRotator{},
+				tracker:    &MockTracker{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{}, // Wrong type
+			},
+			want: want{
+				err: errors.New(errNotServiceBinding),
+			},
+		},
+		"DeleteBlockedByDependencies": {
+			reason: "should return error when delete is blocked by dependencies",
+			fields: fields{
+				client:     &MockServiceBindingClient{},
+				keyRotator: &MockKeyRotator{},
+				tracker: &MockTracker{
+					deleteBlocked: true,
+				},
+				kube: &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				err: errors.New(providerv1alpha1.ErrResourceInUse),
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					withConditions(xpv1.Deleting()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+		},
+		"DeleteRetiredKeysError": {
+			reason: "should return error when deleting retired keys fails",
+			fields: fields{
+				client:     &MockServiceBindingClient{},
+				keyRotator: &MockKeyRotator{
+					deleteRetiredKeysErr: errors.New("delete retired keys error"),
+				},
+				tracker: &MockTracker{
+					deleteBlocked: false,
+				},
+				kube: &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				err: errors.New("delete retired keys error"),
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					withConditions(xpv1.Deleting()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+		},
+		"ClientDeleteError": {
+			reason: "should return error when client delete fails",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					deleteErr: errors.New("client delete error"),
+				},
+				keyRotator: &MockKeyRotator{},
+				tracker: &MockTracker{
+					deleteBlocked: false,
+				},
+				kube: &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				err: errors.New("client delete error"),
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					withConditions(xpv1.Deleting()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+		},
+		"SuccessfulDelete": {
+			reason: "should delete successfully",
+			fields: fields{
+				client: &MockServiceBindingClient{
+					deletion: managed.ExternalDelete{},
+				},
+				keyRotator: &MockKeyRotator{},
+				tracker: &MockTracker{
+					deleteBlocked: false,
+				},
+				kube: &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					withConditions(xpv1.Deleting()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				kube:       tc.fields.kube,
+				client:     tc.fields.client,
+				keyRotator: tc.fields.keyRotator,
+				tracker:    tc.fields.tracker,
+			}
+
+			got, err := e.Delete(context.Background(), tc.args.mg)
+
+			if tc.want.err != nil {
+				if err == nil {
+					t.Errorf("\n%s\ne.Delete(...): expected error, got nil\n", tc.reason)
+				} else {
+					expectedMsg := tc.want.err.Error()
+					gotMsg := err.Error()
+					if !containsError(gotMsg, expectedMsg) {
+						t.Errorf("\n%s\ne.Delete(...): expected error containing %q, got %q\n", tc.reason, expectedMsg, gotMsg)
+					}
+				}
+			} else if err != nil {
+				t.Errorf("\n%s\ne.Delete(...): expected no error, got %v\n", tc.reason, err)
+			}
+
+			if tc.want.err == nil {
+				expectedDeletion := tc.fields.client.(*MockServiceBindingClient).deletion
+				if diff := cmp.Diff(expectedDeletion, got); diff != "" {
+					t.Errorf("\n%s\ne.Delete(...): -want deletion, +got deletion:\n%s\n", tc.reason, diff)
+				}
+			}
+
+			if tc.want.cr != nil {
+				cr, ok := tc.args.mg.(*v1alpha1.ServiceBinding)
+				if !ok {
+					t.Fatalf("expected *v1alpha1.ServiceBinding, got %T", tc.args.mg)
+				}
+				if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+					t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+				}
+			}
+		})
+	}
+}
+
+// Helper function to check if an error message contains the expected text
+func containsError(got, expected string) bool {
+	// For tracking errors, we expect the error to be wrapped
+	if expected == "mock tracking error" {
+		return strings.Contains(got, expected)
+	}
+	return strings.Contains(got, expected)
+}
