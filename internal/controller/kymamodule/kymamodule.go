@@ -65,15 +65,13 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	creds, err := secretfetcher.Fetch(ctx, cr)
 
 	if err != nil {
-		return &external{
-			client:        nil, // No client available
-			tracker:       c.resourcetracker,
-			kube:          c.kube,
-			secretfetcher: secretfetcher,
-		}, nil
+		return nil, errors.Wrap(err, errSetupClient)
 	}
 
 	svc, err := c.newServiceFn(creds)
+	if err != nil {
+		return nil, errors.Wrap(err, errSetupClient)
+	}
 
 	return &external{
 			client:        svc,
@@ -81,7 +79,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 			kube:          c.kube,
 			secretfetcher: secretfetcher,
 		},
-		err
+		nil
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
