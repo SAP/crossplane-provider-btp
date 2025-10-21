@@ -46,6 +46,22 @@ func TestBuildComplexParameterJson(t *testing.T) {
 			args: args{specParams: []byte("a: 1\nb: x"), secretRefs: []xpv1.SecretKeySelector{}},
 			want: map[string]interface{}{"a": 1, "b": "x"},
 		},
+		"OnlySecretPrimitive": {
+			args: args{
+				secretRefs: []xpv1.SecretKeySelector{{
+					SecretReference: xpv1.SecretReference{Name: "s1", Namespace: "default"},
+					Key:             "data",
+				}},
+				// no spec parameters provided
+				specParams: []byte{},
+				client: &test.MockClient{MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					secret := obj.(*corev1.Secret)
+					secret.Data = map[string][]byte{"data": []byte(`{"password":"fromSecret"}`)}
+					return nil
+				}},
+			},
+			want: map[string]interface{}{"password": "fromSecret"},
+		},
 		"SecretsAndSpecMergeNoOverlap": {
 			args: args{
 				secretRefs: []xpv1.SecretKeySelector{{
@@ -135,6 +151,21 @@ func TestBuildComplexParameterJson(t *testing.T) {
 				}},
 			},
 			want: map[string]interface{}{"parent": map[string]interface{}{"password": "keep"}},
+		},
+		"MapAndNonMapConflictKeepNonMap": {
+			args: args{
+				secretRefs: []xpv1.SecretKeySelector{{
+					SecretReference: xpv1.SecretReference{Name: "s1", Namespace: "default"},
+					Key:             "data",
+				}},
+				specParams: []byte(`{"parent":"not-a-map"}`),
+				client: &test.MockClient{MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					secret := obj.(*corev1.Secret)
+					secret.Data = map[string][]byte{"data": []byte(`{"parent":{"a":1}}`)}
+					return nil
+				}},
+			},
+			want: map[string]interface{}{"parent": "not-a-map"},
 		},
 	}
 
