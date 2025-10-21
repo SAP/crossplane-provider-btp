@@ -22,7 +22,6 @@ import (
 
 var (
 	errNotKymaModule                  = "managed resource is not a KymaModule custom resource"
-	errTrackPCUsage                   = "cannot track ProviderConfig usage"
 	errTrackRUsage                    = "cannot track ResourceUsage"
 	errSetupClient                    = "cannot setup KymaModule client"
 	errObserveResource                = "cannot observe KymaModule"
