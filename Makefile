@@ -242,11 +242,6 @@ test-e2e: $(KIND) $(HELM3) build generate-test-crs
 	@UUT_CONFIG=$(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME)):$(VERSION) UUT_CONTROLLER=$(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME))-controller:$(VERSION) go test $(PROJECT_REPO)/test/... -tags=e2e -short -count=1 -timeout 30m
 	@$(OK) e2e tests passed
 
-list-e2e-tests: $(KIND)
-	@$(INFO) listing e2e tests
-	@UUT_CONFIG=$(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME)):$(VERSION) UUT_CONTROLLER=$(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME))-controller:$(VERSION) go test -list . $(PROJECT_REPO)/test/e2e/ -tags=e2e | tee list-tests.txt
-	@$(OK) e2e tests passed
-
 #run single test-e2e-long test with <make e2e testFilter=functionNameOfTest>
 test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
 	@$(INFO) running integration tests
