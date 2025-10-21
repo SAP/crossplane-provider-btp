@@ -19,6 +19,9 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			kube:            kube,
 			usage:           usage,
 			resourcetracker: resourcetracker,
+			tfConnector:               newTfConnectorFn(kube),
+			newServiceBindingClientFn: newServiceBindingClientFn,
+			newSBKeyRotatorFn:        newSBKeyRotatorFn,
 		}
 	})
 }

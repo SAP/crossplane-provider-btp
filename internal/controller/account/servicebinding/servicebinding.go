@@ -35,10 +35,31 @@ const (
 
 const iso8601Date = "2006-01-02T15:04:05Z0700"
 
+var newTfConnectorFn = func(kube kubeclient.Client) servicebindingclient.TfConnector {
+	return tfClient.NewInternalTfConnector(
+		kube,
+		"btp_subaccount_service_binding",
+		v1alpha1.SubaccountServiceBinding_GroupVersionKind,
+		false,
+		nil,
+	)
+}
+
+var newServiceBindingClientFn = func(sbConnector servicebindingclient.TfConnector, kube kubeclient.Client) *servicebindingclient.ServiceBindingClient {
+	return servicebindingclient.NewServiceBindingClient(sbConnector, kube)
+}
+
+var newSBKeyRotatorFn = func(bindingDeleter servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator {
+	return servicebindingclient.NewSBKeyRotator(bindingDeleter)
+}
+
 type connector struct {
 	kube            kubeclient.Client
 	usage           resource.Tracker
 	resourcetracker tracking.ReferenceResolverTracker
+	tfConnector                 servicebindingclient.TfConnector
+	newServiceBindingClientFn   func(servicebindingclient.TfConnector, kubeclient.Client) *servicebindingclient.ServiceBindingClient
+	newSBKeyRotatorFn          func(servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -52,15 +73,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, "cannot track resource references")
 	}
 
-	sbConnector := tfClient.NewInternalTfConnector(
-		c.kube,
-		"btp_subaccount_service_binding",
-		v1alpha1.SubaccountServiceBinding_GroupVersionKind,
-		false,
-		nil,
-	)
-
-	client := servicebindingclient.NewServiceBindingClient(sbConnector, c.kube)
+	client := c.newServiceBindingClientFn(c.tfConnector, c.kube)
 
 	ext := &external{
 		kube:    c.kube,
@@ -68,8 +81,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		tracker: c.resourcetracker,
 	}
 
-	// Create key rotator with the external client as binding deleter
-	ext.keyRotator = servicebindingclient.NewSBKeyRotator(ext)
+	ext.keyRotator = c.newSBKeyRotatorFn(ext)
 
 	return ext, nil
 }
@@ -77,7 +89,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 type external struct {
 	kube       kubeclient.Client
 	keyRotator servicebindingclient.KeyRotator
-	client     *servicebindingclient.ServiceBindingClient
+	client     servicebindingclient.ServiceBindingClientInterface
 	tracker    tracking.ReferenceResolverTracker
 }
 

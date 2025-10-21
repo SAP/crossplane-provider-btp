@@ -32,6 +32,14 @@ type TfConnector interface {
 	Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error)
 }
 
+// ServiceBindingClientInterface provides the interface for service binding client operations
+type ServiceBindingClientInterface interface {
+	Create(ctx context.Context, publicCR *v1alpha1.ServiceBinding, btpName string) (string, types.UID, managed.ExternalCreation, error)
+	Delete(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalDelete, error)
+	Update(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalUpdate, error)
+	Observe(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error)
+}
+
 // ServiceBindingClient handles the lifecycle of service binding instances
 type ServiceBindingClient struct {
 	sbConnector TfConnector
