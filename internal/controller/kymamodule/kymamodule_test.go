@@ -17,9 +17,183 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
 	"github.com/sap/crossplane-provider-btp/internal/controller/kymamodule/fake"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+func TestConnect(t *testing.T) {
+	type args struct {
+		cr              resource.Managed
+		kube            client.Client
+		resourcetracker tracking.ReferenceResolverTracker
+		newServiceFn    func([]byte) (kymamodule.Client, error)
+	}
+
+	type want struct {
+		clientNil bool
+		err       error
+	}
+
+	cases := map[string]struct {
+		args args
+		want want
+	}{
+		"HappyPath": {
+			args: args{
+				cr: module(withBindingRef("test-binding"), withResolvedSecret("test-secret", "default")),
+				kube: &test.MockClient{
+					MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+						if secret, ok := obj.(*corev1.Secret); ok {
+							secret.Data = map[string][]byte{
+								v1alpha1.KymaEnvironmentBindingKey:           []byte("kubeconfig"),
+								v1alpha1.KymaEnvironmentBindingExpirationKey: []byte("9999-09-09 00:00:00 +0000 UTC"),
+							}
+						}
+						return nil
+					}),
+				},
+				resourcetracker: &fake.MockTracker{},
+				newServiceFn: func(kubeconfig []byte) (kymamodule.Client, error) {
+					return &fake.MockKymaModuleClient{}, nil
+				},
+			},
+			want: want{
+				clientNil: false,
+				err:       nil,
+			},
+		},
+		"TrackerError": {
+			args: args{
+				cr:   module(withBindingRef("test-binding"), withResolvedSecret("test-secret", "default")),
+				kube: &test.MockClient{},
+				resourcetracker: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return errors.New("tracker failed")
+					},
+				},
+			},
+			want: want{
+				clientNil: true,
+				err:       errors.Wrap(errors.New("tracker failed"), errTrackRUsage),
+			},
+		},
+		"TrackerCalledWithCorrectResource": {
+			args: args{
+				cr: module(withBindingRef("test-binding"), withResolvedSecret("test-secret", "default")),
+				kube: &test.MockClient{
+					MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+						if secret, ok := obj.(*corev1.Secret); ok {
+							secret.Data = map[string][]byte{
+								v1alpha1.KymaEnvironmentBindingKey:           []byte("kubeconfig"),
+								v1alpha1.KymaEnvironmentBindingExpirationKey: []byte("9999-09-09 00:00:00 +0000 UTC"),
+							}
+						}
+						return nil
+					}),
+				},
+				resourcetracker: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						km, ok := mg.(*v1alpha1.KymaModule)
+						if !ok {
+							return errors.New("expected KymaModule, got different type")
+						}
+						if km.GetName() != "kymaModule" {
+							return errors.New("unexpected KymaModule name")
+						}
+						return nil
+					},
+				},
+				newServiceFn: func(kubeconfig []byte) (kymamodule.Client, error) {
+					return &fake.MockKymaModuleClient{}, nil
+				},
+			},
+			want: want{
+				clientNil: false,
+				err:       nil,
+			},
+		},
+		"SecretFetcherError": {
+			args: args{
+				cr: module(withBindingRef("test-binding"), withResolvedSecret("test-secret", "default")),
+				kube: &test.MockClient{
+					MockGet: test.NewMockGetFn(errors.New("secret not found")),
+				},
+				resourcetracker: &fake.MockTracker{},
+			},
+			want: want{
+				clientNil: true,
+				err:       errors.Wrap(errors.New("secret not found"), errSetupClient),
+			},
+		},
+		"NewServiceFnError": {
+			args: args{
+				cr: module(withBindingRef("test-binding"), withResolvedSecret("test-secret", "default")),
+				kube: &test.MockClient{
+					MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+						if secret, ok := obj.(*corev1.Secret); ok {
+							secret.Data = map[string][]byte{
+								v1alpha1.KymaEnvironmentBindingKey:           []byte("kubeconfig"),
+								v1alpha1.KymaEnvironmentBindingExpirationKey: []byte("9999-09-09 00:00:00 +0000 UTC"),
+							}
+						}
+						return nil
+					}),
+				},
+				resourcetracker: &fake.MockTracker{},
+				newServiceFn: func(kubeconfig []byte) (kymamodule.Client, error) {
+					return nil, errors.New("failed to create client")
+				},
+			},
+			want: want{
+				clientNil: true,
+				err:       errors.Wrap(errors.New("failed to create client"), errSetupClient),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			c := &connector{
+				kube:            tc.args.kube,
+				resourcetracker: tc.args.resourcetracker,
+				newServiceFn:    tc.args.newServiceFn,
+			}
+
+			got, err := c.Connect(context.Background(), tc.args.cr)
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\nc.Connect(...): -want error, +got error:\n%s\n", diff)
+			}
+
+			if tc.want.clientNil && got != nil {
+				t.Errorf("\nc.Connect(...): expected nil client, got non-nil")
+			}
+
+			if !tc.want.clientNil && tc.want.err == nil {
+				if got == nil {
+					t.Errorf("\nc.Connect(...): expected non-nil client, got nil")
+				} else {
+					// Verify the external client has expected fields
+					ext, ok := got.(*external)
+					if !ok {
+						t.Errorf("\nc.Connect(...): expected *external, got %T", got)
+					} else {
+						if ext.client == nil && tc.args.newServiceFn != nil {
+							t.Errorf("\nc.Connect(...): external.client is nil")
+						}
+						if ext.kube == nil {
+							t.Errorf("\nc.Connect(...): external.kube is nil")
+						}
+						if ext.tracker == nil {
+							t.Errorf("\nc.Connect(...): external.tracker is nil")
+						}
+					}
+				}
+			}
+		})
+	}
+}
 
 func TestObserve(t *testing.T) {
 	type args struct {
@@ -175,83 +349,6 @@ func TestObserve(t *testing.T) {
 					}),
 				},
 				tracker: &fake.MockTracker{},
-				secretfetcher: &fake.MockSecretFetcher{
-					MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
-						return []byte("VALID KUBECONFIG"), nil
-					},
-				},
-			},
-			want: want{
-				obs: managed.ExternalObservation{
-					ResourceExists:   true,
-					ResourceUpToDate: true,
-				},
-				err: nil,
-			},
-		},
-		"TrackerError": {
-			args: args{
-				cr: module(withBindingRef("test-binding")),
-				client: &fake.MockKymaModuleClient{
-					MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
-						return &v1alpha1.ModuleStatus{}, nil
-					},
-				},
-				kube: &test.MockClient{
-					MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
-						if binding, ok := obj.(*v1alpha1.KymaEnvironmentBinding); ok {
-							binding.SetName("test-binding")
-							binding.SetNamespace("default")
-						}
-						return nil
-					}),
-				},
-				tracker: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error {
-						return errors.New("tracker failed")
-					},
-				},
-				secretfetcher: &fake.MockSecretFetcher{
-					MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
-						return []byte("VALID KUBECONFIG"), nil
-					},
-				},
-			},
-			want: want{
-				obs: managed.ExternalObservation{},
-				err: errors.Wrap(errors.New("tracker failed"), errTrackRUsage),
-			},
-		},
-		"TrackerCalledWithCorrectResource": {
-			args: args{
-				cr: module(withBindingRef("test-binding")),
-				client: &fake.MockKymaModuleClient{
-					MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
-						return &v1alpha1.ModuleStatus{}, nil
-					},
-				},
-				kube: &test.MockClient{
-					MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
-						if binding, ok := obj.(*v1alpha1.KymaEnvironmentBinding); ok {
-							binding.SetName("test-binding")
-							binding.SetNamespace("default")
-						}
-						return nil
-					}),
-				},
-				tracker: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error {
-						// Verify Track is called with the correct resource
-						km, ok := mg.(*v1alpha1.KymaModule)
-						if !ok {
-							return errors.New("expected KymaModule, got different type")
-						}
-						if km.GetName() != "kymaModule" {
-							return errors.New("unexpected KymaModule name")
-						}
-						return nil
-					},
-				},
 				secretfetcher: &fake.MockSecretFetcher{
 					MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
 						return []byte("VALID KUBECONFIG"), nil
@@ -556,4 +653,11 @@ func withBindingRef(name string) moduleModifier {
 
 func ptrString(s string) *string {
 	return &s
+}
+
+func withResolvedSecret(secretName, secretNamespace string) moduleModifier {
+	return func(km *v1alpha1.KymaModule) {
+		km.Spec.KymaEnvironmentBindingSecret = secretName
+		km.Spec.KymaEnvironmentBindingSecretNamespace = secretNamespace
+	}
 }
