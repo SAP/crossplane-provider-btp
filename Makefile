@@ -42,6 +42,8 @@ GO_SUBDIRS += cmd internal apis
 GO111MODULE = on
 -include build/makelib/golang.mk
 
+export GO_LINT_ARGS	?= --timeout 5m
+
 # kind-related versions
 KIND_VERSION ?= v0.23.0
 KIND_NODE_IMAGE_TAG ?= v1.30.2
