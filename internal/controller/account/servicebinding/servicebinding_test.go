@@ -1081,6 +1081,7 @@ func TestUpdate(t *testing.T) {
 
 	type want struct {
 		err error
+		u   managed.ExternalUpdate    // Expected update result
 		cr  *v1alpha1.ServiceBinding // Expected complete CR after update
 	}
 
@@ -1123,6 +1124,7 @@ func TestUpdate(t *testing.T) {
 			},
 			want: want{
 				err: errors.New("client update error"),
+				u:   managed.ExternalUpdate{}, // Empty update result on error
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					func(cr *v1alpha1.ServiceBinding) {
@@ -1156,6 +1158,7 @@ func TestUpdate(t *testing.T) {
 			},
 			want: want{
 				err: errors.New("delete expired keys error"),
+				u:   managed.ExternalUpdate{}, // Empty update result on error
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					func(cr *v1alpha1.ServiceBinding) {
@@ -1191,6 +1194,9 @@ func TestUpdate(t *testing.T) {
 				),
 			},
 			want: want{
+				u: managed.ExternalUpdate{
+					ConnectionDetails: managed.ConnectionDetails{}, // Empty map when update is skipped
+				},
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					func(cr *v1alpha1.ServiceBinding) {
@@ -1232,6 +1238,11 @@ func TestUpdate(t *testing.T) {
 				),
 			},
 			want: want{
+				u: managed.ExternalUpdate{
+					ConnectionDetails: managed.ConnectionDetails{
+						"updated-key": []byte("updated-value"),
+					},
+				},
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					func(cr *v1alpha1.ServiceBinding) {
@@ -1272,23 +1283,9 @@ func TestUpdate(t *testing.T) {
 				t.Errorf("\n%s\ne.Update(...): expected no error, got %v\n", tc.reason, err)
 			}
 
-			// Verify the update result
-			if tc.want.err == nil {
-				// For the retired binding case, we expect empty connection details since update is skipped
-				if name == "SuccessWithCurrentBindingRetired" {
-					if len(got.ConnectionDetails) != 0 {
-						t.Errorf("\n%s\ne.Update(...): expected empty connection details for retired binding, got: %v\n", tc.reason, got.ConnectionDetails)
-					}
-				} else {
-					expectedUpdate := tc.fields.client.(*MockServiceBindingClient).update
-					// Check if connection details were flattened correctly
-					if len(expectedUpdate.ConnectionDetails) > 0 {
-						// For successful updates, the connection details should be flattened
-						if diff := cmp.Diff(expectedUpdate.ConnectionDetails, got.ConnectionDetails); diff != "" {
-							t.Errorf("\n%s\ne.Update(...): -want connection details, +got connection details:\n%s\n", tc.reason, diff)
-						}
-					}
-				}
+			// Simple diff comparison for update result
+			if diff := cmp.Diff(tc.want.u, got); diff != "" {
+				t.Errorf("\n%s\ne.Update(...): -want, +got:\n%s\n", tc.reason, diff)
 			}
 
 			if tc.want.cr != nil {
@@ -1318,6 +1315,7 @@ func TestDelete(t *testing.T) {
 
 	type want struct {
 		err error
+		d   managed.ExternalDelete   // Expected deletion result
 		cr  *v1alpha1.ServiceBinding // Expected complete CR after deletion
 	}
 
@@ -1340,6 +1338,7 @@ func TestDelete(t *testing.T) {
 			},
 			want: want{
 				err: errors.New(errNotServiceBinding),
+				d:   managed.ExternalDelete{}, // Empty deletion result on error
 			},
 		},
 		"DeleteBlockedByDependencies": {
@@ -1362,6 +1361,7 @@ func TestDelete(t *testing.T) {
 			},
 			want: want{
 				err: errors.New(providerv1alpha1.ErrResourceInUse),
+				d:   managed.ExternalDelete{}, // Empty deletion result on error
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					withConditions(xpv1.Deleting()),
@@ -1393,6 +1393,7 @@ func TestDelete(t *testing.T) {
 			},
 			want: want{
 				err: errors.New("delete retired keys error"),
+				d:   managed.ExternalDelete{}, // Empty deletion result on error
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					withConditions(xpv1.Deleting()),
@@ -1424,6 +1425,7 @@ func TestDelete(t *testing.T) {
 			},
 			want: want{
 				err: errors.New("client delete error"),
+				d:   managed.ExternalDelete{}, // Empty deletion result on error
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					withConditions(xpv1.Deleting()),
@@ -1454,6 +1456,7 @@ func TestDelete(t *testing.T) {
 				),
 			},
 			want: want{
+				d: managed.ExternalDelete{}, // Expected deletion result
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					withConditions(xpv1.Deleting()),
@@ -1490,11 +1493,9 @@ func TestDelete(t *testing.T) {
 				t.Errorf("\n%s\ne.Delete(...): expected no error, got %v\n", tc.reason, err)
 			}
 
-			if tc.want.err == nil {
-				expectedDeletion := tc.fields.client.(*MockServiceBindingClient).deletion
-				if diff := cmp.Diff(expectedDeletion, got); diff != "" {
-					t.Errorf("\n%s\ne.Delete(...): -want deletion, +got deletion:\n%s\n", tc.reason, diff)
-				}
+			// Simple diff comparison for deletion result
+			if diff := cmp.Diff(tc.want.d, got); diff != "" {
+				t.Errorf("\n%s\ne.Delete(...): -want, +got:\n%s\n", tc.reason, diff)
 			}
 
 			if tc.want.cr != nil {
