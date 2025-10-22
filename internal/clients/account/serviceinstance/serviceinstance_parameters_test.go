@@ -198,3 +198,79 @@ func cmpDiffMaps(want, got map[string]interface{}) string {
 	}
 	return "want=" + string(wantB) + " got=" + string(gotB)
 }
+
+func TestAddMap(t *testing.T) {
+	type args struct {
+		mergedData map[string]interface{}
+		toAdd      map[string]interface{}
+	}
+	cases := map[string]struct {
+		args args
+		want map[string]interface{}
+	}{
+		"SimpleMerge": {
+			args: args{
+				mergedData: map[string]interface{}{"a": 1},
+				toAdd:      map[string]interface{}{"b": 2},
+			},
+			want: map[string]interface{}{"a": 1, "b": 2},
+		},
+		"MergedDataEmpty": {
+			args: args{
+				mergedData: map[string]interface{}{},
+				toAdd:      map[string]interface{}{"parent": map[string]interface{}{"a": 1, "b": 2}},
+			},
+			want: map[string]interface{}{"parent": map[string]interface{}{"a": 1, "b": 2}},
+		},
+		"toAddEmpty": {
+			args: args{
+				mergedData: map[string]interface{}{"parent": map[string]interface{}{"a": 1, "b": 2}},
+				toAdd:      map[string]interface{}{},
+			},
+			want: map[string]interface{}{"parent": map[string]interface{}{"a": 1, "b": 2}},
+		},
+		"DeepMerge": {
+			args: args{
+				mergedData: map[string]interface{}{"parent": map[string]interface{}{"a": 1}},
+				toAdd:      map[string]interface{}{"parent": map[string]interface{}{"a": 2}},
+			},
+			want: map[string]interface{}{"parent": map[string]interface{}{"a": 2}},
+		},
+		"OverWriteNonMap": {
+			args: args{
+				mergedData: map[string]interface{}{"parent": "not-a-map"},
+				toAdd:      map[string]interface{}{"parent": map[string]interface{}{"a": 1}},
+			},
+			want: map[string]interface{}{"parent": map[string]interface{}{"a": 1}},
+		},
+		"KeepNonMap": {
+			args: args{
+				mergedData: map[string]interface{}{"parent": map[string]interface{}{"a": 1}},
+				toAdd:      map[string]interface{}{"parent": "not-a-map"},
+			},
+			want: map[string]interface{}{"parent": "not-a-map"},
+		},
+		"EmptyMapToAdd": {
+			args: args{
+				mergedData: map[string]interface{}{"a": 1, "b": map[string]interface{}{"x": 1}},
+				toAdd:      map[string]interface{}{"b": map[string]interface{}{}},
+			},
+			want: map[string]interface{}{"a": 1, "b": map[string]interface{}{"x": 1}},
+		},
+		"PartialOverwrite": {
+			args: args{
+				mergedData: map[string]interface{}{"a": 1, "b": 2},
+				toAdd:      map[string]interface{}{"a": 3},
+			},
+			want: map[string]interface{}{"a": 3, "b": 2},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			addMap(tc.args.mergedData, tc.args.toAdd)
+			if diff := cmpDiffMaps(tc.want, tc.args.mergedData); diff != "" {
+				t.Errorf("result mismatch: %s", diff)
+			}
+		})
+	}
+}
