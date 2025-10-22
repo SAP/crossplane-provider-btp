@@ -7,6 +7,7 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/upjet/pkg/resource"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -17,11 +18,16 @@ import (
 )
 
 var (
-	conditionUnknown = xpv1.Condition{
+	readyUnknown = xpv1.Condition{
 		Type:   xpv1.TypeReady,
 		Status: corev1.ConditionUnknown,
 	}
-	conditionAvailable = xpv1.Available()
+	readyAvailable = xpv1.Available()
+	asyncUnknown   = xpv1.Condition{
+		Type:   resource.TypeAsyncOperation,
+		Status: corev1.ConditionUnknown,
+	}
+	asyncFinished = resource.AsyncOperationFinishedCondition()
 )
 
 func TestTfResource(t *testing.T) {
@@ -65,7 +71,7 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
-					withTfCondition(conditionUnknown),
+					withTfConditions(readyUnknown, asyncUnknown),
 				),
 				hasErr: false,
 			},
@@ -86,7 +92,7 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
-					withTfCondition(conditionUnknown),
+					withTfConditions(readyUnknown, asyncUnknown),
 				),
 				hasErr: false,
 			},
@@ -107,7 +113,7 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
-					withTfCondition(conditionUnknown),
+					withTfConditions(readyUnknown, asyncUnknown),
 				),
 				hasErr: false,
 			},
@@ -131,7 +137,7 @@ func TestTfResource(t *testing.T) {
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
 					withTfServicePlanID("resolved-plan-id"),
-					withTfCondition(conditionUnknown),
+					withTfConditions(readyUnknown, asyncUnknown),
 				),
 				hasErr: false,
 			},
@@ -187,7 +193,7 @@ func TestTfResource(t *testing.T) {
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
-					withCondition(conditionUnknown),
+					withConditions(readyUnknown, asyncUnknown),
 				),
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
@@ -212,7 +218,7 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
-					withTfCondition(conditionUnknown),
+					withTfConditions(readyUnknown, asyncUnknown),
 				),
 			},
 		},
@@ -225,7 +231,7 @@ func TestTfResource(t *testing.T) {
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
-					withCondition(conditionUnknown),
+					withConditions(readyUnknown, asyncUnknown),
 				),
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
@@ -250,7 +256,7 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
-					withTfCondition(conditionUnknown),
+					withTfConditions(readyUnknown, asyncUnknown),
 				),
 			},
 		},
@@ -261,7 +267,7 @@ func TestTfResource(t *testing.T) {
 					withExternalName("123"),
 					withProviderConfigRef("default"),
 					withManagementPolicies(),
-					withCondition(conditionAvailable),
+					withConditions(readyAvailable, asyncFinished),
 				),
 			},
 			want: want{
@@ -271,7 +277,7 @@ func TestTfResource(t *testing.T) {
 					withTfParameters(`{}`),
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
-					withTfCondition(conditionAvailable),
+					withTfConditions(readyAvailable, asyncFinished),
 				),
 			},
 		},
@@ -289,7 +295,7 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfParameters(`{}`),
 					withTfProviderConfigRef("default"),
-					withTfCondition(conditionUnknown),
+					withTfConditions(readyUnknown, asyncUnknown),
 				),
 			},
 		},
@@ -404,15 +410,15 @@ func withTfParameters(jsonParams string) func(*v1alpha1.SubaccountServiceInstanc
 	}
 }
 
-func withCondition(condition xpv1.Condition) func(*v1alpha1.ServiceInstance) {
+func withConditions(condition ...xpv1.Condition) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Status.SetConditions(condition)
+		cr.Status.SetConditions(condition...)
 	}
 }
 
-func withTfCondition(condition xpv1.Condition) func(*v1alpha1.SubaccountServiceInstance) {
+func withTfConditions(condition ...xpv1.Condition) func(*v1alpha1.SubaccountServiceInstance) {
 	return func(cr *v1alpha1.SubaccountServiceInstance) {
-		cr.Status.SetConditions(condition)
+		cr.Status.SetConditions(condition...)
 	}
 }
 
