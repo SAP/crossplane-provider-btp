@@ -61,7 +61,7 @@ type KymaServiceInstanceSpec struct {
 	KymaEnvironmentBindingId string `json:"kymaEnvironmentBindingId,omitempty"`
 
 	// Reference to KymaEnvironmentBinding (for rotating kubeconfig)
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:XValidation:rule="has(self.kymaEnvironmentBindingRef) || has(self.kymaEnvironmentBindingSelector)",message="Must specify either kymaEnvironmentBindingRef or kymaEnvironmentBindingSelector"
 	KymaEnvironmentBindingRef *xpv1.Reference `json:"kymaEnvironmentBindingRef,omitempty" reference-group:"environment.btp.sap.crossplane.io" reference-kind:"KymaEnvironmentBinding" reference-apiversion:"v1alpha1"`
 
 	// +kubebuilder:validation:Optional
