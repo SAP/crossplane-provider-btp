@@ -15,7 +15,7 @@ Get started developing the SAP BTP Crossplane Provider in under 5 minutes.
 
 3. **Wait ~3 minutes** for automatic setup
 
-## 🚀 Quick Start Development
+## ⚙️ Development Setup Options
 
 ### Option 1: GitHub Codespaces (Fastest)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/SAP/crossplane-provider-btp)
