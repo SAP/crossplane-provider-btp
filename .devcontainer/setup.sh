@@ -203,6 +203,12 @@ EOF
   fi
 fi
 
+# Install git hooks to prevent credential leaks
+if [ -f ".devcontainer/install-hooks.sh" ]; then
+  echo "🔒 Installing git hooks for credential protection..."
+  bash .devcontainer/install-hooks.sh
+fi
+
 echo ""
 echo "🔧 Installed tools:"
 echo "   - kind: $(kind version 2>/dev/null | head -n1 || echo 'N/A')"
