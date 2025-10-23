@@ -13,19 +13,23 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymaserviceinstance"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	errNotKymaServiceInstance = "managed resource is not a KymaServiceInstance custom resource"
-	errTrackUsage             = "cannot track ProviderConfig usage"
-	errFetchKubeconfig        = "cannot fetch kubeconfig from KymaEnvironmentBinding"
-	errNewClient              = "cannot create new Kyma ServiceInstance client"
-	errDescribeInstance       = "cannot describe ServiceInstance"
-	errCreateInstance         = "cannot create ServiceInstance"
-	errUpdateInstance         = "cannot update ServiceInstance"
-	errDeleteInstance         = "cannot delete ServiceInstance"
-	errTrackResourceUsage     = "cannot track ResourceUsage"
+	errNotKymaServiceInstance  = "managed resource is not a KymaServiceInstance custom resource"
+	errTrackUsage              = "cannot track ProviderConfig usage"
+	errFetchKubeconfig         = "cannot fetch kubeconfig from KymaEnvironmentBinding"
+	errNewClient               = "cannot create new Kyma ServiceInstance client"
+	errDescribeInstance        = "cannot describe ServiceInstance"
+	errCreateInstance          = "cannot create ServiceInstance"
+	errUpdateInstance          = "cannot update ServiceInstance"
+	errDeleteInstance          = "cannot delete ServiceInstance"
+	errTrackResourceUsage      = "cannot track ResourceUsage"
+	errCannotGetKymaBinding    = "cannot get KymaEnvironmentBinding"
+	errKymaBindingNotSpecified = "KymaEnvironmentBindingRef must be specified"
 )
 
 // connector is expected to produce an ExternalClient when its Connect method is called.
@@ -88,6 +92,30 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotKymaServiceInstance)
 	}
+
+	if cr.Spec.KymaEnvironmentBindingRef == nil {
+		cr.SetConditions(xpv1.Unavailable().WithMessage(errKymaBindingNotSpecified))
+		return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
+	}
+	// Check if referenced binding exists and is not being deleted
+	binding := &v1alpha1.KymaEnvironmentBinding{}
+	bindingName := types.NamespacedName{
+		Name:      cr.Spec.KymaEnvironmentBindingRef.Name,
+		Namespace: cr.GetNamespace(),
+	}
+	if err := e.kube.Get(ctx, bindingName, binding); err != nil {
+		if kerrors.IsNotFound(err) {
+			// Binding doesn't exist
+			cr.SetConditions(xpv1.Unavailable().WithMessage(
+				"Referenced KymaEnvironmentBinding not found",
+			))
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errCannotGetKymaBinding)
+	}
+	// Track if binding is pending deletion
+	bindingPendingDeletion := binding.GetDeletionTimestamp() != nil
+
 	// Describe the instance in Kyma
 	observation, _, err := e.client.DescribeInstance(ctx, cr.Spec.ForProvider.Namespace, cr.Spec.ForProvider.Name)
 	if err != nil {
@@ -104,9 +132,22 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Set conditions
 	if observation.Ready == corev1.ConditionTrue {
-		cr.SetConditions(xpv1.Available())
+		if bindingPendingDeletion {
+			cr.SetConditions(xpv1.Available().WithMessage(
+				"ServiceInstance is available. Warning: Referenced KymaEnvironmentBinding is pending deletion. " +
+					"Delete this KymaServiceInstance to allow binding cleanup.",
+			))
+		} else {
+			cr.SetConditions(xpv1.Available())
+		}
 	} else {
-		cr.SetConditions(xpv1.Creating())
+		if bindingPendingDeletion {
+			cr.SetConditions(xpv1.Creating().WithMessage(
+				"ServiceInstance is being created. Warning: Referenced KymaEnvironmentBinding is pending deletion.",
+			))
+		} else {
+			cr.SetConditions(xpv1.Creating())
+		}
 	}
 
 	return managed.ExternalObservation{
