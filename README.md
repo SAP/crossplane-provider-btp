@@ -80,6 +80,12 @@ make test-acceptance
 
 This will spin up a specific kind cluster which runs the provider as docker container in it. The e2e tests will run kubectl commands against that cluster to test the provider's functionality.
 
+If you want to run a single E2E Test locally simply set the `testFilter` variable like this:
+
+```bash
+make test-acceptance testFilter=<functionNameOfTest>
+````
+
 :warning:
 Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
 
