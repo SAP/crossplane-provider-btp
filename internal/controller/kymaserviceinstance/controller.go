@@ -195,8 +195,8 @@ func hasFailedCondition(conditions []v1alpha1.ServiceInstanceCondition) bool {
 		if cond.Type == "Failed" && cond.Status == corev1.ConditionTrue {
 			return true
 		}
-		// Check for Failed condition with ProvisioningFailed reason
-		if cond.Type == "Failed" && cond.Status == corev1.ConditionFalse && cond.Reason == "ProvisioningFailed" {
+
+		if cond.Type == "Ready" && cond.Status == corev1.ConditionFalse && cond.Reason == "ProvisioningFailed" {
 			return true
 		}
 	}
