@@ -160,9 +160,43 @@ func mergeJsonData(mergedData map[string]interface{}, jsonToMerge []byte) error 
 	return nil
 }
 
-// mergeMaps merges a
+// addMap merges toAdd into mergedData recursively.
+//
+// Merge behavior:
+//   - When both values are maps: Recursively merges their contents
+//   - When types differ or value is not a map: toAdd's value overwrites mergedData's value
+//
+// Example:
+//
+//	mergedData:  {"data": {"user": "admin", "timeout": 30}}
+//	toAdd: {"data": {"timeout": 60, "password": "secret"}}
+//	result: {"data": {"user": "admin", "timeout": 60, "password": "secret"}}
+//	                  ↑ preserved      ↑ overwritten  ↑ added
 func addMap(mergedData map[string]interface{}, toAdd map[string]interface{}) {
 	for k, v := range toAdd {
-		mergedData[k] = v
+		// check if the value is a nested map
+		vMap, isValueMap := v.(map[string]interface{})
+		if !isValueMap {
+			mergedData[k] = v
+			continue
+		}
+
+		// check if there is an existing entry
+		existing, exists := mergedData[k]
+		if !exists {
+			mergedData[k] = vMap
+			continue
+		}
+
+		// check if the existing entry is also a map
+		existingMap, isExistingMap := existing.(map[string]interface{})
+		if !isExistingMap {
+			mergedData[k] = vMap
+			continue
+		}
+
+		// both are maps run recursion
+		addMap(existingMap, vMap)
+		mergedData[k] = existingMap
 	}
 }
