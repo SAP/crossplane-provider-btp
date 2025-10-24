@@ -163,11 +163,27 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			cr.SetConditions(xpv1.Creating())
 		}
 	}
-
+	upToDate := isResourceUpToDate(cr, observation)
 	return managed.ExternalObservation{
 		ResourceExists:   true,
-		ResourceUpToDate: true, // TODO: Implement drift detection
+		ResourceUpToDate: upToDate,
 	}, nil
+}
+
+func isResourceUpToDate(_ *v1alpha1.KymaServiceInstance, obs *v1alpha1.KymaServiceInstanceObservation) bool {
+	// If resource is not ready, we can't determine if it's up-to-date
+	// Let it finish provisioning first
+	if obs.Ready != corev1.ConditionTrue {
+		return true // Don't try to update while creating
+	}
+
+	// For now, ServiceInstance fields are immutable after creation
+	// BTP doesn't support updating serviceOfferingName or servicePlanName
+	// Only parameters can be updated
+
+	// TODO: Implement parameter drift detection when needed
+
+	return true
 }
 
 // Check if there is a Failed condition in the observation
