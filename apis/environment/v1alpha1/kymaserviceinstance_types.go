@@ -48,6 +48,16 @@ type KymaServiceInstanceObservation struct {
 
 	// Instance ID from BTP
 	InstanceID string `json:"instanceID,omitempty"`
+
+	// Capture conditions from Kyma ServiceInstance status
+	Conditions []ServiceInstanceCondition `json:"conditions,omitempty"`
+}
+
+type ServiceInstanceCondition struct {
+	Type    string                 `json:"type"`
+	Status  corev1.ConditionStatus `json:"status"`
+	Reason  string                 `json:"reason,omitempty"`
+	Message string                 `json:"message,omitempty"`
 }
 
 // A KymaServiceInstanceSpec defines the desired state of a KymaServiceInstance.

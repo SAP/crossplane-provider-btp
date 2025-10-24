@@ -2,6 +2,7 @@ package kymaserviceinstance
 
 import (
 	"context"
+	"fmt"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 
@@ -115,9 +116,19 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	// Track if binding is pending deletion
 	bindingPendingDeletion := binding.GetDeletionTimestamp() != nil
+	// Check is client is available
+	if e.client == nil {
+		cr.SetConditions(xpv1.Unavailable().WithMessage(
+			"Cannot connect to Kyma cluster - kubeconfig may be unavailable or expired",
+		))
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: false,
+		}, nil
+	}
 
 	// Describe the instance in Kyma
-	observation, _, err := e.client.DescribeInstance(ctx, cr.Spec.ForProvider.Namespace, cr.Spec.ForProvider.Name)
+	observation, err := e.client.DescribeInstance(ctx, cr.Spec.ForProvider.Namespace, cr.Spec.ForProvider.Name)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errDescribeInstance)
 	}
@@ -130,8 +141,11 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	// Update status
 	cr.Status.AtProvider = *observation
 
-	// Set conditions
-	if observation.Ready == corev1.ConditionTrue {
+	if hasFailedCondition(observation.Conditions) {
+		// Provisioning failed (e.g missing entitlements, quota exceeded, etc)
+		failureMessage := getFailureMessage(observation)
+		cr.SetConditions(xpv1.Unavailable().WithMessage(fmt.Sprintf("Service Instance provisioning failed: %s", failureMessage)))
+	} else if observation.Ready == corev1.ConditionTrue {
 		if bindingPendingDeletion {
 			cr.SetConditions(xpv1.Available().WithMessage(
 				"ServiceInstance is available. Warning: Referenced KymaEnvironmentBinding is pending deletion. " +
@@ -154,6 +168,32 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		ResourceExists:   true,
 		ResourceUpToDate: true, // TODO: Implement drift detection
 	}, nil
+}
+
+// Check if there is a Failed condition in the observation
+func hasFailedCondition(conditions []v1alpha1.ServiceInstanceCondition) bool {
+	for _, cond := range conditions {
+		if cond.Type == "Failed" && cond.Status == corev1.ConditionTrue {
+			return true
+		}
+		// Check for Failed condition with ProvisioningFailed reason
+		if cond.Type == "Failed" && cond.Status == corev1.ConditionFalse && cond.Reason == "ProvisioningFailed" {
+			return true
+		}
+	}
+	return false
+}
+
+// Get failure message from Failed condition
+func getFailureMessage(observation *v1alpha1.KymaServiceInstanceObservation) string {
+	for _, cond := range observation.Conditions {
+		if cond.Type == "Failed" || cond.Reason == "ProvisioningFailed" {
+			if cond.Message != "" {
+				return cond.Message
+			}
+		}
+	}
+	return "Unknown failure - check ServiceInstance status in Kyma cluster"
 }
 
 // Create the external resource

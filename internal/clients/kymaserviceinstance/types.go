@@ -22,7 +22,15 @@ type ServiceInstanceSpec struct {
 }
 
 type ServiceInstanceStatus struct {
-	Ready      corev1.ConditionStatus `json:"ready"`
-	InstanceID string                 `json:"instanceID,omitempty"`
+	Ready      corev1.ConditionStatus     `json:"ready"`
+	InstanceID string                     `json:"instanceID,omitempty"`
+	Conditions []ServiceInstanceCondition `json:"conditions,omitempty"`
 	// ... more fields
+}
+
+type ServiceInstanceCondition struct {
+	Type    string                 `json:"type"`
+	Status  corev1.ConditionStatus `json:"status"`
+	Reason  string                 `json:"reason,omitempty"`
+	Message string                 `json:"message,omitempty"`
 }

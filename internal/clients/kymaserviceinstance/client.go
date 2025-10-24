@@ -32,11 +32,9 @@ type Client interface {
 	// DescribeInstance gets the current state of a ServiceInstance
 	// Returns:
 	//   - Observation: current status
-	//   - bool: true if external-name was updated/discovered
 	//   - error: any error that occurred
 	DescribeInstance(ctx context.Context, namespace, name string) (
 		*v1alpha1.KymaServiceInstanceObservation,
-		bool,
 		error,
 	)
 
@@ -80,25 +78,35 @@ func (c *client) DescribeInstance(
 	ctx context.Context,
 	namespace,
 	name string,
-) (*v1alpha1.KymaServiceInstanceObservation, bool, error) {
+) (*v1alpha1.KymaServiceInstanceObservation, error) {
 	// Get the ServiceInstance from Kyma
 	si, err := c.getServiceInstance(ctx, namespace, name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, false, nil
+			return nil, nil
 		}
-		return nil, false, errors.Wrap(err, errFailedToGetServiceInstance)
+		return nil, errors.Wrap(err, errFailedToGetServiceInstance)
 	}
 
 	obs := &v1alpha1.KymaServiceInstanceObservation{
 		Ready:      si.Status.Ready,
 		InstanceID: si.Status.InstanceID,
+		Conditions: extractConditions(si),
 	}
-	// TODO: Check if external-name needs updating
-	externalNameUpdated := false
 
-	return obs, externalNameUpdated, nil
+	return obs, nil
 
+}
+
+func extractConditions(si *ServiceInstance) []v1alpha1.ServiceInstanceCondition {
+	if si.Status.Conditions == nil {
+		return nil
+	}
+	conditions := make([]v1alpha1.ServiceInstanceCondition, 0, len(si.Status.Conditions))
+	for _, cond := range si.Status.Conditions {
+		conditions = append(conditions, v1alpha1.ServiceInstanceCondition(cond))
+	}
+	return conditions
 }
 
 // Create a ServiceInstance in Kyma cluster
