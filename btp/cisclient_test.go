@@ -6,6 +6,14 @@ import (
 	"testing"
 )
 
+// TODO: Add unit tests for GetCFEnvironmentByNameAndOrg
+// Currently cannot be tested without refactoring due to hardcoded getCFEnvironments() dependency.
+// Proposed approaches:
+//   1. Interface-based DI: Add EnvironmentFetcher interface to Client
+//   2. Function field injection: Add getCFEnvironmentsFunc field to Client
+// This would enable testing the ID matching logic added in PR #362 without hitting real BTP API.
+// Related to: CloudFoundry environment import bug fix
+
 func Test_authenticationParams(t *testing.T) {
 	type args struct {
 		credential *Credentials
