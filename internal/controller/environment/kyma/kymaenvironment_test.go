@@ -80,6 +80,19 @@ func TestCreate(t *testing.T) {
 				cr:  environment(withExternalName("1234")),
 			},
 		},
+		"NameNotProvided": {
+			args: args{
+				client: fake.MockClient{MockCreateCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (string, error) {
+					return "1234", errors.Errorf(errNoNameProvided)
+				}},
+				cr: environment(withNoForProviderName()),
+			},
+			want: want{
+				o:   managed.ExternalCreation{},
+				err: errors.New(errNoNameProvided),
+				cr:  environment(withNoForProviderName()),
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -505,6 +518,29 @@ func TestObserve(t *testing.T) {
 				),
 			},
 		},
+		"UpdateNameField": {
+			args: args{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+						State:        internal.Ptr("OK"),
+						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
+						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
+						Parameters:   internal.Ptr("{\"name\":\"kyma\"}"),
+					}, false, nil
+				}},
+				httpClient: mockedHttpClient(kubeConfigData),
+				cr:         environment(withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}}), withNoForProviderName()),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceLateInitialized: true,
+				},
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           nil,
+				// Name field is copied over to Spec.ForProvider.Name during late initialization
+				cr: environment(withUID("1234"), withConditions(xpv1.Available()), withKymaParameters(v1alpha1.KymaEnvironmentParameters{Name: internal.Ptr("my-kyma")})),
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -782,6 +818,11 @@ func withExternalName(name string) environmentModifier {
 		r.Annotations = map[string]string{"crossplane.io/external-name": name}
 	}
 }
+func withNoForProviderName() environmentModifier {
+	return func(r *v1alpha1.KymaEnvironment) {
+		r.Spec.ForProvider.Name = nil
+	}
+}
 
 func withRetryStatus(retryStatus *v1alpha1.RetryStatus) environmentModifier {
 	return func(r *v1alpha1.KymaEnvironment) { r.Status.RetryStatus = retryStatus }
@@ -797,6 +838,11 @@ func environment(m ...environmentModifier) *v1alpha1.KymaEnvironment {
 	cr := &v1alpha1.KymaEnvironment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kyma",
+		},
+		Spec: v1alpha1.KymaEnvironmentSpec{
+			ForProvider: v1alpha1.KymaEnvironmentParameters{
+				Name: internal.Ptr("my-kyma"),
+			},
 		},
 	}
 	for _, f := range m {
