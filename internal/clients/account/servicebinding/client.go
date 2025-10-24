@@ -10,7 +10,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -34,72 +33,62 @@ type TfConnector interface {
 
 // ServiceBindingClientInterface provides the interface for service binding client operations
 type ServiceBindingClientInterface interface {
-	Create(ctx context.Context, publicCR *v1alpha1.ServiceBinding, btpName string) (string, types.UID, managed.ExternalCreation, error)
-	Delete(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalDelete, error)
-	Update(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalUpdate, error)
-	Observe(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error)
+	// Creates a servicebinding
+	Create(ctx context.Context) (string, managed.ExternalCreation, error)
+	// Deletes a service binding instance
+	Delete(ctx context.Context) (managed.ExternalDelete, error)
+	// Updates a service binding instance
+	Update(ctx context.Context) (managed.ExternalUpdate, error)
+	// Observes a service binding instance
+	Observe(ctx context.Context) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error)
 }
 
 // ServiceBindingClient handles the lifecycle of service binding instances
 type ServiceBindingClient struct {
-	sbConnector TfConnector
-	kube        client.Client
+	tfClient managed.ExternalClient
+	kube     client.Client
+	ssb      *v1alpha1.SubaccountServiceBinding
 }
 
-func NewServiceBindingClient(sbConnector TfConnector, kube client.Client) *ServiceBindingClient {
-	return &ServiceBindingClient{
-		sbConnector: sbConnector,
-		kube:        kube,
+func NewServiceBindingClient(ctx context.Context, kube client.Client, tfConnector TfConnector, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (*ServiceBindingClient, error) {
+	subaccountServiceBinding, err := buildSubaccountServiceBinding(ctx, kube, cr, targetName, targetExternalName)
+	if err != nil {
+		return nil, err
 	}
+	tfClient, err := tfConnector.Connect(ctx, subaccountServiceBinding)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ServiceBindingClient{
+		tfClient: tfClient,
+		kube:     kube,
+		ssb:      subaccountServiceBinding,
+	}, nil
 }
 
-// Create creates a new service binding instance using the btpName from spec
-// by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client create command
-// Returns the instance name, UID, and ExternalCreation for tracking
-func (m *ServiceBindingClient) Create(ctx context.Context, publicCR *v1alpha1.ServiceBinding, btpName string) (string, types.UID, managed.ExternalCreation, error) {
+func (m *ServiceBindingClient) Create(ctx context.Context) (string, managed.ExternalCreation, error) {
 	// use a random name once for the creation. Afterwards, the external name sets a
 	// reasonable name. This means that when observing the resource for the first time after
 	// creating, another store for this resource will be created. This will create a dangling
 	// TF workspace, but this way no new name collisions will occur.
-	instanceUID := GenerateInstanceUID(publicCR.UID, GenerateRandomName(btpName))
+	// instanceUID := GenerateInstanceUID(m.ssb.UID, GenerateRandomName(*m.ssb.Spec.ForProvider.Name))
+	//
+	// m.ssb.SetUID(instanceUID)
 
-	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, btpName, instanceUID, "")
+	creation, err := m.tfClient.Create(ctx, m.ssb)
 	if err != nil {
-		return "", "", managed.ExternalCreation{}, errors.Wrap(err, errBuildTfResource)
+		return "", managed.ExternalCreation{}, errors.Wrap(err, errCreateTfResource)
 	}
 
-	tfController, err := m.sbConnector.Connect(ctx, subaccountBinding)
-	if err != nil {
-		return "", "", managed.ExternalCreation{}, errors.Wrap(err, errConnectTfController)
-	}
-
-	creation, err := tfController.Create(ctx, subaccountBinding)
-	if err != nil {
-		return "", "", managed.ExternalCreation{}, errors.Wrap(err, errCreateTfResource)
-	}
-
-	return meta.GetExternalName(subaccountBinding), instanceUID, creation, nil
+	return meta.GetExternalName(m.ssb), creation, nil
 }
 
-// Delete deletes a the actual service binding instance in the BTP. This is done by deleting the virtual SubaccountServiceBinding CR (the TF CR)
-// by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client delete command
-func (m *ServiceBindingClient) Delete(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalDelete, error) {
+func (m *ServiceBindingClient) Delete(ctx context.Context) (managed.ExternalDelete, error) {
+	m.ssb.SetDeletionTimestamp(internal.Ptr(metav1.NewTime(time.Now())))
+	m.ssb.SetConditions(xpv1.Deleting())
 
-	targetUID := GenerateInstanceUID(publicCR.UID, targetExternalName)
-	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
-	if err != nil {
-		return managed.ExternalDelete{}, errors.Wrap(err, errBuildTfResource)
-	}
-
-	subaccountBinding.SetDeletionTimestamp(internal.Ptr(metav1.NewTime(time.Now())))
-	subaccountBinding.SetConditions(xpv1.Deleting())
-
-	tfController, err := m.sbConnector.Connect(ctx, subaccountBinding)
-	if err != nil {
-		return managed.ExternalDelete{}, errors.Wrap(err, errConnectTfController)
-	}
-
-	deletion, err := tfController.Delete(ctx, subaccountBinding)
+	deletion, err := m.tfClient.Delete(ctx, m.ssb)
 	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteTfResource)
 	}
@@ -107,53 +96,45 @@ func (m *ServiceBindingClient) Delete(ctx context.Context, publicCR *v1alpha1.Se
 	return deletion, nil
 }
 
-// Update updates a service binding instance with a different name and UID
-// by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client update command
-func (m *ServiceBindingClient) Update(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalUpdate, error) {
-	targetUID := GenerateInstanceUID(publicCR.UID, targetExternalName)
-	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
-	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errBuildTfResource)
-	}
-
-	tfController, err := m.sbConnector.Connect(ctx, subaccountBinding)
-	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errConnectTfController)
-	}
-
-	return tfController.Update(ctx, subaccountBinding)
+// Updates a service binding instance
+func (m *ServiceBindingClient) Update(ctx context.Context) (managed.ExternalUpdate, error) {
+	// Update is ignored. This is because it is assumed that all fields need
+	// a recreation of the resource. This logic could be outsourced to the controller,
+	// but keeping this in the client keeps the controller straight forward, keeping all
+	// special cases in the client.
+	return managed.ExternalUpdate{}, nil
 }
 
-// Observe observes a service binding instance with a different name and UID
-// by mapping the public CR to a TF CR, overwriting name and UID, and calling the TF client observe command
-// Returns the observation and the TF resource for data extraction
-func (m *ServiceBindingClient) Observe(ctx context.Context, publicCR *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
-	targetUID := GenerateInstanceUID(publicCR.UID, targetExternalName)
-	subaccountBinding, err := m.buildSubaccountServiceBinding(ctx, publicCR, targetName, targetUID, targetExternalName)
-	if err != nil {
-		return managed.ExternalObservation{}, nil, errors.Wrap(err, errBuildTfResource)
-	}
-
-	tfController, err := m.sbConnector.Connect(ctx, subaccountBinding)
-	if err != nil {
-		return managed.ExternalObservation{}, nil, errors.Wrap(err, errConnectTfController)
-	}
-
-	observation, err := tfController.Observe(ctx, subaccountBinding)
+// Observes a servicebinding
+func (m *ServiceBindingClient) Observe(ctx context.Context) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
+	observation, err := m.tfClient.Observe(ctx, m.ssb)
 	if err != nil {
 		return managed.ExternalObservation{}, nil, errors.Wrap(err, errObserveTfResource)
 	}
 
-	return observation, subaccountBinding, nil
+	// For some unclear reason (underlying code is very abstract,
+	// may need some further investigation in the future), the observation
+	// always wants an update on the resource because it thinks that the "labels" field
+	// in m.ssb has a diff. It has not as you can see in debugging.
+	// We can hardcode "ResourceUpToDate = true", because for a servicebinding,
+	// all fields are immutable and would require a recreation of the resource.
+	// This seems to be abug in the upjet tfpluginfw implementation, because this didn't
+	// happen before upgrading to the tfpluginfw implementation.
+	// TODO: Check if really all fields are immutable
+	observation.ResourceUpToDate = true
+
+	return observation, m.ssb, nil
 }
 
 // buildSubaccountServiceBinding creates a SubaccountServiceBinding resource from a ServiceBinding
-func (m *ServiceBindingClient) buildSubaccountServiceBinding(ctx context.Context, sb *v1alpha1.ServiceBinding, name string, uid types.UID, externalName string) (*v1alpha1.SubaccountServiceBinding, error) {
+func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *v1alpha1.ServiceBinding, name string, externalName string) (*v1alpha1.SubaccountServiceBinding, error) {
 
-	parameterJson, err := instanceClient.BuildComplexParameterJson(ctx, m.kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters.Raw)
+	parameterJson, err := instanceClient.BuildComplexParameterJson(ctx, kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters.Raw)
 	if err != nil {
 		return nil, errors.Wrap(err, errBuildParametersField)
 	}
+
+	targetUID := GenerateInstanceUID(sb.UID, externalName)
 
 	sBinding := &v1alpha1.SubaccountServiceBinding{
 		TypeMeta: metav1.TypeMeta{
@@ -162,7 +143,7 @@ func (m *ServiceBindingClient) buildSubaccountServiceBinding(ctx context.Context
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
-			UID:               uid,
+			UID:               targetUID,
 			DeletionTimestamp: sb.DeletionTimestamp,
 		},
 		Spec: v1alpha1.SubaccountServiceBindingSpec{

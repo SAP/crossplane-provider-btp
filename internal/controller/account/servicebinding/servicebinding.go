@@ -45,8 +45,30 @@ var newTfConnectorFn = func(kube kubeclient.Client) servicebindingclient.TfConne
 	)
 }
 
-var newServiceBindingClientFn = func(sbConnector servicebindingclient.TfConnector, kube kubeclient.Client) *servicebindingclient.ServiceBindingClient {
-	return servicebindingclient.NewServiceBindingClient(sbConnector, kube)
+// ServiceBindingClientFactory creates ServiceBindingClient instances
+type ServiceBindingClientFactory interface {
+	CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (servicebindingclient.ServiceBindingClientInterface, error)
+}
+
+// DefaultServiceBindingClientFactory is the production implementation
+type DefaultServiceBindingClientFactory struct {
+	kube        kubeclient.Client
+	tfConnector servicebindingclient.TfConnector
+}
+
+func (f *DefaultServiceBindingClientFactory) CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (servicebindingclient.ServiceBindingClientInterface, error) {
+	client, err := servicebindingclient.NewServiceBindingClient(ctx, f.kube, f.tfConnector, cr, targetName, targetExternalName)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+func newServiceBindingClientFactory(kube kubeclient.Client, tfConnector servicebindingclient.TfConnector) ServiceBindingClientFactory {
+	return &DefaultServiceBindingClientFactory{
+		kube:        kube,
+		tfConnector: tfConnector,
+	}
 }
 
 var newSBKeyRotatorFn = func(bindingDeleter servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator {
@@ -54,12 +76,11 @@ var newSBKeyRotatorFn = func(bindingDeleter servicebindingclient.BindingDeleter)
 }
 
 type connector struct {
-	kube            kubeclient.Client
-	usage           resource.Tracker
-	resourcetracker tracking.ReferenceResolverTracker
-	tfConnector                 servicebindingclient.TfConnector
-	newServiceBindingClientFn   func(servicebindingclient.TfConnector, kubeclient.Client) *servicebindingclient.ServiceBindingClient
-	newSBKeyRotatorFn          func(servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator
+	kube                    kubeclient.Client
+	usage                   resource.Tracker
+	resourcetracker         tracking.ReferenceResolverTracker
+	clientFactory           ServiceBindingClientFactory
+	newSBKeyRotatorFn       func(servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -73,12 +94,10 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, "cannot track resource references")
 	}
 
-	client := c.newServiceBindingClientFn(c.tfConnector, c.kube)
-
 	ext := &external{
-		kube:    c.kube,
-		client:  client,
-		tracker: c.resourcetracker,
+		kube:          c.kube,
+		clientFactory: c.clientFactory,
+		tracker:       c.resourcetracker,
 	}
 
 	ext.keyRotator = c.newSBKeyRotatorFn(ext)
@@ -87,10 +106,10 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 }
 
 type external struct {
-	kube       kubeclient.Client
-	keyRotator servicebindingclient.KeyRotator
-	client     servicebindingclient.ServiceBindingClientInterface
-	tracker    tracking.ReferenceResolverTracker
+	kube          kubeclient.Client
+	keyRotator    servicebindingclient.KeyRotator
+	clientFactory ServiceBindingClientFactory
+	tracker       tracking.ReferenceResolverTracker
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -105,14 +124,21 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceBinding)
 	}
 
-	btpName := getBtpName(cr)
-
-	// During the first rotation, the btpName may be empty. Using the forProvider.Name as a placeholder
-	if btpName == "" {
-		btpName = cr.Spec.ForProvider.Name
+	// Generate the current name for observation
+	var targetName string
+	if cr.Status.AtProvider.Name != "" {
+		targetName = cr.Status.AtProvider.Name
+	} else {
+		targetName = cr.Spec.ForProvider.Name
 	}
 
-	observation, tfResource, err := e.client.Observe(ctx, cr, btpName, meta.GetExternalName(cr))
+	// Create client for observation
+	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
+	if err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
+	}
+
+	observation, tfResource, err := client.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
 	}
@@ -168,24 +194,28 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.SetConditions(xpv1.Creating())
 
-	// Generate btpName if not already set in spec
-	var btpName string
-	if e.isRotationEnabled(cr) {
-		btpName = servicebindingclient.GenerateRandomName(cr.Spec.ForProvider.Name)
-	} else {
-		btpName = cr.Spec.ForProvider.Name
-	}
+	// Generate name based on rotation settings (pure, testable business logic)
+	name := e.generateName(cr)
 
-	externalName, _, creation, err := e.client.Create(ctx, cr, btpName)
+	// Create client for this operation only
+	client, err := e.clientFactory.CreateClient(ctx, cr, name, name)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
-	meta.SetExternalName(cr, externalName)
-	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
+	// Prepare client (required by upjet tfpluginfw)
+	if err := e.prepareClient(ctx, client); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
+	}
 
-	// Call the kube client to update the external-name and force-rotation annotations
-	if err := e.kube.Update(ctx, cr); err != nil {
+	// Perform the actual creation
+	externalName, creation, err := client.Create(ctx)
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
+	}
+
+	// Update CR with results (pure, testable business logic)
+	if err := e.updateCRAfterCreate(ctx, cr, externalName); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
@@ -201,9 +231,21 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	// Only update if the current binding is not retired (service bindings are immutable in BTP)
 	updateResult := managed.ExternalUpdate{}
 	if !e.keyRotator.IsCurrentBindingRetired(cr) {
-		btpName := getBtpName(cr)
+		// Generate the current name for update
+		var targetName string
+		if cr.Status.AtProvider.Name != "" {
+			targetName = cr.Status.AtProvider.Name
+		} else {
+			targetName = cr.Spec.ForProvider.Name
+		}
 
-		update, err := e.client.Update(ctx, cr, btpName, meta.GetExternalName(cr))
+		// Create client for update
+		client, err := e.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
+		if err != nil {
+			return managed.ExternalUpdate{}, err
+		}
+
+		update, err := client.Update(ctx)
 		if err != nil {
 			return managed.ExternalUpdate{}, err
 		}
@@ -250,7 +292,21 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
 	}
 
-	deletion, err := e.client.Delete(ctx, cr, cr.Status.AtProvider.Name, meta.GetExternalName(cr))
+	// Generate the current name for deletion
+	var targetName string
+	if cr.Status.AtProvider.Name != "" {
+		targetName = cr.Status.AtProvider.Name
+	} else {
+		targetName = cr.Spec.ForProvider.Name
+	}
+
+	// Create client for deletion
+	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
+	if err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
+	}
+
+	deletion, err := client.Delete(ctx)
 	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
@@ -260,7 +316,12 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 // DeleteBinding implements the BindingDeleter interface for the key rotator
 func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
-	_, err := e.client.Delete(ctx, cr, targetName, targetExternalName)
+	// Create a client for the specific binding to delete
+	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName)
+	if err != nil {
+		return err
+	}
+	_, err = client.Delete(ctx)
 	return err
 }
 
@@ -277,9 +338,30 @@ func (e *external) isRotationEnabled(cr *v1alpha1.ServiceBinding) bool {
 	return false
 }
 
-// getBtpName returns the btpName from spec, falling back to name for backward compatibility
-func getBtpName(cr *v1alpha1.ServiceBinding) string {
-	return cr.Status.AtProvider.Name
+// generateName generates the target name for the service binding based on rotation settings
+func (e *external) generateName(cr *v1alpha1.ServiceBinding) string {
+	if e.isRotationEnabled(cr) {
+		return servicebindingclient.GenerateRandomName(cr.Spec.ForProvider.Name)
+	}
+	return cr.Spec.ForProvider.Name
+}
+
+// prepareClient prepares the client by calling Observe (required by upjet tfpluginfw)
+func (e *external) prepareClient(ctx context.Context, client servicebindingclient.ServiceBindingClientInterface) error {
+	// We cannot call client.Create() directly, because we just created a new client,
+	// and the upjet tfpluginfw implementation currently needs a hidden field called "n.planResponse" to be not nil.
+	// It is only set in client.Observe() (=> https://github.com/crossplane/upjet/blob/bc4227e2dc7a51b3b1ff7070bb9b0722fd06e43d/pkg/controller/external_tfpluginfw.go#L530)
+	_, _, err := client.Observe(ctx)
+	return err
+}
+
+// updateCRAfterCreate updates the CR with the results of a successful create operation
+func (e *external) updateCRAfterCreate(ctx context.Context, cr *v1alpha1.ServiceBinding, externalName string) error {
+	meta.SetExternalName(cr, externalName)
+	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
+
+	// Call the kube client to update the external-name and force-rotation annotations
+	return e.kube.Update(ctx, cr)
 }
 
 // updateServiceBindingFromTfResource extracts data from SubaccountServiceBinding and updates the public ServiceBinding CR

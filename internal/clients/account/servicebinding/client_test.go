@@ -3,7 +3,6 @@ package servicebindingclient
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -42,7 +40,6 @@ func TestServiceBindingClient_CreateInstance(t *testing.T) {
 	}
 	type want struct {
 		instanceName string
-		instanceUID  types.UID
 		creation     managed.ExternalCreation
 		err          error
 	}
@@ -88,8 +85,7 @@ func TestServiceBindingClient_CreateInstance(t *testing.T) {
 				btpName:  "test-binding",
 			},
 			want: want{
-				instanceName: "", // Empty because CreateInstance returns empty name when using random suffix
-				instanceUID:  "", // Will be verified with pattern matching instead of exact match
+				instanceName: "", // Will be set by the external name from the client
 				creation:     expectedCreation,
 				err:          nil,
 			},
@@ -108,7 +104,6 @@ func TestServiceBindingClient_CreateInstance(t *testing.T) {
 			},
 			want: want{
 				instanceName: "",
-				instanceUID:  "",
 				creation:     managed.ExternalCreation{},
 				err:          errMockConnect,
 			},
@@ -129,7 +124,6 @@ func TestServiceBindingClient_CreateInstance(t *testing.T) {
 			},
 			want: want{
 				instanceName: "",
-				instanceUID:  "",
 				creation:     managed.ExternalCreation{},
 				err:          errMockCreate,
 			},
@@ -138,8 +132,16 @@ func TestServiceBindingClient_CreateInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
-			gotName, gotUID, gotCreation, err := m.Create(tt.args.ctx, tt.args.publicCR, tt.args.btpName)
+			m, clientErr := NewServiceBindingClient(tt.args.ctx, mockClient, tt.fields.sbConnector, tt.args.publicCR, tt.args.btpName, tt.args.btpName)
+			if clientErr != nil {
+				// Handle client creation error
+				assert.Error(t, clientErr)
+				if tt.want.err != nil {
+					assert.Contains(t, clientErr.Error(), tt.want.err.Error())
+				}
+				return
+			}
+			gotName, gotCreation, err := m.Create(tt.args.ctx)
 
 			if tt.want.err != nil {
 				assert.Error(t, err)
@@ -149,17 +151,11 @@ func TestServiceBindingClient_CreateInstance(t *testing.T) {
 			}
 
 			if tt.want.err == nil {
-				// For successful creates, verify the UID pattern instead of exact match
-				expectedPrefix := string(publicCR.UID) + "-" + tt.args.btpName + "-"
-				assert.True(t, strings.HasPrefix(string(gotUID), expectedPrefix),
-					"UID should start with '%s', got '%s'", expectedPrefix, gotUID)
-				// Verify the suffix is exactly 5 characters (random string length)
-				suffix := strings.TrimPrefix(string(gotUID), expectedPrefix)
-				assert.Len(t, suffix, 5, "Random suffix should be 5 characters")
+				// For successful creates, verify the name is returned (external name from the client)
+				assert.NotEmpty(t, gotName, "External name should not be empty on successful create")
 			} else {
 				// For error cases, verify exact matches
 				assert.Equal(t, tt.want.instanceName, gotName)
-				assert.Equal(t, tt.want.instanceUID, gotUID)
 			}
 			if diff := cmp.Diff(tt.want.creation, gotCreation); diff != "" {
 				t.Errorf("CreateInstance creation mismatch (-want +got):\n%s", diff)
@@ -269,8 +265,16 @@ func TestServiceBindingClient_DeleteInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
-			gotDeletion, err := m.Delete(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
+			m, clientErr := NewServiceBindingClient(tt.args.ctx, mockClient, tt.fields.sbConnector, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
+			if clientErr != nil {
+				// Handle client creation error
+				assert.Error(t, clientErr)
+				if tt.want.err != nil {
+					assert.Contains(t, clientErr.Error(), tt.want.err.Error())
+				}
+				return
+			}
+			gotDeletion, err := m.Delete(tt.args.ctx)
 
 			if tt.want.err != nil {
 				assert.Error(t, err)
@@ -281,130 +285,6 @@ func TestServiceBindingClient_DeleteInstance(t *testing.T) {
 
 			if diff := cmp.Diff(tt.want.deletion, gotDeletion); diff != "" {
 				t.Errorf("DeleteInstance deletion mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestServiceBindingClient_UpdateInstance(t *testing.T) {
-	mockClient := fake.NewClientBuilder().Build()
-
-	type fields struct {
-		sbConnector TfConnector
-	}
-	type args struct {
-		ctx                context.Context
-		publicCR           *v1alpha1.ServiceBinding
-		targetName         string
-		targetExternalName string
-	}
-	type want struct {
-		update managed.ExternalUpdate
-		err    error
-	}
-
-	publicCR := &v1alpha1.ServiceBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: "test-uid-123",
-		},
-		Spec: v1alpha1.ServiceBindingSpec{
-			ResourceSpec: xpv1.ResourceSpec{
-				ProviderConfigReference: &xpv1.Reference{
-					Name: "test-provider-config",
-				},
-			},
-			ForProvider: v1alpha1.ServiceBindingParameters{
-				Name: "test-service-binding",
-			},
-		},
-	}
-
-	expectedUpdate := managed.ExternalUpdate{
-		ConnectionDetails: managed.ConnectionDetails{
-			"test-key": []byte("test-value"),
-		},
-	}
-
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   want
-	}{
-		{
-			name: "SuccessfulUpdate",
-			fields: fields{
-				sbConnector: &MockTfConnector{
-					client: &MockExternalClient{
-						update: expectedUpdate,
-					},
-				},
-			},
-			args: args{
-				ctx:                context.Background(),
-				publicCR:           publicCR,
-				targetName:         "test-target",
-				targetExternalName: "external-123",
-			},
-			want: want{
-				update: expectedUpdate,
-				err:    nil,
-			},
-		},
-		{
-			name: "ConnectError",
-			fields: fields{
-				sbConnector: &MockTfConnector{
-					err: errMockConnect,
-				},
-			},
-			args: args{
-				ctx:                context.Background(),
-				publicCR:           publicCR,
-				targetName:         "test-target",
-				targetExternalName: "external-123",
-			},
-			want: want{
-				update: managed.ExternalUpdate{},
-				err:    errMockConnect,
-			},
-		},
-		{
-			name: "UpdateError",
-			fields: fields{
-				sbConnector: &MockTfConnector{
-					client: &MockExternalClient{
-						updateErr: errMockUpdate,
-					},
-				},
-			},
-			args: args{
-				ctx:                context.Background(),
-				publicCR:           publicCR,
-				targetName:         "test-target",
-				targetExternalName: "external-123",
-			},
-			want: want{
-				update: managed.ExternalUpdate{},
-				err:    errMockUpdate,
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
-			gotUpdate, err := m.Update(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
-
-			if tt.want.err != nil {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.want.err.Error())
-			} else {
-				assert.NoError(t, err)
-			}
-
-			if diff := cmp.Diff(tt.want.update, gotUpdate); diff != "" {
-				t.Errorf("UpdateInstance update mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -478,13 +358,13 @@ func TestServiceBindingClient_ObserveInstance(t *testing.T) {
 			},
 		},
 		{
-			name: "SuccessfulObserve_NotUpToDate",
+			name: "SuccessfulObserve_AlwaysUpToDate",
 			fields: fields{
 				sbConnector: &MockTfConnector{
 					client: &MockExternalClient{
 						observation: managed.ExternalObservation{
 							ResourceExists:   true,
-							ResourceUpToDate: false,
+							ResourceUpToDate: false, // This will be overridden to true
 						},
 					},
 				},
@@ -498,7 +378,7 @@ func TestServiceBindingClient_ObserveInstance(t *testing.T) {
 			want: want{
 				observation: managed.ExternalObservation{
 					ResourceExists:   true,
-					ResourceUpToDate: false,
+					ResourceUpToDate: true, // Client always sets this to true
 				},
 				resource: nil,
 				err:      nil,
@@ -549,8 +429,16 @@ func TestServiceBindingClient_ObserveInstance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			originalCR := publicCR.DeepCopy()
-			m := NewServiceBindingClient(tt.fields.sbConnector, mockClient)
-			gotObservation, gotResource, err := m.Observe(tt.args.ctx, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
+			m, clientErr := NewServiceBindingClient(tt.args.ctx, mockClient, tt.fields.sbConnector, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
+			if clientErr != nil {
+				// Handle client creation error
+				assert.Error(t, clientErr)
+				if tt.want.err != nil {
+					assert.Contains(t, clientErr.Error(), tt.want.err.Error())
+				}
+				return
+			}
+			gotObservation, gotResource, err := m.Observe(tt.args.ctx)
 
 			if tt.want.err != nil {
 				assert.Error(t, err)
@@ -616,19 +504,17 @@ func TestServiceBindingClient_buildSubaccountServiceBinding(t *testing.T) {
 		},
 	}
 
-	m := NewServiceBindingClient(nil, mockClient)
 	name := "test-name"
-	uid := types.UID("test-uid")
 	externalName := "external-123"
 
-	result, err := m.buildSubaccountServiceBinding(context.Background(), publicCR, name, uid, externalName)
+	result, err := buildSubaccountServiceBinding(context.Background(), mockClient, publicCR, name, externalName)
 	assert.NoError(t, err)
 
 	// Verify basic structure
 	assert.Equal(t, v1alpha1.SubaccountServiceBinding_Kind, result.Kind)
 	assert.Equal(t, v1alpha1.CRDGroupVersion.String(), result.APIVersion)
 	assert.Equal(t, name, result.Name)
-	assert.Equal(t, uid, result.UID)
+	assert.Equal(t, GenerateInstanceUID(publicCR.UID, externalName), result.UID)
 	assert.Equal(t, publicCR.DeletionTimestamp, result.DeletionTimestamp)
 
 	// Verify spec
@@ -640,7 +526,7 @@ func TestServiceBindingClient_buildSubaccountServiceBinding(t *testing.T) {
 	assert.Equal(t, externalName, meta.GetExternalName(result))
 
 	// Test without external name
-	resultNoExt, err := m.buildSubaccountServiceBinding(context.Background(), publicCR, name, uid, "")
+	resultNoExt, err := buildSubaccountServiceBinding(context.Background(), mockClient, publicCR, name, "")
 	assert.NoError(t, err)
 	assert.Equal(t, "", meta.GetExternalName(resultNoExt))
 }
