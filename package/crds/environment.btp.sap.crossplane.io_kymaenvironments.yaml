@@ -170,7 +170,6 @@ spec:
                   planName:
                     type: string
                 required:
-                - name
                 - planName
                 type: object
               managementPolicies:
