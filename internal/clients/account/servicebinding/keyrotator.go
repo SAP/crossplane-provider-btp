@@ -55,12 +55,12 @@ type KeyRotator interface {
 }
 
 type SBKeyRotator struct {
-	instanceDeleter BindingDeleter
+	bindingDeleter BindingDeleter
 }
 
-func NewSBKeyRotator(instanceDeleter BindingDeleter) *SBKeyRotator {
+func NewSBKeyRotator(bindingDeleter BindingDeleter) *SBKeyRotator {
 	return &SBKeyRotator{
-		instanceDeleter: instanceDeleter,
+		bindingDeleter: bindingDeleter,
 	}
 }
 
@@ -220,7 +220,7 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 			continue
 		}
 
-		if err := r.instanceDeleter.DeleteBinding(ctx, cr, key.Name, key.ID); err != nil {
+		if err := r.bindingDeleter.DeleteBinding(ctx, cr, key.Name, key.ID); err != nil {
 			// If we cannot delete the key, keep it in the list
 			newRetiredKeys = append(newRetiredKeys, key)
 			errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteExpiredKey, key.ID, err))
@@ -232,7 +232,7 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 
 func (r *SBKeyRotator) DeleteRetiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
 	for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
-		if err := r.instanceDeleter.DeleteBinding(ctx, cr, retiredKey.Name, retiredKey.ID); err != nil {
+		if err := r.bindingDeleter.DeleteBinding(ctx, cr, retiredKey.Name, retiredKey.ID); err != nil {
 			return fmt.Errorf("%s %s: %w", errDeleteRetiredKey, retiredKey.ID, err)
 		}
 	}
