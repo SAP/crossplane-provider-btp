@@ -32,12 +32,13 @@ var (
 )
 
 func TestEntitlements(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("BTP Entitlement Controller").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/entitlement")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta.AddToScheme(r.GetScheme())
+				_ = meta.AddToSchemeConcurrent(r.GetScheme())
 				unfilteredEntitlements := &v1alpha1.EntitlementList{}
 				r.List(ctx, unfilteredEntitlements)
 

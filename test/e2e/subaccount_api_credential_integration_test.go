@@ -20,20 +20,21 @@ import (
 )
 
 func TestSubaccountApiCredentialsIntegration(t *testing.T) {
+	t.Parallel()
 	var manifestDir = "testdata/crs/SubaccountApiCredentialsIntegration"
 	crudFeature := features.New("SubaccountApiCredentials Integration Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, manifestDir)
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta.AddToScheme(r.GetScheme())
+				_ = meta.AddToSchemeConcurrent(r.GetScheme())
 				return ctx
 			},
 		).
 		Assess(
 			"Await resources to become synced",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				if err := resources.WaitForResourcesToBeSynced(ctx, cfg, manifestDir, nil, wait.WithTimeout(time.Minute*7)); err != nil {
+				if err := resources.WaitForResourcesToBeSynced(ctx, cfg, manifestDir, nil, wait.WithTimeout(time.Minute*10)); err != nil {
 					t.Fatal(err)
 				}
 				return ctx
@@ -42,7 +43,7 @@ func TestSubaccountApiCredentialsIntegration(t *testing.T) {
 		Assess(
 			"Check Resources Delete",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.DeleteResources(ctx, t, cfg, manifestDir, wait.WithTimeout(time.Minute*7))
+				resources.DeleteResources(ctx, t, cfg, manifestDir, wait.WithTimeout(time.Minute*15))
 				return ctx
 			},
 		).
