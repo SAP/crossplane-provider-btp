@@ -173,6 +173,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 // Check if there is a Failed condition in the observation
 func hasFailedCondition(conditions []v1alpha1.ServiceInstanceCondition) bool {
 	for _, cond := range conditions {
+		if cond.Type == "Succeeded" && cond.Status == corev1.ConditionFalse {
+			return true
+		}
 		if cond.Type == "Failed" && cond.Status == corev1.ConditionTrue {
 			return true
 		}
@@ -187,6 +190,12 @@ func hasFailedCondition(conditions []v1alpha1.ServiceInstanceCondition) bool {
 // Get failure message from Failed condition
 func getFailureMessage(observation *v1alpha1.KymaServiceInstanceObservation) string {
 	for _, cond := range observation.Conditions {
+		if cond.Type == "Succeeded" && cond.Status == corev1.ConditionFalse {
+			if cond.Message != "" {
+				return cond.Message
+			}
+		}
+
 		if cond.Type == "Failed" || cond.Reason == "ProvisioningFailed" {
 			if cond.Message != "" {
 				return cond.Message
