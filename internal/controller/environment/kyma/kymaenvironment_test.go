@@ -186,7 +186,7 @@ func TestObserve(t *testing.T) {
 					}, false, nil
 				}},
 				httpClient: mockedHttpClient("someKubeConfigContent"),
-				cr:         environment(withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}})),
+				cr:         environment(withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000"), Name: internal.Ptr("kyma")}})),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -229,7 +229,7 @@ func TestObserve(t *testing.T) {
 					}, false, nil
 				}},
 				httpClient: mockedHttpClient(kubeConfigData),
-				cr:         environment(withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}})),
+				cr:         environment(withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000"), Name: internal.Ptr("kyma")}})),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -259,7 +259,7 @@ func TestObserve(t *testing.T) {
 					}, false, nil
 				}},
 				httpClient: mockedHttpClient("someNotMatchingKubeConfigData"),
-				cr:         environment(withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}})),
+				cr:         environment(withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000"), Name: internal.Ptr("kyma")}})),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -307,6 +307,7 @@ func TestObserve(t *testing.T) {
 						}, false, nil
 					}},
 				cr: environment(withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+					Name:       internal.Ptr("kyma"),
 					Parameters: runtime.RawExtension{Raw: []byte(`{"foo": "baz"}`)},
 				})),
 			},
@@ -319,6 +320,7 @@ func TestObserve(t *testing.T) {
 				err:           nil,
 				cr: environment(withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+						Name:       internal.Ptr("kyma"),
 						Parameters: runtime.RawExtension{Raw: []byte(`{"foo": "baz"}`)},
 					})),
 			},
@@ -332,6 +334,7 @@ func TestObserve(t *testing.T) {
 					}, false, nil
 				}},
 				cr: environment(withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+					Name:       internal.Ptr("kyma"),
 					Parameters: runtime.RawExtension{Raw: []byte(`foo: baz`)},
 				})),
 			},
@@ -343,6 +346,7 @@ func TestObserve(t *testing.T) {
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()}, err: nil,
 				cr: environment(withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+						Name:       internal.Ptr("kyma"),
 						Parameters: runtime.RawExtension{Raw: []byte(`foo: baz`)},
 					})),
 			},
@@ -356,6 +360,7 @@ func TestObserve(t *testing.T) {
 					}, false, nil
 				}},
 				cr: environment(withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+					Name:       internal.Ptr("kyma"),
 					Parameters: runtime.RawExtension{Raw: []byte(`{asd:y}`)},
 				})),
 			},
@@ -371,6 +376,7 @@ func TestObserve(t *testing.T) {
 					errCheckUpdate),
 				cr: environment(withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+						Name:       internal.Ptr("kyma"),
 						Parameters: runtime.RawExtension{Raw: []byte(`{asd:y}`)},
 					})),
 			},
@@ -384,6 +390,7 @@ func TestObserve(t *testing.T) {
 					}, false, nil
 				}},
 				cr: environment(withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+					Name:       internal.Ptr("kyma"),
 					Parameters: runtime.RawExtension{Raw: []byte(`asd`)},
 				})),
 			},
@@ -399,6 +406,7 @@ func TestObserve(t *testing.T) {
 					errCheckUpdate),
 				cr: environment(withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+						Name:       internal.Ptr("kyma"),
 						Parameters: runtime.RawExtension{Raw: []byte(`asd`)},
 					})),
 			},
@@ -413,6 +421,7 @@ func TestObserve(t *testing.T) {
 				}},
 				cr: environment(withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 					Parameters: runtime.RawExtension{Raw: []byte(`foo: bar`)},
+					Name:       internal.Ptr("kyma"),
 				})),
 			},
 			want: want{
@@ -428,6 +437,7 @@ func TestObserve(t *testing.T) {
 				cr: environment(withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 						Parameters: runtime.RawExtension{Raw: []byte(`foo: bar`)},
+						Name:       internal.Ptr("kyma"),
 					})),
 			},
 		},
@@ -478,6 +488,7 @@ func TestObserve(t *testing.T) {
 					}, false, nil
 				}},
 				cr: environment(withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+					Name:       internal.Ptr("kyma"),
 					Parameters: runtime.RawExtension{Raw: []byte(`foo: bar2`)},
 				}), withRetryStatus(&v1alpha1.RetryStatus{
 					DesiredHash: hash(map[string]interface{}{
@@ -501,6 +512,7 @@ func TestObserve(t *testing.T) {
 				err: nil,
 				cr: environment(
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+						Name:       internal.Ptr("kyma"),
 						Parameters: runtime.RawExtension{Raw: []byte(`foo: bar2`)},
 					}),
 					withConditions(xpv1.Available()),
@@ -522,23 +534,20 @@ func TestObserve(t *testing.T) {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						State:        internal.Ptr("OK"),
-						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
-						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
-						Parameters:   internal.Ptr("{\"name\":\"kyma\"}"),
+						State:      internal.Ptr("OK"),
+						Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
 					}, false, nil
 				}},
 				httpClient: mockedHttpClient(kubeConfigData),
-				cr:         environment(withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}}), withNoForProviderName()),
+				cr:         environment(withUID("1234"), withNoForProviderName()),
 			},
 			want: want{
 				o: managed.ExternalObservation{
 					ResourceLateInitialized: true,
 				},
-				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
-				err:           nil,
+				err: nil,
 				// Name field is copied over to Spec.ForProvider.Name during late initialization
-				cr: environment(withUID("1234"), withConditions(xpv1.Available()), withKymaParameters(v1alpha1.KymaEnvironmentParameters{Name: internal.Ptr("my-kyma")})),
+				cr: environment(withUID("1234"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{Name: internal.Ptr("kyma")})),
 			},
 		},
 	}
@@ -841,7 +850,7 @@ func environment(m ...environmentModifier) *v1alpha1.KymaEnvironment {
 		},
 		Spec: v1alpha1.KymaEnvironmentSpec{
 			ForProvider: v1alpha1.KymaEnvironmentParameters{
-				Name: internal.Ptr("my-kyma"),
+				Name: internal.Ptr("kyma"),
 			},
 		},
 	}
