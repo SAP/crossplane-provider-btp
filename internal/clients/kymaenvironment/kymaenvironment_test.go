@@ -27,6 +27,13 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 	}{
 		{
 			name: "APIerror",
+			mockCr: v1alpha1.KymaEnvironment{
+				Spec: v1alpha1.KymaEnvironmentSpec{
+					ForProvider: v1alpha1.KymaEnvironmentParameters{
+						Name: internal.Ptr(""),
+					},
+				},
+			},
 			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
 				Err:         errors.New("apiError"),
 				ApiResponse: nil,
@@ -36,6 +43,13 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 		},
 		{
 			name: "EmptyResponse",
+			mockCr: v1alpha1.KymaEnvironment{
+				Spec: v1alpha1.KymaEnvironmentSpec{
+					ForProvider: v1alpha1.KymaEnvironmentParameters{
+						Name: internal.Ptr(""),
+					},
+				},
+			},
 			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
 				Err:         nil,
 				ApiResponse: &client.BusinessEnvironmentInstancesResponseCollection{},
@@ -48,6 +62,11 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 			mockCr: v1alpha1.KymaEnvironment{
 				ObjectMeta: v1.ObjectMeta{
 					Annotations: map[string]string{"crossplane.io/external-name": "1234"},
+				},
+				Spec: v1alpha1.KymaEnvironmentSpec{
+					ForProvider: v1alpha1.KymaEnvironmentParameters{
+						Name: internal.Ptr(""),
+					},
 				},
 			},
 			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
@@ -71,9 +90,10 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 		{
 			name: "SuccessByNameAndTypeLookup",
 			mockCr: v1alpha1.KymaEnvironment{
-				ObjectMeta: v1.ObjectMeta{
-					Name:        "kyma",
-					Annotations: map[string]string{"crossplane.io/external-name": "kyma"},
+				Spec: v1alpha1.KymaEnvironmentSpec{
+					ForProvider: v1alpha1.KymaEnvironmentParameters{
+						Name: internal.Ptr("kyma"),
+					},
 				},
 			},
 			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
