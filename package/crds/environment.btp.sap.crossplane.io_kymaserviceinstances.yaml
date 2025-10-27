@@ -142,6 +142,9 @@ spec:
                 required:
                 - name
                 type: object
+                x-kubernetes-validations:
+                - message: Must specify either kymaEnvironmentBindingRef or kymaEnvironmentBindingSelector
+                  rule: has(self.kymaEnvironmentBindingRef) || has(self.kymaEnvironmentBindingSelector)
               kymaEnvironmentBindingSecret:
                 description: 'Extracted values populated by Crossplane reference resolution:'
                 type: string
@@ -362,6 +365,23 @@ spec:
                 description: KymaServiceInstanceObservation are the observable fields
                   of a KymaServiceInstance.
                 properties:
+                  conditions:
+                    description: Capture conditions from Kyma ServiceInstance status
+                    items:
+                      properties:
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                      required:
+                      - status
+                      - type
+                      type: object
+                    type: array
                   instanceID:
                     description: Instance ID from BTP
                     type: string
