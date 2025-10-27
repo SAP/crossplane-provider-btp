@@ -76,11 +76,11 @@ var newSBKeyRotatorFn = func(bindingDeleter servicebindingclient.BindingDeleter)
 }
 
 type connector struct {
-	kube                    kubeclient.Client
-	usage                   resource.Tracker
-	resourcetracker         tracking.ReferenceResolverTracker
-	clientFactory           ServiceBindingClientFactory
-	newSBKeyRotatorFn       func(servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator
+	kube              kubeclient.Client
+	usage             resource.Tracker
+	resourcetracker   tracking.ReferenceResolverTracker
+	clientFactory     ServiceBindingClientFactory
+	newSBKeyRotatorFn func(servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -94,10 +94,23 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, "cannot track resource references")
 	}
 
+	var targetName string
+	if cr.Status.AtProvider.Name == "" {
+		targetName = cr.Status.AtProvider.Name
+	} else {
+		targetName = cr.Spec.ForProvider.Name
+	}
+
+	client, err := c.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create client")
+	}
+
 	ext := &external{
 		kube:          c.kube,
 		clientFactory: c.clientFactory,
 		tracker:       c.resourcetracker,
+		client:        client,
 	}
 
 	ext.keyRotator = c.newSBKeyRotatorFn(ext)
@@ -108,6 +121,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 type external struct {
 	kube          kubeclient.Client
 	keyRotator    servicebindingclient.KeyRotator
+	client        servicebindingclient.ServiceBindingClientInterface
 	clientFactory ServiceBindingClientFactory
 	tracker       tracking.ReferenceResolverTracker
 }
@@ -124,21 +138,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceBinding)
 	}
 
-	// Generate the current name for observation
-	var targetName string
-	if cr.Status.AtProvider.Name != "" {
-		targetName = cr.Status.AtProvider.Name
-	} else {
-		targetName = cr.Spec.ForProvider.Name
-	}
-
-	// Create client for observation
-	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
-	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
-	}
-
-	observation, tfResource, err := client.Observe(ctx)
+	observation, tfResource, err := e.client.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
 	}
@@ -203,8 +203,14 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
+	e.client = client
+
+	// We cannot call client.Create() directly, because we just created a new client,
+	// and the upjet tfpluginfw implementation currently needs a hidden field called "n.planResponse" to be not nil.
+	// It is only set in client.Observe() (=> https://github.com/crossplane/upjet/blob/bc4227e2dc7a51b3b1ff7070bb9b0722fd06e43d/pkg/controller/external_tfpluginfw.go#L530)
+
 	// Prepare client (required by upjet tfpluginfw)
-	if err := e.prepareClient(ctx, client); err != nil {
+	if _, _, err := e.client.Observe(ctx); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
@@ -231,21 +237,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	// Only update if the current binding is not retired (service bindings are immutable in BTP)
 	updateResult := managed.ExternalUpdate{}
 	if !e.keyRotator.IsCurrentBindingRetired(cr) {
-		// Generate the current name for update
-		var targetName string
-		if cr.Status.AtProvider.Name != "" {
-			targetName = cr.Status.AtProvider.Name
-		} else {
-			targetName = cr.Spec.ForProvider.Name
-		}
-
-		// Create client for update
-		client, err := e.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
-		if err != nil {
-			return managed.ExternalUpdate{}, err
-		}
-
-		update, err := client.Update(ctx)
+		update, err := e.client.Update(ctx)
 		if err != nil {
 			return managed.ExternalUpdate{}, err
 		}
@@ -292,21 +284,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
 	}
 
-	// Generate the current name for deletion
-	var targetName string
-	if cr.Status.AtProvider.Name != "" {
-		targetName = cr.Status.AtProvider.Name
-	} else {
-		targetName = cr.Spec.ForProvider.Name
-	}
-
-	// Create client for deletion
-	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
-	if err != nil {
-		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
-	}
-
-	deletion, err := client.Delete(ctx)
+	deletion, err := e.client.Delete(ctx)
 	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
@@ -344,15 +322,6 @@ func (e *external) generateName(cr *v1alpha1.ServiceBinding) string {
 		return servicebindingclient.GenerateRandomName(cr.Spec.ForProvider.Name)
 	}
 	return cr.Spec.ForProvider.Name
-}
-
-// prepareClient prepares the client by calling Observe (required by upjet tfpluginfw)
-func (e *external) prepareClient(ctx context.Context, client servicebindingclient.ServiceBindingClientInterface) error {
-	// We cannot call client.Create() directly, because we just created a new client,
-	// and the upjet tfpluginfw implementation currently needs a hidden field called "n.planResponse" to be not nil.
-	// It is only set in client.Observe() (=> https://github.com/crossplane/upjet/blob/bc4227e2dc7a51b3b1ff7070bb9b0722fd06e43d/pkg/controller/external_tfpluginfw.go#L530)
-	_, _, err := client.Observe(ctx)
-	return err
 }
 
 // updateCRAfterCreate updates the CR with the results of a successful create operation
