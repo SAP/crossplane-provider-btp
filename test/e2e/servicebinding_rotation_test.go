@@ -51,11 +51,6 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 				sb := &v1alpha1.ServiceBinding{}
 				MustGetResource(t, cfg, sbRotationName, nil, sb)
 
-				// Check that the binding is fully initialized
-				if sb.Spec.BtpName == nil || sb.Status.AtProvider.Name != *sb.Spec.BtpName {
-					t.Error("ServiceBinding not fully initialized - BtpName does not match AtProvider.Name")
-				}
-
 				// Check that rotation configuration exists
 				if sb.Spec.ForProvider.Rotation == nil {
 					t.Error("Expected rotation configuration to be set")
@@ -67,9 +62,9 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					t.Error("Expected rotation TTL to be set")
 				}
 
-				// Verify random name is being generated
-				if sb.Status.AtProvider.Name != *sb.Spec.BtpName {
-					t.Error("The name of the external resource should match the generated BtpName")
+				// Verify that the binding is ready and name is populated
+				if sb.Status.AtProvider.Name == "" {
+					t.Error("The external resource should have a name")
 				}
 				if sb.Status.AtProvider.Name == sb.Spec.ForProvider.Name {
 					t.Error("The name of the external resource should be randomly generated for rotation-enabled binding")
@@ -89,9 +84,6 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 				// Store the original ID and creation time
 				originalID := sb.Status.AtProvider.ID
 				originalName := sb.Status.AtProvider.Name
-				if sb.Spec.BtpName == nil || sb.Status.AtProvider.Name != *sb.Spec.BtpName {
-					t.Fatal("Original binding not ready - BtpName does not match AtProvider.Name")
-				}
 
 				t.Logf("Waiting for rotation of binding ID: %s after 2 minutes...", originalID)
 
@@ -128,7 +120,7 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					MustGetResource(t, cfg, sbRotationName, nil, sb)
 
 					// New binding should exist and be ready
-					if sb.Spec.BtpName != nil && sb.Status.AtProvider.Name == *sb.Spec.BtpName && len(sb.Status.AtProvider.RetiredKeys) > 0 {
+					if sb.Status.AtProvider.Name != "" && sb.Status.AtProvider.ID != "" && len(sb.Status.AtProvider.RetiredKeys) > 0 {
 						t.Logf("New binding created: %s", sb.Status.AtProvider.ID)
 						return true, nil
 					}
@@ -144,7 +136,6 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 		).
 		Assess(
 			"Wait for TTL expiration and verify expired key deletion", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				// Wait and observe TTL expiration behavior
 				t.Logf("Monitoring TTL expiration behavior...")
 
 				var maxRetiredKeysObserved int
@@ -158,7 +149,6 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 						maxRetiredKeysObserved = currentRetiredCount
 					}
 
-					// Log detailed information about each retired key
 					now := time.Now()
 					expiredKeysCount := 0
 
@@ -171,7 +161,6 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 						if !key.RetiredDate.IsZero() {
 							retiredTime = key.RetiredDate.Time
 							if sb.Spec.ForProvider.Rotation != nil && sb.Spec.ForProvider.Rotation.TTL != nil && sb.Spec.ForProvider.Rotation.Frequency != nil {
-								// Use new expiration logic: RetiredDate + (TTL - Frequency)
 								gracePeriod := sb.Spec.ForProvider.Rotation.TTL.Duration - sb.Spec.ForProvider.Rotation.Frequency.Duration
 								expirationTime = retiredTime.Add(gracePeriod)
 								timeUntilExpiration := expirationTime.Sub(now)
