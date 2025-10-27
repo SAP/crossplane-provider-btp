@@ -42,3 +42,30 @@ func TestNewBTPClient(t *testing.T) {
 		)
 	}
 }
+
+// TODO: Unit tests for GetCFEnvironmentByNameAndOrg
+//
+// Current blocker: The function calls c.getCFEnvironments() internally,
+// which makes a real API call to BTP. Cannot be mocked without refactoring.
+//
+// Refactoring needed:
+// 1. Extract getCFEnvironments into an interface or function field
+// 2. Allow dependency injection in tests
+// 3. Mock the environment fetching, test the matching logic
+//
+// Options:
+//   A. Interface-based: Add EnvironmentFetcher interface to Client
+//   B. Function field: Add getCFEnvironmentsFunc field to Client
+//
+// Example tests to add after refactoring:
+// - TestGetCFEnvironmentByNameAndOrg_MatchByID
+// - TestGetCFEnvironmentByNameAndOrg_MatchByInstanceName
+// - TestGetCFEnvironmentByNameAndOrg_MatchByOrgName
+// - TestGetCFEnvironmentByNameAndOrg_NotFound
+// - TestGetCFEnvironmentByNameAndOrg_InvalidJSON (should skip, not fail)
+//
+// Related to: CloudFoundry import bug fix where we added ID matching
+
+func TestGetCFEnvironmentByNameAndOrg_Placeholder(t *testing.T) {
+	t.Skip("Requires refactoring for testability - see TODO above")
+}
