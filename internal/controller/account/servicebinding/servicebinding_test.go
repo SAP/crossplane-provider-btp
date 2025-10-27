@@ -875,6 +875,7 @@ func TestObserve(t *testing.T) {
 				clientFactory: tc.fields.clientFactory,
 				keyRotator:    tc.fields.keyRotator,
 				tracker:       tc.fields.tracker,
+				client:        tc.fields.clientFactory.(*MockServiceBindingClientFactory).Client,
 			}
 
 			got, err := e.Observe(context.Background(), tc.args.mg)
@@ -1325,6 +1326,7 @@ func TestUpdate(t *testing.T) {
 				kube:          tc.fields.kube,
 				clientFactory: tc.fields.clientFactory,
 				keyRotator:    tc.fields.keyRotator,
+				client:        tc.fields.clientFactory.(*MockServiceBindingClientFactory).Client,
 			}
 
 			got, err := e.Update(context.Background(), tc.args.mg)
@@ -1545,6 +1547,7 @@ func TestDelete(t *testing.T) {
 				clientFactory: tc.fields.clientFactory,
 				keyRotator:    tc.fields.keyRotator,
 				tracker:       tc.fields.tracker,
+				client:        tc.fields.clientFactory.(*MockServiceBindingClientFactory).Client,
 			}
 
 			got, err := e.Delete(context.Background(), tc.args.mg)
