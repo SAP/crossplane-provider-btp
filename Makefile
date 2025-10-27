@@ -54,7 +54,7 @@ KIND_NODE_IMAGE_TAG ?= v1.30.2
 # Setup Images
 DOCKER_REGISTRY ?= crossplane
 IMAGES = $(PROJECT_NAME) $(PROJECT_NAME)-controller
--include build/makelib/image.mk
+-include build/makelib/imagelight.mk
 
 export UUT_CONFIG = $(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME)):$(VERSION)
 export UUT_CONTROLLER = $(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME))-controller:$(VERSION)
