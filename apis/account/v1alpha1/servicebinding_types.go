@@ -67,10 +67,6 @@ type ServiceBindingParameters struct {
 	// Selector for a ServiceInstance in account to populate serviceInstanceId.
 	// +kubebuilder:validation:Optional
 	ServiceInstanceSelector *v1.Selector `json:"serviceInstanceSelector,omitempty" tf:"-"`
-
-	// Rotation defines the parameters for rotating the service credential binding.
-	// +kubebuilder:validation:Optional
-	Rotation *RotationParameters `json:"rotation,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.ttl) || (has(self.frequency) && duration(self.ttl) >= duration(self.frequency))",message="ttl must be greater than or equal to frequency"
@@ -139,6 +135,10 @@ type ServiceBindingSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 
 	ForProvider ServiceBindingParameters `json:"forProvider"`
+
+	// Rotation defines the parameters for rotating the service credential binding.
+	// +kubebuilder:validation:Optional
+	Rotation *RotationParameters `json:"rotation,omitempty"`
 }
 
 // A ServiceBindingStatus represents the observed state of a ServiceBinding.

@@ -1039,7 +1039,7 @@ func TestCreate(t *testing.T) {
 					withMetadata("old-external-name-uuid", map[string]string{servicebindingclient.ForceRotationKey: "true"}),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.ForProvider.Name = "test-binding"
-						cr.Spec.ForProvider.Rotation = &v1alpha1.RotationParameters{
+						cr.Spec.Rotation = &v1alpha1.RotationParameters{
 							Frequency: &metav1.Duration{Duration: time.Hour * 24},
 						}
 						// Simulate existing status from previous binding (before rotation)
@@ -1057,7 +1057,7 @@ func TestCreate(t *testing.T) {
 					withConditions(xpv1.Creating()),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.ForProvider.Name = "test-binding"
-						cr.Spec.ForProvider.Rotation = &v1alpha1.RotationParameters{
+						cr.Spec.Rotation = &v1alpha1.RotationParameters{
 							Frequency: &metav1.Duration{Duration: time.Hour * 24},
 						}
 						// Status should be preserved when create fails

@@ -67,7 +67,7 @@ func NewSBKeyRotator(bindingDeleter BindingDeleter) *SBKeyRotator {
 // isRotationConfigured checks if the service binding has valid rotation configuration
 // and retired keys to process
 func (r *SBKeyRotator) isRotationConfigured(cr *v1alpha1.ServiceBinding) bool {
-	return cr.Spec.ForProvider.Rotation != nil
+	return cr.Spec.Rotation != nil
 }
 
 func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
@@ -81,7 +81,7 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 
 	var rotationDue bool
 	if r.isRotationConfigured(cr) && !cr.Status.AtProvider.CreatedDate.IsZero() {
-		rotationDue = cr.Status.AtProvider.CreatedDate.Add(cr.Spec.ForProvider.Rotation.Frequency.Duration).Before(time.Now())
+		rotationDue = cr.Status.AtProvider.CreatedDate.Add(cr.Spec.Rotation.Frequency.Duration).Before(time.Now())
 	}
 
 	if !forceRotation && !rotationDue {
@@ -105,7 +105,7 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 		Name:         cr.Status.AtProvider.Name,
 		CreatedDate:  createdDate,
 		RetiredDate:  v1.Now(),
-		DeletionDate: deletionDate(time.Now(), cr.Spec.ForProvider.Rotation),
+		DeletionDate: deletionDate(time.Now(), cr.Spec.Rotation),
 	}
 	cr.Status.AtProvider.RetiredKeys = append(cr.Status.AtProvider.RetiredKeys, retiredKey)
 
@@ -137,7 +137,7 @@ func (r *SBKeyRotator) ValidateRotationSettings(cr *v1alpha1.ServiceBinding) {
 		return
 	}
 
-	rotation := cr.Spec.ForProvider.Rotation
+	rotation := cr.Spec.Rotation
 	ttl := rotation.TTL.Duration
 	frequency := rotation.Frequency.Duration
 
@@ -181,7 +181,7 @@ func (r *SBKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
 
 		// update DeletionDate in case rotation settings were changed
 		if r.isRotationConfigured(cr) {
-			key.DeletionDate = deletionDate(key.RetiredDate.Time, cr.Spec.ForProvider.Rotation)
+			key.DeletionDate = deletionDate(key.RetiredDate.Time, cr.Spec.Rotation)
 		}
 
 		if key.DeletionDate.Before(internal.Ptr(v1.Now())) {
@@ -212,7 +212,7 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 	for _, key := range cr.Status.AtProvider.RetiredKeys {
 		// update DeletionDate in case rotation settings were changed
 		if r.isRotationConfigured(cr) {
-			key.DeletionDate = deletionDate(key.RetiredDate.Time, cr.Spec.ForProvider.Rotation)
+			key.DeletionDate = deletionDate(key.RetiredDate.Time, cr.Spec.Rotation)
 		}
 
 		if !key.DeletionDate.Before(internal.Ptr(v1.Now())) {
