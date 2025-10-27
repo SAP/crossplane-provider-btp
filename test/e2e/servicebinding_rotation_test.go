@@ -52,13 +52,13 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 				MustGetResource(t, cfg, sbRotationName, nil, sb)
 
 				// Check that rotation configuration exists
-				if sb.Spec.ForProvider.Rotation == nil {
+				if sb.Spec.Rotation == nil {
 					t.Error("Expected rotation configuration to be set")
 				}
-				if sb.Spec.ForProvider.Rotation.Frequency == nil {
+				if sb.Spec.Rotation.Frequency == nil {
 					t.Error("Expected rotation frequency to be set")
 				}
-				if sb.Spec.ForProvider.Rotation.TTL == nil {
+				if sb.Spec.Rotation.TTL == nil {
 					t.Error("Expected rotation TTL to be set")
 				}
 
@@ -160,8 +160,8 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 
 						if !key.RetiredDate.IsZero() {
 							retiredTime = key.RetiredDate.Time
-							if sb.Spec.ForProvider.Rotation != nil && sb.Spec.ForProvider.Rotation.TTL != nil && sb.Spec.ForProvider.Rotation.Frequency != nil {
-								gracePeriod := sb.Spec.ForProvider.Rotation.TTL.Duration - sb.Spec.ForProvider.Rotation.Frequency.Duration
+							if sb.Spec.Rotation != nil && sb.Spec.Rotation.TTL != nil && sb.Spec.Rotation.Frequency != nil {
+								gracePeriod := sb.Spec.Rotation.TTL.Duration - sb.Spec.Rotation.Frequency.Duration
 								expirationTime = retiredTime.Add(gracePeriod)
 								timeUntilExpiration := expirationTime.Sub(now)
 								isExpired = timeUntilExpiration <= 0

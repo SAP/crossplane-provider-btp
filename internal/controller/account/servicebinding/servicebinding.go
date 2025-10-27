@@ -309,7 +309,7 @@ func (e *external) isRotationEnabled(cr *v1alpha1.ServiceBinding) bool {
 		return true
 	}
 
-	if cr.Spec.ForProvider.Rotation != nil {
+	if cr.Spec.Rotation != nil {
 		return true
 	}
 
