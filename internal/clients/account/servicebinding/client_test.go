@@ -23,7 +23,6 @@ var (
 	errMockConnect = errors.New("mock connect error")
 	errMockCreate  = errors.New("mock create error")
 	errMockDelete  = errors.New("mock delete error")
-	errMockUpdate  = errors.New("mock update error")
 	errMockObserve = errors.New("mock observe error")
 )
 

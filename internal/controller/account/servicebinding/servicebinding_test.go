@@ -426,6 +426,7 @@ func TestServiceBindingHelpers(t *testing.T) {
 
 		if cr == nil {
 			t.Errorf("expectedServiceBinding() returned nil")
+			return
 		}
 
 		// Should create an empty ServiceBinding by default
