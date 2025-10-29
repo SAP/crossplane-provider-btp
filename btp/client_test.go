@@ -80,6 +80,20 @@ func TestFindCFEnvironmentByNameAndOrg(t *testing.T) {
 			wantID:       internal.Ptr("env-456"),
 			wantErr:      false,
 		},
+		{
+			name: "Not found - no match",
+			envInstances: []provisioningclient.BusinessEnvironmentInstanceResponseObject{
+				{
+					Id:              internal.Ptr("other-env"),
+					EnvironmentType: internal.Ptr("cloudfoundry"),
+					Parameters:      internal.Ptr(`{"instance_name": "different-name"}`),
+				},
+			},
+			instanceName: "nonexistent",
+			orgName:      "",
+			wantID:       nil,
+			wantErr:      false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -90,14 +104,16 @@ func TestFindCFEnvironmentByNameAndOrg(t *testing.T) {
 				return
 			}
 			// Check result
-			if tt.wantID == nil && result != nil {
-				t.Errorf("findCFEnvironment() got = %v, want %v", result, tt.wantID)
-			} else if result == nil {
-				t.Errorf("findCFEnvironment() expected result with ID %s, got nil", *tt.wantID)
-				return
-			}
-			if result != nil && *result.Id != *tt.wantID {
-				t.Errorf("findCFEnvironment() got = %v, want %v", *result.Id, *tt.wantID)
+			if tt.wantID == nil {
+				if result != nil {
+					t.Errorf("findCFEnvironment() expected nil, got %v", result)
+				}
+			} else {
+				if result == nil {
+					t.Errorf("findCFEnvironment() expected result with ID %s, got nil", *tt.wantID)
+				} else if result.Id == nil || *result.Id != *tt.wantID {
+					t.Errorf("findCFEnvironment() got = %v, want %s", result.Id, *tt.wantID)
+				}
 			}
 		})
 	}
