@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/sap/crossplane-provider-btp/internal"
+	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 )
 
 func TestNewBTPClient(t *testing.T) {
@@ -43,29 +44,61 @@ func TestNewBTPClient(t *testing.T) {
 	}
 }
 
-// TODO: Unit tests for GetCFEnvironmentByNameAndOrg
-//
-// Current blocker: The function calls c.getCFEnvironments() internally,
-// which makes a real API call to BTP. Cannot be mocked without refactoring.
-//
-// Refactoring needed:
-// 1. Extract getCFEnvironments into an interface or function field
-// 2. Allow dependency injection in tests
-// 3. Mock the environment fetching, test the matching logic
-//
-// Options:
-//   A. Interface-based: Add EnvironmentFetcher interface to Client
-//   B. Function field: Add getCFEnvironmentsFunc field to Client
-//
-// Example tests to add after refactoring:
-// - TestGetCFEnvironmentByNameAndOrg_MatchByID
-// - TestGetCFEnvironmentByNameAndOrg_MatchByInstanceName
-// - TestGetCFEnvironmentByNameAndOrg_MatchByOrgName
-// - TestGetCFEnvironmentByNameAndOrg_NotFound
-// - TestGetCFEnvironmentByNameAndOrg_InvalidJSON (should skip, not fail)
-//
-// Related to: CloudFoundry import bug fix where we added ID matching
+func TestFindCFEnvironmentByNameAndOrg(t *testing.T) {
+	tests := []struct {
+		name         string
+		envInstances []provisioningclient.BusinessEnvironmentInstanceResponseObject
+		instanceName string
+		orgName      string
+		wantID       *string
+		wantErr      bool
+	}{
+		{
+			name: "Match By ID happy path",
+			envInstances: []provisioningclient.BusinessEnvironmentInstanceResponseObject{
+				{
+					Id:              internal.Ptr("env-id-123"),
+					EnvironmentType: internal.Ptr("cloudfoundry"),
+				},
+			},
+			instanceName: "env-id-123",
+			orgName:      "test-org",
+			wantID:       internal.Ptr("env-id-123"),
+			wantErr:      false,
+		},
+		{
+			name: "Match by instance name in Parameters",
+			envInstances: []provisioningclient.BusinessEnvironmentInstanceResponseObject{
+				{
+					Id:              internal.Ptr("env-456"),
+					EnvironmentType: internal.Ptr("cloudfoundry"),
+					Parameters:      internal.Ptr(`{"instance_name": "my-cf-env"}`),
+				},
+			},
+			instanceName: "my-cf-env",
+			orgName:      "test-org",
+			wantID:       internal.Ptr("env-456"),
+			wantErr:      false,
+		},
+	}
 
-func TestGetCFEnvironmentByNameAndOrg_Placeholder(t *testing.T) {
-	t.Skip("Requires refactoring for testability - see TODO above")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := findCFEnvironment(tt.envInstances, tt.instanceName, tt.orgName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("findCFEnvironment() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			// Check result
+			if tt.wantID == nil && result != nil {
+				t.Errorf("findCFEnvironment() got = %v, want %v", result, tt.wantID)
+			} else if result == nil {
+				t.Errorf("findCFEnvironment() expected result with ID %s, got nil", *tt.wantID)
+				return
+			}
+			if result != nil && *result.Id != *tt.wantID {
+				t.Errorf("findCFEnvironment() got = %v, want %v", *result.Id, *tt.wantID)
+			}
+		})
+	}
 }
