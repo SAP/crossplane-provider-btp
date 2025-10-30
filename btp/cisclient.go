@@ -487,41 +487,13 @@ func (c *Client) GetEnvironmentById(
 func (c *Client) GetCFEnvironmentByNameAndOrg(
 	ctx context.Context, instanceName string, orgName string,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
-	var environmentInstance *provisioningclient.BusinessEnvironmentInstanceResponseObject
 	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
 	envInstances, err := c.getCFEnvironments(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, instance := range envInstances {
-		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
-			continue
-		}
-		if instance.Id != nil && *instance.Id == instanceName {
-			environmentInstance = &instance
-			break
-		}
-
-		var parameters string
-		var parameterList map[string]interface{}
-		if instance.Parameters != nil {
-			parameters = *instance.Parameters
-		}
-		err := json.Unmarshal([]byte(parameters), &parameterList)
-		if err != nil {
-			return nil, err
-		}
-		if parameterList[cfenvironmentParameterInstanceName] == instanceName {
-			environmentInstance = &instance
-			break
-		}
-		if parameterList[cfenvironmentParameterInstanceName] == orgName {
-			environmentInstance = &instance
-			break
-		}
-	}
-	return environmentInstance, err
+	return findCFEnvironment(envInstances, instanceName, orgName)
 }
 
 func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
@@ -541,6 +513,37 @@ func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*pr
 		}
 	}
 	return environmentInstance, err
+}
+
+// findCFEnvironment tries to find a Cloud Foundry environment instance by matching either the ID or the instance name/org name in parameters
+func findCFEnvironment(envInstances []provisioningclient.BusinessEnvironmentInstanceResponseObject, instanceName string, orgName string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	// First check ID match
+	for _, instance := range envInstances {
+		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
+			continue
+		}
+		if instance.Id != nil && *instance.Id == instanceName {
+			return &instance, nil
+		}
+	}
+	// Then check instance name and org name match
+	for _, instance := range envInstances {
+		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
+			continue
+		}
+		var parameters string
+		if instance.Parameters != nil {
+			parameters = *instance.Parameters
+		}
+		var parameterList map[string]interface{}
+		if err := json.Unmarshal([]byte(parameters), &parameterList); err != nil {
+			continue // skip invalid JSON
+		}
+		if parameterList[cfenvironmentParameterInstanceName] == instanceName || parameterList[cfenvironmentParameterInstanceName] == orgName {
+			return &instance, nil
+		}
+	}
+	return nil, nil
 }
 
 func (c *Client) getCFEnvironments(ctx context.Context) ([]provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
