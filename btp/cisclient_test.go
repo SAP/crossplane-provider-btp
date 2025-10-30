@@ -9,7 +9,7 @@ import (
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 )
 
-func TestFindCFEnvironmentByNameAndOrg(t *testing.T) {
+func TestFindCFEnvironment(t *testing.T) {
 	tests := []struct {
 		name         string
 		envInstances []provisioningclient.BusinessEnvironmentInstanceResponseObject
