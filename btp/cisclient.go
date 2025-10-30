@@ -515,6 +515,7 @@ func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*pr
 	return environmentInstance, err
 }
 
+// findCFEnvironment tries to find a Cloud Foundry environment instance by matching either the ID or the instance name/org name in parameters
 func findCFEnvironment(envInstances []provisioningclient.BusinessEnvironmentInstanceResponseObject, instanceName string, orgName string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	// First check ID match
 	for _, instance := range envInstances {
