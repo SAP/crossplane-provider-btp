@@ -89,6 +89,7 @@ spec:
     name: kyma-kubeconfig-local
     namespace: default
   forProvider:
+    name: my-kyma-instance
     planName: azure
     parameters:
       region: northeurope
