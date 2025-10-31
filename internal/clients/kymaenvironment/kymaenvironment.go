@@ -86,7 +86,7 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 	}
 
 	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
-	parameters = AddKymaDefaultParameters(parameters, cr.Name, string(cr.UID))
+	parameters = AddKymaDefaultParameters(parameters, *cr.Spec.ForProvider.Name, string(cr.UID))
 	if err != nil {
 		return err
 	}
