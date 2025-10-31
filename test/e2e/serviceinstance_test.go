@@ -25,12 +25,13 @@ var (
 )
 
 func TestServiceInstance_CreationFlow(t *testing.T) {
+	t.Parallel()
 	crudFeatureSuite := features.New("ServiceInstance Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/serviceinstance")
 				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = apis.AddToScheme(r.GetScheme())
+				_ = apis.AddToSchemeConcurrent(r.GetScheme())
 
 				sm := v1alpha1.ServiceInstance{
 					ObjectMeta: metav1.ObjectMeta{Name: siCreateName, Namespace: cfg.Namespace()},
@@ -55,13 +56,13 @@ func TestServiceInstance_CreationFlow(t *testing.T) {
 			si := &v1alpha1.ServiceInstance{}
 			MustGetResource(t, cfg, siCreateName, nil, si)
 
-			AwaitResourceDeletionOrFail(ctx, t, cfg, si, wait.WithTimeout(time.Minute*5))
+			AwaitResourceDeletionOrFail(ctx, t, cfg, si, wait.WithTimeout(time.Minute*10))
 
 			return ctx
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*5))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance", wait.WithTimeout(time.Minute*10))
 			return ctx
 		},
 	).Feature()
