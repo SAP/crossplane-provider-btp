@@ -33,7 +33,6 @@ import (
 
 const (
 	errNotKymaEnvironment   = "managed resource is not a KymaEnvironment custom resource"
-	errNoNameProvided       = "no forProvider.name provided for kyma environment"
 	errExtractSecretKey     = "No Cloud Management Secret Found"
 	errGetCredentialsSecret = "Could not get secret of local cloud management"
 	errTrackPCUsage         = "cannot track ProviderConfig usage"
@@ -79,14 +78,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr, ok := mg.(*v1alpha1.KymaEnvironment)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotKymaEnvironment)
-	}
-
-	// Ensures backwards compatibility and upgrades existing KymaEnvironments
-	if cr.Spec.ForProvider.Name == nil {
-		cr.Spec.ForProvider.Name = &cr.Name
-		return managed.ExternalObservation{
-			ResourceLateInitialized: true,
-		}, nil
 	}
 
 	instance, hasUpdate, err := c.client.DescribeInstance(ctx, *cr)
@@ -157,10 +148,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotKymaEnvironment)
 	}
 
-	if cr.Spec.ForProvider.Name == nil {
-		return managed.ExternalCreation{}, errors.New(errNoNameProvided)
-	}
-
 	guid, err := c.client.CreateInstance(ctx, *cr)
 	if err != nil {
 		return managed.ExternalCreation{}, err
@@ -221,7 +208,7 @@ func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {
 func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, string, error) {
 
 	desired, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
-	desired = kymaenv.AddKymaDefaultParameters(desired, *cr.Spec.ForProvider.Name, string(cr.UID))
+	desired = kymaenv.AddKymaDefaultParameters(desired, kymaenv.GetKymaEnvironmentName(*cr), string(cr.UID))
 	if err != nil {
 		return false, "", errors.Wrap(err, errParameterParsing)
 	}

@@ -27,13 +27,6 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 	}{
 		{
 			name: "APIerror",
-			mockCr: v1alpha1.KymaEnvironment{
-				Spec: v1alpha1.KymaEnvironmentSpec{
-					ForProvider: v1alpha1.KymaEnvironmentParameters{
-						Name: internal.Ptr(""),
-					},
-				},
-			},
 			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
 				Err:         errors.New("apiError"),
 				ApiResponse: nil,
@@ -43,13 +36,6 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 		},
 		{
 			name: "EmptyResponse",
-			mockCr: v1alpha1.KymaEnvironment{
-				Spec: v1alpha1.KymaEnvironmentSpec{
-					ForProvider: v1alpha1.KymaEnvironmentParameters{
-						Name: internal.Ptr(""),
-					},
-				},
-			},
 			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
 				Err:         nil,
 				ApiResponse: &client.BusinessEnvironmentInstancesResponseCollection{},
@@ -62,11 +48,6 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 			mockCr: v1alpha1.KymaEnvironment{
 				ObjectMeta: v1.ObjectMeta{
 					Annotations: map[string]string{"crossplane.io/external-name": "1234"},
-				},
-				Spec: v1alpha1.KymaEnvironmentSpec{
-					ForProvider: v1alpha1.KymaEnvironmentParameters{
-						Name: internal.Ptr(""),
-					},
 				},
 			},
 			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
@@ -114,6 +95,40 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 			wantResponse: &client.BusinessEnvironmentInstanceResponseObject{
 				Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
 				Name:       internal.Ptr("kyma"),
+				Id:         internal.Ptr("1234"),
+				Type:       internal.Ptr(btp.KymaEnvironmentType().Identifier),
+			},
+		},
+		{
+			name: "SuccessByForProviderName",
+			mockCr: v1alpha1.KymaEnvironment{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "wrong-lookup-name",
+				},
+				Spec: v1alpha1.KymaEnvironmentSpec{
+					ForProvider: v1alpha1.KymaEnvironmentParameters{
+						Name: internal.Ptr("right-lookup-name"),
+					},
+				},
+			},
+			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
+				Err: nil,
+				ApiResponse: &client.BusinessEnvironmentInstancesResponseCollection{
+					EnvironmentInstances: []client.BusinessEnvironmentInstanceResponseObject{
+						{
+							Parameters: internal.Ptr("{\"name\":\"right-lookup-name\"}"),
+							Name:       internal.Ptr("right-lookup-name"),
+							Id:         internal.Ptr("1234"),
+							Type:       internal.Ptr(btp.KymaEnvironmentType().Identifier),
+						},
+					},
+				},
+			},
+			wantErr:        nil,
+			wantInitialize: true,
+			wantResponse: &client.BusinessEnvironmentInstanceResponseObject{
+				Parameters: internal.Ptr("{\"name\":\"right-lookup-name\"}"),
+				Name:       internal.Ptr("right-lookup-name"),
 				Id:         internal.Ptr("1234"),
 				Type:       internal.Ptr(btp.KymaEnvironmentType().Identifier),
 			},

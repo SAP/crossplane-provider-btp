@@ -21,8 +21,9 @@ const (
 type KymaEnvironmentParameters struct {
 	PlanName string `json:"planName"`
 
-	// We use a pointer to distinguish between not provided and empty string
-	// This is important because name should be enforced to exist and is substituted if not provided
+	// Can be provided, if empty the client will use metadata.name as the default value.
+	//
+	// The name of the Kyma Environment.
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name"`
 

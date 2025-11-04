@@ -32,7 +32,7 @@ func (c KymaEnvironments) DescribeInstance(
 	cr v1alpha1.KymaEnvironment,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
 
-	environment, err := c.btp.GetEnvironment(ctx, meta.GetExternalName(&cr), *cr.Spec.ForProvider.Name, btp.KymaEnvironmentType())
+	environment, err := c.btp.GetEnvironment(ctx, meta.GetExternalName(&cr), GetKymaEnvironmentName(cr), btp.KymaEnvironmentType())
 
 	if err != nil {
 		return nil, false, err
@@ -54,13 +54,13 @@ func (c KymaEnvironments) DescribeInstance(
 func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error) {
 
 	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
-	parameters = AddKymaDefaultParameters(parameters, *cr.Spec.ForProvider.Name, string(cr.UID))
+	parameters = AddKymaDefaultParameters(parameters, GetKymaEnvironmentName(cr), string(cr.UID))
 	if err != nil {
 		return "", err
 	}
 	guid, err := c.btp.CreateKymaEnvironment(
 		ctx,
-		*cr.Spec.ForProvider.Name,
+		GetKymaEnvironmentName(cr),
 		cr.Spec.ForProvider.PlanName,
 		parameters,
 		string(cr.UID),
@@ -86,7 +86,7 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 	}
 
 	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
-	parameters = AddKymaDefaultParameters(parameters, *cr.Spec.ForProvider.Name, string(cr.UID))
+	parameters = AddKymaDefaultParameters(parameters, GetKymaEnvironmentName(cr), string(cr.UID))
 	if err != nil {
 		return err
 	}
@@ -104,4 +104,13 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 func AddKymaDefaultParameters(parameters btp.InstanceParameters, instanceName string, resourceUID string) btp.InstanceParameters {
 	parameters[btp.KymaenvironmentParameterInstanceName] = instanceName
 	return parameters
+}
+
+// Defaults to the name of the CR if forProvider.name is not set
+func GetKymaEnvironmentName(cr v1alpha1.KymaEnvironment) string {
+	name := cr.Name
+	if cr.Spec.ForProvider.Name != nil {
+		name = *cr.Spec.ForProvider.Name
+	}
+	return name
 }
