@@ -71,10 +71,9 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 		{
 			name: "SuccessByNameAndTypeLookup",
 			mockCr: v1alpha1.KymaEnvironment{
-				Spec: v1alpha1.KymaEnvironmentSpec{
-					ForProvider: v1alpha1.KymaEnvironmentParameters{
-						Name: internal.Ptr("kyma"),
-					},
+				ObjectMeta: v1.ObjectMeta{
+					Name:        "kyma",
+					Annotations: map[string]string{"crossplane.io/external-name": "kyma"},
 				},
 			},
 			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
