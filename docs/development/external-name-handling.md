@@ -28,7 +28,7 @@ Based on this definition, common assumptions are:
 The external-name (string) identifies the external resource in the external system. 
 A provider can adopt two qualities:
 
-(1) The existance of the external-name express that there should be an external resource it identifies. So if the user creates a MR with the external-name set, the user explicitly states that this resource already exists in the external system and should be adopted/matched. This prevents unintended adoption/matching of existing resources. (2) The identifier than contains the information the provider needs to identify the external resource. This can be an unique identifier or a compound key.
+(1) The existance of the external-name express that there should be an external resource it identifies. So if the user creates a MR with the external-name set, the user explicitly states that this resource should exists in the external system (to its best knowledge) and should be adopted/matched. This prevents unintended adoption/matching of existing resources. This is also an advantage over capturing user intent via managment policies, as they would not prevent unintended matching of existing resources. (2) The identifier than contains the information the provider needs to identify the external resource. This can be an unique identifier or a compound key.
 
 Exceptions to this rule might be necessary and have to be stated clearly for the user and developer.
 
@@ -55,20 +55,26 @@ Consequently, we have to remove this initializer from running. We will have our 
 2. External-name is set, we check its format.
    - If format is not correct (not a valid GUID or not a valid compound key): return error.
 3. Build the Get API Request from the external-name (by either parsing the compound key or using the GUID directly, do not use the spec.forProvider).
-   - If resource is not found, that is a drift, not an error case, we therefore return resourceExist: false to trigger a Create() call.
-   - Else, updateObservation and perform needsCreate()/needsUpdate() check as usual.
+   - If resource is not found, that is a drift, not an error case, we therefore return resourceExist: False to trigger a Create() call.
+   - Else, updateObservation() and perform needsCreate()/needsUpdate() check as usual. Set the `externalOberservation.Diff` and set the diff as status and event for the resource. This is relevant if the user imports a resource and wants to ensure it doesnt generate any diff (by not setting managment polcy: Update) before having the managed resource fully managed by crossplane.
+
+
 
 #### Create()
-We know that the resource does not exist so we perform the Create API Request and store the necessary GUID or compound key from the API response/spec.ForProvider. The case that we don’t have all the necessary information to set the key can not happen because than we would not be able to check the resource for being created.
+We know that the resource does not exist so we perform the Create API Request. 
+If the request is sucessful, set the external-name with the necessary GUID or compound key from the API response/spec.ForProvider. 
+It might be possible that the API works asynchronous and the final external-name is not available after the request. This is a possible szenario but out of scope here.
 
-If the response is creation failed – resource already exist, we treat it as an error. In the next reconcile Observe(), the resource will be shown as resourceExist: true.
+If the response is `creation failed – resource already exist`, we treat it as an error. We do NOT set the external-name. In the next reconcile Observe(), the resource will be shown as resourceExist: False since the external name is not set and we intend to stay in an error loop. The error documents that the resource could not be created because it already exists. To resume, the user needs to set the external-name properly.
+
+If the request fails for any other reason, we will return the error and dont set the external-name.
 
 #### Update()
-If the diff contains a non-updateable field, we return error without executing the update, staying in an error loop until the user fixes the wrong state. This would put the resource into Ready: false, representing the inability to correct the drift.
+Updating non-updateable fields is prevented by using the `kubebuilder:validation:XValidation:rule="self == oldSelf"` annotation to prevent an update to immuteable fields at the API Server. Therefore, we dont need to perform further checks in the provider.
 
 Perform the UPDATE request, return error if it returns error.
 
-If the external-name is a compound key, update the compound key. This is necessary if parts of the compound key were updated.
+If the external-name is a compound key, update the compound key. This is necessary if parts of the compound key were updated. This is unlikely to happen but used as a safeguard in case it happens.
 
 #### Delete()
 If our external resource has a field (written into status by Observe)  indicating it is in deletion state, we return.
@@ -84,14 +90,9 @@ Else, if we have an error in our request, return with error.
 ### Importing of existing external resources
 For importing, setting the right external-name will match the external resource no matter the values in `spec.ForProvider`.
 
-If we set the `spec.forProvider` as required, the user can not create managed resources without those values and therefore must also set the required fields. The official import guide [3] talks about setting fields that are required for unique matching but the validation rules might require more fields. On the other hand, setting it as optional would allow to Observe an external resource and deleting them (using the managementPolicies: Observe, Delete) without having to fill out the spec.
+We set the `spec.forProvider` as required, the user can not create managed resources without those values and therefore must also set the required fields. 
 
-This is not super important for us right now since we plan to have an export cli to create the spec for us but might help to have a more common behaviour accross our providers.
-
-**TODO: how do we decide on this matter above?**
-
-Since the matching between MR and external resource is done based on external-name, a wrongly filled spec would result in Update() calls to the resource changing it. To prevent this, the user would not set the managementPolicy to Update. If there is then a missmatch, the Observe() method would determines this, sets the externalObservation.Diff and it would be visible in the debug log. 
-**TODO**: this should be put as a warning event on the resource maybe, because crossplane-runtime only does a log.Debug with the Diff. As a user adopting existing landscapes it would be good to know if the current spec WOULD trigger an update/diff for confidence.
+Since the matching between MR and external resource is done based on external-name, a wrongly filled spec would result in Update() calls to the resource changing it. To prevent this, the user would not set the managementPolicy to Update. If there is then a missmatch, the Observe() method would determines this, sets the externalObservation.Diff and it would be visible in the debug log. Additionally, we write it into the status field of the resource and write an event to make it visible to the user.
 
 ## Open Questions, Things not considered
 These might not be important for our APIs if we don’t have this scenarios.
