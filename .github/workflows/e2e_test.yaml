@@ -134,8 +134,8 @@ jobs:
 
   cleanup-e2e:
     runs-on: ubuntu-latest
-    needs: e2e-test
-    if: needs.e2e-test.result == 'success' || needs.e2e-test.result == 'failure' # dont run if e2e-test was skipped (which happens if the environment at prepare-matrix is not approved)
+    needs: [prepare-matrix, e2e-test]
+    if: always() && needs.prepare-matrix.result == 'success'  # only run if prepare-matrix was successful (requires manual approval) and then always run after e2e-test
     steps:
       - name: checkout repo
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
