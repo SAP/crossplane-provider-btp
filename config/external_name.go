@@ -12,6 +12,8 @@ var ExternalNameConfigs = map[string]config.ExternalName{
 	"btp_subaccount_trust_configuration":    config.IdentifierFromProvider,
 	"btp_globalaccount_trust_configuration": config.IdentifierFromProvider,
 	"btp_directory_entitlement":             config.IdentifierFromProvider,
+	"btp_subaccount_service_instance":       config.IdentifierFromProvider,
+	"btp_subaccount_service_binding":        config.IdentifierFromProvider,
 	"btp_subaccount_service_broker":         config.IdentifierFromProvider,
 	"btp_subaccount_api_credential":         config.IdentifierFromProvider,
 }
