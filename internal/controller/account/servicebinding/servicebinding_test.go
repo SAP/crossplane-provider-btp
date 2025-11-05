@@ -550,13 +550,6 @@ func (t *TfProxyMock) QueryAsyncData(ctx context.Context) *tfClient.ObservationD
 	return t.data
 }
 
-func (t *TfProxyMock) TfResourceExternalName() string {
-	if t.data == nil {
-		return ""
-	}
-	return t.data.ExternalName
-}
-
 func (t *TfProxyMock) Create(ctx context.Context) error {
 	return t.err
 }
