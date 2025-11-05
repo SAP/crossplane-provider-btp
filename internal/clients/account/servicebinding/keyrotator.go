@@ -89,7 +89,7 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 	}
 
 	// If the binding is already retired, do not retire it again.
-	for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
+	for _, retiredKey := range cr.Status.RetiredKeys {
 		if retiredKey.ID == cr.Status.AtProvider.ID {
 			return true
 		}
@@ -107,7 +107,7 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 		RetiredDate:  v1.Now(),
 		DeletionDate: deletionDate(time.Now(), cr.Spec.Rotation),
 	}
-	cr.Status.AtProvider.RetiredKeys = append(cr.Status.AtProvider.RetiredKeys, retiredKey)
+	cr.Status.RetiredKeys = append(cr.Status.RetiredKeys, retiredKey)
 
 	return true
 }
@@ -170,11 +170,11 @@ func (r *SBKeyRotator) ValidateRotationSettings(cr *v1alpha1.ServiceBinding) {
 }
 
 func (r *SBKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
-	if cr.Status.AtProvider.RetiredKeys == nil {
+	if cr.Status.RetiredKeys == nil {
 		return false
 	}
 
-	for _, key := range cr.Status.AtProvider.RetiredKeys {
+	for _, key := range cr.Status.RetiredKeys {
 		if key.RetiredDate.IsZero() {
 			continue
 		}
@@ -193,7 +193,7 @@ func (r *SBKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
 }
 
 func (r *SBKeyRotator) IsCurrentBindingRetired(cr *v1alpha1.ServiceBinding) bool {
-	for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
+	for _, retiredKey := range cr.Status.RetiredKeys {
 		if retiredKey.ID == cr.Status.AtProvider.ID {
 			return true
 		}
@@ -205,11 +205,11 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 	var newRetiredKeys []*v1alpha1.RetiredSBResource
 	var errs []error
 
-	if cr.Status.AtProvider.RetiredKeys == nil {
+	if cr.Status.RetiredKeys == nil {
 		return newRetiredKeys, nil
 	}
 
-	for _, key := range cr.Status.AtProvider.RetiredKeys {
+	for _, key := range cr.Status.RetiredKeys {
 		// update DeletionDate in case rotation settings were changed
 		if r.isRotationConfigured(cr) {
 			key.DeletionDate = deletionDate(key.RetiredDate.Time, cr.Spec.Rotation)
@@ -231,7 +231,7 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 }
 
 func (r *SBKeyRotator) DeleteRetiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
-	for _, retiredKey := range cr.Status.AtProvider.RetiredKeys {
+	for _, retiredKey := range cr.Status.RetiredKeys {
 		if err := r.bindingDeleter.DeleteBinding(ctx, cr, retiredKey.Name, retiredKey.ID); err != nil {
 			return fmt.Errorf("%s %s: %w", errDeleteRetiredKey, retiredKey.ID, err)
 		}

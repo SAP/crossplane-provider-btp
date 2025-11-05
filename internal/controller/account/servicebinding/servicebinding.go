@@ -250,7 +250,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteExpiredKeys)
 	}
 
-	cr.Status.AtProvider.RetiredKeys = newRetiredKeys
+	cr.Status.RetiredKeys = newRetiredKeys
 
 	if err := e.kube.Status().Update(ctx, cr); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)

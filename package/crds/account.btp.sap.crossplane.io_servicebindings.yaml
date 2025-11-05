@@ -489,40 +489,6 @@ spec:
                   ready:
                     description: Shows whether the service binding is ready
                     type: boolean
-                  retiredKeys:
-                    description: If the binding is rotated, `retiredBindings` stores
-                      resources that have been rotated out but are still transitionally
-                      retained due to `rotation.ttl` setting
-                    items:
-                      description: RetiredSBResource contains only the essential tracking
-                        information for retired service binding instances
-                      properties:
-                        createdDate:
-                          description: The date and time when the resource was created
-                          format: date-time
-                          type: string
-                        deletionDate:
-                          description: |-
-                            The date and time when the resource will be deleted.
-                            May change if the rotation settings change
-                          format: date-time
-                          type: string
-                        id:
-                          description: The ID of the service binding resource
-                          type: string
-                        name:
-                          description: The name of the service binding resource
-                          type: string
-                        retiredDate:
-                          description: The date and time when the resource was retired
-                          format: date-time
-                          type: string
-                      required:
-                      - createdDate
-                      - deletionDate
-                      - retiredDate
-                      type: object
-                    type: array
                   state:
                     description: The current state of the service binding (in progress,
                       failed, succeeded)
@@ -581,6 +547,40 @@ spec:
                   it can not recover from without human intervention.
                 format: int64
                 type: integer
+              retiredKeys:
+                description: If the binding is rotated, `retiredBindings` stores resources
+                  that have been rotated out but are still transitionally retained
+                  due to `rotation.ttl` setting
+                items:
+                  description: RetiredSBResource contains only the essential tracking
+                    information for retired service binding instances
+                  properties:
+                    createdDate:
+                      description: The date and time when the resource was created
+                      format: date-time
+                      type: string
+                    deletionDate:
+                      description: |-
+                        The date and time when the resource will be deleted.
+                        May change if the rotation settings change
+                      format: date-time
+                      type: string
+                    id:
+                      description: The ID of the service binding resource
+                      type: string
+                    name:
+                      description: The name of the service binding resource
+                      type: string
+                    retiredDate:
+                      description: The date and time when the resource was retired
+                      format: date-time
+                      type: string
+                  required:
+                  - createdDate
+                  - deletionDate
+                  - retiredDate
+                  type: object
+                type: array
             type: object
         required:
         - spec

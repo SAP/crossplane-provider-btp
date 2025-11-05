@@ -69,14 +69,14 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 					AtProvider: v1alpha1.ServiceBindingObservation{
 						ID:   "current-id",
 						Name: "current-name",
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:           "current-id",
-								Name:         "current-name",
-								CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
-								RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
-								DeletionDate: &metav1.Time{Time: time.Now().Add(time.Hour)},
-							},
+					},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "current-id",
+							Name:         "current-name",
+							CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+							RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
+							DeletionDate: &metav1.Time{Time: time.Now().Add(time.Hour)},
 						},
 					},
 				},
@@ -162,12 +162,12 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := NewSBKeyRotator(nil)
-			originalRetiredKeys := len(tt.cr.Status.AtProvider.RetiredKeys)
+			originalRetiredKeys := len(tt.cr.Status.RetiredKeys)
 
 			got := r.RetireBinding(tt.cr)
 
 			assert.Equal(t, tt.want, got)
-			assert.Equal(t, tt.wantKeys, len(tt.cr.Status.AtProvider.RetiredKeys)-originalRetiredKeys)
+			assert.Equal(t, tt.wantKeys, len(tt.cr.Status.RetiredKeys)-originalRetiredKeys)
 
 			if got && tt.wantKeys > 0 {
 				// CreatedDate should be preserved when it exists
@@ -175,7 +175,7 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 					assert.NotNil(t, tt.cr.Status.AtProvider.CreatedDate)
 				}
 
-				retiredKey := tt.cr.Status.AtProvider.RetiredKeys[len(tt.cr.Status.AtProvider.RetiredKeys)-1]
+				retiredKey := tt.cr.Status.RetiredKeys[len(tt.cr.Status.RetiredKeys)-1]
 				assert.Equal(t, "current-id", retiredKey.ID)
 				assert.Equal(t, "current-name", retiredKey.Name)
 			}
@@ -203,15 +203,13 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:           "expired-key",
-								Name:         "expired-name",
-								CreatedDate:  metav1.Time{Time: expiredTime},
-								RetiredDate:  metav1.Time{Time: expiredTime},
-								DeletionDate: &metav1.Time{Time: expiredTime.Add(30 * time.Minute)},
-							},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "expired-key",
+							Name:         "expired-name",
+							CreatedDate:  metav1.Time{Time: expiredTime},
+							RetiredDate:  metav1.Time{Time: expiredTime},
+							DeletionDate: &metav1.Time{Time: expiredTime.Add(30 * time.Minute)},
 						},
 					},
 				},
@@ -228,15 +226,13 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:           "valid-key",
-								Name:         "valid-name",
-								CreatedDate:  metav1.Time{Time: validTime},
-								RetiredDate:  metav1.Time{Time: time.Now()},
-								DeletionDate: &metav1.Time{Time: time.Now().Add(30 * time.Minute)},
-							},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "valid-key",
+							Name:         "valid-name",
+							CreatedDate:  metav1.Time{Time: validTime},
+							RetiredDate:  metav1.Time{Time: time.Now()},
+							DeletionDate: &metav1.Time{Time: time.Now().Add(30 * time.Minute)},
 						},
 					},
 				},
@@ -262,15 +258,13 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 			name: "NoTTLConfig",
 			cr: &v1alpha1.ServiceBinding{
 				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:           "some-key",
-								Name:         "some-name",
-								CreatedDate:  metav1.Time{Time: expiredTime},
-								RetiredDate:  metav1.Time{Time: expiredTime},
-								DeletionDate: nil, // Will be updated by the new logic
-							},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "some-key",
+							Name:         "some-name",
+							CreatedDate:  metav1.Time{Time: expiredTime},
+							RetiredDate:  metav1.Time{Time: expiredTime},
+							DeletionDate: nil, // Will be updated by the new logic
 						},
 					},
 				},
@@ -287,15 +281,13 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:           "invalid-key",
-								Name:         "invalid-name",
-								CreatedDate:  metav1.Time{}, // invalid date case
-								RetiredDate:  metav1.Time{}, // invalid date case
-								DeletionDate: nil,           // Will be updated by the new logic
-							},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "invalid-key",
+							Name:         "invalid-name",
+							CreatedDate:  metav1.Time{}, // invalid date case
+							RetiredDate:  metav1.Time{}, // invalid date case
+							DeletionDate: nil,           // Will be updated by the new logic
 						},
 					},
 				},
@@ -336,22 +328,20 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:           "expired-key",
-								Name:         "expired-name",
-								CreatedDate:  metav1.Time{Time: expiredTime},
-								RetiredDate:  metav1.Time{Time: expiredTime},
-								DeletionDate: &metav1.Time{Time: expiredTime.Add(30 * time.Minute)},
-							},
-							{
-								ID:           "valid-key",
-								Name:         "valid-name",
-								CreatedDate:  metav1.Time{Time: validTime},
-								RetiredDate:  metav1.Time{Time: time.Now()},
-								DeletionDate: &metav1.Time{Time: time.Now().Add(30 * time.Minute)},
-							},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "expired-key",
+							Name:         "expired-name",
+							CreatedDate:  metav1.Time{Time: expiredTime},
+							RetiredDate:  metav1.Time{Time: expiredTime},
+							DeletionDate: &metav1.Time{Time: expiredTime.Add(30 * time.Minute)},
+						},
+						{
+							ID:           "valid-key",
+							Name:         "valid-name",
+							CreatedDate:  metav1.Time{Time: validTime},
+							RetiredDate:  metav1.Time{Time: time.Now()},
+							DeletionDate: &metav1.Time{Time: time.Now().Add(30 * time.Minute)},
 						},
 					},
 				},
@@ -371,15 +361,13 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:           "expired-key",
-								Name:         "expired-name",
-								CreatedDate:  metav1.Time{Time: expiredTime},
-								RetiredDate:  metav1.Time{Time: expiredTime},
-								DeletionDate: &metav1.Time{Time: expiredTime.Add(30 * time.Minute)},
-							},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "expired-key",
+							Name:         "expired-name",
+							CreatedDate:  metav1.Time{Time: expiredTime},
+							RetiredDate:  metav1.Time{Time: expiredTime},
+							DeletionDate: &metav1.Time{Time: expiredTime.Add(30 * time.Minute)},
 						},
 					},
 				},
@@ -401,15 +389,13 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:           "valid-key",
-								Name:         "valid-name",
-								CreatedDate:  metav1.Time{Time: validTime},
-								RetiredDate:  metav1.Time{Time: time.Now()},
-								DeletionDate: &metav1.Time{Time: time.Now().Add(30 * time.Minute)},
-							},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "valid-key",
+							Name:         "valid-name",
+							CreatedDate:  metav1.Time{Time: validTime},
+							RetiredDate:  metav1.Time{Time: time.Now()},
+							DeletionDate: &metav1.Time{Time: time.Now().Add(30 * time.Minute)},
 						},
 					},
 				},
@@ -451,22 +437,20 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 			name: "DeleteAllRetiredKeysSuccessfully",
 			cr: &v1alpha1.ServiceBinding{
 				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:           "key1",
-								Name:         "name1",
-								CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
-								RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
-								DeletionDate: nil,
-							},
-							{
-								ID:           "key2",
-								Name:         "name2",
-								CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
-								RetiredDate:  metav1.Time{},
-								DeletionDate: nil,
-							},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "key1",
+							Name:         "name1",
+							CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+							RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
+							DeletionDate: nil,
+						},
+						{
+							ID:           "key2",
+							Name:         "name2",
+							CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+							RetiredDate:  metav1.Time{},
+							DeletionDate: nil,
 						},
 					},
 				},
@@ -478,15 +462,13 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 			name: "DeleteRetiredKeysWithError",
 			cr: &v1alpha1.ServiceBinding{
 				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{
-							{
-								ID:           "key1",
-								Name:         "name1",
-								CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
-								RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
-								DeletionDate: nil,
-							},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "key1",
+							Name:         "name1",
+							CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+							RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
+							DeletionDate: nil,
 						},
 					},
 				},
@@ -500,9 +482,7 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 			name: "NoRetiredKeys",
 			cr: &v1alpha1.ServiceBinding{
 				Status: v1alpha1.ServiceBindingStatus{
-					AtProvider: v1alpha1.ServiceBindingObservation{
-						RetiredKeys: []*v1alpha1.RetiredSBResource{},
-					},
+					RetiredKeys: []*v1alpha1.RetiredSBResource{},
 				},
 			},
 			mockDeleter: &MockInstanceDeleter{},
@@ -524,7 +504,7 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			expectedCallCount := len(tt.cr.Status.AtProvider.RetiredKeys)
+			expectedCallCount := len(tt.cr.Status.RetiredKeys)
 			assert.Equal(t, expectedCallCount, mockDeleter.deleteCallCount)
 		})
 	}

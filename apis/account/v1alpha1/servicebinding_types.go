@@ -104,10 +104,6 @@ type ServiceBindingObservation struct {
 
 	// The parameters of the service binding as a valid JSON object
 	Parameters *string `json:"parameters,omitempty"`
-
-	// If the binding is rotated, `retiredBindings` stores resources that have been rotated out but are still transitionally retained due to `rotation.ttl` setting
-	// +kubebuilder:validation:Optional
-	RetiredKeys []*RetiredSBResource `json:"retiredKeys,omitempty"`
 }
 
 // RetiredSBResource contains only the essential tracking information for retired service binding instances
@@ -145,6 +141,10 @@ type ServiceBindingSpec struct {
 type ServiceBindingStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
 	AtProvider          ServiceBindingObservation `json:"atProvider,omitempty"`
+
+	// If the binding is rotated, `retiredBindings` stores resources that have been rotated out but are still transitionally retained due to `rotation.ttl` setting
+	// +kubebuilder:validation:Optional
+	RetiredKeys []*RetiredSBResource `json:"retiredKeys,omitempty"`
 }
 
 // +kubebuilder:object:root=true

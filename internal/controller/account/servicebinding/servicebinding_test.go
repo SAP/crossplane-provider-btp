@@ -1260,7 +1260,7 @@ func TestUpdate(t *testing.T) {
 					withMetadata("test-external-name", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
-						cr.Status.AtProvider.RetiredKeys = []*v1alpha1.RetiredSBResource{}
+						cr.Status.RetiredKeys = []*v1alpha1.RetiredSBResource{}
 					},
 				),
 			},
@@ -1308,7 +1308,7 @@ func TestUpdate(t *testing.T) {
 					withMetadata("test-external-name", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
-						cr.Status.AtProvider.RetiredKeys = []*v1alpha1.RetiredSBResource{
+						cr.Status.RetiredKeys = []*v1alpha1.RetiredSBResource{
 							{
 								ID:   "retired-id-1",
 								Name: "retired-binding-1",
