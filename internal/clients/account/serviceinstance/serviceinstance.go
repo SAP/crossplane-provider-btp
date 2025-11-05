@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	ujresource "github.com/crossplane/upjet/pkg/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -62,9 +63,11 @@ func (s *ServiceInstanceMapper) TfResource(ctx context.Context, si *v1alpha1.Ser
 		sInstance.Spec.ForProvider.ServiceplanID = &si.Status.AtProvider.ServiceplanID
 	}
 
-	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
-	condition := si.GetCondition(xpv1.TypeReady)
-	sInstance.SetConditions(condition)
+	// in order for the tf reconciler to properly work we need to mimic the ready and async operation condition as well
+	// the (upjet) tfplugin framework client does not set the async condition as part of its observe operation unlike the default cli client
+	readyCondition := si.GetCondition(xpv1.TypeReady)
+	asyncOperationCondition := si.GetCondition(ujresource.TypeAsyncOperation)
+	sInstance.SetConditions(readyCondition, asyncOperationCondition)
 
 	return sInstance, nil
 }
@@ -157,9 +160,43 @@ func mergeJsonData(mergedData map[string]interface{}, jsonToMerge []byte) error 
 	return nil
 }
 
-// mergeMaps merges a
+// addMap merges toAdd into mergedData recursively.
+//
+// Merge behavior:
+//   - When both values are maps: Recursively merges their contents
+//   - When types differ or value is not a map: toAdd's value overwrites mergedData's value
+//
+// Example:
+//
+//	mergedData:  {"data": {"user": "admin", "timeout": 30}}
+//	toAdd: {"data": {"timeout": 60, "password": "secret"}}
+//	result: {"data": {"user": "admin", "timeout": 60, "password": "secret"}}
+//	                  ↑ preserved      ↑ overwritten  ↑ added
 func addMap(mergedData map[string]interface{}, toAdd map[string]interface{}) {
 	for k, v := range toAdd {
-		mergedData[k] = v
+		// check if the value is a nested map
+		vMap, isValueMap := v.(map[string]interface{})
+		if !isValueMap {
+			mergedData[k] = v
+			continue
+		}
+
+		// check if there is an existing entry
+		existing, exists := mergedData[k]
+		if !exists {
+			mergedData[k] = vMap
+			continue
+		}
+
+		// check if the existing entry is also a map
+		existingMap, isExistingMap := existing.(map[string]interface{})
+		if !isExistingMap {
+			mergedData[k] = vMap
+			continue
+		}
+
+		// both are maps run recursion
+		addMap(existingMap, vMap)
+		mergedData[k] = existingMap
 	}
 }

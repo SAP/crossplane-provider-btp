@@ -51,7 +51,7 @@ permissions:
 
 env:
   # hardcoded BTP CLI version
-  btp_cli_version: 2.64.0
+  btp_cli_version: 2.90.2
 
 jobs:
   prepare-matrix:
