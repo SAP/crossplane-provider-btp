@@ -27,8 +27,5 @@ func Configure(p *config.Provider) {
 		// we only use this resource internally, so there is no harm in avoiding usage of secrets here it makes the setup a lot easier
 		r.TerraformResource.Schema["parameters"].Sensitive = false
 
-		// upjet currently has a strong coupling with terraform plugin skdv2 (even when using the tfplugin framework external clients)
-		// that requires us to drop schema attributes that result in ValueType TypeInvalid to prevent reconcile panics
-		delete(r.TerraformResource.Schema, "timeouts")
 	})
 }

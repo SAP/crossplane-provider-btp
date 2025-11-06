@@ -35,10 +35,6 @@ type TfProxyControllerI interface {
 	Delete(ctx context.Context) error
 	// QueryUpdatedData returns the relevant status data once the async creation is done
 	QueryAsyncData(ctx context.Context) *ObservationData
-	// expose external name of the wrapped resource for syncing native and tfresource
-	// this is a workaround for the missing conditions setting of the terraform plugin framwork external client
-	// compared to the default cli external client
-	TfResourceExternalName() string
 }
 
 type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
@@ -106,11 +102,6 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 		return sid
 	}
 	return nil
-}
-
-// TfResourceExternalName returns the external name of the wrapped terraform resource once the async creation is done
-func (t *TfProxyController[UPJETTED]) TfResourceExternalName() string {
-	return meta.GetExternalName(t.tfResource)
 }
 
 func (t *TfProxyController[UPJETTED]) Create(ctx context.Context) error {

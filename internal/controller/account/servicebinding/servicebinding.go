@@ -93,12 +93,6 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	case tfClient.NotExisting:
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	case tfClient.Drift:
-		// sync external name to establish resource tracking in cases of initial drift with tfplugin framework client
-		if externalName := e.tfClient.TfResourceExternalName(); externalName != "" {
-			if err := e.setExternalName(ctx, cr, e.tfClient.TfResourceExternalName()); err != nil {
-				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
-			}
-		}
 		return managed.ExternalObservation{
 			ResourceExists:    true,
 			ResourceUpToDate:  false,
@@ -174,13 +168,5 @@ func (e *external) saveBindingData(ctx context.Context, cr *v1alpha1.ServiceBind
 	}
 	// we rely on status being saved in crossplane reconciler here
 	cr.Status.AtProvider.ID = sid.ID
-	return nil
-}
-
-func (e *external) setExternalName(ctx context.Context, cr *v1alpha1.ServiceBinding, externalName string) error {
-	meta.SetExternalName(cr, externalName)
-	if err := e.kube.Update(ctx, cr); err != nil {
-		return err
-	}
 	return nil
 }
