@@ -3,7 +3,6 @@ package servicebindingclient
 import (
 	"context"
 
-	ujresource "github.com/crossplane/upjet/pkg/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -56,11 +55,9 @@ func (s *ServiceBindingMapper) TfResource(ctx context.Context, sb *v1alpha1.Serv
 	// transfer external name
 	meta.SetExternalName(sBinding, meta.GetExternalName(sb))
 
-	// in order for the tf reconciler to properly work we need to mimic the ready and async operation condition as well
-	// the (upjet) tfplugin framework client does not set the async condition as part of its observe operation unlike the default cli client
-	readyCondition := sb.GetCondition(xpv1.TypeReady)
-	asyncOperationCondition := sb.GetCondition(ujresource.TypeAsyncOperation)
-	sBinding.SetConditions(readyCondition, asyncOperationCondition)
+	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
+	condition := sb.GetCondition(xpv1.TypeReady)
+	sBinding.SetConditions(condition)
 
 	return sBinding, nil
 }
