@@ -5,6 +5,7 @@ metadata:
   namespace: default
 spec:
   forProvider:
+    name: my-kyma-instance
     planName: azure
     parameters:
       region: westeurope
