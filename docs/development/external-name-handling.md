@@ -94,29 +94,17 @@ We set the `spec.forProvider` as required, the user can not create managed resou
 
 Since the matching between MR and external resource is done based on external-name, a wrongly filled spec would result in Update() calls to the resource changing it. To prevent this, the user would not set the managementPolicy to Update. If there is then a missmatch, the Observe() method would determines this, sets the externalObservation.Diff and it would be visible in the debug log. Additionally, we write it into the status field of the resource and write an event to make it visible to the user.
 
-## Open Questions, Things not considered
-These might not be important for our APIs if we don’t have this scenarios.
+### Compound-Key External Name Format
 
-### ID can’t be determined in Create()
-Maybe the ID can not be determined in Create() after the API request, maybe it only has a job id/temporal id and later gets a real GUID, the external name needs to be swapped.
+If we have an external name that requires multiple values from the spec as key, the delimiter is `/`. The advantage is that this is part of the url path and therefore unlikely to be used in the identifying fields.
+The key should be case-sensitive, in the sense that the values from the compound keys are used directly for the API calls. By treating it case-sensitive, we cover APIs that are case-sensitive and insensitive. 
+Trailing/leading spaces are not allowed. Length limit for the external-name is 512 characters.
 
-### external-name compound key
-The delimiter can collide with the field values if they can be in there too. Case sensitive/insensitive matching, leading/trailing spaces. Length limit of annotation, maybe base64 encoded parts of the compound key to avoid delimiter collisions (or escaping of the delimiter character).
 
-Also error case if the compound key matches more than one external resource needs to be handled if a List API is used.
+There might be exceptions to this format. These need to be documented per resource.
 
-### External-name annotation manually edited
-Observe() would return a not found and the resource would be created again with the same `spec.forProvider`. This would probably lead to a creation error. Is this what we want?
-
-### Export tool considerations
-
-The export tool must generate managed resource definitions based on external resource state retrieved through the external system API. To ensure these definitions can be imported successfully, the tool must generate proper `crossplane.io/external-name` annotations.
-
-The export tool **must** be able to derive the `crossplane.io/external-name` annotation value from information obtained through standard API operations (GET, LIST) on external resources.
 
 ## Exceptions
-
-Are hybrid resources an exception to this guide as they set their external-name as compound key based on the status fields of the resources.
 
 Upjet resources are an exception as we dont controll how the external-name is defined and set by Upjet.
 
