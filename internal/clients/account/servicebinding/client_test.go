@@ -357,33 +357,6 @@ func TestServiceBindingClient_ObserveInstance(t *testing.T) {
 			},
 		},
 		{
-			name: "SuccessfulObserve_AlwaysUpToDate",
-			fields: fields{
-				sbConnector: &MockTfConnector{
-					client: &MockExternalClient{
-						observation: managed.ExternalObservation{
-							ResourceExists:   true,
-							ResourceUpToDate: false, // This will be overridden to true
-						},
-					},
-				},
-			},
-			args: args{
-				ctx:                context.Background(),
-				publicCR:           publicCR,
-				targetName:         "test-target",
-				targetExternalName: "external-123",
-			},
-			want: want{
-				observation: managed.ExternalObservation{
-					ResourceExists:   true,
-					ResourceUpToDate: true, // Client always sets this to true
-				},
-				resource: nil,
-				err:      nil,
-			},
-		},
-		{
 			name: "ConnectError",
 			fields: fields{
 				sbConnector: &MockTfConnector{

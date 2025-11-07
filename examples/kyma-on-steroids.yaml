@@ -74,6 +74,7 @@ spec:
   cloudManagementRef:
     name: cis-local
   forProvider:
+    name: my-kyma-instance
     planName: azure
     parameters:
       region: northeurope

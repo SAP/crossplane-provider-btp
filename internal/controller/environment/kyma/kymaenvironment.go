@@ -208,7 +208,7 @@ func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {
 func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, string, error) {
 
 	desired, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
-	desired = kymaenv.AddKymaDefaultParameters(desired, cr.Name, string(cr.UID))
+	desired = kymaenv.AddKymaDefaultParameters(desired, kymaenv.GetKymaEnvironmentName(*cr), string(cr.UID))
 	if err != nil {
 		return false, "", errors.Wrap(err, errParameterParsing)
 	}

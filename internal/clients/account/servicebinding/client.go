@@ -18,11 +18,9 @@ import (
 )
 
 const (
-	errConnectTfController  = "failed to connect TF controller"
 	errCreateTfResource     = "failed to create TF resource"
 	errDeleteTfResource     = "failed to delete TF resource"
 	errObserveTfResource    = "failed to observe TF resource"
-	errBuildTfResource      = "failed to build TF resource"
 	errBuildParametersField = "failed to build parameters field"
 )
 
@@ -98,11 +96,7 @@ func (m *ServiceBindingClient) Delete(ctx context.Context) (managed.ExternalDele
 
 // Updates a service binding instance
 func (m *ServiceBindingClient) Update(ctx context.Context) (managed.ExternalUpdate, error) {
-	// Update is ignored. This is because it is assumed that all fields need
-	// a recreation of the resource. This logic could be outsourced to the controller,
-	// but keeping this in the client keeps the controller straight forward, keeping all
-	// special cases in the client.
-	return managed.ExternalUpdate{}, nil
+	return m.tfClient.Update(ctx, m.ssb)
 }
 
 // Observes a servicebinding
@@ -111,17 +105,6 @@ func (m *ServiceBindingClient) Observe(ctx context.Context) (managed.ExternalObs
 	if err != nil {
 		return managed.ExternalObservation{}, nil, errors.Wrap(err, errObserveTfResource)
 	}
-
-	// For some unclear reason (underlying code is very abstract,
-	// may need some further investigation in the future), the observation
-	// always wants an update on the resource because it thinks that the "labels" field
-	// in m.ssb has a diff. It has not as you can see in debugging.
-	// We can hardcode "ResourceUpToDate = true", because for a servicebinding,
-	// all fields are immutable and would require a recreation of the resource.
-	// This seems to be abug in the upjet tfpluginfw implementation, because this didn't
-	// happen before upgrading to the tfpluginfw implementation.
-	// TODO: Check if really all fields are immutable
-	observation.ResourceUpToDate = true
 
 	return observation, m.ssb, nil
 }

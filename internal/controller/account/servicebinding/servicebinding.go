@@ -95,7 +95,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 
 	var targetName string
-	if cr.Status.AtProvider.Name == "" {
+	if cr.Status.AtProvider.Name != "" {
 		targetName = cr.Status.AtProvider.Name
 	} else {
 		targetName = cr.Spec.ForProvider.Name
@@ -197,7 +197,6 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	// Generate name based on rotation settings (pure, testable business logic)
 	name := e.generateName(cr)
 
-	// Create client for this operation only
 	client, err := e.clientFactory.CreateClient(ctx, cr, name, name)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
@@ -205,23 +204,16 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	e.client = client
 
-	// We cannot call client.Create() directly, because we just created a new client,
-	// and the upjet tfpluginfw implementation currently needs a hidden field called "n.planResponse" to be not nil.
-	// It is only set in client.Observe() (=> https://github.com/crossplane/upjet/blob/bc4227e2dc7a51b3b1ff7070bb9b0722fd06e43d/pkg/controller/external_tfpluginfw.go#L530)
-
-	// Prepare client (required by upjet tfpluginfw)
-	if _, _, err := e.client.Observe(ctx); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
-	}
-
-	// Perform the actual creation
 	externalName, creation, err := client.Create(ctx)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
-	// Update CR with results (pure, testable business logic)
-	if err := e.updateCRAfterCreate(ctx, cr, externalName); err != nil {
+	meta.SetExternalName(cr, externalName)
+	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
+
+	// Call the kube client to update the external-name and force-rotation annotations
+	if err := e.kube.Update(ctx, cr); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
@@ -234,7 +226,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotServiceBinding)
 	}
 
-	// Only update if the current binding is not retired (service bindings are immutable in BTP)
+	// Only update if the current binding is not retired
 	updateResult := managed.ExternalUpdate{}
 	if !e.keyRotator.IsCurrentBindingRetired(cr) {
 		update, err := e.client.Update(ctx)
@@ -322,15 +314,6 @@ func (e *external) generateName(cr *v1alpha1.ServiceBinding) string {
 		return servicebindingclient.GenerateRandomName(cr.Spec.ForProvider.Name)
 	}
 	return cr.Spec.ForProvider.Name
-}
-
-// updateCRAfterCreate updates the CR with the results of a successful create operation
-func (e *external) updateCRAfterCreate(ctx context.Context, cr *v1alpha1.ServiceBinding, externalName string) error {
-	meta.SetExternalName(cr, externalName)
-	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
-
-	// Call the kube client to update the external-name and force-rotation annotations
-	return e.kube.Update(ctx, cr)
 }
 
 // updateServiceBindingFromTfResource extracts data from SubaccountServiceBinding and updates the public ServiceBinding CR

@@ -155,6 +155,12 @@ spec:
                 description: KymaEnvironmentParameters are the configurable fields
                   of a KymaEnvironment.
                 properties:
+                  name:
+                    description: |-
+                      Can be provided, if empty the client will use metadata.name as the default value.
+
+                      The name of the Kyma Environment.
+                    type: string
                   parameters:
                     description: |-
                       Provisioning parameters for the instance.

@@ -8,10 +8,10 @@ export TERRAFORM_VERSION ?= 1.3.9
 
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
-export TERRAFORM_PROVIDER_VERSION ?= 1.16.1
+export TERRAFORM_PROVIDER_VERSION ?= 1.15.1
 export TERRAFORM_PROVIDER_DOWNLOAD_NAME ?= terraform-provider-btp
 export TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX ?= https://releases.hashicorp.com/$(TERRAFORM_PROVIDER_DOWNLOAD_NAME)/$(TERRAFORM_PROVIDER_VERSION)
-export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.16.1_x5
+export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.15.1_x5
 export TERRAFORM_DOCS_PATH ?= docs/resources
 
 # set BUILD_ID if its not running in an action
@@ -125,7 +125,13 @@ pull-docs:
 	fi
 	@git -C "$(WORK_DIR)/$(TERRAFORM_PROVIDER_SOURCE)" sparse-checkout set "$(TERRAFORM_DOCS_PATH)"
 
-generate.init: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
+# cleans the .work directory used for upjet/tf provider. Necessary after tf provider version upgrades so we just do this every time to have a clean dir
+.PHONY: clean-work
+clean-work:
+	@$(INFO) cleaning work directory
+	@rm -rf .work
+
+generate.init: clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
 
 .PHONY: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs terraform.buildvars
 
