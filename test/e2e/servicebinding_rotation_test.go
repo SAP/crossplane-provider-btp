@@ -93,7 +93,7 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					MustGetResource(t, cfg, sbRotationName, nil, sb)
 
 					// Check if the original binding has been retired
-					for _, retiredKey := range sb.Status.AtProvider.RetiredKeys {
+					for _, retiredKey := range sb.Status.RetiredKeys {
 						if retiredKey.ID == originalID && retiredKey.Name == originalName {
 							t.Logf("Original key retired: %s", retiredKey.ID)
 							return true, nil
@@ -120,7 +120,7 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					MustGetResource(t, cfg, sbRotationName, nil, sb)
 
 					// New binding should exist and be ready
-					if sb.Status.AtProvider.Name != "" && sb.Status.AtProvider.ID != "" && len(sb.Status.AtProvider.RetiredKeys) > 0 {
+					if sb.Status.AtProvider.Name != "" && sb.Status.AtProvider.ID != "" && len(sb.Status.RetiredKeys) > 0 {
 						t.Logf("New binding created: %s", sb.Status.AtProvider.ID)
 						return true, nil
 					}
@@ -144,7 +144,7 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					sb := &v1alpha1.ServiceBinding{}
 					MustGetResource(t, cfg, sbRotationName, nil, sb)
 
-					currentRetiredCount := len(sb.Status.AtProvider.RetiredKeys)
+					currentRetiredCount := len(sb.Status.RetiredKeys)
 					if currentRetiredCount > maxRetiredKeysObserved {
 						maxRetiredKeysObserved = currentRetiredCount
 					}
@@ -152,7 +152,7 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					now := time.Now()
 					expiredKeysCount := 0
 
-					for i, key := range sb.Status.AtProvider.RetiredKeys {
+					for i, key := range sb.Status.RetiredKeys {
 						var retiredTime time.Time
 						var expirationTime time.Time
 						var timeInfo string
@@ -202,7 +202,7 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 					// Get final state for logging
 					sb := &v1alpha1.ServiceBinding{}
 					MustGetResource(t, cfg, sbRotationName, nil, sb)
-					t.Logf("TTL monitoring completed after timeout. Max keys observed: %d, Final count: %d", maxRetiredKeysObserved, len(sb.Status.AtProvider.RetiredKeys))
+					t.Logf("TTL monitoring completed after timeout. Max keys observed: %d, Final count: %d", maxRetiredKeysObserved, len(sb.Status.RetiredKeys))
 					if maxRetiredKeysObserved >= 2 {
 						t.Log("✅ Key accumulation observed - rotation is working correctly")
 					}
