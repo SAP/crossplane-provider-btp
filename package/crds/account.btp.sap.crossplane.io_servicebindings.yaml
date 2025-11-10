@@ -414,6 +414,26 @@ spec:
                 required:
                 - name
                 type: object
+              rotation:
+                description: Rotation defines the parameters for rotating the service
+                  credential binding.
+                properties:
+                  frequency:
+                    description: Frequency defines how often the active key should
+                      be rotated.
+                    type: string
+                  ttl:
+                    description: |-
+                      TTL (Time-To-Live) defines the total time a credential is valid for before it is deleted.
+                      Must be >= frequency
+                    type: string
+                required:
+                - frequency
+                type: object
+                x-kubernetes-validations:
+                - message: ttl must be greater than or equal to frequency
+                  rule: '!has(self.ttl) || (has(self.frequency) && duration(self.ttl)
+                    >= duration(self.frequency))'
               writeConnectionSecretToRef:
                 description: |-
                   WriteConnectionSecretToReference specifies the namespace and name of a
@@ -446,7 +466,32 @@ spec:
                 description: ServiceBindingObservation are the observable fields of
                   a ServiceBinding.
                 properties:
+                  createdDate:
+                    description: |-
+                      Additional TF resource fields from SubaccountServiceBinding for the current active binding
+                      The date and time when the resource was created
+                    format: date-time
+                    type: string
                   id:
+                    description: The ID of the service binding resource
+                    type: string
+                  lastModified:
+                    description: The date and time when the resource was last modified
+                    format: date-time
+                    type: string
+                  name:
+                    description: The name of the service binding resource
+                    type: string
+                  parameters:
+                    description: The parameters of the service binding as a valid
+                      JSON object
+                    type: string
+                  ready:
+                    description: Shows whether the service binding is ready
+                    type: boolean
+                  state:
+                    description: The current state of the service binding (in progress,
+                      failed, succeeded)
                     type: string
                 type: object
               conditions:
@@ -502,6 +547,40 @@ spec:
                   it can not recover from without human intervention.
                 format: int64
                 type: integer
+              retiredKeys:
+                description: If the binding is rotated, `retiredBindings` stores resources
+                  that have been rotated out but are still transitionally retained
+                  due to `rotation.ttl` setting
+                items:
+                  description: RetiredSBResource contains only the essential tracking
+                    information for retired service binding instances
+                  properties:
+                    createdDate:
+                      description: The date and time when the resource was created
+                      format: date-time
+                      type: string
+                    deletionDate:
+                      description: |-
+                        The date and time when the resource will be deleted.
+                        May change if the rotation settings change
+                      format: date-time
+                      type: string
+                    id:
+                      description: The ID of the service binding resource
+                      type: string
+                    name:
+                      description: The name of the service binding resource
+                      type: string
+                    retiredDate:
+                      description: The date and time when the resource was retired
+                      format: date-time
+                      type: string
+                  required:
+                  - createdDate
+                  - deletionDate
+                  - retiredDate
+                  type: object
+                type: array
             type: object
         required:
         - spec
