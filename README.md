@@ -140,21 +140,31 @@ Contents from the service binding of a `cis-central` service in the same globala
 
 Contains the CLI server URL, for example:
 
-```
-https://canary.cli.btp.int.sap/
+```env
+"https://canary.cli.btp.int.sap/" # For canary
+# or
+"https://cli.btp.cloud.sap/" # For prod
 ```
 
 **GLOBAL_ACCOUNT**
 
-Contains the subdomain of the global account.
+Contains the id of the global account, for example:
+
+```
+154d0e79-fc1f-420f-8b9c-55b9012785db
+```
 
 **IDP_URL**
 
-Contains the URL of an IDP that can be connected to the global account as trustconfiguration.
+Contains the URL of an IDP that can be connected to the global account as trustconfiguration, for example:
+
+```
+myidp.accounts.ondemand.com
+```
 
 **SECOND_DIRECTORY_ADMIN_EMAIL**
 
-Contains a second email (different from the technical user's email) for the directory admin field.
+Contains a second email (different from the technical user's email) for the directory admin field. This can be your own email.
 
 **TECHNICAL_USER_EMAIL**
 
