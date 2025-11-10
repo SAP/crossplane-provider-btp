@@ -20,7 +20,7 @@ Based on this definition, common assumptions are:
 1. Create an MR manifest with `spec.managementPolicies: Observe`.
 2. Add the external-name annotation with the external resource identifier. If not globally unique, also supply distinguishing `spec.forProvider` fields.
 3. Apply the MR. Controller populates `status.atProvider`.
-4. Copy the fields from `status.atProvider` to `spec.forProvider` and change `managementPolicies` to `*` to gain full control.
+4. Update the fields of `spec.forProvider` based on the values of `status.atProvider` and change `managementPolicies` to `*` to gain full control.
 
 ## Our Approach
 
