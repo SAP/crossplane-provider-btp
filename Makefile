@@ -303,3 +303,24 @@ publish:
 		docker push $(DOCKER_REGISTRY)/$${image}:$(VERSION); \
 	done
 	@$(OK) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
+
+.PHONY: upgrade-test
+upgrade-test: $(KIND) $(HELM3) generate-test-crs
+	@$(INFO) running upgrade tests
+	@if [ -z "$(fromTag)" ] || [ -z "$(toTag)" ]; then \
+		echo "Error: Both fromTag and toTag must be set."; \
+		exit 1; \
+	fi
+	UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) go test -tags=upgrade ./test/upgrade/... -v -timeout=90m
+	@$(OK) upgrade tests passed
+
+.PHONY: upgrade-test-debug
+upgrade-test-debug: $(KIND) $(HELM3) generate-test-crs
+	@$(INFO) running upgrade tests
+	@if [ -z "$(fromTag)" ] || [ -z "$(toTag)" ]; then \
+		echo "Error: Both fromTag and toTag must be set."; \
+		exit 1; \
+	fi
+	go test -gcflags="all=-N -l" -c -o ./test/upgrade/upgrade-test-debug.test $(PROJECT_REPO)/test/upgrade -tags=upgrade
+	cd ./test/upgrade && UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) dlv exec ./upgrade-test-debug.test --headless --listen=:2345 --api-version=2 --accept-multiclient -- -test.v -test.timeout=30m; EXIT_CODE=$$?; rm ./test/upgrade/upgrade-test-debug.test; exit $$EXIT_CODE
+	@$(OK) upgrade tests passed
