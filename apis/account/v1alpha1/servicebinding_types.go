@@ -3,12 +3,23 @@ package v1alpha1
 import (
 	"reflect"
 
+	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+)
 
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+type ServiceBindingOperationType string
+
+type ServiceBindingOperationState string
+
+const (
+	ServiceBindingLastOperationTypeCreate ServiceBindingOperationType = "create"
+	ServiceBindingLastOperationTypeDelete ServiceBindingOperationType = "delete"
+
+	ServiceBindingLastOperationStatePending   ServiceBindingOperationState = "pending"
+	ServiceBindingLastOperationStateSucceeded ServiceBindingOperationState = "succeeded"
 )
 
 // ServiceBindingParameters are the configurable fields of a ServiceBinding.
@@ -34,7 +45,7 @@ type ServiceBindingParameters struct {
 
 	// Reference to a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-" reference-group:"account.btp.sap.crossplane.io" reference-kind:"Subaccount" reference-apiversion:"v1alpha1"`
 
 	// Selector for a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
@@ -51,28 +62,89 @@ type ServiceBindingParameters struct {
 
 	// Reference to a ServiceInstance in account to populate serviceInstanceId.
 	// +kubebuilder:validation:Optional
-	ServiceInstanceRef *v1.Reference `json:"serviceInstanceRef,omitempty" tf:"-"`
+	ServiceInstanceRef *v1.Reference `json:"serviceInstanceRef,omitempty" tf:"-" reference-group:"account.btp.sap.crossplane.io" reference-kind:"ServiceInstance" reference-apiversion:"v1alpha1"`
 
 	// Selector for a ServiceInstance in account to populate serviceInstanceId.
 	// +kubebuilder:validation:Optional
 	ServiceInstanceSelector *v1.Selector `json:"serviceInstanceSelector,omitempty" tf:"-"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.ttl) || (has(self.frequency) && duration(self.ttl) >= duration(self.frequency))",message="ttl must be greater than or equal to frequency"
+type RotationParameters struct {
+	// Frequency defines how often the active key should be rotated.
+	// +kubebuilder:validation:Required
+	Frequency *metav1.Duration `json:"frequency"`
+
+	// TTL (Time-To-Live) defines the total time a credential is valid for before it is deleted.
+	// Must be >= frequency
+	// +kubebuilder:validation:Optional
+	TTL *metav1.Duration `json:"ttl,omitempty"`
+}
+
 // ServiceBindingObservation are the observable fields of a ServiceBinding.
 type ServiceBindingObservation struct {
+	// The ID of the service binding resource
 	ID string `json:"id,omitempty"`
+
+	// The name of the service binding resource
+	Name string `json:"name,omitempty"`
+
+	// Additional TF resource fields from SubaccountServiceBinding for the current active binding
+	// The date and time when the resource was created
+	CreatedDate *metav1.Time `json:"createdDate,omitempty"`
+
+	// The date and time when the resource was last modified
+	LastModified *metav1.Time `json:"lastModified,omitempty"`
+
+	// Shows whether the service binding is ready
+	Ready *bool `json:"ready,omitempty"`
+
+	// The current state of the service binding (in progress, failed, succeeded)
+	State *string `json:"state,omitempty"`
+
+	// The parameters of the service binding as a valid JSON object
+	Parameters *string `json:"parameters,omitempty"`
+}
+
+// RetiredSBResource contains only the essential tracking information for retired service binding instances
+// +kubebuilder:object:generate=true
+type RetiredSBResource struct {
+	// The ID of the service binding resource
+	ID string `json:"id,omitempty"`
+
+	// The name of the service binding resource
+	Name string `json:"name,omitempty"`
+
+	// The date and time when the resource was created
+	CreatedDate metav1.Time `json:"createdDate"`
+
+	// The date and time when the resource was retired
+	RetiredDate metav1.Time `json:"retiredDate"`
+
+	// The date and time when the resource will be deleted.
+	// May change if the rotation settings change
+	DeletionDate *metav1.Time `json:"deletionDate"`
 }
 
 // A ServiceBindingSpec defines the desired state of a ServiceBinding.
 type ServiceBindingSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       ServiceBindingParameters `json:"forProvider"`
+
+	ForProvider ServiceBindingParameters `json:"forProvider"`
+
+	// Rotation defines the parameters for rotating the service credential binding.
+	// +kubebuilder:validation:Optional
+	Rotation *RotationParameters `json:"rotation,omitempty"`
 }
 
 // A ServiceBindingStatus represents the observed state of a ServiceBinding.
 type ServiceBindingStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
 	AtProvider          ServiceBindingObservation `json:"atProvider,omitempty"`
+
+	// If the binding is rotated, `retiredBindings` stores resources that have been rotated out but are still transitionally retained due to `rotation.ttl` setting
+	// +kubebuilder:validation:Optional
+	RetiredKeys []*RetiredSBResource `json:"retiredKeys,omitempty"`
 }
 
 // +kubebuilder:object:root=true
