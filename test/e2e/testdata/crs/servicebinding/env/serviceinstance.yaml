@@ -1,0 +1,16 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: e2e-destination-instance
+  namespace: default
+spec:
+  forProvider:
+    name: e2e-destination-instance-for-binding
+    parameters:
+      HTML5Runtime_enabled: false
+    serviceManagerRef:
+      name: e2e-sm-servicebinding
+    offeringName: destination
+    planName: lite
+    subaccountRef:
+      name: e2e-test-servicebinding
