@@ -17,6 +17,7 @@ import (
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/di"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
@@ -30,6 +31,7 @@ const (
 	errUpdateInstance  = "cannot update serviceinstance"
 	errSaveData        = "cannot update cr data"
 	errGetInstance     = "cannot get serviceinstance"
+	errTrackRUsage     = "cannot track ResourceUsage"
 )
 
 // Dependency Injection
@@ -69,12 +71,16 @@ type connector struct {
 
 	clientConnector             tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance]
 	newServicePlanInitializerFn func() Initializer
+	resourcetracker             tracking.ReferenceResolverTracker
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 	_, ok := mg.(*v1alpha1.ServiceInstance)
 	if !ok {
 		return nil, errors.New(errNotServiceInstance)
+	}
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, errTrackRUsage)
 	}
 
 	// we need to resolve the plan ID here, since at crossplanes initialize stage the required references for the sm secret are not resolved yet
@@ -92,12 +98,13 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, err
 	}
 
-	return &external{tfClient: client, kube: c.kube}, nil
+	return &external{tfClient: client, kube: c.kube, tracker: c.resourcetracker}, nil
 }
 
 type external struct {
 	tfClient tfClient.TfProxyControllerI
 	kube     client.Client
+	tracker  tracking.ReferenceResolverTracker
 }
 
 // Disconnect is a no-op for the external client to close its connection.
