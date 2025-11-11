@@ -81,14 +81,14 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174000"),
 					WithData(v1alpha1.SubaccountParameters{
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{
 						Guid:              "123e4567-e89b-12d3-a456-426614174000",
@@ -142,15 +142,15 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174012"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{
 						Guid:              "123e4567-e89b-12d3-a456-426614174012",
@@ -204,15 +204,15 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174006"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{
 						Guid:              "123e4567-e89b-12d3-a456-426614174006",
@@ -266,15 +266,15 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174001"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{
 						Guid:              "123e4567-e89b-12d3-a456-426614174001",
@@ -328,15 +328,15 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174009"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "NOT_USED_FOR_PRODUCTION",
-					BetaEnabled:       true,
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "NOT_USED_FOR_PRODUCTION",
+						BetaEnabled:       true,
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{
 						Guid:              "123e4567-e89b-12d3-a456-426614174009",
@@ -390,16 +390,16 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174011"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-					DirectoryGuid:     "234",
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+						DirectoryGuid:     "234",
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{
 					Guid:              "123e4567-e89b-12d3-a456-426614174011",
 					Description:       "someDesc",
@@ -452,17 +452,17 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174002"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-					DirectoryGuid:     "234",
-					DirectoryRef:      &xpv1.Reference{Name: "dir-1"},
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+						DirectoryGuid:     "234",
+						DirectoryRef:      &xpv1.Reference{Name: "dir-1"},
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{
 						Guid:              "123e4567-e89b-12d3-a456-426614174002",
@@ -518,15 +518,15 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174007"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{
 						Guid:              "123e4567-e89b-12d3-a456-426614174007",
@@ -581,15 +581,15 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174003"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{
 						Guid:              "123e4567-e89b-12d3-a456-426614174003",
@@ -647,17 +647,17 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174010"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-					DirectoryGuid:     "234",
-					DirectoryRef:      &xpv1.Reference{Name: "dir-1"},
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+						DirectoryGuid:     "234",
+						DirectoryRef:      &xpv1.Reference{Name: "dir-1"},
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{
 					Guid:              "123e4567-e89b-12d3-a456-426614174010",
 					Description:       "someDesc",
@@ -712,16 +712,16 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174008"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-					DirectoryGuid:     "234",
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+						DirectoryGuid:     "234",
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{
 					Guid:              "123e4567-e89b-12d3-a456-426614174008",
 					Description:       "someDesc",
@@ -777,17 +777,17 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174004"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					UsedForProduction: "",
-					BetaEnabled:       false,
-					DirectoryGuid:     "234",
-					Labels:            nil,
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						UsedForProduction: "",
+						BetaEnabled:       false,
+						DirectoryGuid:     "234",
+						Labels:            nil,
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{
 					Guid:              "123e4567-e89b-12d3-a456-426614174004",
 					Description:       "someDesc",
@@ -842,16 +842,16 @@ func TestObserve(t *testing.T) {
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("123e4567-e89b-12d3-a456-426614174005"),
 					WithData(v1alpha1.SubaccountParameters{
-					Description:       "someDesc",
-					Subdomain:         "sub1",
-					Region:            "eu12",
-					DisplayName:       "unittest-sa",
-					Labels:            map[string][]string{"somekey": {"somevalue"}},
-					UsedForProduction: "",
-					BetaEnabled:       false,
-				}), WithProviderConfig(xpv1.Reference{
-					Name: "unittest-pc",
-				})),
+						Description:       "someDesc",
+						Subdomain:         "sub1",
+						Region:            "eu12",
+						DisplayName:       "unittest-sa",
+						Labels:            map[string][]string{"somekey": {"somevalue"}},
+						UsedForProduction: "",
+						BetaEnabled:       false,
+					}), WithProviderConfig(xpv1.Reference{
+						Name: "unittest-pc",
+					})),
 				mockAPIClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{
 						Guid:              "123e4567-e89b-12d3-a456-426614174005",
@@ -1268,7 +1268,7 @@ func TestConnect(t *testing.T) {
 				cr: NewSubaccount("unittest-sa", WithProviderConfig(xpv1.Reference{Name: "unittest-pc"})),
 				kubeObjects: []client.Object{
 					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
-					testutils.NewSecret("cis-provider-secret", nil),
+					testutils.NewSecret("cis-provider-secret", map[string][]byte{"data": []byte("someCISCreds")}),
 				},
 			},
 			want: want{
@@ -1282,7 +1282,7 @@ func TestConnect(t *testing.T) {
 				kubeObjects: []client.Object{
 					testutils.NewProviderConfig("unittest-pc", "cis-provider-secret", "sa-provider-secret"),
 					testutils.NewSecret("cis-provider-secret", nil),
-					testutils.NewSecret("sa-provider-secret", nil),
+					testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte("someSACreds")}),
 				},
 			},
 			want: want{
