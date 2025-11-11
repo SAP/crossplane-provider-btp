@@ -85,7 +85,7 @@ type ServiceInstanceStatus struct {
 
 // +kubebuilder:object:root=true
 
-// A ServiceInstance allows to manage a ServiceInstance in BTP
+// A ServiceInstance allows to manage a ServiceInstance in BTP [Environment: 'Other']
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
