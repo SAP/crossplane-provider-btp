@@ -140,19 +140,19 @@ Contents from the service binding of a `cis-central` service in the same globala
 
 Contains the CLI server URL, for example:
 
-```env
-"https://canary.cli.btp.int.sap/" # For canary
-# or
-"https://cli.btp.cloud.sap/" # For prod
+```
+https://cli.btp.cloud.sap/
 ```
 
 **GLOBAL_ACCOUNT**
 
-Contains the id of the global account, for example:
+Contains the subdomain of the global account, for example:
 
 ```
 154d0e79-fc1f-420f-8b9c-55b9012785db
 ```
+
+The subdomain can be taken from the global account's URL in the BTP cockpit, i.e. `https://<region>.cockpit.btp.cloud.sap/cockpit#/globalaccount/<SUBDOMAIN>/`.
 
 **IDP_URL**
 
@@ -182,7 +182,10 @@ Name of created kind cluster, if not set will be randomly generated
 
 **TEST_REUSE_CLUSTER**
 
-0 or 1, default is 0
+* `0` = no
+* `1` = yes
+
+The default is `0`.
 
 ## Setting up the Provider Configuration
 
