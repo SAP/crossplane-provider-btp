@@ -146,17 +146,17 @@ func SetupClusterWithCrossplane(namespace string) {
 }
 
 func loadPackageTags() (string, string) {
-	fromTag := os.Getenv("UPGRADE_TEST_FROM_TAG")
-	if fromTag == "" {
+	fromTagVar := os.Getenv("UPGRADE_TEST_FROM_TAG")
+	if fromTagVar == "" {
 		panic("UPGRADE_TEST_FROM_TAG environment variable is required")
 	}
 
-	toTag := os.Getenv("UPGRADE_TEST_TO_TAG")
-	if toTag == "" {
+	toTagVar := os.Getenv("UPGRADE_TEST_TO_TAG")
+	if toTagVar == "" {
 		panic("UPGRADE_TEST_TO_TAG environment variable is required")
 	}
 
-	return fromTag, toTag
+	return fromTagVar, toTagVar
 }
 
 func loadDirectoriesWithYAMLFiles(path string) ([]string, error) {
