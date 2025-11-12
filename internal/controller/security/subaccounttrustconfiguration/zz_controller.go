@@ -30,7 +30,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/statemetrics"
 	tjcontroller "github.com/crossplane/upjet/pkg/controller"
 	"github.com/crossplane/upjet/pkg/controller/handler"
-	"github.com/crossplane/upjet/pkg/metrics"
+	"github.com/crossplane/upjet/pkg/terraform"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -47,18 +47,14 @@ func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
 		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), *o.SecretStoreConfigGVK, connection.WithTLSConfig(o.ESSOptions.TLSConfig)))
 	}
 	eventHandler := handler.NewEventHandler(handler.WithLogger(o.Logger.WithValues("gvk", v1alpha1.SubaccountTrustConfiguration_GroupVersionKind)))
-	ac := tjcontroller.NewAPICallbacks(mgr, xpresource.ManagedKind(v1alpha1.SubaccountTrustConfiguration_GroupVersionKind), tjcontroller.WithEventHandler(eventHandler), tjcontroller.WithStatusUpdates(false))
+	ac := tjcontroller.NewAPICallbacks(mgr, xpresource.ManagedKind(v1alpha1.SubaccountTrustConfiguration_GroupVersionKind), tjcontroller.WithEventHandler(eventHandler))
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnecter(
-			tjcontroller.NewTerraformPluginFrameworkAsyncConnector(mgr.GetClient(), o.OperationTrackerStore, o.SetupFn, o.Provider.Resources["btp_subaccount_trust_configuration"],
-				tjcontroller.WithTerraformPluginFrameworkAsyncLogger(o.Logger),
-				tjcontroller.WithTerraformPluginFrameworkAsyncConnectorEventHandler(eventHandler),
-				tjcontroller.WithTerraformPluginFrameworkAsyncCallbackProvider(ac),
-				tjcontroller.WithTerraformPluginFrameworkAsyncMetricRecorder(metrics.NewMetricRecorder(v1alpha1.SubaccountTrustConfiguration_GroupVersionKind, mgr, o.PollInterval)),
-				tjcontroller.WithTerraformPluginFrameworkAsyncManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)))),
+		managed.WithExternalConnecter(tjcontroller.NewConnector(mgr.GetClient(), o.WorkspaceStore, o.SetupFn, o.Provider.Resources["btp_subaccount_trust_configuration"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler),
+			tjcontroller.WithCallbackProvider(ac),
+		)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
-		managed.WithFinalizer(tjcontroller.NewOperationTrackerFinalizer(o.OperationTrackerStore, xpresource.NewAPIFinalizer(mgr.GetClient(), managed.FinalizerName))),
+		managed.WithFinalizer(terraform.NewWorkspaceFinalizer(o.WorkspaceStore, xpresource.NewAPIFinalizer(mgr.GetClient(), managed.FinalizerName))),
 		managed.WithTimeout(3 * time.Minute),
 		managed.WithInitializers(initializers),
 		managed.WithConnectionPublishers(cps...),

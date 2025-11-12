@@ -125,7 +125,13 @@ pull-docs:
 	fi
 	@git -C "$(WORK_DIR)/$(TERRAFORM_PROVIDER_SOURCE)" sparse-checkout set "$(TERRAFORM_DOCS_PATH)"
 
-generate.init: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
+# cleans the .work directory used for upjet/tf provider. Necessary after tf provider version upgrades so we just do this every time to have a clean dir
+.PHONY: clean-work
+clean-work:
+	@$(INFO) cleaning work directory
+	@rm -rf .work
+
+generate.init: clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
 
 .PHONY: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs terraform.buildvars
 

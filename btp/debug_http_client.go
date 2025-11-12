@@ -15,9 +15,8 @@ import (
 )
 
 var (
-	log logging.Logger
-	// the debug flag for the debug client.
-	Debug bool
+	log   logging.Logger
+	debug bool
 )
 
 // SetLogger sets the logger for the debug client.
@@ -25,9 +24,14 @@ func SetLogger(logger logging.Logger) {
 	log = logger
 }
 
+// SetDebug sets the debug flag for the debug client.
+func SetDebug(debugFlag bool) {
+	debug = debugFlag
+}
+
 // NewBackgroundContextWithDebugPrintHTTPClient creates a new context with a HTTP client that logs the request and response in the RoundTrip.
 func NewBackgroundContextWithDebugPrintHTTPClient(opts ...Option) context.Context {
-	if Debug {
+	if debug {
 		return context.WithValue(context.Background(), oauth2.HTTPClient, DebugPrintHTTPClient(opts...))
 	} else {
 		return context.Background()
@@ -36,7 +40,7 @@ func NewBackgroundContextWithDebugPrintHTTPClient(opts ...Option) context.Contex
 
 // AddDebugPrintHTTPClientToContext adds a HTTP client that logs the request and response in the RoundTrip to the context with the oauth2.HTTPClient key.
 func AddDebugPrintHTTPClientToContext(ctx context.Context, opts ...Option) context.Context {
-	if Debug {
+	if debug {
 		return context.WithValue(ctx, oauth2.HTTPClient, DebugPrintHTTPClient(opts...))
 	} else {
 		return ctx
