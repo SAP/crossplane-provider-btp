@@ -317,8 +317,13 @@ upgrade-test: $(KIND) $(HELM3) generate-test-crs
 		echo "Error: Both fromTag and toTag must be set."; \
 		exit 1; \
 	fi
-	UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) go test -tags=upgrade ./test/upgrade/... -v -timeout=120m
-	@$(OK) upgrade tests passed
+	UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) go test -tags=upgrade ./test/upgrade/... -v -short -count=1 -test.v -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
+	@echo "===========Test Summary==========="
+	@grep -E "PASS|FAIL" test-output.log
+	@case `tail -n 1 test-output.log` in \
+			*FAIL*) echo "❌ Error: Test failed"; exit 1 ;; \
+			*) echo "✅ All tests passed"; $(OK) upgrade tests passed ;; \
+	 esac
 
 .PHONY: upgrade-test-debug
 upgrade-test-debug: $(KIND) $(HELM3) generate-test-crs
