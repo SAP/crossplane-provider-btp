@@ -16,7 +16,6 @@ permissions:
 
 on:
   workflow_dispatch:
-  workflow_call:
     inputs:
       source:
         description: "Source version"
@@ -27,27 +26,6 @@ on:
         description: "Target version"
         required: false
         type: string
-    secrets:
-      CLI_SERVER_URL:
-        description: contains the CLI server URL
-        required: true
-      GLOBAL_ACCOUNT:
-        description: contains the subdomain of the global account
-        required: true
-      IDP_URL:
-        description: contains the URL of an IDP that can be connected to the global account
-        required: true
-      SECOND_DIRECTORY_ADMIN_EMAIL:
-        description: contains a second email (different from the technical user's email) for the directory
-        required: true
-      CIS_CENTRAL_BINDING:
-        description: contents from the service binding of a `cis-central` service
-        required: true
-      BTP_TECHNICAL_USER:
-        required: true
-      TECHNICAL_USER_EMAIL:
-        description: contains the email of the BTP_TECHNICAL_USER
-        required: true
 
 jobs:
   build-test-version:

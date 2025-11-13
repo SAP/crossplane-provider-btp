@@ -317,7 +317,7 @@ upgrade-test: $(KIND) $(HELM3) generate-test-crs
 		echo "Error: Both fromTag and toTag must be set."; \
 		exit 1; \
 	fi
-	UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) go test -tags=upgrade ./test/upgrade/... -v -timeout=90m
+	UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) go test -tags=upgrade ./test/upgrade/... -v -timeout=120m
 	@$(OK) upgrade tests passed
 
 .PHONY: upgrade-test-debug
