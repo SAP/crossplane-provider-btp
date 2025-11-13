@@ -51,8 +51,7 @@ var (
 	kindClusterName           string
 	resourceDirectories       []string
 	ignoreResourceDirectories = []string{
-		"../e2e/testdata/crs/entitlement_cf",                  // not used in e2e tests
-		"../e2e/testdata/crs/GlobalaccountTrustConfiguration", // currently failing for unknown reasons
+		"../e2e/testdata/crs/entitlement_cf", // not used in e2e tests
 	}
 )
 
