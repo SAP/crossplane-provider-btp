@@ -3,6 +3,7 @@ package providerconfig
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
@@ -23,11 +24,13 @@ import (
 const (
 	errGetPC              = "cannot get ProviderConfig"
 	errGetCISCreds        = "cannot get CIS credentials"
-	errGetCFCreds         = "cannot get Service Account credentials"
+	errGetSACreds         = "cannot get Service Account credentials"
 	errTrackRUsage        = "cannot track ResourceUsage"
 	errTrackPCUsage       = "cannot track ProviderConfig usage"
 	errNewClient          = "cannot create new Service"
 	errCisSecretEmpty     = "CIS Secret is empty or nil, please check config & secrets referenced in provider config"
+	errSaSecretEmpty      = "Service Account Secret is empty or nil, please check config & secrets referenced in provider config"
+	errSecretKeyNotFound  = "%s: %v key not found in secret data"
 	errCisSecretCorrupted = "CIS Secret does not match expected format"
 )
 
@@ -83,19 +86,9 @@ func CreateClient(
 		return nil, cisErr
 	}
 
-	cd := pc.Spec.ServiceAccountSecret
-	ServiceAccountSecretData, err := resource.CommonCredentialExtractor(
-		ctx,
-		cd.Source,
-		kube,
-		cd.CommonCredentialSelectors,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, errGetCFCreds)
-	}
-	if ServiceAccountSecretData == nil {
-		return nil, errors.New(errCisSecretEmpty)
-
+	ServiceAccountSecretData, saErr := loadSaCredentials(ctx, kube, pc)
+	if saErr != nil {
+		return nil, saErr
 	}
 
 	svc, err := newServiceFn(CISSecretData, ServiceAccountSecretData)
@@ -112,14 +105,12 @@ func ResolveProviderConfig(ctx context.Context, mg resource.Managed, kube client
 // Supports two formats:
 //   - our own format:
 //     data:
+//     {"endpoints": {...}, "uaa": {...}, "grant_type": "client_credentials", ...
+//     ....
+//   - btp service operator generated:
 //     endpoints: // json as string
 //     uaa:	   // json as string
 //     grant_type: client_credentials
-//     ....
-//   - btp service operator generated:
-//     data:
-//     data: //(key as defined in providerconfig ref)
-//     {"endpoints": {...}, "uaa": {...}, "grant_type": "client_credentials", ...
 func loadCisCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig) ([]byte, error) {
 	cd := pc.Spec.CISSecret
 	var secret corev1.Secret
@@ -139,8 +130,32 @@ func loadCisCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.Pr
 		if err != nil {
 			return nil, errors.Wrap(err, errCisSecretCorrupted)
 		}
+		// basic validation to avoid empty secrets, defaults to "{}" containing 2 bytes
+		if len(toBytes) == 2 {
+			return nil, errors.New(errCisSecretEmpty)
+		}
 		return toBytes, nil
 	}
+}
+
+// loadSaCredentials loads Service Account credentials from secret
+func loadSaCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig) ([]byte, error) {
+	cd := pc.Spec.ServiceAccountSecret
+
+	ServiceAccountSecretData, err := resource.CommonCredentialExtractor(
+		ctx,
+		cd.Source,
+		kube,
+		cd.CommonCredentialSelectors,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, errGetSACreds)
+	}
+	if ServiceAccountSecretData == nil {
+		return nil, fmt.Errorf(errSecretKeyNotFound, errSaSecretEmpty, cd.SecretRef.Key)
+	}
+
+	return ServiceAccountSecretData, nil
 }
 
 // decodes btp service operator generated format from map of byte slices to stringified json
