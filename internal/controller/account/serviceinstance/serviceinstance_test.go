@@ -8,8 +8,11 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	corssplanev1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -23,12 +26,110 @@ var (
 	errKube        = errors.New("kubeError")
 	errCreator     = errors.New("creatorError")
 	errInitializer = errors.New("initializerError")
+	errTracking    = errors.New("trackingError")
 )
+
+func TestConnect_ResourceTracking(t *testing.T) {
+	type fields struct {
+		creator         *TfProxyClientCreatorMock
+		initializer     Initializer
+		resourcetracker *ResourceTrackerMock
+	}
+	type args struct {
+		mg resource.Managed
+	}
+	type want struct {
+		err         error
+		trackCalled bool
+	}
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"TrackError": {
+			reason: "should return an error when tracking fails",
+			fields: fields{
+				creator:         &TfProxyClientCreatorMock{},
+				initializer:     &InitializerMock{},
+				resourcetracker: &ResourceTrackerMock{trackErr: errTracking},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err:         errTracking,
+				trackCalled: true,
+			},
+		},
+		"TrackingSuccessBeforeInitialization": {
+			reason: "should call Track before initialization",
+			fields: fields{
+				creator:         &TfProxyClientCreatorMock{},
+				initializer:     &InitializerMock{},
+				resourcetracker: &ResourceTrackerMock{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err:         nil,
+				trackCalled: true,
+			},
+		},
+		"TrackingWithServiceManagerRef": {
+			reason: "should track ServiceManagerRef",
+			fields: fields{
+				creator:         &TfProxyClientCreatorMock{},
+				initializer:     &InitializerMock{},
+				resourcetracker: &ResourceTrackerMock{},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{
+					Spec: v1alpha1.ServiceInstanceSpec{
+						ForProvider: v1alpha1.ServiceInstanceParameters{
+							ServiceManagerRef: &xpv1.Reference{
+								Name: "test-servicemanager",
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				err:         nil,
+				trackCalled: true,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			c := connector{
+				clientConnector:             tc.fields.creator,
+				newServicePlanInitializerFn: func() Initializer { return tc.fields.initializer },
+				resourcetracker:             tc.fields.resourcetracker,
+			}
+			_, err := c.Connect(context.Background(), tc.args.mg)
+			expectedErrorBehaviour(t, tc.want.err, err)
+			// Verify if Track was called
+			if tc.want.trackCalled != tc.fields.resourcetracker.trackCalled {
+				t.Errorf("expected Track() called=%v, got=%v", tc.want.trackCalled, tc.fields.resourcetracker.trackCalled)
+			}
+			// Verify the correct resource was tracked
+			if tc.want.trackCalled && tc.fields.resourcetracker.trackedResource != tc.args.mg {
+				t.Errorf("Track() called with wrong resource")
+			}
+
+		})
+	}
+}
 
 func TestConnect(t *testing.T) {
 	type fields struct {
-		creator     *TfProxyClientCreatorMock
-		initializer Initializer
+		creator         *TfProxyClientCreatorMock
+		initializer     Initializer
+		resourcetracker tracking.ReferenceResolverTracker
 	}
 
 	type args struct {
@@ -49,8 +150,9 @@ func TestConnect(t *testing.T) {
 		"InitializerError": {
 			reason: "should return an error when the initalizer fails",
 			fields: fields{
-				creator:     &TfProxyClientCreatorMock{},
-				initializer: &InitializerMock{err: errInitializer},
+				creator:         &TfProxyClientCreatorMock{},
+				initializer:     &InitializerMock{err: errInitializer},
+				resourcetracker: &ResourceTrackerMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -62,8 +164,9 @@ func TestConnect(t *testing.T) {
 		"CreatorError": {
 			reason: "should return an error when the creator fails",
 			fields: fields{
-				creator:     &TfProxyClientCreatorMock{err: errCreator},
-				initializer: &InitializerMock{},
+				creator:         &TfProxyClientCreatorMock{err: errCreator},
+				initializer:     &InitializerMock{},
+				resourcetracker: &ResourceTrackerMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -75,8 +178,9 @@ func TestConnect(t *testing.T) {
 		"ConnectSuccess": {
 			reason: "should return a client when the creator succeeds",
 			fields: fields{
-				creator:     &TfProxyClientCreatorMock{},
-				initializer: &InitializerMock{},
+				creator:         &TfProxyClientCreatorMock{},
+				initializer:     &InitializerMock{},
+				resourcetracker: &ResourceTrackerMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -92,6 +196,7 @@ func TestConnect(t *testing.T) {
 			c := connector{
 				clientConnector:             tc.fields.creator,
 				newServicePlanInitializerFn: func() Initializer { return tc.fields.initializer },
+				resourcetracker:             tc.fields.resourcetracker,
 			}
 
 			got, err := c.Connect(context.Background(), tc.args.mg)
@@ -545,6 +650,37 @@ func TestDelete(t *testing.T) {
 			}
 		})
 	}
+}
+
+var _ tracking.ReferenceResolverTracker = &ResourceTrackerMock{}
+
+type ResourceTrackerMock struct {
+	trackCalled         bool
+	trackedResource     resource.Managed
+	trackErr            error
+	shouldBlock         bool
+	setConditionsCalled bool
+}
+
+func (r *ResourceTrackerMock) Track(ctx context.Context, mg resource.Managed) error {
+	r.trackCalled = true
+	r.trackedResource = mg
+	return r.trackErr
+}
+
+func (r *ResourceTrackerMock) SetConditions(ctx context.Context, mg resource.Managed) {
+	r.setConditionsCalled = true
+}
+func (r *ResourceTrackerMock) ResolveSource(ctx context.Context, ru corssplanev1alpha1.ResourceUsage) (*metav1.PartialObjectMetadata, error) {
+	return nil, nil
+}
+
+func (r *ResourceTrackerMock) ResolveTarget(ctx context.Context, ru corssplanev1alpha1.ResourceUsage) (*metav1.PartialObjectMetadata, error) {
+	return nil, nil
+}
+
+func (r *ResourceTrackerMock) DeleteShouldBeBlocked(mg resource.Managed) bool {
+	return r.shouldBlock
 }
 
 var _ tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] = &TfProxyClientCreatorMock{}
