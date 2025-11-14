@@ -8,17 +8,15 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	corssplanev1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
-	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	"github.com/stretchr/testify/assert"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	ujresource "github.com/crossplane/upjet/pkg/resource"
+	"github.com/sap/crossplane-provider-btp/internal/testutils"
 )
 
 var (
@@ -33,7 +31,7 @@ func TestConnect_ResourceTracking(t *testing.T) {
 	type fields struct {
 		creator         *TfProxyClientCreatorMock
 		initializer     Initializer
-		resourcetracker *ResourceTrackerMock
+		resourcetracker *testutils.ResourceTrackerMock
 	}
 	type args struct {
 		mg resource.Managed
@@ -53,7 +51,7 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{},
-				resourcetracker: &ResourceTrackerMock{trackErr: errTracking},
+				resourcetracker: &testutils.ResourceTrackerMock{TrackErr: errTracking},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -68,7 +66,7 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{},
-				resourcetracker: &ResourceTrackerMock{},
+				resourcetracker: &testutils.ResourceTrackerMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -83,7 +81,7 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{},
-				resourcetracker: &ResourceTrackerMock{},
+				resourcetracker: &testutils.ResourceTrackerMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{
@@ -113,11 +111,11 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			_, err := c.Connect(context.Background(), tc.args.mg)
 			expectedErrorBehaviour(t, tc.want.err, err)
 			// Verify if Track was called
-			if tc.want.trackCalled != tc.fields.resourcetracker.trackCalled {
-				t.Errorf("expected Track() called=%v, got=%v", tc.want.trackCalled, tc.fields.resourcetracker.trackCalled)
+			if tc.want.trackCalled != tc.fields.resourcetracker.TrackCalled {
+				t.Errorf("expected Track() called=%v, got=%v", tc.want.trackCalled, tc.fields.resourcetracker.TrackCalled)
 			}
 			// Verify the correct resource was tracked
-			if tc.want.trackCalled && tc.fields.resourcetracker.trackedResource != tc.args.mg {
+			if tc.want.trackCalled && tc.fields.resourcetracker.TrackedResource != tc.args.mg {
 				t.Errorf("Track() called with wrong resource")
 			}
 
@@ -129,7 +127,7 @@ func TestConnect(t *testing.T) {
 	type fields struct {
 		creator         *TfProxyClientCreatorMock
 		initializer     Initializer
-		resourcetracker tracking.ReferenceResolverTracker
+		resourcetracker *testutils.ResourceTrackerMock
 	}
 
 	type args struct {
@@ -152,7 +150,7 @@ func TestConnect(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{err: errInitializer},
-				resourcetracker: &ResourceTrackerMock{},
+				resourcetracker: &testutils.ResourceTrackerMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -166,7 +164,7 @@ func TestConnect(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{err: errCreator},
 				initializer:     &InitializerMock{},
-				resourcetracker: &ResourceTrackerMock{},
+				resourcetracker: &testutils.ResourceTrackerMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -180,7 +178,7 @@ func TestConnect(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{},
-				resourcetracker: &ResourceTrackerMock{},
+				resourcetracker: &testutils.ResourceTrackerMock{},
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -650,37 +648,6 @@ func TestDelete(t *testing.T) {
 			}
 		})
 	}
-}
-
-var _ tracking.ReferenceResolverTracker = &ResourceTrackerMock{}
-
-type ResourceTrackerMock struct {
-	trackCalled         bool
-	trackedResource     resource.Managed
-	trackErr            error
-	shouldBlock         bool
-	setConditionsCalled bool
-}
-
-func (r *ResourceTrackerMock) Track(ctx context.Context, mg resource.Managed) error {
-	r.trackCalled = true
-	r.trackedResource = mg
-	return r.trackErr
-}
-
-func (r *ResourceTrackerMock) SetConditions(ctx context.Context, mg resource.Managed) {
-	r.setConditionsCalled = true
-}
-func (r *ResourceTrackerMock) ResolveSource(ctx context.Context, ru corssplanev1alpha1.ResourceUsage) (*metav1.PartialObjectMetadata, error) {
-	return nil, nil
-}
-
-func (r *ResourceTrackerMock) ResolveTarget(ctx context.Context, ru corssplanev1alpha1.ResourceUsage) (*metav1.PartialObjectMetadata, error) {
-	return nil, nil
-}
-
-func (r *ResourceTrackerMock) DeleteShouldBeBlocked(mg resource.Managed) bool {
-	return r.shouldBlock
 }
 
 var _ tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] = &TfProxyClientCreatorMock{}
