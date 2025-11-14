@@ -41,11 +41,11 @@ func TestUpgradeProvider(t *testing.T) {
 		})).
 		Assess(
 			"verify resources after upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*90),
+			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*30),
 		).
 		WithTeardown(
 			"delete resources",
-			upgrade.DeleteResources(upgradeTest.ResourceDirectories, time.Minute*30),
+			upgrade.DeleteResources(upgradeTest.ResourceDirectories, time.Minute*90),
 		).
 		WithTeardown(
 			"delete provider",
