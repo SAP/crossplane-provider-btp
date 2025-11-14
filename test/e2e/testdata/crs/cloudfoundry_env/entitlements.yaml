@@ -1,7 +1,7 @@
 apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: Entitlement
 metadata:
-  name: cis-local-entitlement
+  name: cis-local-entitlement-cf
   namespace: default
 spec:
   forProvider:
