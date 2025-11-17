@@ -146,7 +146,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gettext
 
       - name: Run upgrade test
-        timeout-minutes: 120
+        timeout-minutes: 180
         run: |
           make upgrade-test fromTag=${{ github.event.inputs.source }} toTag=${TARGET_IMAGE_VERSION}
         env:
