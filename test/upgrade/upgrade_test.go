@@ -17,7 +17,7 @@ func TestUpgradeProvider(t *testing.T) {
 		ProviderName:        providerName,
 		FromProviderPackage: fromPackage,
 		ToProviderPackage:   toPackage,
-		ResourceDirectories: resourceDirectories,
+		ResourceDirectories: []string{"../e2e/testdata/crs/kyma_env"},
 	}
 
 	upgradeFeature := features.New(fmt.Sprintf("upgrade provider btp from %s to %s", fromTag, toTag)).
@@ -31,7 +31,7 @@ func TestUpgradeProvider(t *testing.T) {
 		).
 		Assess(
 			"verify resources before upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*90),
+			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*60),
 		).
 		Assess("upgrade provider", upgrade.UpgradeProvider(upgrade.UpgradeProviderOptions{
 			ClusterName:         upgradeTest.ClusterName,
@@ -41,11 +41,11 @@ func TestUpgradeProvider(t *testing.T) {
 		})).
 		Assess(
 			"verify resources after upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*30),
+			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*25),
 		).
 		WithTeardown(
 			"delete resources",
-			upgrade.DeleteResources(upgradeTest.ResourceDirectories, time.Minute*90),
+			upgrade.DeleteResources(upgradeTest.ResourceDirectories, time.Minute*25),
 		).
 		WithTeardown(
 			"delete provider",
