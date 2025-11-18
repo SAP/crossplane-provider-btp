@@ -17,7 +17,7 @@ func TestUpgradeProvider(t *testing.T) {
 		ProviderName:        providerName,
 		FromProviderPackage: fromPackage,
 		ToProviderPackage:   toPackage,
-		ResourceDirectories: []string{"../e2e/testdata/crs/kyma_env"},
+		ResourceDirectories: resourceDirectories,
 	}
 
 	upgradeFeature := features.New(fmt.Sprintf("upgrade provider btp from %s to %s", fromTag, toTag)).
