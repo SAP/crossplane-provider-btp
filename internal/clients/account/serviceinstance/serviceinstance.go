@@ -113,6 +113,7 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 			ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
 				SubaccountID: si.Spec.ForProvider.SubaccountID,
 				Name:         internal.Ptr(si.Spec.ForProvider.Name),
+				Shared:       si.Spec.ForProvider.Shared,
 			},
 			InitProvider: v1alpha1.SubaccountServiceInstanceInitParameters{},
 		},
