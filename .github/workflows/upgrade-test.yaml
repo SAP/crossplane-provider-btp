@@ -157,7 +157,7 @@ jobs:
           GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
-          IDP_URL: ${{ secrets.IDP_URL }}
+          IDP_URL: ${{ secrets.SECOND_IDP_URL }} # Use a different IDP for the upgrade tests to avoid conflicts
 
       - name: clean up cluster
         if: always()
