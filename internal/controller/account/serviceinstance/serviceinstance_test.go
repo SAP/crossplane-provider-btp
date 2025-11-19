@@ -16,6 +16,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	ujresource "github.com/crossplane/upjet/pkg/resource"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
 )
 
@@ -26,6 +27,10 @@ var (
 	errInitializer = errors.New("initializerError")
 	errTracking    = errors.New("trackingError")
 )
+
+// ====================================================================================
+// Resource Usage Tests
+// ====================================================================================
 
 func TestConnect_ResourceTracking(t *testing.T) {
 	type fields struct {
@@ -51,7 +56,7 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{},
-				resourcetracker: &testutils.ResourceTrackerMock{TrackErr: errTracking},
+				resourcetracker: testutils.NewResourceTrackerMockWithError(errTracking),
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -66,7 +71,7 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{},
-				resourcetracker: &testutils.ResourceTrackerMock{},
+				resourcetracker: testutils.NewResourceTrackerMock(),
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -81,7 +86,7 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{},
-				resourcetracker: &testutils.ResourceTrackerMock{},
+				resourcetracker: testutils.NewResourceTrackerMock(),
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{
@@ -123,6 +128,116 @@ func TestConnect_ResourceTracking(t *testing.T) {
 	}
 }
 
+// ====================================================================================
+// Deletion Blocking Tests
+// ====================================================================================
+
+func TestDelete_DeletionBlocking(t *testing.T) {
+	type fields struct {
+		client  *TfProxyMock
+		tracker *testutils.ResourceTrackerMock
+	}
+
+	type args struct {
+		mg resource.Managed
+	}
+
+	type want struct {
+		err                 error
+		setConditionsCalled bool
+		deleteAttempted     bool
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"BlockedByServiceBinding": {
+			reason: "should block deletion when ServiceBindings reference this instance",
+			fields: fields{
+				client:  &TfProxyMock{},
+				tracker: testutils.NewResourceTrackerMockBlocking(),
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err:                 errors.New(providerv1alpha1.ErrResourceInUse),
+				setConditionsCalled: true,
+				deleteAttempted:     false,
+			},
+		},
+		"AllowedWhenNoBindings": {
+			reason: "should allow deletion when no ServiceBindings reference this instance",
+			fields: fields{
+				client:  &TfProxyMock{},
+				tracker: testutils.NewResourceTrackerMock(),
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err:                 nil,
+				setConditionsCalled: true,
+				deleteAttempted:     true,
+			},
+		},
+		"DeleteAPIErrorWhenNotBlocked": {
+			reason: "should return API error when deletion proceeds but API fails",
+			fields: fields{
+				client:  &TfProxyMock{err: errClient},
+				tracker: testutils.NewResourceTrackerMock(),
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err:                 errClient,
+				setConditionsCalled: true,
+				deleteAttempted:     true,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				tfClient: tc.fields.client,
+				kube: &test.MockClient{
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+				tracker: tc.fields.tracker,
+			}
+
+			_, err := e.Delete(context.Background(), tc.args.mg)
+
+			// Check error
+			if tc.want.err != nil {
+				if err == nil {
+					t.Errorf("expected error %v, got nil", tc.want.err)
+				} else if !errors.Is(err, tc.want.err) && err.Error() != tc.want.err.Error() {
+					t.Errorf("expected error %v, got %v", tc.want.err, err)
+				}
+			} else if err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+
+			// Verify SetConditions was called
+			if tc.want.setConditionsCalled != tc.fields.tracker.SetConditionsCalled {
+				t.Errorf("expected SetConditions() called=%v, got=%v",
+					tc.want.setConditionsCalled, tc.fields.tracker.SetConditionsCalled)
+			}
+
+			// Verify delete was attempted (or not)
+			if tc.want.deleteAttempted != tc.fields.client.deleteCalled {
+				t.Errorf("expected Delete() called=%v, got=%v",
+					tc.want.deleteAttempted, tc.fields.client.deleteCalled)
+			}
+		})
+	}
+}
 func TestConnect(t *testing.T) {
 	type fields struct {
 		creator         *TfProxyClientCreatorMock
@@ -150,7 +265,7 @@ func TestConnect(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{err: errInitializer},
-				resourcetracker: &testutils.ResourceTrackerMock{},
+				resourcetracker: testutils.NewResourceTrackerMock(),
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -164,7 +279,7 @@ func TestConnect(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{err: errCreator},
 				initializer:     &InitializerMock{},
-				resourcetracker: &testutils.ResourceTrackerMock{},
+				resourcetracker: testutils.NewResourceTrackerMock(),
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -178,7 +293,7 @@ func TestConnect(t *testing.T) {
 			fields: fields{
 				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{},
-				resourcetracker: &testutils.ResourceTrackerMock{},
+				resourcetracker: testutils.NewResourceTrackerMock(),
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -677,10 +792,16 @@ func (i *InitializerMock) Initialize(kube client.Client, ctx context.Context, mg
 var _ tfclient.TfProxyControllerI = &TfProxyMock{}
 
 type TfProxyMock struct {
-	status  tfclient.Status
-	data    *tfclient.ObservationData
-	err     error
-	details map[string][]byte
+	status       tfclient.Status
+	data         *tfclient.ObservationData
+	err          error
+	details      map[string][]byte
+	deleteCalled bool
+}
+
+func (t *TfProxyMock) Delete(ctx context.Context) error {
+	t.deleteCalled = true
+	return t.err
 }
 
 func (t *TfProxyMock) QueryAsyncData(ctx context.Context) *tfclient.ObservationData {
@@ -693,10 +814,6 @@ func (t *TfProxyMock) Create(ctx context.Context) error {
 
 func (t *TfProxyMock) Observe(context context.Context) (tfclient.Status, map[string][]byte, error) {
 	return t.status, t.details, t.err
-}
-
-func (t *TfProxyMock) Delete(ctx context.Context) error {
-	return t.err
 }
 
 func (t *TfProxyMock) Update(ctx context.Context) error {

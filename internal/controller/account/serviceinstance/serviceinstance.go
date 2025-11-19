@@ -13,6 +13,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
@@ -188,6 +189,15 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotServiceInstance)
 	}
 	cr.SetConditions(xpv1.Deleting())
+
+	// Set resource usage conditions to check dependencies
+	c.tracker.SetConditions(ctx, cr)
+
+	// Block deletion if other resources are still using this ServiceInstance
+	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
+	}
+
 	if err := c.tfClient.Delete(ctx); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, "cannot delete serviceinstance")
 	}

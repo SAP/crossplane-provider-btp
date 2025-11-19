@@ -12,6 +12,11 @@ import (
 
 // ResourceTrackerMock is a mock implementation of tracking.ReferenceResolverTracker
 // for use in unit tests across the codebase.
+//
+// Usage:
+//   - NewResourceTrackerMock() for normal operation
+//   - NewResourceTrackerMockWithError(err) to simulate tracking failures
+//   - NewResourceTrackerMockBlocking() to simulate deletion blocking
 var _ tracking.ReferenceResolverTracker = &ResourceTrackerMock{}
 
 type ResourceTrackerMock struct {
