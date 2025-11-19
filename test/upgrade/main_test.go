@@ -12,29 +12,18 @@ import (
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
+	"github.com/crossplane-contrib/xp-testing/pkg/images"
+	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
-	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	meta_api "github.com/sap/crossplane-provider-btp/apis"
-	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	testutil "github.com/sap/crossplane-provider-btp/test"
 	"github.com/vladimirvivien/gexe"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
-	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/support/kind"
-
-	"sigs.k8s.io/e2e-framework/pkg/env"
-
-	"github.com/crossplane-contrib/xp-testing/pkg/images"
-	"github.com/crossplane-contrib/xp-testing/pkg/logging"
-	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 )
 
 const (
@@ -64,7 +53,7 @@ var (
 
 func TestMain(m *testing.M) {
 	var verbosity = 4
-	setupLogging(verbosity)
+	testutil.SetupLogging(verbosity)
 
 	namespace := envconf.RandomName("test-ns", 16)
 
@@ -76,8 +65,8 @@ func TestMain(m *testing.M) {
 func SetupClusterWithCrossplane(namespace string) {
 	testenv = env.New()
 
-	bindingSecretData := getBindingSecretOrPanic()
-	userSecretData := getUserSecretOrPanic()
+	bindingSecretData := testutil.GetBindingSecretOrPanic()
+	userSecretData := testutil.GetUserSecretOrPanic()
 	globalAccount := envvar.GetOrPanic("GLOBAL_ACCOUNT")
 	cliServerUrl := envvar.GetOrPanic("CLI_SERVER_URL")
 
@@ -143,9 +132,9 @@ func SetupClusterWithCrossplane(namespace string) {
 	_ = cfg.Configure(testenv, &kind.Cluster{})
 
 	testenv.Setup(
-		ApplySecretInCrossplaneNamespace(cisSecretName, bindingSecretData),
-		ApplySecretInCrossplaneNamespace(serviceUserSecretName, userSecretData),
-		createProviderConfigFn(namespace, globalAccount, cliServerUrl),
+		testutil.ApplySecretInCrossplaneNamespace(cisSecretName, bindingSecretData),
+		testutil.ApplySecretInCrossplaneNamespace(serviceUserSecretName, userSecretData),
+		testutil.CreateProviderConfigFn(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName),
 	)
 }
 
@@ -211,109 +200,4 @@ func mustPullImage(image string) {
 	if p.Err() != nil {
 		panic(fmt.Errorf("docker pull %v failed: %w: %s", image, p.Err(), p.Result()))
 	}
-}
-
-func createProviderConfigFn(namespace string, globalAccount string, cliServerUrl string) func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		r, _ := res.New(cfg.Client().RESTConfig())
-		_ = meta_api.AddToScheme(r.GetScheme())
-
-		obj := providerConfig(namespace, globalAccount, cliServerUrl)
-		err := r.Create(ctx, obj)
-		if kubeErrors.IsAlreadyExists(err) {
-			return ctx, r.Update(ctx, obj)
-		}
-		return ctx, err
-	}
-}
-
-func providerConfig(namespace string, globalAccount string, cliServerUrl string) *apiV1Alpha1.ProviderConfig {
-	return &apiV1Alpha1.ProviderConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "default",
-			Namespace: namespace,
-		},
-		Spec: apiV1Alpha1.ProviderConfigSpec{
-			ServiceAccountSecret: apiV1Alpha1.ProviderCredentials{
-				Source: "Secret",
-				CommonCredentialSelectors: v1.CommonCredentialSelectors{
-					SecretRef: &v1.SecretKeySelector{
-						SecretReference: v1.SecretReference{
-							Name:      serviceUserSecretName,
-							Namespace: "crossplane-system",
-						},
-						Key: "credentials",
-					},
-				},
-			},
-			CISSecret: apiV1Alpha1.ProviderCredentials{
-				Source: "Secret",
-				CommonCredentialSelectors: v1.CommonCredentialSelectors{
-					SecretRef: &v1.SecretKeySelector{
-						SecretReference: v1.SecretReference{
-							Name:      cisSecretName,
-							Namespace: "crossplane-system",
-						},
-						Key: "data",
-					},
-				},
-			},
-			GlobalAccount: globalAccount,
-			CliServerUrl:  cliServerUrl,
-		},
-		Status: apiV1Alpha1.ProviderConfigStatus{},
-	}
-}
-
-func getBindingSecretOrPanic() map[string]string {
-
-	binding := envvar.GetOrPanic("CIS_CENTRAL_BINDING")
-
-	bindingSecret := map[string]string{
-		"data": binding,
-	}
-
-	return bindingSecret
-}
-
-func getUserSecretOrPanic() map[string]string {
-
-	user := envvar.GetOrPanic("BTP_TECHNICAL_USER")
-
-	userSecret := map[string]string{
-		"credentials": user,
-	}
-
-	return userSecret
-}
-
-func ApplySecretInCrossplaneNamespace(name string, data map[string]string) env.Func {
-	return xpenvfuncs.Compose(
-		func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-			r, err := resources.New(cfg.Client().RESTConfig())
-
-			if err != nil {
-				klog.Error(err)
-				return ctx, err
-			}
-
-			secret := xpenvfuncs.SimpleSecret(name, xpenvfuncs.CrossplaneNamespace, data)
-
-			if err := r.Create(ctx, secret); err != nil {
-				if kubeErrors.IsAlreadyExists(err) {
-					return ctx, r.Update(ctx, secret)
-				}
-				klog.Error(err)
-				return ctx, err
-			}
-
-			return ctx, nil
-		},
-	)
-}
-
-func setupLogging(verbosity int) {
-	logging.EnableVerboseLogging(&verbosity)
-	zl := zap.New(zap.UseDevMode(true))
-	ctrl.SetLogger(zl)
 }
