@@ -8,7 +8,7 @@ include ../../../build/makelib/common.mk
 # ====================================================================================
 #  Options
 IMAGE = $(BUILD_REGISTRY)/crossplane/provider-btp-controller
-include ../../../build/makelib/image.mk
+include ../../../build/makelib/imagelight.mk
 
 # ====================================================================================
 img.build:
