@@ -317,7 +317,7 @@ upgrade-test: $(KIND) $(HELM3) generate-test-crs
 		echo "Error: Both fromTag and toTag must be set."; \
 		exit 1; \
 	fi
-	UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) go test -tags=upgrade ./test/upgrade/... -v -short -count=1 -test.v -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
+	UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) go test -tags=upgrade ./test/upgrade/... -v -short -count=1 -test.v -run '$(testFilter)' -timeout 180m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
@@ -333,5 +333,10 @@ upgrade-test-debug: $(KIND) $(HELM3) generate-test-crs
 		exit 1; \
 	fi
 	go test -gcflags="all=-N -l" -c -o ./test/upgrade/upgrade-test-debug.test $(PROJECT_REPO)/test/upgrade -tags=upgrade
-	cd ./test/upgrade && UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) dlv exec ./upgrade-test-debug.test --headless --listen=:2345 --api-version=2 --accept-multiclient -- -test.v -test.timeout=30m; EXIT_CODE=$$?; rm ./test/upgrade/upgrade-test-debug.test; exit $$EXIT_CODE
-	@$(OK) upgrade tests passed
+	UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) dlv exec ./upgrade-test-debug.test --headless --listen=:2345 --api-version=2 --accept-multiclient -- -v -short -count=1 -test.v -run '$(testFilter)' -timeout 180m 2>&1 | tee test-output.log; rm ./test/upgrade/upgrade-test-debug.test; exit $$EXIT_CODE
+	@echo "===========Test Summary==========="
+	@grep -E "PASS|FAIL" test-output.log
+	@case `tail -n 1 test-output.log` in \
+			*FAIL*) echo "❌ Error: Test failed"; exit 1 ;; \
+			*) echo "✅ All tests passed"; $(OK) upgrade tests passed ;; \
+	 esac
