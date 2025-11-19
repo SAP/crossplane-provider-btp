@@ -31,7 +31,7 @@ func TestUpgradeProvider(t *testing.T) {
 		).
 		Assess(
 			"verify resources before upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*60),
+			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*45),
 		).
 		Assess("upgrade provider", upgrade.UpgradeProvider(upgrade.UpgradeProviderOptions{
 			ClusterName:         upgradeTest.ClusterName,
@@ -41,11 +41,11 @@ func TestUpgradeProvider(t *testing.T) {
 		})).
 		Assess(
 			"verify resources after upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*25),
+			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*30),
 		).
 		WithTeardown(
 			"delete resources",
-			upgrade.DeleteResources(upgradeTest.ResourceDirectories, time.Minute*25),
+			upgrade.DeleteResources(upgradeTest.ResourceDirectories, time.Minute*45),
 		).
 		WithTeardown(
 			"delete provider",
