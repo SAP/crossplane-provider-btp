@@ -366,9 +366,13 @@ func CleanUpSubaccounts(uaaAuth *UaaAuth, cisBinding CisBinding, subaccounts *Su
 
 // btpLogin logs the in to the btp cli.
 // returns error if it fails
-func btpLogin(username string, password string, globalAccount string) error {
+func btpLogin(username, password, globalAccount, btpCliUrl string) error {
 	// run command to login
-	cmd := exec.Command("btp", "login", "--user", username, "--password", password, "--subdomain", globalAccount)
+	args := []string{"login", "--user", username, "--password", password, "--subdomain", globalAccount}
+	if len(btpCliUrl) > 0 {
+		args = append(args, "--url", btpCliUrl)
+	}
+	cmd := exec.Command("btp", args...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -655,8 +659,10 @@ func cleanup() (errs error) {
 	}
 	fmt.Println("Successfully got BTP technical user")
 
+	btpCliUrlEnv := os.Getenv("CLI_SERVER_URL")
+
 	fmt.Println("Logging in to BTP CLI with technical user credentials...")
-	err = btpLogin(technicalUser.Email, technicalUser.Password, cisBinding.Uaa.Identityzoneid)
+	err = btpLogin(technicalUser.Email, technicalUser.Password, cisBinding.Uaa.Identityzoneid, btpCliUrlEnv)
 	if err != nil {
 		errs = errors.Join(errs, fmt.Errorf("error logging into BTP CLI: %w", err))
 		return errs

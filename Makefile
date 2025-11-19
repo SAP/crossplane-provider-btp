@@ -285,7 +285,7 @@ test-acceptance-debug: $(KIND) $(HELM3) build generate-test-crs
 	@echo UUT_CONFIG=$$UUT_CONFIG
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
 	@echo "UUT_IMAGES=$$UUT_IMAGES"
-	go test -gcflags="all=-N -l" -c -v  $(PROJECT_REPO)/test/... -tags=e2e -o ./test/e2e/test-acceptance-debug.test -timeout 30m
+	go test -gcflags="all=-N -l" -c -v  $(PROJECT_REPO)/test/e2e/ -tags=e2e -o ./test/e2e/test-acceptance-debug.test -timeout 30m
 	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '$(testFilter)'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
 	@$(OK) integration tests passed
 
