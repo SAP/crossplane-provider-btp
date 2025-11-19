@@ -693,7 +693,8 @@ func TestSaveCallback(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	type fields struct {
-		client *TfProxyMock
+		client  *TfProxyMock
+		tracker *testutils.ResourceTrackerMock
 	}
 	type args struct {
 		mg resource.Managed
@@ -712,7 +713,8 @@ func TestDelete(t *testing.T) {
 		"ApiError": {
 			reason: "should return an error when the API call fails",
 			fields: fields{
-				client: &TfProxyMock{err: errClient},
+				client:  &TfProxyMock{err: errClient},
+				tracker: testutils.NewResourceTrackerMock(),
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -727,7 +729,8 @@ func TestDelete(t *testing.T) {
 		"HappyPath": {
 			reason: "should delete the resource successfully and set Deleting condition",
 			fields: fields{
-				client: &TfProxyMock{},
+				client:  &TfProxyMock{},
+				tracker: testutils.NewResourceTrackerMock(),
 			},
 			args: args{
 				mg: &v1alpha1.ServiceInstance{},
@@ -748,6 +751,7 @@ func TestDelete(t *testing.T) {
 				kube: &test.MockClient{
 					MockUpdate: test.NewMockUpdateFn(nil),
 				},
+				tracker: tc.fields.tracker,
 			}
 
 			_, err := e.Delete(context.Background(), tc.args.mg)
