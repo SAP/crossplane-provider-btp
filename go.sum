@@ -91,8 +91,6 @@ github.com/coreos/go-oidc/v3 v3.6.0 h1:AKVxfYw1Gmkn/w96z0DbT/B/xFnzTd3MkZvWLjF4n
 github.com/coreos/go-oidc/v3 v3.6.0/go.mod h1:ZpHUsHBucTUj6WOkrP4E20UPynbLZzhTQ1XKCXkxyPc=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/crossplane-contrib/xp-testing v1.8.1-0.20251119124238-9f3ad7ee0ddc h1:RUSFR7xecGTSZm5F4nmyyEY5tTVLLe41tPOsGg9bJ/A=
-github.com/crossplane-contrib/xp-testing v1.8.1-0.20251119124238-9f3ad7ee0ddc/go.mod h1:m0LRN/advg63QJ1AjbXZtSEJifOmjqt8JHnkZTXZu4Q=
 github.com/crossplane-contrib/xp-testing v1.9.0 h1:hl5e6J6+FDUaGP/e/wfE3XdqsPVuHhZK162wHcRUeO8=
 github.com/crossplane-contrib/xp-testing v1.9.0/go.mod h1:m0LRN/advg63QJ1AjbXZtSEJifOmjqt8JHnkZTXZu4Q=
 github.com/crossplane/crossplane-runtime v1.20.0 h1:I54uipRIecqZyms+vz1J/l62yjVQ7HV5w+Nh3RMrUtc=
