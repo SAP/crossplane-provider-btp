@@ -93,6 +93,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6N
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/crossplane-contrib/xp-testing v1.8.1-0.20251119124238-9f3ad7ee0ddc h1:RUSFR7xecGTSZm5F4nmyyEY5tTVLLe41tPOsGg9bJ/A=
 github.com/crossplane-contrib/xp-testing v1.8.1-0.20251119124238-9f3ad7ee0ddc/go.mod h1:m0LRN/advg63QJ1AjbXZtSEJifOmjqt8JHnkZTXZu4Q=
+github.com/crossplane-contrib/xp-testing v1.9.0 h1:hl5e6J6+FDUaGP/e/wfE3XdqsPVuHhZK162wHcRUeO8=
+github.com/crossplane-contrib/xp-testing v1.9.0/go.mod h1:m0LRN/advg63QJ1AjbXZtSEJifOmjqt8JHnkZTXZu4Q=
 github.com/crossplane/crossplane-runtime v1.20.0 h1:I54uipRIecqZyms+vz1J/l62yjVQ7HV5w+Nh3RMrUtc=
 github.com/crossplane/crossplane-runtime v1.20.0/go.mod h1:lfV1VJenDc9PNVLxDC80YjPoTm+JdSZ13xlS2h37Dvg=
 github.com/crossplane/crossplane-tools v0.0.0-20230925130601-628280f8bf79 h1:HigXs5tEQxWz0fcj8hzbU2UAZgEM7wPe0XRFOsrtF8Y=
