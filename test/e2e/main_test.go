@@ -3,38 +3,22 @@
 package e2e
 
 import (
-	"context"
-	"os"
-	"strings"
-	"testing"
-
 	"encoding/json"
+	"os"
+	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/images"
-	"github.com/crossplane-contrib/xp-testing/pkg/logging"
 	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
-
-	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	meta_api "github.com/sap/crossplane-provider-btp/apis"
+	"github.com/pkg/errors"
+	testutil "github.com/sap/crossplane-provider-btp/test"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
-	"sigs.k8s.io/e2e-framework/third_party/kind"
-
-	"github.com/pkg/errors"
-	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
-	"github.com/vladimirvivien/gexe"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/third_party/kind"
 )
 
 var (
@@ -55,7 +39,7 @@ var (
 
 func TestMain(m *testing.M) {
 	var verbosity = 4
-	setupLogging(verbosity)
+	testutil.SetupLogging(verbosity)
 
 	namespace := envconf.RandomName("test-ns", 16)
 
@@ -73,8 +57,8 @@ func SetupClusterWithCrossplane(namespace string) {
 
 	testenv = env.New()
 
-	bindingSecretData := getBindingSecretOrPanic()
-	userSecretData := getUserSecretOrPanic()
+	bindingSecretData := testutil.GetBindingSecretOrPanic()
+	userSecretData := testutil.GetUserSecretOrPanic()
 	globalAccount := envvar.GetOrPanic("GLOBAL_ACCOUNT")
 	cliServerUrl := envvar.GetOrPanic("CLI_SERVER_URL")
 
@@ -120,105 +104,10 @@ func SetupClusterWithCrossplane(namespace string) {
 	cfg.Configure(testenv, &kind.Cluster{})
 
 	testenv.Setup(
-		ApplySecretInCrossplaneNamespace(CIS_SECRET_NAME, bindingSecretData),
-		ApplySecretInCrossplaneNamespace(SERVICE_USER_SECRET_NAME, userSecretData),
-		createProviderConfigFn(namespace, globalAccount, cliServerUrl),
+		testutil.ApplySecretInCrossplaneNamespace(CIS_SECRET_NAME, bindingSecretData),
+		testutil.ApplySecretInCrossplaneNamespace(SERVICE_USER_SECRET_NAME, userSecretData),
+		testutil.CreateProviderConfigFn(namespace, globalAccount, cliServerUrl, CIS_SECRET_NAME, SERVICE_USER_SECRET_NAME),
 	)
-}
-
-func checkEnvVarExists(existsKey string) bool {
-	v := os.Getenv(existsKey)
-
-	if v == "1" {
-		return true
-	}
-
-	return false
-}
-
-func createProviderConfigFn(namespace string, globalAccount string, cliServerUrl string) func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		r, _ := res.New(cfg.Client().RESTConfig())
-		_ = meta_api.AddToScheme(r.GetScheme())
-
-		obj := providerConfig(namespace, globalAccount, cliServerUrl)
-		err := r.Create(ctx, obj)
-		if kubeErrors.IsAlreadyExists(err) {
-			return ctx, r.Update(ctx, obj)
-		}
-		return ctx, err
-	}
-}
-
-func providerConfig(namespace string, globalAccount string, cliServerUrl string) *apiV1Alpha1.ProviderConfig {
-	return &apiV1Alpha1.ProviderConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "default",
-			Namespace: namespace,
-		},
-		Spec: apiV1Alpha1.ProviderConfigSpec{
-			ServiceAccountSecret: apiV1Alpha1.ProviderCredentials{
-				Source: "Secret",
-				CommonCredentialSelectors: v1.CommonCredentialSelectors{
-					SecretRef: &v1.SecretKeySelector{
-						SecretReference: v1.SecretReference{
-							Name:      SERVICE_USER_SECRET_NAME,
-							Namespace: "crossplane-system",
-						},
-						Key: "credentials",
-					},
-				},
-			},
-			CISSecret: apiV1Alpha1.ProviderCredentials{
-				Source: "Secret",
-				CommonCredentialSelectors: v1.CommonCredentialSelectors{
-					SecretRef: &v1.SecretKeySelector{
-						SecretReference: v1.SecretReference{
-							Name:      CIS_SECRET_NAME,
-							Namespace: "crossplane-system",
-						},
-						Key: "data",
-					},
-				},
-			},
-			GlobalAccount: globalAccount,
-			CliServerUrl:  cliServerUrl,
-		},
-		Status: apiV1Alpha1.ProviderConfigStatus{},
-	}
-}
-
-func getBindingSecretOrPanic() map[string]string {
-
-	binding := envvar.GetOrPanic("CIS_CENTRAL_BINDING")
-
-	bindingSecret := map[string]string{
-		"data": binding,
-	}
-
-	return bindingSecret
-}
-
-func getUserSecretOrPanic() map[string]string {
-
-	user := envvar.GetOrPanic("BTP_TECHNICAL_USER")
-
-	userSecret := map[string]string{
-		"credentials": user,
-	}
-
-	return userSecret
-}
-
-func clusterExists(name string) bool {
-	e := gexe.New()
-	clusters := e.Run("kind get clusters")
-	for _, c := range strings.Split(clusters, "\n") {
-		if c == name {
-			return true
-		}
-	}
-	return false
 }
 
 func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
@@ -235,45 +124,4 @@ func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
 	uutController := imageMap[UUT_CONTROLLER_KEY]
 
 	return uutConfig, uutController
-}
-
-func getUserNameFromSecretOrError(t *testing.T) string {
-	secretData := getUserSecretOrPanic()
-	secretJson := map[string]string{}
-	err := json.Unmarshal([]byte(secretData["credentials"]), &secretJson)
-	if err != nil {
-		t.Fatal("error while retrieving technical user email")
-	}
-	return secretJson["email"]
-}
-
-func setupLogging(verbosity int) {
-	logging.EnableVerboseLogging(&verbosity)
-	zl := zap.New(zap.UseDevMode(true))
-	ctrl.SetLogger(zl)
-}
-
-func ApplySecretInCrossplaneNamespace(name string, data map[string]string) env.Func {
-	return xpenvfuncs.Compose(
-		func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-			r, err := resources.New(cfg.Client().RESTConfig())
-
-			if err != nil {
-				klog.Error(err)
-				return ctx, err
-			}
-
-			secret := xpenvfuncs.SimpleSecret(name, xpenvfuncs.CrossplaneNamespace, data)
-
-			if err := r.Create(ctx, secret); err != nil {
-				if kubeErrors.IsAlreadyExists(err) {
-					return ctx, r.Update(ctx, secret)
-				}
-				klog.Error(err)
-				return ctx, err
-			}
-
-			return ctx, nil
-		},
-	)
 }
