@@ -3,11 +3,15 @@
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/upgrade"
+	"github.com/sap/crossplane-provider-btp/test"
+	"sigs.k8s.io/e2e-framework/klient/wait"
+	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 )
 
@@ -45,7 +49,14 @@ func TestUpgradeProvider(t *testing.T) {
 		).
 		WithTeardown(
 			"delete resources",
-			upgrade.DeleteResources(upgradeTest.ResourceDirectories, time.Minute*90),
+			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				err := test.DeleteResourcesFromDirsGracefully(ctx, cfg, resourceDirectories, wait.WithTimeout(time.Minute*30))
+				if err != nil {
+					t.Logf("failed to clean up resources: %v", err)
+				}
+
+				return ctx
+			},
 		).
 		WithTeardown(
 			"delete provider",

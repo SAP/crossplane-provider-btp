@@ -2,23 +2,35 @@ package test
 
 import (
 	"context"
+	"os"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/logging"
+	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metaApi "github.com/sap/crossplane-provider-btp/apis"
 	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/klient/decoder"
+	"sigs.k8s.io/e2e-framework/klient/k8s"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/klient/wait"
+	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 )
+
+type mockList struct {
+	metav1.ListInterface
+	runtime.Object
+	Items []k8s.Object
+}
 
 func SetupLogging(verbosity int) {
 	logging.EnableVerboseLogging(&verbosity)
@@ -29,7 +41,7 @@ func SetupLogging(verbosity int) {
 func ApplySecretInCrossplaneNamespace(name string, data map[string]string) env.Func {
 	return xpenvfuncs.Compose(
 		func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-			r, err := resources.New(cfg.Client().RESTConfig())
+			r, err := res.New(cfg.Client().RESTConfig())
 
 			if err != nil {
 				klog.Error(err)
@@ -121,4 +133,59 @@ func ProviderConfig(namespace string, globalAccount string, cliServerUrl string,
 		},
 		Status: apiV1Alpha1.ProviderConfigStatus{},
 	}
+}
+
+// DeleteResourcesFromDirsGracefully deletes previously imported resources from multiple directories, failing gracefully
+func DeleteResourcesFromDirsGracefully(ctx context.Context, cfg *envconf.Config, manifestDirs []string, timeout wait.Option) error {
+	klog.V(4).Info("Attempt to delete previously imported resources")
+	r, _ := resources.GetResourcesWithRESTConfig(cfg)
+	objects, err := GetObjectsToImport(ctx, cfg, manifestDirs)
+	if err != nil {
+		return err
+	}
+
+	for _, obj := range objects {
+		delErr := r.Delete(ctx, obj)
+		if delErr != nil && !kubeErrors.IsNotFound(delErr) {
+			return delErr
+		}
+	}
+
+	if err = wait.For(
+		conditions.New(r).ResourcesDeleted(&mockList{Items: objects}),
+		timeout,
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetObjectsToImport(ctx context.Context, cfg *envconf.Config, dirs []string) ([]k8s.Object, error) {
+	r := resClient(cfg)
+
+	r.WithNamespace(cfg.Namespace())
+
+	objects := make([]k8s.Object, 0)
+	for _, dir := range dirs {
+		err := decoder.DecodeEachFile(
+			ctx, os.DirFS(dir), "*",
+			func(ctx context.Context, obj k8s.Object) error {
+				objects = append(objects, obj)
+				return nil
+			},
+			decoder.MutateNamespace(cfg.Namespace()),
+		)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return objects, nil
+}
+
+func resClient(cfg *envconf.Config) *res.Resources {
+	r, _ := resources.GetResourcesWithRESTConfig(cfg)
+	return r
 }
