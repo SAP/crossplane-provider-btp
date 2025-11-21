@@ -33,7 +33,7 @@ GOLANGCILINT_VERSION ?= 1.64.5
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
-GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider
+GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider  $(GO_PROJECT)/cmd/exporter
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.Version=$(VERSION)
 # this version will eventually be passed to the terraform provider
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.ProviderVersion=$(VERSION)
