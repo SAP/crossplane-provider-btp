@@ -3,7 +3,9 @@ package subaccount
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"testing"
+	"unsafe"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -52,6 +54,18 @@ func TestObserve(t *testing.T) {
 		},
 		"NeedsCreation": {
 			reason: "Empty status indicates not found",
+			args: args{
+				cr: NewSubaccount("unittest-sa"),
+				mockAPIClient: &MockSubaccountClient{
+					returnSubaccounts: &accountclient.ResponseCollection{Value: []accountclient.SubaccountResponseObject{}},
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{ResourceExists: false},
+			},
+		},
+		"EmptyExternalNameNeedsCreation": {
+			reason: "Empty external name indicates not found",
 			args: args{
 				cr: NewSubaccount("unittest-sa"),
 				mockAPIClient: &MockSubaccountClient{
@@ -913,7 +927,7 @@ func TestObserve(t *testing.T) {
 					returnSubaccounts: &accountclient.ResponseCollection{
 						Value: []accountclient.SubaccountResponseObject{
 							{
-								Guid:              "subaccount-guid-123",
+								Guid:              "12340000-0000-0000-0000-000000000000",
 								Subdomain:         "unittest-sa",
 								Region:            "eu10",
 								ParentGUID:        "global-123",
@@ -930,7 +944,7 @@ func TestObserve(t *testing.T) {
 					},
 					// GetSubaccount (direct lookup after migration) will succeed
 					returnSubaccount: &accountclient.SubaccountResponseObject{
-						Guid:              "subaccount-guid-123",
+						Guid:              "12340000-0000-0000-0000-000000000000",
 						Subdomain:         "unittest-sa",
 						Region:            "eu10",
 						ParentGUID:        "global-123",
@@ -963,8 +977,8 @@ func TestObserve(t *testing.T) {
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
 					// External name should be updated to GUID during migration
-					meta.SetExternalName(cr, "subaccount-guid-123")
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("subaccount-guid-123")
+					meta.SetExternalName(cr, "12340000-0000-0000-0000-000000000000")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("12340000-0000-0000-0000-000000000000")
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu10")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("unittest-sa")
@@ -1020,8 +1034,97 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
+		"EmptyExternalNameWithoutBackwardsCompat": {
+			reason: "Empty external-name without matching resource should return resourceExists: false (ADR compliance)",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithData(v1alpha1.SubaccountParameters{
+						Subdomain: "unittest-sa",
+						Region:    "eu10",
+					})),
+				mockAPIClient: &MockSubaccountClient{
+					// GetSubaccounts (fallback) will return empty result - no matching resource
+					returnSubaccounts: &accountclient.ResponseCollection{
+						Value: []accountclient.SubaccountResponseObject{},
+					},
+				},
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+			},
+		},
+		"InvalidGUIDFormatError": {
+			reason: "Invalid GUID format in external-name should return error (ADR compliance)",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("invalid-guid-format"), // Not a valid UUID
+					WithData(v1alpha1.SubaccountParameters{
+						Subdomain: "unittest-sa",
+						Region:    "eu10",
+					})),
+				mockAPIClient: &MockSubaccountClient{
+					returnSubaccounts: &accountclient.ResponseCollection{
+						Value: []accountclient.SubaccountResponseObject{},
+					},
+				},
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					return mockClient
+				}(),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.New("external-name 'invalid-guid-format' is not a valid GUID format"),
+			},
+		},
+		"ValidGUID404Response": {
+			reason: "Valid GUID that doesn't exist (404 response) should return resourceExists: false (ADR compliance)",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174999"), // Valid UUID but doesn't exist
+					WithData(v1alpha1.SubaccountParameters{
+						Subdomain: "unittest-sa",
+						Region:    "eu10",
+					})),
+				mockAPIClient: &MockSubaccountClient{
+					// GetSubaccount returns 404
+					getSubaccountErr: errors.New("404 not found"),
+				},
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				crChanges: func(cr *v1alpha1.Subaccount) {
+					// Status should be reset
+					cr.Status.AtProvider = v1alpha1.SubaccountObservation{}
+				},
+			},
+		},
 		"ExternalNameMigrationNotFound": {
-			reason: "Resource with name as external-name should fallback to subdomain+region lookup and not find anything",
+			reason: "Resource with name as external-name should fallback to subdomain+region lookup and not find anything, therefore since external-name is not a valid GUID, return error",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("unittest-sa"), // Old behavior: external name = resource name
@@ -1049,9 +1152,7 @@ func TestObserve(t *testing.T) {
 				}(),
 			},
 			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists: false,
-				},
+				err: errors.New("external-name 'unittest-sa' is not a valid GUID format"),
 			},
 		},
 	}
@@ -1183,6 +1284,39 @@ func TestCreate(t *testing.T) {
 					WithExternalName("123"),
 				),
 				o: managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}},
+			},
+		},
+
+		"ResourceAlreadyExistsError": {
+			reason: "ADR compliance: 'resource already exists' error should NOT set external-name",
+			args: args{
+				cr: NewSubaccount("unittest-sa"),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{},
+					returnErr:        create409Error(),
+				},
+			},
+			want: want{
+				// External name should NOT be set - stays empty
+				cr:  NewSubaccount("unittest-sa"),
+				o:   managed.ExternalCreation{},
+				err: errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource: 409 Conflict"),
+			},
+		},
+		"OtherCreationError": {
+			reason: "ADR compliance: Other creation errors should NOT set external-name",
+			args: args{
+				cr: NewSubaccount("unittest-sa"),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{},
+					returnErr:        errors.New("500 Internal Server Error"),
+				},
+			},
+			want: want{
+				// External name should NOT be set - stays empty
+				cr:  NewSubaccount("unittest-sa"),
+				o:   managed.ExternalCreation{},
+				err: errors.New("500 Internal Server Error"),
 			},
 		},
 	}
@@ -1450,6 +1584,47 @@ func TestDelete(t *testing.T) {
 			},
 			want: want{
 				err: errors.New("Resource cannot be deleted, still has usages"),
+			},
+		},
+		"AsyncDeletionInProgress": {
+			reason: "ADR compliance: Deletion already in progress (DELETING state) should not trigger another DELETE API call",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174000"),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr("123e4567-e89b-12d3-a456-426614174000"),
+						Status:         internal.Ptr(subaccountStateDeleting),
+					})),
+				mockClient: &MockSubaccountClient{
+					// API should NOT be called since deletion is already in progress
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123e4567-e89b-12d3-a456-426614174000"},
+				},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				err: nil, // No error, just wait for deletion to complete
+			},
+		},
+		"ExternallyRemovedResource": {
+			reason: "ADR compliance: Resource already deleted externally (404) should not be treated as error",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("123e4567-e89b-12d3-a456-426614174000"),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr("123e4567-e89b-12d3-a456-426614174000"),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123e4567-e89b-12d3-a456-426614174000"},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						// Resource was already deleted externally - return 404
+						return &accountclient.SubaccountResponseObject{}, &http.Response{StatusCode: 404}, nil
+					},
+				},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				err: nil, // 404 should not be treated as error
 			},
 		},
 	}
@@ -1775,4 +1950,36 @@ func WithExternalName(externalName string) SubaccountModifier {
 	return func(r *v1alpha1.Subaccount) {
 		meta.SetExternalName(r, externalName)
 	}
+}
+
+// create409Error creates a GenericOpenAPIError with a 409 status code
+// that wraps an ApiExceptionResponseObject with code 409.
+// This mimics the actual API behavior for "resource already exists" errors.
+func create409Error() error {
+	// Create the inner error object with code 409
+	apiExceptionError := accountclient.NewApiExceptionResponseObjectError()
+	apiExceptionError.SetCode(409)
+
+	// Create the API exception response that wraps the error
+	apiException := accountclient.NewApiExceptionResponseObject(*apiExceptionError)
+
+	// Create GenericOpenAPIError
+	err := &accountclient.GenericOpenAPIError{}
+	errValue := reflect.ValueOf(err).Elem()
+
+	// Use unsafe to set unexported 'model' field
+	modelField := errValue.FieldByName("model")
+	if modelField.IsValid() {
+		reflect.NewAt(modelField.Type(), unsafe.Pointer(modelField.UnsafeAddr())).
+			Elem().Set(reflect.ValueOf(*apiException))
+	}
+
+	// Use unsafe to set unexported 'error' field
+	errorField := errValue.FieldByName("error")
+	if errorField.IsValid() {
+		reflect.NewAt(errorField.Type(), unsafe.Pointer(errorField.UnsafeAddr())).
+			Elem().SetString("409 Conflict")
+	}
+
+	return err
 }
