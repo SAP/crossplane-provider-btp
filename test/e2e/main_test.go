@@ -42,8 +42,9 @@ var (
 	UUT_CONFIG_KEY     = "crossplane/provider-btp"
 	UUT_CONTROLLER_KEY = "crossplane/provider-btp-controller"
 
-	CIS_SECRET_NAME          = "cis-provider-secret"
-	SERVICE_USER_SECRET_NAME = "sa-provider-secret"
+	CIS_SECRET_NAME              = "cis-provider-secret"
+	SERVICE_USER_SECRET_NAME     = "sa-provider-secret"
+	TECHNICAL_USER_EMAIL_ENV_KEY = "TECHNICAL_USER_EMAIL"
 
 	UUT_BUILD_ID_KEY = "BUILD_ID"
 )
