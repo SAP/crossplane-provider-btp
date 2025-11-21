@@ -19,7 +19,6 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 
-	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
@@ -30,81 +29,33 @@ import (
 
 var (
 	saK8sResName               = "e2e-test-sa"
-	subaccountImportK8sResName = NewID("e2e-test-subaccount-import", envvar.Get(UUT_BUILD_ID_KEY))
+	subaccountImportK8sResName = "e2e-test-subaccount-import"
 	dirk8sResName              = "e2e-test-directory-sa"
 	subaccountNameE2e          string
 	subaccountDirectoryNameE2e string
 )
 
 func TestSubaccountImportFlow(t *testing.T) {
-	importManagementPolicies := []xpv1.ManagementAction{
-		xpv1.ManagementActionObserve,
-		xpv1.ManagementActionCreate,
-		xpv1.ManagementActionUpdate,
-		xpv1.ManagementActionLateInitialize,
-	}
-	subaccountBase := v1alpha1.Subaccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      subaccountImportK8sResName,
-			Namespace: "",
-		},
-		Spec: v1alpha1.SubaccountSpec{
-			ForProvider: v1alpha1.SubaccountParameters{
-				DisplayName:      subaccountImportK8sResName,
-				Subdomain:        subaccountImportK8sResName,
-				Region:           "eu10",
-				SubaccountAdmins: []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
+	importTester := NewImportTester(
+		&v1alpha1.Subaccount{
+			Spec: v1alpha1.SubaccountSpec{
+				ForProvider: v1alpha1.SubaccountParameters{
+					DisplayName:      subaccountImportK8sResName,
+					Subdomain:        subaccountImportK8sResName,
+					Region:           "eu10",
+					SubaccountAdmins: []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
+				},
 			},
 		},
-	}
-	importFeature := features.New("BTP Subaccount Import Flow").
-		Setup(
-			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta.AddToScheme(r.GetScheme())
+		subaccountImportK8sResName,
+		WithWaitCreateTimeout[*v1alpha1.Subaccount](wait.WithTimeout(5*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.Subaccount](wait.WithTimeout(5*time.Minute)),
+	)
 
-				createSubaccount := subaccountBase.DeepCopy()
-				createSubaccount.Spec.ManagementPolicies = importManagementPolicies
-
-				if err := cfg.Client().Resources().Create(ctx, createSubaccount); err != nil {
-					t.Fatalf("Failed to create Subaccount for import test: %v", err)
-				}
-
-				waitForResource(createSubaccount, cfg, t)
-
-				createdSubaccount := &v1alpha1.Subaccount{}
-				MustGetResource(t, cfg, subaccountImportK8sResName, nil, createdSubaccount)
-				externalName := xpmeta.GetExternalName(createdSubaccount)
-				klog.InfoS("Subaccount created for importing with external name", "externalName", externalName)
-				ctx = context.WithValue(ctx, "importExternalName", externalName)
-
-				AwaitResourceDeletionOrFail(ctx, t, cfg, createdSubaccount, wait.WithTimeout(time.Minute*3))
-				return ctx
-			},
-		).
-		Assess(
-			"Check Imported Subaccount gets healthy", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				externalName := ctx.Value("importExternalName").(string)
-				subaccount := subaccountBase.DeepCopy()
-				xpmeta.SetExternalName(subaccount, externalName)
-				subaccount.Spec.ManagementPolicies = xpv1.ManagementPolicies{xpv1.ManagementActionAll}
-				if err := cfg.Client().Resources().Create(ctx, subaccount); err != nil {
-					t.Fatalf("Failed to create Subaccount for import test: %v", err)
-				}
-
-				waitForResource(subaccount, cfg, t)
-				return ctx
-			},
-		).Teardown(
-		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			createdSubaccount := &v1alpha1.Subaccount{}
-			MustGetResource(t, cfg, subaccountImportK8sResName, nil, createdSubaccount)
-			AwaitResourceDeletionOrFail(ctx, t, cfg, createdSubaccount, wait.WithTimeout(time.Minute*5))
-			return ctx
-		},
-	).Feature()
+	importFeature := importTester.BuildTestFeature("BTP Subaccount Import Flow").Feature()
 
 	testenv.Test(t, importFeature)
+
 }
 
 func TestAccount(t *testing.T) {
