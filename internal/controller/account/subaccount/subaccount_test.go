@@ -26,6 +26,8 @@ import (
 	"github.com/sap/crossplane-provider-btp/btp"
 )
 
+const SAMPLE_GUID = "12340000-0000-0000-0000-000000000000"
+
 func TestObserve(t *testing.T) {
 	type args struct {
 		cr            resource.Managed
@@ -79,7 +81,7 @@ func TestObserve(t *testing.T) {
 		"FindSubaccountError": {
 			reason: "Get Subaccount error should reset remote state",
 			args: args{
-				cr: NewSubaccount("unittest-sa"),
+				cr: NewSubaccount("unittest-sa", WithExternalName(SAMPLE_GUID)),
 				mockAPIClient: &MockSubaccountClient{
 					returnErr: errors.New("Error getting subaccount"),
 				},
@@ -93,7 +95,7 @@ func TestObserve(t *testing.T) {
 			reason: "Empty description should NOT require Update",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
-					WithExternalName("123e4567-e89b-12d3-a456-426614174000"),
+					WithExternalName(SAMPLE_GUID),
 					WithData(v1alpha1.SubaccountParameters{
 						Subdomain:         "sub1",
 						Region:            "eu12",
@@ -105,7 +107,7 @@ func TestObserve(t *testing.T) {
 					})),
 				mockAPIClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{
-						Guid:              "123e4567-e89b-12d3-a456-426614174000",
+						Guid:              SAMPLE_GUID,
 						Description:       "",
 						Subdomain:         "sub1",
 						Region:            "eu12",
@@ -135,7 +137,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174000")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr(SAMPLE_GUID)
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu12")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("sub1")
@@ -927,7 +929,7 @@ func TestObserve(t *testing.T) {
 					returnSubaccounts: &accountclient.ResponseCollection{
 						Value: []accountclient.SubaccountResponseObject{
 							{
-								Guid:              "12340000-0000-0000-0000-000000000000",
+								Guid:              SAMPLE_GUID,
 								Subdomain:         "unittest-sa",
 								Region:            "eu10",
 								ParentGUID:        "global-123",
@@ -944,7 +946,7 @@ func TestObserve(t *testing.T) {
 					},
 					// GetSubaccount (direct lookup after migration) will succeed
 					returnSubaccount: &accountclient.SubaccountResponseObject{
-						Guid:              "12340000-0000-0000-0000-000000000000",
+						Guid:              SAMPLE_GUID,
 						Subdomain:         "unittest-sa",
 						Region:            "eu10",
 						ParentGUID:        "global-123",
@@ -977,8 +979,8 @@ func TestObserve(t *testing.T) {
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
 					// External name should be updated to GUID during migration
-					meta.SetExternalName(cr, "12340000-0000-0000-0000-000000000000")
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("12340000-0000-0000-0000-000000000000")
+					meta.SetExternalName(cr, SAMPLE_GUID)
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr(SAMPLE_GUID)
 					cr.Status.AtProvider.Status = internal.Ptr("OK")
 					cr.Status.AtProvider.Region = internal.Ptr("eu10")
 					cr.Status.AtProvider.Subdomain = internal.Ptr("unittest-sa")
@@ -997,7 +999,7 @@ func TestObserve(t *testing.T) {
 			reason: "Resource with GUID as external-name should be found directly without fallback",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
-					WithExternalName("123e4567-e89b-12d3-a456-426614174000"), // New behavior: external name = GUID (proper UUID format)
+					WithExternalName(SAMPLE_GUID), // New behavior: external name = GUID (proper UUID format)
 					WithData(v1alpha1.SubaccountParameters{
 						Subdomain: "unittest-sa",
 						Region:    "eu10",
@@ -1005,7 +1007,7 @@ func TestObserve(t *testing.T) {
 				mockAPIClient: &MockSubaccountClient{
 					// GetSubaccount (by GUID) will succeed
 					returnSubaccount: &accountclient.SubaccountResponseObject{
-						Guid:       "123e4567-e89b-12d3-a456-426614174000",
+						Guid:       SAMPLE_GUID,
 						Subdomain:  "unittest-sa",
 						Region:     "eu10",
 						ParentGUID: "global-123",
@@ -1029,7 +1031,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				crChanges: func(cr *v1alpha1.Subaccount) {
-					cr.Status.AtProvider.SubaccountGuid = internal.Ptr("123e4567-e89b-12d3-a456-426614174000")
+					cr.Status.AtProvider.SubaccountGuid = internal.Ptr(SAMPLE_GUID)
 					cr.Status.AtProvider.ParentGuid = internal.Ptr("global-123")
 				},
 			},
@@ -1094,7 +1096,7 @@ func TestObserve(t *testing.T) {
 			reason: "Valid GUID that doesn't exist (404 response) should return resourceExists: false (ADR compliance)",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
-					WithExternalName("123e4567-e89b-12d3-a456-426614174999"), // Valid UUID but doesn't exist
+					WithExternalName(SAMPLE_GUID), // Valid UUID but doesn't exist
 					WithData(v1alpha1.SubaccountParameters{
 						Subdomain: "unittest-sa",
 						Region:    "eu10",
@@ -1540,11 +1542,11 @@ func TestDelete(t *testing.T) {
 		"DeleteAPI404": {
 			reason: "Deletion should be successful if subaccount not found",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123")})),
+				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr(SAMPLE_GUID)})),
 				mockClient: &MockSubaccountClient{
-					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
 					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
-						return &accountclient.SubaccountResponseObject{Guid: "123"}, &http.Response{StatusCode: 404}, nil
+						return &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID}, &http.Response{StatusCode: 404}, nil
 					},
 				},
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
@@ -1556,11 +1558,11 @@ func TestDelete(t *testing.T) {
 		"DeleteAPIError": {
 			reason: "Deletion should fail if API returns error",
 			args: args{
-				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr("123")})),
+				cr: NewSubaccount("unittest-sa", WithStatus(v1alpha1.SubaccountObservation{SubaccountGuid: internal.Ptr(SAMPLE_GUID)})),
 				mockClient: &MockSubaccountClient{
-					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123"},
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
 					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
-						return &accountclient.SubaccountResponseObject{Guid: "123"}, &http.Response{StatusCode: 500}, errors.New("apiError")
+						return &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID}, &http.Response{StatusCode: 500}, errors.New("apiError")
 					},
 				},
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
@@ -1590,14 +1592,14 @@ func TestDelete(t *testing.T) {
 			reason: "ADR compliance: Deletion already in progress (DELETING state) should not trigger another DELETE API call",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
-					WithExternalName("123e4567-e89b-12d3-a456-426614174000"),
+					WithExternalName(SAMPLE_GUID),
 					WithStatus(v1alpha1.SubaccountObservation{
 						SubaccountGuid: internal.Ptr("123e4567-e89b-12d3-a456-426614174000"),
 						Status:         internal.Ptr(subaccountStateDeleting),
 					})),
 				mockClient: &MockSubaccountClient{
 					// API should NOT be called since deletion is already in progress
-					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123e4567-e89b-12d3-a456-426614174000"},
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
 				},
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
 			},
@@ -1609,13 +1611,13 @@ func TestDelete(t *testing.T) {
 			reason: "ADR compliance: Resource already deleted externally (404) should not be treated as error",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
-					WithExternalName("123e4567-e89b-12d3-a456-426614174000"),
+					WithExternalName(SAMPLE_GUID),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid: internal.Ptr("123e4567-e89b-12d3-a456-426614174000"),
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
 						Status:         internal.Ptr(subaccountStateOk),
 					})),
 				mockClient: &MockSubaccountClient{
-					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: "123e4567-e89b-12d3-a456-426614174000"},
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
 					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
 						// Resource was already deleted externally - return 404
 						return &accountclient.SubaccountResponseObject{}, &http.Response{StatusCode: 404}, nil
@@ -1693,7 +1695,7 @@ func TestUpdate(t *testing.T) {
 						DirectoryRef:  &xpv1.Reference{Name: "dir-1"},
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid: internal.Ptr("123"),
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
 						ParentGuid:     internal.Ptr("234"),
 					}),
 				),
@@ -1708,7 +1710,7 @@ func TestUpdate(t *testing.T) {
 						DirectoryRef:  &xpv1.Reference{Name: "dir-1"},
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid: internal.Ptr("123"),
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
 						ParentGuid:     internal.Ptr("234"),
 					})),
 				o:   managed.ExternalUpdate{},
@@ -1724,7 +1726,7 @@ func TestUpdate(t *testing.T) {
 						DirectoryRef:  &xpv1.Reference{Name: "dir-1"},
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid: internal.Ptr("123"),
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
 						ParentGuid:     internal.Ptr("234"),
 					}),
 				),
@@ -1738,7 +1740,7 @@ func TestUpdate(t *testing.T) {
 						DirectoryRef:  &xpv1.Reference{Name: "dir-1"},
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid: internal.Ptr("123"),
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
 						ParentGuid:     internal.Ptr("234"),
 					})),
 				o: managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{}},
@@ -1754,7 +1756,7 @@ func TestUpdate(t *testing.T) {
 						Labels:        map[string][]string{"somekey": {"somevalue"}},
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid: internal.Ptr("123"),
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
 						ParentGuid:     internal.Ptr("234"),
 					}),
 				),
@@ -1769,7 +1771,7 @@ func TestUpdate(t *testing.T) {
 						Labels:        map[string][]string{"somekey": {"somevalue"}},
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid: internal.Ptr("123"),
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
 						ParentGuid:     internal.Ptr("234"),
 					})),
 				o: managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{}},
@@ -1783,7 +1785,7 @@ func TestUpdate(t *testing.T) {
 						DirectoryGuid: "345",
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid: internal.Ptr("123"),
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
 						ParentGuid:     internal.Ptr("234"),
 					}),
 				),
@@ -1795,7 +1797,7 @@ func TestUpdate(t *testing.T) {
 						DirectoryGuid: "345",
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid: internal.Ptr("123"),
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
 						ParentGuid:     internal.Ptr("234"),
 					})),
 				o:   managed.ExternalUpdate{},
@@ -1810,7 +1812,7 @@ func TestUpdate(t *testing.T) {
 						DirectoryGuid: "dir-123",
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid:    internal.Ptr("123"),
+						SubaccountGuid:    internal.Ptr(SAMPLE_GUID),
 						GlobalAccountGUID: internal.Ptr("global-123"),
 						ParentGuid:        internal.Ptr("global-123"),
 					}),
@@ -1823,7 +1825,7 @@ func TestUpdate(t *testing.T) {
 						DirectoryGuid: "dir-123",
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid:    internal.Ptr("123"),
+						SubaccountGuid:    internal.Ptr(SAMPLE_GUID),
 						GlobalAccountGUID: internal.Ptr("global-123"),
 						ParentGuid:        internal.Ptr("global-123"),
 					})),
@@ -1839,7 +1841,7 @@ func TestUpdate(t *testing.T) {
 						DirectoryGuid: "",
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid:    internal.Ptr("123"),
+						SubaccountGuid:    internal.Ptr(SAMPLE_GUID),
 						GlobalAccountGUID: internal.Ptr("global-123"),
 						ParentGuid:        internal.Ptr("dir-123"),
 					}),
@@ -1852,7 +1854,7 @@ func TestUpdate(t *testing.T) {
 						DirectoryGuid: "",
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
-						SubaccountGuid:    internal.Ptr("123"),
+						SubaccountGuid:    internal.Ptr(SAMPLE_GUID),
 						GlobalAccountGUID: internal.Ptr("global-123"),
 						ParentGuid:        internal.Ptr("dir-123"),
 					})),
@@ -1870,7 +1872,7 @@ func TestUpdate(t *testing.T) {
 					WithStatus(v1alpha1.SubaccountObservation{
 						Labels: &map[string][]string{"somekey": {"somevalue"}},
 					}),
-					WithExternalName("123"),
+					WithExternalName(SAMPLE_GUID),
 				),
 				mockClient:   &MockSubaccountClient{returnSubaccount: &accountclient.SubaccountResponseObject{}},
 				mockAccessor: &MockAccountsApiAccessor{},
@@ -1883,7 +1885,7 @@ func TestUpdate(t *testing.T) {
 					WithStatus(v1alpha1.SubaccountObservation{
 						Labels: &map[string][]string{"somekey": {"somevalue"}},
 					}),
-					WithExternalName("123")),
+					WithExternalName(SAMPLE_GUID)),
 				o: managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{}},
 			},
 		},
