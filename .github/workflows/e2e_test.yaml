@@ -167,3 +167,23 @@ jobs:
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
           GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
+
+  # required for test matrix status reporting. Ignores cleanup-e2e job failure/success.
+  e2e-test-success:
+    runs-on: ubuntu-latest
+    needs: 
+      - prepare-matrix
+      - e2e-test
+    timeout-minutes: 1
+    if: always()
+    steps:
+      - name: Fail for failed prepare-matrix job
+        if: |
+          needs.prepare-matrix.result == 'failure' || 
+          needs.prepare-matrix.result == 'cancelled'
+        run: exit 1
+      - name: Fail for failed matrix jobs
+        if: |
+          needs.e2e-test.result == 'failure' || 
+          needs.e2e-test.result == 'cancelled'
+        run: exit 1
