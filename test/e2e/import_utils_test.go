@@ -27,6 +27,10 @@ var importManagementPolicies = []xpv1.ManagementAction{
 	xpv1.ManagementActionLateInitialize,
 }
 
+const (
+	importFeatureContextKey = "importExternalName"
+)
+
 // ImportTester helps to build e2e test feature for import flow of a managed resource.
 // T is the type of the managed resource to be imported.
 // Use NewImportTester to create an instance, then use BuildTestFeature to build the test feature.
@@ -36,8 +40,7 @@ type ImportTester[T resource.Managed] struct {
 	BaseResource T
 
 	// will be prefixed with BUILD_ID to ensure uniqueness
-	BaseName     string
-	prefixedName string
+	BaseName string
 
 	// the timeout for waiting till resource get healthy after creating (in setup and assess)
 	WaitCreateTimeout wait.Option
@@ -45,10 +48,6 @@ type ImportTester[T resource.Managed] struct {
 	// the timeout for waiting till resource get deleted (in setup and teardown)
 	WaitDeletionTimeout wait.Option
 }
-
-const (
-	importFeatureContextKey = "importExternalName"
-)
 
 type ImportTesterOption[T resource.Managed] func(*ImportTester[T])
 
@@ -74,14 +73,17 @@ func NewImportTester[T resource.Managed](baseResource T, baseName string, o ...I
 		WaitCreateTimeout:   wait.WithInterval(3 * time.Minute),
 		WaitDeletionTimeout: wait.WithInterval(3 * time.Minute),
 	}
-	it.prefixedName = NewID(it.BaseName, envvar.Get(UUT_BUILD_ID_KEY))
-	it.BaseResource.SetName(it.prefixedName)
+	it.BaseResource.SetName(it.GetPrefixedName())
 
 	for _, opt := range o {
 		opt(it)
 	}
 
 	return it
+}
+
+func (it *ImportTester[T]) GetPrefixedName() string {
+	return NewID(it.BaseName, envvar.GetOrDefault(UUT_BUILD_ID_KEY, "0000"))
 }
 
 func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilder {
@@ -95,23 +97,24 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 				createResource := it.BaseResource.DeepCopyObject().(T)
 				createResource.SetManagementPolicies(importManagementPolicies)
 
-				if err := cfg.Client().Resources().Create(ctx, createResource); err != nil {
-					t.Fatalf("Failed to create Subaccount for import test: %v", err)
-				}
+				log("Creating resource on external system to be imported later", func() {
+					if err := cfg.Client().Resources().Create(ctx, createResource); err != nil {
+						t.Fatalf("Failed to create Subaccount for import test: %v", err)
+					}
+					waitForResource(createResource, cfg, t, it.WaitCreateTimeout)
+				}, "name", createResource.GetName())
 
-				waitForResource(createResource, cfg, t, it.WaitCreateTimeout)
-
-				// load resource to get the external name
 				createdResource := it.BaseResource.DeepCopyObject().(T)
-				MustGetResource(t, cfg, it.prefixedName, nil, createdResource)
-				externalName := xpmeta.GetExternalName(createdResource)
-
-				klog.InfoS("Resource created on external system to be imported later", "type", createdResource.GetObjectKind().GroupVersionKind().String(), "externalName", externalName)
-				ctx = context.WithValue(ctx, importFeatureContextKey, externalName)
+				log("Getting created resource to obtain external name", func() {
+					MustGetResource(t, cfg, it.GetPrefixedName(), nil, createdResource)
+					externalName := xpmeta.GetExternalName(createdResource)
+					ctx = context.WithValue(ctx, importFeatureContextKey, externalName)
+				}, "name", createResource.GetName(), "externalName", xpmeta.GetExternalName(createResource))
 
 				// delete the created resource to prepare for import. With managment policies missing Delete, it will not be deleted in the external system
-				klog.InfoS("Deleting managed resource without deleting the resource on external system ", "type", createdResource.GetObjectKind().GroupVersionKind().String(), "externalName", externalName)
-				AwaitResourceDeletionOrFail(ctx, t, cfg, createdResource, it.WaitDeletionTimeout)
+				log("Deleting resource", func() {
+					AwaitResourceDeletionOrFail(ctx, t, cfg, createdResource, it.WaitDeletionTimeout)
+				}, "name", createdResource.GetName(), xpmeta.GetExternalName(createResource))
 
 				return ctx
 			},
@@ -125,24 +128,32 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 			resource.SetManagementPolicies(xpv1.ManagementPolicies{xpv1.ManagementActionAll})
 
 			//create the resource again for importing, should match the external resource
-			if err := cfg.Client().Resources().Create(ctx, resource); err != nil {
-				t.Fatalf("Failed to create Subaccount for import test: %v", err)
-			}
-			klog.InfoS("Waiting for imported resource to become healthy", "type", resource.GetObjectKind().GroupVersionKind().String(), "externalName", externalName)
+			log("Create MR for importing", func() {
+				if err := cfg.Client().Resources().Create(ctx, resource); err != nil {
+					t.Fatalf("Failed to create cr when importing: %v", err)
+				}
+			}, "name", resource.GetName(), "externalName", externalName)
 
-			waitForResource(resource, cfg, t, it.WaitCreateTimeout)
-
+			log("Waiting for imported resource to become healthy", func() {
+				waitForResource(resource, cfg, t, it.WaitCreateTimeout)
+			}, "name", resource.GetName(), "externalName", externalName)
 			return ctx
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			resource := it.BaseResource.DeepCopyObject().(T)
-			MustGetResource(t, cfg, it.prefixedName, nil, resource)
+			MustGetResource(t, cfg, it.GetPrefixedName(), nil, resource)
 
-			AwaitResourceDeletionOrFail(ctx, t, cfg, resource, it.WaitDeletionTimeout)
-			klog.InfoS("Managed resource deleted (also on external system)", "type", resource.GetObjectKind().GroupVersionKind().String(), "externalName", xpmeta.GetExternalName(resource))
-
+			log("Deleting imported resource", func() {
+				AwaitResourceDeletionOrFail(ctx, t, cfg, resource, it.WaitDeletionTimeout)
+			}, "name", resource.GetName(), "externalName", xpmeta.GetExternalName(resource))
 			return ctx
 		},
 	)
+}
+
+func log(msg string, f func(), keysAndValues ...interface{}) {
+	klog.InfoS("STARTING: "+msg, keysAndValues...)
+	f()
+	klog.InfoS("DONE: "+msg, keysAndValues...)
 }
