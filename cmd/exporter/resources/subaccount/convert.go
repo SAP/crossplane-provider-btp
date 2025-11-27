@@ -23,6 +23,7 @@ func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObje
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
+			// TODO: switch to `exporttool/parsan` for name sanitization, once it supports RFC 1123.
 			Name: sanitizeK8sResourceName(subaccount.DisplayName, subaccount.Guid),
 			Annotations: map[string]string{
 				"crossplane.io/external-name": subaccount.Guid,

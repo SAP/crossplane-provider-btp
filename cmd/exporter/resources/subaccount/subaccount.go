@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
-	"github.com/sap/crossplane-provider-btp/internal/exporttool/cli/configparam"
-	"github.com/sap/crossplane-provider-btp/internal/exporttool/cli/export"
-	"github.com/sap/crossplane-provider-btp/internal/exporttool/erratt"
 )
 
 var (

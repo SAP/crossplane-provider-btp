@@ -9,12 +9,12 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 
-	// go get github.com/SAP/crossplane-provider-cloudfoundry@5aaac3d6e693b6250e9d492bd0cdd8217cb2ef45
-	"github.com/sap/crossplane-provider-btp/internal/exporttool/cli"
-	"github.com/sap/crossplane-provider-btp/internal/exporttool/cli/configparam"
-	"github.com/sap/crossplane-provider-btp/internal/exporttool/cli/export"
-	_ "github.com/sap/crossplane-provider-btp/internal/exporttool/cli/export"
-	"github.com/sap/crossplane-provider-btp/internal/exporttool/erratt"
+	// go get github.com/SAP/crossplane-provider-cloudfoundry@37645f0d9e41cf991591b9a3735b13ccce13d5de
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
+	_ "github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
 )
 
 const (
