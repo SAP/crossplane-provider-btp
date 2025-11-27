@@ -68,7 +68,7 @@ func (c *KymaModuleClient) ObserveModule(ctx context.Context, moduleCr *v1alpha1
 	// Reason: we use one managed resource per module while kyma bundles it all in one cr.
 	// To resolve this many to one mapping, for every one of our module managed resource, we query the same kyma cr and find the correct name in it.
 	for _, module := range kyma.Status.Modules {
-		if module.Name == moduleCr.ObjectMeta.Annotations.externalName {
+		if module.Name == moduleCr.Spec.ForProvider.Name {
 			moduleCr.Status.AtProvider = module
 			return &module, nil
 		}
