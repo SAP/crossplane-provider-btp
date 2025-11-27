@@ -1,8 +1,4 @@
 # Release builds and publish a new release.
-
-# Secrets:
-# TEST_REGISTRY_USER: registry user for the container registry
-# TEST_REGISTRY_PASSWORD: password for container registry
 # Vars:
 # REGISTRY_URL: registry url for the container registry
 
@@ -15,24 +11,26 @@ on:
           description: 'specify the release version in the semver format v[major].[minor].[patch] e.g. v0.0.0'
           required: true
 
-# Releases need permissions to read and write the repository contents.
-# GitHub considers creating releases and uploading assets as writing contents.
-permissions:
-  contents: write
-  packages: write
-
 jobs:
     run-go-license-check:
       uses: ./.github/workflows/check-go-licenses.yaml
+      permissions:
+        contents: read
 
     run-reuse-license-check:
       uses: ./.github/workflows/reuse-scan.yaml
+      permissions:
+        contents: read
 
     run-unit-test:
       uses: ./.github/workflows/unit_test.yaml
+      permissions:
+        contents: read
 
     run-make-reviewable-and-check-diff:
       uses: ./.github/workflows/reviewable_check_diff.yaml
+      permissions:
+        contents: read
 
     run-e2e-test:
       uses: ./.github/workflows/e2e_test.yaml
@@ -51,6 +49,8 @@ jobs:
         CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
         BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
         TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
+      permissions:
+        contents: read
 
     release:
       runs-on: ubuntu-latest
@@ -59,6 +59,11 @@ jobs:
       - run-unit-test
       - run-make-reviewable-and-check-diff
       - run-e2e-test
+      # Releases need permissions to read and write the repository contents.
+      # GitHub considers creating releases and uploading assets as writing contents.
+      permissions:
+        contents: write
+        packages: write
 
       steps:
       - name: Print Version Number

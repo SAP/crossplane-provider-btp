@@ -6,10 +6,14 @@ spec:
   forProvider:
     name: destination-binding
     # parameters: ... same options for setting parameters via json, yaml or secrets as for instances
-    serviceInstanceRef: 
+    serviceInstanceRef:
       name: destination-instance
     subaccountRef:
       name: sa-serviceinstance
+  # Optional: Enable rotation
+  # rotation:
+  #   ttl: 1440h
+  #   frequency: 720h
   writeConnectionSecretToRef:
     name: destination-binding
     namespace: default

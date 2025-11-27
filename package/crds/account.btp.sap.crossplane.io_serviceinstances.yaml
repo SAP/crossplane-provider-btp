@@ -34,7 +34,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A ServiceInstance allows to manage a ServiceInstance in BTP
+        description: 'A ServiceInstance allows to manage a ServiceInstance in BTP
+          [Environment: ''Other'']'
         properties:
           apiVersion:
             description: |-

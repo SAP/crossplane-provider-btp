@@ -13,10 +13,12 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/di"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
@@ -30,6 +32,7 @@ const (
 	errUpdateInstance  = "cannot update serviceinstance"
 	errSaveData        = "cannot update cr data"
 	errGetInstance     = "cannot get serviceinstance"
+	errTrackRUsage     = "cannot track ResourceUsage"
 )
 
 // Dependency Injection
@@ -69,12 +72,16 @@ type connector struct {
 
 	clientConnector             tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance]
 	newServicePlanInitializerFn func() Initializer
+	resourcetracker             tracking.ReferenceResolverTracker
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 	_, ok := mg.(*v1alpha1.ServiceInstance)
 	if !ok {
 		return nil, errors.New(errNotServiceInstance)
+	}
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, errTrackRUsage)
 	}
 
 	// we need to resolve the plan ID here, since at crossplanes initialize stage the required references for the sm secret are not resolved yet
@@ -92,12 +99,13 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, err
 	}
 
-	return &external{tfClient: client, kube: c.kube}, nil
+	return &external{tfClient: client, kube: c.kube, tracker: c.resourcetracker}, nil
 }
 
 type external struct {
 	tfClient tfClient.TfProxyControllerI
 	kube     client.Client
+	tracker  tracking.ReferenceResolverTracker
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -115,16 +123,11 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
 	}
+
 	switch status {
 	case tfClient.NotExisting:
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	case tfClient.Drift:
-		// sync external name to establish resource tracking in cases of initial drift with tfplugin framework client
-		if externalName := e.tfClient.TfResourceExternalName(); externalName != "" {
-			if err := e.setExternalName(ctx, cr, e.tfClient.TfResourceExternalName()); err != nil {
-				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
-			}
-		}
 		return managed.ExternalObservation{
 			ResourceExists:    true,
 			ResourceUpToDate:  false,
@@ -186,6 +189,15 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotServiceInstance)
 	}
 	cr.SetConditions(xpv1.Deleting())
+
+	// Set resource usage conditions to check dependencies
+	c.tracker.SetConditions(ctx, cr)
+
+	// Block deletion if other resources are still using this ServiceInstance
+	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
+		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
+	}
+
 	if err := c.tfClient.Delete(ctx); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, "cannot delete serviceinstance")
 	}
@@ -202,13 +214,5 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 	}
 	// we rely on status being saved in crossplane reconciler here
 	cr.Status.AtProvider.ID = sid.ID
-	return nil
-}
-
-func (e *external) setExternalName(ctx context.Context, cr *v1alpha1.ServiceInstance, externalName string) error {
-	meta.SetExternalName(cr, externalName)
-	if err := e.kube.Update(ctx, cr); err != nil {
-		return err
-	}
 	return nil
 }
