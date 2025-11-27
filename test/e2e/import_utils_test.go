@@ -97,24 +97,24 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 				createResource := it.BaseResource.DeepCopyObject().(T)
 				createResource.SetManagementPolicies(importManagementPolicies)
 
-				log("Creating resource on external system to be imported later", func() {
+				log("Creating resource on external system to be imported later", createResource, func() {
 					if err := cfg.Client().Resources().Create(ctx, createResource); err != nil {
 						t.Fatalf("Failed to create Subaccount for import test: %v", err)
 					}
 					waitForResource(createResource, cfg, t, it.WaitCreateTimeout)
-				}, "name", createResource.GetName())
+				})
 
 				createdResource := it.BaseResource.DeepCopyObject().(T)
-				log("Getting created resource to obtain external name", func() {
+				log("Getting created resource to obtain external name", createResource, func() {
 					MustGetResource(t, cfg, it.GetPrefixedName(), nil, createdResource)
 					externalName := xpmeta.GetExternalName(createdResource)
 					ctx = context.WithValue(ctx, importFeatureContextKey, externalName)
-				}, "name", createResource.GetName(), "externalName", xpmeta.GetExternalName(createResource))
+				})
 
 				// delete the created resource to prepare for import. With managment policies missing Delete, it will not be deleted in the external system
-				log("Deleting resource", func() {
+				log("Deleting resource", createdResource, func() {
 					AwaitResourceDeletionOrFail(ctx, t, cfg, createdResource, it.WaitDeletionTimeout)
-				}, "name", createdResource.GetName(), xpmeta.GetExternalName(createResource))
+				})
 
 				return ctx
 			},
@@ -128,15 +128,15 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 			resource.SetManagementPolicies(xpv1.ManagementPolicies{xpv1.ManagementActionAll})
 
 			//create the resource again for importing, should match the external resource
-			log("Create MR for importing", func() {
+			log("Create MR for importing", resource, func() {
 				if err := cfg.Client().Resources().Create(ctx, resource); err != nil {
 					t.Fatalf("Failed to create cr when importing: %v", err)
 				}
-			}, "name", resource.GetName(), "externalName", externalName)
+			})
 
-			log("Waiting for imported resource to become healthy", func() {
+			log("Waiting for imported resource to become healthy", resource, func() {
 				waitForResource(resource, cfg, t, it.WaitCreateTimeout)
-			}, "name", resource.GetName(), "externalName", externalName)
+			})
 			return ctx
 		},
 	).Teardown(
@@ -144,16 +144,20 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 			resource := it.BaseResource.DeepCopyObject().(T)
 			MustGetResource(t, cfg, it.GetPrefixedName(), nil, resource)
 
-			log("Deleting imported resource", func() {
+			log("Deleting imported resource", resource, func() {
 				AwaitResourceDeletionOrFail(ctx, t, cfg, resource, it.WaitDeletionTimeout)
-			}, "name", resource.GetName(), "externalName", xpmeta.GetExternalName(resource))
+			})
 			return ctx
 		},
 	)
 }
 
-func log(msg string, f func(), keysAndValues ...interface{}) {
-	klog.InfoS("STARTING: "+msg, keysAndValues...)
+// log is a helper function to log the start and end of an operation on a managed resource with name and external name.
+func log(msg string, mr resource.Managed, f func(), keysAndValues ...any) {
+	kAndV := []interface{}{"name", mr.GetName(), "external-name", xpmeta.GetExternalName(mr)}
+	kAndV = append(kAndV, keysAndValues...)
+
+	klog.InfoS("STARTING: "+msg, kAndV...)
 	f()
-	klog.InfoS("DONE: "+msg, keysAndValues...)
+	klog.InfoS("DONE: "+msg, kAndV...)
 }
