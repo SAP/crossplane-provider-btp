@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/sap/crossplane-provider-btp/btp"
-	"github.com/sap/crossplane-provider-btp/internal/exporttool/cli/configparam"
-	"github.com/sap/crossplane-provider-btp/internal/exporttool/cli/export"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
 )
 
 // Kind interface must be implemented by each BTP provider custom resource kind.
