@@ -43,6 +43,9 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if !ok {
 		return nil, errors.New(errNotServiceManager)
 	}
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
+		return nil, errors.Wrap(err, "cannot track resource usage")
+	}
 
 	err := c.InitializeServicePlanId(ctx, cr)
 	if err != nil {
