@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
+	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -42,6 +43,9 @@ type ImportTester[T resource.Managed] struct {
 	// will be prefixed with BUILD_ID to ensure uniqueness
 	BaseName string
 
+	// the path to the dependent resource yaml files, if any
+	DependentResourceDirectory string
+
 	// the timeout for waiting till resource get healthy after creating (in setup and assess)
 	WaitCreateTimeout wait.Option
 
@@ -60,6 +64,12 @@ func WithWaitCreateTimeout[T resource.Managed](timeout wait.Option) ImportTester
 func WithWaitDeletionTimeout[T resource.Managed](timeout wait.Option) ImportTesterOption[T] {
 	return func(it *ImportTester[T]) {
 		it.WaitDeletionTimeout = timeout
+	}
+}
+
+func WithDependentResourceDirectory[T resource.Managed](path string) ImportTesterOption[T] {
+	return func(it *ImportTester[T]) {
+		it.DependentResourceDirectory = path
 	}
 }
 
@@ -92,6 +102,17 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = meta.AddToScheme(r.GetScheme())
+
+				if it.DependentResourceDirectory != "" {
+					log("Applying dependent resources from "+it.DependentResourceDirectory, it.BaseResource, func() {
+						resources.ImportResources(ctx, t, cfg, it.DependentResourceDirectory)
+
+						if err := resources.WaitForResourcesToBeSynced(ctx, cfg, it.DependentResourceDirectory, nil, wait.WithTimeout(time.Minute*5)); err != nil {
+							resources.DumpManagedResources(ctx, t, cfg)
+							t.Fatal(err)
+						}
+					})
+				}
 
 				//prepare the resource for creation
 				createResource := it.BaseResource.DeepCopyObject().(T)
@@ -146,6 +167,12 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 
 			log("Deleting imported resource", resource, func() {
 				AwaitResourceDeletionOrFail(ctx, t, cfg, resource, it.WaitDeletionTimeout)
+			})
+
+			log("Deleting dependent resources", resource, func() {
+				if it.DependentResourceDirectory != "" {
+					DeleteResourcesIgnoreMissing(ctx, t, cfg, it.DependentResourceDirectory, it.WaitDeletionTimeout)
+				}
 			})
 			return ctx
 		},
