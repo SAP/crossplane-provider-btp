@@ -180,15 +180,23 @@ func (cLogin *CertLogin) callAuthorizeEndpoint(cert tls.Certificate, authorizeUr
 
 func parseCert(data []byte, password string) (tls.Certificate, error) {
 
-	privKey, pubKey, _, err := pkcs12.DecodeChain(data, password)
+	privKey, leafCert, caCerts, err := pkcs12.DecodeChain(data, password)
 	if err != nil {
 		return tls.Certificate{}, err
 	}
 
 	// Seems to be an IAS created p12, this probably requires improvement to make it robust
 
+	// Start with leaf
+	certChain := [][]byte{leafCert.Raw}
+
+	// Append intermediates (if any)
+	for _, ca := range caCerts {
+		certChain = append(certChain, ca.Raw)
+	}
+
 	pair := tls.Certificate{
-		Certificate: [][]byte{pubKey.Raw},
+		Certificate: certChain,
 		PrivateKey:  privKey,
 	}
 	return pair, nil
