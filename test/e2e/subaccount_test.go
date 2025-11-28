@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -28,10 +29,34 @@ import (
 
 var (
 	saK8sResName               = "e2e-test-sa"
+	subaccountImportK8sResName = "e2e-test-subaccount-import"
 	dirk8sResName              = "e2e-test-directory-sa"
 	subaccountNameE2e          string
 	subaccountDirectoryNameE2e string
 )
+
+func TestSubaccountImportFlow(t *testing.T) {
+	importTester := NewImportTester(
+		&v1alpha1.Subaccount{
+			Spec: v1alpha1.SubaccountSpec{
+				ForProvider: v1alpha1.SubaccountParameters{
+					DisplayName:      subaccountImportK8sResName,
+					Subdomain:        subaccountImportK8sResName,
+					Region:           "eu10",
+					SubaccountAdmins: []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
+				},
+			},
+		},
+		subaccountImportK8sResName,
+		WithWaitCreateTimeout[*v1alpha1.Subaccount](wait.WithTimeout(5*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.Subaccount](wait.WithTimeout(5*time.Minute)),
+	)
+
+	importFeature := importTester.BuildTestFeature("BTP Subaccount Import Flow").Feature()
+
+	testenv.Test(t, importFeature)
+
+}
 
 func TestAccount(t *testing.T) {
 	subaccountNameE2e = NewID(saK8sResName, BUILD_ID)
