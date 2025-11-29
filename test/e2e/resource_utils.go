@@ -6,18 +6,16 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/sap/crossplane-provider-btp/test"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/e2e-framework/klient/decoder"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	wairres "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
@@ -84,7 +82,7 @@ func GetResource[T k8s.Object](cfg *envconf.Config, name string, ns *string, ct 
 func DeleteResourcesIgnoreMissing(ctx context.Context, t *testing.T, cfg *envconf.Config, manifestDir string, timeout wait.Option) context.Context {
 	klog.V(4).Info("Attempt to delete previously imported resources")
 	r, _ := GetResourcesWithRESTConfig(cfg)
-	objects, err := getObjectsToImport(ctx, cfg, manifestDir)
+	objects, err := test.GetObjectsToImport(ctx, cfg, []string{manifestDir})
 	if err != nil {
 		t.Fatal(objects)
 	}
@@ -127,27 +125,6 @@ func AwaitResourceDeletionOrFail(ctx context.Context, t *testing.T, cfg *envconf
 func GetResourcesWithRESTConfig(cfg *envconf.Config) (*wairres.Resources, error) {
 	r, err := wairres.New(cfg.Client().RESTConfig())
 	return r, err
-}
-
-func getObjectsToImport(ctx context.Context, cfg *envconf.Config, dir string) ([]k8s.Object, error) {
-	r := resClient(cfg)
-
-	r.WithNamespace(cfg.Namespace())
-
-	objects := make([]k8s.Object, 0)
-	err := decoder.DecodeEachFile(
-		ctx, os.DirFS(filepath.Join("./testdata/crs", dir)), "*",
-		func(ctx context.Context, obj k8s.Object) error {
-			objects = append(objects, obj)
-			return nil
-		},
-	)
-	return objects, err
-}
-
-func resClient(cfg *envconf.Config) *wairres.Resources {
-	r, _ := GetResourcesWithRESTConfig(cfg)
-	return r
 }
 
 // Identifier returns k8s object name
