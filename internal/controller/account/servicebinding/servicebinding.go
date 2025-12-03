@@ -231,15 +231,17 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	// Clean up expired keys if there are any retired keys
-	newRetiredKeys, err := e.keyRotator.DeleteExpiredKeys(ctx, cr)
-	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteExpiredKeys)
-	}
+	newRetiredKeys, deleteErr := e.keyRotator.DeleteExpiredKeys(ctx, cr)
 
 	cr.Status.RetiredKeys = newRetiredKeys
 
+	// store the result in the status even if errors are returned,
+	// to remove keys for those where deletion was successfull
 	if err := e.kube.Status().Update(ctx, cr); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
+	}
+	if deleteErr != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(deleteErr, errDeleteExpiredKeys)
 	}
 
 	return managed.ExternalUpdate{}, nil
