@@ -586,11 +586,11 @@ func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 	}
 
 	//labels are in the new format
-	if _, exists := labels["Org Id"]; exists {
+	if _, exists := labels["Org ID"]; exists {
 		if _, exists := labels["Org Name"]; exists {
 			if _, exists := labels["API Endpoint"]; exists {
 				return &CloudFoundryOrg{
-					Id:          labels["Org Id"],
+					Id:          labels["Org ID"],
 					Name:        labels["Org Name"],
 					ApiEndpoint: labels["API Endpoint"],
 				}, nil
@@ -600,7 +600,7 @@ func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 
 	//map the old format
 	return &CloudFoundryOrg{
-		Id:          labels["Org Id:"],
+		Id:          labels["Org ID:"],
 		Name:        labels["Org Name:"],
 		ApiEndpoint: labels["API Endpoint:"],
 	}, nil

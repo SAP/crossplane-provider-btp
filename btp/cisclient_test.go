@@ -221,7 +221,7 @@ func TestCloudFoundryOrgByLabel(t *testing.T) {
 		{
 			name: "Happy Path",
 			args: args{
-				labels: `{"Org Id":"id", "Org Name":"test-name", "API Endpoint":"api-endpoint"}`,
+				labels: `{"Org ID":"id", "Org Name":"test-name", "API Endpoint":"api-endpoint"}`,
 			},
 			want: &CloudFoundryOrg{
 				Id:          "id",
@@ -233,7 +233,7 @@ func TestCloudFoundryOrgByLabel(t *testing.T) {
 		{
 			name: "Old Format",
 			args: args{
-				labels: `{"Org Id:":"id", "Org Name:":"test-name", "API Endpoint:":"api-endpoint"}`,
+				labels: `{"Org ID:":"id", "Org Name:":"test-name", "API Endpoint:":"api-endpoint"}`,
 			},
 			want: &CloudFoundryOrg{
 				Id:          "id",
@@ -245,7 +245,7 @@ func TestCloudFoundryOrgByLabel(t *testing.T) {
 		{
 			name: "Invalid JSON",
 			args: args{
-				labels: `{"Org Id":"id", "Org Name":"test-name", "API Endpoint":}`,
+				labels: `{"Org ID":"id", "Org Name":"test-name", "API Endpoint":}`,
 			},
 			want:    nil,
 			wantErr: true,
