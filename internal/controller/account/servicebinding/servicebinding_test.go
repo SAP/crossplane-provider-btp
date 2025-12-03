@@ -1158,47 +1158,11 @@ func TestUpdate(t *testing.T) {
 				err: errors.New(errNotServiceBinding),
 			},
 		},
-		"ClientUpdateError": {
-			reason: "should return error when client update fails",
-			fields: fields{
-				clientFactory: &MockServiceBindingClientFactory{
-					Client: &MockServiceBindingClient{
-						updateErr: errors.New("client update error"),
-					},
-				},
-				keyRotator: &MockKeyRotator{},
-				kube:       &test.MockClient{},
-			},
-			args: args{
-				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
-					func(cr *v1alpha1.ServiceBinding) {
-						cr.Status.AtProvider.Name = "test-binding"
-					},
-				),
-			},
-			want: want{
-				err: errors.New("client update error"),
-				u:   managed.ExternalUpdate{}, // Empty update result on error
-				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
-					func(cr *v1alpha1.ServiceBinding) {
-						cr.Status.AtProvider.Name = "test-binding"
-					},
-				),
-			},
-		},
 		"DeleteExpiredKeysError": {
 			reason: "should return error when deleting expired keys fails",
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
-					Client: &MockServiceBindingClient{
-						update: managed.ExternalUpdate{
-							ConnectionDetails: managed.ConnectionDetails{
-								"test-key": []byte("test-value"),
-							},
-						},
-					},
+					Client: &MockServiceBindingClient{},
 				},
 				keyRotator: &MockKeyRotator{
 					deleteExpiredKeysErr: errors.New("delete expired keys error"),
@@ -1215,7 +1179,7 @@ func TestUpdate(t *testing.T) {
 			},
 			want: want{
 				err: errors.New("delete expired keys error"),
-				u:   managed.ExternalUpdate{}, // Empty update result on error
+				u:   managed.ExternalUpdate{},
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					func(cr *v1alpha1.ServiceBinding) {
@@ -1224,21 +1188,14 @@ func TestUpdate(t *testing.T) {
 				),
 			},
 		},
-		"SuccessWithCurrentBindingRetired": {
-			reason: "should skip update when current binding is retired",
+		"SuccessWithEmptyRetiredKeys": {
+			reason: "should update successfully with no retired keys",
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
-					Client: &MockServiceBindingClient{
-						update: managed.ExternalUpdate{
-							ConnectionDetails: managed.ConnectionDetails{
-								"test-key": []byte("test-value"),
-							},
-						},
-					},
+					Client: &MockServiceBindingClient{},
 				},
 				keyRotator: &MockKeyRotator{
-					isCurrentBindingRetiredResult: true,
-					deleteExpiredKeysResult:       []*v1alpha1.RetiredSBResource{},
+					deleteExpiredKeysResult: []*v1alpha1.RetiredSBResource{},
 				},
 				kube: &test.MockClient{
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
@@ -1253,9 +1210,7 @@ func TestUpdate(t *testing.T) {
 				),
 			},
 			want: want{
-				u: managed.ExternalUpdate{
-					ConnectionDetails: managed.ConnectionDetails{}, // Empty map when update is skipped
-				},
+				u: managed.ExternalUpdate{},
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					func(cr *v1alpha1.ServiceBinding) {
@@ -1265,20 +1220,13 @@ func TestUpdate(t *testing.T) {
 				),
 			},
 		},
-		"SuccessWithUpdate": {
-			reason: "should update successfully when binding is not retired",
+		"SuccessWithRetiredKeys": {
+			reason: "should update successfully with retired keys",
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
-					Client: &MockServiceBindingClient{
-						update: managed.ExternalUpdate{
-							ConnectionDetails: managed.ConnectionDetails{
-								"updated-key": []byte("updated-value"),
-							},
-						},
-					},
+					Client: &MockServiceBindingClient{},
 				},
 				keyRotator: &MockKeyRotator{
-					isCurrentBindingRetiredResult: false,
 					deleteExpiredKeysResult: []*v1alpha1.RetiredSBResource{
 						{
 							ID:   "retired-id-1",
@@ -1299,11 +1247,7 @@ func TestUpdate(t *testing.T) {
 				),
 			},
 			want: want{
-				u: managed.ExternalUpdate{
-					ConnectionDetails: managed.ConnectionDetails{
-						"updated-key": []byte("updated-value"),
-					},
-				},
+				u: managed.ExternalUpdate{},
 				cr: expectedServiceBinding(
 					withMetadata("test-external-name", nil),
 					func(cr *v1alpha1.ServiceBinding) {

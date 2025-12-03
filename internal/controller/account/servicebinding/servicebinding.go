@@ -220,20 +220,14 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	return creation, nil
 }
 
+// Update() does not make a real update of the service binding, because service
+// bindings are immutable anyway. This behaviour is also disabled in the
+// underlying terraform provider.
+// Instead, Update() is only used to delete expired keys.
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotServiceBinding)
-	}
-
-	// Only update if the current binding is not retired
-	updateResult := managed.ExternalUpdate{}
-	if !e.keyRotator.IsCurrentBindingRetired(cr) {
-		update, err := e.client.Update(ctx)
-		if err != nil {
-			return managed.ExternalUpdate{}, err
-		}
-		updateResult = update
 	}
 
 	// Clean up expired keys if there are any retired keys
@@ -248,12 +242,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
 	}
 
-	updateResult.ConnectionDetails, err = flattenSecretData(updateResult.ConnectionDetails)
-	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errFlattenSecret)
-	}
-
-	return updateResult, nil
+	return managed.ExternalUpdate{}, nil
 }
 
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
