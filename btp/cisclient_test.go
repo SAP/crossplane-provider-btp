@@ -207,3 +207,78 @@ func Test_authenticationParams(t *testing.T) {
 		)
 	}
 }
+
+func TestCloudFoundryOrgByLabel(t *testing.T) {
+	type args struct {
+		labels string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *CloudFoundryOrg
+		wantErr bool
+	}{
+		{
+			name: "Happy Path",
+			args: args{
+				labels: `{"Org Id":"id", "Org Name":"test-name", "API Endpoint":"api-endpoint"}`,
+			},
+			want: &CloudFoundryOrg{
+				Id:          "id",
+				Name:        "test-name",
+				ApiEndpoint: "api-endpoint",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Old Format",
+			args: args{
+				labels: `{"Org Id:":"id", "Org Name:":"test-name", "API Endpoint:":"api-endpoint"}`,
+			},
+			want: &CloudFoundryOrg{
+				Id:          "id",
+				Name:        "test-name",
+				ApiEndpoint: "api-endpoint",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid JSON",
+			args: args{
+				labels: `{"Org Id":"id", "Org Name":"test-name", "API Endpoint":}`,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Empty labels",
+			args: args{
+				labels: ``,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Empty json",
+			args: args{
+				labels: `{}`,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				got, err := NewCloudFoundryOrgByLabel(tt.args.labels)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("NewCloudFoundryOrgByLabel() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("NewCloudFoundryOrgByLabel() = %+v, want %+v", got, tt.want)
+				}
+			},
+		)
+	}
+}
