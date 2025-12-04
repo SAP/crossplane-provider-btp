@@ -44,8 +44,8 @@ github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
-github.com/SAP/crossplane-provider-cloudfoundry v0.3.4-0.20251202165155-c13053bac6bc h1:7zDDMH1fPqQQ7g1QDgSiE54neyTEU36qIVALTRfuh8M=
-github.com/SAP/crossplane-provider-cloudfoundry v0.3.4-0.20251202165155-c13053bac6bc/go.mod h1:VT2uC/6kx2vgj6xP05s9LsPHJTlEixlMjLXP2BBYgII=
+github.com/SAP/crossplane-provider-cloudfoundry v0.3.4-0.20251204090126-9962d2900363 h1:c0vTAr/GiVUTqc0wEDzuECVySsG53dCIb1rtncWSuts=
+github.com/SAP/crossplane-provider-cloudfoundry v0.3.4-0.20251204090126-9962d2900363/go.mod h1:VT2uC/6kx2vgj6xP05s9LsPHJTlEixlMjLXP2BBYgII=
 github.com/agext/levenshtein v1.2.1/go.mod h1:JEDfjyjHDjOF/1e4FlBE/PkbqA9OfWu2ki2W0IB5558=
 github.com/agext/levenshtein v1.2.3 h1:YB2fHEn0UJagG8T1rrWknE3ZQzWM06O8AMAatNn7lmo=
 github.com/agext/levenshtein v1.2.3/go.mod h1:JEDfjyjHDjOF/1e4FlBE/PkbqA9OfWu2ki2W0IB5558=
