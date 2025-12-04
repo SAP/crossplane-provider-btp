@@ -6,7 +6,7 @@ toolchain go1.24.5
 
 require (
 	dario.cat/mergo v1.0.2
-	github.com/SAP/crossplane-provider-cloudfoundry v0.3.4-0.20251202165155-c13053bac6bc
+	github.com/SAP/crossplane-provider-cloudfoundry v0.3.4-0.20251204090126-9962d2900363
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.12
 	github.com/crossplane-contrib/xp-testing v1.6.0
