@@ -569,7 +569,7 @@ func (c *Client) ExtractOrg(cfEnvironment *provisioningclient.BusinessEnvironmen
 }
 
 // NewCloudFoundryOrgByLabel creates a CloudFoundryOrg from a JSON-formatted labels string.
-// In a legavy format, the keys have a trailing colon (:), while in the new format they do not.
+// In legacy format, the keys have a trailing colon (:), while in the new format they do not.
 // The function handles both formats.
 func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 	if rawLabels == "" {
@@ -585,24 +585,24 @@ func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 		return nil, errors.New("no labels found in the provided string")
 	}
 
-	//labels are in the new format
-	if _, exists := labels["Org ID"]; exists {
-		if _, exists := labels["Org Name"]; exists {
-			if _, exists := labels["API Endpoint"]; exists {
-				return &CloudFoundryOrg{
-					Id:          labels["Org ID"],
-					Name:        labels["Org Name"],
-					ApiEndpoint: labels["API Endpoint"],
-				}, nil
-			}
-		}
+	oldOrgId, oldOrgIdExists := labels["Org ID:"]
+	oldOrgName, oldOrgNameExist := labels["Org Name:"]
+	oldApiEndpoint, oldApiEndpointExist := labels["API Endpoint:"]
+
+	if oldOrgIdExists || oldOrgNameExist || oldApiEndpointExist {
+		//labels are in the old format
+		return &CloudFoundryOrg{
+			Id:          oldOrgId,
+			Name:        oldOrgName,
+			ApiEndpoint: oldApiEndpoint,
+		}, nil
 	}
 
-	//map the old format
+	//use the new format, having empty values will be handled by the caller
 	return &CloudFoundryOrg{
-		Id:          labels["Org ID:"],
-		Name:        labels["Org Name:"],
-		ApiEndpoint: labels["API Endpoint:"],
+		Id:          labels["Org ID"],
+		Name:        labels["Org Name"],
+		ApiEndpoint: labels["API Endpoint"],
 	}, nil
 }
 
