@@ -565,13 +565,44 @@ func (c *Client) ExtractOrg(cfEnvironment *provisioningclient.BusinessEnvironmen
 		label = *cfEnvironment.Labels
 	}
 
-	return c.NewCloudFoundryOrgByLabel(label)
+	return NewCloudFoundryOrgByLabel(label)
 }
 
-func (c *Client) NewCloudFoundryOrgByLabel(label string) (*CloudFoundryOrg, error) {
-	var cloudFoundryOrg *CloudFoundryOrg
-	err := json.Unmarshal([]byte(label), &cloudFoundryOrg)
-	return cloudFoundryOrg, err
+// NewCloudFoundryOrgByLabel creates a CloudFoundryOrg from a JSON-formatted labels string.
+// In legacy format, the keys have a trailing colon (:), while in the new format they do not.
+// The function handles both formats.
+func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
+	if rawLabels == "" {
+		return nil, errors.New("labels string is empty")
+	}
+	labels := make(map[string]string)
+	err := json.Unmarshal([]byte(rawLabels), &labels)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed unmarshaling labels format")
+	}
+
+	if len(labels) == 0 {
+		return nil, errors.New("no labels found in the provided string")
+	}
+
+	oldOrgId, oldOrgIdExists := labels["Org ID:"]
+	oldApiEndpoint, oldApiEndpointExist := labels["API Endpoint:"]
+
+	if oldOrgIdExists || oldApiEndpointExist {
+		//labels are in the old format
+		return &CloudFoundryOrg{
+			Id:          oldOrgId,
+			Name:        labels["Org Name"],
+			ApiEndpoint: oldApiEndpoint,
+		}, nil
+	}
+
+	//use the new format, having empty values will be handled by the caller
+	return &CloudFoundryOrg{
+		Id:          labels["Org ID"],
+		Name:        labels["Org Name"],
+		ApiEndpoint: labels["API Endpoint"],
+	}, nil
 }
 
 func (c *Client) GetBTPSubaccount(
