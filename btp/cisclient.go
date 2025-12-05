@@ -586,14 +586,13 @@ func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 	}
 
 	oldOrgId, oldOrgIdExists := labels["Org ID:"]
-	oldOrgName, oldOrgNameExist := labels["Org Name:"]
 	oldApiEndpoint, oldApiEndpointExist := labels["API Endpoint:"]
 
-	if oldOrgIdExists || oldOrgNameExist || oldApiEndpointExist {
+	if oldOrgIdExists || oldApiEndpointExist {
 		//labels are in the old format
 		return &CloudFoundryOrg{
 			Id:          oldOrgId,
-			Name:        oldOrgName,
+			Name:        labels["Org Name"],
 			ApiEndpoint: oldApiEndpoint,
 		}, nil
 	}

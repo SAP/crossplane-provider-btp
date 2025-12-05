@@ -233,7 +233,7 @@ func TestCloudFoundryOrgByLabel(t *testing.T) {
 		{
 			name: "Old Format",
 			args: args{
-				labels: `{"Org ID:":"id", "Org Name:":"test-name", "API Endpoint:":"api-endpoint"}`,
+				labels: `{"Org ID:":"id", "Org Name":"test-name", "API Endpoint:":"api-endpoint"}`,
 			},
 			want: &CloudFoundryOrg{
 				Id:          "id",
