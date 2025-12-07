@@ -13,6 +13,14 @@ import (
 	openapiaccount "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 )
 
+const (
+	warnMissingDisplayName = "WARNING: 'displayName' field is missing in the source, cannot set 'DisplayName'"
+	warnMissingGuid        = "WARNING: 'guid' field is missing in the source, cannot set 'external-name'"
+	warnMissingRegion      = "WARNING: 'region' field is missing in the source, cannot set 'Region'"
+	warnMissingSubdomain   = "WARNING: 'subdomain' field is missing in the source, cannot set 'Subdomain'"
+	warnMissingCreatedBy   = "WARNING: 'createdBy' field is missing in the source, cannot set 'SubaccountAdmins'"
+)
+
 // convertSubaccountResource converts the given OpenAPI subaccount response object to a Subaccount custom resource,
 // defined by the BTP Crossplane provider.
 // - The function fills all mandatory fields
@@ -58,19 +66,19 @@ func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObje
 
 	// Comment the resource out, if any of the required fields is missing.
 	if !hasName {
-		saResource.AddComment("WARNING: 'displayName' field is missing in the source, cannot set 'DisplayName'")
+		saResource.AddComment(warnMissingDisplayName)
 	}
 	if !hasGuid {
-		saResource.AddComment("WARNING: 'guid' field is missing in the source, cannot set 'external-name'")
+		saResource.AddComment(warnMissingGuid)
 	}
 	if !hasRegion {
-		saResource.AddComment("WARNING: 'region' field is missing in the source, cannot set 'Region'")
+		saResource.AddComment(warnMissingRegion)
 	}
 	if !hasSubdomain {
-		saResource.AddComment("WARNING: 'subdomain' field is missing in the source, cannot set 'Subdomain'")
+		saResource.AddComment(warnMissingSubdomain)
 	}
 	if !hasCreatedBy {
-		saResource.AddComment("WARNING: 'createdBy' field is missing in the source, cannot set 'SubaccountAdmins'")
+		saResource.AddComment(warnMissingCreatedBy)
 	}
 
 	// Fill the optional fields that are relevant for the Update operation, to have it match status.atProvider
