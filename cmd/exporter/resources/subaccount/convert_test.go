@@ -3,9 +3,10 @@ package subaccount
 import (
 	"testing"
 
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/stretchr/testify/require"
-	"k8s.io/utils/ptr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	openapiaccount "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
@@ -14,216 +15,397 @@ import (
 func TestConvertSubaccountResource(t *testing.T) {
 	r := require.New(t)
 
+	displayName := "Test Subaccount"
+	saGuid := "12345678-1234-1234-1234-123456789abc"
+	region := "eu10"
+	subdomain := "test-subdomain"
+	createdBy := "admin@example.com"
+	gaGuid := "global-account-guid"
+	dirGuid := "directory-guid"
+	description := "Test description"
+	usedForProd := "USED_FOR_PRODUCTION"
+	betaEnabled := true
+	labels := map[string][]string{"env": {"dev"}, "team": {"platform"}}
+	displayNameSpecial := "Test_Subaccount With Spaces & Special!@#"
+	empty := ""
+	wantResourceName := "test-subaccount"
+
 	tests := []struct {
-		name                string
-		subaccount          *openapiaccount.SubaccountResponseObject
-		wantName            string
-		wantExternalName    string
-		wantDisplayName     string
-		wantRegion          string
-		wantSubdomain       string
-		wantAdmins          []string
-		wantGlobalAccount   string
-		wantDirectory       string
-		wantDescription     string
-		wantUsedForProd     string
-		wantBetaEnabled     bool
-		wantLabels          map[string][]string
-		wantCommented       bool
-		wantCommentContains []string
+		name       string
+		subaccount *openapiaccount.SubaccountResponseObject
+		want       *yaml.ResourceWithComment
 	}{
 		{
 			name: "all required fields present",
 			subaccount: &openapiaccount.SubaccountResponseObject{
-				DisplayName: "Test Subaccount",
-				Guid:        "12345678-1234-1234-1234-123456789abc",
-				Region:      "eu10",
-				Subdomain:   "test-subdomain",
-				CreatedBy:   ptr.To("test@example.com"),
+				DisplayName: displayName,
+				Guid:        saGuid,
+				Region:      region,
+				Subdomain:   subdomain,
+				CreatedBy:   &createdBy,
 			},
-			wantName:         "test-subaccount",
-			wantExternalName: "12345678-1234-1234-1234-123456789abc",
-			wantDisplayName:  "Test Subaccount",
-			wantRegion:       "eu10",
-			wantSubdomain:    "test-subdomain",
-			wantAdmins:       []string{"test@example.com"},
-			wantCommented:    false,
+			want: yaml.NewResourceWithComment(
+				&v1alpha1.Subaccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       v1alpha1.SubaccountKind,
+						APIVersion: v1alpha1.CRDGroupVersion.String(),
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: wantResourceName,
+						Annotations: map[string]string{
+							"crossplane.io/external-name": saGuid,
+						},
+					},
+					Spec: v1alpha1.SubaccountSpec{
+						ResourceSpec: v1.ResourceSpec{
+							ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+						},
+						ForProvider: v1alpha1.SubaccountParameters{
+							DisplayName:      displayName,
+							Region:           region,
+							Subdomain:        subdomain,
+							SubaccountAdmins: []string{createdBy},
+						},
+					},
+				}),
 		},
 		{
 			name: "all fields including optional",
 			subaccount: &openapiaccount.SubaccountResponseObject{
-				DisplayName:       "Full Subaccount",
-				Guid:              "87654321-4321-4321-4321-cba987654321",
-				Region:            "us10",
-				Subdomain:         "full-subdomain",
-				CreatedBy:         ptr.To("admin@example.com"),
-				GlobalAccountGUID: "global-account-guid",
-				ParentGUID:        "directory-guid",
-				Description:       "Test description",
-				UsedForProduction: "USED_FOR_PRODUCTION",
-				BetaEnabled:       true,
-				Labels:            &map[string][]string{"env": {"dev"}, "team": {"platform"}},
+				DisplayName:       displayName,
+				Guid:              saGuid,
+				Region:            region,
+				Subdomain:         subdomain,
+				CreatedBy:         &createdBy,
+				GlobalAccountGUID: gaGuid,
+				ParentGUID:        dirGuid,
+				Description:       description,
+				UsedForProduction: usedForProd,
+				BetaEnabled:       betaEnabled,
+				Labels:            &labels,
 			},
-			wantName:          "full-subaccount",
-			wantExternalName:  "87654321-4321-4321-4321-cba987654321",
-			wantDisplayName:   "Full Subaccount",
-			wantRegion:        "us10",
-			wantSubdomain:     "full-subdomain",
-			wantAdmins:        []string{"admin@example.com"},
-			wantGlobalAccount: "global-account-guid",
-			wantDirectory:     "directory-guid",
-			wantDescription:   "Test description",
-			wantUsedForProd:   "USED_FOR_PRODUCTION",
-			wantBetaEnabled:   true,
-			wantLabels:        map[string][]string{"env": {"dev"}, "team": {"platform"}},
-			wantCommented:     false,
+			want: yaml.NewResourceWithComment(
+				&v1alpha1.Subaccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       v1alpha1.SubaccountKind,
+						APIVersion: v1alpha1.CRDGroupVersion.String(),
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: wantResourceName,
+						Annotations: map[string]string{
+							"crossplane.io/external-name": saGuid,
+						},
+					},
+					Spec: v1alpha1.SubaccountSpec{
+						ResourceSpec: v1.ResourceSpec{
+							ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+						},
+						ForProvider: v1alpha1.SubaccountParameters{
+							DisplayName:       displayName,
+							Region:            region,
+							Subdomain:         subdomain,
+							SubaccountAdmins:  []string{createdBy},
+							GlobalAccountGuid: gaGuid,
+							DirectoryGuid:     dirGuid,
+							Description:       description,
+							UsedForProduction: usedForProd,
+							BetaEnabled:       true,
+							Labels:            map[string][]string{"env": {"dev"}, "team": {"platform"}},
+						},
+					},
+				}),
 		},
 		{
 			name: "missing displayName",
 			subaccount: &openapiaccount.SubaccountResponseObject{
-				Guid:      "12345678-1234-1234-1234-123456789abc",
-				Region:    "eu10",
-				Subdomain: "test-subdomain",
-				CreatedBy: ptr.To("test@example.com"),
+				Guid:      saGuid,
+				Region:    region,
+				Subdomain: subdomain,
+				CreatedBy: &createdBy,
 			},
-			wantName:            "12345678-1234-1234-1234-123456789abc",
-			wantExternalName:    "12345678-1234-1234-1234-123456789abc",
-			wantDisplayName:     "",
-			wantRegion:          "eu10",
-			wantSubdomain:       "test-subdomain",
-			wantAdmins:          []string{"test@example.com"},
-			wantCommented:       true,
-			wantCommentContains: []string{"WARNING: 'displayName' field is missing"},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.Subaccount{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.SubaccountKind,
+							APIVersion: v1alpha1.CRDGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: saGuid,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": saGuid,
+							},
+						},
+						Spec: v1alpha1.SubaccountSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+							},
+							ForProvider: v1alpha1.SubaccountParameters{
+								Region:           region,
+								Subdomain:        subdomain,
+								SubaccountAdmins: []string{createdBy},
+							},
+						},
+					})
+				rwc.AddComment(warnMissingDisplayName)
+				return rwc
+			}(),
 		},
 		{
 			name: "missing guid",
 			subaccount: &openapiaccount.SubaccountResponseObject{
-				DisplayName: "Test Subaccount",
-				Region:      "eu10",
-				Subdomain:   "test-subdomain",
-				CreatedBy:   ptr.To("test@example.com"),
+				DisplayName: displayName,
+				Region:      region,
+				Subdomain:   subdomain,
+				CreatedBy:   &createdBy,
 			},
-			wantName:            "test-subaccount",
-			wantExternalName:    "",
-			wantDisplayName:     "Test Subaccount",
-			wantRegion:          "eu10",
-			wantSubdomain:       "test-subdomain",
-			wantAdmins:          []string{"test@example.com"},
-			wantCommented:       true,
-			wantCommentContains: []string{"WARNING: 'guid' field is missing"},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.Subaccount{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.SubaccountKind,
+							APIVersion: v1alpha1.CRDGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: wantResourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": "",
+							},
+						},
+						Spec: v1alpha1.SubaccountSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+							},
+							ForProvider: v1alpha1.SubaccountParameters{
+								DisplayName:      displayName,
+								Region:           region,
+								Subdomain:        subdomain,
+								SubaccountAdmins: []string{createdBy},
+							},
+						},
+					})
+				rwc.AddComment(warnMissingGuid)
+				return rwc
+			}(),
 		},
 		{
 			name: "missing region",
 			subaccount: &openapiaccount.SubaccountResponseObject{
-				DisplayName: "Test Subaccount",
-				Guid:        "12345678-1234-1234-1234-123456789abc",
-				Subdomain:   "test-subdomain",
-				CreatedBy:   ptr.To("test@example.com"),
+				DisplayName: displayName,
+				Guid:        saGuid,
+				Subdomain:   subdomain,
+				CreatedBy:   &createdBy,
 			},
-			wantName:            "test-subaccount",
-			wantExternalName:    "12345678-1234-1234-1234-123456789abc",
-			wantDisplayName:     "Test Subaccount",
-			wantRegion:          "",
-			wantSubdomain:       "test-subdomain",
-			wantAdmins:          []string{"test@example.com"},
-			wantCommented:       true,
-			wantCommentContains: []string{"WARNING: 'region' field is missing"},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.Subaccount{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.SubaccountKind,
+							APIVersion: v1alpha1.CRDGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: wantResourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": saGuid,
+							},
+						},
+						Spec: v1alpha1.SubaccountSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+							},
+							ForProvider: v1alpha1.SubaccountParameters{
+								DisplayName:      displayName,
+								Subdomain:        subdomain,
+								SubaccountAdmins: []string{createdBy},
+							},
+						},
+					})
+				rwc.AddComment(warnMissingRegion)
+				return rwc
+			}(),
 		},
 		{
 			name: "missing subdomain",
 			subaccount: &openapiaccount.SubaccountResponseObject{
-				DisplayName: "Test Subaccount",
-				Guid:        "12345678-1234-1234-1234-123456789abc",
-				Region:      "eu10",
-				CreatedBy:   ptr.To("test@example.com"),
+				DisplayName: displayName,
+				Guid:        saGuid,
+				Region:      region,
+				CreatedBy:   &createdBy,
 			},
-			wantName:            "test-subaccount",
-			wantExternalName:    "12345678-1234-1234-1234-123456789abc",
-			wantDisplayName:     "Test Subaccount",
-			wantRegion:          "eu10",
-			wantSubdomain:       "",
-			wantAdmins:          []string{"test@example.com"},
-			wantCommented:       true,
-			wantCommentContains: []string{"WARNING: 'subdomain' field is missing"},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.Subaccount{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.SubaccountKind,
+							APIVersion: v1alpha1.CRDGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: wantResourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": saGuid,
+							},
+						},
+						Spec: v1alpha1.SubaccountSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+							},
+							ForProvider: v1alpha1.SubaccountParameters{
+								DisplayName:      displayName,
+								Region:           region,
+								SubaccountAdmins: []string{createdBy},
+							},
+						},
+					})
+				rwc.AddComment(warnMissingSubdomain)
+				return rwc
+			}(),
 		},
 		{
 			name: "missing createdBy",
 			subaccount: &openapiaccount.SubaccountResponseObject{
-				DisplayName: "Test Subaccount",
-				Guid:        "12345678-1234-1234-1234-123456789abc",
-				Region:      "eu10",
-				Subdomain:   "test-subdomain",
+				DisplayName: displayName,
+				Guid:        saGuid,
+				Region:      region,
+				Subdomain:   subdomain,
 			},
-			wantName:            "test-subaccount",
-			wantExternalName:    "12345678-1234-1234-1234-123456789abc",
-			wantDisplayName:     "Test Subaccount",
-			wantRegion:          "eu10",
-			wantSubdomain:       "test-subdomain",
-			wantAdmins:          []string{""},
-			wantCommented:       true,
-			wantCommentContains: []string{"WARNING: 'createdBy' field is missing"},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.Subaccount{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.SubaccountKind,
+							APIVersion: v1alpha1.CRDGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: wantResourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": saGuid,
+							},
+						},
+						Spec: v1alpha1.SubaccountSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+							},
+							ForProvider: v1alpha1.SubaccountParameters{
+								DisplayName:      displayName,
+								Region:           region,
+								Subdomain:        subdomain,
+								SubaccountAdmins: []string{""},
+							},
+						},
+					})
+				rwc.AddComment(warnMissingCreatedBy)
+				return rwc
+			}(),
 		},
 		{
 			name: "parentGUID same as globalAccountGUID",
 			subaccount: &openapiaccount.SubaccountResponseObject{
-				DisplayName:       "Test Subaccount",
-				Guid:              "12345678-1234-1234-1234-123456789abc",
-				Region:            "eu10",
-				Subdomain:         "test-subdomain",
-				CreatedBy:         ptr.To("test@example.com"),
-				GlobalAccountGUID: "ga-guid",
-				ParentGUID:        "ga-guid",
+				DisplayName:       displayName,
+				Guid:              saGuid,
+				Region:            region,
+				Subdomain:         subdomain,
+				CreatedBy:         &createdBy,
+				GlobalAccountGUID: gaGuid,
+				ParentGUID:        gaGuid,
 			},
-			wantName:          "test-subaccount",
-			wantExternalName:  "12345678-1234-1234-1234-123456789abc",
-			wantDisplayName:   "Test Subaccount",
-			wantRegion:        "eu10",
-			wantSubdomain:     "test-subdomain",
-			wantAdmins:        []string{"test@example.com"},
-			wantGlobalAccount: "ga-guid",
-			wantDirectory:     "",
-			wantCommented:     false,
+			want: yaml.NewResourceWithComment(
+				&v1alpha1.Subaccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       v1alpha1.SubaccountKind,
+						APIVersion: v1alpha1.CRDGroupVersion.String(),
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: wantResourceName,
+						Annotations: map[string]string{
+							"crossplane.io/external-name": saGuid,
+						},
+					},
+					Spec: v1alpha1.SubaccountSpec{
+						ResourceSpec: v1.ResourceSpec{
+							ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+						},
+						ForProvider: v1alpha1.SubaccountParameters{
+							DisplayName:       displayName,
+							Region:            region,
+							Subdomain:         subdomain,
+							SubaccountAdmins:  []string{createdBy},
+							GlobalAccountGuid: gaGuid,
+						},
+					},
+				}),
 		},
 		{
 			name: "special characters in displayName",
 			subaccount: &openapiaccount.SubaccountResponseObject{
-				DisplayName: "Test_Subaccount With Spaces & Special!@#",
-				Guid:        "12345678-1234-1234-1234-123456789abc",
-				Region:      "eu10",
-				Subdomain:   "test-subdomain",
-				CreatedBy:   ptr.To("test@example.com"),
+				DisplayName: displayNameSpecial,
+				Guid:        saGuid,
+				Region:      region,
+				Subdomain:   subdomain,
+				CreatedBy:   &createdBy,
 			},
-			wantName:         "test-subaccount-with-spaces--special",
-			wantExternalName: "12345678-1234-1234-1234-123456789abc",
-			wantDisplayName:  "Test_Subaccount With Spaces & Special!@#",
-			wantRegion:       "eu10",
-			wantSubdomain:    "test-subdomain",
-			wantAdmins:       []string{"test@example.com"},
-			wantCommented:    false,
+			want: yaml.NewResourceWithComment(
+				&v1alpha1.Subaccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       v1alpha1.SubaccountKind,
+						APIVersion: v1alpha1.CRDGroupVersion.String(),
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-subaccount-with-spaces--special",
+						Annotations: map[string]string{
+							"crossplane.io/external-name": saGuid,
+						},
+					},
+					Spec: v1alpha1.SubaccountSpec{
+						ResourceSpec: v1.ResourceSpec{
+							ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+						},
+						ForProvider: v1alpha1.SubaccountParameters{
+							DisplayName:      displayNameSpecial,
+							Region:           region,
+							Subdomain:        subdomain,
+							SubaccountAdmins: []string{createdBy},
+						},
+					},
+				}),
 		},
 		{
 			name: "empty string fields",
 			subaccount: &openapiaccount.SubaccountResponseObject{
-				DisplayName: "",
-				Guid:        "",
-				Region:      "",
-				Subdomain:   "",
-				CreatedBy:   ptr.To(""),
+				DisplayName: empty,
+				Guid:        empty,
+				Region:      empty,
+				Subdomain:   empty,
+				CreatedBy:   &empty,
 			},
-			wantName:         "",
-			wantExternalName: "",
-			wantDisplayName:  "",
-			wantRegion:       "",
-			wantSubdomain:    "",
-			wantAdmins:       []string{""},
-			wantCommented:    true,
-			wantCommentContains: []string{
-				"WARNING: 'displayName' field is missing",
-				"WARNING: 'guid' field is missing",
-				"WARNING: 'region' field is missing",
-				"WARNING: 'subdomain' field is missing",
-				"WARNING: 'createdBy' field is missing",
-			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.Subaccount{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.SubaccountKind,
+							APIVersion: v1alpha1.CRDGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "",
+							Annotations: map[string]string{
+								"crossplane.io/external-name": "",
+							},
+						},
+						Spec: v1alpha1.SubaccountSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+							},
+							ForProvider: v1alpha1.SubaccountParameters{
+								SubaccountAdmins: []string{""},
+							},
+						},
+					})
+				rwc.AddComment(warnMissingDisplayName)
+				rwc.AddComment(warnMissingGuid)
+				rwc.AddComment(warnMissingRegion)
+				rwc.AddComment(warnMissingSubdomain)
+				rwc.AddComment(warnMissingCreatedBy)
+				return rwc
+			}(),
 		},
 	}
 
@@ -232,61 +414,50 @@ func TestConvertSubaccountResource(t *testing.T) {
 			result := convertSubaccountResource(tt.subaccount)
 			r.NotNil(result)
 
-			// Check comment status
-			comment, hasComment := result.Comment()
-			r.Equal(tt.wantCommented, hasComment)
-
-			// Check comment contents
-			if tt.wantCommented {
-				for _, substr := range tt.wantCommentContains {
-					r.Contains(comment, substr)
-				}
+			// Verify comments.
+			gotComment, gotHasComment := result.Comment()
+			wantComment, wantHasComment := tt.want.Comment()
+			r.Equal(wantHasComment, gotHasComment, "comment presence mismatch")
+			if wantHasComment {
+				r.Equal(wantComment, gotComment, "comment mismatch")
 			}
 
-			// Get the underlying Subaccount resource
-			sa, ok := result.Resource().(*v1alpha1.Subaccount)
-			r.Truef(ok, "Resource must be of type v1alpha1.Subaccount")
+			// Verify resource type.
+			gotSa, gotOk := result.Resource().(*v1alpha1.Subaccount)
+			wantSa, wantOk := tt.want.Resource().(*v1alpha1.Subaccount)
+			r.True(gotOk && wantOk, "expected resource type to be *v1alpha1.Subaccount")
 
-			// Verify metadata
-			r.Equal(v1alpha1.SubaccountKind, sa.TypeMeta.Kind)
-			r.Equal(v1alpha1.CRDGroupVersion.String(), sa.TypeMeta.APIVersion)
-			r.Equal(tt.wantName, sa.ObjectMeta.Name)
-			r.Equal(tt.wantExternalName, sa.ObjectMeta.Annotations["crossplane.io/external-name"])
+			// Verify metadata.
+			r.Equal(wantSa.TypeMeta.Kind, gotSa.TypeMeta.Kind)
+			r.Equal(wantSa.TypeMeta.APIVersion, gotSa.TypeMeta.APIVersion)
+			r.Equal(wantSa.ObjectMeta.Name, gotSa.ObjectMeta.Name)
+			r.Equal(wantSa.ObjectMeta.Annotations["crossplane.io/external-name"], gotSa.ObjectMeta.Annotations["crossplane.io/external-name"])
 
-			// Verify ManagementPolicies
-			r.Equal(1, len(sa.Spec.ManagementPolicies))
-			r.Equal(v1.ManagementActionObserve, sa.Spec.ManagementPolicies[0])
+			// Verify ManagementPolicies.
+			r.Equal(1, len(gotSa.Spec.ManagementPolicies))
+			r.Equal(v1.ManagementActionObserve, gotSa.Spec.ManagementPolicies[0])
+			r.Equal(wantSa.Spec.ManagementPolicies, gotSa.Spec.ManagementPolicies)
 
-			// Verify providerConfigRef
-			r.Nil(sa.GetProviderConfigReference(), "providerConfigRef must not be set")
+			// Verify providerConfigRef.
+			r.Nil(gotSa.GetProviderConfigReference(), "providerConfigRef must not be set")
 
-			// Verify required fields
-			r.Equal(tt.wantDisplayName, sa.Spec.ForProvider.DisplayName)
-			r.Equal(tt.wantRegion, sa.Spec.ForProvider.Region)
-			r.Equal(tt.wantSubdomain, sa.Spec.ForProvider.Subdomain)
-			r.NotNil(sa.Spec.ForProvider.SubaccountAdmins, "SubaccountAdmins must not be nil")
-			r.Equal(tt.wantAdmins, sa.Spec.ForProvider.SubaccountAdmins)
+			// Verify required fields.
+			r.Equal(wantSa.Spec.ForProvider.DisplayName, gotSa.Spec.ForProvider.DisplayName)
+			r.Equal(wantSa.Spec.ForProvider.Region, gotSa.Spec.ForProvider.Region)
+			r.Equal(wantSa.Spec.ForProvider.Subdomain, gotSa.Spec.ForProvider.Subdomain)
+			r.NotNil(gotSa.Spec.ForProvider.SubaccountAdmins, "SubaccountAdmins must not be nil")
+			r.Equal(wantSa.Spec.ForProvider.SubaccountAdmins, gotSa.Spec.ForProvider.SubaccountAdmins)
 
-			// Verify optional fields
-			r.Equal(tt.wantGlobalAccount, sa.Spec.ForProvider.GlobalAccountGuid)
-			r.Equal(tt.wantDirectory, sa.Spec.ForProvider.DirectoryGuid)
-			r.Equal(tt.wantDescription, sa.Spec.ForProvider.Description)
-			r.Equal(tt.wantUsedForProd, sa.Spec.ForProvider.UsedForProduction)
-			r.Equal(tt.wantBetaEnabled, sa.Spec.ForProvider.BetaEnabled)
-			r.Equal(tt.wantLabels, sa.Spec.ForProvider.Labels)
+			// Verify optional fields.
+			r.Equal(wantSa.Spec.ForProvider.GlobalAccountGuid, gotSa.Spec.ForProvider.GlobalAccountGuid)
+			r.Equal(wantSa.Spec.ForProvider.DirectoryGuid, gotSa.Spec.ForProvider.DirectoryGuid)
+			r.Equal(wantSa.Spec.ForProvider.Description, gotSa.Spec.ForProvider.Description)
+			r.Equal(wantSa.Spec.ForProvider.UsedForProduction, gotSa.Spec.ForProvider.UsedForProduction)
+			r.Equal(wantSa.Spec.ForProvider.BetaEnabled, gotSa.Spec.ForProvider.BetaEnabled)
+			r.Equal(wantSa.Spec.ForProvider.Labels, gotSa.Spec.ForProvider.Labels)
+
+			// Final overall comparison.
+			r.Equal(wantSa, gotSa)
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || len(s) > len(substr)+1 && findInString(s, substr)))
-}
-
-func findInString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
