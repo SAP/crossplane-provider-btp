@@ -140,7 +140,15 @@ type SubaccountStatus struct {
 
 // +kubebuilder:object:root=true
 
-// A Subaccount is a managed resource that represents a subaccount in the SAP Business Technology Platform
+// A Subaccount is a managed resource that represents a subaccount in the SAP Business Technology Platform.
+//
+// External-Name Configuration:
+//   - Follow Standard: yes
+//   - Format: Subaccount GUID (UUID format)
+//   - How to find:
+//     - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
+//     - CLI: btp list accounts/subaccount (field: guid)
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
