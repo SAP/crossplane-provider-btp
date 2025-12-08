@@ -3,6 +3,7 @@ package subaccount
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 
@@ -383,13 +384,13 @@ func (c *external) createBTPSubaccount(
 	ctx context.Context, subaccount *apisv1alpha1.Subaccount,
 ) error {
 	ctrl.Log.Info(fmt.Sprintf("Creating subaccount: %s", subaccount.Name))
-	createdSubaccount, _, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.
+	createdSubaccount, resp, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.
 		CreateSubaccount(ctx).
 		CreateSubaccountRequestPayload(toCreateApiPayload(subaccount)).
 		Execute()
 	if err != nil {
 		// Check if error is "resource already exists"
-		if isResourceAlreadyExistsError(err) {
+		if resp.StatusCode == http.StatusConflict {
 			// ADR: Do NOT set external-name, stay in error loop
 			// User must set external-name manually to resolve
 			return errors.Wrap(err, "creation failed - resource already exists. Please set external-name annotation to adopt the existing resource")
@@ -505,23 +506,6 @@ func specifyAPIError(err error) error {
 		}
 	}
 	return err
-}
-
-// isResourceAlreadyExistsError checks if the API error code is 409 for subaccount already exitsts in the region
-func isResourceAlreadyExistsError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	if genericErr, ok := err.(*accountclient.GenericOpenAPIError); ok {
-		if accountError, ok := genericErr.Model().(accountclient.ApiExceptionResponseObject); ok {
-			return internal.Val(accountError.Error.Code) == 409
-		}
-		if genericErr.Body() != nil {
-			return false
-		}
-	}
-	return false
 }
 
 func changedLabels(specLabels map[string][]string, statusLabels *map[string][]string) bool {

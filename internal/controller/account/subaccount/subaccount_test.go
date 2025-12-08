@@ -1296,6 +1296,7 @@ func TestCreate(t *testing.T) {
 				mockClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{},
 					returnErr:        create409Error(),
+					httpStatusCode:   http.StatusConflict,
 				},
 			},
 			want: want{
