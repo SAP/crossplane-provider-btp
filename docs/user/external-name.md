@@ -21,46 +21,16 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 ...
 ```
 
-## Standard Format
-
-```go
-// <ResourceName> is a managed resource that represents <description> in the SAP Business Technology Platform.
-//
-// External-Name Configuration:
-//   - Follow Standard: yes|no [explanation if no]
-//   - Format: <identifier description>
-//   - How to find:
-//     - UI: <navigation path>
-//     - CLI: <command> (field: <field_name>)
-//
-```
-
-## Key Elements
-
-1. **Follow Standard**: Indicates if the external-name follows the standard pattern
-   - `yes` - Uses standard identifier (typically a single GUID/UUID)
-   - `no` - Requires explanation (e.g., composite key, special format)
-
-2. **Format**: Describes the identifier structure and type
-
-3. **How to find**: Provides both UI and CLI methods to locate the identifier
-
-## How to generate docs for the CRD external name
-
-```bash
- make docs.generate-external-name
- ```
-
 ## Generated Data Below
 
-### GlobalAccount
+### Directory
 
 - Follow Standard: yes
-- Format: Global Account GUID (UUID format)
+- Format: Directory GUID (UUID format)
 - How to find:
 
-  - UI: Global Account → Account Explorer → Global Account Details → Global Account ID
-  - CLI: btp get accounts/global-account (field: guid)
+  - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
+  - CLI: btp list accounts/directory (field: guid)
 
 ### Subaccount
 

@@ -87,6 +87,41 @@ If our delete request is successful, we return EVEN IF the deletion operation is
 
 Else, if we have an error in our request, return with error.
 
+#### Documentation generation
+
+## Standard Format
+
+Comments in this format should be on top of the CRDs which will support external name.
+Scrip (see below) will use it for the docs generation.
+And append the file [docs/user/external-name.md](/docs/user/external-name.md)
+
+```go
+//
+// External-Name Configuration:
+//   - Follow Standard: yes|no [explanation if no]
+//   - Format: <identifier description>
+//   - How to find:
+//     - UI: <navigation path>
+//     - CLI: <command> (field: <field_name>)
+//
+```
+
+## Key Elements
+
+1. **Follow Standard**: Indicates if the external-name follows the standard pattern
+   - `yes` - Uses standard identifier (typically a single GUID/UUID)
+   - `no` - Requires explanation (e.g., composite key, special format)
+
+2. **Format**: Describes the identifier structure and type
+
+3. **How to find**: Provides both UI and CLI methods to locate the identifier
+
+## How to generate docs for the CRD external name
+
+```bash
+ make docs.generate-external-name
+ ```
+
 ### Importing of existing external resources
 For importing, setting the right external-name will match the external resource no matter the values in `spec.ForProvider`.
 

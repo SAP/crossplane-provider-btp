@@ -101,6 +101,14 @@ type DirectoryStatus struct {
 // +kubebuilder:object:root=true
 
 // A Directory is a managed resource that allows grouping of subaccounts in the SAP Business Technology Platform
+//
+// External-Name Configuration:
+//   - Follow Standard: yes
+//   - Format: Directory GUID (UUID format)
+//   - How to find:
+//     - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
+//     - CLI: btp list accounts/directory (field: guid)
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

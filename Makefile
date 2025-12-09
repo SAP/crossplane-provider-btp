@@ -314,5 +314,5 @@ publish:
 .PHONY: docs.generate-external-name
 docs.generate-external-name:
 	@$(INFO) Generating external-name documentation from *_types.go files
-	@./scripts/generate-external-name-docs.sh
+	@$(GO) run ./scripts/generate-external-name-docs.go
 	@$(OK) External-name documentation generated
