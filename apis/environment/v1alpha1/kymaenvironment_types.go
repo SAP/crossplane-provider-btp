@@ -21,6 +21,12 @@ const (
 type KymaEnvironmentParameters struct {
 	PlanName string `json:"planName"`
 
+	// Can be provided, if empty the client will use metadata.name as the default value.
+	//
+	// The name of the Kyma Environment.
+	// +kubebuilder:validation:Optional
+	Name *string `json:"name"`
+
 	// Provisioning parameters for the instance.
 	//
 	// The Parameters field is NOT secret or secured in any way and should

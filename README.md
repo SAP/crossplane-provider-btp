@@ -80,6 +80,12 @@ make test-acceptance
 
 This will spin up a specific kind cluster which runs the provider as docker container in it. The e2e tests will run kubectl commands against that cluster to test the provider's functionality.
 
+If you want to run a single E2E Test locally simply set the `testFilter` variable like this:
+
+```bash
+make test-acceptance testFilter=<functionNameOfTest>
+````
+
 :warning:
 Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
 
@@ -135,20 +141,30 @@ Contents from the service binding of a `cis-central` service in the same globala
 Contains the CLI server URL, for example:
 
 ```
-https://canary.cli.btp.int.sap/
+https://cli.btp.cloud.sap/
 ```
 
 **GLOBAL_ACCOUNT**
 
-Contains the subdomain of the global account.
+Contains the subdomain of the global account, for example:
+
+```
+154d0e79-fc1f-420f-8b9c-55b9012785db
+```
+
+The subdomain can be taken from the global account's URL in the BTP cockpit, i.e. `https://<region>.cockpit.btp.cloud.sap/cockpit#/globalaccount/<SUBDOMAIN>/`.
 
 **IDP_URL**
 
-Contains the URL of an IDP that can be connected to the global account as trustconfiguration.
+Contains the URL of an IDP that can be connected to the global account as trustconfiguration, for example:
+
+```
+myidp.accounts.ondemand.com
+```
 
 **SECOND_DIRECTORY_ADMIN_EMAIL**
 
-Contains a second email (different from the technical user's email) for the directory admin field.
+Contains a second email (different from the technical user's email) for the directory admin field. This can be your own email.
 
 **TECHNICAL_USER_EMAIL**
 
@@ -166,7 +182,10 @@ Name of created kind cluster, if not set will be randomly generated
 
 **TEST_REUSE_CLUSTER**
 
-0 or 1, default is 0
+* `0` = no
+* `1` = yes
+
+The default is `0`.
 
 ## Setting up the Provider Configuration
 

@@ -8,10 +8,7 @@ import (
 	// Note(turkenh): we are importing this to embed provider schema document
 	_ "embed"
 
-	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
 	ujconfig "github.com/crossplane/upjet/pkg/config"
-	"github.com/hashicorp/terraform-plugin-framework/provider"
-	"github.com/sap/crossplane-provider-btp/btp"
 	apicredentials "github.com/sap/crossplane-provider-btp/config/btp_subaccount_api_credential"
 	directoryentitlement "github.com/sap/crossplane-provider-btp/config/directory_entitlement"
 	globaltrustconfig "github.com/sap/crossplane-provider-btp/config/globalaccount_trust_configuration"
@@ -34,18 +31,10 @@ var providerMetadata string
 
 // GetProvider returns provider configuration
 func GetProvider() *ujconfig.Provider {
-	var terraformProviderBtp provider.Provider
-	if btp.Debug {
-		terraformProviderBtp = tfprovider.NewWithClient(btp.DebugPrintHTTPClient())
-	} else {
-		terraformProviderBtp = tfprovider.New()
-	}
 	pc := ujconfig.NewProvider([]byte(providerSchema), resourcePrefix, modulePath, []byte(providerMetadata),
 		ujconfig.WithRootGroup("btp.sap.crossplane.io"),
-		ujconfig.WithIncludeList(CLIReconciledResourceList()),
+		ujconfig.WithIncludeList(ExternalNameConfigured()),
 		ujconfig.WithFeaturesPackage("internal/features"),
-		ujconfig.WithTerraformPluginFrameworkIncludeList(TerraformPluginFrameworkReconciledResourceList()),
-		ujconfig.WithTerraformPluginFrameworkProvider(terraformProviderBtp),
 		ujconfig.WithDefaultResourceOptions(
 			ExternalNameConfigurations(),
 		))

@@ -487,41 +487,13 @@ func (c *Client) GetEnvironmentById(
 func (c *Client) GetCFEnvironmentByNameAndOrg(
 	ctx context.Context, instanceName string, orgName string,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
-	var environmentInstance *provisioningclient.BusinessEnvironmentInstanceResponseObject
 	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
 	envInstances, err := c.getCFEnvironments(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, instance := range envInstances {
-		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
-			continue
-		}
-		if instance.Id != nil && *instance.Id == instanceName {
-			environmentInstance = &instance
-			break
-		}
-
-		var parameters string
-		var parameterList map[string]interface{}
-		if instance.Parameters != nil {
-			parameters = *instance.Parameters
-		}
-		err := json.Unmarshal([]byte(parameters), &parameterList)
-		if err != nil {
-			return nil, err
-		}
-		if parameterList[cfenvironmentParameterInstanceName] == instanceName {
-			environmentInstance = &instance
-			break
-		}
-		if parameterList[cfenvironmentParameterInstanceName] == orgName {
-			environmentInstance = &instance
-			break
-		}
-	}
-	return environmentInstance, err
+	return findCFEnvironment(envInstances, instanceName, orgName)
 }
 
 func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
@@ -543,6 +515,37 @@ func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*pr
 	return environmentInstance, err
 }
 
+// findCFEnvironment tries to find a Cloud Foundry environment instance by matching either the ID or the instance name/org name in parameters
+func findCFEnvironment(envInstances []provisioningclient.BusinessEnvironmentInstanceResponseObject, instanceName string, orgName string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	// First check ID match
+	for _, instance := range envInstances {
+		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
+			continue
+		}
+		if instance.Id != nil && *instance.Id == instanceName {
+			return &instance, nil
+		}
+	}
+	// Then check instance name and org name match
+	for _, instance := range envInstances {
+		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
+			continue
+		}
+		var parameters string
+		if instance.Parameters != nil {
+			parameters = *instance.Parameters
+		}
+		var parameterList map[string]interface{}
+		if err := json.Unmarshal([]byte(parameters), &parameterList); err != nil {
+			continue // skip invalid JSON
+		}
+		if parameterList[cfenvironmentParameterInstanceName] == instanceName || parameterList[cfenvironmentParameterInstanceName] == orgName {
+			return &instance, nil
+		}
+	}
+	return nil, nil
+}
+
 func (c *Client) getCFEnvironments(ctx context.Context) ([]provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
 	response, _, err := c.ProvisioningServiceClient.GetEnvironmentInstances(ctx).Authorization("").Execute()
@@ -562,13 +565,44 @@ func (c *Client) ExtractOrg(cfEnvironment *provisioningclient.BusinessEnvironmen
 		label = *cfEnvironment.Labels
 	}
 
-	return c.NewCloudFoundryOrgByLabel(label)
+	return NewCloudFoundryOrgByLabel(label)
 }
 
-func (c *Client) NewCloudFoundryOrgByLabel(label string) (*CloudFoundryOrg, error) {
-	var cloudFoundryOrg *CloudFoundryOrg
-	err := json.Unmarshal([]byte(label), &cloudFoundryOrg)
-	return cloudFoundryOrg, err
+// NewCloudFoundryOrgByLabel creates a CloudFoundryOrg from a JSON-formatted labels string.
+// In legacy format, the keys have a trailing colon (:), while in the new format they do not.
+// The function handles both formats.
+func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
+	if rawLabels == "" {
+		return nil, errors.New("labels string is empty")
+	}
+	labels := make(map[string]string)
+	err := json.Unmarshal([]byte(rawLabels), &labels)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed unmarshaling labels format")
+	}
+
+	if len(labels) == 0 {
+		return nil, errors.New("no labels found in the provided string")
+	}
+
+	oldOrgId, oldOrgIdExists := labels["Org ID:"]
+	oldApiEndpoint, oldApiEndpointExist := labels["API Endpoint:"]
+
+	if oldOrgIdExists || oldApiEndpointExist {
+		//labels are in the old format
+		return &CloudFoundryOrg{
+			Id:          oldOrgId,
+			Name:        labels["Org Name"],
+			ApiEndpoint: oldApiEndpoint,
+		}, nil
+	}
+
+	//use the new format, having empty values will be handled by the caller
+	return &CloudFoundryOrg{
+		Id:          labels["Org ID"],
+		Name:        labels["Org Name"],
+		ApiEndpoint: labels["API Endpoint"],
+	}, nil
 }
 
 func (c *Client) GetBTPSubaccount(

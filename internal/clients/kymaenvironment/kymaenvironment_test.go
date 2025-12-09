@@ -98,6 +98,40 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 				Type:       internal.Ptr(btp.KymaEnvironmentType().Identifier),
 			},
 		},
+		{
+			name: "SuccessByForProviderName",
+			mockCr: v1alpha1.KymaEnvironment{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "wrong-lookup-name",
+				},
+				Spec: v1alpha1.KymaEnvironmentSpec{
+					ForProvider: v1alpha1.KymaEnvironmentParameters{
+						Name: internal.Ptr("right-lookup-name"),
+					},
+				},
+			},
+			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
+				Err: nil,
+				ApiResponse: &client.BusinessEnvironmentInstancesResponseCollection{
+					EnvironmentInstances: []client.BusinessEnvironmentInstanceResponseObject{
+						{
+							Parameters: internal.Ptr("{\"name\":\"right-lookup-name\"}"),
+							Name:       internal.Ptr("right-lookup-name"),
+							Id:         internal.Ptr("1234"),
+							Type:       internal.Ptr(btp.KymaEnvironmentType().Identifier),
+						},
+					},
+				},
+			},
+			wantErr:        nil,
+			wantInitialize: true,
+			wantResponse: &client.BusinessEnvironmentInstanceResponseObject{
+				Parameters: internal.Ptr("{\"name\":\"right-lookup-name\"}"),
+				Name:       internal.Ptr("right-lookup-name"),
+				Id:         internal.Ptr("1234"),
+				Type:       internal.Ptr(btp.KymaEnvironmentType().Identifier),
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
