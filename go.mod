@@ -17,7 +17,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/int128/kubelogin v1.28.0
+	github.com/int128/kubelogin v1.35.0
 	github.com/json-iterator/go v1.1.12
 	github.com/mitchellh/reflectwalk v1.0.2
 	github.com/muvaf/typewriter v0.0.0-20240614220100-70f9d4a54ea0
