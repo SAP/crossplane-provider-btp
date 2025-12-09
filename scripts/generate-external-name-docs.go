@@ -12,6 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This tool scans all *_types.go files in the apis directory, extracts External-Name
+// Configuration comments from resource type definitions, and generates comprehensive
+// documentation in docs/user/external-name.md.
+//
+// The External-Name Configuration comment format should be:
+//
+//	// External-Name Configuration:
+//	//   - Follow Standard: yes|no
+//	//   - Format: <description of the identifier format>
+//	//   - How to find:
+//	//     - UI: <navigation path in the UI>
+//	//     - CLI: <CLI command> (field: <field_name>)
+//
+// Usage:
+//
+//	go run scripts/generate-external-name-docs.go
+//
+// Or via Make:
+//
+//	make docs.generate-external-name
 package main
 
 import (
@@ -25,14 +45,20 @@ import (
 )
 
 const (
-	apisDir    = "apis"
-	docsFile   = "docs/user/external-name.md"
-	marker     = "## Generated Data Below"
+	// apisDir is the root directory containing API type definitions
+	apisDir = "apis"
+	// docsFile is the path to the external-name documentation file
+	docsFile = "docs/user/external-name.md"
+	// marker is the text marker in the docs file after which generated content is inserted
+	marker = "## Generated Data Below"
 )
 
-// ResourceConfig holds the external-name configuration for a resource
+// ResourceConfig holds the external-name configuration extracted from a resource type.
+// It contains the resource name and the formatted configuration content.
 type ResourceConfig struct {
-	Name    string
+	// Name is the resource type name (e.g., "GlobalAccount", "Subaccount")
+	Name string
+	// Content is the formatted external-name configuration documentation
 	Content string
 }
 
@@ -43,6 +69,10 @@ func main() {
 	}
 }
 
+// run orchestrates the documentation generation process.
+// It searches for External-Name Configuration comments in all *_types.go files,
+// extracts the configuration details, sorts them alphabetically, and updates
+// the documentation file with the generated content.
 func run() error {
 	fmt.Println("Searching for External-Name Configuration comments in *_types.go files...")
 
@@ -112,17 +142,17 @@ func extractFromFile(filePath string) (*ResourceConfig, error) {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	
+
 	const (
 		stateSearching = iota
 		stateInComment
 		stateAfterComment
 	)
-	
+
 	state := stateSearching
 	var commentLines []string
 	var resourceName string
-	
+
 	// Regex to match the External-Name Configuration marker
 	markerRegex := regexp.MustCompile(`^\s*//\s*External-Name\s+Configuration:`)
 	// Regex to match comment lines
@@ -178,7 +208,7 @@ func formatCommentContent(lines []string) string {
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Check if this is the "How to find:" line
 		if strings.HasPrefix(trimmed, "- How to find:") {
 			result = append(result, line)
