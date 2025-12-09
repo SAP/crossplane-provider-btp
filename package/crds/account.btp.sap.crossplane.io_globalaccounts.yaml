@@ -36,7 +36,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A GlobalAccount is an example API type.
+        description: A GlobalAccount is a managed resource that represents a global
+          account in the SAP Business Technology Platform.
         properties:
           apiVersion:
             description: |-
