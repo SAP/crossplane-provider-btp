@@ -3,7 +3,18 @@ set -e
 
 echo "🚀 Setting up SAP BTP Provider development environment..."
 
-# Function to check if command succeeded
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+TERRAFORM_VERSION="1.10.3"
+TFDOCS_VERSION="v0.19.0"
+K9S_VERSION="v0.32.5"
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
 check_command() {
   if [ $? -ne 0 ]; then
     echo "❌ Error: $1 failed"
@@ -11,171 +22,248 @@ check_command() {
   fi
 }
 
-# Wait for Docker to be ready (Docker-in-Docker takes a moment)
+install_tool() {
+  local tool_name=$1
+  local check_cmd=$2
+  local install_fn=$3
+  
+  if ! command -v $check_cmd &> /dev/null; then
+    echo "📦 Installing $tool_name..."
+    $install_fn
+  else
+    echo "✓ $tool_name already installed"
+  fi
+}
+
+# =============================================================================
+# LOAD ENVIRONMENT
+# =============================================================================
+
+if [ -f .env ]; then
+  echo "📋 Loading environment variables from .env file..."
+  set -a
+  source .env 2>/dev/null || echo "⚠️ Could not load .env"
+  set +a
+  echo "✓ Environment variables loaded"
+else
+  echo "⚠️  No .env file found in workspace root"
+fi
+
+# =============================================================================
+# INSTALL CERTIFICATES
+# =============================================================================
+
+install_sap_certificates() {
+  echo "🔒 Installing SAP root certificates..."
+  sudo mkdir -p /usr/local/share/ca-certificates/sap
+  
+  if [ -z "$(ls -A /usr/local/share/ca-certificates/sap/ 2>/dev/null)" ]; then
+    echo "  Extracting certificates from SAP server..."
+    
+    if echo | timeout 10 openssl s_client -showcerts \
+      -connect authentication.sap.hana.ondemand.com:443 2>/dev/null | \
+      awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/ {print}' > /tmp/sap-certs.pem 2>/dev/null && \
+      [ -s /tmp/sap-certs.pem ]; then
+      
+      cd /tmp
+      csplit -s -f sap-cert- sap-certs.pem '/-----BEGIN CERTIFICATE-----/' '{*}' 2>/dev/null || true
+      
+      cert_count=0
+      for file in sap-cert-*; do
+        if [ -f "$file" ] && [ -s "$file" ] && grep -q "BEGIN CERTIFICATE" "$file"; then
+          sudo cp "$file" "/usr/local/share/ca-certificates/sap/sap-cert-${cert_count}.crt"
+          cert_count=$((cert_count + 1))
+        fi
+        rm -f "$file"
+      done
+      
+      rm -f sap-certs.pem
+      cd - > /dev/null
+      echo "  ✓ Installed ${cert_count} SAP certificates"
+    else
+      echo "  ⚠️  Could not extract certificates (network issue?)"
+    fi
+  else
+    echo "  ✓ SAP certificates already installed"
+  fi
+  
+  sudo update-ca-certificates --fresh > /dev/null 2>&1 || \
+    sudo update-ca-certificates > /dev/null 2>&1
+  echo "✓ Certificate configuration complete"
+}
+
+install_sap_certificates
+
+# =============================================================================
+# WAIT FOR DOCKER
+# =============================================================================
+
 echo "⏳ Waiting for Docker to be ready..."
 for i in {1..30}; do
   if docker ps &>/dev/null; then
     echo "✓ Docker is ready"
     break
   fi
-  echo "   Waiting for Docker... ($i/30)"
+  [ $i -eq 30 ] && { echo "❌ Docker failed to start"; exit 1; }
   sleep 2
 done
 
-if ! docker ps &>/dev/null; then
-  echo "❌ Docker failed to start after 60 seconds"
-  exit 1
-fi
+# =============================================================================
+# INSTALL CLI TOOLS
+# =============================================================================
 
-# Install kind
-if ! command -v kind &> /dev/null; then
-  echo "📦 Installing kind..."
+# kind
+install_tool "kind" "kind" "install_kind"
+install_kind() {
   curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
   chmod +x ./kind
   sudo mv ./kind /usr/local/bin/kind
-else
-  echo "✓ kind already installed"
-fi
+}
 
-# Install crossplane CLI
-if ! command -v crossplane &> /dev/null; then
-  echo "📦 Installing Crossplane CLI..."
+# Crossplane CLI
+install_tool "Crossplane CLI" "crossplane" "install_crossplane"
+install_crossplane() {
   curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh" | sh
   sudo mv crossplane /usr/local/bin/
-else
-  echo "✓ Crossplane CLI already installed"
-fi
+}
 
-# Install Terraform
-if ! command -v terraform &> /dev/null; then
-  echo "📦 Installing Terraform..."
-  TERRAFORM_VERSION=$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r '.current_version')
-  
-  curl -Lo terraform.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
-  unzip terraform.zip
-  sudo mv terraform /usr/local/bin/
-  rm terraform.zip
-  
-  echo "✓ Terraform ${TERRAFORM_VERSION} installed"
-else
-  TERRAFORM_VERSION=$(terraform version -json | jq -r '.terraform_version')
-  echo "✓ Terraform ${TERRAFORM_VERSION} already installed"
-fi
-
-# Install Terraform docs
-if ! command -v terraform-docs &> /dev/null; then
-  echo "📦 Installing terraform-docs..."
-  TFDOCS_VERSION=$(curl -s https://api.github.com/repos/terraform-docs/terraform-docs/releases/latest | jq -r '.tag_name')
-  curl -Lo terraform-docs.tar.gz "https://github.com/terraform-docs/terraform-docs/releases/download/${TFDOCS_VERSION}/terraform-docs-${TFDOCS_VERSION}-linux-amd64.tar.gz"
-  tar -xzf terraform-docs.tar.gz
-  sudo mv terraform-docs /usr/local/bin/
-  rm terraform-docs.tar.gz
-  echo "✓ terraform-docs installed"
-else
-  echo "✓ terraform-docs already installed"
-fi
-
-# Install jq
+# jq
 if ! command -v jq &> /dev/null; then
   echo "📦 Installing jq..."
-  sudo apt-get update && sudo apt-get install -y jq unzip
+  sudo apt-get update -qq && sudo apt-get install -y jq unzip > /dev/null
+  echo "✓ jq installed"
 else
   echo "✓ jq already installed"
 fi
 
-# Create kind cluster only if it doesn't exist
+# Terraform
+if ! command -v terraform &> /dev/null; then
+  echo "📦 Installing Terraform ${TERRAFORM_VERSION}..."
+  curl -sSLo terraform.zip \
+    "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+  if [ -s terraform.zip ]; then
+    unzip -q terraform.zip && sudo mv terraform /usr/local/bin/ && rm terraform.zip
+    echo "✓ Terraform installed"
+  fi
+else
+  echo "✓ Terraform already installed"
+fi
+
+# terraform-docs
+if ! command -v terraform-docs &> /dev/null; then
+  echo "📦 Installing terraform-docs ${TFDOCS_VERSION}..."
+  curl -sSLo terraform-docs.tar.gz \
+    "https://github.com/terraform-docs/terraform-docs/releases/download/${TFDOCS_VERSION}/terraform-docs-${TFDOCS_VERSION}-linux-amd64.tar.gz"
+  if [ -s terraform-docs.tar.gz ]; then
+    tar -xzf terraform-docs.tar.gz terraform-docs
+    sudo mv terraform-docs /usr/local/bin/
+    rm -f terraform-docs.tar.gz LICENSE README.md
+    echo "✓ terraform-docs installed"
+  fi
+else
+  echo "✓ terraform-docs already installed"
+fi
+
+# k9s
+if ! command -v k9s &> /dev/null; then
+  echo "📦 Installing k9s ${K9S_VERSION}..."
+  curl -sSLo k9s.tar.gz \
+    "https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_amd64.tar.gz"
+  if [ -s k9s.tar.gz ]; then
+    tar -xzf k9s.tar.gz k9s
+    sudo mv k9s /usr/local/bin/
+    rm -f k9s.tar.gz LICENSE README.md
+    echo "✓ k9s installed"
+  fi
+else
+  echo "✓ k9s already installed"
+fi
+
+# =============================================================================
+# SETUP KUBERNETES CLUSTER
+# =============================================================================
+
 if kind get clusters 2>/dev/null | grep -q "^btp-dev$"; then
   echo "✓ kind cluster 'btp-dev' already exists"
-  echo "📝 Exporting kubeconfig for existing cluster..."
   kind export kubeconfig --name btp-dev
-  echo "✓ kubeconfig updated"
 else
   echo "🎯 Creating kind cluster (this takes ~2 min)..."
   kind create cluster --name btp-dev --wait 3m
-  echo "✓ kind cluster created"
   kind export kubeconfig --name btp-dev
+  echo "✓ kind cluster created"
 fi
 
-# Verify kubectl can see the cluster
-echo "✓ Verifying kubectl configuration..."
-kubectl config get-contexts
-kubectl config current-context
+echo "✓ Verifying cluster..."
+kubectl cluster-info > /dev/null
 
-# Verify cluster is accessible
-echo "✓ Verifying cluster access..."
-kubectl cluster-info
-kubectl get nodes
+# =============================================================================
+# INSTALL CROSSPLANE
+# =============================================================================
 
-# Check if Crossplane is already installed
 if kubectl get namespace crossplane-system &>/dev/null; then
-  echo "✓ Crossplane already installed, skipping"
+  echo "✓ Crossplane already installed"
 else
-  echo "⚙️  Installing Crossplane in cluster..."
-  helm repo add crossplane-stable https://charts.crossplane.io/stable
-  helm repo update
+  echo "⚙️  Installing Crossplane..."
+  helm repo add crossplane-stable https://charts.crossplane.io/stable > /dev/null 2>&1
+  helm repo update > /dev/null 2>&1
   helm install crossplane crossplane-stable/crossplane \
     --namespace crossplane-system \
     --create-namespace \
-    --wait
+    --wait > /dev/null 2>&1
   check_command "Crossplane installation"
+  echo "✓ Crossplane installed"
 fi
 
-echo ""
-echo "✅ Base setup complete!"
-echo ""
+# =============================================================================
+# INSTALL BTP PROVIDER CRDs
+# =============================================================================
 
-# Handle BTP credentials
-SECRETS_CREATED=false
-
-if [ -n "$BTP_TECHNICAL_USER" ] && [ -n "$CIS_CENTRAL_BINDING" ]; then
-  echo "🔐 BTP credentials detected - configuring..."
-  
-  # Check if secrets already exist
-  if kubectl get secret cis-provider-secret -n crossplane-system &>/dev/null; then
-    echo "✓ CIS secret already exists"
-  else
-    kubectl create secret generic cis-provider-secret \
-      --from-literal=credentials="$CIS_CENTRAL_BINDING" \
-      -n crossplane-system
-    check_command "CIS secret creation"
-    echo "✅ CIS credentials configured"
-  fi
-  
-  if kubectl get secret sa-provider-secret -n crossplane-system &>/dev/null; then
-    echo "✓ SA secret already exists"
-  else
-    kubectl create secret generic sa-provider-secret \
-      --from-literal=credentials="$BTP_TECHNICAL_USER" \
-      -n crossplane-system
-    check_command "SA secret creation"
-    echo "✅ SA credentials configured"
-  fi
-  
-  # Clear from environment
-  unset CIS_CENTRAL_BINDING BTP_TECHNICAL_USER
-  
-  SECRETS_CREATED=true
+if [ -d "package/crds" ]; then
+  echo "📦 Installing BTP Provider CRDs..."
+  kubectl apply -f package/crds/ > /dev/null 2>&1
+  check_command "CRD installation"
+  sleep 5
+  echo "✓ BTP Provider CRDs installed"
 else
-  echo "⚠️  No BTP credentials found"
-  echo "   Set BTP_TECHNICAL_USER and CIS_CENTRAL_BINDING environment variables"
-  echo "   Or add them to .env file for local development"
+  echo "⚠️  package/crds not found - run 'kubectl apply -f package/crds/' before 'make run'"
 fi
 
-# Create ProviderConfig
-if kubectl get providerconfig account-provider-config &>/dev/null 2>&1; then
-  echo "✓ ProviderConfig 'account-provider-config' already exists"
-elif [ "$SECRETS_CREATED" = true ]; then
-  echo "📝 Creating ProviderConfig..."
+# =============================================================================
+# CONFIGURE BTP CREDENTIALS
+# =============================================================================
+
+configure_credentials() {
+  local namespace="default"
   
-  # Check if BTP_GLOBAL_ACCOUNT is set
-  if [ -z "$BTP_GLOBAL_ACCOUNT" ]; then
-    echo "⚠️  Warning: BTP_GLOBAL_ACCOUNT not set"
-    echo "   You need to set this environment variable"
-    echo "   Skipping ProviderConfig creation"
-  else
-    echo "✓ Using globalAccount: $BTP_GLOBAL_ACCOUNT"
+  if [ -n "$BTP_TECHNICAL_USER" ] && [ -n "$CIS_CENTRAL_BINDING" ]; then
+    echo "🔐 Configuring BTP credentials..."
     
-    cat > /tmp/providerconfig.yaml <<EOF
+    kubectl get secret cis-provider-secret -n $namespace &>/dev/null || \
+      kubectl create secret generic cis-provider-secret \
+        --from-literal=data="$CIS_CENTRAL_BINDING" -n $namespace
+    
+    kubectl get secret sa-provider-secret -n $namespace &>/dev/null || \
+      kubectl create secret generic sa-provider-secret \
+        --from-literal=credentials="$BTP_TECHNICAL_USER" -n $namespace
+    
+    unset CIS_CENTRAL_BINDING BTP_TECHNICAL_USER
+    echo "✓ Credentials configured"
+    return 0
+  else
+    echo "⚠️  No credentials found"
+    echo "   Add to .env file:"
+    echo "   BTP_TECHNICAL_USER='{...}'"
+    echo "   CIS_CENTRAL_BINDING='{...}'"
+    echo "   BTP_GLOBAL_ACCOUNT='...'"
+    return 1
+  fi
+}
+
+if configure_credentials; then
+  # Create ProviderConfig
+  if ! kubectl get providerconfig account-provider-config &>/dev/null && [ -n "$BTP_GLOBAL_ACCOUNT" ]; then
+    echo "📝 Creating ProviderConfig..."
+    cat <<EOF | kubectl apply -f - > /dev/null
 apiVersion: btp.sap.crossplane.io/v1alpha1
 kind: ProviderConfig
 metadata:
@@ -186,50 +274,42 @@ spec:
   cisCredentials:
     secretRef:
       name: cis-provider-secret
-      namespace: crossplane-system
-      key: credentials
+      namespace: default
+      key: data
     source: Secret
   serviceAccountSecret:
     secretRef:
-      key: credentials
       name: sa-provider-secret
-      namespace: crossplane-system
+      namespace: default
+      key: credentials
     source: Secret
 EOF
-    
-    kubectl apply -f /tmp/providerconfig.yaml
-    check_command "ProviderConfig creation"
-    echo "✅ ProviderConfig 'account-provider-config' created"
+    echo "✓ ProviderConfig created"
   fi
 fi
 
-# Install git hooks to prevent credential leaks
-if [ -f ".devcontainer/install-hooks.sh" ]; then
-  echo "🔒 Installing git hooks for credential protection..."
-  bash .devcontainer/install-hooks.sh
-fi
+# =============================================================================
+# INSTALL GIT HOOKS
+# =============================================================================
+
+[ -f ".devcontainer/install-hooks.sh" ] && bash .devcontainer/install-hooks.sh
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
 
 echo ""
+echo "✅ Setup complete!"
+echo ""
 echo "🔧 Installed tools:"
-echo "   - kind: $(kind version 2>/dev/null | head -n1 || echo 'N/A')"
-echo "   - kubectl: $(kubectl version --client --short 2>/dev/null | head -n1 || echo 'N/A')"
-echo "   - helm: $(helm version --short 2>/dev/null || echo 'N/A')"
-echo "   - crossplane: $(crossplane --version 2>/dev/null || echo 'N/A')"
-echo "   - terraform: $(terraform version -json 2>/dev/null | jq -r '.terraform_version' || echo 'N/A')"
-echo "   - go: $(go version 2>/dev/null | awk '{print $3}' || echo 'N/A')"
+echo "   - kind:       $(kind version 2>/dev/null | head -n1)"
+echo "   - kubectl:    $(kubectl version --client -o json 2>/dev/null | jq -r '.clientVersion.gitVersion')"
+echo "   - crossplane: $(crossplane --version 2>/dev/null)"
+echo "   - terraform:  $(terraform version -json 2>/dev/null | jq -r '.terraform_version')"
+echo "   - k9s:        ${K9S_VERSION}"
 echo ""
 echo "📚 Next steps:"
+echo "   make run                                    # Run local controller"
+echo "   kubectl apply -f examples/subaccount.yaml   # Test it"
+echo "   k9s                                         # Watch resources"
 echo ""
-echo "   1. Install BTP provider:"
-echo "      kubectl crossplane install provider ghcr.io/sap/crossplane-provider-btp:latest"
-echo ""
-echo "   2. Wait for provider:"
-echo "      kubectl wait --for=condition=Healthy provider.pkg.crossplane.io --all --timeout=300s"
-echo ""
-echo "   3. Run controller locally:"
-echo "      make run"
-echo ""
-echo "   4. Create a test subaccount:"
-echo "      kubectl apply -f examples/subaccount.yaml"
-echo ""
-echo "✨ Happy coding!"
