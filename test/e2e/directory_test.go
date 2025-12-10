@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -145,8 +146,9 @@ func TestDirectoryImport(t *testing.T) {
 		&v1alpha1.Directory{
 			Spec: v1alpha1.DirectorySpec{
 				ForProvider: v1alpha1.DirectoryParameters{
-					DisplayName: internal.Ptr(dirImportName),
-					Description: internal.Ptr("Directory for import test"),
+					DisplayName:     internal.Ptr(dirImportName),
+					Description:     internal.Ptr("Directory for import test"),
+					DirectoryAdmins: []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY), envvar.GetOrPanic(SECONDARY_DIRC_ADMIN_ENV_KEY)},
 				},
 			},
 		},
