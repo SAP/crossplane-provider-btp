@@ -1,4 +1,4 @@
-// Copyright 2024 The Crossplane Authors. All rights reserved.
+// Copyright 2025 The Crossplane Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -51,6 +51,8 @@ const (
 	docsFile = "docs/user/external-name.md"
 	// marker is the text marker in the docs file after which generated content is inserted
 	marker = "## Generated Data Below"
+	// File permissions
+	filePermissions = 0644
 )
 
 // ResourceConfig holds the external-name configuration extracted from a resource type.
@@ -283,7 +285,7 @@ func updateDocsFile(generatedContent string) error {
 	result.WriteString(generatedContent)
 
 	// Write the updated content back to the file
-	if err := os.WriteFile(docsFile, []byte(result.String()), 0644); err != nil {
+	if err := os.WriteFile(docsFile, []byte(result.String()), filePermissions); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 

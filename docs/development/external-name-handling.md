@@ -87,9 +87,9 @@ If our delete request is successful, we return EVEN IF the deletion operation is
 
 Else, if we have an error in our request, return with error.
 
-#### Documentation generation
+## Documentation generation
 
-## Standard Format
+#### Standard Format
 
 Comments in this format should be on top of the CRDs which will support external name.
 Scrip (see below) will use it for the docs generation.
@@ -106,7 +106,7 @@ And append the file [docs/user/external-name.md](/docs/user/external-name.md)
 //
 ```
 
-## Key Elements
+#### Key Elements
 
 1. **Follow Standard**: Indicates if the external-name follows the standard pattern
    - `yes` - Uses standard identifier (typically a single GUID/UUID)
@@ -115,21 +115,31 @@ And append the file [docs/user/external-name.md](/docs/user/external-name.md)
 2. **Format**: Describes the identifier structure and type
 
 3. **How to find**: Provides both UI and CLI methods to locate the identifier
+4. **Example**:
 
-## How to generate docs for the CRD external name
+```go
+// External-Name Configuration:
+//   - Follow Standard: yes
+//   - Format: Subaccount GUID (UUID format)
+//   - How to find:
+//     - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
+//     - CLI: btp list accounts/subaccount (field: guid)
+```
+
+#### How to generate docs for the CRD external name
 
 ```bash
  make docs.generate-external-name
  ```
 
-### Importing of existing external resources
+## Importing of existing external resources
 For importing, setting the right external-name will match the external resource no matter the values in `spec.ForProvider`.
 
 We set the `spec.forProvider` as required, the user can not create managed resources without those values and therefore must also set the required fields. 
 
 Since the matching between MR and external resource is done based on external-name, a wrongly filled spec would result in Update() calls to the resource changing it. To prevent this, the user would not set the managementPolicy to Update. If there is then a missmatch, the Observe() method would determines this, sets the externalObservation.Diff and it would be visible in the debug log. Additionally, we write it into the status field of the resource and write an event to make it visible to the user.
 
-### Compound-Key External Name Format
+## Compound-Key External Name Format
 
 If we have an external name that requires multiple values from the spec as key, the delimiter is `/`. The advantage is that this is part of the url path and therefore unlikely to be used in the identifying fields.
 The key should be case-sensitive, in the sense that the values from the compound keys are used directly for the API calls. By treating it case-sensitive, we cover APIs that are case-sensitive and insensitive. 
