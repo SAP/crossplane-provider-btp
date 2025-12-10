@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	v1_crossplane "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -57,7 +56,7 @@ func TestConnect(t *testing.T) {
 				cr: &v1alpha1.Directory{
 					Spec: v1alpha1.DirectorySpec{
 						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &v1_crossplane.Reference{
+							ProviderConfigReference: &xpv1.Reference{
 								Name: "pc-reference",
 							}},
 					},
@@ -73,7 +72,7 @@ func TestConnect(t *testing.T) {
 				cr: &v1alpha1.Directory{
 					Spec: v1alpha1.DirectorySpec{
 						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &v1_crossplane.Reference{
+							ProviderConfigReference: &xpv1.Reference{
 								Name: "pc-reference",
 							}},
 					},
@@ -91,7 +90,7 @@ func TestConnect(t *testing.T) {
 				cr: &v1alpha1.Directory{
 					Spec: v1alpha1.DirectorySpec{
 						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &v1_crossplane.Reference{
+							ProviderConfigReference: &xpv1.Reference{
 								Name: "pc-reference",
 							}},
 					},
@@ -110,7 +109,7 @@ func TestConnect(t *testing.T) {
 				cr: &v1alpha1.Directory{
 					Spec: v1alpha1.DirectorySpec{
 						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &v1_crossplane.Reference{
+							ProviderConfigReference: &xpv1.Reference{
 								Name: "pc-reference",
 							}},
 					},
@@ -130,7 +129,7 @@ func TestConnect(t *testing.T) {
 				cr: &v1alpha1.Directory{
 					Spec: v1alpha1.DirectorySpec{
 						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &v1_crossplane.Reference{
+							ProviderConfigReference: &xpv1.Reference{
 								Name: "pc-reference",
 							}},
 					},
@@ -156,7 +155,7 @@ func TestConnect(t *testing.T) {
 				cr: &v1alpha1.Directory{
 					Spec: v1alpha1.DirectorySpec{
 						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &v1_crossplane.Reference{
+							ProviderConfigReference: &xpv1.Reference{
 								Name: "pc-reference",
 							}},
 					},
@@ -604,7 +603,6 @@ func TestObserveADRCompliance(t *testing.T) {
 	type args struct {
 		cr         resource.Managed
 		mockClient MockClient
-		mockKube   test.MockClient
 	}
 	type want struct {
 		err error
