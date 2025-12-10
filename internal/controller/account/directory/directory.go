@@ -2,14 +2,18 @@ package directory
 
 import (
 	"context"
+	"fmt"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/clients/directory"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -73,6 +77,19 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotDirectory)
 	}
 
+	// ADR Step 1: Check if external-name is empty
+	if meta.GetExternalName(cr) == "" {
+		// Backwards compatibility not needed, therefore return ResourceExists: false
+		return managed.ExternalObservation{ResourceExists: false}, nil
+
+	}
+
+	// ADR Step 2: External-name is set, check its format (must be valid GUID)
+	if !isValidUUID(meta.GetExternalName(cr)) {
+		return managed.ExternalObservation{}, errors.New(fmt.Sprintf("external-name '%s' is not a valid GUID format", meta.GetExternalName(cr)))
+	}
+
+	// ADR Step 3: Build the Get API Request from the external-name (using GUID directly)
 	directoryHandler := c.handler(cr)
 
 	needsCreation, createErr := directoryHandler.NeedsCreation(ctx)
@@ -156,11 +173,37 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotDirectory)
 	}
 
+	// ADR: Check if resource is already in deletion state
+	if cr.Status.AtProvider.EntityState != nil && *cr.Status.AtProvider.EntityState == "DELETING" {
+		return managed.ExternalDelete{}, nil
+	}
+
 	cr.SetConditions(xpv1.Deleting())
 
-	return managed.ExternalDelete{}, c.handler(cr).DeleteDirectory(ctx)
+	err := c.handler(cr).DeleteDirectory(ctx)
+	// ADR: 404 not found means already deleted - not considered as error case
+	if err != nil && isNotFoundError(err) {
+		ctrl.Log.Info("associated BTP directory not found, continue deletion")
+		return managed.ExternalDelete{}, nil
+	}
+
+	return managed.ExternalDelete{}, err
 }
 
 func (c *external) handler(cr *v1alpha1.Directory) directory.DirectoryClientI {
 	return c.newDirHandlerFn(c.btpClient, cr)
+}
+
+// isValidUUID checks if a string is a valid UUID format
+func isValidUUID(s string) bool {
+	_, err := uuid.Parse(s)
+	return err == nil
+}
+
+// isNotFoundError checks if an error is a 404 not found error
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return err.Error() == "directory not found"
 }

@@ -22,6 +22,7 @@ import (
 
 	meta "github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 )
 
 // TODO: separate the k8s resource name and the external resource name
@@ -133,4 +134,28 @@ func createK8sResources(ctx context.Context, t *testing.T, cfg *envconf.Config, 
 
 func NewID(oldId string, buildId string) string {
 	return buildId + "-" + oldId
+}
+
+// TestDirectoryImport tests importing an existing Directory resource using external-name annotation
+// Uses ImportTester utility to follow the standard import test pattern
+func TestDirectoryImport(t *testing.T) {
+	dirImportName := "e2e-test-dir-import"
+
+	importTester := NewImportTester(
+		&v1alpha1.Directory{
+			Spec: v1alpha1.DirectorySpec{
+				ForProvider: v1alpha1.DirectoryParameters{
+					DisplayName: internal.Ptr(dirImportName),
+					Description: internal.Ptr("Directory for import test"),
+				},
+			},
+		},
+		dirImportName,
+		WithWaitCreateTimeout[*v1alpha1.Directory](wait.WithTimeout(7*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.Directory](wait.WithTimeout(5*time.Minute)),
+	)
+
+	importFeature := importTester.BuildTestFeature("BTP Directory Import Flow").Feature()
+
+	testenv.Test(t, importFeature)
 }
