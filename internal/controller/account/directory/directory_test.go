@@ -22,6 +22,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const validGUID = "12345678-1234-1234-1234-123456789012"
+
 func TestConnect(t *testing.T) {
 	type args struct {
 		cr              resource.Managed
@@ -235,13 +237,15 @@ func TestObserve(t *testing.T) {
 		"APIErrorOnRead": {
 			reason: "When needsCreation can't be determined we can't proceed",
 			args: args{
-				cr:         testutils.NewDirectory("dir-unittests", testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+					testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 				mockClient: MockClient{needsCreation: true, needsCreationErr: errors.New("internalServerError")},
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
 				err: errors.New("internalServerError"),
-				cr:  testutils.NewDirectory("dir-unittests", testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
+				cr:  testutils.NewDirectory("dir-unittests", testutils.WithExternalName(validGUID), testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 			},
 		},
 		"RequiresCreation": {
@@ -258,12 +262,16 @@ func TestObserve(t *testing.T) {
 		"SyncError": {
 			reason: "If client requires it we need to trigger an update",
 			args: args{
-				cr:         testutils.NewDirectory("dir-unittests", testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+					testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 				mockClient: MockClient{needsCreation: false, needsUpdate: true, syncErr: errors.New("syncError")},
 			},
 			want: want{
-				o:   managed.ExternalObservation{},
-				cr:  testutils.NewDirectory("dir-unittests", testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
+				o: managed.ExternalObservation{},
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+					testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 				err: errors.New("syncError"),
 			},
 		},
@@ -271,6 +279,7 @@ func TestObserve(t *testing.T) {
 			reason: "If state does not indicate OK its unavailable",
 			args: args{
 				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
 					testutils.WithStatus(v1alpha1.DirectoryObservation{
 						Guid:        internal.Ptr("123"),
 						EntityState: internal.Ptr("CREATION"),
@@ -285,6 +294,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
 					testutils.WithStatus(v1alpha1.DirectoryObservation{
 						Guid:        internal.Ptr("123"),
 						EntityState: internal.Ptr("CREATION"),
@@ -295,7 +305,9 @@ func TestObserve(t *testing.T) {
 		"RequiresUpdate": {
 			reason: "If client requires it we need to trigger an update",
 			args: args{
-				cr:         testutils.NewDirectory("dir-unittests", testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+					testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 				mockClient: MockClient{needsCreation: false, needsUpdate: true, syncErr: nil, available: true},
 			},
 			want: want{
@@ -304,13 +316,16 @@ func TestObserve(t *testing.T) {
 					ResourceUpToDate:  false,
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
-				cr: testutils.NewDirectory("dir-unittests", testutils.WithConditions(xpv1.Available()), testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+					testutils.WithConditions(xpv1.Available()), testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 			},
 		},
 		"UpToDate": {
 			reason: "If client determines everything is up to date we don't need to do anything",
 			args: args{
 				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
 					testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")}),
 				),
 				mockClient: MockClient{needsCreation: false, needsUpdate: false, syncErr: nil, available: true},
@@ -322,6 +337,7 @@ func TestObserve(t *testing.T) {
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
 				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
 					testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")}),
 					testutils.WithConditions(xpv1.Available())),
 			},
@@ -583,7 +599,6 @@ func TestUpdate(t *testing.T) {
 
 // TestObserveADRCompliance tests ADR-compliant external name handling in Observe
 func TestObserveADRCompliance(t *testing.T) {
-	const validGUID = "12345678-1234-1234-1234-123456789012"
 	const invalidGUID = "not-a-valid-guid"
 
 	type args struct {
@@ -741,8 +756,6 @@ func TestObserveADRCompliance(t *testing.T) {
 
 // TestCreateADRCompliance tests ADR-compliant external name handling in Create
 func TestCreateADRCompliance(t *testing.T) {
-	const createdGUID = "98765432-4321-4321-4321-098765432109"
-
 	type args struct {
 		cr         resource.Managed
 		mockClient MockClient
@@ -762,20 +775,23 @@ func TestCreateADRCompliance(t *testing.T) {
 		"SuccessfulCreationSetsExternalName": {
 			reason: "ADR: Successful creation should set external-name to returned GUID",
 			args: args{
-				cr: testutils.NewDirectory("dir-unittests"),
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+				),
 				mockClient: MockClient{
 					createErr: nil,
 					createResult: *testutils.NewDirectory("dir-unittests",
-						testutils.WithExternalName(createdGUID),
+						testutils.WithExternalName(validGUID),
 					),
 				},
 			},
 			want: want{
 				o:                managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}},
 				externalNameSet:  true,
-				expectedExternal: createdGUID,
+				expectedExternal: validGUID,
 				cr: testutils.NewDirectory("dir-unittests",
 					testutils.WithConditions(xpv1.Creating()),
+					testutils.WithExternalName(validGUID),
 				),
 			},
 		},
@@ -852,7 +868,6 @@ func TestCreateADRCompliance(t *testing.T) {
 
 // TestDeleteADRCompliance tests ADR-compliant external name handling in Delete
 func TestDeleteADRCompliance(t *testing.T) {
-	const validGUID = "12345678-1234-1234-1234-123456789012"
 
 	type args struct {
 		cr         resource.Managed

@@ -53,7 +53,7 @@ func NewDirectory(name string, m ...DirectoryModifier) *v1alpha1.Directory {
 	cr := &v1alpha1.Directory{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 	}
-	meta.SetExternalName(cr, name)
+
 	for _, f := range m {
 		f(cr)
 	}
