@@ -5,16 +5,19 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/sap/crossplane-provider-btp/btp"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
-	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
-
-	// go get github.com/SAP/crossplane-provider-cloudfoundry@37645f0d9e41cf991591b9a3735b13ccce13d5de
+	// go get github.com/SAP/crossplane-provider-cloudfoundry@<commit_hash>
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
 	_ "github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
+
+	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
 const (
@@ -51,7 +54,7 @@ func main() {
 		resolveRefencesParam,
 	)
 	export.AddConfigParams(resources.ConfigParams()...)
-	export.AddResourceKinds("subaccount")
+	export.AddResourceKinds(subaccount.KIND_NAME, entitlement.KIND_NAME)
 	cli.Execute()
 }
 
@@ -59,12 +62,11 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 	defer eventHandler.Stop()
 
 	// Determine, which kinds the user would like to have exported.
-	// selectedResources := []string{"subaccount"} // Uncomment for debugging in the IDE.
-	selectedResources, err := export.ResourceKindParam.ValueOrAsk(ctx) // Comment for debugging in the IDE.
+	selectedResources, err := export.ResourceKindParam.ValueOrAsk(ctx)
 	if err != nil {
 		return erratt.Errorf("cannot get the value for resource kind parameter: %w", err)
 	}
-	slog.Debug("kinds selected", "kinds", selectedResources)
+	slog.Debug("Kinds selected", "kinds", selectedResources)
 
 	// Connect to BTP API
 	cisSecret := []byte(cisSecretParam.Value())
