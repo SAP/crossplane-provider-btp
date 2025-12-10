@@ -3,17 +3,21 @@ package subaccount
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
+
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 )
 
+const KIND_NAME = "subaccount"
+
 var (
-	subaccountParam = configparam.StringSlice("subaccount", "UUID of a BTP subaccount").
-		WithFlagName("subaccount")
+	subaccountParam = configparam.StringSlice(KIND_NAME, "UUID of a BTP subaccount. Used in combination with '--kind "+KIND_NAME+"'").
+		WithFlagName(KIND_NAME)
 	Exporter = subaccountExporter{}
 )
 
@@ -25,12 +29,17 @@ type subaccountExporter struct{}
 
 var _ resources.Kind = subaccountExporter{}
 
-func (o subaccountExporter) Param() configparam.ConfigParam {
+func (e subaccountExporter) Param() configparam.ConfigParam {
 	return subaccountParam
 }
 
-func (o subaccountExporter) Export(ctx context.Context, btpClient *btp.Client, eventHandler export.EventHandler, _ bool) error {
+func (e subaccountExporter) KindName() string {
+	return subaccountParam.GetName()
+}
+
+func (e subaccountExporter) Export(ctx context.Context, btpClient *btp.Client, eventHandler export.EventHandler, _ bool) error {
 	accountIDs := subaccountParam.Value()
+	slog.Debug("Subaccounts selected", "subaccounts", accountIDs)
 
 	// If no subaccount IDs are provided via command line, export all subaccounts.
 	if len(accountIDs) == 0 {

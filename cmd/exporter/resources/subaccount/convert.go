@@ -1,15 +1,13 @@
 package subaccount
 
 import (
-	"regexp"
-	"strings"
-
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation"
+
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	openapiaccount "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 )
 
@@ -28,11 +26,11 @@ const (
 // - The function fills optional fields that are relevant for the Update operation
 // - The function does not perform extensive input validation, e.g. if an uuid string is a valid uuid.
 func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObject) *yaml.ResourceWithComment {
-	saDisplayName, hasName := stringValueOk(subaccount.GetDisplayNameOk())
-	saGuid, hasGuid := stringValueOk(subaccount.GetGuidOk())
-	saRegion, hasRegion := stringValueOk(subaccount.GetRegionOk())
-	saSubdomain, hasSubdomain := stringValueOk(subaccount.GetSubdomainOk())
-	saCreatedBy, hasCreatedBy := stringValueOk(subaccount.GetCreatedByOk())
+	saDisplayName, hasName := resources.StringValueOk(subaccount.GetDisplayNameOk())
+	saGuid, hasGuid := resources.StringValueOk(subaccount.GetGuidOk())
+	saRegion, hasRegion := resources.StringValueOk(subaccount.GetRegionOk())
+	saSubdomain, hasSubdomain := resources.StringValueOk(subaccount.GetSubdomainOk())
+	saCreatedBy, hasCreatedBy := resources.StringValueOk(subaccount.GetCreatedByOk())
 
 	// Create Subaccount with required fields first.
 	saResource := yaml.NewResourceWithComment(
@@ -43,7 +41,7 @@ func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObje
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				// TODO: switch to `exporttool/parsan` for name sanitization, once it supports RFC 1123.
-				Name: sanitizeK8sResourceName(saDisplayName, saGuid),
+				Name: resources.SanitizeK8sResourceName(saDisplayName, saGuid),
 				Annotations: map[string]string{
 					"crossplane.io/external-name": saGuid,
 				},
@@ -83,19 +81,19 @@ func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObje
 
 	// Fill the optional fields that are relevant for the Update operation, to have it match status.atProvider
 	// and not trigger an update right after managementPolicies is set to manage the resource.
-	ga, ok := stringValueOk(subaccount.GetGlobalAccountGUIDOk())
+	ga, ok := resources.StringValueOk(subaccount.GetGlobalAccountGUIDOk())
 	if ok {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.GlobalAccountGuid = ga
 	}
-	parent, ok := stringValueOk(subaccount.GetParentGUIDOk())
+	parent, ok := resources.StringValueOk(subaccount.GetParentGUIDOk())
 	if ok && parent != ga {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.DirectoryGuid = parent
 	}
-	v, ok := stringValueOk(subaccount.GetDescriptionOk())
+	v, ok := resources.StringValueOk(subaccount.GetDescriptionOk())
 	if ok {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Description = v
 	}
-	v, ok = stringValueOk(subaccount.GetUsedForProductionOk())
+	v, ok = resources.StringValueOk(subaccount.GetUsedForProductionOk())
 	if ok {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.UsedForProduction = v
 	}
@@ -103,64 +101,10 @@ func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObje
 	if ok {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Labels = *l
 	}
-	b, ok := boolValueOk(subaccount.GetBetaEnabledOk())
+	b, ok := resources.BoolValueOk(subaccount.GetBetaEnabledOk())
 	if ok {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.BetaEnabled = b
 	}
 
 	return saResource
-}
-
-func sanitizeK8sResourceName(s, fallback string) string {
-	// Convert to lowercase.
-	s = strings.ToLower(s)
-
-	// Replace spaces and underscores with hyphens.
-	s = strings.ReplaceAll(s, " ", "-")
-	s = strings.ReplaceAll(s, "_", "-")
-
-	// Remove invalid characters (keep only alphanumeric and hyphens).
-	reg := regexp.MustCompile("[^a-z0-9-]")
-	s = reg.ReplaceAllString(s, "")
-
-	// Remove leading/trailing hyphens.
-	s = strings.Trim(s, "-")
-
-	// Handle empty result.
-	if s == "" {
-		s = fallback
-	}
-
-	// Truncate to max length.
-	if len(s) > validation.DNS1123LabelMaxLength { // 63 chars
-		s = s[:validation.DNS1123LabelMaxLength]
-	}
-
-	// Ensure it doesn't end with hyphen after truncation.
-	s = strings.TrimRight(s, "-")
-
-	// Validate it.
-	if errs := validation.IsDNS1123Label(s); len(errs) > 0 {
-		// Handle validation errors if needed
-		return fallback
-	}
-
-	return s
-}
-
-func stringValueOk(s *string, hint bool) (string, bool) {
-	if !hint || s == nil {
-		return "", false
-	}
-	if len(*s) == 0 {
-		return "", false
-	}
-	return *s, true
-}
-
-func boolValueOk(b *bool, hint bool) (bool, bool) {
-	if !hint || b == nil {
-		return false, false
-	}
-	return *b, true
 }
