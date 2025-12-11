@@ -19,7 +19,7 @@
 // The External-Name Configuration comment format should be:
 //
 //	// External-Name Configuration:
-//	//   - Follow Standard: yes|no
+//	//   - Follows Standard: yes|no
 //	//   - Format: <description of the identifier format>
 //	//   - How to find:
 //	//     - UI: <navigation path in the UI>

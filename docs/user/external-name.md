@@ -25,7 +25,7 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 
 ### Directory
 
-- Follow Standard: yes
+- Follows Standard: yes
 - Format: Directory GUID (UUID format)
 - How to find:
 
@@ -34,7 +34,7 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 
 ### Subaccount
 
-- Follow Standard: yes
+- Follows Standard: yes
 - Format: Subaccount GUID (UUID format)
 - How to find:
 

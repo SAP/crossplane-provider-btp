@@ -103,7 +103,7 @@ type DirectoryStatus struct {
 // A Directory is a managed resource that allows grouping of subaccounts in the SAP Business Technology Platform
 //
 // External-Name Configuration:
-//   - Follow Standard: yes
+//   - Follows Standard: yes
 //   - Format: Directory GUID (UUID format)
 //   - How to find:
 //     - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID

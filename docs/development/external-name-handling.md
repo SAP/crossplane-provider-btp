@@ -92,13 +92,13 @@ Else, if we have an error in our request, return with error.
 #### Standard Format
 
 Comments in this format should be on top of the CRDs which will support external name.
-Scrip (see below) will use it for the docs generation.
+Script (see below) will use it for the docs generation.
 And append the file [docs/user/external-name.md](/docs/user/external-name.md)
 
 ```go
 //
 // External-Name Configuration:
-//   - Follow Standard: yes|no [explanation if no]
+//   - Follows Standard: yes|no [explanation if no]
 //   - Format: <identifier description>
 //   - How to find:
 //     - UI: <navigation path>
@@ -108,7 +108,7 @@ And append the file [docs/user/external-name.md](/docs/user/external-name.md)
 
 #### Key Elements
 
-1. **Follow Standard**: Indicates if the external-name follows the standard pattern
+1. **Follows Standard**: Indicates if the external-name follows the standard pattern
    - `yes` - Uses standard identifier (typically a single GUID/UUID)
    - `no` - Requires explanation (e.g., composite key, special format)
 
@@ -119,7 +119,7 @@ And append the file [docs/user/external-name.md](/docs/user/external-name.md)
 
 ```go
 // External-Name Configuration:
-//   - Follow Standard: yes
+//   - Follows Standard: yes
 //   - Format: Subaccount GUID (UUID format)
 //   - How to find:
 //     - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID

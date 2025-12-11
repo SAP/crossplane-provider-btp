@@ -143,7 +143,7 @@ type SubaccountStatus struct {
 // A Subaccount is a managed resource that represents a subaccount in the SAP Business Technology Platform.
 //
 // External-Name Configuration:
-//   - Follow Standard: yes
+//   - Follows Standard: yes
 //   - Format: Subaccount GUID (UUID format)
 //   - How to find:
 //     - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
