@@ -15,8 +15,9 @@ import (
 const KIND_NAME = "entitlement"
 
 const (
-	paramNameSubaccount = "entitlement-subaccount"
-	paramNameService    = "entitlement-service"
+	paramNameSubaccount   = "entitlement-subaccount"
+	paramNameService      = "entitlement-service"
+	paramNameAutoAssigned = "entitlement-auto-assigned"
 )
 
 var (
@@ -25,12 +26,15 @@ var (
 		WithFlagName(paramNameSubaccount)
 	serviceNameParam = configparam.String(paramNameService, "Technical name of a BTP service. Used in combination with '--kind "+KIND_NAME+"'").
 		WithFlagName(paramNameService)
+	autoAssignedParam = configparam.Bool(paramNameAutoAssigned, "Include service plans that are automatically available in all subaccounts.\nUsed in combination with '--kind "+KIND_NAME+"'").
+		WithFlagName(paramNameAutoAssigned)
 )
 
 func init() {
 	resources.RegisterKind(Exporter)
 	export.AddConfigParams(subaccountParam)
 	export.AddConfigParams(serviceNameParam)
+	export.AddConfigParams(autoAssignedParam)
 }
 
 type entitlementExporter struct{}
@@ -48,8 +52,10 @@ func (e entitlementExporter) KindName() string {
 func (e entitlementExporter) Export(ctx context.Context, btpClient *btp.Client, eventHandler export.EventHandler, _ bool) error {
 	saGuid := subaccountParam.Value()
 	serviceName := serviceNameParam.Value()
+	exportAutoAssigned := autoAssignedParam.Value()
 	slog.Debug("Subaccount selected", "subaccount", saGuid)
 	slog.Debug("Technical service name selected", "service", serviceName)
+	slog.Debug("Export auto-assigned entitlements", "auto-assigned", exportAutoAssigned)
 
 	req := btpClient.EntitlementsServiceClient.
 		GetDirectoryAssignments(ctx).
@@ -86,6 +92,13 @@ func (e entitlementExporter) Export(ctx context.Context, btpClient *btp.Client, 
 			}
 
 			for _, a := range assignments {
+				autoAssigned, hasAutoAssigned := a.GetAutoAssignedOk()
+				if hasAutoAssigned && *autoAssigned && !exportAutoAssigned {
+					if svc.Name != nil && plan.Name != nil {
+						slog.Debug("Skipping auto-assigned entitlement", "service", *svc.Name, "plan", *plan.Name)
+					}
+					continue
+				}
 				eventHandler.Resource(convertEntitlementResource(&svc, &plan, &a))
 			}
 		}
