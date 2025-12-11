@@ -89,7 +89,7 @@ func convertEntitlementResource(svc *openapi.AssignedServiceResponseObject,
 		entitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider.Enable = &enable
 	}
 	amount, hasAmount := resources.FloatValueOk(assignment.GetAmountOk())
-	if !hasEnable && hasAmount {
+	if !hasEnable && hasAmount && amount >= 1 {
 		amountInt := int(amount)
 		entitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider.Amount = &amountInt
 	}
@@ -98,7 +98,7 @@ func convertEntitlementResource(svc *openapi.AssignedServiceResponseObject,
 }
 
 // getEnableOk uses heuristics to determine whether the Enable field should be set to true.
-// Enable is normally set to true to enable the service plan assignment to the specified subaccount
+// The Enable field is normally set to true to enable the service plan assignment to the specified subaccount
 // without quantity restrictions. Relevant and mandatory only for plans that do NOT have a numeric quota.
 func getEnableOk(assignment *openapi.AssignedServicePlanSubaccountDTO) (bool, bool) {
 	amount, hasAmount := resources.FloatValueOk(assignment.GetAmountOk())
@@ -107,7 +107,7 @@ func getEnableOk(assignment *openapi.AssignedServicePlanSubaccountDTO) (bool, bo
 	unlimitedAmountAssigned, hasUnlimitedAmountAssigned := resources.BoolValueOk(assignment.GetUnlimitedAmountAssignedOk())
 
 	// Case 1: Service plan with global unlimited quota is involved.
-	if hasAmount && hasParentAmount && hasUnlimitedAmountAssigned {
+	if hasUnlimitedAmountAssigned && hasAmount && hasParentAmount {
 		if unlimitedAmountAssigned && amount == amountUnlimited && parentAmount == amountUnlimited {
 			return true, true
 		}
