@@ -309,3 +309,10 @@ publish:
 		docker push $(DOCKER_REGISTRY)/$${image}:$(VERSION); \
 	done
 	@$(OK) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
+
+# Generate external-name documentation from *_types.go files
+.PHONY: docs.generate-external-name
+docs.generate-external-name:
+	@$(INFO) Generating external-name documentation from *_types.go files
+	@$(GO) run ./scripts/generate-external-name-docs.go
+	@$(OK) External-name documentation generated
