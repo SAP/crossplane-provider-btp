@@ -21,6 +21,8 @@ const (
 	undefinedName              = "undefined"
 )
 
+const amountUnlimited float32 = 2000000000
+
 func convertEntitlementResource(svc *openapi.AssignedServiceResponseObject,
 	plan *openapi.AssignedServicePlanResponseObject,
 	assignment *openapi.AssignedServicePlanSubaccountDTO) *yaml.ResourceWithComment {
@@ -81,5 +83,44 @@ func convertEntitlementResource(svc *openapi.AssignedServiceResponseObject,
 		entitlement.AddComment(warnUnsupportedEntityType + ", but got: '" + entityType + "'")
 	}
 
+	// Set optional fields.
+	enable, hasEnable := getEnableOk(assignment) // This is a hack.
+	if hasEnable {
+		entitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider.Enable = &enable
+	}
+	amount, hasAmount := resources.FloatValueOk(assignment.GetAmountOk())
+	if !hasEnable && hasAmount {
+		amountInt := int(amount)
+		entitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider.Amount = &amountInt
+	}
+
 	return entitlement
+}
+
+// getEnableOk uses heuristics to determine whether the Enable field should be set to true.
+// Enable is normally set to true to enable the service plan assignment to the specified subaccount
+// without quantity restrictions. Relevant and mandatory only for plans that do NOT have a numeric quota.
+func getEnableOk(assignment *openapi.AssignedServicePlanSubaccountDTO) (bool, bool) {
+	amount, hasAmount := resources.FloatValueOk(assignment.GetAmountOk())
+	parentAmount, hasParentAmount := resources.FloatValueOk(assignment.GetParentAmountOk())
+	parentRemainingAmount, hasParentRemainingAmount := resources.FloatValueOk(assignment.GetParentRemainingAmountOk())
+	unlimitedAmountAssigned, hasUnlimitedAmountAssigned := resources.BoolValueOk(assignment.GetUnlimitedAmountAssignedOk())
+
+	// Case 1: Service plan with global unlimited quota is involved.
+	if hasAmount && hasParentAmount && hasUnlimitedAmountAssigned {
+		if unlimitedAmountAssigned && amount == amountUnlimited && parentAmount == amountUnlimited {
+			return true, true
+		}
+	}
+
+	// Case 2: Service plan is assigned, but its remaining parent amount is not getting less.
+	if hasAmount && hasParentAmount && hasParentRemainingAmount {
+		// This should not happen to service plans that have a numeric quota, because then:
+		// parentRemainingAmount = parentAmount - amount - other subaccount's amount
+		if amount > 0 && amount == parentAmount && amount == parentRemainingAmount {
+			return true, true
+		}
+	}
+
+	return false, false
 }
