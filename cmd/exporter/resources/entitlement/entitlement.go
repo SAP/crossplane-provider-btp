@@ -7,6 +7,7 @@ import (
 
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
+	openapi "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
@@ -64,7 +65,7 @@ func (e entitlementExporter) Export(ctx context.Context, btpClient *btp.Client, 
 
 	result, _, err := req.Execute()
 	if err != nil {
-		return fmt.Errorf("failed to get full list of entitlements: %w", err)
+		return fmt.Errorf("failed to get entitlements from BTP backend: %w", err)
 	}
 
 	svcs, hasSvcs := result.GetAssignedServicesOk()
@@ -77,6 +78,16 @@ func (e entitlementExporter) Export(ctx context.Context, btpClient *btp.Client, 
 	// - assigned services
 	// - assigned plans of those services
 	// - assignment information of each plan
+	processServices(ctx, eventHandler, svcs, exportAutoAssigned)
+
+	return nil
+}
+
+func processServices(ctx context.Context,
+	eventHandler export.EventHandler,
+	svcs []openapi.AssignedServiceResponseObject,
+	exportAutoAssigned bool) {
+
 	for _, svc := range svcs {
 		plans, hasPlans := svc.GetServicePlansOk()
 		if !hasPlans || len(plans) == 0 {
@@ -84,25 +95,45 @@ func (e entitlementExporter) Export(ctx context.Context, btpClient *btp.Client, 
 			continue
 		}
 
-		for _, plan := range plans {
-			assignments, hasAssignments := plan.GetAssignmentInfoOk()
-			if !hasAssignments || len(assignments) == 0 {
-				eventHandler.Warn(fmt.Errorf("no assignment info found for service: %s plan: %s", *svc.Name, *plan.Name))
-				continue
-			}
-
-			for _, a := range assignments {
-				autoAssigned, hasAutoAssigned := a.GetAutoAssignedOk()
-				if hasAutoAssigned && *autoAssigned && !exportAutoAssigned {
-					if svc.Name != nil && plan.Name != nil {
-						slog.Debug("Skipping auto-assigned entitlement", "service", *svc.Name, "plan", *plan.Name)
-					}
-					continue
-				}
-				eventHandler.Resource(convertEntitlementResource(&svc, &plan, &a))
-			}
-		}
+		processServicePlans(ctx, eventHandler, &svc, plans, exportAutoAssigned)
 	}
+}
 
-	return nil
+func processServicePlans(ctx context.Context,
+	eventHandler export.EventHandler,
+	svc *openapi.AssignedServiceResponseObject,
+	plans []openapi.AssignedServicePlanResponseObject,
+	exportAutoAssigned bool) {
+
+	for _, plan := range plans {
+		assignments, hasAssignments := plan.GetAssignmentInfoOk()
+		if !hasAssignments || len(assignments) == 0 {
+			eventHandler.Warn(fmt.Errorf("no assignment info found for service: %s plan: %s", *svc.Name, *plan.Name))
+			continue
+		}
+
+		processPlanAssignments(ctx, eventHandler, svc, &plan, assignments, exportAutoAssigned)
+	}
+}
+
+func processPlanAssignments(ctx context.Context,
+	eventHandler export.EventHandler,
+	svc *openapi.AssignedServiceResponseObject,
+	plan *openapi.AssignedServicePlanResponseObject,
+	assignments []openapi.AssignedServicePlanSubaccountDTO,
+	exportAutoAssigned bool) {
+
+	for _, a := range assignments {
+		autoAssigned, hasAutoAssigned := a.GetAutoAssignedOk()
+		if hasAutoAssigned && *autoAssigned && !exportAutoAssigned {
+			if svc.Name != nil && plan.Name != nil {
+				slog.Debug("Skipping auto-assigned entitlement", "service", *svc.Name, "plan", *plan.Name)
+			} else {
+				slog.Debug("Skipping auto-assigned entitlement for unnamed service or plan")
+			}
+			continue
+		}
+
+		eventHandler.Resource(convertEntitlementResource(svc, plan, &a))
+	}
 }
