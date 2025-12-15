@@ -6,10 +6,10 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/directory"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -85,7 +85,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// ADR Step 2: External-name is set, check its format (must be valid GUID)
-	if !isValidUUID(meta.GetExternalName(cr)) {
+	if !internal.IsValidUUID(meta.GetExternalName(cr)) {
 		return managed.ExternalObservation{}, errors.New(fmt.Sprintf("external-name '%s' is not a valid GUID format", meta.GetExternalName(cr)))
 	}
 
@@ -192,12 +192,6 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (c *external) handler(cr *v1alpha1.Directory) directory.DirectoryClientI {
 	return c.newDirHandlerFn(c.btpClient, cr)
-}
-
-// isValidUUID checks if a string is a valid UUID format
-func isValidUUID(s string) bool {
-	_, err := uuid.Parse(s)
-	return err == nil
 }
 
 // isNotFoundError checks if an error is a 404 not found error
