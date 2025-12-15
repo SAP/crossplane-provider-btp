@@ -22,19 +22,6 @@ check_command() {
   fi
 }
 
-install_tool() {
-  local tool_name=$1
-  local check_cmd=$2
-  local install_fn=$3
-  
-  if ! command -v $check_cmd &> /dev/null; then
-    echo "📦 Installing $tool_name..."
-    $install_fn
-  else
-    echo "✓ $tool_name already installed"
-  fi
-}
-
 # =============================================================================
 # LOAD ENVIRONMENT
 # =============================================================================
@@ -113,19 +100,25 @@ done
 # =============================================================================
 
 # kind
-install_tool "kind" "kind" "install_kind"
-install_kind() {
+if ! command -v kind &> /dev/null; then
+  echo "📦 Installing kind..."
   curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
   chmod +x ./kind
   sudo mv ./kind /usr/local/bin/kind
-}
+  echo "✓ kind installed"
+else
+  echo "✓ kind already installed"
+fi
 
 # Crossplane CLI
-install_tool "Crossplane CLI" "crossplane" "install_crossplane"
-install_crossplane() {
+if ! command -v crossplane &> /dev/null; then
+  echo "📦 Installing Crossplane CLI..."
   curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh" | sh
   sudo mv crossplane /usr/local/bin/
-}
+  echo "✓ Crossplane CLI installed"
+else
+  echo "✓ Crossplane CLI already installed"
+fi
 
 # jq
 if ! command -v jq &> /dev/null; then
@@ -309,7 +302,19 @@ echo "   - terraform:  $(terraform version -json 2>/dev/null | jq -r '.terraform
 echo "   - k9s:        ${K9S_VERSION}"
 echo ""
 echo "📚 Next steps:"
+echo ""
+echo "   👨‍💻 Developer workflow (run code locally):"
+echo "   ----------------------------------------"
 echo "   make run                                    # Run local controller"
 echo "   kubectl apply -f examples/subaccount.yaml   # Test it"
-echo "   k9s                                         # Watch resources"
+echo ""
+echo "   🧪 Evaluator workflow (try published provider):"
+echo "   -----------------------------------------------"
+echo "   kubectl crossplane install provider ghcr.io/sap/crossplane-provider-btp:latest"
+echo "   kubectl wait --for=condition=Healthy provider.pkg.crossplane.io --all --timeout=300s"
+echo "   kubectl apply -f examples/subaccount.yaml"
+echo ""
+echo "   📊 Monitor resources:"
+echo "   --------------------"
+echo "   k9s                                         # Interactive UI"
 echo ""
