@@ -34,8 +34,15 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A Subaccount is a managed resource that represents a subaccount
-          in the SAP Business Technology Platform
+        description: |-
+          A Subaccount is a managed resource that represents a subaccount in the SAP Business Technology Platform.
+
+          External-Name Configuration:
+            - Follows Standard: yes
+            - Format: Subaccount GUID (UUID format)
+            - How to find:
+              - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
+              - CLI: btp list accounts/subaccount (field: guid)
         properties:
           apiVersion:
             description: |-
