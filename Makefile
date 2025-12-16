@@ -17,8 +17,7 @@ export TERRAFORM_DOCS_PATH ?= docs/resources
 # set BUILD_ID if its not running in an action
 BUILD_ID ?= $(shell date +"%H%M%S")
 
-TEST_CRS_PATH ?= test/e2e/testdata/crs
-UPGRADE_TEST_CRS_PATH ?= test/upgrade/testdata/baseCRs
+export TEST_CRS_PATH ?= test/e2e/testdata/crs
 
 PLATFORMS ?= linux_amd64
 #get version from current git release tag
@@ -317,6 +316,11 @@ publish:
 # Upgrade Tests
 # ====================================================================================
 
+# Upgrade tests run relative to the test/upgrade/ folder
+# Therefore, the CRs path in the makefile must be prefixed with test/upgrade/
+export UPGRADE_TEST_CRS_PATH ?= testdata/baseCRs
+UPGRADE_TEST_FULL_CRS_PATH ?= test/upgrade/$(UPGRADE_TEST_CRS_PATH)
+
 .PHONY: upgrade-test
 upgrade-test: $(KIND)
 	@for var in UPGRADE_TEST_FROM_TAG UPGRADE_TEST_TO_TAG UPGRADE_TEST_CRS_PATH; do \
@@ -324,7 +328,7 @@ upgrade-test: $(KIND)
 			echo "❌ Error: $$var is not set"; exit 1; \
 		fi; \
 	done
-	@$(MAKE) generate-test-crs TEST_CRS_PATH=$(UPGRADE_TEST_CRS_PATH)
+	@$(MAKE) generate-test-crs TEST_CRS_PATH=$(UPGRADE_TEST_FULL_CRS_PATH)
 	@$(INFO) Running upgrade tests
 	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
@@ -335,13 +339,13 @@ upgrade-test: $(KIND)
 	 esac
 
 .PHONY: upgrade-test-debug
-upgrade-test-debug: $(KIND) $(HELM3)
+upgrade-test-debug: $(KIND)
 	@for var in UPGRADE_TEST_FROM_TAG UPGRADE_TEST_TO_TAG UPGRADE_TEST_CRS_PATH; do \
 		if [ -z "$${!var}" ]; then \
 			echo "❌ Error: $$var is not set"; exit 1; \
 		fi; \
 	done
-	@$(MAKE) generate-test-crs TEST_CRS_PATH=$(UPGRADE_TEST_CRS_PATH)
+	@$(MAKE) generate-test-crs TEST_CRS_PATH=$(UPGRADE_TEST_FULL_CRS_PATH)
 	@$(INFO) Running upgrade tests
 	@dlv test -tags=upgrade ./test/upgrade --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
@@ -356,6 +360,6 @@ upgrade-test-restore-crs:
 	@if [ -z "$(UPGRADE_TEST_CRS_PATH)" ]; then \
 		echo "❌ Error: UPGRADE_TEST_CRS_PATH is not set"; exit 1; \
 	fi
-	@$(INFO) Restoring $(UPGRADE_TEST_CRS_PATH)
-	@git restore $(UPGRADE_TEST_CRS_PATH)
+	@$(INFO) Restoring $(UPGRADE_TEST_FULL_CRS_PATH)
+	@git restore $(UPGRADE_TEST_FULL_CRS_PATH)
 	@$(OK) CRs restored
