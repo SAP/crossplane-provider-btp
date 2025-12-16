@@ -17,6 +17,9 @@ export TERRAFORM_DOCS_PATH ?= docs/resources
 # set BUILD_ID if its not running in an action
 BUILD_ID ?= $(shell date +"%H%M%S")
 
+TEST_CRS_PATH ?= test/e2e/testdata/crs
+UPGRADE_TEST_CRS_PATH ?= test/upgrade/testdata/baseCRs
+
 PLATFORMS ?= linux_amd64
 #get version from current git release tag
 VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse HEAD)
@@ -289,19 +292,19 @@ test-acceptance-debug: $(KIND) $(HELM3) build generate-test-crs
 	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '$(testFilter)'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
 	@$(OK) integration tests passed
 
-.PHONY:generate-test-crs
+.PHONY: generate-test-crs
 generate-test-crs:
-	@echo generating crs
-	find test/e2e/testdata/crs -type f -name "*.yaml" -exec sh -c '\
+	@$(INFO) Generating CRS in $(TEST_CRS_PATH)
+	@find $(TEST_CRS_PATH) -type f -name "*.yaml" -exec sh -c '\
     	for template; do \
     		envsubst < "$$template" > "$${template}.tmp" && mv "$${template}.tmp" "$$template"; \
     	done' sh {} +
-	@echo crs generated
+	@$(OK) CRS generated
 
 
 PUBLISH_IMAGES ?= crossplane/provider-btp crossplane/provider-btp-controller
 
-.PONY: publish
+.PHONY: publish
 publish:
 	@$(INFO) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
 	@for image in $(PUBLISH_IMAGES); do \
@@ -310,33 +313,49 @@ publish:
 	done
 	@$(OK) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
 
+# ====================================================================================
+# Upgrade Tests
+# ====================================================================================
+
 .PHONY: upgrade-test
-upgrade-test: $(KIND) $(HELM3) generate-test-crs
-	@$(INFO) running upgrade tests
-	@if [ -z "$(fromTag)" ] || [ -z "$(toTag)" ]; then \
-		echo "Error: Both fromTag and toTag must be set."; \
-		exit 1; \
-	fi
-	UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) go test -tags=upgrade ./test/upgrade/... -v -short -count=1 -test.v -run '$(testFilter)' -timeout 180m 2>&1 | tee test-output.log
+upgrade-test: $(KIND)
+	@for var in UPGRADE_TEST_FROM_TAG UPGRADE_TEST_TO_TAG UPGRADE_TEST_CRS_PATH; do \
+		if [ -z "$${!var}" ]; then \
+			echo "❌ Error: $$var is not set"; exit 1; \
+		fi; \
+	done
+	@$(MAKE) generate-test-crs TEST_CRS_PATH=$(UPGRADE_TEST_CRS_PATH)
+	@$(INFO) Running upgrade tests
+	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
 			*FAIL*) echo "❌ Error: Test failed"; exit 1 ;; \
-			*) echo "✅ All tests passed"; $(OK) upgrade tests passed ;; \
+			*) echo "✅ All tests passed"; $(OK) Upgrade tests passed ;; \
 	 esac
 
 .PHONY: upgrade-test-debug
-upgrade-test-debug: $(KIND) $(HELM3) generate-test-crs
-	@$(INFO) running upgrade tests
-	@if [ -z "$(fromTag)" ] || [ -z "$(toTag)" ]; then \
-		echo "Error: Both fromTag and toTag must be set."; \
-		exit 1; \
-	fi
-	go test -gcflags="all=-N -l" -c -o ./test/upgrade/upgrade-test-debug.test $(PROJECT_REPO)/test/upgrade -tags=upgrade
-	UPGRADE_TEST_FROM_TAG=$(fromTag) UPGRADE_TEST_TO_TAG=$(toTag) dlv exec ./upgrade-test-debug.test --headless --listen=:2345 --api-version=2 --accept-multiclient -- -v -short -count=1 -test.v -run '$(testFilter)' -timeout 180m 2>&1 | tee test-output.log; rm ./test/upgrade/upgrade-test-debug.test; exit $$EXIT_CODE
+upgrade-test-debug: $(KIND) $(HELM3)
+	@for var in UPGRADE_TEST_FROM_TAG UPGRADE_TEST_TO_TAG UPGRADE_TEST_CRS_PATH; do \
+		if [ -z "$${!var}" ]; then \
+			echo "❌ Error: $$var is not set"; exit 1; \
+		fi; \
+	done
+	@$(MAKE) generate-test-crs TEST_CRS_PATH=$(UPGRADE_TEST_CRS_PATH)
+	@$(INFO) Running upgrade tests
+	@dlv test -tags=upgrade ./test/upgrade --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
 			*FAIL*) echo "❌ Error: Test failed"; exit 1 ;; \
-			*) echo "✅ All tests passed"; $(OK) upgrade tests passed ;; \
+			*) echo "✅ All tests passed"; $(OK) Upgrade tests passed ;; \
 	 esac
+
+.PHONY: upgrade-test-restore-crs
+upgrade-test-restore-crs:
+	@if [ -z "$(UPGRADE_TEST_CRS_PATH)" ]; then \
+		echo "❌ Error: UPGRADE_TEST_CRS_PATH is not set"; exit 1; \
+	fi
+	@$(INFO) Restoring $(UPGRADE_TEST_CRS_PATH)
+	@git restore $(UPGRADE_TEST_CRS_PATH)
+	@$(OK) CRs restored

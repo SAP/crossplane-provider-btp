@@ -6,51 +6,61 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/upgrade"
 	"github.com/sap/crossplane-provider-btp/test"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 )
 
 func TestUpgradeProvider(t *testing.T) {
+	klog.V(2).Infof("Starting upgrade test from %s to %s", fromTag, toTag)
+	klog.V(2).Infof("Testing resources in directories: %v", resourceDirectories)
+
+	// TODO: Make sure there are logs for the full package strings
+
 	upgradeTest := upgrade.UpgradeTest{
-		ClusterName:         kindClusterName,
 		ProviderName:        providerName,
-		FromProviderPackage: fromPackage,
-		ToProviderPackage:   toPackage,
+		ClusterName:         kindClusterName,
+		FromProviderPackage: fromProviderPackage,
+		ToProviderPackage:   toProviderPackage,
 		ResourceDirectories: resourceDirectories,
 	}
 
-	upgradeFeature := features.New(fmt.Sprintf("upgrade provider btp from %s to %s", fromTag, toTag)).
+	upgradeFeature := features.New(fmt.Sprintf("Upgrade %s from %s to %s", providerName, fromTag, toTag)).
 		WithSetup(
-			"install provider",
+			"Install provider with version "+fromTag,
 			upgrade.ApplyProvider(upgradeTest.ClusterName, upgradeTest.FromProviderInstallOptions()),
 		).
 		WithSetup(
-			"import resources",
+			"Import resources in "+resourceDirectoryRoot,
 			upgrade.ImportResources(upgradeTest.ResourceDirectories),
 		).
 		Assess(
-			"verify resources before upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*30),
+			"Verify resources before upgrade",
+			upgrade.VerifyResources(upgradeTest.ResourceDirectories, verifyTimeout),
 		).
-		Assess("upgrade provider", upgrade.UpgradeProvider(upgrade.UpgradeProviderOptions{
+		Assess("Upgrade provider to version "+toTag, upgrade.UpgradeProvider(upgrade.UpgradeProviderOptions{
 			ClusterName:         upgradeTest.ClusterName,
 			ProviderOptions:     upgradeTest.ToProviderInstallOptions(),
 			ResourceDirectories: upgradeTest.ResourceDirectories,
-			WaitForPause:        time.Minute * 1,
+			WaitForPause:        waitForPause,
 		})).
 		Assess(
-			"verify resources after upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, time.Minute*30),
+			"Verify resources after upgrade",
+			upgrade.VerifyResources(upgradeTest.ResourceDirectories, verifyTimeout),
 		).
 		WithTeardown(
-			"delete resources",
+			"Delete resources",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				err := test.DeleteResourcesFromDirsGracefully(ctx, cfg, resourceDirectories, wait.WithTimeout(time.Minute*30))
+				err := test.DeleteResourcesFromDirsGracefully(
+					ctx,
+					cfg,
+					resourceDirectories,
+					wait.WithTimeout(verifyTimeout),
+				)
 				if err != nil {
 					t.Logf("failed to clean up resources: %v", err)
 				}
@@ -59,7 +69,7 @@ func TestUpgradeProvider(t *testing.T) {
 			},
 		).
 		WithTeardown(
-			"delete provider",
+			"Delete provider",
 			upgrade.DeleteProvider(upgradeTest.ProviderName),
 		)
 	testenv.Test(t, upgradeFeature.Feature())

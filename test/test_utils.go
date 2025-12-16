@@ -2,7 +2,11 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/logging"
@@ -188,4 +192,35 @@ func GetObjectsToImport(ctx context.Context, cfg *envconf.Config, dirs []string)
 func resClient(cfg *envconf.Config) *res.Resources {
 	r, _ := resources.GetResourcesWithRESTConfig(cfg)
 	return r
+}
+
+func LoadDirectoriesWithYAMLFiles(path string, ignoreDirectories []string) ([]string, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read resource files from %s: %w", path, err)
+	}
+
+	var directories []string
+	containsYAMLFile := false
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			if !slices.Contains(ignoreDirectories, filepath.Join(path, entry.Name())) {
+				subEntries, err := LoadDirectoriesWithYAMLFiles(filepath.Join(path, entry.Name()), ignoreDirectories)
+				if err != nil {
+					return nil, err
+				}
+
+				directories = append(directories, subEntries...)
+			}
+		} else if strings.HasSuffix(entry.Name(), ".yaml") {
+			containsYAMLFile = true
+		}
+	}
+
+	if containsYAMLFile {
+		directories = append(directories, path)
+	}
+
+	return directories, nil
 }
