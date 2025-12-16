@@ -32,6 +32,16 @@ func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObje
 	saSubdomain, hasSubdomain := resources.StringValueOk(subaccount.GetSubdomainOk())
 	saCreatedBy, hasCreatedBy := resources.StringValueOk(subaccount.GetCreatedByOk())
 
+	var resourceName string
+	switch {
+	case !hasName && hasGuid:
+		resourceName = KIND_NAME + "-" + saGuid
+	case !hasName:
+		resourceName = resources.UNDEFINED_NAME
+	default:
+		resourceName = resources.SanitizeK8sResourceName(saDisplayName)
+	}
+
 	// Create Subaccount with required fields first.
 	saResource := yaml.NewResourceWithComment(
 		&v1alpha1.Subaccount{
@@ -40,8 +50,7 @@ func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObje
 				APIVersion: v1alpha1.CRDGroupVersion.String(),
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				// TODO: switch to `exporttool/parsan` for name sanitization, once it supports RFC 1123.
-				Name: resources.SanitizeK8sResourceName(saDisplayName, saGuid),
+				Name: resourceName,
 				Annotations: map[string]string{
 					"crossplane.io/external-name": saGuid,
 				},
@@ -81,26 +90,38 @@ func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObje
 
 	// Fill the optional fields that are relevant for the Update operation, to have it match status.atProvider
 	// and not trigger an update right after managementPolicies is set to manage the resource.
+
+	// GlobalAccountGuid
 	ga, ok := resources.StringValueOk(subaccount.GetGlobalAccountGUIDOk())
 	if ok {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.GlobalAccountGuid = ga
 	}
+
+	// DirectoryGuid
 	parent, ok := resources.StringValueOk(subaccount.GetParentGUIDOk())
 	if ok && parent != ga {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.DirectoryGuid = parent
 	}
+
+	// Description
 	v, ok := resources.StringValueOk(subaccount.GetDescriptionOk())
 	if ok {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Description = v
 	}
+
+	// UsedForProduction
 	v, ok = resources.StringValueOk(subaccount.GetUsedForProductionOk())
 	if ok {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.UsedForProduction = v
 	}
+
+	// Labels
 	l, ok := subaccount.GetLabelsOk()
 	if ok {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Labels = *l
 	}
+
+	// BetaEnabled
 	b, ok := resources.BoolValueOk(subaccount.GetBetaEnabledOk())
 	if ok {
 		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.BetaEnabled = b

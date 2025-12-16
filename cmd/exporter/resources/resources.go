@@ -2,16 +2,15 @@ package resources
 
 import (
 	"context"
-	"regexp"
-	"strings"
-
-	"k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/parsan"
 
 	"github.com/sap/crossplane-provider-btp/btp"
 )
+
+const UNDEFINED_NAME = "UNDEFINED-NAME"
 
 // Kind interface must be implemented by each BTP provider custom resource kind.
 type Kind interface {
@@ -98,39 +97,11 @@ func FloatValueOk(f *float32, hint bool) (float32, bool) {
 	return *f, true
 }
 
-func SanitizeK8sResourceName(s, fallback string) string {
-	// Convert to lowercase.
-	s = strings.ToLower(s)
-
-	// Replace spaces and underscores with hyphens.
-	s = strings.ReplaceAll(s, " ", "-")
-	s = strings.ReplaceAll(s, "_", "-")
-
-	// Remove invalid characters (keep only alphanumeric and hyphens).
-	reg := regexp.MustCompile("[^a-z0-9-]")
-	s = reg.ReplaceAllString(s, "")
-
-	// Remove leading/trailing hyphens.
-	s = strings.Trim(s, "-")
-
-	// Handle empty result.
-	if s == "" {
-		s = fallback
+func SanitizeK8sResourceName(s string) string {
+	suggestions := parsan.ParseAndSanitize(s, parsan.RFC1035LowerSubdomain)
+	if len(suggestions) == 0 {
+		return UNDEFINED_NAME
 	}
 
-	// Truncate to max length.
-	if len(s) > validation.DNS1123LabelMaxLength { // 63 chars
-		s = s[:validation.DNS1123LabelMaxLength]
-	}
-
-	// Ensure it doesn't end with hyphen after truncation.
-	s = strings.TrimRight(s, "-")
-
-	// Validate it.
-	if errs := validation.IsDNS1123Label(s); len(errs) > 0 {
-		// Handle validation errors if needed
-		return fallback
-	}
-
-	return s
+	return suggestions[0]
 }

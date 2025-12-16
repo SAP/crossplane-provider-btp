@@ -18,7 +18,6 @@ const (
 	warnMissingSubaccountGuid  = "WARNING: subaccount ID is missing in the source, cannot create a valid Entitlement resource"
 	warnUndefinedResourceName  = "WARNING: could not generate a valid name for the Entitlement resource"
 	warnUnsupportedEntityType  = "WARNING: only 'SUBACCOUNT' entity type is supported for Entitlement resources"
-	undefinedName              = "undefined"
 )
 
 const amountUnlimited float32 = 2000000000
@@ -32,9 +31,11 @@ func convertEntitlementResource(svc *openapi.AssignedServiceResponseObject,
 	subAccountGuid, hasSubaccountGuid := resources.StringValueOk(assignment.GetEntityIdOk())
 	entityType, hasEntityType := resources.StringValueOk(assignment.GetEntityTypeOk())
 
-	// TODO: switch to `exporttool/parsan` for name sanitization, once it supports RFC 1123.
+	resourceName := resources.UNDEFINED_NAME
 	planId, hasPlanId := resources.StringValueOk(plan.GetUniqueIdentifierOk())
-	resourceName := resources.SanitizeK8sResourceName(planId+"-"+subAccountGuid, undefinedName)
+	if hasPlanId && hasSubaccountGuid {
+		resourceName = resources.SanitizeK8sResourceName(planId + "-" + subAccountGuid)
+	}
 
 	// Create Subaccount with required fields first.
 	entitlement := yaml.NewResourceWithComment(
@@ -76,7 +77,7 @@ func convertEntitlementResource(svc *openapi.AssignedServiceResponseObject,
 	if !hasSubaccountGuid {
 		entitlement.AddComment(warnMissingSubaccountGuid)
 	}
-	if resourceName == undefinedName {
+	if resourceName == resources.UNDEFINED_NAME {
 		entitlement.AddComment(warnUndefinedResourceName)
 	}
 	if !hasEntityType || entityType != "SUBACCOUNT" {

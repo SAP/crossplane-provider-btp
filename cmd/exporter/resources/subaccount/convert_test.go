@@ -10,6 +10,7 @@ import (
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	openapiaccount "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 )
 
@@ -132,7 +133,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: saGuid,
+							Name: "subaccount-" + saGuid,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": saGuid,
 							},
@@ -351,7 +352,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 						APIVersion: v1alpha1.CRDGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-subaccount-with-spaces--special",
+						Name: "test-subaccount-with-spaces---special--at-x",
 						Annotations: map[string]string{
 							"crossplane.io/external-name": saGuid,
 						},
@@ -386,7 +387,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: "",
+							Name: resources.UNDEFINED_NAME,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": "",
 							},
