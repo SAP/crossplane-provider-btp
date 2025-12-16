@@ -43,8 +43,11 @@ func TestUpgradeProvider(t *testing.T) {
 			upgrade.VerifyResources(upgradeTest.ResourceDirectories, verifyTimeout),
 		).
 		Assess("Upgrade provider to version "+toTag, upgrade.UpgradeProvider(upgrade.UpgradeProviderOptions{
-			ClusterName:         upgradeTest.ClusterName,
-			ProviderOptions:     upgradeTest.ToProviderInstallOptions(),
+			ClusterName: upgradeTest.ClusterName,
+			ProviderOptions: test.InstallProviderOptionsWithController(
+				upgradeTest.ToProviderInstallOptions(),
+				toControllerPackage,
+			),
 			ResourceDirectories: upgradeTest.ResourceDirectories,
 			WaitForPause:        waitForPause,
 		})).

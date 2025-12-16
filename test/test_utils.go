@@ -224,3 +224,10 @@ func LoadDirectoriesWithYAMLFiles(path string, ignoreDirectories []string) ([]st
 
 	return directories, nil
 }
+
+func InstallProviderOptionsWithController(
+	options xpenvfuncs.InstallCrossplaneProviderOptions, controllerPackage string,
+) xpenvfuncs.InstallCrossplaneProviderOptions {
+	options.ControllerImage = &controllerPackage
+	return options
+}
