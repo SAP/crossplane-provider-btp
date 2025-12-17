@@ -3,6 +3,7 @@ package subaccount
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 
@@ -88,19 +89,36 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotSubaccount)
 	}
 
+	// ADR Step 1: Check if external-name is empty
+	if meta.GetExternalName(desiredCR) == "" {
+		// Backwards compatibility: not necessary since previously it was in another format
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+
+	}
+
+	// Migrate old external-name format if necessary
 	if err := c.migrateExternalName(ctx, desiredCR); err != nil {
 		return managed.ExternalObservation{}, err
 	}
 
+	// ADR Step 2: External-name is set, check its format (must be valid GUID)
+	if !isValidUUID(meta.GetExternalName(desiredCR)) {
+		return managed.ExternalObservation{}, errors.New(fmt.Sprintf("external-name '%s' is not a valid GUID format", meta.GetExternalName(desiredCR)))
+	}
+
+	// ADR Step 3: Build the Get API Request from the external-name (using GUID directly)
 	if err := c.generateObservation(ctx, desiredCR); err != nil {
 		return managed.ExternalObservation{}, err
 	}
 
 	c.tracker.SetConditions(ctx, desiredCR)
+
 	// Needs Creation?
 	if needsCreation := c.needsCreation(desiredCR); needsCreation {
 		return managed.ExternalObservation{
-			ResourceExists: !needsCreation,
+			ResourceExists: false,
 		}, nil
 	}
 
@@ -303,6 +321,7 @@ func deleteBTPSubaccount(
 	subaccountId := meta.GetExternalName(subaccount)
 
 	_, raw, err := accountsServiceClient.AccountsServiceClient.SubaccountOperationsAPI.DeleteSubaccount(ctx, subaccountId).Execute()
+	// 404 not found means already deleted - not considered as error case
 	if raw.StatusCode == 404 {
 		ctrl.Log.Info("associated BTP subaccount not found, continue deletion")
 		return nil
@@ -365,14 +384,22 @@ func (c *external) createBTPSubaccount(
 	ctx context.Context, subaccount *apisv1alpha1.Subaccount,
 ) error {
 	ctrl.Log.Info(fmt.Sprintf("Creating subaccount: %s", subaccount.Name))
-	createdSubaccount, _, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.
+	createdSubaccount, resp, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.
 		CreateSubaccount(ctx).
 		CreateSubaccountRequestPayload(toCreateApiPayload(subaccount)).
 		Execute()
 	if err != nil {
+		// Check if error is "resource already exists"
+		if resp.StatusCode == http.StatusConflict {
+			// ADR: Do NOT set external-name, stay in error loop
+			// User must set external-name manually to resolve
+			return errors.Wrap(err, "creation failed - resource already exists. Please set external-name annotation to adopt the existing resource")
+		}
+		// Other errors: do not set external-name either
 		return specifyAPIError(err)
 	}
 
+	// ADR: Successful creation - set external-name from API response
 	guid := createdSubaccount.Guid
 	ctrl.Log.Info(fmt.Sprintf("subaccount (%s) created", guid))
 	subaccount.Status.AtProvider.SubaccountGuid = &guid
