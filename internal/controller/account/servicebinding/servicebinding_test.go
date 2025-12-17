@@ -1167,7 +1167,9 @@ func TestUpdate(t *testing.T) {
 				keyRotator: &MockKeyRotator{
 					deleteExpiredKeysErr: errors.New("delete expired keys error"),
 				},
-				kube: &test.MockClient{},
+				kube: &test.MockClient{
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
 			},
 			args: args{
 				mg: expectedServiceBinding(
