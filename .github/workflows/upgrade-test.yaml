@@ -28,71 +28,8 @@ on:
         type: string
 
 jobs:
-  build-test-version:
-    if: ${{ github.event.inputs.target == '' }}
-    outputs:
-      target_version: ${{ steps.set-target-version.outputs.BUILD_IMAGE_VERSION }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
-        with:
-          version: v0.15.1
-          install: true
-
-      - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
-        with:
-          submodules: true
-
-      - name: Fetch History
-        run: git fetch --prune --unshallow
-
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version: "1.24"
-
-      - name: Vendor Dependencies
-        run: make vendor vendor.check
-
-      - name: Set up Version
-        id: set-target-version
-        run: |
-          echo "setting version to v0.0.0-draft-${{ github.sha }}"
-          echo "BUILD_IMAGE_VERSION=v0.0.0-draft-${{ github.sha }}" >> $GITHUB_ENV
-          echo "BUILD_IMAGE_VERSION=v0.0.0-draft-${{ github.sha }}" >> $GITHUB_OUTPUT
-
-      - name: Print Version Number
-        run: |
-          echo "BUILD_IMAGE_VERSION is $BUILD_IMAGE_VERSION"
-
-      - name: Build Images
-        run: make build VERSION=$BUILD_IMAGE_VERSION
-        env:
-          # We're using docker buildx, which doesn't actually load the images it
-          # builds by default. Specifying --load does so.
-          BUILD_ARGS: "--load"
-          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
-          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
-
-      - name: Login to Container Registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
-        with:
-          registry: ${{ vars.REGISTRY_URL }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish Artifacts to DockerHub
-        run: make publish BRANCH_NAME=${GITHUB_REF##*/} VERSION=$BUILD_IMAGE_VERSION
-        env:
-          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
-          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
-
   upgrade-test:
-    needs: [build-test-version]
     runs-on: ubuntu-latest
-    if: always() # would also run if build-test-version fails but we just fail too
     environment: ${{ inputs.environment }}
     env:
       # hardcoded BTP CLI version
@@ -101,7 +38,7 @@ jobs:
       - name: Set TARGET_IMAGE_VERSION
         run: |
           if [ -z "${{ github.event.inputs.target }}" ]; then
-            echo "TARGET_IMAGE_VERSION=${{ needs.build-test-version.outputs.target_version }}" >> $GITHUB_ENV
+            echo "TARGET_IMAGE_VERSION=local" >> $GITHUB_ENV
           else
             echo "TARGET_IMAGE_VERSION=${{ github.event.inputs.target }}" >> $GITHUB_ENV
           fi
@@ -146,9 +83,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gettext
 
       - name: Run upgrade test
-        timeout-minutes: 180
+        timeout-minutes: 120
         run: |
-          make upgrade-test fromTag=${{ github.event.inputs.source }} toTag=${TARGET_IMAGE_VERSION}
+          make upgrade-test
         env:
           BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
@@ -158,6 +95,8 @@ jobs:
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
           IDP_URL: ${{ secrets.SECOND_IDP_URL }} # Use a different IDP for the upgrade tests to avoid conflicts
+          UPGRADE_TEST_FROM_TAG: ${{ github.event.inputs.source }}
+          UPGRADE_TEST_TO_TAG: ${{ env.TARGET_IMAGE_VERSION }}
 
       - name: clean up cluster
         if: always()
