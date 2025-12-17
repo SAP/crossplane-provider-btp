@@ -9,7 +9,7 @@ include ../../../build/makelib/common.mk
 DOCKER_REGISTRY ?= crossplane
 IMAGE = $(BUILD_REGISTRY)/crossplane/provider-btp
 OSBASEIMAGE = scratch
-include ../../../build/makelib/image.mk
+include ../../../build/makelib/imagelight.mk
 
 # ====================================================================================
 # Targets
