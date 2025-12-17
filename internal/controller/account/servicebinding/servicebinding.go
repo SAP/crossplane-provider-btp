@@ -278,6 +278,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 // DeleteBinding implements the BindingDeleter interface for the key rotator
 func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
 	// The deletion timestamp must be set before the Connect() function is called on the external client. This fixes (#425).
+	// Otherwise it could in some cases end in an error stating that `prevent_destroy` is set to `true` on the resource.
 	cr = cr.DeepCopy()
 	cr.SetDeletionTimestamp(internal.Ptr(metav1.Now()))
 	cr.SetConditions(xpv1.Deleting())
