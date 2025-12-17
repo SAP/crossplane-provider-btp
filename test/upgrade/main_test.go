@@ -32,6 +32,8 @@ const (
 
 	namespacePrefix = "btp-upgrade-test-"
 
+	resourceDirectoryRoot = "./testdata/baseCRs"
+
 	cisSecretName         = "cis-provider-secret"
 	serviceUserSecretName = "sa-provider-secret"
 
@@ -45,15 +47,12 @@ const (
 	fromControllerRepositoryEnvVar = "UPGRADE_TEST_FROM_CONTROLLER_REPOSITORY"
 	toControllerRepositoryEnvVar   = "UPGRADE_TEST_TO_CONTROLLER_REPOSITORY"
 
-	resourceDirectoryEnvVar = "UPGRADE_TEST_CRS_PATH"
-
 	verifyTimeoutEnvVar = "UPGRADE_TEST_VERIFY_TIMEOUT"
 	waitForPauseEnvVar  = "UPGRADE_TEST_WAIT_FOR_PAUSE"
 
 	defaultProviderRepository   = "ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp"
 	defaultControllerRepository = "ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp-controller"
 
-	defaultResourceDirectory = "./testdata/baseCRs"
 	defaultVerifyTimeoutMins = 30
 	defaultWaitForPauseMins  = 1
 )
@@ -65,9 +64,8 @@ var (
 	// Add any directories to ignore here, e.g.: ./testdata/baseCRs/ignore-this-dir
 	ignoreResourceDirectories []string
 
-	resourceDirectoryRoot string
-	verifyTimeout         time.Duration
-	waitForPause          time.Duration
+	verifyTimeout time.Duration
+	waitForPause  time.Duration
 )
 
 var (
@@ -100,7 +98,6 @@ func SetupClusterWithCrossplane(namespace string) {
 
 	fromTag, toTag = loadTags()
 	fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository := loadRepositories()
-	resourceDirectoryRoot = loadResourceDirectoryRoot()
 	verifyTimeout = loadDurationMins(verifyTimeoutEnvVar, defaultVerifyTimeoutMins)
 	waitForPause = loadDurationMins(waitForPauseEnvVar, defaultWaitForPauseMins)
 
@@ -241,22 +238,6 @@ func getDeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeCon
 			},
 		},
 	}
-}
-
-func loadResourceDirectoryRoot() string {
-	resourceDirectoryRootVar := os.Getenv(resourceDirectoryEnvVar)
-	if resourceDirectoryRootVar == "" {
-		resourceDirectoryRootVar = defaultResourceDirectory
-		klog.V(4).Infof("Using default resource directory: %s", resourceDirectoryRootVar)
-	} else {
-		klog.V(4).Infof(
-			"Using resource directory from %s: %s",
-			resourceDirectoryEnvVar,
-			resourceDirectoryRootVar,
-		)
-	}
-
-	return resourceDirectoryRootVar
 }
 
 func getEnv(key, fallback string) string {

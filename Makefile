@@ -316,22 +316,44 @@ publish:
 # Upgrade Tests
 # ====================================================================================
 
-# Upgrade tests run relative to the test/upgrade/ folder
-# Therefore, the CRs path in the makefile must be prefixed with test/upgrade/
-export UPGRADE_TEST_CRS_PATH ?= testdata/baseCRs
-UPGRADE_TEST_FULL_CRS_PATH ?= test/upgrade/$(UPGRADE_TEST_CRS_PATH)
+# If UPGRADE_TEST_CRS_TAG is not set, use UPGRADE_TEST_FROM_TAG as default
+UPGRADE_TEST_CRS_TAG ?= $(UPGRADE_TEST_FROM_TAG)
 
-.PHONY: prepare-upgrade-test
-prepare-upgrade-test:
-	@for var in UPGRADE_TEST_FROM_TAG UPGRADE_TEST_TO_TAG UPGRADE_TEST_CRS_PATH; do \
+.PHONY: generate-upgrade-test-crs
+generate-upgrade-test-crs: TEST_CRS_PATH := test/upgrade/testdata/baseCRs
+generate-upgrade-test-crs: generate-test-crs
+
+.PHONY: check-upgrade-test-vars
+check-upgrade-test-vars:
+	@for var in UPGRADE_TEST_FROM_TAG UPGRADE_TEST_TO_TAG; do \
 		if [ -z "$${!var}" ]; then \
 			echo "❌ Error: $$var is not set"; exit 1; \
 		fi; \
 	done
-	@$(MAKE) generate-test-crs TEST_CRS_PATH=$(UPGRADE_TEST_FULL_CRS_PATH)
+
+.PHONY: pull-upgrade-test-version-crs
+pull-upgrade-test-version-crs:
+	@if [ -z "$(UPGRADE_TEST_CRS_TAG)" ]; then \
+		echo "❌ Error: UPGRADE_TEST_CRS_TAG or UPGRADE_TEST_FROM_TAG is not set"; exit 1; \
+	fi
+	@$(INFO) "Pulling CRs from \"$(UPGRADE_TEST_CRS_TAG)\""
+	@if [ "$(UPGRADE_TEST_CRS_TAG)" = "local" ]; then \
+		$(OK) "Using local CRs from test/upgrade/testdata/baseCRs/ (UPGRADE_TEST_CRS_TAG is \"local\")"; \
+	else \
+		$(INFO) "Attempting to check out CRs from tag $(UPGRADE_TEST_CRS_TAG)"; \
+		if git ls-tree -r $(UPGRADE_TEST_CRS_TAG) --name-only | grep -q "^test/upgrade/testdata/baseCRs/"; then \
+			$(INFO) "Checking out CRs to test/upgrade/testdata/baseCRs from $(UPGRADE_TEST_CRS_TAG)"; \
+			rm -r test/upgrade/testdata/baseCRs; \
+			mkdir -p test/upgrade/testdata/baseCRs; \
+			git archive $(UPGRADE_TEST_CRS_TAG) test/upgrade/testdata/baseCRs | tar -x --strip-components=2 -C test/upgrade; \
+			$(OK) "Checked out CRs to test/upgrade/testdata/baseCRs from $(UPGRADE_TEST_CRS_TAG)"; \
+		else \
+			$(WARN) "No CRs found for tag $(UPGRADE_TEST_CRS_TAG) at path test/upgrade/testdata/baseCRs/. Defaulting to local CRs"; \
+		fi; \
+	fi
 
 .PHONY: upgrade-test
-upgrade-test: $(KIND) prepare-upgrade-test
+upgrade-test: $(KIND) check-upgrade-test-vars pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
 	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
@@ -342,7 +364,7 @@ upgrade-test: $(KIND) prepare-upgrade-test
 	 esac
 
 .PHONY: upgrade-test-debug
-upgrade-test-debug: $(KIND) prepare-upgrade-test
+upgrade-test-debug: $(KIND) check-upgrade-test-vars pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
 	@dlv test -tags=upgrade ./test/upgrade --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
@@ -354,9 +376,6 @@ upgrade-test-debug: $(KIND) prepare-upgrade-test
 
 .PHONY: upgrade-test-restore-crs
 upgrade-test-restore-crs:
-	@if [ -z "$(UPGRADE_TEST_CRS_PATH)" ]; then \
-		echo "❌ Error: UPGRADE_TEST_CRS_PATH is not set"; exit 1; \
-	fi
-	@$(INFO) Restoring $(UPGRADE_TEST_FULL_CRS_PATH)
-	@git restore $(UPGRADE_TEST_FULL_CRS_PATH)
+	@$(INFO) Restoring test/upgrade/testdata/baseCRs
+	@git restore test/upgrade/testdata/baseCRs
 	@$(OK) CRs restored
