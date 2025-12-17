@@ -139,10 +139,12 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	directoryHandler := c.handler(cr)
 
 	cr.SetConditions(xpv1.Creating())
-	_, clientErr := directoryHandler.CreateDirectory(ctx)
+	respDirectory, clientErr := directoryHandler.CreateDirectory(ctx)
 	if clientErr != nil {
 		return managed.ExternalCreation{}, clientErr
 	}
+
+	meta.SetExternalName(cr, meta.GetExternalName(respDirectory))
 
 	return managed.ExternalCreation{
 		ConnectionDetails: managed.ConnectionDetails{},

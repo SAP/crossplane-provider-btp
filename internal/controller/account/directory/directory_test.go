@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -210,6 +209,8 @@ func TestConnect(t *testing.T) {
 }
 
 func TestObserve(t *testing.T) {
+	const invalidGUID = "not-a-valid-guid"
+
 	type args struct {
 		cr         resource.Managed
 		mockClient MockClient
@@ -245,6 +246,52 @@ func TestObserve(t *testing.T) {
 				o:   managed.ExternalObservation{},
 				err: errors.New("internalServerError"),
 				cr:  testutils.NewDirectory("dir-unittests", testutils.WithExternalName(validGUID), testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
+			},
+		},
+		"EmptyExternalNameNeedsCreation": {
+			reason: "ADR: Empty external-name indicates resource needs creation",
+			args: args{
+				cr: testutils.NewDirectory("dir-unittests"),
+				mockClient: MockClient{
+					needsCreation: true,
+				},
+			},
+			want: want{
+				o:  managed.ExternalObservation{ResourceExists: false},
+				cr: testutils.NewDirectory("dir-unittests"),
+			},
+		},
+		"InvalidGUIDFormat": {
+			reason: "ADR: External-name with invalid GUID format should return error",
+			args: args{
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(invalidGUID),
+				),
+				mockClient: MockClient{},
+			},
+			want: want{
+				err: errors.New(fmt.Sprintf("external-name '%s' is not a valid GUID format", invalidGUID)),
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(invalidGUID),
+				),
+			},
+		},
+		"ValidGUIDNotExists404": {
+			reason: "ADR: Valid GUID that doesn't exist (404 response) should return ResourceExists: false",
+			args: args{
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+				),
+				mockClient: MockClient{
+					needsCreation:    true,
+					needsCreationErr: nil,
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{ResourceExists: false},
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+				),
 			},
 		},
 		"RequiresCreation": {
@@ -403,18 +450,48 @@ func TestCreate(t *testing.T) {
 				err: errors.New("CreateError"),
 			},
 		},
+		"AlreadyExistsErrorDoesNotSetExternalName": {
+			reason: "ADR: 'Resource already exists' error should NOT set external-name",
+			args: args{
+				cr: testutils.NewDirectory("dir-unittests"),
+				mockClient: MockClient{
+					createErr: errors.New("creation failed - directory already exists"),
+				},
+			},
+			want: want{
+				err: errors.New("creation failed - directory already exists"),
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		"OtherErrorDoesNotSetExternalName": {
+			reason: "ADR: Other creation errors should NOT set external-name",
+			args: args{
+				cr: testutils.NewDirectory("dir-unittests"),
+				mockClient: MockClient{
+					createErr: errors.New("internal server error"),
+				},
+			},
+			want: want{
+				err: errors.New("internal server error"),
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithConditions(xpv1.Creating()),
+				),
+			},
+		},
 		"Success": {
 			reason: "We expect to finish gracefully if no error happened during create",
 			args: args{
 				cr: testutils.NewDirectory("dir-unittests", testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 				mockClient: MockClient{
 					createErr: nil,
-					createResult: *testutils.NewDirectory("dir-unittests",
+					createResult: *testutils.NewDirectory("dir-unittests", testutils.WithExternalName(validGUID),
 						testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 				}},
 			want: want{
 				o:   managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}},
-				cr:  testutils.NewDirectory("dir-unittests", testutils.WithConditions(xpv1.Creating()), testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
+				cr:  testutils.NewDirectory("dir-unittests", testutils.WithConditions(xpv1.Creating()), testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")}), testutils.WithExternalName(validGUID)),
 				err: nil,
 			},
 		},
@@ -483,7 +560,7 @@ func TestDelete(t *testing.T) {
 			},
 		},
 		"Success": {
-			reason: "We expect to finish gracefully if no error happened during create",
+			reason: "We expect to finish gracefully if no error happened during delete",
 			args: args{
 				cr: testutils.NewDirectory("dir-unittests", testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 				mockClient: MockClient{
@@ -492,6 +569,49 @@ func TestDelete(t *testing.T) {
 			want: want{
 				cr:  testutils.NewDirectory("dir-unittests", testutils.WithConditions(xpv1.Deleting()), testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 				err: nil,
+			},
+		},
+		"DeletingStateSkipsDelete": {
+			reason: "ADR: Resource in DELETING state should skip deletion call",
+			args: args{
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+					testutils.WithStatus(v1alpha1.DirectoryObservation{
+						Guid:        internal.Ptr(validGUID),
+						EntityState: internal.Ptr("DELETING"),
+					}),
+				),
+				mockClient: MockClient{
+					deleteErr: errors.New("should not be called"),
+				},
+			},
+			want: want{
+				err: nil,
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+					testutils.WithStatus(v1alpha1.DirectoryObservation{
+						Guid:        internal.Ptr(validGUID),
+						EntityState: internal.Ptr("DELETING"),
+					}),
+				),
+			},
+		},
+		"404NotFoundNotError": {
+			reason: "ADR: 404 response should NOT be treated as error",
+			args: args{
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+				),
+				mockClient: MockClient{
+					deleteErr: errors.New("directory not found"),
+				},
+			},
+			want: want{
+				err: nil, // Should not be an error
+				cr: testutils.NewDirectory("dir-unittests",
+					testutils.WithExternalName(validGUID),
+					testutils.WithConditions(xpv1.Deleting()),
+				),
 			},
 		},
 	}
@@ -592,409 +712,6 @@ func TestUpdate(t *testing.T) {
 				t.Errorf("\n%s\ne.Update(...): -want cr, +got cr:\n%s\n", tc.reason, diff)
 			}
 
-		})
-	}
-}
-
-// TestObserveADRCompliance tests ADR-compliant external name handling in Observe
-func TestObserveADRCompliance(t *testing.T) {
-	const invalidGUID = "not-a-valid-guid"
-
-	type args struct {
-		cr         resource.Managed
-		mockClient MockClient
-	}
-	type want struct {
-		err error
-		o   managed.ExternalObservation
-		cr  resource.Managed
-	}
-	tests := map[string]struct {
-		reason string
-		args   args
-		want   want
-	}{
-		"EmptyExternalNameNeedsCreation": {
-			reason: "ADR: Empty external-name indicates resource needs creation",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests"),
-				mockClient: MockClient{
-					needsCreation: true,
-				},
-			},
-			want: want{
-				o:  managed.ExternalObservation{ResourceExists: false},
-				cr: testutils.NewDirectory("dir-unittests"),
-			},
-		},
-		"InvalidGUIDFormat": {
-			reason: "ADR: External-name with invalid GUID format should return error",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(invalidGUID),
-				),
-				mockClient: MockClient{},
-			},
-			want: want{
-				err: errors.New(fmt.Sprintf("external-name '%s' is not a valid GUID format", invalidGUID)),
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(invalidGUID),
-				),
-			},
-		},
-		"ValidGUIDNotExists404": {
-			reason: "ADR: Valid GUID that doesn't exist (404 response) should return ResourceExists: false",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-				),
-				mockClient: MockClient{
-					needsCreation:    true,
-					needsCreationErr: nil,
-				},
-			},
-			want: want{
-				o: managed.ExternalObservation{ResourceExists: false},
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-				),
-			},
-		},
-		"ValidGUIDExists": {
-			reason: "ADR: Valid GUID that exists should observe normally",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithStatus(v1alpha1.DirectoryObservation{
-						Guid:        internal.Ptr(validGUID),
-						EntityState: internal.Ptr(v1alpha1.DirectoryEntityStateOk),
-					}),
-				),
-				mockClient: MockClient{
-					needsCreation: false,
-					needsUpdate:   false,
-					available:     true,
-				},
-			},
-			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists:    true,
-					ResourceUpToDate:  true,
-					ConnectionDetails: managed.ConnectionDetails{},
-				},
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithStatus(v1alpha1.DirectoryObservation{
-						Guid:        internal.Ptr(validGUID),
-						EntityState: internal.Ptr(v1alpha1.DirectoryEntityStateOk),
-					}),
-					testutils.WithConditions(xpv1.Available()),
-				),
-			},
-		},
-		"DriftDetectionNeedsUpdate": {
-			reason: "ADR: Drift detection should identify when update is needed",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithStatus(v1alpha1.DirectoryObservation{
-						Guid:        internal.Ptr(validGUID),
-						EntityState: internal.Ptr(v1alpha1.DirectoryEntityStateOk),
-					}),
-				),
-				mockClient: MockClient{
-					needsCreation: false,
-					needsUpdate:   true,
-					available:     true,
-				},
-			},
-			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists:    true,
-					ResourceUpToDate:  false,
-					ConnectionDetails: managed.ConnectionDetails{},
-				},
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithStatus(v1alpha1.DirectoryObservation{
-						Guid:        internal.Ptr(validGUID),
-						EntityState: internal.Ptr(v1alpha1.DirectoryEntityStateOk),
-					}),
-					testutils.WithConditions(xpv1.Available()),
-				),
-			},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			mockKube := testutils.NewFakeKubeClientBuilder().Build()
-			ctrl := external{
-				newDirHandlerFn: func(client2 *btp.Client, cr *v1alpha1.Directory) directory.DirectoryClientI {
-					return tc.args.mockClient
-				},
-				tracker:   nil,
-				kube:      &mockKube,
-				btpClient: &btp.Client{},
-			}
-			got, err := ctrl.Observe(context.Background(), tc.args.cr)
-
-			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want error, +got error:\n%s\n", tc.reason, diff)
-			}
-			if diff := cmp.Diff(tc.want.o, got); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
-			}
-			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want cr, +got cr:\n%s\n", tc.reason, diff)
-			}
-		})
-	}
-}
-
-// TestCreateADRCompliance tests ADR-compliant external name handling in Create
-func TestCreateADRCompliance(t *testing.T) {
-	type args struct {
-		cr         resource.Managed
-		mockClient MockClient
-	}
-	type want struct {
-		err              error
-		o                managed.ExternalCreation
-		cr               resource.Managed
-		externalNameSet  bool
-		expectedExternal string
-	}
-	tests := map[string]struct {
-		reason string
-		args   args
-		want   want
-	}{
-		"SuccessfulCreationSetsExternalName": {
-			reason: "ADR: Successful creation should set external-name to returned GUID",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-				),
-				mockClient: MockClient{
-					createErr: nil,
-					createResult: *testutils.NewDirectory("dir-unittests",
-						testutils.WithExternalName(validGUID),
-					),
-				},
-			},
-			want: want{
-				o:                managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}},
-				externalNameSet:  true,
-				expectedExternal: validGUID,
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithConditions(xpv1.Creating()),
-					testutils.WithExternalName(validGUID),
-				),
-			},
-		},
-		"AlreadyExistsErrorDoesNotSetExternalName": {
-			reason: "ADR: 'Resource already exists' error should NOT set external-name",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests"),
-				mockClient: MockClient{
-					createErr: errors.New("creation failed - directory already exists"),
-				},
-			},
-			want: want{
-				err:             errors.New("creation failed - directory already exists"),
-				externalNameSet: false,
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithConditions(xpv1.Creating()),
-				),
-			},
-		},
-		"OtherErrorDoesNotSetExternalName": {
-			reason: "ADR: Other creation errors should NOT set external-name",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests"),
-				mockClient: MockClient{
-					createErr: errors.New("internal server error"),
-				},
-			},
-			want: want{
-				err:             errors.New("internal server error"),
-				externalNameSet: false,
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithConditions(xpv1.Creating()),
-				),
-			},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			mockKube := testutils.NewFakeKubeClientBuilder().Build()
-			ctrl := external{
-				newDirHandlerFn: func(client2 *btp.Client, cr *v1alpha1.Directory) directory.DirectoryClientI {
-					return tc.args.mockClient
-				},
-				tracker: nil,
-				kube:    &mockKube,
-			}
-			got, err := ctrl.Create(context.Background(), tc.args.cr)
-
-			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\ne.Create(...): -want error, +got error:\n%s\n", tc.reason, diff)
-			}
-			if tc.want.err == nil {
-				if diff := cmp.Diff(tc.want.o, got); diff != "" {
-					t.Errorf("\n%s\ne.Create(...): -want, +got:\n%s\n", tc.reason, diff)
-				}
-			}
-			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
-				t.Errorf("\n%s\ne.Create(...): -want cr, +got cr:\n%s\n", tc.reason, diff)
-			}
-
-			// Verify external-name handling
-			dir := tc.args.cr.(*v1alpha1.Directory)
-			actualExternal := meta.GetExternalName(dir)
-			if tc.want.externalNameSet && actualExternal != tc.want.expectedExternal {
-				t.Errorf("\n%s\nExpected external-name to be set to %s, got %s\n", tc.reason, tc.want.expectedExternal, actualExternal)
-			}
-			if !tc.want.externalNameSet && actualExternal != "" && actualExternal != dir.Name {
-				t.Errorf("\n%s\nExpected external-name NOT to be set, but got %s\n", tc.reason, actualExternal)
-			}
-		})
-	}
-}
-
-// TestDeleteADRCompliance tests ADR-compliant external name handling in Delete
-func TestDeleteADRCompliance(t *testing.T) {
-
-	type args struct {
-		cr         resource.Managed
-		mockClient MockClient
-	}
-	type want struct {
-		err error
-		cr  resource.Managed
-	}
-	tests := map[string]struct {
-		reason string
-		args   args
-		want   want
-	}{
-		"404NotFoundNotError": {
-			reason: "ADR: 404 response should NOT be treated as error",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-				),
-				mockClient: MockClient{
-					deleteErr: errors.New("directory not found"),
-				},
-			},
-			want: want{
-				err: nil, // Should not be an error
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithConditions(xpv1.Deleting()),
-				),
-			},
-		},
-		"DeletingStateSkipsDelete": {
-			reason: "ADR: Resource in DELETING state should skip deletion call",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithStatus(v1alpha1.DirectoryObservation{
-						Guid:        internal.Ptr(validGUID),
-						EntityState: internal.Ptr("DELETING"),
-					}),
-				),
-				mockClient: MockClient{
-					deleteErr: errors.New("should not be called"),
-				},
-			},
-			want: want{
-				err: nil,
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithStatus(v1alpha1.DirectoryObservation{
-						Guid:        internal.Ptr(validGUID),
-						EntityState: internal.Ptr("DELETING"),
-					}),
-				),
-			},
-		},
-		"SuccessfulDeletion": {
-			reason: "ADR: Successful deletion should complete without error",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithStatus(v1alpha1.DirectoryObservation{
-						Guid:        internal.Ptr(validGUID),
-						EntityState: internal.Ptr(v1alpha1.DirectoryEntityStateOk),
-					}),
-				),
-				mockClient: MockClient{
-					deleteErr: nil,
-				},
-			},
-			want: want{
-				err: nil,
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithConditions(xpv1.Deleting()),
-					testutils.WithStatus(v1alpha1.DirectoryObservation{
-						Guid:        internal.Ptr(validGUID),
-						EntityState: internal.Ptr(v1alpha1.DirectoryEntityStateOk),
-					}),
-				),
-			},
-		},
-		"OtherDeleteError": {
-			reason: "ADR: Other deletion errors should be returned",
-			args: args{
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithStatus(v1alpha1.DirectoryObservation{
-						Guid:        internal.Ptr(validGUID),
-						EntityState: internal.Ptr(v1alpha1.DirectoryEntityStateOk),
-					}),
-				),
-				mockClient: MockClient{
-					deleteErr: errors.New("internal server error"),
-				},
-			},
-			want: want{
-				err: errors.New("internal server error"),
-				cr: testutils.NewDirectory("dir-unittests",
-					testutils.WithExternalName(validGUID),
-					testutils.WithConditions(xpv1.Deleting()),
-					testutils.WithStatus(v1alpha1.DirectoryObservation{
-						Guid:        internal.Ptr(validGUID),
-						EntityState: internal.Ptr(v1alpha1.DirectoryEntityStateOk),
-					}),
-				),
-			},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			mockKube := testutils.NewFakeKubeClientBuilder().Build()
-			ctrl := external{
-				newDirHandlerFn: func(client2 *btp.Client, cr *v1alpha1.Directory) directory.DirectoryClientI {
-					return tc.args.mockClient
-				},
-				tracker: nil,
-				kube:    &mockKube,
-			}
-			_, err := ctrl.Delete(context.Background(), tc.args.cr)
-
-			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\ne.Delete(...): -want error, +got error:\n%s\n", tc.reason, diff)
-			}
-			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
-				t.Errorf("\n%s\ne.Delete(...): -want cr, +got cr:\n%s\n", tc.reason, diff)
-			}
 		})
 	}
 }
