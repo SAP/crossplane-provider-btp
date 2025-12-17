@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +33,8 @@ const (
 
 	namespacePrefix = "btp-upgrade-test-"
 
+	localTagName = "local"
+
 	resourceDirectoryRoot = "./testdata/baseCRs"
 
 	cisSecretName         = "cis-provider-secret"
@@ -39,6 +42,7 @@ const (
 
 	globalAccountEnvVar = "GLOBAL_ACCOUNT"
 	cliServerUrlEnvVar  = "CLI_SERVER_URL"
+	uutImagesEnvVar     = "UUT_IMAGES"
 
 	fromTagEnvVar                  = "UPGRADE_TEST_FROM_TAG"
 	toTagEnvVar                    = "UPGRADE_TEST_TO_TAG"
@@ -98,21 +102,21 @@ func SetupClusterWithCrossplane(namespace string) {
 
 	fromTag, toTag = loadTags()
 	fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository := loadRepositories()
+
 	verifyTimeout = loadDurationMins(verifyTimeoutEnvVar, defaultVerifyTimeoutMins)
 	waitForPause = loadDurationMins(waitForPauseEnvVar, defaultWaitForPauseMins)
 
 	resourceDirectories = loadResourceDirectories()
 	klog.V(4).Infof("Found the following resource directories: %s", resourceDirectories)
 
-	fromProviderPackage = fmt.Sprintf("%s:%s", fromProviderRepository, fromTag)
-	toProviderPackage = fmt.Sprintf("%s:%s", toProviderRepository, toTag)
-	fromControllerPackage = fmt.Sprintf("%s:%s", fromControllerRepository, fromTag)
-	toControllerPackage = fmt.Sprintf("%s:%s", toControllerRepository, toTag)
-
-	mustPullImage(fromProviderPackage)
-	mustPullImage(toProviderPackage)
-	mustPullImage(fromControllerPackage)
-	mustPullImage(toControllerPackage)
+	resolvePackages(
+		fromTag,
+		toTag,
+		fromProviderRepository,
+		toProviderRepository,
+		fromControllerRepository,
+		toControllerRepository,
+	)
 
 	deploymentRuntimeConfig := getDeploymentRuntimeConfig(providerName)
 
@@ -144,6 +148,53 @@ func SetupClusterWithCrossplane(namespace string) {
 		testutil.ApplySecretInCrossplaneNamespace(serviceUserSecretName, userSecretData),
 		testutil.CreateProviderConfigFn(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName),
 	)
+}
+
+func resolvePackages(
+	fromTag, toTag string,
+	fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository string,
+) {
+	isLocalFromTag := fromTag == localTagName
+	isLocalToTag := toTag == localTagName
+
+	// If either tag is local, parse `UUT_IMAGES` once.
+	if isLocalFromTag || isLocalToTag {
+		uutImages := os.Getenv(uutImagesEnvVar)
+		if uutImages == "" {
+			panic(uutImagesEnvVar + " environment variable is required when FROM_TAG or TO_TAG is set to \"local\"")
+		}
+
+		localProviderPackage, localControllerPackage := testutil.GetImagesFromJsonOrPanic(uutImages)
+		localTag := strings.Split(localProviderPackage, ":")[1]
+
+		if isLocalFromTag {
+			fromTag = localTag
+			fromProviderPackage = localProviderPackage
+			fromControllerPackage = localControllerPackage
+		}
+
+		if isLocalToTag {
+			toTag = localTag
+			toProviderPackage = localProviderPackage
+			toControllerPackage = localControllerPackage
+		}
+	}
+
+	if !isLocalFromTag {
+		fromProviderPackage = fmt.Sprintf("%s:%s", fromProviderRepository, fromTag)
+		fromControllerPackage = fmt.Sprintf("%s:%s", fromControllerRepository, fromTag)
+
+		mustPullImage(fromProviderPackage)
+		mustPullImage(fromControllerPackage)
+	}
+
+	if !isLocalToTag {
+		toProviderPackage = fmt.Sprintf("%s:%s", toProviderRepository, toTag)
+		toControllerPackage = fmt.Sprintf("%s:%s", toControllerRepository, toTag)
+
+		mustPullImage(toProviderPackage)
+		mustPullImage(toControllerPackage)
+	}
 }
 
 func loadTags() (string, string) {

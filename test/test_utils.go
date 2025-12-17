@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,6 +29,11 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+)
+
+const (
+	uutConfigKey     = "crossplane/provider-btp"
+	uutControllerKey = "crossplane/provider-btp-controller"
 )
 
 type mockList struct {
@@ -230,4 +236,19 @@ func InstallProviderOptionsWithController(
 ) xpenvfuncs.InstallCrossplaneProviderOptions {
 	options.ControllerImage = &controllerPackage
 	return options
+}
+
+func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
+	imageMap := map[string]string{}
+
+	err := json.Unmarshal([]byte(imagesJson), &imageMap)
+
+	if err != nil {
+		panic(fmt.Errorf("failed to unmarshal images json: %w", err))
+	}
+
+	uutConfig := imageMap[uutConfigKey]
+	uutController := imageMap[uutControllerKey]
+
+	return uutConfig, uutController
 }

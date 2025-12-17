@@ -336,7 +336,7 @@ pull-upgrade-test-version-crs:
 	@if [ -z "$(UPGRADE_TEST_CRS_TAG)" ]; then \
 		echo "❌ Error: UPGRADE_TEST_CRS_TAG or UPGRADE_TEST_FROM_TAG is not set"; exit 1; \
 	fi
-	@$(INFO) "Pulling CRs from \"$(UPGRADE_TEST_CRS_TAG)\""
+	@$(INFO) "Pulling CRs from $(UPGRADE_TEST_CRS_TAG)"
 	@if [ "$(UPGRADE_TEST_CRS_TAG)" = "local" ]; then \
 		$(OK) "Using local CRs from test/upgrade/testdata/baseCRs/ (UPGRADE_TEST_CRS_TAG is \"local\")"; \
 	else \
@@ -352,8 +352,16 @@ pull-upgrade-test-version-crs:
 		fi; \
 	fi
 
+.PHONY: build-upgrade-test-images
+build-upgrade-test-images:
+	@if [ "$(UPGRADE_TEST_FROM_TAG)" == "local" ] || [ "$(UPGRADE_TEST_TO_TAG)" == "local" ]; then \
+		$(INFO) "Building local images (UPGRADE_TEST_FROM_TAG or UPGRADE_TEST_TO_TAG is \"local\")"; \
+		$(MAKE) build; \
+		$(OK) "Built local images: $(UUT_IMAGES)"; \
+	fi
+
 .PHONY: upgrade-test
-upgrade-test: $(KIND) check-upgrade-test-vars pull-upgrade-test-version-crs generate-upgrade-test-crs
+upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
 	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
@@ -364,7 +372,7 @@ upgrade-test: $(KIND) check-upgrade-test-vars pull-upgrade-test-version-crs gene
 	 esac
 
 .PHONY: upgrade-test-debug
-upgrade-test-debug: $(KIND) check-upgrade-test-vars pull-upgrade-test-version-crs generate-upgrade-test-crs
+upgrade-test-debug: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
 	@dlv test -tags=upgrade ./test/upgrade --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="

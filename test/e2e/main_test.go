@@ -3,7 +3,6 @@
 package e2e
 
 import (
-	"encoding/json"
 	"os"
 	"testing"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/images"
 	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
-	"github.com/pkg/errors"
 	testutil "github.com/sap/crossplane-provider-btp/test"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,9 +20,7 @@ import (
 )
 
 var (
-	UUT_IMAGES_KEY     = "UUT_IMAGES"
-	UUT_CONFIG_KEY     = "crossplane/provider-btp"
-	UUT_CONTROLLER_KEY = "crossplane/provider-btp-controller"
+	UUT_IMAGES_KEY = "UUT_IMAGES"
 
 	CIS_SECRET_NAME          = "cis-provider-secret"
 	SERVICE_USER_SECRET_NAME = "sa-provider-secret"
@@ -53,7 +49,7 @@ func SetupClusterWithCrossplane(namespace string) {
 	BUILD_ID = envvar.Get(UUT_BUILD_ID_KEY)
 
 	uutImages := envvar.GetOrPanic(UUT_IMAGES_KEY)
-	uutConfig, uutController := GetImagesFromJsonOrPanic(uutImages)
+	uutConfig, uutController := testutil.GetImagesFromJsonOrPanic(uutImages)
 
 	testenv = env.New()
 
@@ -108,20 +104,4 @@ func SetupClusterWithCrossplane(namespace string) {
 		testutil.ApplySecretInCrossplaneNamespace(SERVICE_USER_SECRET_NAME, userSecretData),
 		testutil.CreateProviderConfigFn(namespace, globalAccount, cliServerUrl, CIS_SECRET_NAME, SERVICE_USER_SECRET_NAME),
 	)
-}
-
-func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
-
-	imageMap := map[string]string{}
-
-	err := json.Unmarshal([]byte(imagesJson), &imageMap)
-
-	if err != nil {
-		panic(errors.Wrap(err, "failed to unmarshal json from UUT_IMAGE"))
-	}
-
-	uutConfig := imageMap[UUT_CONFIG_KEY]
-	uutController := imageMap[UUT_CONTROLLER_KEY]
-
-	return uutConfig, uutController
 }
