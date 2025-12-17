@@ -363,10 +363,10 @@ build-upgrade-test-images:
 .PHONY: upgrade-test
 upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
-	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
+	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '$(testFilter)' -timeout 120m 2>&1 | tee upgrade-test-output.log
 	@echo "===========Test Summary==========="
-	@grep -E "PASS|FAIL" test-output.log
-	@case `tail -n 1 test-output.log` in \
+	@grep -E "PASS|FAIL" upgrade-test-output.log
+	@case `tail -n 1 upgrade-test-output.log` in \
 			*FAIL*) echo "❌ Error: Test failed"; exit 1 ;; \
 			*) echo "✅ All tests passed"; $(OK) Upgrade tests passed ;; \
 	 esac
@@ -374,10 +374,10 @@ upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upg
 .PHONY: upgrade-test-debug
 upgrade-test-debug: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
-	@dlv test -tags=upgrade ./test/upgrade --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee test-output.log
+	@dlv test -tags=upgrade ./test/upgrade --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee upgrade-test-output.log
 	@echo "===========Test Summary==========="
-	@grep -E "PASS|FAIL" test-output.log
-	@case `tail -n 1 test-output.log` in \
+	@grep -E "PASS|FAIL" upgrade-test-output.log
+	@case `tail -n 1 upgrade-test-output.log` in \
 			*FAIL*) echo "❌ Error: Test failed"; exit 1 ;; \
 			*) echo "✅ All tests passed"; $(OK) Upgrade tests passed ;; \
 	 esac
@@ -387,3 +387,16 @@ upgrade-test-restore-crs:
 	@$(INFO) Restoring test/upgrade/testdata/baseCRs
 	@git restore test/upgrade/testdata/baseCRs
 	@$(OK) CRs restored
+
+.PHONY: upgrade-test-clean
+upgrade-test-clean: upgrade-test-restore-crs
+	@$(INFO) Cleaning upgrade test artifacts
+	@rm -rf test/upgrade/logs
+	@rm -f upgrade-test-output.log
+	@$(OK) Upgrade test artifacts cleaned
+	@$(INFO) Deleting kind clusters
+	@$(KIND) get clusters 2>/dev/null | grep e2e | xargs -r -n1 $(KIND) delete cluster --name || true
+	@$(OK) Kind clusters deleted
+	@$(INFO) Cleaning BTP artifacts
+	@$(GO) run .github/workflows/cleanup.go
+	@$(OK) BTP artifacts cleaned
