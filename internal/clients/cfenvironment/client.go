@@ -91,15 +91,15 @@ func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstan
 		return managed.ConnectionDetails{}, nil
 	}
 	cflabels := make(map[string]string)
-	var label string
+	var label []byte
 	if instance.Labels != nil {
-		label = *instance.Labels
+		label = []byte(*instance.Labels)
 	}
-	if err := json.Unmarshal([]byte(label), &cflabels); err != nil {
+	if err := json.Unmarshal(label, &cflabels); err != nil {
 		return managed.ConnectionDetails{}, err
 	}
 	details := managed.ConnectionDetails{
-		v1alpha1.ResourceRaw: []byte(label),
+		v1alpha1.ResourceRaw: label,
 	}
 
 	if orgName, ok := cflabels["Org Name"]; ok {
