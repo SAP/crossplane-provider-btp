@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 
+	"github.com/google/uuid"
 	json "github.com/json-iterator/go"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -178,4 +179,10 @@ func LoadSecretData(ctx context.Context, kube client.Client, secretName string, 
 		return nil, err
 	}
 	return secret.Data, nil
+}
+
+// IsValidUUID checks if a string is a valid UUID format
+func IsValidUUID(s string) bool {
+	err := uuid.Validate(s)
+	return err == nil
 }

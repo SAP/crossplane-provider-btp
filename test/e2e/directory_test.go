@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
@@ -22,6 +23,7 @@ import (
 
 	meta "github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 )
 
 // TODO: separate the k8s resource name and the external resource name
@@ -133,4 +135,29 @@ func createK8sResources(ctx context.Context, t *testing.T, cfg *envconf.Config, 
 
 func NewID(oldId string, buildId string) string {
 	return buildId + "-" + oldId
+}
+
+// TestDirectoryImport tests importing an existing Directory resource using external-name annotation
+// Uses ImportTester utility to follow the standard import test pattern
+func TestDirectoryImport(t *testing.T) {
+	dirImportName := "e2e-test-dir-import"
+
+	importTester := NewImportTester(
+		&v1alpha1.Directory{
+			Spec: v1alpha1.DirectorySpec{
+				ForProvider: v1alpha1.DirectoryParameters{
+					DisplayName:     internal.Ptr(dirImportName),
+					Description:     internal.Ptr("Directory for import test"),
+					DirectoryAdmins: []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY), envvar.GetOrPanic(SECONDARY_DIRC_ADMIN_ENV_KEY)},
+				},
+			},
+		},
+		dirImportName,
+		WithWaitCreateTimeout[*v1alpha1.Directory](wait.WithTimeout(7*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.Directory](wait.WithTimeout(5*time.Minute)),
+	)
+
+	importFeature := importTester.BuildTestFeature("BTP Directory Import Flow").Feature()
+
+	testenv.Test(t, importFeature)
 }
