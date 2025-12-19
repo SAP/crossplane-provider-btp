@@ -1,6 +1,14 @@
-name: Upgrade Test Workflow
+# Enviroment variables/secrets that are needed
+# CLI_SERVER_URL contains the CLI server URL
+# GLOBAL_ACCOUNT contains the subdomain of the global account
+# IDP_URL contains the URL of an IDP that can be connected to the global account
+# SECOND_DIRECTORY_ADMIN_EMAIL contains a second email (different from the technical user's email) for the directory
+# CIS_CENTRAL_BINDING contents from the service binding of a `cis-central` service
+# BTP_TECHNICAL_USER
+# TECHNICAL_USER_EMAIL contains the email of the BTP_TECHNICAL_USER
+# More information in the README.md
 
-# triggered on workflow dispatch
+name: Upgrade Test Workflow
 
 permissions:
   contents: read
@@ -13,134 +21,90 @@ on:
         description: "Source version"
         required: true
         default: "v1.0.3"
+        type: string
       target:
         description: "Target version"
         required: false
+        type: string
 
 jobs:
-  # if the target is not set, we want to take the latest git commit of the branch and build the image with that.
-  build-test-version:
-    if: ${{ github.event.inputs.target == '' }}
-    outputs:
-      target_version: ${{ steps.set-target-version.outputs.BUILD_IMAGE_VERSION }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
-        with:
-          version: v0.15.1
-          install: true
-      - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
-        with:
-          submodules: true
-      - name: Fetch History
-        run: git fetch --prune --unshallow
-
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version: "1.21"
-
-      - name: Vendor Dependencies
-        run: make vendor vendor.check
-
-      - name: Set up Version
-        id: set-target-version
-        run: |
-          echo "setting version to v0.0.0-draft-${{ github.sha }}" 
-          echo "BUILD_IMAGE_VERSION=v0.0.0-draft-${{ github.sha }}" >> $GITHUB_ENV
-          echo "BUILD_IMAGE_VERSION=v0.0.0-draft-${{ github.sha }}" >> $GITHUB_OUTPUT
-
-      - name: Print Version Number
-        run: |
-          echo "BUILD_IMAGE_VERSION is $BUILD_IMAGE_VERSION"
-
-      - name: Build Images
-        run: make build VERSION=$BUILD_IMAGE_VERSION
-        env:
-          # We're using docker buildx, which doesn't actually load the images it
-          # builds by default. Specifying --load does so.
-          BUILD_ARGS: "--load"
-          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
-          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
-
-      - name: Login to Container Registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
-        with:
-          registry: ${{ vars.REGISTRY_URL }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish Artifacts to DockerHub
-        run: make publish BRANCH_NAME=${GITHUB_REF##*/} VERSION=$BUILD_IMAGE_VERSION
-        env:
-          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
-          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
-
   upgrade-test:
-    needs: [build-test-version]
     runs-on: ubuntu-latest
-    if: always() # would also run if build-test-version fails but we just fail too
+    environment: ${{ inputs.environment }}
+    env:
+      # hardcoded BTP CLI version
+      btp_cli_version: 2.90.2
     steps:
-      # if the target is not set, use the version built in the build-test-version job
-      # if triggered with source and target we just use these to versions for the test
       - name: Set TARGET_IMAGE_VERSION
         run: |
           if [ -z "${{ github.event.inputs.target }}" ]; then
-            echo "TARGET_IMAGE_VERSION=${{ needs.build-test-version.outputs.target_version }}" >> $GITHUB_ENV
+            echo "TARGET_IMAGE_VERSION=local" >> $GITHUB_ENV
           else
             echo "TARGET_IMAGE_VERSION=${{ github.event.inputs.target }}" >> $GITHUB_ENV
           fi
+
       - name: Print TARGET_IMAGE_VERSION
         run: |
           echo "TARGET_IMAGE_VERSION is $TARGET_IMAGE_VERSION"
 
-      - name: Clone provider-upgrade-test repo
+      - name: checkout repo
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
+          ref: ${{ inputs.checkout-ref }}
+          submodules: true
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: '1.24'
+      - run: go version
+
+      - name: Install Helm
         run: |
-          git clone https://github.com/openmcp-project/provider-upgrade-test.git
-          echo "Repository provider-upgrade-test cloned successfully."
+          curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+          sudo apt-get install apt-transport-https --yes
+          echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+          sudo apt-get update
+          sudo apt-get install -y helm
 
-      - name: Install CLI Tools
+      - name: Install BTP CLI
+        #hardcoded version
         run: |
-          echo "Installing Kind..."
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
-          chmod +x ./kind
-          sudo mv ./kind /usr/local/bin/kind
+          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+          cd linux-amd64
+          mv btp /usr/local/bin
 
-          echo "Installing Kubectl..."
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
+      - name: Set BUILD_ID
+        run: |
+          echo "BUILD_ID=${{github.run_number}}" >> $GITHUB_ENV
 
-          echo "Installing Chainsaw..."
-          curl -LO https://github.com/kyverno/chainsaw/releases/download/v0.2.12/chainsaw_linux_amd64.tar.gz && \
-          tar -xzvf chainsaw_linux_amd64.tar.gz && \
-          chmod +x chainsaw && \
-          sudo mv chainsaw /usr/local/bin/chainsaw && \
-          chainsaw version
+      - name: Install gettext for envsubst
+        run: sudo apt-get update && sudo apt-get install -y gettext
 
-          echo "Installing sed..."
-          sudo apt-get update && sudo apt-get install -y sed
-
-          echo "Installing jq..."
-          sudo apt-get install -y jq
-
-          echo "Installing yq..."
-          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
-          sudo chmod +x /usr/bin/yq
-
-          echo "All tools installed successfully."
       - name: Run upgrade test
-        if: github.event_name == 'workflow_dispatch'
+        timeout-minutes: 120
         run: |
-          cd provider-upgrade-test
-          echo "Running upgrade test..."
-          REGISTRY=ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp && ./provider-test.sh upgrade-test --source "${REGISTRY}:${{ github.event.inputs.source }}" --target ${REGISTRY}:${TARGET_IMAGE_VERSION} --provider provider-btp 
+          make upgrade-test
         env:
-          CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
-          GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
-          SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
+          BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
+          CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
+          GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
-          IDP_URL: ${{ secrets.IDP_URL }}
+          SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
+          IDP_URL: ${{ secrets.SECOND_IDP_URL }} # Use a different IDP for the upgrade tests to avoid conflicts
+          UPGRADE_TEST_FROM_TAG: ${{ github.event.inputs.source }}
+          UPGRADE_TEST_TO_TAG: ${{ env.TARGET_IMAGE_VERSION }}
+
+      - name: clean up cluster
+        if: always()
+        run: |
+          go run .github/workflows/cleanup.go
+        env:
+          BUILD_ID: ${{ env.BUILD_ID }}
+          CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
+          BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
+          CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
+          GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
