@@ -205,8 +205,9 @@ func TestObserve(t *testing.T) {
 	}
 
 	type want struct {
-		obs managed.ExternalObservation
-		err error
+		obs              managed.ExternalObservation
+		err              error
+		statusModuleName string // Expected module name in status.atProvider after observe
 	}
 
 	cases := map[string]struct {
@@ -243,6 +244,51 @@ func TestObserve(t *testing.T) {
 					ResourceUpToDate: true,
 				},
 				err: nil,
+			},
+		},
+		"ExternalNameLookup": {
+			args: args{
+				cr: func() *v1alpha1.KymaModule {
+					m := module(withBindingRef("test-binding"))
+					m.SetAnnotations(map[string]string{
+						"crossplane.io/external-name": "actual-module",
+					})
+					return m
+				}(),
+				client: &fake.MockKymaModuleClient{
+					MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
+						// Real implementation uses meta.GetExternalName for lookup
+						status := &v1alpha1.ModuleStatus{
+							Name:  "actual-module",
+							State: "Ready",
+						}
+						moduleCr.Status.AtProvider = *status
+						return status, nil
+					},
+				},
+				kube: &test.MockClient{
+					MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+						if binding, ok := obj.(*v1alpha1.KymaEnvironmentBinding); ok {
+							binding.SetName("test-binding")
+							binding.SetNamespace("default")
+						}
+						return nil
+					}),
+				},
+				tracker: &fake.MockTracker{},
+				secretfetcher: &fake.MockSecretFetcher{
+					MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+						return []byte("VALID KUBECONFIG"), nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+				},
+				err:              nil,
+				statusModuleName: "actual-module",
 			},
 		},
 		"NeedsCreation": {
@@ -379,6 +425,14 @@ func TestObserve(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want.obs, got); diff != "" {
 				t.Errorf("\ne.Observe(...): -want, +got:\n%s\n", diff)
+			}
+
+			// Verify the observed module name in status if specified
+			if tc.want.statusModuleName != "" && err == nil && got.ResourceExists {
+				cr := tc.args.cr.(*v1alpha1.KymaModule)
+				if cr.Status.AtProvider.Name != tc.want.statusModuleName {
+					t.Errorf("\ne.Observe(...): expected status.atProvider.name='%s', got='%s'", tc.want.statusModuleName, cr.Status.AtProvider.Name)
+				}
 			}
 		})
 	}
