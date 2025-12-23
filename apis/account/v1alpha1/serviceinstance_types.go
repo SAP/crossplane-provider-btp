@@ -22,6 +22,10 @@ type ServiceInstanceParameters struct {
 	// Name of the service plan of that offering
 	PlanName string `json:"planName,omitempty"`
 
+	// Whether the service instance is shared or not
+	// +kubebuilder:validation:Optional
+	Shared *bool `json:"shared,omitempty"`
+
 	// Parameters in JSON or YAML format, will be merged with yaml parameters and secret parameters, will overwrite duplicated keys from secrets
 	// +kubebuilder:validation:Optional
 	Parameters runtime.RawExtension `json:"parameters,omitempty"`
