@@ -426,8 +426,8 @@ github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lpr
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
-github.com/SAP/crossplane-provider-cloudfoundry v0.3.4-0.20251215130535-1ed5e2d9565c h1:ItxUNv0lor0Qgoo5q8GXUMRPwX3s7mQu2P3dOQhRfeQ=
-github.com/SAP/crossplane-provider-cloudfoundry v0.3.4-0.20251215130535-1ed5e2d9565c/go.mod h1:gPsDFLos5qbChVTGvEgyIH6O5oGn4VziT9EWbRFT3/o=
+github.com/SAP/crossplane-provider-cloudfoundry v0.3.4-0.20251216131141-9cece0edeb91 h1:UerkSNd7PeLAUtoXuc0uDyJu+EH8Be2e2b3fhoDDxsQ=
+github.com/SAP/crossplane-provider-cloudfoundry v0.3.4-0.20251216131141-9cece0edeb91/go.mod h1:gPsDFLos5qbChVTGvEgyIH6O5oGn4VziT9EWbRFT3/o=
 github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=
 github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMxUHB2q5Ap20/P/eIdh4G0pI=
 github.com/VividCortex/gohistogram v1.0.0/go.mod h1:Pf5mBqqDxYaXu3hDrrU+w6nw50o/4+TcAqDqk/vUH7g=
