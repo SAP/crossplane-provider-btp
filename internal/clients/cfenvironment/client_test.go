@@ -61,7 +61,7 @@ func TestGetConnectionDetails(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Old format with colons - API Endpoint:, Org ID:",
+			name: "Labels old format with colons - API Endpoint:, Org ID:",
 			args: args{
 				instance: instance(withLabels("{\"API Endpoint:\":\"https://api.cf.example.com\",\"Org Name\":\"my-org\",\"Org ID:\":\"old-uuid\"}")),
 			},
