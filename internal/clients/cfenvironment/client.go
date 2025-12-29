@@ -109,14 +109,14 @@ func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstan
 		details[v1alpha1.ResourceOrgName] = []byte(orgName)
 	}
 
-	for _, orgIdKey := range []string{"Org ID:", "Org ID"} {
+	for _, orgIdKey := range []string{"Org ID", "Org ID:"} {
 		if orgID, ok := cflabels[orgIdKey]; ok {
 			details[v1alpha1.ResourceOrgId] = []byte(orgID)
 			break
 		}
 	}
 
-	for _, apiEndpointKey := range []string{"API Endpoint:", "API Endpoint"} {
+	for _, apiEndpointKey := range []string{"API Endpoint", "API Endpoint:"} {
 		if apiEndpoint, ok := cflabels[apiEndpointKey]; ok {
 			details[v1alpha1.ResourceAPIEndpoint] = []byte(apiEndpoint)
 			break
