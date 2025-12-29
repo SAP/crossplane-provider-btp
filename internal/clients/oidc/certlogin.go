@@ -36,11 +36,12 @@ type CertLogin struct {
 var _ LoginPerformer = &CertLogin{}
 
 type CertConfiguration struct {
-	IssuerURL       string
-	ClientID        string
-	UserCertificate []byte
-	Password        string
-	Scopes          []string
+	IssuerURL                string
+	ClientID                 string
+	UserCertificate          []byte
+	Password                 string
+	Scopes                   []string
+	ContainsCertificateChain bool
 }
 
 func NewCertLogin(config CertConfiguration, ctx context.Context) (*CertLogin, error) {
@@ -80,7 +81,7 @@ func configureOIDCProvider(ctx context.Context, issuerURL string, clientID strin
 }
 
 func (cLogin *CertLogin) DoLogin(ctx context.Context) (*oidc.TokenSet, error) {
-	tlsCert, certErr := parseCert(cLogin.config.UserCertificate, cLogin.config.Password)
+	tlsCert, certErr := parseCert(cLogin.config.UserCertificate, cLogin.config.Password, cLogin.config.ContainsCertificateChain)
 	if certErr != nil {
 		return nil, certErr
 	}
@@ -178,21 +179,20 @@ func (cLogin *CertLogin) callAuthorizeEndpoint(cert tls.Certificate, authorizeUr
 	return err
 }
 
-func parseCert(data []byte, password string) (tls.Certificate, error) {
+func parseCert(data []byte, password string, containsCertificateChain bool) (tls.Certificate, error) {
 
 	privKey, leafCert, caCerts, err := pkcs12.DecodeChain(data, password)
 	if err != nil {
 		return tls.Certificate{}, err
 	}
 
-	// Seems to be an IAS created p12, this probably requires improvement to make it robust
-
 	// Start with leaf
 	certChain := [][]byte{leafCert.Raw}
 
-	// Append intermediates (if any)
-	for _, ca := range caCerts {
-		certChain = append(certChain, ca.Raw)
+	if containsCertificateChain {
+		for _, ca := range caCerts {
+			certChain = append(certChain, ca.Raw)
+		}
 	}
 
 	pair := tls.Certificate{
