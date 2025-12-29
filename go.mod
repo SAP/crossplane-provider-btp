@@ -33,6 +33,7 @@ require (
 	github.com/vladimirvivien/gexe v0.5.0
 	golang.org/x/oauth2 v0.32.0
 	golang.org/x/sync v0.18.0
+	golang.org/x/net v0.46.0
 	gopkg.in/validator.v2 v2.0.1
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.34.1
