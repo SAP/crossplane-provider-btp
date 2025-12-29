@@ -54,9 +54,9 @@ func (e entitlementExporter) Export(ctx context.Context, btpClient *btp.Client, 
 	saGuid := subaccountParam.Value()
 	serviceName := serviceNameParam.Value()
 	exportAutoAssigned := autoAssignedParam.Value()
-	slog.Debug("Subaccount selected", "subaccount", saGuid)
-	slog.Debug("Technical service name selected", "service", serviceName)
-	slog.Debug("Export auto-assigned entitlements", "auto-assigned", exportAutoAssigned)
+	slog.DebugContext(ctx, "Subaccount selected", "subaccount", saGuid)
+	slog.DebugContext(ctx, "Technical service name selected", "service", serviceName)
+	slog.DebugContext(ctx, "Export auto-assigned entitlements", "auto-assigned", exportAutoAssigned)
 
 	req := btpClient.EntitlementsServiceClient.
 		GetDirectoryAssignments(ctx).
@@ -127,9 +127,9 @@ func processPlanAssignments(ctx context.Context,
 		autoAssigned, hasAutoAssigned := a.GetAutoAssignedOk()
 		if hasAutoAssigned && *autoAssigned && !exportAutoAssigned {
 			if svc.Name != nil && plan.Name != nil {
-				slog.Debug("Skipping auto-assigned entitlement", "service", *svc.Name, "plan", *plan.Name)
+				slog.DebugContext(ctx, "Skipping auto-assigned entitlement", "service", *svc.Name, "plan", *plan.Name)
 			} else {
-				slog.Debug("Skipping auto-assigned entitlement for unnamed service or plan")
+				slog.DebugContext(ctx, "Skipping auto-assigned entitlement for unnamed service or plan")
 			}
 			continue
 		}

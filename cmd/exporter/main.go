@@ -16,6 +16,8 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
@@ -54,7 +56,11 @@ func main() {
 		resolveRefencesParam,
 	)
 	export.AddConfigParams(resources.ConfigParams()...)
-	export.AddResourceKinds(subaccount.KIND_NAME, entitlement.KIND_NAME)
+	export.AddResourceKinds(
+		subaccount.KIND_NAME,
+		entitlement.KIND_NAME,
+		serviceinstance.KIND_NAME,
+	)
 	cli.Execute()
 }
 

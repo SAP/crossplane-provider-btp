@@ -39,7 +39,7 @@ func (e subaccountExporter) KindName() string {
 
 func (e subaccountExporter) Export(ctx context.Context, btpClient *btp.Client, eventHandler export.EventHandler, _ bool) error {
 	accountIDs := subaccountParam.Value()
-	slog.Debug("Subaccounts selected", "subaccounts", accountIDs)
+	slog.DebugContext(ctx, "Subaccounts selected", "subaccounts", accountIDs)
 
 	// If no subaccount IDs are provided via command line, export all subaccounts.
 	if len(accountIDs) == 0 {
