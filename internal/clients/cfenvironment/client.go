@@ -86,6 +86,9 @@ func GenerateObservation(
 	return observation
 }
 
+// GetConnectionDetails creates ConnectionDetails from a JSON-formatted labels string.
+// In legacy format, the keys have a trailing colon (:), while in the new format they do not.
+// The function handles both formats.
 func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject) (managed.ConnectionDetails, error) {
 	if instance == nil {
 		return managed.ConnectionDetails{}, nil
