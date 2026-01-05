@@ -86,37 +86,42 @@ func GenerateObservation(
 	return observation
 }
 
+// GetConnectionDetails creates ConnectionDetails from a JSON-formatted labels string.
+// In legacy format, the keys have a trailing colon (:), while in the new format they do not.
+// The function handles both formats.
 func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject) (managed.ConnectionDetails, error) {
 	if instance == nil {
 		return managed.ConnectionDetails{}, nil
 	}
-	var cflabels cfEnvironmentLabels
-	var label string
+	cflabels := make(map[string]string)
+	var label []byte
 	if instance.Labels != nil {
-		label = *instance.Labels
+		label = []byte(*instance.Labels)
 	}
-	if err := json.Unmarshal([]byte(label), &cflabels); err != nil {
+	if err := json.Unmarshal(label, &cflabels); err != nil {
 		return managed.ConnectionDetails{}, err
 	}
 	details := managed.ConnectionDetails{
-		v1alpha1.ResourceRaw: []byte(label),
+		v1alpha1.ResourceRaw: label,
 	}
 
-	if cflabels.OrgName != nil {
-		details[v1alpha1.ResourceOrgName] = []byte(*cflabels.OrgName)
+	if orgName, ok := cflabels["Org Name"]; ok {
+		details[v1alpha1.ResourceOrgName] = []byte(orgName)
 	}
-	if cflabels.OrgId != nil {
-		details[v1alpha1.ResourceOrgId] = []byte(*cflabels.OrgId)
+
+	for _, orgIdKey := range []string{"Org ID", "Org ID:"} {
+		if orgID, ok := cflabels[orgIdKey]; ok {
+			details[v1alpha1.ResourceOrgId] = []byte(orgID)
+			break
+		}
 	}
-	if cflabels.ApiEndpoint != nil {
-		details[v1alpha1.ResourceAPIEndpoint] = []byte(*cflabels.ApiEndpoint)
+
+	for _, apiEndpointKey := range []string{"API Endpoint", "API Endpoint:"} {
+		if apiEndpoint, ok := cflabels[apiEndpointKey]; ok {
+			details[v1alpha1.ResourceAPIEndpoint] = []byte(apiEndpoint)
+			break
+		}
 	}
 
 	return details, nil
-}
-
-type cfEnvironmentLabels struct {
-	ApiEndpoint *string `json:"API Endpoint,omitempty"`
-	OrgName     *string `json:"Org Name,omitempty"`
-	OrgId       *string `json:"Org ID,omitempty"`
 }
