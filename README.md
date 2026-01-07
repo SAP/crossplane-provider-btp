@@ -86,8 +86,8 @@ If you want to run a single E2E Test locally simply set the `testFilter` variabl
 make test-acceptance testFilter=<functionNameOfTest>
 ````
 
-:warning:
-Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
+> [!WARNING]
+> Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
 
 Please note that when running multiple times you might want to delete the kind cluster again to avoid conflicts:
 
@@ -206,7 +206,7 @@ make upgrade-test
 > The same environment variables as for the e2e tests are required:
 > `BTP_TECHNICAL_USER`, `CIS_CENTRAL_BINDING`, `CLI_SERVER_URL`, `GLOBAL_ACCOUNT`, `IDP_URL`, `SECOND_DIRECTORY_ADMIN_EMAIL`, `TECHNICAL_USER_EMAIL`
 
-**UPGRADE_TEST_FROM_VERSION**
+**UPGRADE_TEST_FROM_TAG**
 
 Version from which the upgrade should be performed, for example:
 
@@ -214,7 +214,7 @@ Version from which the upgrade should be performed, for example:
 v1.4.0
 ```
 
-**UPGRADE_TEST_TO_VERSION**
+**UPGRADE_TEST_TO_TAG**
 
 Version to which the upgrade should be performed, for example:
 
@@ -223,13 +223,13 @@ v1.5.0
 ```
 
 > [!NOTE]  
-> The `UPGRADE_TEST_FROM_VERSION` and `UPGRADE_TEST_TO_VERSION` variables may be set to "local" to indicate that the current local build should be used as source or target version respectively.
+> The `UPGRADE_TEST_FROM_TAG` and `UPGRADE_TEST_TO_TAG` variables may be set to "local" to indicate that the current local build should be used as source or target version respectively.
 
 #### Optional configuration
 
 **UPGRADE_TEST_CRS_TAG**
 
-Before carrying out the upgrade tests, the local test CRs are replaced with CRs from a specific tag, defaulting to the one specified in `UPGRADE_TEST_FROM_VERSION`. This may be set to "local" to indicate that the current local test CRs should be used instead.
+Before carrying out the upgrade tests, the local test CRs are replaced with CRs from a specific tag, defaulting to the one specified in `UPGRADE_TEST_FROM_TAG`. This may be set to "local" to indicate that the current local test CRs should be used instead.
 
 Example:
 
