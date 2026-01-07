@@ -190,6 +190,9 @@ spec:
                             type: string
                         type: object
                     type: object
+                  shared:
+                    description: Whether the service instance is shared or not
+                    type: boolean
                   subaccountId:
                     description: |-
                       (String) The ID of the subaccount.

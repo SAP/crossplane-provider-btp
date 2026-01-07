@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -12,9 +13,11 @@ import (
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const errMisUse = "can not request API without GUID"
+const errDirectoryNotFound = "directory not found"
 
 // DirectoryClientI acts as clear interface between controller and buisness logic
 type DirectoryClientI interface {
@@ -72,7 +75,12 @@ func (d *DirectoryClient) DeleteDirectory(ctx context.Context) error {
 		return errors.New(errMisUse)
 	}
 
-	_, _, err := d.btpClient.AccountsServiceClient.DirectoryOperationsAPI.DeleteDirectory(ctx, d.externalID()).Execute()
+	_, resp, err := d.btpClient.AccountsServiceClient.DirectoryOperationsAPI.DeleteDirectory(ctx, d.externalID()).Execute()
+
+	// ADR: 404 not found means already deleted - return specific error for controller to handle
+	if resp != nil && resp.StatusCode == 404 {
+		return errors.New(errDirectoryNotFound)
+	}
 
 	return err
 }
@@ -95,6 +103,7 @@ func (d *DirectoryClient) getDirectory(ctx context.Context) (*accountclient.Dire
 	}
 
 	directory, raw, err := d.btpClient.AccountsServiceClient.DirectoryOperationsAPI.GetDirectory(ctx, extID).Execute()
+	// ADR: If resource is not found, that is drift, not an error - return nil to trigger Create()
 	if raw.StatusCode == 404 {
 		// Unfortunately the API has no error type for 404 errors, so we can only extract that from raw status
 		return nil, nil
@@ -116,16 +125,27 @@ func (d *DirectoryClient) NeedsUpdate(ctx context.Context) (bool, error) {
 }
 
 func (d *DirectoryClient) CreateDirectory(ctx context.Context) (*v1alpha1.Directory, error) {
-	directory, _, err := d.btpClient.AccountsServiceClient.DirectoryOperationsAPI.
+	directory, resp, err := d.btpClient.AccountsServiceClient.DirectoryOperationsAPI.
 		CreateDirectory(ctx).
 		ParentGUID(d.cr.Spec.ForProvider.DirectoryGuid).
 		CreateDirectoryRequestPayload(d.toCreateApiPayload()).
 		Execute()
 
 	if err != nil {
+		// ADR: Check if error is "resource already exists"
+		if resp != nil && resp.StatusCode == http.StatusConflict {
+			// ADR: Do NOT set external-name, stay in error loop
+			// User must set external-name manually to resolve
+			return d.cr, fmt.Errorf("creation failed - directory already exists. Please set external-name annotation to adopt the existing resource: %w", specifyAPIError(err))
+		}
+		// ADR: Other errors: do not set external-name either
 		return d.cr, specifyAPIError(err)
 	}
-	meta.SetExternalName(d.cr, directory.Guid)
+
+	// ADR: Successful creation - set external-name from API response
+	guid := directory.Guid
+	ctrl.Log.Info(fmt.Sprintf("directory (%s) created", guid))
+	meta.SetExternalName(d.cr, guid)
 	return d.cr, nil
 }
 

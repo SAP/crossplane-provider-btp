@@ -86,8 +86,8 @@ If you want to run a single E2E Test locally simply set the `testFilter` variabl
 make test-acceptance testFilter=<functionNameOfTest>
 ````
 
-:warning:
-Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
+> [!WARNING]
+> Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
 
 Please note that when running multiple times you might want to delete the kind cluster again to avoid conflicts:
 
@@ -186,6 +186,104 @@ Name of created kind cluster, if not set will be randomly generated
 * `1` = yes
 
 The default is `0`.
+
+### Upgrade Tests
+
+The provider also comes with upgrade tests that can be run locally. These upgrade tests ensure that resources created with an older version of the provider can be properly handled by the current version.
+
+To run the upgrade tests, you can use the following command:
+
+```bash
+make upgrade-test
+```
+
+> [!WARNING]  
+> Please be aware that as part of the upgrade tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/upgrade/testdata/baseCRs` after running the command. Make sure to not commit those changes into git.
+
+#### Required configuration
+
+> [!NOTE]  
+> The same environment variables as for the e2e tests are required:
+> `BTP_TECHNICAL_USER`, `CIS_CENTRAL_BINDING`, `CLI_SERVER_URL`, `GLOBAL_ACCOUNT`, `IDP_URL`, `SECOND_DIRECTORY_ADMIN_EMAIL`, `TECHNICAL_USER_EMAIL`
+
+**UPGRADE_TEST_FROM_TAG**
+
+Version from which the upgrade should be performed, for example:
+
+```
+v1.4.0
+```
+
+**UPGRADE_TEST_TO_TAG**
+
+Version to which the upgrade should be performed, for example:
+
+```
+v1.5.0
+```
+
+> [!NOTE]  
+> The `UPGRADE_TEST_FROM_TAG` and `UPGRADE_TEST_TO_TAG` variables may be set to "local" to indicate that the current local build should be used as source or target version respectively.
+
+#### Optional configuration
+
+**UPGRADE_TEST_CRS_TAG**
+
+Before carrying out the upgrade tests, the local test CRs are replaced with CRs from a specific tag, defaulting to the one specified in `UPGRADE_TEST_FROM_TAG`. This may be set to "local" to indicate that the current local test CRs should be used instead.
+
+Example:
+
+```
+v1.3.0
+```
+
+**UPGRADE_TEST_FROM_PROVIDER_REPOSITORY**
+
+Repository from which the upgrade should be performed, for example (and defaulting to):
+
+```
+ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp
+```
+
+**UPGRADE_TEST_TO_PROVIDER_REPOSITORY**
+
+Repository to which the upgrade should be performed, for example (and defaulting to):
+
+```
+ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp
+```
+
+**UPGRADE_TEST_FROM_CONTROLLER_REPOSITORY**
+
+Controller repository from which the upgrade should be performed, for example (and defaulting to):
+
+```
+ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp-controller
+```
+
+**UPGRADE_TEST_TO_CONTROLLER_REPOSITORY**
+
+Controller repository to which the upgrade should be performed, for example (and defaulting to):
+
+```
+ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp-controller
+```
+
+**UPGRADE_TEST_VERIFY_TIMEOUT**
+
+The timeout, in minutes, for verifying that all test CRs are in a healthy state before and after the upgrade, for example (and defaulting to):
+
+```
+30
+```
+
+**UPGRADE_TEST_WAIT_FOR_PAUSE**
+
+The timeout, in minutes, for waiting until all test CRs are paused, for example (and defaulting to):
+
+```
+1
+```
 
 ## Setting up the Provider Configuration
 

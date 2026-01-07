@@ -1,0 +1,17 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Directory
+metadata:
+  name: upgrade-test-directory-sa
+spec:
+  forProvider:
+    description: "$BUILD_ID-created by upgrade tests"
+    directoryAdmins:
+      - "$SECOND_DIRECTORY_ADMIN_EMAIL"
+      - "$TECHNICAL_USER_EMAIL"
+    directoryFeatures:
+      - "DEFAULT"
+    displayName: $BUILD_ID-upgrade-test-directory-sa
+    labels:
+      custom_label: ["custom_value"]
+      another_label: ["onevalue", "twovalue"]
+      BUILD_ID: [ "$BUILD_ID" ]

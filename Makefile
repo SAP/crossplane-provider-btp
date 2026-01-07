@@ -17,6 +17,8 @@ export TERRAFORM_DOCS_PATH ?= docs/resources
 # set BUILD_ID if its not running in an action
 BUILD_ID ?= $(shell date +"%H%M%S")
 
+export TEST_CRS_PATH ?= test/e2e/testdata/crs
+
 PLATFORMS ?= linux_amd64
 #get version from current git release tag
 VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse HEAD)
@@ -289,19 +291,19 @@ test-acceptance-debug: $(KIND) $(HELM3) build generate-test-crs
 	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '$(testFilter)'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
 	@$(OK) integration tests passed
 
-.PHONY:generate-test-crs
+.PHONY: generate-test-crs
 generate-test-crs:
-	@echo generating crs
-	find test/e2e/testdata/crs -type f -name "*.yaml" -exec sh -c '\
+	@$(INFO) Generating CRS in $(TEST_CRS_PATH)
+	@find $(TEST_CRS_PATH) -type f -name "*.yaml" -exec sh -c '\
     	for template; do \
     		envsubst < "$$template" > "$${template}.tmp" && mv "$${template}.tmp" "$$template"; \
     	done' sh {} +
-	@echo crs generated
+	@$(OK) CRS generated
 
 
 PUBLISH_IMAGES ?= crossplane/provider-btp crossplane/provider-btp-controller
 
-.PONY: publish
+.PHONY: publish
 publish:
 	@$(INFO) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
 	@for image in $(PUBLISH_IMAGES); do \
@@ -309,3 +311,99 @@ publish:
 		docker push $(DOCKER_REGISTRY)/$${image}:$(VERSION); \
 	done
 	@$(OK) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
+
+# Generate external-name documentation from *_types.go files
+.PHONY: docs.generate-external-name
+docs.generate-external-name:
+	@$(INFO) Generating external-name documentation from *_types.go files
+	@$(GO) run ./scripts/generate-external-name-docs.go
+	@$(OK) External-name documentation generated
+
+# ====================================================================================
+# Upgrade Tests
+# ====================================================================================
+
+# If UPGRADE_TEST_CRS_TAG is not set, use UPGRADE_TEST_FROM_TAG as default
+UPGRADE_TEST_CRS_TAG ?= $(UPGRADE_TEST_FROM_TAG)
+
+.PHONY: generate-upgrade-test-crs
+generate-upgrade-test-crs: TEST_CRS_PATH := test/upgrade/testdata/baseCRs
+generate-upgrade-test-crs: generate-test-crs
+
+.PHONY: check-upgrade-test-vars
+check-upgrade-test-vars:
+	@for var in UPGRADE_TEST_FROM_TAG UPGRADE_TEST_TO_TAG; do \
+		if [ -z "$${!var}" ]; then \
+			echo "❌ Error: $$var is not set"; exit 1; \
+		fi; \
+	done
+
+.PHONY: pull-upgrade-test-version-crs
+pull-upgrade-test-version-crs:
+	@if [ -z "$(UPGRADE_TEST_CRS_TAG)" ]; then \
+		echo "❌ Error: UPGRADE_TEST_CRS_TAG or UPGRADE_TEST_FROM_TAG is not set"; exit 1; \
+	fi
+	@$(INFO) "Pulling CRs from $(UPGRADE_TEST_CRS_TAG)"
+	@if [ "$(UPGRADE_TEST_CRS_TAG)" = "local" ]; then \
+		$(OK) "Using local CRs from test/upgrade/testdata/baseCRs/ (UPGRADE_TEST_CRS_TAG is \"local\")"; \
+	else \
+		$(INFO) "Attempting to check out CRs from tag $(UPGRADE_TEST_CRS_TAG)"; \
+		if git ls-tree -r $(UPGRADE_TEST_CRS_TAG) --name-only | grep -q "^test/upgrade/testdata/baseCRs/"; then \
+			$(INFO) "Checking out CRs to test/upgrade/testdata/baseCRs from $(UPGRADE_TEST_CRS_TAG)"; \
+			rm -r test/upgrade/testdata/baseCRs; \
+			mkdir -p test/upgrade/testdata/baseCRs; \
+			git archive $(UPGRADE_TEST_CRS_TAG) test/upgrade/testdata/baseCRs | tar -x --strip-components=2 -C test/upgrade; \
+			$(OK) "Checked out CRs to test/upgrade/testdata/baseCRs from $(UPGRADE_TEST_CRS_TAG)"; \
+		else \
+			$(WARN) "No CRs found for tag $(UPGRADE_TEST_CRS_TAG) at path test/upgrade/testdata/baseCRs/. Defaulting to local CRs"; \
+		fi; \
+	fi
+
+.PHONY: build-upgrade-test-images
+build-upgrade-test-images:
+	@if [ "$(UPGRADE_TEST_FROM_TAG)" == "local" ] || [ "$(UPGRADE_TEST_TO_TAG)" == "local" ]; then \
+		$(INFO) "Building local images (UPGRADE_TEST_FROM_TAG or UPGRADE_TEST_TO_TAG is \"local\")"; \
+		$(MAKE) build; \
+		$(OK) "Built local images: $(UUT_IMAGES)"; \
+	fi
+
+.PHONY: upgrade-test
+upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
+	@$(INFO) Running upgrade tests
+	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '$(testFilter)' -timeout 120m 2>&1 | tee upgrade-test-output.log
+	@echo "===========Test Summary==========="
+	@grep -E "PASS|FAIL" upgrade-test-output.log
+	@case `tail -n 1 upgrade-test-output.log` in \
+			*FAIL*) echo "❌ Error: Test failed"; exit 1 ;; \
+			*) echo "✅ All tests passed"; $(OK) Upgrade tests passed ;; \
+	 esac
+
+.PHONY: upgrade-test-debug
+upgrade-test-debug: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
+	@$(INFO) Running upgrade tests
+	@dlv test -tags=upgrade ./test/upgrade --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee upgrade-test-output.log
+	@echo "===========Test Summary==========="
+	@grep -E "PASS|FAIL" upgrade-test-output.log
+	@case `tail -n 1 upgrade-test-output.log` in \
+			*FAIL*) echo "❌ Error: Test failed"; exit 1 ;; \
+			*) echo "✅ All tests passed"; $(OK) Upgrade tests passed ;; \
+	 esac
+
+.PHONY: upgrade-test-restore-crs
+upgrade-test-restore-crs:
+	@$(INFO) Restoring test/upgrade/testdata/baseCRs
+	@git restore test/upgrade/testdata/baseCRs
+	@$(OK) CRs restored
+
+.PHONY: upgrade-test-clean
+upgrade-test-clean: upgrade-test-restore-crs
+	@$(INFO) Cleaning upgrade test artifacts
+	@rm -rf test/upgrade/logs
+	@rm -f upgrade-test-output.log
+	@$(OK) Upgrade test artifacts cleaned
+	@$(INFO) Deleting kind clusters
+	@$(KIND) get clusters 2>/dev/null | grep e2e | xargs -r -n1 $(KIND) delete cluster --name || true
+	@$(OK) Kind clusters deleted
+	@$(INFO) Cleaning BTP artifacts
+	@$(GO) run .github/workflows/cleanup.go
+	@$(OK) BTP artifacts cleaned
