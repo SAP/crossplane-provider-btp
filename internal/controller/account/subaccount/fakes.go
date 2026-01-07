@@ -25,11 +25,12 @@ func (m *MockAccountsApiAccessor) UpdateSubaccount(ctx context.Context, subaccou
 var _ AccountsApiAccessor = &MockAccountsApiAccessor{}
 
 type MockSubaccountClient struct {
-	returnSubaccounts *accountclient.ResponseCollection
-	returnSubaccount  *accountclient.SubaccountResponseObject
-	mockDeleteSubaccountExecute  func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error)
-	returnErr         error
-	getSubaccountErr  error
+	returnSubaccounts           *accountclient.ResponseCollection
+	returnSubaccount            *accountclient.SubaccountResponseObject
+	mockDeleteSubaccountExecute func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error)
+	returnErr                   error
+	getSubaccountErr            error
+	httpStatusCode              int
 }
 
 var _ accountclient.SubaccountOperationsAPI = &MockSubaccountClient{}
@@ -47,7 +48,7 @@ func (m *MockSubaccountClient) CreateSubaccount(ctx context.Context) accountclie
 }
 
 func (m *MockSubaccountClient) CreateSubaccountExecute(r accountclient.ApiCreateSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
-	return m.returnSubaccount, nil, m.returnErr
+	return m.returnSubaccount, &http.Response{StatusCode: m.httpStatusCode}, m.returnErr
 }
 
 func (m *MockSubaccountClient) UpdateSubaccount(ctx context.Context, subaccountGUID string) accountclient.ApiUpdateSubaccountRequest {
@@ -73,7 +74,6 @@ func (m *MockSubaccountClient) DeleteSubaccount(ctx context.Context, subaccountG
 func (m *MockSubaccountClient) DeleteSubaccountExecute(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
 	return m.mockDeleteSubaccountExecute(r)
 }
-
 
 func (m *MockSubaccountClient) CloneNeoSubaccount(ctx context.Context, sourceSubaccountGUID string) accountclient.ApiCloneNeoSubaccountRequest {
 	//TODO implement me

@@ -220,40 +220,31 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	return creation, nil
 }
 
+// Update() does not make a real update of the service binding, because service
+// bindings are immutable anyway. This behaviour is also disabled in the
+// underlying terraform provider.
+// Instead, Update() is only used to delete expired keys.
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotServiceBinding)
 	}
 
-	// Only update if the current binding is not retired
-	updateResult := managed.ExternalUpdate{}
-	if !e.keyRotator.IsCurrentBindingRetired(cr) {
-		update, err := e.client.Update(ctx)
-		if err != nil {
-			return managed.ExternalUpdate{}, err
-		}
-		updateResult = update
-	}
-
 	// Clean up expired keys if there are any retired keys
-	newRetiredKeys, err := e.keyRotator.DeleteExpiredKeys(ctx, cr)
-	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteExpiredKeys)
-	}
+	newRetiredKeys, deleteErr := e.keyRotator.DeleteExpiredKeys(ctx, cr)
 
 	cr.Status.RetiredKeys = newRetiredKeys
 
+	// store the result in the status even if errors are returned,
+	// to remove keys for those where deletion was successfull
 	if err := e.kube.Status().Update(ctx, cr); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
 	}
-
-	updateResult.ConnectionDetails, err = flattenSecretData(updateResult.ConnectionDetails)
-	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errFlattenSecret)
+	if deleteErr != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(deleteErr, errDeleteExpiredKeys)
 	}
 
-	return updateResult, nil
+	return managed.ExternalUpdate{}, nil
 }
 
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
@@ -286,6 +277,12 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 // DeleteBinding implements the BindingDeleter interface for the key rotator
 func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
+	// The deletion timestamp must be set before the Connect() function is called on the external client. This fixes (#425).
+	// Otherwise it could in some cases end in an error stating that `prevent_destroy` is set to `true` on the resource.
+	cr = cr.DeepCopy()
+	cr.SetDeletionTimestamp(internal.Ptr(metav1.Now()))
+	cr.SetConditions(xpv1.Deleting())
+
 	// Create a client for the specific binding to delete
 	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName)
 	if err != nil {
