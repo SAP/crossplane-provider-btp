@@ -10,7 +10,7 @@ require (
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.9
 	github.com/crossplane-contrib/xp-testing v1.9.0
 	github.com/crossplane/crossplane-runtime v1.20.0
-	github.com/crossplane/crossplane-tools v0.0.0-20230925130601-628280f8bf79
+	github.com/crossplane/crossplane-tools v0.0.0-20251017183449-dd4517244339
 	github.com/crossplane/upjet v1.9.0
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/runtime v0.28.0
@@ -45,7 +45,6 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
-	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
 	github.com/antchfx/htmlquery v1.2.4 // indirect
 	github.com/antchfx/xpath v1.2.0 // indirect
@@ -58,7 +57,7 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.15.1 // indirect
 	github.com/coreos/go-oidc/v3 v3.6.0 // indirect
-	github.com/dave/jennifer v1.6.0 // indirect
+	github.com/dave/jennifer v1.7.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/docker v25.0.6+incompatible // indirect
@@ -181,7 +180,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/grpc v1.73.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
-	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
