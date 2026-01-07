@@ -3,12 +3,13 @@ package oidc
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/pkg/errors"
 	"log"
 	"os"
 	"path"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/stretchr/testify/assert"
 
@@ -58,12 +59,17 @@ func Test_parseCert(t *testing.T) {
 			t.Fatal(err)
 			return
 		}
+		containsCertificateChain := false
+		if store.name == "openssl-with-certchain" {
+			containsCertificateChain = true
+		}
 
 		tests = append(tests, certLoginTest{
 			name: store.name,
 			args: certLoginTestArgs{
-				data:     store.p12,
-				password: store.p12Password,
+				data:                     store.p12,
+				password:                 store.p12Password,
+				containsCertificateChain: containsCertificateChain,
 			},
 			want: certificate,
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
@@ -77,7 +83,7 @@ func Test_parseCert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseCert(tt.args.data, tt.args.password)
+			got, err := parseCert(tt.args.data, tt.args.password, tt.args.containsCertificateChain)
 			if !tt.wantErr(t, err, fmt.Sprintf("parseCert(%v, %v)", tt.args.data, tt.args.password)) {
 				return
 			}
@@ -184,6 +190,7 @@ type certLoginTest struct {
 	wantErr assert.ErrorAssertionFunc
 }
 type certLoginTestArgs struct {
-	data     []byte
-	password string
+	data                     []byte
+	password                 string
+	containsCertificateChain bool
 }
