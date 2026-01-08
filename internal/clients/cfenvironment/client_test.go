@@ -60,6 +60,19 @@ func TestGetConnectionDetails(t *testing.T) {
 			want:    managed.ConnectionDetails{},
 			wantErr: true,
 		},
+		{
+			name: "Labels old format with colons - API Endpoint:, Org ID:",
+			args: args{
+				instance: instance(withLabels("{\"API Endpoint:\":\"https://api.cf.example.com\",\"Org Name\":\"my-org\",\"Org ID:\":\"old-uuid\"}")),
+			},
+			want: managed.ConnectionDetails{
+				v1alpha1.ResourceOrgName:     []byte("my-org"),
+				v1alpha1.ResourceOrgId:       []byte("old-uuid"),
+				v1alpha1.ResourceAPIEndpoint: []byte("https://api.cf.example.com"),
+				v1alpha1.ResourceRaw:         []byte("{\"API Endpoint:\":\"https://api.cf.example.com\",\"Org Name\":\"my-org\",\"Org ID:\":\"old-uuid\"}"),
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a bug to help us improve
+about: Create a bug to help us improve. DO NOT INCLUDE INTERNAL INFORMATION, THIS IS A PUBLIC REPO.
 title: "[BUG] "
 type: bug
 assignees: ''
@@ -9,6 +9,8 @@ assignees: ''
 
 **Describe the bug**
 A clear and concise description of what the bug is.
+
+DO NOT INCLUDE INTERNAL INFORMATION, THIS IS A PUBLIC REPO. 
 
 **Tested with Provider Version**
 v1.x.x
