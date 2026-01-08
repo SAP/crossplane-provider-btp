@@ -61,6 +61,7 @@ type UserCredential struct {
 	Email    string
 	Username string
 	Password string
+	Origin   string
 }
 
 type CISCredential struct {
