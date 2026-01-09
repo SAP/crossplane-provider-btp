@@ -101,6 +101,12 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 			"globalaccount":  pc.Spec.GlobalAccount,
 			"cli_server_url": pc.Spec.CliServerUrl,
 		}
+
+		// Set custom idp if provided
+		if userCredential.Idp != "" {
+			ps.Configuration["idp"] = userCredential.Idp
+		}
+
 		return ps, nil
 	}
 }
@@ -145,6 +151,12 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 			"globalaccount":  pc.Spec.GlobalAccount,
 			"cli_server_url": pc.Spec.CliServerUrl,
 		}
+
+		// Set custom idp if provided
+		if userCredential.Idp != "" {
+			ps.Configuration["idp"] = userCredential.Idp
+		}
+
 		return ps, nil
 	}
 }
