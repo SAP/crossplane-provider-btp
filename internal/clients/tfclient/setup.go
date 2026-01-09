@@ -103,8 +103,8 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 		}
 
 		// Set custom idp if provided
-		if userCredential.Origin != "" {
-			ps.Configuration["idp"] = userCredential.Origin
+		if userCredential.Idp != "" {
+			ps.Configuration["idp"] = userCredential.Idp
 		}
 
 		return ps, nil
@@ -153,8 +153,8 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 		}
 
 		// Set custom idp if provided
-		if userCredential.Origin != "" {
-			ps.Configuration["idp"] = userCredential.Origin
+		if userCredential.Idp != "" {
+			ps.Configuration["idp"] = userCredential.Idp
 		}
 
 		return ps, nil

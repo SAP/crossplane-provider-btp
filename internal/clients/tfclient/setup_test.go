@@ -68,7 +68,7 @@ func TestTerraformSetupBuilder_ConditionalIDP(t *testing.T) {
 			userCred := btp.UserCredential{
 				Username: testUsername,
 				Password: testPassword,
-				Origin:   tc.args.origin,
+				Idp:      tc.args.origin,
 			}
 			credJSON, err := json.Marshal(userCred)
 			if err != nil {
@@ -176,7 +176,7 @@ func TestTerraformSetupBuilderNoTracking_ConditionalIDP(t *testing.T) {
 			userCred := btp.UserCredential{
 				Username: testUsername,
 				Password: testPassword,
-				Origin:   tc.args.origin,
+				Idp:      tc.args.origin,
 			}
 			credJSON, err := json.Marshal(userCred)
 			if err != nil {
