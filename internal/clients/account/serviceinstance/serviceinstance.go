@@ -164,14 +164,14 @@ func mergeJsonData(mergedData map[string]interface{}, jsonToMerge []byte) error 
 // Merge behavior:
 //   - When both values are maps: Recursively merges their contents
 //   - When types differ or value is not a map: toAdd's value overwrites mergedData's value
-//   - In case of slices, overlapping slices are appended together
+//   - Overlapping slices are appended together, in case of missing slices from either map are just set
 //
 // Example:
 //
-//	mergedData:  {"data": {"user": "admin", "timeout": 30}}
-//	toAdd: {"data": {"timeout": 60, "password": "secret"}}
-//	result: {"data": {"user": "admin", "timeout": 60, "password": "secret"}}
-//	                  ↑ preserved      ↑ overwritten  ↑ added
+//	mergedData:  {"data": {"user": "admin", "timeout": 30, "features": ["a", "b"]}}
+//	toAdd: {"data": {"timeout": 60, "password": "secret", "features": ["c"]}}
+//	result: {"data": {"user": "admin", "timeout": 60, "password": "secret", "features": ["a", "b", "c"]}}
+//	                  ↑ preserved      ↑ overwritten  ↑ added               ↑ slices appended
 func addMap(mergedData map[string]any, toAdd map[string]any) {
 	for k, v := range toAdd {
 		// check if the value is a nested map
