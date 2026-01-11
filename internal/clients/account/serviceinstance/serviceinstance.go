@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -163,6 +164,7 @@ func mergeJsonData(mergedData map[string]interface{}, jsonToMerge []byte) error 
 // Merge behavior:
 //   - When both values are maps: Recursively merges their contents
 //   - When types differ or value is not a map: toAdd's value overwrites mergedData's value
+//   - In case of slices, overlapping slices are appended together
 //
 // Example:
 //
@@ -170,11 +172,24 @@ func mergeJsonData(mergedData map[string]interface{}, jsonToMerge []byte) error 
 //	toAdd: {"data": {"timeout": 60, "password": "secret"}}
 //	result: {"data": {"user": "admin", "timeout": 60, "password": "secret"}}
 //	                  ↑ preserved      ↑ overwritten  ↑ added
-func addMap(mergedData map[string]interface{}, toAdd map[string]interface{}) {
+func addMap(mergedData map[string]any, toAdd map[string]any) {
 	for k, v := range toAdd {
 		// check if the value is a nested map
-		vMap, isValueMap := v.(map[string]interface{})
+		vMap, isValueMap := v.(map[string]any)
 		if !isValueMap {
+			// If not map[string]any, check if explicitly for a slice:
+			// append if exists, otherwise just set
+			switch v.(type) {
+			case []any:
+				if ev, ex := mergedData[k]; ex {
+					mergedSlice := reflect.AppendSlice(reflect.ValueOf(v), reflect.ValueOf(ev))
+					mergedData[k] = mergedSlice.Interface()
+					continue
+				}
+			default:
+				mergedData[k] = v
+				continue
+			}
 			mergedData[k] = v
 			continue
 		}
@@ -187,7 +202,7 @@ func addMap(mergedData map[string]interface{}, toAdd map[string]interface{}) {
 		}
 
 		// check if the existing entry is also a map
-		existingMap, isExistingMap := existing.(map[string]interface{})
+		existingMap, isExistingMap := existing.(map[string]any)
 		if !isExistingMap {
 			mergedData[k] = vMap
 			continue
