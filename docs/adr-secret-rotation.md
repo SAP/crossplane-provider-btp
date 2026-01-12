@@ -43,7 +43,7 @@ spec:
 
 ### Status
 
-The `.status.retiredKeys` (TODO: how to name this? Maybe just `.status.rotation`?) field of the resource is the only place where information about retired instances  are stored (information about the current instance is located in `.status.atProvider`). `.status.retiredInstances` is an array, where every entry represents one retired instance. The order of this array is not important. Example status:
+The `.status.retiredKeys` field of the resource is the only place where information about retired instances  are stored (information about the current instance is located in `.status.atProvider`). `.status.retiredInstances` is an array, where every entry represents one retired instance. The order of this array is not important. Example status:
 
 ```yaml
 
@@ -74,7 +74,7 @@ status:
       deletionDate: 2025-11-05T13:14:28Z
 ```
 
-The `.status.atProvider` can be filled with any arbitrary information about the current instance, just like it is done for other resources. Only a `.createdDate` field is required, to track when the instance should be retired. The `.status.retiredKeys` field is an array for the retired instances. It should only have the fields necessary for instance identification and rotation logic. These fields are: `.createdAt` (when the instance got created), `.retiredDate` (when the instance got retired), `.deletionDate` (when the instance is planned for deletion), and `.id` (the external identifier (TODO: maybe rename to `.externalName`?)) and, in the case of upjetted resources, `.name`.
+The `.status.atProvider` can be filled with any arbitrary information about the current instance, just like it is done for other resources. Only a `.createdDate` field is required, to track when the instance should be retired. The `.status.retiredKeys` field is an array for the retired instances. It should only have the fields necessary for instance identification and rotation logic. These fields are: `.createdAt` (when the instance got created), `.retiredDate` (when the instance got retired), `.deletionDate` (when the instance is planned for deletion), and `.id` (the external identifier) and, in the case of upjetted resources, `.name`.
 
 The `.status.atProvider` field as well as the connection details (the content of the secret associated with the resource) should always represent the current instance. This means when a new instance is created during rotation, the atProvider field and the content of the connection details secret should be updated accordingly. However, as new instances can potentially take some time until being ready, the current atProvider and connection details fields should not change. This means that the atProvider field and the connection details should not suddenly be empty, even for a short period of time. This also means that during this short time, the "just retired" instance may be represented in the atProvider fields as well as in the `.retiredKeys` array. This duplication is not a problem.
 
