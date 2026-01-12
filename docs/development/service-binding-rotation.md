@@ -1,5 +1,4 @@
-# ADR Secret Rotation
-
+# Service Binding Rotation
 
 > Secret rotation refers to the automated or manual process of replacing sensitive credentials—such as API keys, access tokens, passwords, and cryptographic keys—on a regular or policy-driven basis. In the context of cybersecurity and Non-Human Identities (NHIs), secret rotation ensures that machine credentials are periodically updated to reduce the risk of unauthorized access, credential theft, or long-lived exposure. The process typically involves generating a new secret, validating its integration, retiring the old secret, and updating dependent systems accordingly[^1].
 
