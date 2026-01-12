@@ -14,7 +14,7 @@ Secret Rotation should be solved in a standardized manner for all Cloud Orchestr
 - "Instance": One entity of the resource we wanna manage / rotate. It translates to exactly one entity on the server side (not to be confused with e.g. `BTP ServiceInstance`)
 - "Current Instance": The instance that is the newest one and the one where the current connectionDetails come from
 - "Retired Instances": The instances that still exist, but should no longer be used. They are kept in an array in the status (e.g. in `.status.retired`). Dependend applications should migrate to the (new) current instance
-- "Expired Instances": Instances in `.status.retired` which `expireAt` is in the past. They should be deleted as soon as possible (in the next reconcilation)
+- "Expired Instances": Instances in `.status.retired` for which `expireAt` is in the past. They should be deleted as soon as possible (in the next reconcilation)
 - "Enabling rotation": Definining `ttl` and `frequency` in `.spec.rotation`
 - "Check if rotation is enabled": Check if `.spec.rotation` exists
 - "Disabling rotation": Removing `.spec.rotation`
