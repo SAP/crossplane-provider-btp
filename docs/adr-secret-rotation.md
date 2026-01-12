@@ -11,7 +11,7 @@ Secret Rotation should be solved in a standardized manner for all Cloud Orchestr
 
 ## Definitions
 
-- "Instance": One thing of the resource we wanna manage / rotate (not to be confused with e.g. `BTP ServiceInstance`)
+- "Instance": One entity of the resource we wanna manage / rotate. It translates to exactly one entity on the server side (not to be confused with e.g. `BTP ServiceInstance`)
 - "Current Instance": The instance that is the newest one and the one where the current connectionDetails come from
 - "Retired Instances": The instances that still exist, but should no longer be used. They are kept in an array in the status (e.g. in `.status.retired`). Dependend applications should migrate to the (new) current instance
 - "Expired Instances": Instances in `.status.retired` which `expireAt` is in the past. They should be deleted as soon as possible (in the next reconcilation)
@@ -111,3 +111,4 @@ For every instance in `.retiredKeys`, check if `.deletionDate>now()`. If true th
 When the resource is marked for deletion, it should beginn with the deletion of the retired instances before deleting the currently valid instance, in case of an error. Similar to how expired instances are deleted in the `Update()` part of the reconcilation, it should be iterated through `.retiredKeys` and all remaining instances should be deleted (in contrast to only the expired instances like in `Update()`).
 
 If this step was successful, continue with the deletion of the current instance.
+
