@@ -38,7 +38,7 @@ require (
 	sigs.k8s.io/controller-tools v0.16.5
 	sigs.k8s.io/e2e-framework v0.6.0
 	sigs.k8s.io/yaml v1.6.0
-	software.sslmate.com/src/go-pkcs12 v0.5.0
+	software.sslmate.com/src/go-pkcs12 v0.7.0
 )
 
 require (
