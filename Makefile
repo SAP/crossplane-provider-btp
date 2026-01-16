@@ -30,8 +30,8 @@ $(info VERSION is $(VERSION))
 -include build/makelib/output.mk
 
 # Setup Versions
-GO_REQUIRED_VERSION=1.23
-GOLANGCILINT_VERSION ?= 1.64.5
+GO_REQUIRED_VERSION=1.25
+GOLANGCILINT_VERSION ?= 2.4.0
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
