@@ -73,11 +73,11 @@ type memoizedBusinessEnvironmentInstanceResponseObject struct {
 	*provisioningclient.BusinessEnvironmentInstanceResponseObject
 }
 
-func (instance memoizedBusinessEnvironmentInstanceResponseObject)GetMemoKey() *string {
+func (instance memoizedBusinessEnvironmentInstanceResponseObject) GetMemoKey() *string {
 	if instance.BusinessEnvironmentInstanceResponseObject == nil {
 		return nil
 	}
-	return instance.BusinessEnvironmentInstanceResponseObject.Labels
+	return instance.Labels
 }
 
 var connDetailsMemoizationMap = memoize.New[managed.ConnectionDetails](context.Background())
@@ -140,7 +140,9 @@ func readKubeconfigFromUrl(url string, httpClient *http.Client) ([]byte, error) 
 	if err != nil || resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("couldn't load kubeconfig file: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {

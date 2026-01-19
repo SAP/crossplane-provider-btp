@@ -150,7 +150,7 @@ func lookupSecrets(ctx context.Context, kube client.Client, secretsSelectors []x
 
 // mergeJsonData merges the json data into the map
 func mergeJsonData(mergedData map[string]interface{}, jsonToMerge []byte) error {
-	var toAdd map[string]interface{} = make(map[string]interface{})
+	var toAdd = make(map[string]interface{})
 	if err := json.Unmarshal(jsonToMerge, &toAdd); err != nil {
 		return err
 	}

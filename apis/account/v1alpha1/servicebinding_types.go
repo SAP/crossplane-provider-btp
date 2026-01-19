@@ -3,7 +3,6 @@ package v1alpha1
 import (
 	"reflect"
 
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,11 +44,11 @@ type ServiceBindingParameters struct {
 
 	// Reference to a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-" reference-group:"account.btp.sap.crossplane.io" reference-kind:"Subaccount" reference-apiversion:"v1alpha1"`
+	SubaccountRef *xpv1.Reference `json:"subaccountRef,omitempty" tf:"-" reference-group:"account.btp.sap.crossplane.io" reference-kind:"Subaccount" reference-apiversion:"v1alpha1"`
 
 	// Selector for a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+	SubaccountSelector *xpv1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
 
 	// (String) The ID of the service instance associated with the binding.
 	// The ID of the service instance associated with the binding.
@@ -62,11 +61,11 @@ type ServiceBindingParameters struct {
 
 	// Reference to a ServiceInstance in account to populate serviceInstanceId.
 	// +kubebuilder:validation:Optional
-	ServiceInstanceRef *v1.Reference `json:"serviceInstanceRef,omitempty" tf:"-" reference-group:"account.btp.sap.crossplane.io" reference-kind:"ServiceInstance" reference-apiversion:"v1alpha1"`
+	ServiceInstanceRef *xpv1.Reference `json:"serviceInstanceRef,omitempty" tf:"-" reference-group:"account.btp.sap.crossplane.io" reference-kind:"ServiceInstance" reference-apiversion:"v1alpha1"`
 
 	// Selector for a ServiceInstance in account to populate serviceInstanceId.
 	// +kubebuilder:validation:Optional
-	ServiceInstanceSelector *v1.Selector `json:"serviceInstanceSelector,omitempty" tf:"-"`
+	ServiceInstanceSelector *xpv1.Selector `json:"serviceInstanceSelector,omitempty" tf:"-"`
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(self.ttl) || (has(self.frequency) && duration(self.ttl) >= duration(self.frequency))",message="ttl must be greater than or equal to frequency"
