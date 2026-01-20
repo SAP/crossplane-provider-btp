@@ -31,7 +31,7 @@ $(info VERSION is $(VERSION))
 
 # Setup Versions
 GO_REQUIRED_VERSION=1.25
-GOLANGCILINT_VERSION ?= 2.4.0
+GOLANGCILINT_VERSION ?= 2.8.0
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
