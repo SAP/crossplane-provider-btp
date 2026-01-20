@@ -33,6 +33,11 @@ $(info VERSION is $(VERSION))
 GO_REQUIRED_VERSION=1.25
 GOLANGCILINT_VERSION ?= 2.8.0
 
+# needs to be overwritten to cope with golangci-lint v2.8.0 changes (probably this is not required when switching to newer build module)
+ifeq ($(RUNNING_IN_CI),true)
+GO_LINT_ARGS += --output.checkstyle.path=$(GO_LINT_OUTPUT)/checkstyle.xml
+endif
+
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
 GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider
