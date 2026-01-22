@@ -33,11 +33,6 @@ $(info VERSION is $(VERSION))
 GO_REQUIRED_VERSION=1.25
 GOLANGCILINT_VERSION ?= 2.8.0
 
-# needs to be overwritten to cope with golangci-lint v2.8.0 changes (probably this is not required when switching to newer build module)
-ifeq ($(RUNNING_IN_CI),true)
-GO_LINT_ARGS += --output.checkstyle.path=$(GO_LINT_OUTPUT)/checkstyle.xml
-endif
-
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
 GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider
@@ -48,6 +43,10 @@ GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.ProviderVersion=$(VERSION)
 GO_SUBDIRS += cmd internal apis
 GO111MODULE = on
 -include build/makelib/golang.mk
+
+# Override the GO_LINT_ARGS from golang.mk to use updated golangci-lint parameters
+# this can potentially be removed when we update to a newer version of the build
+GO_LINT_ARGS = --output.checkstyle.path=$(GO_LINT_OUTPUT)/checkstyle.xml
 
 # kind-related versions
 KIND_VERSION ?= v0.23.0
