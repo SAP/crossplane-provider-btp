@@ -327,7 +327,7 @@ docs.generate-external-name:
 UPGRADE_TEST_CRS_TAG ?= $(UPGRADE_TEST_FROM_TAG)
 
 .PHONY: generate-upgrade-test-crs
-generate-upgrade-test-crs: TEST_CRS_PATH := test/upgrade/testdata/baseCRs
+generate-upgrade-test-crs: TEST_CRS_PATH := test/upgrade/testdata # Should also generate for custom CRs
 generate-upgrade-test-crs: generate-test-crs
 
 .PHONY: check-upgrade-test-vars

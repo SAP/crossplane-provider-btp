@@ -1,0 +1,15 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subaccount
+metadata:
+  namespace: default
+  name: upgrade-test-extn-sa
+spec:
+  forProvider:
+    displayName: $BUILD_ID-upgrade-test-extn-sa
+    region: eu10
+    subdomain: $BUILD_ID-upgrade-test-extn-sa
+    labels:
+      safe-to-delete: [ "yes" ]
+      BUILD_ID: [ "$BUILD_ID" ]
+    subaccountAdmins:
+      - $TECHNICAL_USER_EMAIL

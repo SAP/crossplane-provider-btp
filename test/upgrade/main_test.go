@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	testutil "github.com/sap/crossplane-provider-btp/test"
-	"github.com/vladimirvivien/gexe"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,12 +71,14 @@ var (
 )
 
 var (
-	fromTag               string
-	toTag                 string
-	fromProviderPackage   string
-	toProviderPackage     string
-	fromControllerPackage string
-	toControllerPackage   string
+	fromTag                  string
+	toTag                    string
+	fromProviderRepository   string
+	toProviderRepository     string
+	fromControllerRepository string
+	toControllerRepository   string
+	fromProviderPackage      string
+	fromControllerPackage    string
 )
 
 func TestMain(m *testing.M) {
@@ -101,7 +101,8 @@ func SetupClusterWithCrossplane(namespace string) {
 	cliServerUrl := envvar.GetOrPanic(cliServerUrlEnvVar)
 
 	fromTag, toTag = loadTags()
-	fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository := loadRepositories()
+
+	resolveRepositories()
 
 	verifyTimeout = loadDurationMins(verifyTimeoutEnvVar, defaultVerifyTimeoutMins)
 	waitForPause = loadDurationMins(waitForPauseEnvVar, defaultWaitForPauseMins)
@@ -109,14 +110,7 @@ func SetupClusterWithCrossplane(namespace string) {
 	resourceDirectories = loadResourceDirectories()
 	klog.V(4).Infof("Found the following resource directories: %s", resourceDirectories)
 
-	resolvePackages(
-		fromTag,
-		toTag,
-		fromProviderRepository,
-		toProviderRepository,
-		fromControllerRepository,
-		toControllerRepository,
-	)
+	resolvePackages()
 
 	deploymentRuntimeConfig := getDeploymentRuntimeConfig(providerName)
 
@@ -150,51 +144,19 @@ func SetupClusterWithCrossplane(namespace string) {
 	)
 }
 
-func resolvePackages(
-	fromTag, toTag string,
-	fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository string,
-) {
-	isLocalFromTag := fromTag == localTagName
-	isLocalToTag := toTag == localTagName
+func resolveRepositories() {
+	fromProviderRepository = getEnv(fromProviderRepositoryEnvVar, defaultProviderRepository)
+	toProviderRepository = getEnv(toProviderRepositoryEnvVar, defaultProviderRepository)
+	fromControllerRepository = getEnv(fromControllerRepositoryEnvVar, defaultControllerRepository)
+	toControllerRepository = getEnv(toControllerRepositoryEnvVar, defaultControllerRepository)
+}
 
-	// If either tag is local, parse `UUT_IMAGES` once.
-	if isLocalFromTag || isLocalToTag {
-		uutImages := os.Getenv(uutImagesEnvVar)
-		if uutImages == "" {
-			panic(uutImagesEnvVar + " environment variable is required when FROM_TAG or TO_TAG is set to \"local\"")
-		}
-
-		localProviderPackage, localControllerPackage := testutil.GetImagesFromJsonOrPanic(uutImages)
-		localTag := strings.Split(localProviderPackage, ":")[1]
-
-		if isLocalFromTag {
-			fromTag = localTag
-			fromProviderPackage = localProviderPackage
-			fromControllerPackage = localControllerPackage
-		}
-
-		if isLocalToTag {
-			toTag = localTag
-			toProviderPackage = localProviderPackage
-			toControllerPackage = localControllerPackage
-		}
-	}
-
-	if !isLocalFromTag {
-		fromProviderPackage = fmt.Sprintf("%s:%s", fromProviderRepository, fromTag)
-		fromControllerPackage = fmt.Sprintf("%s:%s", fromControllerRepository, fromTag)
-
-		mustPullImage(fromProviderPackage)
-		mustPullImage(fromControllerPackage)
-	}
-
-	if !isLocalToTag {
-		toProviderPackage = fmt.Sprintf("%s:%s", toProviderRepository, toTag)
-		toControllerPackage = fmt.Sprintf("%s:%s", toControllerRepository, toTag)
-
-		mustPullImage(toProviderPackage)
-		mustPullImage(toControllerPackage)
-	}
+func resolvePackages() {
+	fromProviderPackage, _, fromControllerPackage, _ = testutil.LoadUpgradePackages(
+		fromTag, toTag,
+		fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository,
+		uutImagesEnvVar, localTagName,
+	)
 }
 
 func loadTags() (string, string) {
@@ -209,15 +171,6 @@ func loadTags() (string, string) {
 	}
 
 	return fromTagVar, toTagVar
-}
-
-func loadRepositories() (string, string, string, string) {
-	fromProviderRepository := getEnv(fromProviderRepositoryEnvVar, defaultProviderRepository)
-	toProviderRepository := getEnv(toProviderRepositoryEnvVar, defaultProviderRepository)
-	fromControllerRepository := getEnv(fromControllerRepositoryEnvVar, defaultControllerRepository)
-	toControllerRepository := getEnv(toControllerRepositoryEnvVar, defaultControllerRepository)
-
-	return fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository
 }
 
 func loadResourceDirectories() []string {
@@ -254,16 +207,6 @@ func loadDurationMins(envVar string, defaultValue int) time.Duration {
 
 	klog.V(4).Infof("Using %s of %d minutes", envVar, durationMin)
 	return time.Duration(durationMin) * time.Minute
-}
-
-func mustPullImage(image string) {
-	klog.V(4).Info("Pulling ", image)
-	runner := gexe.New()
-	p := runner.RunProc(fmt.Sprintf("docker pull %s", image))
-	if p.Err() != nil {
-		panic(fmt.Errorf("docker pull %v failed: %w: %s", image, p.Err(), p.Result()))
-	}
-	klog.V(4).Info("Pulled ", image)
 }
 
 func getDeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeConfig {

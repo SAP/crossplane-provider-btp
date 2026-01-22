@@ -16,6 +16,7 @@ import (
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metaApi "github.com/sap/crossplane-provider-btp/apis"
 	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/vladimirvivien/gexe"
 	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -251,4 +252,69 @@ func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
 	uutController := imageMap[uutControllerKey]
 
 	return uutConfig, uutController
+}
+
+// LoadUpgradePackages resolves provider and controller packages for upgrade tests.
+// It handles both local and remote tags, pulling images as needed.
+// Returns: fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
+func LoadUpgradePackages(
+	fromTag, toTag string,
+	fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository string,
+	uutImagesEnvVar, localTagName string,
+) (string, string, string, string) {
+	isLocalFromTag := fromTag == localTagName
+	isLocalToTag := toTag == localTagName
+
+	var fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage string
+
+	// If either tag is local, parse UUT_IMAGES once.
+	if isLocalFromTag || isLocalToTag {
+		uutImages := os.Getenv(uutImagesEnvVar)
+		if uutImages == "" {
+			panic(uutImagesEnvVar + " environment variable is required when FROM_TAG or TO_TAG is set to \"" + localTagName + "\"")
+		}
+
+		localProviderPackage, localControllerPackage := GetImagesFromJsonOrPanic(uutImages)
+		localTag := strings.Split(localProviderPackage, ":")[1]
+
+		if isLocalFromTag {
+			fromTag = localTag
+			fromProviderPackage = localProviderPackage
+			fromControllerPackage = localControllerPackage
+		}
+
+		if isLocalToTag {
+			toTag = localTag
+			toProviderPackage = localProviderPackage
+			toControllerPackage = localControllerPackage
+		}
+	}
+
+	if !isLocalFromTag {
+		fromProviderPackage = fmt.Sprintf("%s:%s", fromProviderRepository, fromTag)
+		fromControllerPackage = fmt.Sprintf("%s:%s", fromControllerRepository, fromTag)
+
+		mustPullImage(fromProviderPackage)
+		mustPullImage(fromControllerPackage)
+	}
+
+	if !isLocalToTag {
+		toProviderPackage = fmt.Sprintf("%s:%s", toProviderRepository, toTag)
+		toControllerPackage = fmt.Sprintf("%s:%s", toControllerRepository, toTag)
+
+		mustPullImage(toProviderPackage)
+		mustPullImage(toControllerPackage)
+	}
+
+	return fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
+}
+
+func mustPullImage(image string) {
+	klog.V(4).Info("Pulling ", image)
+	runner := gexe.New()
+	p := runner.RunProc(fmt.Sprintf("docker pull %s", image))
+	if p.Err() != nil {
+		panic(fmt.Errorf("docker pull %v failed: %w: %s", image, p.Err(), p.Result()))
+	}
+	klog.V(4).Info("Pulled ", image)
 }
