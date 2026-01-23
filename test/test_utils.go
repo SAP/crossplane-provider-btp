@@ -7,16 +7,21 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/logging"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metaApi "github.com/sap/crossplane-provider-btp/apis"
 	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/vladimirvivien/gexe"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -317,4 +322,64 @@ func mustPullImage(image string) {
 		panic(fmt.Errorf("docker pull %v failed: %w: %s", image, p.Err(), p.Result()))
 	}
 	klog.V(4).Info("Pulled ", image)
+}
+
+func DeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeConfig {
+	return vendored.DeploymentRuntimeConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namePrefix + "-runtime-config",
+		},
+		Spec: vendored.DeploymentRuntimeConfigSpec{
+			DeploymentTemplate: &vendored.DeploymentTemplate{
+				Spec: &appsv1.DeploymentSpec{
+					Selector: &metav1.LabelSelector{},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "package-runtime",
+									Args: []string{"--debug", "--sync=10s"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func LoadDurationMins(envVar string, defaultValue int) time.Duration {
+	durationStr := os.Getenv(envVar)
+	if durationStr == "" {
+		klog.V(4).Infof("%s not found, defaulting to %d minutes", envVar, defaultValue)
+		return time.Duration(defaultValue) * time.Minute
+	}
+
+	durationMin, err := strconv.Atoi(durationStr)
+	if err != nil {
+		klog.Warningf("%s value \"%s\" is invalid, defaulting to %d minutes", envVar, durationStr, defaultValue)
+		return time.Duration(defaultValue) * time.Minute
+	}
+
+	if durationMin <= 0 {
+		klog.Warningf(
+			"%s value \"%d\" is invalid (must be > 0), defaulting to %d minutes",
+			envVar,
+			durationMin,
+			defaultValue,
+		)
+		return time.Duration(defaultValue) * time.Minute
+	}
+
+	klog.V(4).Infof("Using %s of %d minutes", envVar, durationMin)
+	return time.Duration(durationMin) * time.Minute
+}
+
+func GetEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+
+	return fallback
 }

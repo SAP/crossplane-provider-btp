@@ -25,7 +25,7 @@ var (
 func Test_Subaccount_External_Name(t *testing.T) {
 	const subaccountName = "upgrade-test-extn-sa"
 
-	upgradeFeature := NewCustomUpgradeTest("subaccount-external-name-test").
+	upgradeTest := NewCustomUpgradeTest("subaccount-external-name-test").
 		FromVersion(fromCustomTag).
 		ToVersion(toCustomTag).
 		WithResourceDirectories(customResourceDirectories).
@@ -101,8 +101,7 @@ func Test_Subaccount_External_Name(t *testing.T) {
 
 				return ctx
 			},
-		).
-		Build()
+		)
 
-	testenv.Test(t, upgradeFeature)
+	upgradeTest.testenv.Test(t, upgradeTest.Feature())
 }

@@ -8,11 +8,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane-contrib/xp-testing/pkg/images"
+	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/crossplane-contrib/xp-testing/pkg/upgrade"
 	"github.com/sap/crossplane-provider-btp/test"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/e2e-framework/klient/wait"
+	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
+	"sigs.k8s.io/e2e-framework/support/kind"
 )
 
 // CustomUpgradeTestBuilder provides an API for creating custom upgrade tests.
@@ -38,8 +43,8 @@ type CustomUpgradeTestBuilder struct {
 	resourceDirectories []string
 
 	// Timeout configuration
-	verifyTimeout *time.Duration
-	waitForPause  *time.Duration
+	verifyTimeout time.Duration
+	waitForPause  time.Duration
 
 	// Custom test phases
 	preUpgradeAssessments  []phaseFunc
@@ -47,6 +52,10 @@ type CustomUpgradeTestBuilder struct {
 
 	// Disable default phases
 	skipDefaultResourceVerification bool
+
+	// Configuration
+	kindClusterName string
+	testenv         env.Environment
 }
 
 // phaseFunc represents a test phase function that can be added to the test feature.
@@ -62,11 +71,16 @@ type phaseFunc struct {
 //
 //	builder := NewCustomUpgradeTest("test-external-name-migration")
 func NewCustomUpgradeTest(testName string) *CustomUpgradeTestBuilder {
+	testenv := env.New()
+
 	return &CustomUpgradeTestBuilder{
 		testName:               testName,
 		resourceDirectories:    []string{},
 		preUpgradeAssessments:  []phaseFunc{},
 		postUpgradeAssessments: []phaseFunc{},
+		testenv:                testenv,
+		waitForPause:           globalWaitForPause,
+		verifyTimeout:          globalVerifyTimeout,
 	}
 }
 
@@ -101,14 +115,14 @@ func (b *CustomUpgradeTestBuilder) WithResourceDirectories(dirs []string) *Custo
 // WithVerifyTimeout sets the timeout duration for resource verification.
 // If not set, the value from UPGRADE_TEST_VERIFY_TIMEOUT or default (30 minutes) will be used.
 func (b *CustomUpgradeTestBuilder) WithVerifyTimeout(timeout time.Duration) *CustomUpgradeTestBuilder {
-	b.verifyTimeout = &timeout
+	b.verifyTimeout = timeout
 	return b
 }
 
 // WithWaitForPause sets the duration to wait for resources to pause during upgrade.
 // If not set, the value from UPGRADE_TEST_WAIT_FOR_PAUSE or default (1 minute) will be used.
 func (b *CustomUpgradeTestBuilder) WithWaitForPause(duration time.Duration) *CustomUpgradeTestBuilder {
-	b.waitForPause = &duration
+	b.waitForPause = duration
 	return b
 }
 
@@ -150,7 +164,7 @@ func (b *CustomUpgradeTestBuilder) SkipDefaultResourceVerification() *CustomUpgr
 	return b
 }
 
-// Build constructs the upgrade test feature from the builder configuration.
+// Feature constructs the upgrade test feature from the builder configuration.
 // It resolves all configuration values (using defaults where not explicitly set),
 // builds the test phases in the correct order, and returns a features.Feature ready for execution.
 //
@@ -166,24 +180,32 @@ func (b *CustomUpgradeTestBuilder) SkipDefaultResourceVerification() *CustomUpgr
 //
 // Example:
 //
-//	feature := builder.Build()
+//	feature := builder.Feature()
 //	testenv.Test(t, feature)
-func (b *CustomUpgradeTestBuilder) Build() features.Feature {
-	// Resolve configuration from builder or defaults
-	config := b.resolveConfig()
+func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
+	if b.fromTag == "" || b.toTag == "" {
+		panic("Both fromTag and toTag must be specified before building an upgrade test feature")
+	}
+
+	fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage := loadPackages(b.fromTag, b.toTag)
+
+	b.setupClusterWithCrossplane(
+		fromProviderPackage,
+		fromControllerPackage,
+	)
 
 	upgradeTest := upgrade.UpgradeTest{
 		ProviderName:        providerName,
-		ClusterName:         kindClusterName,
-		FromProviderPackage: config.fromProviderPackage,
-		ToProviderPackage:   config.toProviderPackage,
-		ResourceDirectories: config.resourceDirs,
+		ClusterName:         b.kindClusterName,
+		FromProviderPackage: fromProviderPackage,
+		ToProviderPackage:   toProviderPackage,
+		ResourceDirectories: b.resourceDirectories,
 	}
 
-	featureName := fmt.Sprintf("%s: Upgrade %s from %s to %s", b.testName, providerName, config.fromTag, config.toTag)
+	featureName := fmt.Sprintf("%s: Upgrade %s from %s to %s", b.testName, providerName, b.fromTag, b.toTag)
 	feature := features.New(featureName).
 		WithSetup(
-			"Install provider with version "+config.fromTag,
+			"Install provider with version "+b.fromTag,
 			upgrade.ApplyProvider(upgradeTest.ClusterName, upgradeTest.FromProviderInstallOptions()),
 		).
 		WithSetup(
@@ -194,7 +216,7 @@ func (b *CustomUpgradeTestBuilder) Build() features.Feature {
 	if !b.skipDefaultResourceVerification {
 		feature = feature.Assess(
 			"Verify resources before upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, config.verifyTimeout),
+			upgrade.VerifyResources(upgradeTest.ResourceDirectories, b.verifyTimeout),
 		)
 	}
 
@@ -204,22 +226,22 @@ func (b *CustomUpgradeTestBuilder) Build() features.Feature {
 	}
 
 	feature = feature.Assess(
-		"Upgrade provider to version "+config.toTag,
+		"Upgrade provider to version "+b.toTag,
 		upgrade.UpgradeProvider(upgrade.UpgradeProviderOptions{
 			ClusterName: upgradeTest.ClusterName,
 			ProviderOptions: test.InstallProviderOptionsWithController(
 				upgradeTest.ToProviderInstallOptions(),
-				config.toControllerPackage,
+				toControllerPackage,
 			),
 			ResourceDirectories: upgradeTest.ResourceDirectories,
-			WaitForPause:        config.waitForPause,
+			WaitForPause:        b.waitForPause,
 		}),
 	)
 
 	if !b.skipDefaultResourceVerification {
 		feature = feature.Assess(
 			"Verify resources after upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, config.verifyTimeout),
+			upgrade.VerifyResources(upgradeTest.ResourceDirectories, b.verifyTimeout),
 		)
 	}
 
@@ -234,8 +256,8 @@ func (b *CustomUpgradeTestBuilder) Build() features.Feature {
 			err := test.DeleteResourcesFromDirsGracefully(
 				ctx,
 				cfg,
-				config.resourceDirs,
-				wait.WithTimeout(config.verifyTimeout),
+				b.resourceDirectories,
+				wait.WithTimeout(b.verifyTimeout),
 			)
 			if err != nil {
 				t.Logf("failed to clean up resources: %v", err)
@@ -252,53 +274,42 @@ func (b *CustomUpgradeTestBuilder) Build() features.Feature {
 	return feature.Feature()
 }
 
-// resolvedConfig holds the final resolved configuration for the test
-type resolvedConfig struct {
-	fromTag               string
-	toTag                 string
-	fromProviderPackage   string
-	toProviderPackage     string
-	fromControllerPackage string
-	toControllerPackage   string
-	resourceDirs          []string
-	verifyTimeout         time.Duration
-	waitForPause          time.Duration
-}
+func (b *CustomUpgradeTestBuilder) setupClusterWithCrossplane(fromProviderPackage, fromControllerPackage string) {
+	namespace := envconf.RandomName(namespacePrefix, 16)
 
-// resolveConfig resolves all configuration values, using builder overrides or falling back to defaults
-func (b *CustomUpgradeTestBuilder) resolveConfig() resolvedConfig {
-	config := resolvedConfig{
-		fromTag:      b.fromTag,
-		toTag:        b.toTag,
-		resourceDirs: b.resourceDirectories,
+	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName)
+
+	cfg := setup.ClusterSetup{
+		ProviderName: providerName,
+		Images: images.ProviderImages{
+			Package:         fromProviderPackage,
+			ControllerImage: &fromControllerPackage,
+		},
+		CrossplaneSetup: setup.CrossplaneSetup{
+			Version:  crossplaneVersion,
+			Registry: setup.DockerRegistry,
+		},
+		DeploymentRuntimeConfig: &deploymentRuntimeConfig,
 	}
 
-	fromProviderPkg, toProviderPkg, fromControllerPkg, toControllerPkg := loadCustomPackages(
-		config.fromTag,
-		config.toTag,
+	cfg.PostCreate(func(clusterName string) env.Func {
+		return func(ctx context.Context, config *envconf.Config) (context.Context, error) {
+			b.kindClusterName = clusterName
+			klog.V(4).Infof("Upgrade cluster %s has been created", clusterName)
+			return ctx, nil
+		}
+	})
+
+	_ = cfg.Configure(b.testenv, &kind.Cluster{})
+
+	b.testenv.Setup(
+		test.ApplySecretInCrossplaneNamespace(cisSecretName, bindingSecretData),
+		test.ApplySecretInCrossplaneNamespace(serviceUserSecretName, userSecretData),
+		test.CreateProviderConfigFn(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName),
 	)
-
-	config.fromProviderPackage = fromProviderPkg
-	config.toProviderPackage = toProviderPkg
-	config.fromControllerPackage = fromControllerPkg
-	config.toControllerPackage = toControllerPkg
-
-	if b.verifyTimeout != nil {
-		config.verifyTimeout = *b.verifyTimeout
-	} else {
-		config.verifyTimeout = verifyTimeout
-	}
-
-	if b.waitForPause != nil {
-		config.waitForPause = *b.waitForPause
-	} else {
-		config.waitForPause = waitForPause
-	}
-
-	return config
 }
 
-func loadCustomPackages(fromTag, toTag string) (string, string, string, string) {
+func loadPackages(fromTag, toTag string) (string, string, string, string) {
 	return test.LoadUpgradePackages(
 		fromTag, toTag,
 		fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository,
