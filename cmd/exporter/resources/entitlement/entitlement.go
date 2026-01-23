@@ -7,10 +7,10 @@ import (
 
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
-	openapi "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 
-	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/client"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	openapi "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 )
 
 const KIND_NAME = "entitlement"
@@ -50,7 +50,7 @@ func (e entitlementExporter) KindName() string {
 	return KIND_NAME
 }
 
-func (e entitlementExporter) Export(ctx context.Context, btpClient *btp.Client, eventHandler export.EventHandler, _ bool) error {
+func (e entitlementExporter) Export(ctx context.Context, btpClient *client.Client, eventHandler export.EventHandler, _ bool) error {
 	saGuid := subaccountParam.Value()
 	serviceName := serviceNameParam.Value()
 	exportAutoAssigned := autoAssignedParam.Value()
@@ -58,7 +58,7 @@ func (e entitlementExporter) Export(ctx context.Context, btpClient *btp.Client, 
 	slog.DebugContext(ctx, "Technical service name selected", "service", serviceName)
 	slog.DebugContext(ctx, "Export auto-assigned entitlements", "auto-assigned", exportAutoAssigned)
 
-	req := btpClient.EntitlementsServiceClient.
+	req := btpClient.CisClient.EntitlementsServiceClient.
 		GetDirectoryAssignments(ctx).
 		SubaccountGUID(saGuid).
 		AssignedServiceName(serviceName)

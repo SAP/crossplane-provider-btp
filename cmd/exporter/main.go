@@ -12,7 +12,7 @@ import (
 	_ "github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
 
-	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/client"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
@@ -40,7 +40,7 @@ var (
 	userSecretParam = configparam.SensitiveString(flagNameUserSecret, "If omitted, be the value of the "+envVarUserSecret+" environment variable is used.\nSee https://github.com/SAP/crossplane-provider-btp for more details.").
 		WithFlagName(flagNameUserSecret).
 		WithEnvVarName(envVarUserSecret).
-		WithExample("{\"username\": \"P-User\",\"password\":\"p_user_password\",\"email\":\"p.user@email.address\"}")
+		WithExample("{\"username\": \"P-UserName\",\"password\":\"p_user_password\",\"email\":\"p.user@email.address\"}")
 	resolveRefencesParam = configparam.Bool("resolve-references", "Resolve inter-resource references").
 		WithShortName("r").
 		WithEnvVarName("RESOLVE_REFERENCES")
@@ -78,7 +78,7 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 	cisSecret := []byte(cisSecretParam.Value())
 	userSecret := []byte(userSecretParam.Value())
 
-	btpClient, err := btp.ServiceClientFromSecret(cisSecret, userSecret)
+	btpClient, err := client.NewLoggedInClient(ctx, cisSecret, userSecret)
 	if err != nil {
 		return fmt.Errorf("failed to create BTP Client: %w", err)
 	}
@@ -87,7 +87,7 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 	// Export selected kinds.
 	for _, kind := range selectedResources {
 		if eFn := resources.ExportFn(kind); eFn != nil {
-			if err := eFn(ctx, &btpClient, eventHandler, resolveRefencesParam.Value()); err != nil {
+			if err := eFn(ctx, btpClient, eventHandler, resolveRefencesParam.Value()); err != nil {
 				eventHandler.Warn(erratt.Errorf("failed to call export function for kind: %w", err).With("kind", kind))
 			}
 		} else {

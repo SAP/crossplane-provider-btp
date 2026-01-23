@@ -7,7 +7,7 @@ import (
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/parsan"
 
-	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/client"
 )
 
 const UNDEFINED_NAME = "UNDEFINED-NAME"
@@ -24,7 +24,7 @@ type Kind interface {
 	// parameters. Then it collects the resource definitions
 	// through BTP Client. Finally, the resources are exported
 	// using the eventHandler.
-	Export(ctx context.Context, btpClient *btp.Client, evHandler export.EventHandler, resolveReferences bool) error
+	Export(ctx context.Context, btpClient *client.Client, evHandler export.EventHandler, resolveReferences bool) error
 }
 
 var kinds = map[string]Kind{}
@@ -47,7 +47,7 @@ func ConfigParams() []configparam.ConfigParam {
 }
 
 // ExportFn returns the export function of a given kind.
-func ExportFn(kind string) func(context.Context, *btp.Client, export.EventHandler, bool) error {
+func ExportFn(kind string) func(context.Context, *client.Client, export.EventHandler, bool) error {
 	resource, ok := kinds[kind]
 	if !ok || resource == nil {
 		return nil

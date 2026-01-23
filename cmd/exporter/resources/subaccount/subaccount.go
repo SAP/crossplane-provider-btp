@@ -10,6 +10,7 @@ import (
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
 
 	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/client"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 )
 
@@ -37,13 +38,13 @@ func (e subaccountExporter) KindName() string {
 	return subaccountParam.GetName()
 }
 
-func (e subaccountExporter) Export(ctx context.Context, btpClient *btp.Client, eventHandler export.EventHandler, _ bool) error {
+func (e subaccountExporter) Export(ctx context.Context, btpClient *client.Client, eventHandler export.EventHandler, _ bool) error {
 	accountIDs := subaccountParam.Value()
 	slog.DebugContext(ctx, "Subaccounts selected", "subaccounts", accountIDs)
 
 	// If no subaccount IDs are provided via command line, export all subaccounts.
 	if len(accountIDs) == 0 {
-		response, _, err := btpClient.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccounts(ctx).Execute()
+		response, _, err := btpClient.CisClient.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccounts(ctx).Execute()
 		if err != nil {
 			return fmt.Errorf("failed to get full list of subaccounts: %w", err)
 		}
@@ -60,7 +61,7 @@ func (e subaccountExporter) Export(ctx context.Context, btpClient *btp.Client, e
 
 	// Export subaccounts requested from command line.
 	for _, id := range accountIDs {
-		exportSubaccount(ctx, btpClient, eventHandler, id)
+		exportSubaccount(ctx, btpClient.CisClient, eventHandler, id)
 	}
 
 	return nil
