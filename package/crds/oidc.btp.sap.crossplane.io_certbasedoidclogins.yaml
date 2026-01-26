@@ -78,6 +78,12 @@ spec:
                   certificate:
                     description: Reference to p12 certificate, encoded as secret
                     properties:
+                      containsCertificateChain:
+                        description: ContainsCertificateChain indicates whether the
+                          provided certificate should be parsed as the full certificate
+                          chain (true) or just the leaf certificate (false). Default
+                          is false to keep backwards compatibility.
+                        type: boolean
                       env:
                         description: |-
                           Env is a reference to an environment variable that contains credentials

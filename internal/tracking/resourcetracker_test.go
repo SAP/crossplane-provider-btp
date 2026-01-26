@@ -1,6 +1,7 @@
 package tracking
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/samber/lo"
-	"golang.org/x/net/context"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
