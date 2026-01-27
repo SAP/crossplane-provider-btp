@@ -1,9 +1,13 @@
 {
   "name": "SAP BTP Provider Dev",
-  "image": "mcr.microsoft.com/devcontainers/go:1.24-bullseye",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
   
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest"
+    },
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
       "version": "latest",
       "helm": "latest",
@@ -15,6 +19,8 @@
       "terragrunt": "none"
     }
   },
+  "onCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list && sudo apt-get update",
+
   "postStartCommand": "bash .devcontainer/setup.sh",
   
   "customizations": {
