@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/client/btpcli"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -11,7 +12,6 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
-	openapiaccount "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 )
 
 func TestConvertSubaccountResource(t *testing.T) {
@@ -33,18 +33,18 @@ func TestConvertSubaccountResource(t *testing.T) {
 	wantResourceName := "test-subaccount"
 
 	tests := []struct {
-		name       string
-		subaccount *openapiaccount.SubaccountResponseObject
-		want       *yaml.ResourceWithComment
+		name string
+		sa   *btpcli.Subaccount
+		want *yaml.ResourceWithComment
 	}{
 		{
 			name: "all required fields present",
-			subaccount: &openapiaccount.SubaccountResponseObject{
+			sa: &btpcli.Subaccount{
 				DisplayName: displayName,
-				Guid:        saGuid,
+				GUID:        saGuid,
 				Region:      region,
 				Subdomain:   subdomain,
-				CreatedBy:   &createdBy,
+				CreatedBy:   createdBy,
 			},
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.Subaccount{
@@ -73,18 +73,18 @@ func TestConvertSubaccountResource(t *testing.T) {
 		},
 		{
 			name: "all fields including optional",
-			subaccount: &openapiaccount.SubaccountResponseObject{
+			sa: &btpcli.Subaccount{
 				DisplayName:       displayName,
-				Guid:              saGuid,
+				GUID:              saGuid,
 				Region:            region,
 				Subdomain:         subdomain,
-				CreatedBy:         &createdBy,
+				CreatedBy:         createdBy,
 				GlobalAccountGUID: gaGuid,
 				ParentGUID:        dirGuid,
 				Description:       description,
 				UsedForProduction: usedForProd,
 				BetaEnabled:       betaEnabled,
-				Labels:            &labels,
+				Labels:            labels,
 			},
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.Subaccount{
@@ -119,11 +119,11 @@ func TestConvertSubaccountResource(t *testing.T) {
 		},
 		{
 			name: "missing displayName",
-			subaccount: &openapiaccount.SubaccountResponseObject{
-				Guid:      saGuid,
+			sa: &btpcli.Subaccount{
+				GUID:      saGuid,
 				Region:    region,
 				Subdomain: subdomain,
-				CreatedBy: &createdBy,
+				CreatedBy: createdBy,
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -155,11 +155,11 @@ func TestConvertSubaccountResource(t *testing.T) {
 		},
 		{
 			name: "missing guid",
-			subaccount: &openapiaccount.SubaccountResponseObject{
+			sa: &btpcli.Subaccount{
 				DisplayName: displayName,
 				Region:      region,
 				Subdomain:   subdomain,
-				CreatedBy:   &createdBy,
+				CreatedBy:   createdBy,
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -192,11 +192,11 @@ func TestConvertSubaccountResource(t *testing.T) {
 		},
 		{
 			name: "missing region",
-			subaccount: &openapiaccount.SubaccountResponseObject{
+			sa: &btpcli.Subaccount{
 				DisplayName: displayName,
-				Guid:        saGuid,
+				GUID:        saGuid,
 				Subdomain:   subdomain,
-				CreatedBy:   &createdBy,
+				CreatedBy:   createdBy,
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -228,11 +228,11 @@ func TestConvertSubaccountResource(t *testing.T) {
 		},
 		{
 			name: "missing subdomain",
-			subaccount: &openapiaccount.SubaccountResponseObject{
+			sa: &btpcli.Subaccount{
 				DisplayName: displayName,
-				Guid:        saGuid,
+				GUID:        saGuid,
 				Region:      region,
-				CreatedBy:   &createdBy,
+				CreatedBy:   createdBy,
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -264,9 +264,9 @@ func TestConvertSubaccountResource(t *testing.T) {
 		},
 		{
 			name: "missing createdBy",
-			subaccount: &openapiaccount.SubaccountResponseObject{
+			sa: &btpcli.Subaccount{
 				DisplayName: displayName,
-				Guid:        saGuid,
+				GUID:        saGuid,
 				Region:      region,
 				Subdomain:   subdomain,
 			},
@@ -301,12 +301,12 @@ func TestConvertSubaccountResource(t *testing.T) {
 		},
 		{
 			name: "parentGUID same as globalAccountGUID",
-			subaccount: &openapiaccount.SubaccountResponseObject{
+			sa: &btpcli.Subaccount{
 				DisplayName:       displayName,
-				Guid:              saGuid,
+				GUID:              saGuid,
 				Region:            region,
 				Subdomain:         subdomain,
-				CreatedBy:         &createdBy,
+				CreatedBy:         createdBy,
 				GlobalAccountGUID: gaGuid,
 				ParentGUID:        gaGuid,
 			},
@@ -338,12 +338,12 @@ func TestConvertSubaccountResource(t *testing.T) {
 		},
 		{
 			name: "special characters in displayName",
-			subaccount: &openapiaccount.SubaccountResponseObject{
+			sa: &btpcli.Subaccount{
 				DisplayName: displayNameSpecial,
-				Guid:        saGuid,
+				GUID:        saGuid,
 				Region:      region,
 				Subdomain:   subdomain,
-				CreatedBy:   &createdBy,
+				CreatedBy:   createdBy,
 			},
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.Subaccount{
@@ -372,12 +372,12 @@ func TestConvertSubaccountResource(t *testing.T) {
 		},
 		{
 			name: "empty string fields",
-			subaccount: &openapiaccount.SubaccountResponseObject{
+			sa: &btpcli.Subaccount{
 				DisplayName: empty,
-				Guid:        empty,
+				GUID:        empty,
 				Region:      empty,
 				Subdomain:   empty,
-				CreatedBy:   &empty,
+				CreatedBy:   empty,
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -413,7 +413,10 @@ func TestConvertSubaccountResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertSubaccountResource(tt.subaccount)
+			result := convertSubaccountResource(&subaccount{
+				Subaccount:          tt.sa,
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+			})
 			r.NotNil(result)
 
 			// Verify comments.

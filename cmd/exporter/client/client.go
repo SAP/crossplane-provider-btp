@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/client/btpcli"
@@ -18,9 +17,6 @@ type Client struct {
 
 	// The BTP CLI client is used to retrieve other resources.
 	BtpCli *btpcli.BtpCli
-
-	// cache for BTP resources
-	cache ObjectCache
 }
 
 func NewLoggedInClient(ctx context.Context, cisSecret []byte, userSecret []byte) (*Client, error) {
@@ -40,7 +36,6 @@ func NewLoggedInClient(ctx context.Context, cisSecret []byte, userSecret []byte)
 	if err != nil {
 		resultingErr = errors.Join(resultingErr, fmt.Errorf("failed to get BTP CLI login parameters: %w", err))
 	} else {
-		slog.InfoContext(ctx, "BTP CLI login parameters:", "user", cliParams.UserName, "subdomain", cliParams.GlobalAccountSubdomain)
 		client.BtpCli = btpcli.NewClient("")
 		err = client.BtpCli.Login(ctx, cliParams)
 		if err != nil {
@@ -74,5 +69,16 @@ func cliLoginParametersFromSecret(cisSecret []byte, userSecret []byte) (*btpcli.
 		UserName:               userCredential.Username,
 		Password:               userCredential.Password,
 		GlobalAccountSubdomain: cisCredential.Uaa.Tenantid,
+	}, nil
+}
+
+func NewClientAndLogin(ctx context.Context, path string, params *btpcli.LoginParameters) (*Client, error) {
+	c := btpcli.NewClient(path)
+	err := c.Login(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to login to BTP CLI: %w", err)
+	}
+	return &Client{
+		BtpCli: c,
 	}, nil
 }

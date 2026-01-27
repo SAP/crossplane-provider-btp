@@ -21,19 +21,6 @@ const DefaultServerURL string = "https://cli.btp.cloud.sap"
 func (c *BtpCli) Login(ctx context.Context, params *LoginParameters) error {
 	var err error
 
-	if params.UserName == "" {
-		err = errors.Join(err, fmt.Errorf("user name is required"))
-	}
-	if params.Password == "" {
-		err = errors.Join(err, fmt.Errorf("password is required"))
-	}
-	if params.GlobalAccountSubdomain == "" {
-		err = errors.Join(err, fmt.Errorf("subdomain is required"))
-	}
-	if err != nil {
-		return fmt.Errorf("invalid login parameters: %w", err)
-	}
-
 	args := []string{
 		"login",
 		"--user", params.UserName,

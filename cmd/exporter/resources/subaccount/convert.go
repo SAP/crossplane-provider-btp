@@ -7,8 +7,6 @@ import (
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
-	openapiaccount "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 )
 
 const (
@@ -19,28 +17,13 @@ const (
 	warnMissingCreatedBy   = "WARNING: 'createdBy' field is missing in the source, cannot set 'SubaccountAdmins'"
 )
 
-// convertSubaccountResource converts the given OpenAPI subaccount response object to a Subaccount custom resource,
-// defined by the BTP Crossplane provider.
-// - The function fills all mandatory fields
-// - The function comments out the resource, if any of the mandatory fields is missing
-// - The function fills optional fields that are relevant for the Update operation
-// - The function does not perform extensive input validation, e.g. if an uuid string is a valid uuid.
-func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObject) *yaml.ResourceWithComment {
-	saDisplayName, hasName := resources.StringValueOk(subaccount.GetDisplayNameOk())
-	saGuid, hasGuid := resources.StringValueOk(subaccount.GetGuidOk())
-	saRegion, hasRegion := resources.StringValueOk(subaccount.GetRegionOk())
-	saSubdomain, hasSubdomain := resources.StringValueOk(subaccount.GetSubdomainOk())
-	saCreatedBy, hasCreatedBy := resources.StringValueOk(subaccount.GetCreatedByOk())
-
-	var resourceName string
-	switch {
-	case !hasName && hasGuid:
-		resourceName = KIND_NAME + "-" + saGuid
-	case !hasName:
-		resourceName = resources.UNDEFINED_NAME
-	default:
-		resourceName = resources.SanitizeK8sResourceName(saDisplayName)
-	}
+func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
+	saDisplayName := sa.GetDisplayName()
+	saGuid := sa.GetID()
+	saRegion := sa.Region
+	saSubdomain := sa.Subdomain
+	saCreatedBy := sa.CreatedBy
+	resourceName := sa.GenerateK8sResourceName()
 
 	// Create Subaccount with required fields first.
 	saResource := yaml.NewResourceWithComment(
@@ -71,20 +54,23 @@ func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObje
 			},
 		})
 
+	// Copy comments from the original resource.
+	saResource.CloneComment(sa)
+
 	// Comment the resource out, if any of the required fields is missing.
-	if !hasName {
+	if saDisplayName == "" {
 		saResource.AddComment(warnMissingDisplayName)
 	}
-	if !hasGuid {
+	if saGuid == "" {
 		saResource.AddComment(warnMissingGuid)
 	}
-	if !hasRegion {
+	if saRegion == "" {
 		saResource.AddComment(warnMissingRegion)
 	}
-	if !hasSubdomain {
+	if saSubdomain == "" {
 		saResource.AddComment(warnMissingSubdomain)
 	}
-	if !hasCreatedBy {
+	if saCreatedBy == "" {
 		saResource.AddComment(warnMissingCreatedBy)
 	}
 
@@ -92,40 +78,32 @@ func convertSubaccountResource(subaccount *openapiaccount.SubaccountResponseObje
 	// and not trigger an update right after managementPolicies is set to manage the resource.
 
 	// GlobalAccountGuid
-	ga, ok := resources.StringValueOk(subaccount.GetGlobalAccountGUIDOk())
-	if ok {
-		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.GlobalAccountGuid = ga
+	if sa.GlobalAccountGUID != "" {
+		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.GlobalAccountGuid = sa.GlobalAccountGUID
 	}
 
 	// DirectoryGuid
-	parent, ok := resources.StringValueOk(subaccount.GetParentGUIDOk())
-	if ok && parent != ga {
-		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.DirectoryGuid = parent
+	if sa.ParentGUID != "" && sa.ParentGUID != sa.GlobalAccountGUID {
+		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.DirectoryGuid = sa.ParentGUID
 	}
 
 	// Description
-	v, ok := resources.StringValueOk(subaccount.GetDescriptionOk())
-	if ok {
-		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Description = v
+	if sa.Description != "" {
+		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Description = sa.Description
 	}
 
 	// UsedForProduction
-	v, ok = resources.StringValueOk(subaccount.GetUsedForProductionOk())
-	if ok {
-		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.UsedForProduction = v
+	if sa.UsedForProduction != "" {
+		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.UsedForProduction = sa.UsedForProduction
 	}
 
 	// Labels
-	l, ok := subaccount.GetLabelsOk()
-	if ok {
-		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Labels = *l
+	if len(sa.Labels) > 0 {
+		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Labels = sa.Labels
 	}
 
 	// BetaEnabled
-	b, ok := resources.BoolValueOk(subaccount.GetBetaEnabledOk())
-	if ok {
-		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.BetaEnabled = b
-	}
+	saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.BetaEnabled = sa.BetaEnabled
 
 	return saResource
 }

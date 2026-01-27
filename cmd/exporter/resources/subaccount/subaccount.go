@@ -7,9 +7,10 @@ import (
 
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/parsan"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/client/btpcli"
 
-	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/client"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 )
@@ -17,63 +18,122 @@ import (
 const KIND_NAME = "subaccount"
 
 var (
+	subaccountCache resources.ResourceCache[*subaccount]
 	subaccountParam = configparam.StringSlice(KIND_NAME, "UUID of a BTP subaccount. Used in combination with '--kind "+KIND_NAME+"'").
 		WithFlagName(KIND_NAME)
-	Exporter = subaccountExporter{}
 )
 
 func init() {
-	resources.RegisterKind(Exporter)
+	resources.RegisterKind(exporter{})
 }
 
-type subaccountExporter struct{}
+type exporter struct{}
 
-var _ resources.Kind = subaccountExporter{}
+var _ resources.Kind = exporter{}
 
-func (e subaccountExporter) Param() configparam.ConfigParam {
+func (e exporter) Param() configparam.ConfigParam {
 	return subaccountParam
 }
 
-func (e subaccountExporter) KindName() string {
+func (e exporter) KindName() string {
 	return subaccountParam.GetName()
 }
 
-func (e subaccountExporter) Export(ctx context.Context, btpClient *client.Client, eventHandler export.EventHandler, _ bool) error {
-	accountIDs := subaccountParam.Value()
-	slog.DebugContext(ctx, "Subaccounts selected", "subaccounts", accountIDs)
-
-	// If no subaccount IDs are provided via command line, export all subaccounts.
-	if len(accountIDs) == 0 {
-		response, _, err := btpClient.CisClient.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccounts(ctx).Execute()
-		if err != nil {
-			return fmt.Errorf("failed to get full list of subaccounts: %w", err)
-		}
-
-		subaccounts := response.Value
-		if len(subaccounts) == 0 {
-			eventHandler.Warn(fmt.Errorf("no subaccounts found"))
-		}
-		for _, a := range subaccounts {
-			eventHandler.Resource(convertSubaccountResource(&a))
-		}
-		return nil
+func (e exporter) Export(ctx context.Context, btpClient *client.Client, eventHandler export.EventHandler, _ bool) error {
+	cache, err := Get(ctx, btpClient.BtpCli)
+	if err != nil {
+		return fmt.Errorf("failed to get cache with subaccounts: %w", err)
 	}
+	slog.DebugContext(ctx, "Subaccounts retrieved", "count", cache.Len())
 
-	// Export subaccounts requested from command line.
-	for _, id := range accountIDs {
-		exportSubaccount(ctx, btpClient.CisClient, eventHandler, id)
+	if cache.Len() == 0 {
+		eventHandler.Warn(fmt.Errorf("no subaccounts found"))
+	} else {
+		for _, sa := range cache.All() {
+			eventHandler.Resource(convertSubaccountResource(sa))
+		}
 	}
 
 	return nil
 }
 
-// exportSubaccount exports a single subaccount by its ID.
-func exportSubaccount(ctx context.Context, btpClient *btp.Client, eventHandler export.EventHandler, subaccountID string) {
-	response, err := btpClient.GetBTPSubaccount(ctx, subaccountID)
-	if err != nil {
-		eventHandler.Warn(erratt.Errorf("failed to get subaccount: %w", err).With("uuid", subaccountID))
-		return
+type subaccount struct {
+	*btpcli.Subaccount
+	*yaml.ResourceWithComment
+}
+
+var _ resources.BtpResource = &subaccount{}
+
+func (s *subaccount) GetID() string {
+	return s.GUID
+}
+
+func (s *subaccount) GetDisplayName() string {
+	return s.DisplayName
+}
+
+func (s *subaccount) GetExternalName() string {
+	return s.GUID
+}
+
+func (s *subaccount) GenerateK8sResourceName() string {
+	var resourceName string
+	saGuid := s.GetID()
+	saDisplayName := s.GetDisplayName()
+	hasGuid := saGuid != ""
+	hasName := saDisplayName != ""
+
+	switch {
+	case !hasName && hasGuid:
+		resourceName = KIND_NAME + "-" + saGuid
+	case !hasName:
+		resourceName = resources.UNDEFINED_NAME
+	default:
+		names := parsan.ParseAndSanitize(saDisplayName, parsan.RFC1035LowerSubdomain)
+		if len(names) == 0 {
+			s.AddComment(fmt.Sprintf("error sanitizing subaccount name: %s", saDisplayName))
+			resourceName = saDisplayName
+		} else {
+			resourceName = names[0]
+		}
 	}
 
-	eventHandler.Resource(convertSubaccountResource(response))
+	return resourceName
+}
+
+func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*subaccount], error) {
+	if subaccountCache != nil {
+		return subaccountCache, nil
+	}
+
+	originals, err := btpClient.ListSubaccounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get subaccounts: %w", err)
+	}
+
+	var subaccounts []*subaccount
+	for _, sa := range originals {
+		subaccounts = append(subaccounts, &subaccount{
+			Subaccount:          &sa,
+			ResourceWithComment: yaml.NewResourceWithComment(nil),
+		})
+	}
+
+	cache := resources.NewResourceCache[*subaccount]()
+	cache.Store(subaccounts...)
+	widgetValues := cache.ValuesForSelection()
+	subaccountParam.WithPossibleValuesFn(func() ([]string, error) {
+		return widgetValues.Values(), nil
+	})
+
+	selectedSubaccounts, err := subaccountParam.ValueOrAsk(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parameter value: %s, %w", subaccountParam.GetName(), err)
+	}
+	slog.DebugContext(ctx, "Selected subaccounts", "subaccounts", selectedSubaccounts)
+
+	cache.KeepSelectedOnly(selectedSubaccounts)
+	subaccountCache = cache
+
+	return subaccountCache, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os/exec"
 )
 
@@ -27,6 +28,7 @@ func NewClient(btpPath string) *BtpCli {
 
 // Execute runs a btp CLI command and returns the output
 func (c *BtpCli) Execute(ctx context.Context, args ...string) ([]byte, error) {
+	logCommand(ctx, c.BtpPath, args...)
 	cmd := exec.CommandContext(ctx, c.BtpPath, args...)
 
 	output, err := cmd.CombinedOutput()
@@ -48,4 +50,18 @@ func (c *BtpCli) ExecuteJSON(ctx context.Context, result interface{}, args ...st
 	}
 
 	return json.Unmarshal(output, result)
+}
+
+func logCommand(ctx context.Context, command string, args ...string) {
+	masked := make([]string, len(args))
+	copy(masked, args)
+	for i, arg := range masked {
+		// Simple masking for sensitive flags
+		if arg == "--password" || arg == "--user" || arg == "--jwt" {
+			if i+1 < len(args) {
+				masked[i+1] = "****"
+			}
+		}
+	}
+	slog.DebugContext(ctx, "Executing BTP CLI command", "name", command, "args", masked)
 }
