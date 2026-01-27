@@ -3,12 +3,19 @@
 package upgrade
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
+	"github.com/crossplane-contrib/xp-testing/pkg/images"
+	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/sap/crossplane-provider-btp/test"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/e2e-framework/pkg/env"
+	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/support/kind"
 )
 
 const (
@@ -59,11 +66,18 @@ var (
 	toProviderRepository     string
 	fromControllerRepository string
 	toControllerRepository   string
+
+	kindClusterName string
+	namespace       string
+	testenv         env.Environment
 )
 
 func TestMain(m *testing.M) {
+	testenv = env.New()
 	var verbosity = 4
 	test.SetupLogging(verbosity)
+
+	namespace = envconf.RandomName(namespacePrefix, 16)
 
 	// Load ProviderConfig secrets
 	bindingSecretData = test.GetBindingSecretOrPanic()
@@ -81,5 +95,63 @@ func TestMain(m *testing.M) {
 	globalVerifyTimeout = test.LoadDurationMins(verifyTimeoutEnvVar, defaultVerifyTimeoutMins)
 	globalWaitForPause = test.LoadDurationMins(waitForPauseEnvVar, defaultWaitForPauseMins)
 
-	os.Exit(m.Run())
+	// Setup cluster
+	fromTag, toTag := LoadUpgradeTags()
+
+	fromProviderPackage, _, fromControllerPackage, _ := test.LoadUpgradePackages(
+		fromTag, toTag,
+		fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository,
+		uutImagesEnvVar, localTagName,
+		false,
+	)
+
+	setupClusterWithCrossplane(fromProviderPackage, fromControllerPackage)
+
+	os.Exit(testenv.Run(m))
+}
+
+func setupClusterWithCrossplane(fromProviderPackage, fromControllerPackage string) {
+	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName)
+
+	cfg := setup.ClusterSetup{
+		ProviderName: providerName,
+		Images: images.ProviderImages{
+			Package:         fromProviderPackage,
+			ControllerImage: &fromControllerPackage,
+		},
+		CrossplaneSetup: setup.CrossplaneSetup{
+			Version:  crossplaneVersion,
+			Registry: setup.DockerRegistry,
+		},
+		DeploymentRuntimeConfig: &deploymentRuntimeConfig,
+	}
+
+	cfg.PostCreate(func(clusterName string) env.Func {
+		return func(ctx context.Context, config *envconf.Config) (context.Context, error) {
+			kindClusterName = clusterName
+			klog.V(4).Infof("Upgrade cluster %s has been created", clusterName)
+			return ctx, nil
+		}
+	})
+
+	_ = cfg.Configure(testenv, &kind.Cluster{})
+
+	testenv.Setup(
+		test.ApplySecretInCrossplaneNamespace(cisSecretName, bindingSecretData),
+		test.ApplySecretInCrossplaneNamespace(serviceUserSecretName, userSecretData),
+	)
+}
+
+func LoadUpgradeTags() (string, string) {
+	fromTagVar := os.Getenv(fromTagEnvVar)
+	if fromTagVar == "" {
+		panic(fromTagEnvVar + " environment variable is required")
+	}
+
+	toTagVar := os.Getenv(toTagEnvVar)
+	if toTagVar == "" {
+		panic(toTagEnvVar + " environment variable is required")
+	}
+
+	return fromTagVar, toTagVar
 }

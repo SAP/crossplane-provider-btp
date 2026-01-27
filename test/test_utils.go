@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
@@ -35,6 +36,7 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/pkg/features"
 )
 
 const (
@@ -99,17 +101,54 @@ func GetUserSecretOrPanic() map[string]string {
 	return userSecret
 }
 
-func CreateProviderConfigFn(namespace string, globalAccount string, cliServerUrl string, cisSecretName string, serviceUserSecretName string) func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+func CreateProviderConfigFn(
+	namespace string,
+	globalAccount string,
+	cliServerUrl string,
+	cisSecretName string,
+	serviceUserSecretName string,
+) features.Func {
+	return func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 		r, _ := res.New(cfg.Client().RESTConfig())
 		_ = metaApi.AddToScheme(r.GetScheme())
 
 		obj := ProviderConfig(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
 		err := r.Create(ctx, obj)
 		if kubeErrors.IsAlreadyExists(err) {
-			return ctx, r.Update(ctx, obj)
+			err = r.Update(ctx, obj)
+			if err != nil {
+				t.Errorf("failed to update existing ProviderConfig: %v", err)
+			}
+
+			return ctx
 		}
-		return ctx, err
+
+		if err != nil {
+			t.Errorf("failed to create ProviderConfig: %v", err)
+		}
+
+		return ctx
+	}
+}
+
+func DeleteProviderConfigFn(
+	namespace string,
+	globalAccount string,
+	cliServerUrl string,
+	cisSecretName string,
+	serviceUserSecretName string,
+) features.Func {
+	return func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+		r, _ := res.New(cfg.Client().RESTConfig())
+		_ = metaApi.AddToScheme(r.GetScheme())
+
+		obj := ProviderConfig(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
+		err := r.Delete(ctx, obj)
+		if err != nil && !kubeErrors.IsNotFound(err) {
+			t.Errorf("failed to delete ProviderConfig: %v", err)
+		}
+
+		return ctx
 	}
 }
 
@@ -266,6 +305,7 @@ func LoadUpgradePackages(
 	fromTag, toTag string,
 	fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository string,
 	uutImagesEnvVar, localTagName string,
+	pullPackages bool,
 ) (string, string, string, string) {
 	isLocalFromTag := fromTag == localTagName
 	isLocalToTag := toTag == localTagName
@@ -299,16 +339,20 @@ func LoadUpgradePackages(
 		fromProviderPackage = fmt.Sprintf("%s:%s", fromProviderRepository, fromTag)
 		fromControllerPackage = fmt.Sprintf("%s:%s", fromControllerRepository, fromTag)
 
-		mustPullImage(fromProviderPackage)
-		mustPullImage(fromControllerPackage)
+		if pullPackages {
+			mustPullImage(fromProviderPackage)
+			mustPullImage(fromControllerPackage)
+		}
 	}
 
 	if !isLocalToTag {
 		toProviderPackage = fmt.Sprintf("%s:%s", toProviderRepository, toTag)
 		toControllerPackage = fmt.Sprintf("%s:%s", toControllerRepository, toTag)
 
-		mustPullImage(toProviderPackage)
-		mustPullImage(toControllerPackage)
+		if pullPackages {
+			mustPullImage(toProviderPackage)
+			mustPullImage(toControllerPackage)
+		}
 	}
 
 	return fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage

@@ -103,5 +103,5 @@ func Test_Subaccount_External_Name(t *testing.T) {
 			},
 		)
 
-	upgradeTest.testenv.Test(t, upgradeTest.Feature())
+	testenv.Test(t, upgradeTest.Feature())
 }

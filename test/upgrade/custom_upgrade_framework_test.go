@@ -8,16 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crossplane-contrib/xp-testing/pkg/images"
-	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/crossplane-contrib/xp-testing/pkg/upgrade"
 	"github.com/sap/crossplane-provider-btp/test"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/e2e-framework/klient/wait"
-	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
-	"sigs.k8s.io/e2e-framework/support/kind"
 )
 
 // CustomUpgradeTestBuilder provides an API for creating custom upgrade tests.
@@ -52,10 +47,6 @@ type CustomUpgradeTestBuilder struct {
 
 	// Disable default phases
 	skipDefaultResourceVerification bool
-
-	// Configuration
-	kindClusterName string
-	testenv         env.Environment
 }
 
 // phaseFunc represents a test phase function that can be added to the test feature.
@@ -71,14 +62,11 @@ type phaseFunc struct {
 //
 //	builder := NewCustomUpgradeTest("test-external-name-migration")
 func NewCustomUpgradeTest(testName string) *CustomUpgradeTestBuilder {
-	testenv := env.New()
-
 	return &CustomUpgradeTestBuilder{
 		testName:               testName,
 		resourceDirectories:    []string{},
 		preUpgradeAssessments:  []phaseFunc{},
 		postUpgradeAssessments: []phaseFunc{},
-		testenv:                testenv,
 		waitForPause:           globalWaitForPause,
 		verifyTimeout:          globalVerifyTimeout,
 	}
@@ -189,14 +177,9 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 
 	fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage := loadPackages(b.fromTag, b.toTag)
 
-	b.setupClusterWithCrossplane(
-		fromProviderPackage,
-		fromControllerPackage,
-	)
-
 	upgradeTest := upgrade.UpgradeTest{
 		ProviderName:        providerName,
-		ClusterName:         b.kindClusterName,
+		ClusterName:         kindClusterName,
 		FromProviderPackage: fromProviderPackage,
 		ToProviderPackage:   toProviderPackage,
 		ResourceDirectories: b.resourceDirectories,
@@ -206,7 +189,14 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 	feature := features.New(featureName).
 		WithSetup(
 			"Install provider with version "+b.fromTag,
-			upgrade.ApplyProvider(upgradeTest.ClusterName, upgradeTest.FromProviderInstallOptions()),
+			upgrade.ApplyProvider(upgradeTest.ClusterName, test.InstallProviderOptionsWithController(
+				upgradeTest.FromProviderInstallOptions(),
+				fromControllerPackage,
+			)),
+		).
+		WithSetup(
+			"Apply ProviderConfig",
+			test.CreateProviderConfigFn(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName),
 		).
 		WithSetup(
 			"Import resources from directories",
@@ -266,47 +256,17 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 		},
 	)
 
-	feature = feature.WithTeardown(
-		"Delete provider",
-		upgrade.DeleteProvider(upgradeTest.ProviderName),
-	)
+	feature = feature.
+		WithTeardown(
+			"Delete ProviderConfig",
+			test.DeleteProviderConfigFn(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName),
+		).
+		WithTeardown(
+			"Delete provider",
+			upgrade.DeleteProvider(upgradeTest.ProviderName),
+		)
 
 	return feature.Feature()
-}
-
-func (b *CustomUpgradeTestBuilder) setupClusterWithCrossplane(fromProviderPackage, fromControllerPackage string) {
-	namespace := envconf.RandomName(namespacePrefix, 16)
-
-	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName)
-
-	cfg := setup.ClusterSetup{
-		ProviderName: providerName,
-		Images: images.ProviderImages{
-			Package:         fromProviderPackage,
-			ControllerImage: &fromControllerPackage,
-		},
-		CrossplaneSetup: setup.CrossplaneSetup{
-			Version:  crossplaneVersion,
-			Registry: setup.DockerRegistry,
-		},
-		DeploymentRuntimeConfig: &deploymentRuntimeConfig,
-	}
-
-	cfg.PostCreate(func(clusterName string) env.Func {
-		return func(ctx context.Context, config *envconf.Config) (context.Context, error) {
-			b.kindClusterName = clusterName
-			klog.V(4).Infof("Upgrade cluster %s has been created", clusterName)
-			return ctx, nil
-		}
-	})
-
-	_ = cfg.Configure(b.testenv, &kind.Cluster{})
-
-	b.testenv.Setup(
-		test.ApplySecretInCrossplaneNamespace(cisSecretName, bindingSecretData),
-		test.ApplySecretInCrossplaneNamespace(serviceUserSecretName, userSecretData),
-		test.CreateProviderConfigFn(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName),
-	)
 }
 
 func loadPackages(fromTag, toTag string) (string, string, string, string) {
@@ -314,5 +274,6 @@ func loadPackages(fromTag, toTag string) (string, string, string, string) {
 		fromTag, toTag,
 		fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository,
 		uutImagesEnvVar, localTagName,
+		true,
 	)
 }

@@ -37,7 +37,7 @@ func Test_BaselineUpgradeProvider(t *testing.T) {
 		ToVersion(toTag).
 		WithResourceDirectories(resourceDirectories)
 
-	upgradeTest.testenv.Test(t, upgradeTest.Feature())
+	testenv.Test(t, upgradeTest.Feature())
 }
 
 func loadTags() (string, string) {
