@@ -196,7 +196,7 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 		).
 		WithSetup(
 			"Apply ProviderConfig",
-			test.CreateProviderConfigFn(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName),
+			test.CreateProviderConfigFeatureFn(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName),
 		).
 		WithSetup(
 			"Import resources from directories",

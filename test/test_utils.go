@@ -101,7 +101,31 @@ func GetUserSecretOrPanic() map[string]string {
 	return userSecret
 }
 
-func CreateProviderConfigFn(
+// CreateProviderConfig contains the core logic for creating or updating a ProviderConfig.
+// Returns an error if the operation fails.
+func CreateProviderConfig(
+	ctx context.Context,
+	cfg *envconf.Config,
+	namespace string,
+	globalAccount string,
+	cliServerUrl string,
+	cisSecretName string,
+	serviceUserSecretName string,
+) error {
+	r, _ := res.New(cfg.Client().RESTConfig())
+	_ = metaApi.AddToScheme(r.GetScheme())
+
+	obj := ProviderConfig(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
+	err := r.Create(ctx, obj)
+	if kubeErrors.IsAlreadyExists(err) {
+		return r.Update(ctx, obj)
+	}
+
+	return err
+}
+
+// CreateProviderConfigFeatureFn returns a features.Func for use in feature.WithSetup.
+func CreateProviderConfigFeatureFn(
 	namespace string,
 	globalAccount string,
 	cliServerUrl string,
@@ -109,25 +133,28 @@ func CreateProviderConfigFn(
 	serviceUserSecretName string,
 ) features.Func {
 	return func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-		r, _ := res.New(cfg.Client().RESTConfig())
-		_ = metaApi.AddToScheme(r.GetScheme())
-
-		obj := ProviderConfig(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
-		err := r.Create(ctx, obj)
-		if kubeErrors.IsAlreadyExists(err) {
-			err = r.Update(ctx, obj)
-			if err != nil {
-				t.Errorf("failed to update existing ProviderConfig: %v", err)
-			}
-
-			return ctx
-		}
-
+		err := CreateProviderConfig(ctx, cfg, namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
 		if err != nil {
 			t.Errorf("failed to create ProviderConfig: %v", err)
 		}
-
 		return ctx
+	}
+}
+
+// CreateProviderConfigEnvFn returns an env.Func for use in env.Setup.
+func CreateProviderConfigEnvFn(
+	namespace string,
+	globalAccount string,
+	cliServerUrl string,
+	cisSecretName string,
+	serviceUserSecretName string,
+) env.Func {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		err := CreateProviderConfig(ctx, cfg, namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
+		if err != nil {
+			return ctx, fmt.Errorf("failed to create ProviderConfig: %w", err)
+		}
+		return ctx, nil
 	}
 }
 
