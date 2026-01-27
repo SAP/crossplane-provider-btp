@@ -381,7 +381,7 @@ upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upg
 .PHONY: upgrade-test-debug
 upgrade-test-debug: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
-	@cd test/upgrade && dlv test --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee upgrade-test-output.log
+	@dlv test ./test/upgrade --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee upgrade-test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" upgrade-test-output.log
 	@case `tail -n 1 upgrade-test-output.log` in \

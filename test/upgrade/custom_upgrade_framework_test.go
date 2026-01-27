@@ -189,6 +189,11 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 
 	fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage := loadPackages(b.fromTag, b.toTag)
 
+	b.setupClusterWithCrossplane(
+		fromProviderPackage,
+		fromControllerPackage,
+	)
+
 	upgradeTest := upgrade.UpgradeTest{
 		ProviderName:        providerName,
 		ClusterName:         b.kindClusterName,
@@ -198,15 +203,7 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 	}
 
 	featureName := fmt.Sprintf("%s: Upgrade %s from %s to %s", b.testName, providerName, b.fromTag, b.toTag)
-	feature := features.New(featureName)
-
-	b.setupClusterWithCrossplane(
-		fromProviderPackage,
-		fromControllerPackage,
-		feature,
-	)
-
-	feature.
+	feature := features.New(featureName).
 		WithSetup(
 			"Install provider with version "+b.fromTag,
 			upgrade.ApplyProvider(upgradeTest.ClusterName, upgradeTest.FromProviderInstallOptions()),
@@ -277,10 +274,7 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 	return feature.Feature()
 }
 
-func (b *CustomUpgradeTestBuilder) setupClusterWithCrossplane(
-	fromProviderPackage, fromControllerPackage string,
-	featureBuilder *features.FeatureBuilder,
-) {
+func (b *CustomUpgradeTestBuilder) setupClusterWithCrossplane(fromProviderPackage, fromControllerPackage string) {
 	namespace := envconf.RandomName(namespacePrefix, 16)
 
 	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName)
@@ -299,44 +293,19 @@ func (b *CustomUpgradeTestBuilder) setupClusterWithCrossplane(
 	}
 
 	cfg.PostCreate(func(clusterName string) env.Func {
-		b.kindClusterName = clusterName
 		return func(ctx context.Context, config *envconf.Config) (context.Context, error) {
+			b.kindClusterName = clusterName
 			klog.V(4).Infof("Upgrade cluster %s has been created", clusterName)
 			return ctx, nil
 		}
 	})
 
-	// Problem:
-	//   - testenv.Setup() steps are only being executed in testenv.Run()
-	//   - testenv.Run() takes a *testing.M as a parameter (cannot be called here)
-	//   - xp-testing uses testenv.Setup() to create the cluster in setup.ClusterSetup.Configure()
-	//
-	// TLDR: This still uses testenv.Setup, which will not run
 	_ = cfg.Configure(b.testenv, &kind.Cluster{})
 
-	featureBuilder.WithSetup(
-		"Apply provider config and credentials",
-		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			ctx, err := test.ApplySecretInCrossplaneNamespace(cisSecretName, bindingSecretData)(ctx, cfg)
-			if err != nil {
-				t.Fatalf("Failed to apply CIS secret: %v", err)
-			}
-
-			ctx, err = test.ApplySecretInCrossplaneNamespace(serviceUserSecretName, userSecretData)(ctx, cfg)
-			if err != nil {
-				t.Fatalf("Failed to apply Service User secret: %v", err)
-			}
-
-			ctx, err = test.CreateProviderConfigFn(
-				namespace,
-				globalAccount,
-				cliServerUrl,
-				cisSecretName,
-				serviceUserSecretName,
-			)(ctx, cfg)
-
-			return ctx
-		},
+	b.testenv.Setup(
+		test.ApplySecretInCrossplaneNamespace(cisSecretName, bindingSecretData),
+		test.ApplySecretInCrossplaneNamespace(serviceUserSecretName, userSecretData),
+		test.CreateProviderConfigFn(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName),
 	)
 }
 
