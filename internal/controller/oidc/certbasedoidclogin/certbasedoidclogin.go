@@ -184,7 +184,8 @@ func createCertLoginService(ctx context.Context, cr *v1alpha1.CertBasedOIDCLogin
 		UserCertificate: cert,
 		Password:        pw,
 		//TODO: potentially add to CRD
-		Scopes: []string{"email"},
+		Scopes:                   []string{"email"},
+		ContainsCertificateChain: cr.Spec.ForProvider.Certificate.ContainsCertificateChain,
 	}, ctx)
 }
 
