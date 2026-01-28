@@ -19,8 +19,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
-
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -260,7 +258,7 @@ func formExternalName(serviceInstanceID, serviceBindingID string) string {
 	return serviceInstanceID + "/" + serviceBindingID
 }
 
-func mapToInstance(src *apisv1alpha1.SubaccountServiceInstanceObservation) *v1beta1.Instance {
+func mapToInstance(src *apisv1alpha1.SubaccountServiceInstanceObservation) *apisv1beta1.Instance {
 	if src == nil {
 		return nil
 	}

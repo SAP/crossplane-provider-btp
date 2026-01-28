@@ -717,7 +717,7 @@ func newResourceTracker(c client.Client) tracking.ReferenceResolverTracker {
 }
 
 func WithConditions(c ...xpv1.Condition) RoleCollectionModifier {
-	return func(r *v1alpha1.RoleCollectionAssignment) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *v1alpha1.RoleCollectionAssignment) { r.Status.Conditions = c }
 }
 
 type tracker struct {

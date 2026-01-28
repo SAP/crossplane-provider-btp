@@ -22,7 +22,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/internal"
-	environments "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -121,9 +120,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if connectionDetailsNeedUpdate(lastModified, cr) {
 		// remove the connection details from memoization map
 		// to force fetching a new ConnectionDetails object
-		environments.InvalidateConnectionDetails(instance)
+		kymaenv.InvalidateConnectionDetails(instance)
 	}
-	details, readErr := environments.GetConnectionDetails(instance, c.httpClient)
+	details, readErr := kymaenv.GetConnectionDetails(instance, c.httpClient)
 	if readErr != nil {
 		return managed.ExternalObservation{
 			ResourceExists:   true,

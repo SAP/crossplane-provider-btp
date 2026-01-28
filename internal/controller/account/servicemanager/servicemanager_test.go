@@ -11,10 +11,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	sm "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -296,8 +294,8 @@ func TestObserve(t *testing.T) {
 			args: args{
 				cr: NewServiceManager("test"),
 				tfClient: &TfClientFake{
-					observeFn: func() (servicemanager.ResourcesStatus, error) {
-						return servicemanager.ResourcesStatus{}, errors.New("observeError")
+					observeFn: func() (sm.ResourcesStatus, error) {
+						return sm.ResourcesStatus{}, errors.New("observeError")
 					},
 				},
 			},
@@ -316,9 +314,9 @@ func TestObserve(t *testing.T) {
 			args: args{
 				cr: NewServiceManager("test"),
 				tfClient: &TfClientFake{
-					observeFn: func() (servicemanager.ResourcesStatus, error) {
+					observeFn: func() (sm.ResourcesStatus, error) {
 						// Doesn't matter what observe is returned exactly, as long as its passed through and IDs are persisted
-						return servicemanager.ResourcesStatus{
+						return sm.ResourcesStatus{
 							ExternalObservation: managed.ExternalObservation{ResourceExists: false},
 							InstanceID:          "someID",
 						}, nil
@@ -342,9 +340,9 @@ func TestObserve(t *testing.T) {
 			args: args{
 				cr: NewServiceManager("test"),
 				tfClient: &TfClientFake{
-					observeFn: func() (servicemanager.ResourcesStatus, error) {
+					observeFn: func() (sm.ResourcesStatus, error) {
 						// Doesn't matter if updated or not
-						return servicemanager.ResourcesStatus{
+						return sm.ResourcesStatus{
 							ExternalObservation: managed.ExternalObservation{
 								ResourceExists:    true,
 								ResourceUpToDate:  true,
@@ -629,7 +627,7 @@ func NewServiceManager(name string, m ...ServiceManagerModifier) *apisv1beta1.Se
 }
 
 // this pattern can be potentially auto generated, its quite useful to write expressive unittests
-type ServiceManagerModifier func(dirEnvironment *v1beta1.ServiceManager)
+type ServiceManagerModifier func(dirEnvironment *apisv1beta1.ServiceManager)
 
 func WithStatus(status apisv1beta1.ServiceManagerObservation) ServiceManagerModifier {
 	return func(r *apisv1beta1.ServiceManager) {
@@ -644,7 +642,7 @@ func WithData(data apisv1beta1.ServiceManagerParameters) ServiceManagerModifier 
 }
 
 func WithConditions(c ...xpv1.Condition) ServiceManagerModifier {
-	return func(r *apisv1beta1.ServiceManager) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *apisv1beta1.ServiceManager) { r.Status.Conditions = c }
 }
 
 func WithExternalName(externalName string) ServiceManagerModifier {
@@ -654,17 +652,17 @@ func WithExternalName(externalName string) ServiceManagerModifier {
 }
 
 // Fakes
-var _ servicemanager.ITfClient = &TfClientFake{}
+var _ sm.ITfClient = &TfClientFake{}
 
 type TfClientFake struct {
-	observeFn    func() (servicemanager.ResourcesStatus, error)
+	observeFn    func() (sm.ResourcesStatus, error)
 	createFn     func() (string, string, error)
 	updateFn     func() error
 	deleteFn     func() error
 	DeleteCalled bool
 }
 
-func (t *TfClientFake) ObserveResources(ctx context.Context, cr *apisv1beta1.ServiceManager) (servicemanager.ResourcesStatus, error) {
+func (t *TfClientFake) ObserveResources(ctx context.Context, cr *apisv1beta1.ServiceManager) (sm.ResourcesStatus, error) {
 	return t.observeFn()
 }
 

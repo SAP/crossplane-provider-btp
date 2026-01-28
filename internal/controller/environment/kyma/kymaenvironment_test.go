@@ -768,7 +768,7 @@ func TestMaxRetriesExtraction(t *testing.T) {
 type environmentModifier func(*v1alpha1.KymaEnvironment)
 
 func withConditions(c ...xpv1.Condition) environmentModifier {
-	return func(r *v1alpha1.KymaEnvironment) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *v1alpha1.KymaEnvironment) { r.Status.Conditions = c }
 }
 
 func withKymaParameters(c v1alpha1.KymaEnvironmentParameters) environmentModifier {

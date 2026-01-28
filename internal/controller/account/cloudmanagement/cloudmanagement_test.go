@@ -637,7 +637,7 @@ func WithData(data v1beta1.CloudManagementParameters) CloudManagementModifier {
 }
 
 func WithConditions(c ...xpv1.Condition) CloudManagementModifier {
-	return func(r *v1beta1.CloudManagement) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *v1beta1.CloudManagement) { r.Status.Conditions = c }
 }
 
 func WithExternalName(externalName string) CloudManagementModifier {

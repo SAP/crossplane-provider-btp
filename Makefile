@@ -30,8 +30,8 @@ $(info VERSION is $(VERSION))
 -include build/makelib/output.mk
 
 # Setup Versions
-GO_REQUIRED_VERSION=1.23
-GOLANGCILINT_VERSION ?= 1.64.5
+GO_REQUIRED_VERSION=1.25
+GOLANGCILINT_VERSION ?= 2.8.0
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
@@ -43,6 +43,10 @@ GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.ProviderVersion=$(VERSION)
 GO_SUBDIRS += cmd internal apis
 GO111MODULE = on
 -include build/makelib/golang.mk
+
+# Override the GO_LINT_ARGS from golang.mk to use updated golangci-lint parameters
+# this can potentially be removed when we update to a newer version of the build
+GO_LINT_ARGS = --output.checkstyle.path=$(GO_LINT_OUTPUT)/checkstyle.xml
 
 # kind-related versions
 KIND_VERSION ?= v0.23.0

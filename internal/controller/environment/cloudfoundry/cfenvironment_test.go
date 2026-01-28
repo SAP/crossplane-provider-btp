@@ -321,7 +321,7 @@ func TestDelete(t *testing.T) {
 type environmentModifier func(foundryEnvironment *v1alpha1.CloudFoundryEnvironment)
 
 func withConditions(c ...xpv1.Condition) environmentModifier {
-	return func(r *v1alpha1.CloudFoundryEnvironment) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *v1alpha1.CloudFoundryEnvironment) { r.Status.Conditions = c }
 }
 func withUID(uid types.UID) environmentModifier {
 	return func(r *v1alpha1.CloudFoundryEnvironment) { r.UID = uid }
@@ -339,7 +339,7 @@ func withData(data v1alpha1.CfEnvironmentParameters) environmentModifier {
 
 func withAnnotaions(annotations map[string]string) environmentModifier {
 	return func(r *v1alpha1.CloudFoundryEnvironment) {
-		r.ObjectMeta.Annotations = annotations
+		r.Annotations = annotations
 	}
 }
 

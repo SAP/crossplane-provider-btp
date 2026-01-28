@@ -1946,7 +1946,7 @@ func WithProviderConfig(pc xpv1.Reference) SubaccountModifier {
 }
 
 func WithConditions(c ...xpv1.Condition) SubaccountModifier {
-	return func(r *v1alpha1.Subaccount) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *v1alpha1.Subaccount) { r.Status.Conditions = c }
 }
 
 func WithExternalName(externalName string) SubaccountModifier {
