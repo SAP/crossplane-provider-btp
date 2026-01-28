@@ -28,6 +28,8 @@ type CertBasedOIDCLoginParameters struct {
 type Certificate struct {
 	// Type of certificate, currently just used for manual bookkepping
 	Type string `json:"type,omitempty"`
+	// ContainsCertificateChain indicates whether the provided certificate should be parsed as the full certificate chain (true) or just the leaf certificate (false). Default is false to keep backwards compatibility.
+	ContainsCertificateChain bool `json:"containsCertificateChain,omitempty"`
 	// +kubebuilder:validation:Enum=None;Secret;InjectedIdentity;Environment;Filesystem
 	Source                         xpv1.CredentialsSource `json:"source"`
 	xpv1.CommonCredentialSelectors `json:",inline"`

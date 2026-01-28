@@ -61,6 +61,7 @@ type UserCredential struct {
 	Email    string
 	Username string
 	Password string
+	Idp      string
 }
 
 type CISCredential struct {
