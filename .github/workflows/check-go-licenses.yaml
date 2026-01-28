@@ -4,7 +4,8 @@ on:
   workflow_call:
 
 env:
-  GO_VERSION: '1.25'
+  # it is important to use the exact same patch version here (compared to the go.mod) to avoid unexpected issues
+  GO_VERSION: '1.25.6'
 
 permissions:
   contents: read
@@ -23,8 +24,8 @@ jobs:
 
       - name: Install go-licenses
         run: |
-          go install github.com/google/go-licenses@latest
+          go install github.com/google/go-licenses/v2@latest
 
       - name: check licenses
         run: |
-          go-licenses check --allowed_licenses="Apache-2.0,BSD-3-Clause,MIT,MPL-2.0,ISC,BSD-2-Clause" ./...
+          go-licenses check --allowed_licenses="Apache-2.0,BSD-3-Clause,MIT,MPL-2.0,ISC,BSD-2-Clause,Unicode-DFS-2016" ./...
