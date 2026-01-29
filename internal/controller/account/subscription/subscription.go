@@ -125,12 +125,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	externalName := meta.GetExternalName(cr)
 	if externalName == cr.Name {
-		if cr.Spec.ForProvider.AppName != "" && cr.Spec.ForProvider.PlanName != "" {
-			// Set correct external-name format for import/observe scenarios
-			correctExternalName := fmt.Sprintf("%s/%s", cr.Spec.ForProvider.AppName, cr.Spec.ForProvider.PlanName)
-			if isObserveOnly(cr) {
-				meta.SetExternalName(cr, correctExternalName)
-			}
+		// Set correct external-name format for import/observe scenarios
+		if isObserveOnly(cr) && cr.Spec.ForProvider.AppName != "" && cr.Spec.ForProvider.PlanName != "" {
+			expectedExternalName := fmt.Sprintf("%s/%s", cr.Spec.ForProvider.AppName, cr.Spec.ForProvider.PlanName)
+			return managed.ExternalObservation{}, errors.Errorf(
+				"For Observe-only Subscriptions, external-name must be set to 'appName/planName' format. "+
+					"Found: '%s'. Expected: '%s'. "+
+					"Please set the annotation: crossplane.io/external-name: \"%s\"",
+				externalName, expectedExternalName, expectedExternalName,
+			)
+
 		}
 	}
 

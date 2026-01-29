@@ -60,54 +60,6 @@ func TestObserve(t *testing.T) {
 				cr: NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("dir-unittests")),
 			},
 		},
-		"ObserveOnly_SetsCorrectExternalName": {
-			reason: "Observe-only resource with default external-name should be corrected to appName/planName format",
-			args: args{
-				cr: func() *v1alpha1.Subscription {
-					return NewSubscription("test-subscription",
-						WithData(v1alpha1.SubscriptionSpec{
-							ForProvider: v1alpha1.SubscriptionParameters{
-								AppName:  "sapappstudio",
-								PlanName: "standard-edition",
-							},
-						}),
-						WithManagementPolicies(xpv1.ManagementActionObserve),
-						WithExternalName("test-subscription"), // Still has default name
-					)
-				}(),
-				mockApiHandler: &MockApiHandler{
-					returnGet: &subscription.SubscriptionGet{
-						State: internal.Ptr("SUBSCRIBED"),
-					},
-					returnErr: nil,
-				},
-				mockTypeMapper: &MockTypeMapper{
-					synced:    true,
-					available: true,
-				},
-			},
-			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists:    true,
-					ResourceUpToDate:  true,
-					ConnectionDetails: managed.ConnectionDetails{},
-				},
-				cr: NewSubscription("test-subscription",
-					WithData(v1alpha1.SubscriptionSpec{
-						ForProvider: v1alpha1.SubscriptionParameters{
-							AppName:  "sapappstudio",
-							PlanName: "standard-edition",
-						},
-					}),
-					WithManagementPolicies(xpv1.ManagementActionObserve),
-					WithConditions(xpv1.Available()),
-					WithStatus(v1alpha1.SubscriptionObservation{
-						State: internal.Ptr("SUBSCRIBED"),
-					}),
-					WithExternalName("sapappstudio/standard-edition"), // Should be corrected
-				),
-			},
-		},
 		"APIErrorOnRead": {
 			reason: "When needsCreation can't be determined we can't proceed",
 			args: args{
@@ -213,6 +165,35 @@ func TestObserve(t *testing.T) {
 				cr: NewSubscription("dir-unittests", WithConditions(xpv1.Available()), WithStatus(v1alpha1.SubscriptionObservation{
 					State: internal.Ptr("SUBSCRIBED"),
 				}), WithExternalName("name1/plan2")),
+			},
+		},
+		"ObserveOnly_RequiresCorrectExternalNameFormat": {
+			reason: "Observe-only resource with default external-name should return validation error",
+			args: args{
+				cr: NewSubscription("test-subscription",
+					WithData(v1alpha1.SubscriptionSpec{
+						ForProvider: v1alpha1.SubscriptionParameters{
+							AppName:  "sapappstudio",
+							PlanName: "standard-edition",
+						},
+					}),
+					WithManagementPolicies(xpv1.ManagementActionObserve),
+					WithExternalName("test-subscription"), // Wrong - equals metadata.name
+				),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.New("For Observe-only Subscriptions, external-name must be set to 'appName/planName' format. Found: 'test-subscription'. Expected: 'sapappstudio/standard-edition'. Please set the annotation: crossplane.io/external-name: \"sapappstudio/standard-edition\""),
+				cr: NewSubscription("test-subscription",
+					WithData(v1alpha1.SubscriptionSpec{
+						ForProvider: v1alpha1.SubscriptionParameters{
+							AppName:  "sapappstudio",
+							PlanName: "standard-edition",
+						},
+					}),
+					WithManagementPolicies(xpv1.ManagementActionObserve),
+					WithExternalName("test-subscription"),
+				),
 			},
 		},
 	}
