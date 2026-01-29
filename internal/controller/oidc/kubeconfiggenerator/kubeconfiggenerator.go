@@ -235,7 +235,7 @@ func updateStatus(cr *v1alpha1.KubeConfigGenerator, result oidc.GenerateResult) 
 	cr.Status.AtProvider.LastUpdatedAt = time.Now().String()
 	cr.Status.AtProvider.TokenHash = result.SourceTokenHash
 	cr.Status.AtProvider.KubeConfigHash = result.SourceKubeConfigHash
-	cr.Status.AtProvider.UpdatedGeneration = cr.ObjectMeta.Generation
+	cr.Status.AtProvider.UpdatedGeneration = cr.Generation
 	cr.Status.AtProvider.ServerUrl = result.ServerUrl
 }
 
@@ -257,7 +257,7 @@ func cleanupCreatedKubeConfig(ctx context.Context, cr *v1alpha1.KubeConfigGenera
 }
 
 func isCrUpToDate(cr *v1alpha1.KubeConfigGenerator) bool {
-	return cr.Status.AtProvider.UpdatedGeneration == cr.ObjectMeta.Generation
+	return cr.Status.AtProvider.UpdatedGeneration == cr.Generation
 }
 
 func needsUpdate(cr *v1alpha1.KubeConfigGenerator, c *external, kubeConfig []byte, token []byte) bool {

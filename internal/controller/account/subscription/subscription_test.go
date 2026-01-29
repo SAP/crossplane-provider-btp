@@ -667,7 +667,7 @@ func WithData(data v1alpha1.SubscriptionSpec) SubscriptionModifier {
 }
 
 func WithConditions(c ...xpv1.Condition) SubscriptionModifier {
-	return func(r *v1alpha1.Subscription) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *v1alpha1.Subscription) { r.Status.Conditions = c }
 }
 
 func WithExternalName(externalName string) SubscriptionModifier {
