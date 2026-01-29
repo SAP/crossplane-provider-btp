@@ -48,6 +48,7 @@ func Val[VAL any, PTR *VAL](ptr PTR) VAL {
 
 func Flatten(m map[string]interface{}) map[string][]byte {
 	o := make(map[string][]byte)
+	
 	for k, v := range m {
 		k = strings.ReplaceAll(k, " ", "_")
 		switch child := v.(type) {
