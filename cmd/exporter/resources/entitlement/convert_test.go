@@ -10,93 +10,87 @@ import (
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
-	openapi "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 )
 
 func Test_getEnableOk(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	tests := []struct {
 		name                    string
-		amount                  *float32
-		parentAmount            *float32
-		parentRemainingAmount   *float32
-		unlimitedAmountAssigned *bool
+		amount                  float64
+		parentAmount            float64
+		parentRemainingAmount   *float64
+		unlimitedAmountAssigned bool
 		wantEnable              bool
-		wantOk                  bool
 	}{
 		{
 			name:                    "global unlimited quota",
-			amount:                  float32Ptr(amountUnlimited),
-			parentAmount:            float32Ptr(amountUnlimited),
-			unlimitedAmountAssigned: boolPtr(true),
+			amount:                  amountUnlimited,
+			parentAmount:            amountUnlimited,
+			unlimitedAmountAssigned: true,
 			wantEnable:              true,
-			wantOk:                  true,
 		},
 		{
 			name:                  "assigned, parent not getting less",
-			amount:                float32Ptr(1),
-			parentAmount:          float32Ptr(1),
-			parentRemainingAmount: float32Ptr(1),
+			amount:                1,
+			parentAmount:          1,
+			parentRemainingAmount: float64Ptr(1),
 			wantEnable:            true,
-			wantOk:                true,
 		},
 		{
 			name:                  "assigned, parent getting less",
-			amount:                float32Ptr(3),
-			parentAmount:          float32Ptr(5),
-			parentRemainingAmount: float32Ptr(2),
+			amount:                3,
+			parentAmount:          5,
+			parentRemainingAmount: float64Ptr(2),
 			wantEnable:            false,
-			wantOk:                false,
 		},
 		{
 			name:       "no relevant fields set",
 			wantEnable: false,
-			wantOk:     false,
 		},
 		{
 			name:                    "unlimitedAmountAssigned false",
-			amount:                  float32Ptr(amountUnlimited),
-			parentAmount:            float32Ptr(amountUnlimited),
-			unlimitedAmountAssigned: boolPtr(false),
+			amount:                  amountUnlimited,
+			parentAmount:            amountUnlimited,
+			unlimitedAmountAssigned: false,
 			wantEnable:              false,
-			wantOk:                  false,
 		},
 		{
 			name:                    "unlimitedAmountAssigned true, but amount not unlimited",
-			amount:                  float32Ptr(1),
-			parentAmount:            float32Ptr(1),
-			unlimitedAmountAssigned: boolPtr(true),
+			amount:                  1,
+			parentAmount:            1,
+			unlimitedAmountAssigned: true,
 			wantEnable:              false,
-			wantOk:                  false,
 		},
 		{
 			name:                  "amount zero",
-			amount:                float32Ptr(0),
-			parentAmount:          float32Ptr(0),
-			parentRemainingAmount: float32Ptr(0),
+			amount:                0,
+			parentAmount:          0,
+			parentRemainingAmount: float64Ptr(0),
 			wantEnable:            false,
-			wantOk:                false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assignment := &openapi.AssignedServicePlanSubaccountDTO{
-				Amount:                  tt.amount,
-				ParentAmount:            tt.parentAmount,
-				ParentRemainingAmount:   tt.parentRemainingAmount,
-				UnlimitedAmountAssigned: tt.unlimitedAmountAssigned,
+			e := &entitlement{
+				assignment: &btpcli.AssignmentInfo{
+					Amount:                  tt.amount,
+					ParentAmount:            tt.parentAmount,
+					ParentRemainingAmount:   tt.parentRemainingAmount,
+					UnlimitedAmountAssigned: tt.unlimitedAmountAssigned,
+				},
 			}
-			gotEnable, gotOk := getEnableOk(assignment)
-			r.Equal(tt.wantEnable, gotEnable)
-			r.Equal(tt.wantOk, gotOk)
+			r.Equal(tt.wantEnable, e.isEnable())
 		})
 	}
 }
 
 func TestConvertEntitlementResource(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	svcName := "test-service"
@@ -105,36 +99,31 @@ func TestConvertEntitlementResource(t *testing.T) {
 	subAccountUuid := "123e4567-e89b-12d3-a456-426614174000"
 	typeSubaccount := "SUBACCOUNT"
 	typeDirectory := "DIRECTORY"
-	var amount float32 = 1
-	var parentAmount float32 = 10
-	var parentRemainingAmount float32 = 5
+	var amount float64 = 1
+	var parentAmount float64 = 10
+	var parentRemainingAmount float64 = 5
 	resourceName := planId + "-" + subAccountUuid
+	externalName := "no-external-name-support"
 
 	tests := []struct {
-		name    string
-		service *openapi.AssignedServiceResponseObject
-		want    *yaml.ResourceWithComment
+		name string
+		ent  *entitlement
+		want *yaml.ResourceWithComment
 	}{
 		{
 			name: "standard case for amount",
-			service: &openapi.AssignedServiceResponseObject{
-				Name: &svcName,
-				ServicePlans: []openapi.AssignedServicePlanResponseObject{
-					{
-						Name:             &planName,
-						UniqueIdentifier: &planId,
-						AssignmentInfo: []openapi.AssignedServicePlanSubaccountDTO{
-							{
-								EntityId:                &subAccountUuid,
-								EntityType:              &typeSubaccount,
-								Amount:                  &amount,
-								ParentAmount:            &parentAmount,
-								ParentRemainingAmount:   &parentRemainingAmount,
-								UnlimitedAmountAssigned: boolPtr(false),
-							},
-						},
-					},
+			ent: &entitlement{
+				serviceName: svcName,
+				planName:    planName,
+				assignment: &btpcli.AssignmentInfo{
+					EntityID:                subAccountUuid,
+					EntityType:              typeSubaccount,
+					Amount:                  amount,
+					ParentAmount:            parentAmount,
+					ParentRemainingAmount:   float64Ptr(parentRemainingAmount),
+					UnlimitedAmountAssigned: false,
 				},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.Entitlement{
@@ -145,7 +134,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: resourceName,
 						Annotations: map[string]string{
-							"crossplane.io/external-name": resourceName,
+							"crossplane.io/external-name": externalName,
 						},
 					},
 					Spec: v1alpha1.EntitlementSpec{
@@ -165,24 +154,18 @@ func TestConvertEntitlementResource(t *testing.T) {
 		},
 		{
 			name: "standard case for enable",
-			service: &openapi.AssignedServiceResponseObject{
-				Name: &svcName,
-				ServicePlans: []openapi.AssignedServicePlanResponseObject{
-					{
-						Name:             &planName,
-						UniqueIdentifier: &planId,
-						AssignmentInfo: []openapi.AssignedServicePlanSubaccountDTO{
-							{
-								EntityId:                &subAccountUuid,
-								EntityType:              &typeSubaccount,
-								Amount:                  &amount,
-								ParentAmount:            &amount,
-								ParentRemainingAmount:   &amount,
-								UnlimitedAmountAssigned: boolPtr(false),
-							},
-						},
-					},
+			ent: &entitlement{
+				serviceName: svcName,
+				planName:    planName,
+				assignment: &btpcli.AssignmentInfo{
+					EntityID:                subAccountUuid,
+					EntityType:              typeSubaccount,
+					Amount:                  amount,
+					ParentAmount:            amount,
+					ParentRemainingAmount:   float64Ptr(amount),
+					UnlimitedAmountAssigned: false,
 				},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.Entitlement{
@@ -193,7 +176,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: resourceName,
 						Annotations: map[string]string{
-							"crossplane.io/external-name": resourceName,
+							"crossplane.io/external-name": externalName,
 						},
 					},
 					Spec: v1alpha1.EntitlementSpec{
@@ -213,23 +196,17 @@ func TestConvertEntitlementResource(t *testing.T) {
 		},
 		{
 			name: "enable if unlimited",
-			service: &openapi.AssignedServiceResponseObject{
-				Name: &svcName,
-				ServicePlans: []openapi.AssignedServicePlanResponseObject{
-					{
-						Name:             &planName,
-						UniqueIdentifier: &planId,
-						AssignmentInfo: []openapi.AssignedServicePlanSubaccountDTO{
-							{
-								EntityId:                &subAccountUuid,
-								EntityType:              &typeSubaccount,
-								Amount:                  float32Ptr(amountUnlimited),
-								ParentAmount:            float32Ptr(amountUnlimited),
-								UnlimitedAmountAssigned: boolPtr(true),
-							},
-						},
-					},
+			ent: &entitlement{
+				serviceName: svcName,
+				planName:    planName,
+				assignment: &btpcli.AssignmentInfo{
+					EntityID:                subAccountUuid,
+					EntityType:              typeSubaccount,
+					Amount:                  amountUnlimited,
+					ParentAmount:            amountUnlimited,
+					UnlimitedAmountAssigned: true,
 				},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.Entitlement{
@@ -240,7 +217,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: resourceName,
 						Annotations: map[string]string{
-							"crossplane.io/external-name": resourceName,
+							"crossplane.io/external-name": externalName,
 						},
 					},
 					Spec: v1alpha1.EntitlementSpec{
@@ -260,23 +237,17 @@ func TestConvertEntitlementResource(t *testing.T) {
 		},
 		{
 			name: "missing service name",
-			service: &openapi.AssignedServiceResponseObject{
-				ServicePlans: []openapi.AssignedServicePlanResponseObject{
-					{
-						Name:             &planName,
-						UniqueIdentifier: &planId,
-						AssignmentInfo: []openapi.AssignedServicePlanSubaccountDTO{
-							{
-								EntityId:                &subAccountUuid,
-								EntityType:              &typeSubaccount,
-								Amount:                  &amount,
-								ParentAmount:            &parentAmount,
-								ParentRemainingAmount:   &parentRemainingAmount,
-								UnlimitedAmountAssigned: boolPtr(false),
-							},
-						},
-					},
+			ent: &entitlement{
+				planName: planName,
+				assignment: &btpcli.AssignmentInfo{
+					EntityID:                subAccountUuid,
+					EntityType:              typeSubaccount,
+					Amount:                  amount,
+					ParentAmount:            parentAmount,
+					ParentRemainingAmount:   float64Ptr(parentRemainingAmount),
+					UnlimitedAmountAssigned: false,
 				},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -286,9 +257,9 @@ func TestConvertEntitlementResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: resources.UNDEFINED_NAME,
 							Annotations: map[string]string{
-								"crossplane.io/external-name": resourceName,
+								"crossplane.io/external-name": externalName,
 							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
@@ -305,28 +276,23 @@ func TestConvertEntitlementResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment(warnMissingServiceName)
+				rwc.AddComment(warnUndefinedResourceName)
 				return rwc
 			}(),
 		},
 		{
 			name: "missing service plan name",
-			service: &openapi.AssignedServiceResponseObject{
-				Name: &svcName,
-				ServicePlans: []openapi.AssignedServicePlanResponseObject{
-					{
-						UniqueIdentifier: &planId,
-						AssignmentInfo: []openapi.AssignedServicePlanSubaccountDTO{
-							{
-								EntityId:                &subAccountUuid,
-								EntityType:              &typeSubaccount,
-								Amount:                  &amount,
-								ParentAmount:            &parentAmount,
-								ParentRemainingAmount:   &parentRemainingAmount,
-								UnlimitedAmountAssigned: boolPtr(false),
-							},
-						},
-					},
+			ent: &entitlement{
+				serviceName: svcName,
+				assignment: &btpcli.AssignmentInfo{
+					EntityID:                subAccountUuid,
+					EntityType:              typeSubaccount,
+					Amount:                  amount,
+					ParentAmount:            parentAmount,
+					ParentRemainingAmount:   float64Ptr(parentRemainingAmount),
+					UnlimitedAmountAssigned: false,
 				},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -336,9 +302,9 @@ func TestConvertEntitlementResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: resources.UNDEFINED_NAME,
 							Annotations: map[string]string{
-								"crossplane.io/external-name": resourceName,
+								"crossplane.io/external-name": externalName,
 							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
@@ -355,80 +321,23 @@ func TestConvertEntitlementResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment(warnMissingServicePlanName)
-				return rwc
-			}(),
-		},
-		{
-			name: "missing service plan ID",
-			service: &openapi.AssignedServiceResponseObject{
-				Name: &svcName,
-				ServicePlans: []openapi.AssignedServicePlanResponseObject{
-					{
-						Name: &planName,
-						AssignmentInfo: []openapi.AssignedServicePlanSubaccountDTO{
-							{
-								EntityId:                &subAccountUuid,
-								EntityType:              &typeSubaccount,
-								Amount:                  &amount,
-								ParentAmount:            &parentAmount,
-								ParentRemainingAmount:   &parentRemainingAmount,
-								UnlimitedAmountAssigned: boolPtr(false),
-							},
-						},
-					},
-				},
-			},
-			want: func() *yaml.ResourceWithComment {
-				rwc := yaml.NewResourceWithComment(
-					&v1alpha1.Entitlement{
-						TypeMeta: metav1.TypeMeta{
-							Kind:       v1alpha1.EntitlementKind,
-							APIVersion: v1alpha1.CRDGroupVersion.String(),
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name: resources.UNDEFINED_NAME,
-							Annotations: map[string]string{
-								"crossplane.io/external-name": resources.UNDEFINED_NAME,
-							},
-						},
-						Spec: v1alpha1.EntitlementSpec{
-							ResourceSpec: v1.ResourceSpec{
-								ManagementPolicies: []v1.ManagementAction{
-									v1.ManagementActionObserve,
-								},
-							},
-							ForProvider: v1alpha1.EntitlementParameters{
-								ServiceName:     svcName,
-								ServicePlanName: planName,
-								SubaccountGuid:  subAccountUuid,
-								Amount:          intPtr(int(amount)),
-							},
-						},
-					})
-				rwc.AddComment(warnMissingServicePlanId)
 				rwc.AddComment(warnUndefinedResourceName)
 				return rwc
 			}(),
 		},
 		{
 			name: "missing subaccount ID",
-			service: &openapi.AssignedServiceResponseObject{
-				Name: &svcName,
-				ServicePlans: []openapi.AssignedServicePlanResponseObject{
-					{
-						Name:             &planName,
-						UniqueIdentifier: &planId,
-						AssignmentInfo: []openapi.AssignedServicePlanSubaccountDTO{
-							{
-								EntityType:              &typeSubaccount,
-								Amount:                  &amount,
-								ParentAmount:            &parentAmount,
-								ParentRemainingAmount:   &parentRemainingAmount,
-								UnlimitedAmountAssigned: boolPtr(false),
-							},
-						},
-					},
+			ent: &entitlement{
+				serviceName: svcName,
+				planName:    planName,
+				assignment: &btpcli.AssignmentInfo{
+					EntityType:              typeSubaccount,
+					Amount:                  amount,
+					ParentAmount:            parentAmount,
+					ParentRemainingAmount:   float64Ptr(parentRemainingAmount),
+					UnlimitedAmountAssigned: false,
 				},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -440,7 +349,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UNDEFINED_NAME,
 							Annotations: map[string]string{
-								"crossplane.io/external-name": resources.UNDEFINED_NAME,
+								"crossplane.io/external-name": externalName,
 							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
@@ -463,24 +372,18 @@ func TestConvertEntitlementResource(t *testing.T) {
 		},
 		{
 			name: "unsupported entity type",
-			service: &openapi.AssignedServiceResponseObject{
-				Name: &svcName,
-				ServicePlans: []openapi.AssignedServicePlanResponseObject{
-					{
-						Name:             &planName,
-						UniqueIdentifier: &planId,
-						AssignmentInfo: []openapi.AssignedServicePlanSubaccountDTO{
-							{
-								EntityId:                &subAccountUuid,
-								EntityType:              &typeDirectory,
-								Amount:                  &amount,
-								ParentAmount:            &parentAmount,
-								ParentRemainingAmount:   &parentRemainingAmount,
-								UnlimitedAmountAssigned: boolPtr(false),
-							},
-						},
-					},
+			ent: &entitlement{
+				serviceName: svcName,
+				planName:    planName,
+				assignment: &btpcli.AssignmentInfo{
+					EntityID:                subAccountUuid,
+					EntityType:              typeDirectory,
+					Amount:                  amount,
+					ParentAmount:            parentAmount,
+					ParentRemainingAmount:   float64Ptr(parentRemainingAmount),
+					UnlimitedAmountAssigned: false,
 				},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -492,7 +395,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resourceName,
 							Annotations: map[string]string{
-								"crossplane.io/external-name": resourceName,
+								"crossplane.io/external-name": externalName,
 							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
@@ -517,9 +420,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			plan := &tt.service.ServicePlans[0]
-			assignment := &plan.AssignmentInfo[0]
-			result := convertEntitlementResource(tt.service, plan, assignment)
+			result := convertEntitlementResource(t.Context(), nil, tt.ent, nil, false)
 			r.NotNil(result)
 
 			// Verify comments.
@@ -550,6 +451,6 @@ func intPtr(i int) *int {
 	return &i
 }
 
-func float32Ptr(f float32) *float32 {
+func float64Ptr(f float64) *float64 {
 	return &f
 }

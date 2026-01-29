@@ -9,9 +9,8 @@ import (
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/parsan"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/client/btpcli"
 
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/client"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 )
 
@@ -19,7 +18,7 @@ const KIND_NAME = "subaccount"
 
 var (
 	subaccountCache resources.ResourceCache[*subaccount]
-	subaccountParam = configparam.StringSlice(KIND_NAME, "UUID of a BTP subaccount. Used in combination with '--kind "+KIND_NAME+"'").
+	subaccountParam = configparam.StringSlice(KIND_NAME, "BTP subaccount ID.").
 		WithFlagName(KIND_NAME)
 )
 
@@ -39,8 +38,8 @@ func (e exporter) KindName() string {
 	return subaccountParam.GetName()
 }
 
-func (e exporter) Export(ctx context.Context, btpClient *client.Client, eventHandler export.EventHandler, _ bool) error {
-	cache, err := Get(ctx, btpClient.BtpCli)
+func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, _ bool) error {
+	cache, err := Get(ctx, btpClient)
 	if err != nil {
 		return fmt.Errorf("failed to get cache with subaccounts: %w", err)
 	}
@@ -55,6 +54,61 @@ func (e exporter) Export(ctx context.Context, btpClient *client.Client, eventHan
 	}
 
 	return nil
+}
+
+func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*subaccount], error) {
+	if subaccountCache != nil {
+		return subaccountCache, nil
+	}
+
+	originals, err := btpClient.ListSubaccounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get subaccounts: %w", err)
+	}
+
+	var subaccounts []*subaccount
+	for _, sa := range originals {
+		subaccounts = append(subaccounts, &subaccount{
+			Subaccount:          &sa,
+			ResourceWithComment: yaml.NewResourceWithComment(nil),
+		})
+	}
+
+	cache := resources.NewResourceCache[*subaccount]()
+	cache.Store(subaccounts...)
+	widgetValues := cache.ValuesForSelection()
+	subaccountParam.WithPossibleValuesFn(func() ([]string, error) {
+		return widgetValues.Values(), nil
+	})
+
+	selectedSubaccounts, err := subaccountParam.ValueOrAsk(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parameter value: %s, %w", subaccountParam.GetName(), err)
+	}
+	slog.DebugContext(ctx, "Selected subaccounts", "subaccounts", selectedSubaccounts)
+
+	cache.KeepSelectedOnly(selectedSubaccounts)
+	subaccountCache = cache
+
+	return subaccountCache, nil
+}
+
+func GetK8sResourceNameByID(ctx context.Context, btpClient *btpcli.BtpCli, id string) (string, error) {
+	if id == "" {
+		return "", fmt.Errorf("subaccount ID is not set")
+	}
+
+	saCache, err := Get(ctx, btpClient)
+	if err != nil {
+		return "", fmt.Errorf("failed to get cache with subaccounts: %w", err)
+	}
+
+	sa := saCache.Get(id)
+	if sa == nil {
+		return "", fmt.Errorf("subaccount not found by ID: %s", id)
+	}
+
+	return sa.GenerateK8sResourceName(), nil
 }
 
 type subaccount struct {
@@ -99,41 +153,4 @@ func (s *subaccount) GenerateK8sResourceName() string {
 	}
 
 	return resourceName
-}
-
-func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*subaccount], error) {
-	if subaccountCache != nil {
-		return subaccountCache, nil
-	}
-
-	originals, err := btpClient.ListSubaccounts(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get subaccounts: %w", err)
-	}
-
-	var subaccounts []*subaccount
-	for _, sa := range originals {
-		subaccounts = append(subaccounts, &subaccount{
-			Subaccount:          &sa,
-			ResourceWithComment: yaml.NewResourceWithComment(nil),
-		})
-	}
-
-	cache := resources.NewResourceCache[*subaccount]()
-	cache.Store(subaccounts...)
-	widgetValues := cache.ValuesForSelection()
-	subaccountParam.WithPossibleValuesFn(func() ([]string, error) {
-		return widgetValues.Values(), nil
-	})
-
-	selectedSubaccounts, err := subaccountParam.ValueOrAsk(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get parameter value: %s, %w", subaccountParam.GetName(), err)
-	}
-	slog.DebugContext(ctx, "Selected subaccounts", "subaccounts", selectedSubaccounts)
-
-	cache.KeepSelectedOnly(selectedSubaccounts)
-	subaccountCache = cache
-
-	return subaccountCache, nil
 }

@@ -26,6 +26,15 @@ func NewClient(btpPath string) *BtpCli {
 	}
 }
 
+func NewClientAndLogin(ctx context.Context, path string, params *LoginParameters) (*BtpCli, error) {
+	c := NewClient(path)
+	err := c.Login(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to login to BTP CLI: %w", err)
+	}
+	return c, nil
+}
+
 // Execute runs a btp CLI command and returns the output
 func (c *BtpCli) Execute(ctx context.Context, args ...string) ([]byte, error) {
 	logCommand(ctx, c.BtpPath, args...)

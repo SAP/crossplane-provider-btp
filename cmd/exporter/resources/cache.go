@@ -14,6 +14,7 @@ type ResourceCache[T BtpResource] interface {
 	Len() int
 	Store(resources ...T)
 	All() iter.Seq2[string, T]
+	AllIDs() []string
 	ValuesForSelection() *DisplayValues
 	KeepSelectedOnly(selectedValues []string)
 }
@@ -68,6 +69,13 @@ func (c *resourceCache[T]) All() iter.Seq2[string, T] {
 	defer c.mu.RUnlock()
 
 	return maps.All(c.resources)
+}
+
+func (c *resourceCache[T]) AllIDs() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return slices.Sorted(maps.Keys(c.resources))
 }
 
 func (c *resourceCache[T]) ValuesForSelection() *DisplayValues {

@@ -4,17 +4,18 @@ import (
 	"testing"
 
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/client/btpcli"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 )
 
 func TestConvertSubaccountResource(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	displayName := "Test Subaccount"

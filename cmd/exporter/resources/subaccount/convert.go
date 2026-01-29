@@ -24,6 +24,7 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 	saSubdomain := sa.Subdomain
 	saCreatedBy := sa.CreatedBy
 	resourceName := sa.GenerateK8sResourceName()
+	externalName := sa.GetExternalName()
 
 	// Create Subaccount with required fields first.
 	saResource := yaml.NewResourceWithComment(
@@ -35,7 +36,7 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: resourceName,
 				Annotations: map[string]string{
-					"crossplane.io/external-name": saGuid,
+					"crossplane.io/external-name": externalName,
 				},
 			},
 			Spec: v1alpha1.SubaccountSpec{

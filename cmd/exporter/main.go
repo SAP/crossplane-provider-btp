@@ -11,9 +11,8 @@ import (
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
 	_ "github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/client/btpcli"
 
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/client"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
@@ -26,12 +25,6 @@ import (
 const (
 	shortName      = "btp"
 	observedSystem = "SAP Business Technology Platform"
-
-	envVarCISSecret  = "CIS_CENTRAL_BINDING"
-	envVarUserSecret = "BTP_TECHNICAL_USER"
-
-	flagNameCISSecret  = "cred-cis"
-	flagNameUserSecret = "cred-user"
 
 	envVarBtpCliPath       = "BTP_EXPORT_BTP_CLI_PATH"
 	envVarBtpCliServer     = "BTP_EXPORT_BTP_CLI_SERVER_URL"
@@ -49,13 +42,6 @@ const (
 )
 
 var (
-	paramCisSecret = configparam.String(flagNameCISSecret, "If omitted, the value of "+envVarCISSecret+" environment variable is used.\nSee https://github.com/SAP/crossplane-provider-btp for more details.").
-		WithFlagName(flagNameCISSecret).
-		WithEnvVarName(envVarCISSecret)
-	paramUserSecret = configparam.SensitiveString(flagNameUserSecret, "If omitted, be the value of the "+envVarUserSecret+" environment variable is used.\nSee https://github.com/SAP/crossplane-provider-btp for more details.").
-		WithFlagName(flagNameUserSecret).
-		WithEnvVarName(envVarUserSecret).
-		WithExample("{\"username\": \"P-UserName\",\"password\":\"p_user_password\",\"email\":\"p.user@email.address\"}")
 	paramResolveRefences = configparam.Bool("resolve-references", "Resolve inter-resource references").
 		WithShortName("r").
 		WithEnvVarName("RESOLVE_REFERENCES")
@@ -84,8 +70,6 @@ func main() {
 	cli.Configuration.ObservedSystem = observedSystem
 	export.SetCommand(exportCmd)
 	export.AddConfigParams(
-		paramCisSecret,
-		paramUserSecret,
 		paramResolveRefences,
 		paramUserName,
 		paramPassword,
@@ -114,7 +98,7 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 	slog.Debug("Kinds selected", "kinds", selectedResources)
 
 	// Connect to BTP API
-	btpClient, err := client.NewClientAndLogin(ctx,
+	btpClient, err := btpcli.NewClientAndLogin(ctx,
 		paramBtpCliPath.Value(),
 		&btpcli.LoginParameters{
 			UserName:               paramUserName.Value(),

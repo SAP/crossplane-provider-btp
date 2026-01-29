@@ -1,11 +1,13 @@
 package serviceinstance
 
 import (
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/client/btpcli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
+
+	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 )
 
 func convertServiceInstanceResource(si *btpcli.ServiceInstance) *yaml.ResourceWithComment {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/client"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 )
 
 // Kind interface must be implemented by each BTP provider custom resource kind.
@@ -20,7 +20,7 @@ type Kind interface {
 	// parameters. Then it collects the resource definitions
 	// through BTP Client. Finally, the resources are exported
 	// using the eventHandler.
-	Export(ctx context.Context, btpClient *client.Client, evHandler export.EventHandler, resolveReferences bool) error
+	Export(ctx context.Context, btpClient *btpcli.BtpCli, evHandler export.EventHandler, resolveReferences bool) error
 }
 
 var kinds = map[string]Kind{}
@@ -43,7 +43,7 @@ func ConfigParams() []configparam.ConfigParam {
 }
 
 // ExportFn returns the export function of a given kind.
-func ExportFn(kind string) func(context.Context, *client.Client, export.EventHandler, bool) error {
+func ExportFn(kind string) func(context.Context, *btpcli.BtpCli, export.EventHandler, bool) error {
 	resource, ok := kinds[kind]
 	if !ok || resource == nil {
 		return nil

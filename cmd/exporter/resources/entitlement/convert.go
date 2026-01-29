@@ -1,44 +1,41 @@
 package entitlement
 
 import (
+	"context"
+
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
+	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
 	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
-	openapi "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
 const (
-	warnMissingServiceName     = "WARNING: service name is missing in the source, cannot create a Entitlement resource"
-	warnMissingServicePlanName = "WARNING: service plan name is missing in the source, cannot create a Entitlement resource"
-	warnMissingServicePlanId   = "WARNING: service plan ID is missing in the source, cannot create a valid Entitlement resource"
-	warnMissingSubaccountGuid  = "WARNING: subaccount ID is missing in the source, cannot create a valid Entitlement resource"
-	warnUndefinedResourceName  = "WARNING: could not generate a valid name for the Entitlement resource"
-	warnUnsupportedEntityType  = "WARNING: only 'SUBACCOUNT' entity type is supported for Entitlement resources"
+	warnMissingServiceName      = "WARNING: service name is missing in the source, cannot create a Entitlement resource"
+	warnMissingServicePlanName  = "WARNING: service plan name is missing in the source, cannot create a Entitlement resource"
+	warnMissingSubaccountGuid   = "WARNING: subaccount ID is missing in the source, cannot create a valid Entitlement resource"
+	warnUndefinedResourceName   = "WARNING: could not generate a valid name for the Entitlement resource"
+	warnUnsupportedEntityType   = "WARNING: only 'SUBACCOUNT' entity type is supported for Entitlement resources"
+	warnCannotResolveSubaccount = "WARNING: cannot resolve subaccount ID to a resource name"
 )
 
-const amountUnlimited float32 = 2000000000
+func convertEntitlementResource(ctx context.Context, btpClient *btpcli.BtpCli, e *entitlement, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
 
-func convertEntitlementResource(svc *openapi.AssignedServiceResponseObject,
-	plan *openapi.AssignedServicePlanResponseObject,
-	assignment *openapi.AssignedServicePlanSubaccountDTO) *yaml.ResourceWithComment {
-
-	serviceName, hasServiceName := resources.StringValueOk(svc.GetNameOk())
-	servicePlanName, hasPlanName := resources.StringValueOk(plan.GetNameOk())
-	subAccountGuid, hasSubaccountGuid := resources.StringValueOk(assignment.GetEntityIdOk())
-	entityType, hasEntityType := resources.StringValueOk(assignment.GetEntityTypeOk())
-
-	resourceName := resources.UNDEFINED_NAME
-	planId, hasPlanId := resources.StringValueOk(plan.GetUniqueIdentifierOk())
-	if hasPlanId && hasSubaccountGuid {
-		resourceName = resources.SanitizeK8sResourceName(planId + "-" + subAccountGuid)
-	}
+	serviceName := e.serviceName
+	servicePlanName := e.planName
+	subAccountGuid := e.assignment.EntityID
+	entityType := e.assignment.EntityType
+	resourceName := e.GenerateK8sResourceName()
+	externalName := e.GetExternalName()
 
 	// Create Subaccount with required fields first.
-	entitlement := yaml.NewResourceWithComment(
+	managedEntitlement := yaml.NewResourceWithComment(
 		&v1alpha1.Entitlement{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       v1alpha1.EntitlementKind,
@@ -47,7 +44,7 @@ func convertEntitlementResource(svc *openapi.AssignedServiceResponseObject,
 			ObjectMeta: metav1.ObjectMeta{
 				Name: resourceName,
 				Annotations: map[string]string{
-					"crossplane.io/external-name": resourceName,
+					"crossplane.io/external-name": externalName,
 				},
 			},
 			Spec: v1alpha1.EntitlementSpec{
@@ -64,64 +61,58 @@ func convertEntitlementResource(svc *openapi.AssignedServiceResponseObject,
 			},
 		})
 
+	// Copy comments from the original resource.
+	managedEntitlement.CloneComment(e)
+
 	// Comment the resource out, if any of the required fields is missing.
-	if !hasServiceName {
-		entitlement.AddComment(warnMissingServiceName)
+	if serviceName == "" {
+		managedEntitlement.AddComment(warnMissingServiceName)
 	}
-	if !hasPlanName {
-		entitlement.AddComment(warnMissingServicePlanName)
+	if servicePlanName == "" {
+		managedEntitlement.AddComment(warnMissingServicePlanName)
 	}
-	if !hasPlanId {
-		entitlement.AddComment(warnMissingServicePlanId)
-	}
-	if !hasSubaccountGuid {
-		entitlement.AddComment(warnMissingSubaccountGuid)
+	if subAccountGuid == "" {
+		managedEntitlement.AddComment(warnMissingSubaccountGuid)
 	}
 	if resourceName == resources.UNDEFINED_NAME {
-		entitlement.AddComment(warnUndefinedResourceName)
+		managedEntitlement.AddComment(warnUndefinedResourceName)
 	}
-	if !hasEntityType || entityType != "SUBACCOUNT" {
-		entitlement.AddComment(warnUnsupportedEntityType + ", but got: '" + entityType + "'")
+	if entityType != "SUBACCOUNT" {
+		managedEntitlement.AddComment(warnUnsupportedEntityType + ", but got: '" + entityType + "'")
 	}
 
 	// Set optional fields.
-	enable, hasEnable := getEnableOk(assignment) // This is a hack.
-	if hasEnable {
-		entitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider.Enable = &enable
+	isEnable := e.isEnable()
+	if isEnable {
+		managedEntitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider.Enable = &isEnable
 	}
-	amount, hasAmount := resources.FloatValueOk(assignment.GetAmountOk())
-	if !hasEnable && hasAmount && amount >= 1 {
+	amount := e.assignment.Amount
+	if !isEnable && amount >= 1 {
 		amountInt := int(amount)
-		entitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider.Amount = &amountInt
+		managedEntitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider.Amount = &amountInt
 	}
 
-	return entitlement
+	// Reference subaccount resource, if requested.
+	if resolveReferences {
+		if err := resolveReference(ctx, btpClient, &managedEntitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider); err != nil {
+			eventHandler.Warn(erratt.Errorf("cannot resolve subaccount reference: %w", err).With("entitlement", e.GetID()))
+			managedEntitlement.AddComment(warnCannotResolveSubaccount + ": " + subAccountGuid)
+		}
+	}
+
+	return managedEntitlement
 }
 
-// getEnableOk uses heuristics to determine whether the Enable field should be set to true.
-// The Enable field is normally set to true to enable the service plan assignment to the specified subaccount
-// without quantity restrictions. Relevant and mandatory only for plans that do NOT have a numeric quota.
-func getEnableOk(assignment *openapi.AssignedServicePlanSubaccountDTO) (bool, bool) {
-	amount, hasAmount := resources.FloatValueOk(assignment.GetAmountOk())
-	parentAmount, hasParentAmount := resources.FloatValueOk(assignment.GetParentAmountOk())
-	parentRemainingAmount, hasParentRemainingAmount := resources.FloatValueOk(assignment.GetParentRemainingAmountOk())
-	unlimitedAmountAssigned, hasUnlimitedAmountAssigned := resources.BoolValueOk(assignment.GetUnlimitedAmountAssignedOk())
-
-	// Case 1: Service plan with global unlimited quota is involved.
-	if hasUnlimitedAmountAssigned && hasAmount && hasParentAmount {
-		if unlimitedAmountAssigned && amount == amountUnlimited && parentAmount == amountUnlimited {
-			return true, true
-		}
+func resolveReference(ctx context.Context, btpClient *btpcli.BtpCli, entitlement *v1alpha1.EntitlementParameters) error {
+	saName, err := subaccount.GetK8sResourceNameByID(ctx, btpClient, entitlement.SubaccountGuid)
+	if err != nil {
+		return err
 	}
 
-	// Case 2: Service plan is assigned, but its remaining parent amount is not getting less.
-	if hasAmount && hasParentAmount && hasParentRemainingAmount {
-		// This should not happen to service plans that have a numeric quota, because then:
-		// parentRemainingAmount = parentAmount - amount - other subaccount's amount
-		if amount > 0 && amount == parentAmount && amount == parentRemainingAmount {
-			return true, true
-		}
+	entitlement.SubaccountRef = &v1.Reference{
+		Name: saName,
 	}
+	entitlement.SubaccountGuid = ""
 
-	return false, false
+	return nil
 }
