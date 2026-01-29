@@ -60,6 +60,54 @@ func TestObserve(t *testing.T) {
 				cr: NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("dir-unittests")),
 			},
 		},
+		"ObserveOnly_SetsCorrectExternalName": {
+			reason: "Observe-only resource with default external-name should be corrected to appName/planName format",
+			args: args{
+				cr: func() *v1alpha1.Subscription {
+					return NewSubscription("test-subscription",
+						WithData(v1alpha1.SubscriptionSpec{
+							ForProvider: v1alpha1.SubscriptionParameters{
+								AppName:  "sapappstudio",
+								PlanName: "standard-edition",
+							},
+						}),
+						WithManagementPolicies(xpv1.ManagementActionObserve),
+						WithExternalName("test-subscription"), // Still has default name
+					)
+				}(),
+				mockApiHandler: &MockApiHandler{
+					returnGet: &subscription.SubscriptionGet{
+						State: internal.Ptr("SUBSCRIBED"),
+					},
+					returnErr: nil,
+				},
+				mockTypeMapper: &MockTypeMapper{
+					synced:    true,
+					available: true,
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  true,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				cr: NewSubscription("test-subscription",
+					WithData(v1alpha1.SubscriptionSpec{
+						ForProvider: v1alpha1.SubscriptionParameters{
+							AppName:  "sapappstudio",
+							PlanName: "standard-edition",
+						},
+					}),
+					WithManagementPolicies(xpv1.ManagementActionObserve),
+					WithConditions(xpv1.Available()),
+					WithStatus(v1alpha1.SubscriptionObservation{
+						State: internal.Ptr("SUBSCRIBED"),
+					}),
+					WithExternalName("sapappstudio/standard-edition"), // Should be corrected
+				),
+			},
+		},
 		"APIErrorOnRead": {
 			reason: "When needsCreation can't be determined we can't proceed",
 			args: args{
@@ -679,5 +727,56 @@ func WithExternalName(externalName string) SubscriptionModifier {
 func WithRecreateOnSubscriptionFailure() SubscriptionModifier {
 	return func(r *v1alpha1.Subscription) {
 		r.Spec.RecreateOnSubscriptionFailure = true
+	}
+}
+
+func TestIsObserveOnly(t *testing.T) {
+	tests := map[string]struct {
+		managementPolicies []xpv1.ManagementAction
+		expected           bool
+	}{
+		"ObserveOnly": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve},
+			expected:           true,
+		},
+		"AllActions": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionAll},
+			expected:           false,
+		},
+		"IncludesCreate": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve, xpv1.ManagementActionCreate},
+			expected:           false,
+		},
+		"ObserveAndUpdate": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve, xpv1.ManagementActionUpdate},
+			expected:           true,
+		},
+		"EmptyDefault": {
+			managementPolicies: []xpv1.ManagementAction{},
+			expected:           false,
+		},
+		"NilDefault": {
+			managementPolicies: nil,
+			expected:           false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cr := &v1alpha1.Subscription{
+				Spec: v1alpha1.SubscriptionSpec{},
+			}
+			cr.Spec.ManagementPolicies = tc.managementPolicies
+			got := isObserveOnly(cr)
+			if got != tc.expected {
+				t.Errorf("isObserveOnly() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func WithManagementPolicies(policies ...xpv1.ManagementAction) SubscriptionModifier {
+	return func(r *v1alpha1.Subscription) {
+		r.Spec.ManagementPolicies = policies
 	}
 }
