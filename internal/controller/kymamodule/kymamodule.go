@@ -21,11 +21,15 @@ import (
 )
 
 var (
-	errNotKymaModule                  = "managed resource is not a KymaModule custom resource"
-	errTrackRUsage                    = "cannot track ResourceUsage"
-	errSetupClient                    = "cannot setup KymaModule client"
-	errObserveResource                = "cannot observe KymaModule"
-	errKymaEnvironmentBindingNotFound = "cannot get referenced KymaEnvironmentBinding"
+	errNotKymaModule                     = "managed resource is not a KymaModule custom resource"
+	errTrackRUsage                       = "cannot track ResourceUsage"
+	errSetupClient                       = "cannot setup KymaModule client"
+	errObserveResource                   = "cannot observe KymaModule"
+	errKymaEnvironmentBindingNotFound    = "cannot get referenced KymaEnvironmentBinding"
+	errKymaEnvironmentBindingRefRequired = "KymaEnvironmentBindingRef must be specified"
+	errCannotConnectToKymaCluster        = "Cannot connect to Kyma cluster - kubeconfig may be unavailable or expired"
+	errKymaEnvironmentBindingNotExist    = "Referenced KymaEnvironmentBinding %s doesn't exist"
+	errKymaEnvironmentBindingDeleting    = "KymaEnvironmentBinding is pending deletion. Delete this KymaModule to allow binding deletion."
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -91,10 +95,21 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	// Get the reference for the kyma environment binding
 	if cr.Spec.KymaEnvironmentBindingRef == nil {
 		cr.SetConditions(xpv1.Unavailable().WithMessage(
-			"KymaEnvironmentBindingRef must be specified",
+			errKymaEnvironmentBindingRefRequired,
 		))
 		return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
 	}
+
+	if c.client == nil {
+		cr.SetConditions(xpv1.Unavailable().WithMessage(
+			errCannotConnectToKymaCluster,
+		))
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: false,
+		}, nil
+	}
+
 	binding := &v1alpha1.KymaEnvironmentBinding{}
 	bindingName := types.NamespacedName{
 		Name:      cr.Spec.KymaEnvironmentBindingRef.Name,
@@ -104,7 +119,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if err := c.kube.Get(ctx, bindingName, binding); err != nil {
 		if kerrors.IsNotFound(err) {
 			// Reference is gone - can't be processed
-			cr.SetConditions(xpv1.Unavailable().WithMessage(fmt.Sprintf("Referenced KymaEnvironmentBinding %s doesn't exist", binding.Name)))
+			cr.SetConditions(xpv1.Unavailable().WithMessage(fmt.Sprintf(errKymaEnvironmentBindingNotExist, binding.Name)))
 			return managed.ExternalObservation{ResourceExists: false}, nil
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errKymaEnvironmentBindingNotFound)
@@ -113,18 +128,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	// Check if the binding is being deleted
 	if binding.GetDeletionTimestamp() != nil {
 		cr.SetConditions(xpv1.ReconcileSuccess().WithMessage(
-			"KymaEnvironmentBinding is pending deletion. Delete this KymaModule to allow binding deletion.",
+			errKymaEnvironmentBindingDeleting,
 		))
-	}
-
-	if c.client == nil {
-		cr.SetConditions(xpv1.Unavailable().WithMessage(
-			"Cannot connect to Kyma cluster - kubeconfig may be unavailable or expired",
-		))
-		return managed.ExternalObservation{
-			ResourceExists:   true,
-			ResourceUpToDate: false,
-		}, nil
 	}
 
 	res, err := c.client.ObserveModule(ctx, cr)
