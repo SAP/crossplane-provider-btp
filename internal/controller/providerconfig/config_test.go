@@ -85,9 +85,10 @@ func mockClient(secretData map[string][]byte) *test2.MockClient {
 			case *v1alpha1.ProviderConfig:
 				fakeProviderConfig(fakeProviderConfig(v))
 			case *v1.Secret:
-				if key.Name == secretNameCIS {
+				switch key.Name {
+				case secretNameCIS:
 					v.Data = secretData
-				} else if key.Name == secretNameSM {
+				case secretNameSM:
 					v.Data = smSecret
 				}
 			}

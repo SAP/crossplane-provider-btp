@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
@@ -60,11 +59,11 @@ type ServiceInstanceParameters struct {
 
 	// Reference to a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+	SubaccountRef *xpv1.Reference `json:"subaccountRef,omitempty" tf:"-"`
 
 	// Selector for a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+	SubaccountSelector *xpv1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
 }
 
 // ServiceInstanceObservation are the observable fields of a ServiceInstance.
