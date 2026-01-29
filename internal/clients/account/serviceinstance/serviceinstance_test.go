@@ -160,11 +160,12 @@ func TestTfResource(t *testing.T) {
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						s := obj.(*corev1.Secret)
-						if key.Name == "secret1" {
+						switch key.Name {
+						case "secret1":
 							s.Data = map[string][]byte{
 								"secret-key1": []byte(`{"key2": "value2"}`),
 							}
-						} else if key.Name == "secret2" {
+						case "secret2":
 							s.Data = map[string][]byte{
 								"secret-key2": []byte(`{no-json}`),
 							}
@@ -192,11 +193,12 @@ func TestTfResource(t *testing.T) {
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						s := obj.(*corev1.Secret)
-						if key.Name == "secret1" {
+						switch key.Name {
+						case "secret1":
 							s.Data = map[string][]byte{
 								"secret-key1": []byte(`{"key2": "value2"}`),
 							}
-						} else if key.Name == "secret2" {
+						case "secret2":
 							s.Data = map[string][]byte{
 								"secret-key2": []byte(`{"key3": "value3"}`),
 							}
@@ -230,11 +232,12 @@ func TestTfResource(t *testing.T) {
 				kube: &test.MockClient{
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						s := obj.(*corev1.Secret)
-						if key.Name == "secret1" {
+						switch key.Name {
+						case "secret1":
 							s.Data = map[string][]byte{
 								"secret-key1": []byte(`{"key2": "value2"}`),
 							}
-						} else if key.Name == "secret2" {
+						case "secret2":
 							s.Data = map[string][]byte{
 								"secret-key2": []byte(`{"key3": "value3"}`),
 							}
@@ -362,7 +365,7 @@ func withTfExternalName(externalName string) func(*v1alpha1.SubaccountServiceIns
 
 func withProviderConfigRef(providerConfigName string) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Spec.ResourceSpec.ProviderConfigReference = &xpv1.Reference{
+		cr.Spec.ProviderConfigReference = &xpv1.Reference{
 			Name: providerConfigName,
 		}
 	}
@@ -370,7 +373,7 @@ func withProviderConfigRef(providerConfigName string) func(*v1alpha1.ServiceInst
 
 func withTfProviderConfigRef(providerConfigName string) func(*v1alpha1.SubaccountServiceInstance) {
 	return func(cr *v1alpha1.SubaccountServiceInstance) {
-		cr.Spec.ResourceSpec.ProviderConfigReference = &xpv1.Reference{
+		cr.Spec.ProviderConfigReference = &xpv1.Reference{
 			Name: providerConfigName,
 		}
 	}
@@ -378,7 +381,7 @@ func withTfProviderConfigRef(providerConfigName string) func(*v1alpha1.Subaccoun
 
 func withManagementPolicies() func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Spec.ResourceSpec.ManagementPolicies = []xpv1.ManagementAction{
+		cr.Spec.ManagementPolicies = []xpv1.ManagementAction{
 			xpv1.ManagementActionAll,
 		}
 	}
@@ -386,7 +389,7 @@ func withManagementPolicies() func(*v1alpha1.ServiceInstance) {
 
 func withTfManagementPolicies() func(*v1alpha1.SubaccountServiceInstance) {
 	return func(cr *v1alpha1.SubaccountServiceInstance) {
-		cr.Spec.ResourceSpec.ManagementPolicies = []xpv1.ManagementAction{
+		cr.Spec.ManagementPolicies = []xpv1.ManagementAction{
 			xpv1.ManagementActionAll,
 		}
 	}
