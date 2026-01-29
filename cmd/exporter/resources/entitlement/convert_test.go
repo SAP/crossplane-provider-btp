@@ -3,11 +3,10 @@ package entitlement
 import (
 	"testing"
 
+	"github.com/SAP/xp-clifford/yaml"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"

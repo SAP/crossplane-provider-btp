@@ -3,12 +3,11 @@ package entitlement
 import (
 	"context"
 
+	"github.com/SAP/xp-clifford/cli/export"
+	"github.com/SAP/xp-clifford/erratt"
+	"github.com/SAP/xp-clifford/yaml"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/yaml"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"

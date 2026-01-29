@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"log/slog"
 
-	// go get github.com/SAP/crossplane-provider-cloudfoundry@<commit_hash>
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli"
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/configparam"
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
-	_ "github.com/SAP/crossplane-provider-cloudfoundry/exporttool/cli/export"
-	"github.com/SAP/crossplane-provider-cloudfoundry/exporttool/erratt"
+	// go get github.com/SAP/xp-clifford@<commit_hash>
+	"github.com/SAP/xp-clifford/cli"
+	"github.com/SAP/xp-clifford/cli/configparam"
+	"github.com/SAP/xp-clifford/cli/export"
+	_ "github.com/SAP/xp-clifford/cli/export"
+	"github.com/SAP/xp-clifford/erratt"
 
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
