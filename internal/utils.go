@@ -49,12 +49,12 @@ func Val[VAL any, PTR *VAL](ptr PTR) VAL {
 func Flatten(m map[string]interface{}) map[string][]byte {
 	o := make(map[string][]byte)
 	for k, v := range m {
-		k = strings.Replace(k, " ", "_", -1)
+		k = strings.ReplaceAll(k, " ", "_")
 		switch child := v.(type) {
 		case map[string]interface{}:
 			nm := Flatten(child)
 			for nk, nv := range nm {
-				nk = strings.Replace(nk, " ", "_", -1)
+				nk = strings.ReplaceAll(nk, " ", "_")
 				o[k+"."+nk] = nv
 			}
 		case string:

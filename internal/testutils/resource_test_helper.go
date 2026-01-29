@@ -76,7 +76,7 @@ func WithData(data v1alpha1.DirectoryParameters) DirectoryModifier {
 }
 
 func WithConditions(c ...xpv1.Condition) DirectoryModifier {
-	return func(r *v1alpha1.Directory) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *v1alpha1.Directory) { r.Status.Conditions = c }
 }
 
 func WithExternalName(externalName string) DirectoryModifier {

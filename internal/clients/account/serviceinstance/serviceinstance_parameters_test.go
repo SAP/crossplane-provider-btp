@@ -13,8 +13,8 @@ import (
 )
 
 // helper to decode JSON into map for comparison
-func mustMap(t *testing.T, b []byte) map[string]interface{} {
-	m := map[string]interface{}{}
+func mustMap(t *testing.T, b []byte) map[string]any {
+	m := map[string]any{}
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatalf("failed to unmarshal test json: %v", err)
 	}
@@ -31,20 +31,20 @@ func TestBuildComplexParameterJson(t *testing.T) {
 	}
 	cases := map[string]struct {
 		args    args
-		want    map[string]interface{}
+		want    map[string]any
 		wantErr bool
 	}{
 		"EmptyBoth": {
 			args: args{specParams: []byte{}, secretRefs: []xpv1.SecretKeySelector{}},
-			want: map[string]interface{}{},
+			want: map[string]any{},
 		},
 		"OnlySpecJSON": {
 			args: args{specParams: []byte(`{"a":1,"b":"x"}`), secretRefs: []xpv1.SecretKeySelector{}},
-			want: map[string]interface{}{"a": float64(1), "b": "x"},
+			want: map[string]any{"a": float64(1), "b": "x"},
 		},
 		"OnlySpecYAML": {
 			args: args{specParams: []byte("a: 1\nb: x"), secretRefs: []xpv1.SecretKeySelector{}},
-			want: map[string]interface{}{"a": 1, "b": "x"},
+			want: map[string]any{"a": 1, "b": "x"},
 		},
 		"OnlySecretPrimitive": {
 			args: args{
@@ -60,7 +60,7 @@ func TestBuildComplexParameterJson(t *testing.T) {
 					return nil
 				}},
 			},
-			want: map[string]interface{}{"password": "fromSecret"},
+			want: map[string]any{"password": "fromSecret"},
 		},
 		"SecretsAndSpecMergeNoOverlap": {
 			args: args{
@@ -77,7 +77,7 @@ func TestBuildComplexParameterJson(t *testing.T) {
 					return nil
 				}},
 			},
-			want: map[string]interface{}{"a": float64(1), "b": float64(2)},
+			want: map[string]any{"a": float64(1), "b": float64(2)},
 		},
 		"SecretsAndSpecOverlapSpecWins": {
 			args: args{
@@ -93,7 +93,7 @@ func TestBuildComplexParameterJson(t *testing.T) {
 				}},
 			},
 			// spec overwrites top-level a; nested map preserved
-			want: map[string]interface{}{"a": float64(99), "nested": map[string]interface{}{"x": float64(1)}},
+			want: map[string]any{"a": float64(99), "nested": map[string]any{"x": float64(1)}},
 		},
 		"SecretsAndSpecDeepMerge": {
 			args: args{
@@ -108,7 +108,7 @@ func TestBuildComplexParameterJson(t *testing.T) {
 					return nil
 				}},
 			},
-			want: map[string]interface{}{"parent": map[string]interface{}{"a": float64(1), "b": float64(2)}},
+			want: map[string]any{"parent": map[string]any{"a": float64(1), "b": float64(2)}},
 		},
 		"SecretLookupError": {
 			args: args{
@@ -150,7 +150,7 @@ func TestBuildComplexParameterJson(t *testing.T) {
 					return nil
 				}},
 			},
-			want: map[string]interface{}{"parent": map[string]interface{}{"password": "keep"}},
+			want: map[string]any{"parent": map[string]any{"password": "keep"}},
 		},
 		"MapAndNonMapConflictKeepNonMap": {
 			args: args{
@@ -165,7 +165,85 @@ func TestBuildComplexParameterJson(t *testing.T) {
 					return nil
 				}},
 			},
-			want: map[string]interface{}{"parent": "not-a-map"},
+			want: map[string]any{"parent": "not-a-map"},
+		},
+		"MergeArrayFromSpecAndMapFromSecretNonOverlapping": {
+			args: args{
+				secretRefs: []xpv1.SecretKeySelector{{
+					SecretReference: xpv1.SecretReference{Name: "s1", Namespace: "default"},
+					Key:             "data",
+				}},
+				specParams: []byte(`{"a":"1","b":[{"name":"fromSpec"}]}`),
+				client: &test.MockClient{MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					secret := obj.(*corev1.Secret)
+					secret.Data = map[string][]byte{"data": []byte(`{"c":"1"}`)}
+					return nil
+				}},
+			},
+			want: map[string]any{
+				"a": "1",
+				"b": []any{map[string]any{"name": "fromSpec"}},
+				"c": "1"},
+		},
+		"MergeMapFromSpecAndArrayFromSecretNonOverlapping": {
+			args: args{
+				secretRefs: []xpv1.SecretKeySelector{{
+					SecretReference: xpv1.SecretReference{Name: "s1", Namespace: "default"},
+					Key:             "data",
+				}},
+				specParams: []byte(`{"a":"1"}`),
+				client: &test.MockClient{MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					secret := obj.(*corev1.Secret)
+					secret.Data = map[string][]byte{"data": []byte(`{"c":"1", "b":[{"name":"fromSecret"}]}`)}
+					return nil
+				}},
+			},
+			want: map[string]any{
+				"a": "1",
+				"c": "1",
+				"b": []any{map[string]any{"name": "fromSecret"}}},
+		},
+		"MergeMapArrayFromBothOverlapping": {
+			args: args{
+				secretRefs: []xpv1.SecretKeySelector{{
+					SecretReference: xpv1.SecretReference{Name: "s1", Namespace: "default"},
+					Key:             "data",
+				}},
+				specParams: []byte(`{"a":"1", "b":[{"name1":"fromSpec"}]}`),
+				client: &test.MockClient{MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					secret := obj.(*corev1.Secret)
+					secret.Data = map[string][]byte{"data": []byte(`{"c":"1", "b":[{"name2":"fromSecret"}]}`)}
+					return nil
+				}},
+			},
+			want: map[string]any{
+				"a": "1",
+				"c": "1",
+				"b": []any{
+					map[string]any{"name1": "fromSpec"},
+					map[string]any{"name2": "fromSecret"},
+				},
+			},
+		},
+		"MergeMapArrayFromBothNonOverlapping": {
+			args: args{
+				secretRefs: []xpv1.SecretKeySelector{{
+					SecretReference: xpv1.SecretReference{Name: "s1", Namespace: "default"},
+					Key:             "data",
+				}},
+				specParams: []byte(`{"a":"1", "b":[{"name1":"fromSpec"}]}`),
+				client: &test.MockClient{MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					secret := obj.(*corev1.Secret)
+					secret.Data = map[string][]byte{"data": []byte(`{"c":"1", "d":[{"name2":"fromSecret"}]}`)}
+					return nil
+				}},
+			},
+			want: map[string]any{
+				"a": "1",
+				"c": "1",
+				"d": []any{map[string]any{"name2": "fromSecret"}},
+				"b": []any{map[string]any{"name1": "fromSpec"}},
+			},
 		},
 	}
 
@@ -190,7 +268,7 @@ func TestBuildComplexParameterJson(t *testing.T) {
 }
 
 // cmpDiffMaps creates a deterministic diff for two maps using JSON serialization
-func cmpDiffMaps(want, got map[string]interface{}) string {
+func cmpDiffMaps(want, got map[string]any) string {
 	wantB, _ := json.Marshal(want)
 	gotB, _ := json.Marshal(got)
 	if string(wantB) == string(gotB) {
@@ -201,68 +279,68 @@ func cmpDiffMaps(want, got map[string]interface{}) string {
 
 func TestAddMap(t *testing.T) {
 	type args struct {
-		mergedData map[string]interface{}
-		toAdd      map[string]interface{}
+		mergedData map[string]any
+		toAdd      map[string]any
 	}
 	cases := map[string]struct {
 		args args
-		want map[string]interface{}
+		want map[string]any
 	}{
 		"SimpleMerge": {
 			args: args{
-				mergedData: map[string]interface{}{"a": 1},
-				toAdd:      map[string]interface{}{"b": 2},
+				mergedData: map[string]any{"a": 1},
+				toAdd:      map[string]any{"b": 2},
 			},
-			want: map[string]interface{}{"a": 1, "b": 2},
+			want: map[string]any{"a": 1, "b": 2},
 		},
 		"MergedDataEmpty": {
 			args: args{
-				mergedData: map[string]interface{}{},
-				toAdd:      map[string]interface{}{"parent": map[string]interface{}{"a": 1, "b": 2}},
+				mergedData: map[string]any{},
+				toAdd:      map[string]any{"parent": map[string]any{"a": 1, "b": 2}},
 			},
-			want: map[string]interface{}{"parent": map[string]interface{}{"a": 1, "b": 2}},
+			want: map[string]any{"parent": map[string]any{"a": 1, "b": 2}},
 		},
 		"toAddEmpty": {
 			args: args{
-				mergedData: map[string]interface{}{"parent": map[string]interface{}{"a": 1, "b": 2}},
-				toAdd:      map[string]interface{}{},
+				mergedData: map[string]any{"parent": map[string]any{"a": 1, "b": 2}},
+				toAdd:      map[string]any{},
 			},
-			want: map[string]interface{}{"parent": map[string]interface{}{"a": 1, "b": 2}},
+			want: map[string]any{"parent": map[string]any{"a": 1, "b": 2}},
 		},
 		"DeepMerge": {
 			args: args{
-				mergedData: map[string]interface{}{"parent": map[string]interface{}{"a": 1}},
-				toAdd:      map[string]interface{}{"parent": map[string]interface{}{"a": 2}},
+				mergedData: map[string]any{"parent": map[string]any{"a": 1}},
+				toAdd:      map[string]any{"parent": map[string]any{"a": 2}},
 			},
-			want: map[string]interface{}{"parent": map[string]interface{}{"a": 2}},
+			want: map[string]any{"parent": map[string]any{"a": 2}},
 		},
 		"OverWriteNonMap": {
 			args: args{
-				mergedData: map[string]interface{}{"parent": "not-a-map"},
-				toAdd:      map[string]interface{}{"parent": map[string]interface{}{"a": 1}},
+				mergedData: map[string]any{"parent": "not-a-map"},
+				toAdd:      map[string]any{"parent": map[string]any{"a": 1}},
 			},
-			want: map[string]interface{}{"parent": map[string]interface{}{"a": 1}},
+			want: map[string]any{"parent": map[string]any{"a": 1}},
 		},
 		"KeepNonMap": {
 			args: args{
-				mergedData: map[string]interface{}{"parent": map[string]interface{}{"a": 1}},
-				toAdd:      map[string]interface{}{"parent": "not-a-map"},
+				mergedData: map[string]any{"parent": map[string]any{"a": 1}},
+				toAdd:      map[string]any{"parent": "not-a-map"},
 			},
-			want: map[string]interface{}{"parent": "not-a-map"},
+			want: map[string]any{"parent": "not-a-map"},
 		},
 		"EmptyMapToAdd": {
 			args: args{
-				mergedData: map[string]interface{}{"a": 1, "b": map[string]interface{}{"x": 1}},
-				toAdd:      map[string]interface{}{"b": map[string]interface{}{}},
+				mergedData: map[string]any{"a": 1, "b": map[string]any{"x": 1}},
+				toAdd:      map[string]any{"b": map[string]any{}},
 			},
-			want: map[string]interface{}{"a": 1, "b": map[string]interface{}{"x": 1}},
+			want: map[string]any{"a": 1, "b": map[string]any{"x": 1}},
 		},
 		"PartialOverwrite": {
 			args: args{
-				mergedData: map[string]interface{}{"a": 1, "b": 2},
-				toAdd:      map[string]interface{}{"a": 3},
+				mergedData: map[string]any{"a": 1, "b": 2},
+				toAdd:      map[string]any{"a": 3},
 			},
-			want: map[string]interface{}{"a": 3, "b": 2},
+			want: map[string]any{"a": 3, "b": 2},
 		},
 	}
 	for name, tc := range cases {

@@ -111,6 +111,19 @@ User credentials for a user that is Global Account Administrator in the configur
 }
 ```
 
+If using a technical user from a custom identity provider, include the `idp` field with the identity provider value:
+
+```json
+{
+  "email": "email",
+  "username": "PuserId",
+  "password": "mypass",
+  "idp": "your-custom-idp"
+}
+```
+
+The `idp` value can be found in the BTP Cockpit under **Security > Trust Configuration > [Your Trust Configuration] > Main Information > SAP BTP CLI**.
+
 **CIS_CENTRAL_BINDING**
 
 Contents from the service binding of a `cis-central` service in the same globalaccount, structure:
