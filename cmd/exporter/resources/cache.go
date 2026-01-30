@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"iter"
 	"maps"
+	"regexp"
 	"slices"
 	"sync"
 )
@@ -89,21 +90,40 @@ func (c *resourceCache[T]) ValuesForSelection() *DisplayValues {
 	return values
 }
 
+// KeepSelectedOnly keeps only resources that match the values selected by the user.
+// The selected values can be either resource IDs, display names, or regular expressions matching display names.
 func (c *resourceCache[T]) KeepSelectedOnly(selectedValues []string) {
 	displayValues := c.ValuesForSelection()
 
+	// Prepare set of resource IDs to keep.
+	// Also, if a selected value is neither a resource ID nor a display value, compile regexes for name matching.
+	var nameRxs []*regexp.Regexp
 	keepSet := make(map[string]bool)
 	for _, v := range selectedValues {
 		if resourceId, ok := displayValues.values[v]; ok {
+			// Selected by display value.
 			keepSet[resourceId] = true
 		} else if _, ok := c.resources[v]; ok {
+			// Selected by resource ID.
 			keepSet[v] = true
+		} else if rx, err := regexp.Compile(v); err == nil {
+			nameRxs = append(nameRxs, rx)
 		}
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// Match resources by name regexes, if any.
+	for _, rx := range nameRxs {
+		for key := range c.resources {
+			if rx.MatchString(c.resources[key].GetDisplayName()) {
+				keepSet[key] = true
+			}
+		}
+	}
+
+	// Remove resources not in the keep set.
 	for key := range c.resources {
 		if !keepSet[key] {
 			delete(c.resources, key)

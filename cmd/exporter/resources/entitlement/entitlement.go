@@ -18,21 +18,21 @@ import (
 const KIND_NAME = "entitlement"
 
 const (
-	paramNameService      = "entitlement-service"
 	paramNameAutoAssigned = "entitlement-auto-assigned"
 )
 
 var (
 	entitlementCache resources.ResourceCache[*entitlement]
-	serviceNameParam = configparam.StringSlice(paramNameService, "Technical name of a BTP service. Used in combination with '--kind "+KIND_NAME+"'").
-		WithFlagName(paramNameService)
+	entitlementParam = configparam.StringSlice(KIND_NAME, "Service plan name (or name fragment) to export. If specified, it must be a valid regex expression.").
+		WithFlagName(KIND_NAME).
+		WithExample("--entitlement '.*\\bcis\\b.*'")
 	autoAssignedParam = configparam.Bool(paramNameAutoAssigned, "Include service plans that are automatically assigned to all subaccounts.\nUsed in combination with '--kind "+KIND_NAME+"'").
 		WithFlagName(paramNameAutoAssigned)
 )
 
 func init() {
 	resources.RegisterKind(exporter{})
-	export.AddConfigParams(serviceNameParam)
+	export.AddConfigParams(entitlementParam)
 	export.AddConfigParams(autoAssignedParam)
 }
 
@@ -92,13 +92,13 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	cache := resources.NewResourceCache[*entitlement]()
 	cache.Store(entitlements...)
 	widgetValues := cache.ValuesForSelection()
-	serviceNameParam.WithPossibleValuesFn(func() ([]string, error) {
+	entitlementParam.WithPossibleValuesFn(func() ([]string, error) {
 		return widgetValues.Values(), nil
 	})
 
-	selectedEntitlements, err := serviceNameParam.ValueOrAsk(ctx)
+	selectedEntitlements, err := entitlementParam.ValueOrAsk(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get parameter value: %s, %w", serviceNameParam.GetName(), err)
+		return nil, fmt.Errorf("failed to get parameter value: %s, %w", entitlementParam.GetName(), err)
 	}
 	slog.DebugContext(ctx, "Selected entitlements", "service plans", selectedEntitlements)
 
@@ -143,7 +143,7 @@ func (e *entitlement) GetID() string {
 }
 
 func (e *entitlement) GetDisplayName() string {
-	return fmt.Sprintf("service:%s, plan: %s, amount: %g",
+	return fmt.Sprintf("%s-%s-%g",
 		e.serviceName,
 		e.planName,
 		e.assignment.Amount)

@@ -28,7 +28,7 @@ const (
 	envVarGlobalAccount    = "BTP_EXPORT_GLOBAL_ACCOUNT"
 	envVarIdentityProvider = "BTP_EXPORT_IDP"
 
-	flagNameBtpCliPath       = "btp-cli-path"
+	flagNameBtpCliPath       = "btp-cli"
 	flagNameBtpCliServer     = "url"
 	flagNameUser             = "username"
 	flagNamePassword         = "password"
@@ -42,14 +42,16 @@ var (
 		WithEnvVarName("RESOLVE_REFERENCES")
 	paramUserName = configparam.String(flagNameUser, "User name to log in to a global account of SAP BTP.").
 		WithFlagName(flagNameUser).
+		WithShortName("u").
 		WithEnvVarName(envVarUserName)
 	paramPassword = configparam.String(flagNamePassword, "User password to log in to a global account of SAP BTP.").
 		WithFlagName(flagNamePassword).
+		WithShortName("p").
 		WithEnvVarName(envVarPassword)
 	paramGlobalAccount = configparam.String(flagNameGlobalAccount, "The subdomain of the global account to export resources from.").
 		WithFlagName(flagNameGlobalAccount).
 		WithEnvVarName(envVarGlobalAccount)
-	paramBtpCliPath = configparam.String(flagNameBtpCliPath, "Path to the BTP CLI binary that should be by the export tool to access BTP. Default: 'btp' in your $PATH.").
+	paramBtpCliPath = configparam.String(flagNameBtpCliPath, "Path to the BTP CLI binary that should be used by the export tool to access BTP. Default: 'btp' in your $PATH.").
 		WithFlagName(flagNameBtpCliPath).
 		WithEnvVarName(envVarBtpCliPath)
 	paramBtpCliServer = configparam.String(flagNameBtpCliServer, "The URL of the BTP CLI server. Default: 'https://cli.btp.cloud.sap'").
