@@ -102,7 +102,6 @@ func TestConvertEntitlementResource(t *testing.T) {
 	var parentAmount float64 = 10
 	var parentRemainingAmount float64 = 5
 	resourceName := planId + "-" + subAccountUuid
-	externalName := "no-external-name-support"
 
 	tests := []struct {
 		name string
@@ -132,9 +131,6 @@ func TestConvertEntitlementResource(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: resourceName,
-						Annotations: map[string]string{
-							"crossplane.io/external-name": externalName,
-						},
 					},
 					Spec: v1alpha1.EntitlementSpec{
 						ResourceSpec: v1.ResourceSpec{
@@ -174,9 +170,6 @@ func TestConvertEntitlementResource(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: resourceName,
-						Annotations: map[string]string{
-							"crossplane.io/external-name": externalName,
-						},
 					},
 					Spec: v1alpha1.EntitlementSpec{
 						ResourceSpec: v1.ResourceSpec{
@@ -215,9 +208,6 @@ func TestConvertEntitlementResource(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: resourceName,
-						Annotations: map[string]string{
-							"crossplane.io/external-name": externalName,
-						},
 					},
 					Spec: v1alpha1.EntitlementSpec{
 						ResourceSpec: v1.ResourceSpec{
@@ -257,9 +247,6 @@ func TestConvertEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UNDEFINED_NAME,
-							Annotations: map[string]string{
-								"crossplane.io/external-name": externalName,
-							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{
@@ -302,9 +289,6 @@ func TestConvertEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UNDEFINED_NAME,
-							Annotations: map[string]string{
-								"crossplane.io/external-name": externalName,
-							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{
@@ -347,9 +331,6 @@ func TestConvertEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UNDEFINED_NAME,
-							Annotations: map[string]string{
-								"crossplane.io/external-name": externalName,
-							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{
@@ -393,9 +374,6 @@ func TestConvertEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resourceName,
-							Annotations: map[string]string{
-								"crossplane.io/external-name": externalName,
-							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{

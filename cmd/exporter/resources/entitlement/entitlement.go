@@ -150,7 +150,7 @@ func (e *entitlement) GetDisplayName() string {
 }
 
 func (e *entitlement) GetExternalName() string {
-	return "no-external-name-support"
+	return ""
 }
 
 func (e *entitlement) GenerateK8sResourceName() string {
