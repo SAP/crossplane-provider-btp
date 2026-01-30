@@ -2,6 +2,8 @@ package resources
 
 import (
 	"context"
+	"maps"
+	"slices"
 
 	"github.com/SAP/xp-clifford/cli/configparam"
 	"github.com/SAP/xp-clifford/cli/export"
@@ -41,6 +43,11 @@ func ConfigParams() []configparam.ConfigParam {
 		}
 	}
 	return result
+}
+
+// KindNames function returns the names of the registered kinds.
+func KindNames() []string {
+	return slices.Collect(maps.Keys(kinds))
 }
 
 // ExportFn returns the export function of a given kind.

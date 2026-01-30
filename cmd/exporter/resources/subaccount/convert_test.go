@@ -433,10 +433,10 @@ func TestConvertSubaccountResource(t *testing.T) {
 			r.True(gotOk && wantOk, "expected resource type to be *v1alpha1.Subaccount")
 
 			// Verify metadata.
-			r.Equal(wantSa.TypeMeta.Kind, gotSa.TypeMeta.Kind)
-			r.Equal(wantSa.TypeMeta.APIVersion, gotSa.TypeMeta.APIVersion)
-			r.Equal(wantSa.ObjectMeta.Name, gotSa.ObjectMeta.Name)
-			r.Equal(wantSa.ObjectMeta.Annotations["crossplane.io/external-name"], gotSa.ObjectMeta.Annotations["crossplane.io/external-name"])
+			r.Equal(wantSa.Kind, gotSa.Kind)
+			r.Equal(wantSa.APIVersion, gotSa.APIVersion)
+			r.Equal(wantSa.Name, gotSa.Name)
+			r.Equal(wantSa.Annotations["crossplane.io/external-name"], gotSa.Annotations["crossplane.io/external-name"])
 
 			// Verify ManagementPolicies.
 			r.Equal(1, len(gotSa.Spec.ManagementPolicies))
