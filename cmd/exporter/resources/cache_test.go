@@ -86,7 +86,16 @@ func TestResourceCache_KeepSelectedOnly(t *testing.T) {
 			wantIDs: []string{"id-1", "id-2", "id-3", "id-4"},
 		},
 		{
-			name: "no matches",
+			name: "non-existent key does not override existing one",
+			initialCache: []*mockResource{
+				{id: "id-1", displayName: "Resource One"},
+				{id: "id-2", displayName: "Resource Two"},
+			},
+			selectedValues: []string{"non-existent-id", "id-2"},
+			wantIDs:        []string{"id-2"},
+		},
+		{
+			name: "non-existent selection keeps nothing",
 			initialCache: []*mockResource{
 				{id: "id-1", displayName: "Resource One"},
 				{id: "id-2", displayName: "Resource Two"},
