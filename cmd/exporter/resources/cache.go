@@ -95,6 +95,9 @@ func (c *resourceCache[T]) ValuesForSelection() *DisplayValues {
 func (c *resourceCache[T]) KeepSelectedOnly(selectedValues []string) {
 	displayValues := c.ValuesForSelection()
 
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	// Prepare set of resource IDs to keep.
 	// Also, if a selected value is neither a resource ID nor a display value, compile regexes for name matching.
 	var nameRxs []*regexp.Regexp
@@ -110,9 +113,6 @@ func (c *resourceCache[T]) KeepSelectedOnly(selectedValues []string) {
 			nameRxs = append(nameRxs, rx)
 		}
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	// Match resources by name regexes, if any.
 	for _, rx := range nameRxs {
