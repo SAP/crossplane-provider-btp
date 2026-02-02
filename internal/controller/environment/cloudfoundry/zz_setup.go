@@ -15,7 +15,7 @@ import (
 
 // Setup adds a controller that reconciles GlobalAccount managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.CloudFoundryEnvironment{}, v1alpha1.CfEnvironmentGroupKind, v1alpha1.CfEnvironmentGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
+	return providerconfig.DefaultSetupWithoutDefaultInitializer(mgr, o, &v1alpha1.CloudFoundryEnvironment{}, v1alpha1.CfEnvironmentGroupKind, v1alpha1.CfEnvironmentGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 		return &connector{
 			kube:            kube,
 			usage:           usage,

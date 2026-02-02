@@ -2,6 +2,7 @@ package fake
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	environments "github.com/sap/crossplane-provider-btp/internal/clients/cfenvironment"
@@ -9,9 +10,9 @@ import (
 )
 
 type MockClient struct {
-	MockDescribeCluster func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error)
+	MockDescribeCluster func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error)
 	MockCreate          func(cr v1alpha1.CloudFoundryEnvironment) (string, error)
-	MockDelete          func(cr v1alpha1.CloudFoundryEnvironment) error
+	MockDelete          func(cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error)
 	MockUpdate          func(cr v1alpha1.CloudFoundryEnvironment) error
 
 	MockNeedsUpdate func(cr v1alpha1.CloudFoundryEnvironment) bool
@@ -21,7 +22,7 @@ func (m MockClient) NeedsUpdate(cr v1alpha1.CloudFoundryEnvironment) bool {
 	return m.MockNeedsUpdate(cr)
 }
 
-func (m MockClient) DescribeInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+func (m MockClient) DescribeInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
 	return m.MockDescribeCluster(cr)
 }
 
@@ -33,7 +34,7 @@ func (m MockClient) UpdateInstance(ctx context.Context, cr v1alpha1.CloudFoundry
 	return m.MockUpdate(cr)
 }
 
-func (m MockClient) DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
+func (m MockClient) DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
 	return m.MockDelete(cr)
 }
 

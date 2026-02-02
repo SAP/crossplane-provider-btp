@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -331,19 +332,12 @@ func (c *Client) CreateCloudFoundryOrgIfNotExists(
 	ctx context.Context, instanceName string, serviceAccountEmail string, resourceUID string,
 	landscape string, orgName string, environmentName string,
 ) (*CloudFoundryOrg, error) {
-	cfEnvironment, err := c.GetCFEnvironmentByNameAndOrg(ctx, instanceName, orgName)
+
+	orgId, err := c.CreateCloudFoundryOrg(ctx, serviceAccountEmail, resourceUID, landscape, orgName, environmentName)
 	if err != nil {
 		return nil, err
 	}
-	var orgId string
-	if cfEnvironment == nil {
-		orgId, err = c.CreateCloudFoundryOrg(ctx, serviceAccountEmail, resourceUID, landscape, orgName, environmentName)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		orgId = *cfEnvironment.Id
-	}
+
 	cfOrg, err := c.GetCloudFoundryOrg(ctx, orgId)
 	if err != nil {
 		return nil, err
@@ -376,24 +370,24 @@ func (c *Client) getCloudFoundryEnvironmentId(ctx context.Context, instanceName 
 	return cloudFoundryOrgId, nil
 }
 
-func (c *Client) DeleteEnvironmentById(ctx context.Context, environmentId string) error {
-	_, _, err := c.ProvisioningServiceClient.DeleteEnvironmentInstance(ctx, environmentId).Execute()
+func (c *Client) DeleteEnvironmentById(ctx context.Context, environmentId string) (*http.Response, error) {
+	_, raw, err := c.ProvisioningServiceClient.DeleteEnvironmentInstance(ctx, environmentId).Execute()
 	if err != nil {
-		return specifyAPIError(err)
+		return raw, specifyAPIError(err)
 	}
-	return nil
+	return raw, nil
 }
 
-func (c *Client) DeleteCloudFoundryEnvironment(ctx context.Context, instanceName string, orgName string) error {
+func (c *Client) DeleteCloudFoundryEnvironment(ctx context.Context, instanceName string, orgName string) (*http.Response, error) {
 	environmentId, getErr := c.getCloudFoundryEnvironmentId(ctx, instanceName, orgName)
 	if getErr != nil {
-		return specifyAPIError(getErr)
+		return nil, specifyAPIError(getErr)
 	}
-	delErr := c.DeleteEnvironmentById(ctx, environmentId)
+	raw, delErr := c.DeleteEnvironmentById(ctx, environmentId)
 	if delErr != nil {
-		return specifyAPIError(delErr)
+		return nil, specifyAPIError(delErr)
 	}
-	return nil
+	return raw, nil
 }
 
 // First tries to get the environment by external name, if not found, it tries to get it by name and type
@@ -452,6 +446,18 @@ func (c *Client) GetEnvironmentByNameAndType(
 	return environmentInstance, err
 }
 
+func (c *Client) GetEnvironmentsByIdNew(ctx context.Context, Id string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	response, _, err := c.ProvisioningServiceClient.GetEnvironmentInstance(ctx, Id).Execute()
+
+	if err != nil {
+		return nil, specifyAPIError(err)
+	}
+
+	return response, err
+}
+
+// GetEnvironmentById retrieves environment using its ID. It performs a list and filters client-side.
+// DEPRECATED: use GetEnvironmentsByIdNew instead.
 func (c *Client) GetEnvironmentById(
 	ctx context.Context, Id string,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
@@ -497,6 +503,7 @@ func (c *Client) GetCFEnvironmentByNameAndOrg(
 	return findCFEnvironment(envInstances, instanceName, orgName)
 }
 
+// GetCFEnvironmentByOrgId retrieves CF environment using orgId by doing a list with client side filtering
 func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	var environmentInstance *provisioningclient.BusinessEnvironmentInstanceResponseObject
 	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs

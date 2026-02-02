@@ -2,6 +2,7 @@ package cloudfoundry
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -58,8 +59,8 @@ func TestObserve(t *testing.T) {
 		},
 		"ErrorGettingCFEnvironment": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-					return nil, nil, errors.New("Could not call backend")
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
+					return nil, nil, false, errors.New("Could not call backend")
 				}},
 				cr: environment(),
 			},
@@ -71,8 +72,8 @@ func TestObserve(t *testing.T) {
 		},
 		"NeedsCreate": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-					return nil, nil, nil
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
+					return nil, nil, false, nil
 				}},
 				cr: environment(),
 			},
@@ -86,11 +87,11 @@ func TestObserve(t *testing.T) {
 		},
 		"SuccessfulAvailableAndUpToDate": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:  internal.Ptr("OK"),
 						Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
-					}, []v1alpha1.User{aUser}, nil
+					}, []v1alpha1.User{aUser}, false, nil
 				}, MockNeedsUpdate: func(cr v1alpha1.CloudFoundryEnvironment) bool {
 					return false
 				}},
@@ -125,11 +126,11 @@ func TestObserve(t *testing.T) {
 		},
 		"ExistingButNotAvailable": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:  internal.Ptr("CREATING"),
 						Labels: internal.Ptr("{}"),
-					}, []v1alpha1.User{aUser}, nil
+					}, []v1alpha1.User{aUser}, false, nil
 				}, MockNeedsUpdate: func(cr v1alpha1.CloudFoundryEnvironment) bool {
 					return false
 				}},
@@ -280,8 +281,8 @@ func TestDelete(t *testing.T) {
 		},
 		"DeleteError": {
 			args: args{
-				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) error {
-					return errors.New("Could not call backend")
+				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
+					return nil, errors.New("Could not call backend")
 				}},
 				cr: environment(),
 			},
@@ -290,10 +291,22 @@ func TestDelete(t *testing.T) {
 				cr:  environment(withConditions(xpv1.Deleting())),
 			},
 		},
+		"DeleteError-404 not found": {
+			args: args{
+				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
+					return &http.Response{StatusCode: 404}, errors.New("404 not found")
+				}},
+				cr: environment(),
+			},
+			want: want{
+				err: nil,
+				cr:  environment(withConditions(xpv1.Deleting())), //TODO what to do here?
+			},
+		},
 		"Successful": {
 			args: args{
-				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) error {
-					return nil
+				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
+					return nil, nil
 				},
 				},
 				cr: environment(),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 
@@ -13,15 +14,18 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 )
 
+type NeedsExternalNameFormatMigration bool
+
 type Client interface {
 	DescribeInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (
 		*provisioningclient.BusinessEnvironmentInstanceResponseObject,
 		[]v1alpha1.User,
+		NeedsExternalNameFormatMigration,
 		error,
 	)
 	CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error)
 	UpdateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error
-	DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error
+	DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error)
 
 	NeedsUpdate(cr v1alpha1.CloudFoundryEnvironment) bool
 }

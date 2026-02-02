@@ -15,6 +15,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	env "github.com/sap/crossplane-provider-btp/internal/clients/cfenvironment"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 
@@ -121,10 +122,42 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotEnvironment)
 	}
 
-	instance, managers, err := c.client.DescribeInstance(ctx, *cr)
+	// Check if external-name is empty
+	externalName := meta.GetExternalName(cr)
+	if externalName == "" {
+		// No external-name set: resource doesn't exist (needs creation)
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	// check the format
+	//current format is GUID only
+	if !internal.IsValidUUID(externalName) {
+		//name is not a valid guid, check for backwards compatibility
+
+	}
+
+	instance, managers, needsExternalNameFormatMigration, err := c.client.DescribeInstance(ctx, *cr)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
+
+	// If instance not found, it's a drift (external resource was deleted) TODO: is this already handled in DescribeINstance, does it throw an error or returns an empty instance
+	if instance == nil {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	// Migrate external-name to GUID format if necessary
+	if needsExternalNameFormatMigration {
+		meta.SetExternalName(cr, *instance.Id)
+		if err := c.kube.Update(ctx, cr); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, "failed to update external-name to GUID format")
+		}
+	}
+
 	cr.Status.AtProvider = env.GenerateObservation(instance, managers)
 
 	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateOk {
@@ -153,11 +186,14 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotEnvironment)
 	}
 
-	createdOrgName, err := c.client.CreateInstance(ctx, *cr)
+	createdOrgGuid, err := c.client.CreateInstance(ctx, *cr)
 	if err != nil {
+		// Do not set external-name on error (including "already exists" errors)
 		return managed.ExternalCreation{}, err
 	}
-	meta.SetExternalName(cr, createdOrgName)
+
+	// Set external-name to the GUID returned by the API
+	meta.SetExternalName(cr, createdOrgGuid)
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
@@ -181,9 +217,24 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotEnvironment)
 	}
-	cr.SetConditions(xpv1.Deleting())
 
-	return managed.ExternalDelete{}, c.client.DeleteInstance(ctx, *cr)
+	cr.SetConditions(xpv1.Deleting())
+	// Check if resource is already in deletion state
+	if cr.Status.AtProvider.State != nil {
+		state := *cr.Status.AtProvider.State
+		if state == v1alpha1.InstanceStateDeleting {
+			// Already deleting, no need to call delete again
+			return managed.ExternalDelete{}, nil
+		}
+	}
+
+	raw, err := c.client.DeleteInstance(ctx, *cr)
+	// Don't treat 404 as error - resource was already deleted externally (drift)
+	if err != nil && raw.StatusCode != 404 {
+		return managed.ExternalDelete{}, err
+	}
+
+	return managed.ExternalDelete{}, nil
 }
 
 func (c *external) needsCreation(cr *v1alpha1.CloudFoundryEnvironment) bool {
