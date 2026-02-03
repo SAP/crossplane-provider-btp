@@ -2,6 +2,7 @@ package serviceinstance
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -12,6 +13,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	ujresource "github.com/crossplane/upjet/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -19,6 +21,7 @@ import (
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/di"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -119,9 +122,21 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
+
+	// DEBUG
+	fmt.Printf("DEBUG: Observe called for %s\n", cr.Name)
+
 	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
+	}
+
+	//Check for failed async operations ONCE, before the switch
+	if e.checkAsyncOperationFailure(cr) {
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: false,
+		}, nil
 	}
 
 	switch status {
@@ -134,6 +149,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			ConnectionDetails: managed.ConnectionDetails{},
 		}, nil
 	case tfClient.UpToDate:
+
 		data := e.tfClient.QueryAsyncData(ctx)
 
 		if data != nil {
@@ -142,6 +158,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			}
 			cr.SetConditions(xpv1.Available())
 		}
+
 		return managed.ExternalObservation{
 			ResourceExists:    true,
 			ResourceUpToDate:  true,
@@ -215,4 +232,22 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 	// we rely on status being saved in crossplane reconciler here
 	cr.Status.AtProvider.ID = sid.ID
 	return nil
+}
+
+// checkAsyncOperationFailure checks if there's a failed async operation and sets appropriate conditions
+func (e *external) checkAsyncOperationFailure(cr *v1alpha1.ServiceInstance) bool {
+	lastAsyncOp := cr.GetCondition(xpv1.ConditionType("LastAsyncOperation"))
+	if lastAsyncOp.Status == corev1.ConditionFalse && lastAsyncOp.Reason == "ApplyFailure" {
+		cr.SetConditions(xpv1.Unavailable().WithMessage(lastAsyncOp.Message))
+		return true
+	}
+
+	// Also check AsyncOperation as fallback
+	asyncOp := cr.GetCondition(ujresource.TypeAsyncOperation)
+	if asyncOp.Status == corev1.ConditionFalse && asyncOp.Reason == "ApplyFailure" {
+		cr.SetConditions(xpv1.Unavailable().WithMessage(asyncOp.Message))
+		return true
+	}
+
+	return false
 }
