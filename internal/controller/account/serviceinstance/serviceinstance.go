@@ -2,7 +2,6 @@ package serviceinstance
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -122,9 +121,6 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
-
-	// DEBUG
-	fmt.Printf("DEBUG: Observe called for %s\n", cr.Name)
 
 	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
