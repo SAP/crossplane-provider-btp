@@ -18,8 +18,12 @@ import (
 )
 
 const (
-	errNotServiceManager    = "managed resource is not a ServiceManager custom resource"
-	errUpdateNotImplemented = "Update action not implemented"
+	errNotServiceManager                     = "managed resource is not a ServiceManager custom resource"
+	errTrack, errInitialize, errConnect      = "cannot track resource usage", "while initializing service plan ID", "while connecting resources"
+	errGetPlanID, errUpdateStatus, errCreate = "while getting plan ID initializer", "while updating service manager status", "while creating resources"
+	errUpdate, errDelete                     = "while updating resources", "while deleting resources"
+	errSetStatus                             = "while setting status"
+	errGetServicePlan                        = "while getting service manager plan ID by name"
 )
 
 // ServiceManagerPlanIdInitializer is will provide implementation of service plan id lookup by name
@@ -44,12 +48,11 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotServiceManager)
 	}
 	if err := c.resourcetracker.Track(ctx, mg); err != nil {
-		return nil, errors.Wrap(err, "cannot track resource usage")
+		return nil, errors.Wrap(err, errTrack)
 	}
 
-	err := c.InitializeServicePlanId(ctx, cr)
-	if err != nil {
-		return nil, err
+	if err := c.InitializeServicePlanId(ctx, cr); err != nil {
+		return nil, errors.Wrap(err, errInitialize)
 	}
 
 	tfClientInit := c.newClientInitalizerFn()
@@ -57,7 +60,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	tfClient, err := tfClientInit.ConnectResources(ctx, cr)
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errConnect)
 	}
 
 	return &external{
@@ -78,12 +81,12 @@ func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1beta1
 
 	planIdInitializer, err := c.newPlanIdInitializerFn(ctx, cr)
 	if err != nil {
-		return err
+		return errors.Wrap(err, errGetPlanID)
 	}
 
 	id, err := planIdInitializer.ServiceManagerPlanIDByName(ctx, cr.Spec.ForProvider.SubaccountGuid, c.ServicePlanName(cr))
 	if err != nil {
-		return err
+		return errors.Wrap(err, errGetServicePlan)
 	}
 
 	return c.saveId(ctx, cr, id)
@@ -100,7 +103,10 @@ func (c *connector) saveId(ctx context.Context, cr *apisv1beta1.ServiceManager, 
 	cr.Status.AtProvider.DataSourceLookup = &apisv1beta1.DataSourceLookup{
 		ServiceManagerPlanID: id,
 	}
-	return c.kube.Status().Update(ctx, cr)
+	if err := c.kube.Status().Update(ctx, cr); err != nil {
+		return errors.Wrap(err, errUpdateStatus)
+	}
+	return nil
 }
 
 type external struct {
@@ -126,7 +132,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
 	if statusErr != nil {
-		return managed.ExternalObservation{}, statusErr
+		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
 
 	return resStatus.ExternalObservation, err
@@ -141,7 +147,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	sID, bID, err := c.tfClient.CreateResources(ctx, cr)
 	if err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 	meta.SetExternalName(cr, formExternalName(sID, bID))
 
@@ -156,10 +162,10 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	err := c.tfClient.UpdateResources(ctx, cr)
 	if err != nil {
-		return managed.ExternalUpdate{}, err
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 	}
 
-	return managed.ExternalUpdate{}, err
+	return managed.ExternalUpdate{}, nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
@@ -176,7 +182,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
-	return managed.ExternalDelete{}, c.tfClient.DeleteResources(ctx, cr)
+	return managed.ExternalDelete{}, errors.Wrap(c.tfClient.DeleteResources(ctx, cr), errDelete)
 }
 
 func (c *external) setStatus(ctx context.Context, status sm.ResourcesStatus, cr *apisv1beta1.ServiceManager) error {
@@ -191,7 +197,10 @@ func (c *external) setStatus(ctx context.Context, status sm.ResourcesStatus, cr 
 	cr.Status.AtProvider.ServiceBindingID = status.BindingID
 	// Unfortunately we need to update the CR status manually here, because the reconciler will drop the change otherwise
 	// (I guess because we are attempting to save something while ResourceExists remains false for another cycle)
-	return c.kube.Status().Update(ctx, cr)
+	if err := c.kube.Status().Update(ctx, cr); err != nil {
+		return errors.Wrap(err, errUpdateStatus)
+	}
+	return nil
 }
 
 // formExternalName forms an externalName from the given serviceInstanceID and serviceBindingID

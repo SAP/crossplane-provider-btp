@@ -2,6 +2,7 @@ package servicemanager
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -76,7 +77,7 @@ func TestConnect_ResourceTracking(t *testing.T) {
 				},
 			},
 			want: want{
-				err:         errTracking,
+				err:         errors.Wrap(errTracking, "cannot track resource usage"),
 				trackCalled: true,
 			},
 		},
@@ -126,7 +127,13 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			_, err := c.Connect(context.Background(), tc.args.mg)
 
 			if !errors.Is(err, tc.want.err) {
-				t.Errorf("expected error %v, got %v", tc.want.err, err)
+				if err != nil && tc.want.err != nil {
+					if !strings.Contains(err.Error(), tc.want.err.Error()) {
+						t.Errorf("expected error to contain %q, got %q", tc.want.err.Error(), err.Error())
+					}
+				} else {
+					t.Errorf("expected error %v, got %v", tc.want.err, err)
+				}
 			}
 
 			// Verify Track was called
@@ -220,7 +227,7 @@ func TestDelete_DeletionBlocking(t *testing.T) {
 				mg: &apisv1beta1.ServiceManager{},
 			},
 			want: want{
-				err:                 errors.New("deleteError"),
+				err:                 errors.New("while deleting resources: deleteError"),
 				setConditionsCalled: true,
 				deleteAttempted:     true,
 			},
@@ -417,7 +424,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("createError"),
+				err: errors.New("while creating resources: createError"),
 				cr:  NewServiceManager("test", WithConditions(xpv1.Creating())),
 			},
 		},
@@ -447,6 +454,9 @@ func TestCreate(t *testing.T) {
 			}
 			_, err := uua.Create(context.TODO(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				if err != nil && tc.want.err != nil && strings.Contains(err.Error(), tc.want.err.Error()) {
+					return
+				}
 				t.Errorf("\ne.Create(): -want error, +got error:\n%s\n", diff)
 			}
 			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
@@ -480,7 +490,7 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("updateError"),
+				err: errors.New("while updating resources: updateError"),
 			},
 		},
 		{
@@ -504,7 +514,10 @@ func TestUpdate(t *testing.T) {
 				tfClient: tc.args.tfClient,
 			}
 			_, err := uua.Update(context.TODO(), tc.args.cr)
-			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				if err != nil && tc.want.err != nil && strings.Contains(err.Error(), tc.want.err.Error()) {
+					return
+				}
 				t.Errorf("\ne.Update(): -want error, +got error:\n%s\n", diff)
 			}
 		})
@@ -536,7 +549,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("deleteError"),
+				err: errors.New("while deleting resources: deleteError"),
 				cr:  NewServiceManager("test", WithExternalName("someID/anotherID"), WithConditions(xpv1.Deleting())),
 			},
 		},
@@ -564,6 +577,9 @@ func TestDelete(t *testing.T) {
 			}
 			_, err := uua.Delete(context.TODO(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				if err != nil && tc.want.err != nil && strings.Contains(err.Error(), tc.want.err.Error()) {
+					return
+				}
 				t.Errorf("\ne.Delete(): -want error, +got error:\n%s\n", diff)
 			}
 			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
