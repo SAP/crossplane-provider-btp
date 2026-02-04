@@ -6,7 +6,8 @@ import (
 	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	"github.com/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	corev1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -291,7 +292,7 @@ func TestCreate(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalCreation{},
-				err: errMockedLogin,
+				err: errors.Wrap(errMockedLogin, errLogin),
 				mg: cr(
 					defaultResource("unittest-login"),
 					conditions(
@@ -378,7 +379,7 @@ func TestUpdate(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalUpdate{},
-				err: errMockedLogin,
+				err: errors.Wrap(errMockedLogin, errLogin),
 				mg:  defaultResource("unittest-login"),
 			},
 		},

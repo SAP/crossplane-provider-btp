@@ -18,12 +18,17 @@ import (
 )
 
 const (
-	errNotServiceManager                     = "managed resource is not a ServiceManager custom resource"
-	errTrack, errInitialize, errConnect      = "cannot track resource usage", "while initializing service plan ID", "while connecting resources"
-	errGetPlanID, errUpdateStatus, errCreate = "while getting plan ID initializer", "while updating service manager status", "while creating resources"
-	errUpdate, errDelete                     = "while updating resources", "while deleting resources"
-	errSetStatus                             = "while setting status"
-	errGetServicePlan                        = "while getting service manager plan ID by name"
+	errNotServiceManager = "managed resource is not a ServiceManager custom resource"
+	errTrack             = "cannot track resource usage"
+	errInitialize        = "while initializing service plan ID"
+	errConnect           = "while connecting resources"
+	errGetPlanID         = "while getting plan ID initializer"
+	errUpdateStatus      = "while updating service manager status"
+	errCreate            = "while creating resources"
+	errUpdate            = "while updating resources"
+	errDelete            = "while deleting resources"
+	errSetStatus         = "while setting status"
+	errGetServicePlan    = "while getting service manager plan ID by name"
 )
 
 // ServiceManagerPlanIdInitializer is will provide implementation of service plan id lookup by name
