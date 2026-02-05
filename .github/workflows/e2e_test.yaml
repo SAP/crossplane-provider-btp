@@ -10,9 +10,6 @@
 
 name: E2E Test
 
-env:
-  GO_VERSION: '1.25'
-
 on:
   workflow_dispatch:
   workflow_call:
@@ -55,6 +52,7 @@ permissions:
 env:
   # hardcoded BTP CLI version
   btp_cli_version: 2.90.2
+  GO_VERSION: '1.25'
 
 jobs:
   prepare-matrix:
