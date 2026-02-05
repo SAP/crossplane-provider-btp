@@ -1559,10 +1559,10 @@ func TestDeleteBinding(t *testing.T) {
 	}
 
 	type want struct {
-		err                         error
-		crHasDeletionTimestamp      bool
-		crHasDeletingCondition      bool
-		originalCrModified          bool // Verify original CR is not modified (deep copy)
+		err                    error
+		crHasDeletionTimestamp bool
+		crHasDeletingCondition bool
+		originalCrModified     bool // Verify original CR is not modified (deep copy)
 	}
 
 	cases := map[string]struct {
@@ -1592,10 +1592,10 @@ func TestDeleteBinding(t *testing.T) {
 				targetExternalName: "retired-id-1",
 			},
 			want: want{
-				err:                         nil,
-				crHasDeletionTimestamp:      true,
-				crHasDeletingCondition:      true,
-				originalCrModified:          false,
+				err:                    nil,
+				crHasDeletionTimestamp: true,
+				crHasDeletingCondition: true,
+				originalCrModified:     false,
 			},
 		},
 		"ClientCreationError": {
@@ -1617,10 +1617,10 @@ func TestDeleteBinding(t *testing.T) {
 				targetExternalName: "retired-id-1",
 			},
 			want: want{
-				err:                         errors.New("client creation error"),
-				crHasDeletionTimestamp:      true, // Should still be set even on error
-				crHasDeletingCondition:      true,
-				originalCrModified:          false,
+				err:                    errors.New("client creation error"),
+				crHasDeletionTimestamp: true, // Should still be set even on error
+				crHasDeletingCondition: true,
+				originalCrModified:     false,
 			},
 		},
 		"DeleteError": {
@@ -1644,10 +1644,10 @@ func TestDeleteBinding(t *testing.T) {
 				targetExternalName: "retired-id-1",
 			},
 			want: want{
-				err:                         errors.New("delete error"),
-				crHasDeletionTimestamp:      true,
-				crHasDeletingCondition:      true,
-				originalCrModified:          false,
+				err:                    errors.New("delete error"),
+				crHasDeletionTimestamp: true,
+				crHasDeletingCondition: true,
+				originalCrModified:     false,
 			},
 		},
 	}

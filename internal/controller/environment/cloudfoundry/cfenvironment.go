@@ -30,6 +30,9 @@ const (
 	errTrackRUsage             = "cannot track ResourceUsage"
 	errTrackPCUsage            = "cannot track ProviderConfig usage"
 	errCreateConnectionDetails = "Cannot create connection details"
+	errDescribeInstance        = "while describing instance"
+	errCreate                  = "while creating instance"
+	errDelete                  = "while deleting instance"
 
 	errGetPC    = "cannot get ProviderConfig"
 	errGetCreds = "cannot get credentials"
@@ -123,7 +126,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	instance, managers, err := c.client.DescribeInstance(ctx, *cr)
 	if err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errDescribeInstance)
 	}
 	cr.Status.AtProvider = env.GenerateObservation(instance, managers)
 
@@ -155,7 +158,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	createdOrgName, err := c.client.CreateInstance(ctx, *cr)
 	if err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 	meta.SetExternalName(cr, createdOrgName)
 
@@ -183,7 +186,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	cr.SetConditions(xpv1.Deleting())
 
-	return managed.ExternalDelete{}, c.client.DeleteInstance(ctx, *cr)
+	return managed.ExternalDelete{}, errors.Wrap(c.client.DeleteInstance(ctx, *cr), errDelete)
 }
 
 func (c *external) needsCreation(cr *v1alpha1.CloudFoundryEnvironment) bool {
