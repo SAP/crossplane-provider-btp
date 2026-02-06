@@ -29,6 +29,18 @@ const (
 	errNotSubaccount        = "managed resource is not a Subaccount custom resource"
 	subaccountStateDeleting = "DELETING"
 	subaccountStateOk       = "OK"
+	errConnect              = "while connecting to provider"
+	errObserve              = "while observing subaccount"
+	errMigrateExternalName  = "while migrating external name"
+	errInvalidExternalName  = "external-name is not a valid GUID format"
+	errGenerateObservation  = "while generating observation"
+	errCreate               = "while creating subaccount"
+	errUpdate               = "while updating subaccount"
+	errUpdateAPI            = "while updating subaccount via API"
+	errMoveSubaccount       = "while moving subaccount"
+	errDelete               = "while deleting subaccount"
+	errGetSubaccounts       = "while getting subaccounts"
+	errUpdateExternalName   = "while updating external name"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -54,7 +66,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	btpclient, err := providerconfig.CreateClient(ctx, mg, c.kube, c.usage, c.newServiceFn, c.resourcetracker)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errConnect)
 	}
 
 	return &external{
@@ -100,17 +112,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Migrate old external-name format if necessary
 	if err := c.migrateExternalName(ctx, desiredCR); err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errMigrateExternalName)
 	}
 
 	// ADR Step 2: External-name is set, check its format (must be valid GUID)
 	if !isValidUUID(meta.GetExternalName(desiredCR)) {
-		return managed.ExternalObservation{}, errors.New(fmt.Sprintf("external-name '%s' is not a valid GUID format", meta.GetExternalName(desiredCR)))
+		return managed.ExternalObservation{}, errors.Wrap(errors.New(fmt.Sprintf("external-name '%s'", meta.GetExternalName(desiredCR))), errInvalidExternalName)
 	}
 
 	// ADR Step 3: Build the Get API Request from the external-name (using GUID directly)
 	if err := c.generateObservation(ctx, desiredCR); err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errGenerateObservation)
 	}
 
 	c.tracker.SetConditions(ctx, desiredCR)
@@ -209,7 +221,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	err := c.createBTPSubaccount(ctx, cr)
 	if err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 	cr.SetConditions(xpv1.Creating())
 
@@ -281,7 +293,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	connectionDetails := managed.ConnectionDetails{}
 
 	if err := c.updateBTPSubaccount(ctx, subaccount); err != nil {
-		return managed.ExternalUpdate{}, err
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 	}
 
 	return managed.ExternalUpdate{
@@ -308,7 +320,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	subaccount := cr
 
-	return managed.ExternalDelete{}, deleteBTPSubaccount(ctx, subaccount, c.btp)
+	return managed.ExternalDelete{}, errors.Wrap(deleteBTPSubaccount(ctx, subaccount, c.btp), errDelete)
 }
 
 func deleteBTPSubaccount(
@@ -355,7 +367,7 @@ func (c *external) moveSubaccountAPI(ctx context.Context, subaccount *apisv1alph
 
 	err := c.accountsAccessor.MoveSubaccount(ctx, guid, targetID)
 	if err != nil {
-		return errors.Wrap(err, "moving subaccount failed")
+		return errors.Wrap(err, errMoveSubaccount)
 	}
 	return nil
 }
@@ -375,7 +387,7 @@ func (c *external) updateSubaccountAPI(ctx context.Context, subaccount *apisv1al
 
 	err := c.accountsAccessor.UpdateSubaccount(ctx, guid, params)
 	if err != nil {
-		return errors.Wrap(err, "update of subaccount failed")
+		return errors.Wrap(err, errUpdateAPI)
 	}
 	return nil
 }
@@ -425,7 +437,7 @@ func (c *external) migrateExternalName(ctx context.Context, subaccount *apisv1al
 
 	response, _, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccounts(ctx).Execute()
 	if err != nil {
-		return err
+		return errors.Wrap(err, errGetSubaccounts)
 	}
 
 	btpSubaccounts := response.Value
@@ -434,7 +446,7 @@ func (c *external) migrateExternalName(ctx context.Context, subaccount *apisv1al
 			// update the old externalName to be the uid
 			meta.SetExternalName(subaccount, account.Guid)
 			if err := c.Client.Update(ctx, subaccount); err != nil {
-				return err
+				return errors.Wrap(err, errUpdateExternalName)
 			}
 			break
 		}

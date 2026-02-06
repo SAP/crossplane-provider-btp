@@ -112,7 +112,7 @@ func certError() error {
 }
 
 func tokenSecretError() error {
-	return errors.New("Can not update token, because of missing secret")
+	return errors.Wrap(errors.New("missing secret"), errUpdateToken)
 }
 
 func pwError() error {

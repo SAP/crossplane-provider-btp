@@ -35,6 +35,9 @@ const (
 	errSaveData        = "cannot update cr data"
 	errGetInstance     = "cannot get serviceinstance"
 	errTrackRUsage     = "cannot track ResourceUsage"
+	errInitServicePlan = "while initializing service plan"
+	errConnectClient   = "while connecting to service"
+	errDeleteInstance  = "cannot delete serviceinstance"
 )
 
 // Dependency Injection
@@ -91,14 +94,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	err := planInitializer.Initialize(c.kube, ctx, mg)
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errInitServicePlan)
 	}
 
 	// when working with tf proxy resources we want to keep the Connect() logic as part of the delgating Connect calls of the native resources to
 	// deal with errors in the part of process that they belong to
 	client, err := c.clientConnector.Connect(ctx, mg.(*v1alpha1.ServiceInstance))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errConnectClient)
 	}
 
 	return &external{tfClient: client, kube: c.kube, tracker: c.resourcetracker}, nil
@@ -212,7 +215,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	if err := c.tfClient.Delete(ctx); err != nil {
-		return managed.ExternalDelete{}, errors.Wrap(err, "cannot delete serviceinstance")
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteInstance)
 	}
 	return managed.ExternalDelete{}, nil
 }
