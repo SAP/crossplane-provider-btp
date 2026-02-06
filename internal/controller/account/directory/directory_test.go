@@ -244,7 +244,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.New("internalServerError"),
+				err: errors.Wrap(errors.New("internalServerError"), "while checking if resource needs creation"),
 				cr:  testutils.NewDirectory("dir-unittests", testutils.WithExternalName(validGUID), testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
 			},
 		},
@@ -270,7 +270,7 @@ func TestObserve(t *testing.T) {
 				mockClient: MockClient{},
 			},
 			want: want{
-				err: errors.New(fmt.Sprintf("external-name '%s' is not a valid GUID format", invalidGUID)),
+				err: errors.Wrap(errors.New(fmt.Sprintf("external-name '%s'", invalidGUID)), "external-name is not a valid GUID format"),
 				cr: testutils.NewDirectory("dir-unittests",
 					testutils.WithExternalName(invalidGUID),
 				),
@@ -318,7 +318,7 @@ func TestObserve(t *testing.T) {
 				cr: testutils.NewDirectory("dir-unittests",
 					testutils.WithExternalName(validGUID),
 					testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
-				err: errors.New("syncError"),
+				err: errors.Wrap(errors.New("syncError"), "while syncing status"),
 			},
 		},
 		"Unavailable": {
@@ -447,7 +447,7 @@ func TestCreate(t *testing.T) {
 			want: want{
 				o:   managed.ExternalCreation{},
 				cr:  testutils.NewDirectory("dir-unittests", testutils.WithConditions(xpv1.Creating()), testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
-				err: errors.New("CreateError"),
+				err: errors.Wrap(errors.New("CreateError"), "while creating directory"),
 			},
 		},
 		"AlreadyExistsErrorDoesNotSetExternalName": {
@@ -459,7 +459,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("creation failed - directory already exists"),
+				err: errors.Wrap(errors.New("creation failed - directory already exists"), "while creating directory"),
 				cr: testutils.NewDirectory("dir-unittests",
 					testutils.WithConditions(xpv1.Creating()),
 				),
@@ -474,7 +474,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("internal server error"),
+				err: errors.Wrap(errors.New("internal server error"), "while creating directory"),
 				cr: testutils.NewDirectory("dir-unittests",
 					testutils.WithConditions(xpv1.Creating()),
 				),
@@ -556,7 +556,7 @@ func TestDelete(t *testing.T) {
 			},
 			want: want{
 				cr:  testutils.NewDirectory("dir-unittests", testutils.WithConditions(xpv1.Deleting()), testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
-				err: errors.New("DeleteError"),
+				err: errors.Wrap(errors.New("DeleteError"), "while deleting directory"),
 			},
 		},
 		"Success": {
@@ -671,7 +671,7 @@ func TestUpdate(t *testing.T) {
 			want: want{
 				o:   managed.ExternalUpdate{},
 				cr:  testutils.NewDirectory("dir-unittests", testutils.WithStatus(v1alpha1.DirectoryObservation{Guid: internal.Ptr("123")})),
-				err: errors.New("updateError"),
+				err: errors.Wrap(errors.New("updateError"), "while updating directory"),
 			},
 		},
 		"Success": {
