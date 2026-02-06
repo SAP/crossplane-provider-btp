@@ -21,6 +21,9 @@ import (
 
 const (
 	errNotGlobalAccount = "managed resource is not a GlobalAccount custom resource"
+	errConnect          = "while connecting to provider"
+	errGetGlobalAccount = "while getting global account"
+	errEmptyGUID        = "BTP Global Account GUID is empty"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -45,7 +48,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	btpclient, err := providerconfig.CreateClient(ctx, mg, c.kube, c.usage, c.newServiceFn, c.resourcetracker)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errConnect)
 	}
 
 	return &external{
@@ -90,12 +93,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	response, _, err := c.btp.AccountsServiceClient.GlobalAccountOperationsAPI.GetGlobalAccount(ctx).Execute()
 
 	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, "Get global account request failed.")
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetGlobalAccount)
 	}
 
 	globalAccountGuid := response.Guid
 	if globalAccountGuid == "" {
-		return managed.ExternalObservation{}, errors.New("BTP Global Account GUID is empty")
+		return managed.ExternalObservation{}, errors.New(errEmptyGUID)
 	}
 
 	cr.Status.AtProvider.Guid = globalAccountGuid

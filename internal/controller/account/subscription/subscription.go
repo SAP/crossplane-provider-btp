@@ -28,6 +28,12 @@ const (
 	errTrackPCUsage    = "cannot track ProviderConfig usage"
 
 	errCredentialsCorrupted = "secret credentials data not in the expected format"
+	errLoadSecret           = "while loading secret"
+	errInitService          = "while initializing service"
+	errLoadSubscription     = "while loading subscription"
+	errCreate               = "while creating subscription"
+	errUpdate               = "while updating subscription"
+	errDelete               = "while deleting subscription"
 )
 
 var failureStates = []string{
@@ -83,12 +89,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	namespace := cr.Spec.CloudManagementSecretNamespace
 	creds, errGet := internal.LoadSecretData(ctx, c.kube, secretName, namespace)
 	if errGet != nil {
-		return nil, errGet
+		return nil, errors.Wrap(errGet, errLoadSecret)
 	}
 
 	svc, errInit := c.newServiceFn(ctx, creds)
 	if errInit != nil {
-		return nil, errInit
+		return nil, errors.Wrap(errInit, errInitService)
 	}
 
 	return &external{
@@ -126,7 +132,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	apiRes, err := c.loadSubscription(ctx, cr)
 	if err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errLoadSubscription)
 	}
 	if apiRes == nil {
 		return managed.ExternalObservation{ResourceExists: false}, nil
@@ -174,7 +180,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	cr.SetConditions(xpv1.Creating())
 	externalName, clientErr := c.apiHandler.CreateSubscription(ctx, c.typeMapper.ConvertToCreatePayload(cr))
 	if clientErr != nil {
-		return managed.ExternalCreation{}, clientErr
+		return managed.ExternalCreation{}, errors.Wrap(clientErr, errCreate)
 	}
 
 	// set external ID as name to allow proper importing
@@ -194,7 +200,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	err := c.apiHandler.UpdateSubscription(ctx, meta.GetExternalName(cr), c.typeMapper.ConvertToUpdatePayload(cr))
 	if err != nil {
-		return managed.ExternalUpdate{}, err
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 	}
 
 	return managed.ExternalUpdate{
@@ -216,7 +222,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		// api will return 500 if called multiple times, so we will ensure to call it only once
 		return managed.ExternalDelete{}, nil
 	}
-	return managed.ExternalDelete{}, c.apiHandler.DeleteSubscription(ctx, meta.GetExternalName(cr))
+	return managed.ExternalDelete{}, errors.Wrap(c.apiHandler.DeleteSubscription(ctx, meta.GetExternalName(cr)), errDelete)
 }
 
 // loadSubscription gets a Subscription using the APIHandler if a proper externalName has been set, otherwise returns nil

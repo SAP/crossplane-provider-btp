@@ -21,7 +21,15 @@ import (
 )
 
 const (
-	errNotDirectory = "managed resource is not a Directory custom resource"
+	errNotDirectory        = "managed resource is not a Directory custom resource"
+	errConnect             = "while connecting to provider"
+	errInvalidExternalName = "external-name is not a valid GUID format"
+	errNeedsCreation       = "while checking if resource needs creation"
+	errSyncStatus          = "while syncing status"
+	errNeedsUpdate         = "while checking if resource needs update"
+	errCreate              = "while creating directory"
+	errUpdate              = "while updating directory"
+	errDelete              = "while deleting directory"
 )
 
 var newDirHandlerFn = func(client *btp.Client, cr *v1alpha1.Directory) directory.DirectoryClientI {
@@ -46,7 +54,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	btpClient, err := providerconfig.CreateClient(ctx, mg, c.kube, c.usage, c.newServiceFn, c.resourcetracker)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errConnect)
 	}
 
 	return &external{
@@ -86,7 +94,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// ADR Step 2: External-name is set, check its format (must be valid GUID)
 	if !internal.IsValidUUID(meta.GetExternalName(cr)) {
-		return managed.ExternalObservation{}, errors.New(fmt.Sprintf("external-name '%s' is not a valid GUID format", meta.GetExternalName(cr)))
+		return managed.ExternalObservation{}, errors.Wrap(errors.New(fmt.Sprintf("external-name '%s'", meta.GetExternalName(cr))), errInvalidExternalName)
 	}
 
 	// ADR Step 3: Build the Get API Request from the external-name (using GUID directly)
@@ -94,7 +102,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	needsCreation, createErr := directoryHandler.NeedsCreation(ctx)
 	if createErr != nil {
-		return managed.ExternalObservation{}, createErr
+		return managed.ExternalObservation{}, errors.Wrap(createErr, errNeedsCreation)
 	}
 
 	if needsCreation {
@@ -104,7 +112,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	syncErr := directoryHandler.SyncStatus(ctx)
 
 	if syncErr != nil {
-		return managed.ExternalObservation{}, syncErr
+		return managed.ExternalObservation{}, errors.Wrap(syncErr, errSyncStatus)
 	}
 
 	// in case of updating the directoryFeatures instance gets unavailable for a while
@@ -120,7 +128,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	needsUpdate, uErr := directoryHandler.NeedsUpdate(ctx)
 	if (uErr) != nil {
-		return managed.ExternalObservation{}, uErr
+		return managed.ExternalObservation{}, errors.Wrap(uErr, errNeedsUpdate)
 	}
 
 	return managed.ExternalObservation{
@@ -141,7 +149,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	cr.SetConditions(xpv1.Creating())
 	respDirectory, clientErr := directoryHandler.CreateDirectory(ctx)
 	if clientErr != nil {
-		return managed.ExternalCreation{}, clientErr
+		return managed.ExternalCreation{}, errors.Wrap(clientErr, errCreate)
 	}
 
 	meta.SetExternalName(cr, meta.GetExternalName(respDirectory))
@@ -159,7 +167,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	_, err := c.handler(cr).UpdateDirectory(ctx)
 	if err != nil {
-		return managed.ExternalUpdate{}, err
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 	}
 
 	return managed.ExternalUpdate{
@@ -189,7 +197,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, nil
 	}
 
-	return managed.ExternalDelete{}, err
+	return managed.ExternalDelete{}, errors.Wrap(err, errDelete)
 }
 
 func (c *external) handler(cr *v1alpha1.Directory) directory.DirectoryClientI {

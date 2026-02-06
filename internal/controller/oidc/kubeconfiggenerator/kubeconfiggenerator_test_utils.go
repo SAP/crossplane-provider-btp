@@ -134,5 +134,5 @@ func kubeConfigError() error {
 }
 
 func kubeConfigGenerationError() error {
-	return errGenerate
+	return errors.Wrap(errGenerate, errGenerateKubeconfig)
 }
