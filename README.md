@@ -202,7 +202,7 @@ The default is `0`.
 
 ### Upgrade Tests
 
-The provider also comes with upgrade tests that can be run locally. These upgrade tests ensure that resources created with an older version of the provider can be properly handled by the current version.
+The provider also comes with upgrade tests that can be run locally. These upgrade tests ensure that resources created with an older version of the provider can be properly handled by the current version. Find more detailed information in the [upgrade test docs](/docs/development/upgrade-tests.md).
 
 To run the upgrade tests, you can use the following command:
 
