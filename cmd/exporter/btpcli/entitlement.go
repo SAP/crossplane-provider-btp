@@ -2,8 +2,8 @@ package btpcli
 
 import "context"
 
-// ListServiceAssignmentsBySubaccount retrieves information about services assigned to a subaccount.
-func (c *BtpCli) ListServiceAssignmentsBySubaccount(ctx context.Context, subaccountID string) ([]AssignedService, error) {
+// ListServiceAssignments retrieves information about services assigned to a subaccount.
+func (c *BtpCli) ListServiceAssignments(ctx context.Context, subaccountID string) ([]AssignedService, error) {
 	var response EntitlementsBySubaccountResponse
 
 	err := c.ExecuteJSON(ctx, &response, "list", "accounts/entitlement", "--filter-by-subaccount", subaccountID)
@@ -19,14 +19,14 @@ type EntitlementsBySubaccountResponse struct {
 }
 
 type AssignedService struct {
-	Name         string        `json:"name,omitempty"`
-	DisplayName  string        `json:"displayName,omitempty"`
-	IconBase64   string        `json:"iconBase64,omitempty"`
-	OwnerType    string        `json:"ownerType,omitempty"`
-	ServicePlans []ServicePlan `json:"servicePlans,omitempty"`
+	Name         string                `json:"name,omitempty"`
+	DisplayName  string                `json:"displayName,omitempty"`
+	IconBase64   string                `json:"iconBase64,omitempty"`
+	OwnerType    string                `json:"ownerType,omitempty"`
+	ServicePlans []AssignedServicePlan `json:"servicePlans,omitempty"`
 }
 
-type ServicePlan struct {
+type AssignedServicePlan struct {
 	Name                      string           `json:"name,omitempty"`
 	DisplayName               string           `json:"displayName,omitempty"`
 	UniqueIdentifier          string           `json:"uniqueIdentifier,omitempty"`

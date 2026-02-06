@@ -387,7 +387,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resources.UNDEFINED_NAME,
+							Name: resources.UndefinedName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": "",
 							},

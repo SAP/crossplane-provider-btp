@@ -246,7 +246,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resources.UNDEFINED_NAME,
+							Name: resources.UndefinedName,
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{
@@ -261,8 +261,8 @@ func TestConvertEntitlementResource(t *testing.T) {
 							},
 						},
 					})
-				rwc.AddComment(warnMissingServiceName)
-				rwc.AddComment(warnUndefinedResourceName)
+				rwc.AddComment(resources.WarnMissingServiceName)
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				return rwc
 			}(),
 		},
@@ -288,7 +288,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resources.UNDEFINED_NAME,
+							Name: resources.UndefinedName,
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{
@@ -303,8 +303,8 @@ func TestConvertEntitlementResource(t *testing.T) {
 							},
 						},
 					})
-				rwc.AddComment(warnMissingServicePlanName)
-				rwc.AddComment(warnUndefinedResourceName)
+				rwc.AddComment(resources.WarnMissingServicePlanName)
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				return rwc
 			}(),
 		},
@@ -330,7 +330,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resources.UNDEFINED_NAME,
+							Name: resources.UndefinedName,
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{
@@ -345,8 +345,8 @@ func TestConvertEntitlementResource(t *testing.T) {
 							},
 						},
 					})
-				rwc.AddComment(warnMissingSubaccountGuid)
-				rwc.AddComment(warnUndefinedResourceName)
+				rwc.AddComment(resources.WarnMissingSubaccountGuid)
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				return rwc
 			}(),
 		},
@@ -389,7 +389,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 							},
 						},
 					})
-				rwc.AddComment(warnUnsupportedEntityType + ", but got: 'DIRECTORY'")
+				rwc.AddComment(resources.WarnUnsupportedEntityType + ", but got: 'DIRECTORY'")
 				return rwc
 			}(),
 		},

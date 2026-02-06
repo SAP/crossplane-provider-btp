@@ -7,7 +7,6 @@ import (
 
 	"github.com/SAP/xp-clifford/cli/configparam"
 	"github.com/SAP/xp-clifford/cli/export"
-	"github.com/SAP/xp-clifford/parsan"
 	"github.com/SAP/xp-clifford/yaml"
 
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
@@ -15,7 +14,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
-const KIND_NAME = "entitlement"
+const KindName = "entitlement"
 
 const (
 	paramNameAutoAssigned = "entitlement-auto-assigned"
@@ -23,10 +22,10 @@ const (
 
 var (
 	entitlementCache resources.ResourceCache[*entitlement]
-	entitlementParam = configparam.StringSlice(KIND_NAME, "Service plan name (or name fragment) to export. If specified, it must be a valid regex expression.").
-		WithFlagName(KIND_NAME).
+	entitlementParam = configparam.StringSlice(KindName, "Service plan name (or name fragment) to export. If specified, it must be a valid regex expression.").
+		WithFlagName(KindName).
 		WithExample("--entitlement '.*\\bcis\\b.*'")
-	autoAssignedParam = configparam.Bool(paramNameAutoAssigned, "Include service plans that are automatically assigned to all subaccounts.\nUsed in combination with '--kind "+KIND_NAME+"'").
+	autoAssignedParam = configparam.Bool(paramNameAutoAssigned, "Include service plans that are automatically assigned to all subaccounts.\nUsed in combination with '--kind "+KindName+"'").
 		WithFlagName(paramNameAutoAssigned)
 )
 
@@ -45,7 +44,7 @@ func (e exporter) Param() configparam.ConfigParam {
 }
 
 func (e exporter) KindName() string {
-	return KIND_NAME
+	return KindName
 }
 
 func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, resolveReferences bool) error {
@@ -55,7 +54,7 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 	if err != nil {
 		return fmt.Errorf("failed to get cache with entitlements: %w", err)
 	}
-	slog.DebugContext(ctx, "Entitlements retrieved", "count", cache.Len())
+	slog.DebugContext(ctx, "Entitlements in cache after user selection", "count", cache.Len())
 
 	if cache.Len() == 0 {
 		eventHandler.Warn(fmt.Errorf("no entitlements found"))
@@ -73,24 +72,33 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 		return entitlementCache, nil
 	}
 
+	// Let the user select relevant subaccounts.
 	saCache, err := subaccount.Get(ctx, btpClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve subaccount cache: %w", err)
 	}
-	slog.DebugContext(ctx, "Subaccounts retrieved", "count", saCache.Len())
+	slog.DebugContext(ctx, "Subaccounts in cache after user selection", "count", saCache.Len())
 
+	// Retrieve service assignments for all selected subaccounts.
 	var svcs []btpcli.AssignedService
 	for _, saId := range saCache.AllIDs() {
-		saAssignments, err := btpClient.ListServiceAssignmentsBySubaccount(ctx, saId)
+		saAssignments, err := btpClient.ListServiceAssignments(ctx, saId)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get entitlements for subaccount %s: %w", saId, err)
 		}
 		svcs = append(svcs, saAssignments...)
 	}
+	slog.DebugContext(ctx, "Service assignments retrieved by BTP CLI", "count", len(svcs))
 
+	// Wrap service assignments for internal processing and caching.
 	entitlements := serviceToEntitlement(svcs)
+	slog.DebugContext(ctx, "Total entitlements", "count", len(entitlements))
+
+	// Create cache and store all entitlements.
 	cache := resources.NewResourceCache[*entitlement]()
 	cache.Store(entitlements...)
+
+	// Let the user select entitlements to export.
 	widgetValues := cache.ValuesForSelection()
 	entitlementParam.WithPossibleValuesFn(func() ([]string, error) {
 		return widgetValues.Values(), nil
@@ -100,8 +108,9 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter value: %s, %w", entitlementParam.GetName(), err)
 	}
-	slog.DebugContext(ctx, "Selected entitlements", "service plans", selectedEntitlements)
+	slog.DebugContext(ctx, "Selected entitlements", "entitlements", selectedEntitlements)
 
+	// Keep only selected entitlements in the cache.
 	cache.KeepSelectedOnly(selectedEntitlements)
 	entitlementCache = cache
 
@@ -155,16 +164,14 @@ func (e *entitlement) GetExternalName() string {
 
 func (e *entitlement) GenerateK8sResourceName() string {
 	if e.serviceName == "" || e.planName == "" || e.assignment.EntityID == "" {
-		return resources.UNDEFINED_NAME
+		return resources.UndefinedName
 	}
 
 	resourceName := fmt.Sprintf("%s-%s-%s", e.serviceName, e.planName, e.assignment.EntityID)
 
-	names := parsan.ParseAndSanitize(resourceName, parsan.RFC1035LowerSubdomain)
-	if len(names) == 0 {
-		e.AddComment(fmt.Sprintf("error sanitizing entitlement name: %s", resourceName))
-	} else {
-		resourceName = names[0]
+	resourceName, err := resources.GenerateK8sResourceName("", resourceName, "")
+	if err != nil {
+		e.AddComment(fmt.Sprintf("cannot generate entitlement resource name: %s", err))
 	}
 
 	return resourceName

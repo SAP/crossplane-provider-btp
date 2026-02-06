@@ -7,19 +7,18 @@ import (
 
 	"github.com/SAP/xp-clifford/cli/configparam"
 	"github.com/SAP/xp-clifford/cli/export"
-	"github.com/SAP/xp-clifford/parsan"
 	"github.com/SAP/xp-clifford/yaml"
 
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 )
 
-const KIND_NAME = "subaccount"
+const KindName = "subaccount"
 
 var (
 	subaccountCache resources.ResourceCache[*subaccount]
-	subaccountParam = configparam.StringSlice(KIND_NAME, "BTP subaccount ID.").
-		WithFlagName(KIND_NAME)
+	subaccountParam = configparam.StringSlice(KindName, "BTP subaccount ID or regex expression for name.").
+		WithFlagName(KindName)
 )
 
 func init() {
@@ -43,7 +42,7 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 	if err != nil {
 		return fmt.Errorf("failed to get cache with subaccounts: %w", err)
 	}
-	slog.DebugContext(ctx, "Subaccounts retrieved", "count", cache.Len())
+	slog.DebugContext(ctx, "Subaccounts in cache after user selection", "count", cache.Len())
 
 	if cache.Len() == 0 {
 		eventHandler.Warn(fmt.Errorf("no subaccounts found"))
@@ -61,11 +60,14 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 		return subaccountCache, nil
 	}
 
+	// Retrieve all subaccounts.
 	originals, err := btpClient.ListSubaccounts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get subaccounts: %w", err)
 	}
+	slog.DebugContext(ctx, "Total subaccounts returned by BTP CLI", "count", len(originals))
 
+	// Wrap subaccounts for internal processing and caching.
 	var subaccounts []*subaccount
 	for _, sa := range originals {
 		subaccounts = append(subaccounts, &subaccount{
@@ -74,8 +76,11 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 		})
 	}
 
+	// Create cache and store all subaccounts.
 	cache := resources.NewResourceCache[*subaccount]()
 	cache.Store(subaccounts...)
+
+	// Let the user select subaccounts to export.
 	widgetValues := cache.ValuesForSelection()
 	subaccountParam.WithPossibleValuesFn(func() ([]string, error) {
 		return widgetValues.Values(), nil
@@ -87,6 +92,7 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	}
 	slog.DebugContext(ctx, "Selected subaccounts", "subaccounts", selectedSubaccounts)
 
+	// Keep only selected subaccounts in the cache.
 	cache.KeepSelectedOnly(selectedSubaccounts)
 	subaccountCache = cache
 
@@ -131,25 +137,9 @@ func (s *subaccount) GetExternalName() string {
 }
 
 func (s *subaccount) GenerateK8sResourceName() string {
-	var resourceName string
-	saGuid := s.GetID()
-	saDisplayName := s.GetDisplayName()
-	hasGuid := saGuid != ""
-	hasName := saDisplayName != ""
-
-	switch {
-	case !hasName && hasGuid:
-		resourceName = KIND_NAME + "-" + saGuid
-	case !hasName:
-		resourceName = resources.UNDEFINED_NAME
-	default:
-		names := parsan.ParseAndSanitize(saDisplayName, parsan.RFC1035LowerSubdomain)
-		if len(names) == 0 {
-			s.AddComment(fmt.Sprintf("error sanitizing subaccount name: %s", saDisplayName))
-			resourceName = saDisplayName
-		} else {
-			resourceName = names[0]
-		}
+	resourceName, err := resources.GenerateK8sResourceName(s.GetID(), s.GetDisplayName(), KindName)
+	if err != nil {
+		s.AddComment(fmt.Sprintf("cannot generate subaccount resource name: %s", err))
 	}
 
 	return resourceName

@@ -15,15 +15,6 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
-const (
-	warnMissingServiceName      = "WARNING: service name is missing in the source, cannot create a Entitlement resource"
-	warnMissingServicePlanName  = "WARNING: service plan name is missing in the source, cannot create a Entitlement resource"
-	warnMissingSubaccountGuid   = "WARNING: subaccount ID is missing in the source, cannot create a valid Entitlement resource"
-	warnUndefinedResourceName   = "WARNING: could not generate a valid name for the Entitlement resource"
-	warnUnsupportedEntityType   = "WARNING: only 'SUBACCOUNT' entity type is supported for Entitlement resources"
-	warnCannotResolveSubaccount = "WARNING: cannot resolve subaccount ID to a resource name"
-)
-
 func convertEntitlementResource(ctx context.Context, btpClient *btpcli.BtpCli, e *entitlement, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
 
 	serviceName := e.serviceName
@@ -61,19 +52,19 @@ func convertEntitlementResource(ctx context.Context, btpClient *btpcli.BtpCli, e
 
 	// Comment the resource out, if any of the required fields is missing.
 	if serviceName == "" {
-		managedEntitlement.AddComment(warnMissingServiceName)
+		managedEntitlement.AddComment(resources.WarnMissingServiceName)
 	}
 	if servicePlanName == "" {
-		managedEntitlement.AddComment(warnMissingServicePlanName)
+		managedEntitlement.AddComment(resources.WarnMissingServicePlanName)
 	}
 	if subAccountGuid == "" {
-		managedEntitlement.AddComment(warnMissingSubaccountGuid)
+		managedEntitlement.AddComment(resources.WarnMissingSubaccountGuid)
 	}
-	if resourceName == resources.UNDEFINED_NAME {
-		managedEntitlement.AddComment(warnUndefinedResourceName)
+	if resourceName == resources.UndefinedName {
+		managedEntitlement.AddComment(resources.WarnUndefinedResourceName)
 	}
 	if entityType != "SUBACCOUNT" {
-		managedEntitlement.AddComment(warnUnsupportedEntityType + ", but got: '" + entityType + "'")
+		managedEntitlement.AddComment(resources.WarnUnsupportedEntityType + ", but got: '" + entityType + "'")
 	}
 
 	// Set optional fields.
@@ -91,7 +82,7 @@ func convertEntitlementResource(ctx context.Context, btpClient *btpcli.BtpCli, e
 	if resolveReferences {
 		if err := resolveReference(ctx, btpClient, &managedEntitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider); err != nil {
 			eventHandler.Warn(erratt.Errorf("cannot resolve subaccount reference: %w", err).With("entitlement", e.GetID()))
-			managedEntitlement.AddComment(warnCannotResolveSubaccount + ": " + subAccountGuid)
+			managedEntitlement.AddComment(resources.WarnCannotResolveSubaccount + ": " + subAccountGuid)
 		}
 	}
 
