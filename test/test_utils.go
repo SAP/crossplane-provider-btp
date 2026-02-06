@@ -112,11 +112,18 @@ func CreateProviderConfig(
 	cisSecretName string,
 	serviceUserSecretName string,
 ) error {
-	r, _ := res.New(cfg.Client().RESTConfig())
-	_ = metaApi.AddToScheme(r.GetScheme())
+	r, err := res.New(cfg.Client().RESTConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create resources client: %w", err)
+	}
+
+	err = metaApi.AddToScheme(r.GetScheme())
+	if err != nil {
+		return fmt.Errorf("failed to add scheme: %w", err)
+	}
 
 	obj := ProviderConfig(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
-	err := r.Create(ctx, obj)
+	err = r.Create(ctx, obj)
 	if kubeErrors.IsAlreadyExists(err) {
 		return r.Update(ctx, obj)
 	}
@@ -166,11 +173,20 @@ func DeleteProviderConfigFn(
 	serviceUserSecretName string,
 ) features.Func {
 	return func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-		r, _ := res.New(cfg.Client().RESTConfig())
-		_ = metaApi.AddToScheme(r.GetScheme())
+		r, err := res.New(cfg.Client().RESTConfig())
+		if err != nil {
+			t.Errorf("failed to create resources client: %v", err)
+			return ctx
+		}
+
+		err = metaApi.AddToScheme(r.GetScheme())
+		if err != nil {
+			t.Errorf("failed to add scheme: %v", err)
+			return ctx
+		}
 
 		obj := ProviderConfig(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
-		err := r.Delete(ctx, obj)
+		err = r.Delete(ctx, obj)
 		if err != nil && !kubeErrors.IsNotFound(err) {
 			t.Errorf("failed to delete ProviderConfig: %v", err)
 		}
@@ -326,7 +342,11 @@ func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
 }
 
 // LoadUpgradePackages resolves provider and controller packages for upgrade tests.
-// It handles both local and remote tags, pulling images as needed.
+//
+// It handles both local and remote tags, pulling images as needed:
+//   - "local" tag: Uses locally built images from the UUT_IMAGES env var
+//   - Other tags: Constructs image URLs from repositories and optionally pulls them
+//
 // Returns: fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
 func LoadUpgradePackages(
 	fromTag, toTag string,
