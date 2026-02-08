@@ -17,13 +17,13 @@ import (
 )
 
 func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCli, si *servicemanager.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
-	serviceName := si.GetOfferingName()
-	servicePlanName := si.GetPlanName()
+	serviceName := si.OfferingName
+	servicePlanName := si.PlanName
 	subAccountGuid := si.SubaccountID
 	resourceName := si.GenerateK8sResourceName()
 	externalName := si.GetExternalName()
 	instanceID := si.ID
-	smName := si.GetServiceManagerName()
+	smName := si.ServiceManagerName
 
 	serviceInstance := yaml.NewResourceWithComment(
 		&v1alpha1.ServiceInstance{
@@ -73,6 +73,9 @@ func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCl
 	}
 	if externalName == "" {
 		serviceInstance.AddComment(resources.WarnMissingExternalName)
+	}
+	if externalName == resources.UndefinedExternalName {
+		serviceInstance.AddComment(resources.WarnUndefinedExternalName)
 	}
 	if instanceID == "" {
 		serviceInstance.AddComment(resources.WarnMissingInstanceId)

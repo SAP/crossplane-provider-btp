@@ -93,8 +93,8 @@ func AddServiceAndBindingInfo(ctx context.Context, btpClient *btpcli.BtpCli, si 
 	if plan == nil {
 		slog.WarnContext(ctx, "Service plan not found", "id", si.ServicePlanID)
 	} else {
-		si.offeringName = plan.ServiceOfferingName
-		si.planName = plan.Name
+		si.OfferingName = plan.ServiceOfferingName
+		si.PlanName = plan.Name
 	}
 
 	// Add service binding ID.
@@ -102,7 +102,7 @@ func AddServiceAndBindingInfo(ctx context.Context, btpClient *btpcli.BtpCli, si 
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to retrieve binding id from service instance", "id", si.ID)
 	} else if found {
-		si.bindingID = bindingId
+		si.BindingID = bindingId
 	}
 
 	return nil
@@ -113,7 +113,7 @@ func AddServiceManagerResourceName(ctx context.Context, btpClient *btpcli.BtpCli
 	if err != nil {
 		return fmt.Errorf("failed to get service manager name for subaccount %s: %w", si.SubaccountID, err)
 	}
-	si.serviceManagerName = name
+	si.ServiceManagerName = name
 
 	return nil
 }
@@ -166,7 +166,7 @@ func getServiceManagerResourceName(ctx context.Context, btpClient *btpcli.BtpCli
 
 func defaultServiceManagerResourceName(subaccountID string) string {
 	if subaccountID == "" {
-		return DefaultNamePrefix
+		return resources.UndefinedName
 	}
 	return fmt.Sprintf("%s-%s", DefaultNamePrefix, subaccountID)
 }
@@ -174,10 +174,10 @@ func defaultServiceManagerResourceName(subaccountID string) string {
 type ServiceInstance struct {
 	*btpcli.ServiceInstance
 	*yaml.ResourceWithComment
-	offeringName       string
-	planName           string
-	bindingID          string
-	serviceManagerName string
+	OfferingName       string
+	PlanName           string
+	BindingID          string
+	ServiceManagerName string
 }
 
 var _ resources.BtpResource = &ServiceInstance{}
@@ -192,9 +192,25 @@ func (sm *ServiceInstance) GetDisplayName() string {
 
 func (sm *ServiceInstance) GetExternalName() string {
 	if sm.IsServiceManager() {
-		return fmt.Sprintf("%s/%s", sm.GetID(), sm.bindingID)
+		return sm.serviceManagerExternalName()
 	}
-	return sm.GetID()
+	return sm.serviceInstanceExternalName()
+}
+
+func (sm *ServiceInstance) serviceInstanceExternalName() string {
+	if sm.GetID() == "" || sm.SubaccountID == "" {
+		return resources.UndefinedExternalName
+	}
+
+	return fmt.Sprintf("%s,%s", sm.SubaccountID, sm.GetID())
+}
+
+func (sm *ServiceInstance) serviceManagerExternalName() string {
+	if sm.GetID() == "" || sm.BindingID == "" {
+		return resources.UndefinedExternalName
+	}
+
+	return fmt.Sprintf("%s/%s", sm.GetID(), sm.BindingID)
 }
 
 func (sm *ServiceInstance) GenerateK8sResourceName() string {
@@ -214,17 +230,5 @@ func (sm *ServiceInstance) GenerateK8sResourceName() string {
 }
 
 func (sm *ServiceInstance) IsServiceManager() bool {
-	return sm.offeringName == OfferingServiceManager
-}
-
-func (sm *ServiceInstance) GetOfferingName() string {
-	return sm.offeringName
-}
-
-func (sm *ServiceInstance) GetPlanName() string {
-	return sm.planName
-}
-
-func (sm *ServiceInstance) GetServiceManagerName() string {
-	return sm.serviceManagerName
+	return sm.OfferingName == OfferingServiceManager
 }

@@ -20,7 +20,7 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	externalName := si.GetExternalName()
 	subAccountID := si.SubaccountID
 	instanceID := si.ID
-	bindingID := si.bindingID
+	bindingID := si.BindingID
 
 	serviceManager := yaml.NewResourceWithComment(
 		&v1beta1.ServiceManager{
@@ -54,6 +54,9 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	serviceManager.CloneComment(si)
 
 	// Comment the resource out, if any of the required fields is missing.
+	if !si.IsServiceManager() {
+		serviceManager.AddComment(resources.WarnNotServiceManager)
+	}
 	if subAccountID == "" {
 		serviceManager.AddComment(resources.WarnMissingSubaccountGuid)
 	}
@@ -62,6 +65,9 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	}
 	if externalName == "" {
 		serviceManager.AddComment(resources.WarnMissingExternalName)
+	}
+	if externalName == resources.UndefinedExternalName {
+		serviceManager.AddComment(resources.WarnUndefinedExternalName)
 	}
 	if instanceID == "" {
 		serviceManager.AddComment(resources.WarnMissingInstanceId)
@@ -112,6 +118,9 @@ func defaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	// Comment the resource out, if any of the required fields is missing.
 	if subaccountID == "" {
 		serviceManager.AddComment(resources.WarnMissingSubaccountGuid)
+	}
+	if resourceName == resources.UndefinedName {
+		serviceManager.AddComment(resources.WarnUndefinedResourceName)
 	}
 
 	// Reference subaccount resource, if requested.
