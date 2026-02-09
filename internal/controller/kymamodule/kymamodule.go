@@ -26,6 +26,8 @@ var (
 	errSetupClient                    = "cannot setup KymaModule client"
 	errObserveResource                = "cannot observe KymaModule"
 	errKymaEnvironmentBindingNotFound = "cannot get referenced KymaEnvironmentBinding"
+	errCreateModule                   = "cannot create KymaModule"
+	errDeleteModule                   = "cannot delete KymaModule"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -162,7 +164,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	err := c.client.CreateModule(ctx, cr.Spec.ForProvider.Name, *cr.Spec.ForProvider.Channel, *cr.Spec.ForProvider.CustomResourcePolicy)
 	if err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateModule)
 	}
 
 	meta.SetExternalName(cr, cr.Spec.ForProvider.Name)
@@ -188,7 +190,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if c.client != nil {
 		err := c.client.DeleteModule(ctx, cr.Spec.ForProvider.Name)
 		if err != nil {
-			return managed.ExternalDelete{}, err
+			return managed.ExternalDelete{}, errors.Wrap(err, errDeleteModule)
 		}
 	}
 
