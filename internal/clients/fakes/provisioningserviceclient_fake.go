@@ -153,3 +153,35 @@ func (m *MockProvisioningServiceClient) UpdateEnvironmentInstanceExecute(r clien
 }
 
 var _ client.EnvironmentsAPI = &MockProvisioningServiceClient{}
+
+// MockProvisioningServiceClientWithGetByID mocks GetEnvironmentInstanceExecute for GUID lookups
+type MockProvisioningServiceClientWithGetByID struct {
+	MockProvisioningServiceClient
+	GetByIDResponse *client.BusinessEnvironmentInstanceResponseObject
+	GetByIDError    error
+}
+
+func (m *MockProvisioningServiceClientWithGetByID) GetEnvironmentInstanceExecute(r client.ApiGetEnvironmentInstanceRequest) (*client.BusinessEnvironmentInstanceResponseObject, *http.Response, error) {
+	return m.GetByIDResponse, &http.Response{}, m.GetByIDError
+}
+
+// MockProvisioningServiceClientWithCreate mocks CreateInstance
+type MockProvisioningServiceClientWithCreate struct {
+	MockProvisioningServiceClient
+	CreateOrgResponse *CloudFoundryOrg
+	CreateOrgError    error
+}
+
+// CloudFoundryOrg represents a CF org for testing - copy from btp package
+type CloudFoundryOrg struct {
+	Id          string
+	Name        string
+	ApiEndpoint string
+}
+
+// MockProvisioningServiceClientWithDelete mocks DeleteInstance
+type MockProvisioningServiceClientWithDelete struct {
+	MockProvisioningServiceClient
+	DeleteResponse *http.Response
+	DeleteError    error
+}

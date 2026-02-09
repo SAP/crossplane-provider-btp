@@ -116,6 +116,15 @@ type EnvironmentStatus struct {
 // +kubebuilder:object:root=true
 
 // A CloudFoundryEnvironment is a managed resource that represents a Cloud Foundry environment in the SAP Business Technology Platform
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: Cloud Foundry Organization GUID (UUID format)
+//   - How to find:
+//     - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Cloud Foundry Environment → Organization ID
+//     - CLI: Use the Provisioning API to list environments and get the ID field
+//   - Migration: Supports backwards compatibility with legacy formats (orgName and metadata.name)
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

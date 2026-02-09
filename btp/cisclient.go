@@ -297,7 +297,7 @@ func (c *Client) UpdateKymaEnvironment(ctx context.Context, environmentInstanceI
 func (c *Client) CreateCloudFoundryOrg(
 	ctx context.Context, serviceAccountEmail string, resourceUID string,
 	landscape string, orgName string, environmentName string,
-) (createdOrg string, err error) {
+) (instanceId string, err error) {
 	parameters := map[string]interface{}{
 		cfenvironmentParameterInstanceName: orgName, v1alpha1.SubaccountOperatorLabel: resourceUID,
 	}
@@ -324,31 +324,31 @@ func (c *Client) CreateCloudFoundryOrg(
 	if err != nil {
 		return "", specifyAPIError(err)
 	}
-	createdOrg = *localReturnValue.Id
-	return createdOrg, nil
+	instanceId = *localReturnValue.Id
+	return instanceId, nil
 }
 
 func (c *Client) CreateCloudFoundryOrgIfNotExists(
 	ctx context.Context, instanceName string, serviceAccountEmail string, resourceUID string,
 	landscape string, orgName string, environmentName string,
-) (*CloudFoundryOrg, error) {
+) (string, *CloudFoundryOrg, error) {
 
-	orgId, err := c.CreateCloudFoundryOrg(ctx, serviceAccountEmail, resourceUID, landscape, orgName, environmentName)
+	instanceId, err := c.CreateCloudFoundryOrg(ctx, serviceAccountEmail, resourceUID, landscape, orgName, environmentName)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
-	cfOrg, err := c.GetCloudFoundryOrg(ctx, orgId)
+	cfOrg, err := c.GetCloudFoundryOrg(ctx, instanceId)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	return cfOrg, err
+	return instanceId, cfOrg, err
 }
 
 func (c *Client) GetCloudFoundryOrg(
-	ctx context.Context, orgId string,
+	ctx context.Context, instanceId string,
 ) (*CloudFoundryOrg, error) {
-	cfEnvironment, err := c.GetCFEnvironmentByOrgId(ctx, orgId)
+	cfEnvironment, _, err := c.GetEnvironmentsByIdNew(ctx, instanceId)
 	if err != nil {
 		return nil, err
 	}
@@ -374,18 +374,6 @@ func (c *Client) DeleteEnvironmentById(ctx context.Context, environmentId string
 	_, raw, err := c.ProvisioningServiceClient.DeleteEnvironmentInstance(ctx, environmentId).Execute()
 	if err != nil {
 		return raw, specifyAPIError(err)
-	}
-	return raw, nil
-}
-
-func (c *Client) DeleteCloudFoundryEnvironment(ctx context.Context, instanceName string, orgName string) (*http.Response, error) {
-	environmentId, getErr := c.getCloudFoundryEnvironmentId(ctx, instanceName, orgName)
-	if getErr != nil {
-		return nil, specifyAPIError(getErr)
-	}
-	raw, delErr := c.DeleteEnvironmentById(ctx, environmentId)
-	if delErr != nil {
-		return nil, specifyAPIError(delErr)
 	}
 	return raw, nil
 }
@@ -446,14 +434,14 @@ func (c *Client) GetEnvironmentByNameAndType(
 	return environmentInstance, err
 }
 
-func (c *Client) GetEnvironmentsByIdNew(ctx context.Context, Id string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
-	response, _, err := c.ProvisioningServiceClient.GetEnvironmentInstance(ctx, Id).Execute()
+func (c *Client) GetEnvironmentsByIdNew(ctx context.Context, Id string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
+	response, resp, err := c.ProvisioningServiceClient.GetEnvironmentInstance(ctx, Id).Execute()
 
 	if err != nil {
-		return nil, specifyAPIError(err)
+		return nil, resp.StatusCode == 404, specifyAPIError(err)
 	}
 
-	return response, err
+	return response, false, nil
 }
 
 // GetEnvironmentById retrieves environment using its ID. It performs a list and filters client-side.
@@ -515,7 +503,7 @@ func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*pr
 		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
 			continue
 		}
-		if *instance.Id == orgId {
+		if instance.Id != nil && *instance.Id == orgId {
 			environmentInstance = &instance
 			break
 		}

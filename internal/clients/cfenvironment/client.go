@@ -20,7 +20,6 @@ type Client interface {
 	DescribeInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (
 		*provisioningclient.BusinessEnvironmentInstanceResponseObject,
 		[]v1alpha1.User,
-		NeedsExternalNameFormatMigration,
 		error,
 	)
 	CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error)

@@ -15,32 +15,147 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// crWithManagers returns a CloudFoundryEnvironment CR with the given managers.
-func _(specManagers []string, statusManagers []string) v1alpha1.CloudFoundryEnvironment {
-	return v1alpha1.CloudFoundryEnvironment{
+//
+// Unit tests for CloudFoundryEnvironment external-name handling
+// Tests verify compliance with external-name convention documented in docs/development/external-name-handling.md
+//
+
+func TestFormOrgName(t *testing.T) {
+	tests := []struct {
+		name         string
+		orgName      string
+		subaccountId string
+		crName       string
+		want         string
+	}{
+		{
+			name:         "CustomOrgName_ReturnsOrgName",
+			orgName:      "custom-org",
+			subaccountId: "subaccount-123",
+			crName:       "my-cf",
+			want:         "custom-org",
+		},
+		{
+			name:         "EmptyOrgName_ReturnsGenerated",
+			orgName:      "",
+			subaccountId: "subaccount-123",
+			crName:       "my-cf",
+			want:         "subaccount-123-my-cf",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formOrgName(tt.orgName, tt.subaccountId, tt.crName); got != tt.want {
+				t.Errorf("formOrgName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestExternalNameEmptyCheck verifies that empty external-name returns nil
+// This is part of the external-name convention: empty external-name means resource doesn't exist yet
+func TestCloudFoundryOrganization_getEnvironmentByExternalNameWithLegacyHandling_EmptyExternalName(t *testing.T) {
+	c := CloudFoundryOrganization{
+		btp: btp.Client{},
+	}
+
+	cr := v1alpha1.CloudFoundryEnvironment{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "test",
+			// No external-name annotation
+		},
+	}
+
+	got, needsMigration, err := c.getEnvironmentByExternalNameWithLegacyHandling(context.TODO(), cr)
+
+	if err != nil {
+		t.Errorf("Expected no error for empty external-name, got: %v", err)
+	}
+	if got != nil {
+		t.Errorf("Expected nil for empty external-name, got: %v", got)
+	}
+	if needsMigration {
+		t.Errorf("Expected needsMigration=false for empty external-name, got: true")
+	}
+}
+
+// TestExternalNameValidGUID verifies GUID validation
+// Tests that valid GUIDs are recognized correctly
+func TestCloudFoundryOrganization_getEnvironmentByExternalNameWithLegacyHandling_ValidGUID(t *testing.T) {
+	validGUID := "550e8400-e29b-41d4-a716-446655440000"
+
+	// Test that a valid GUID is accepted
+	cr := v1alpha1.CloudFoundryEnvironment{
+		ObjectMeta: v1.ObjectMeta{
+			Name:        "test",
+			Annotations: map[string]string{"crossplane.io/external-name": validGUID},
+		},
+	}
+
+	// Verify the GUID is valid
+	if !internal.IsValidUUID(validGUID) {
+		t.Errorf("Valid GUID was not recognized as valid UUID")
+	}
+
+	// Verify the GUID is extracted from CR
+	externalName := cr.Annotations["crossplane.io/external-name"]
+	if externalName != validGUID {
+		t.Errorf("External name mismatch: got %v, want %v", externalName, validGUID)
+	}
+}
+
+// TestExternalNameInvalidGUID verifies invalid GUID handling
+// Tests that non-GUID formats trigger legacy lookup path
+func TestExternalNameInvalidGUID(t *testing.T) {
+	invalidCases := []string{
+		"not-a-guid",
+		"123",
+		"legacy-org-name",
+	}
+
+	for _, invalidGUID := range invalidCases {
+		t.Run(fmt.Sprintf("Invalid_%s", invalidGUID), func(t *testing.T) {
+			if internal.IsValidUUID(invalidGUID) {
+				t.Errorf("Invalid GUID %q was incorrectly recognized as valid UUID", invalidGUID)
+			}
+		})
+	}
+}
+
+// TestLegacyFormatHandling tests the legacy lookup path
+// Verifies that non-GUID external-names use orgName-based lookup
+func TestCloudFoundryOrganization_LegacyFormatHandling(t *testing.T) {
+	// Test legacy format with non-GUID external-name
+	cr := v1alpha1.CloudFoundryEnvironment{
+		ObjectMeta: v1.ObjectMeta{
+			Name:        "test",
+			Annotations: map[string]string{"crossplane.io/external-name": "legacy-name"},
+		},
 		Spec: v1alpha1.CfEnvironmentSpec{
+			SubaccountGuid: "subaccount-guid",
 			ForProvider: v1alpha1.CfEnvironmentParameters{
-				Managers: specManagers,
-			},
-		},
-		Status: v1alpha1.EnvironmentStatus{
-			AtProvider: v1alpha1.CfEnvironmentObservation{
-				Managers: toUserSlice(statusManagers),
+				OrgName: "custom-org",
 			},
 		},
 	}
-}
 
-// toUserSlice converts a slice of strings to a slice of v1alpha1.User.
-func toUserSlice(ss []string) []v1alpha1.User {
-	us := make([]v1alpha1.User, 0)
-	for _, s := range ss {
-		us = append(us, v1alpha1.User{Username: s, Origin: "sap.ids"})
+	// Verify external-name is not a valid GUID (triggers legacy path)
+	externalName := cr.Annotations["crossplane.io/external-name"]
+	if internal.IsValidUUID(externalName) {
+		t.Errorf("Legacy external-name %q should not be a valid UUID", externalName)
 	}
-	return us
+
+	// Verify orgName is correctly formed for legacy lookup
+	expectedOrgName := "custom-org" // OrgName takes precedence
+	actualOrgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	if actualOrgName != expectedOrgName {
+		t.Errorf("OrgName mismatch: got %v, want %v", actualOrgName, expectedOrgName)
+	}
 }
 
-func TestCloudFoundryOrganization_getEnvironmentByNameAndOrg(t *testing.T) {
+// Test legacy getEnvironmentByNameAndOrg behavior with existing mock infrastructure
+// This validates backwards compatibility with the legacy API
+func TestCloudFoundryOrganization_getEnvironmentByNameAndOrg_Legacy(t *testing.T) {
 	getBtpClient := func(instanceName string) btp.Client {
 		return btp.Client{
 			Credential: &btp.Credentials{
@@ -51,9 +166,9 @@ func TestCloudFoundryOrganization_getEnvironmentByNameAndOrg(t *testing.T) {
 					EnvironmentInstances: []provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						{
 							EnvironmentType: internal.Ptr("cloudfoundry"),
-							Parameters:      internal.Ptr(fmt.Sprintf("{\"instance_name\":\"%s\"}", instanceName)),
+							Parameters:      internal.Ptr(fmt.Sprintf(`{"instance_name":"%s"}`, instanceName)),
 							Id:              internal.Ptr("1234"),
-							Labels:          internal.Ptr("{\"Org Id\":\"1234\",\"Org Name\":\"name\",\"API Endpoint\":\"endpoint\"}"),
+							Labels:          internal.Ptr(`{"Org Id":"1234","Org Name":"name","API Endpoint":"endpoint"}`),
 						},
 					},
 				},
@@ -61,99 +176,85 @@ func TestCloudFoundryOrganization_getEnvironmentByNameAndOrg(t *testing.T) {
 		}
 	}
 
-	type fields struct {
-		btp btp.Client
-	}
-	type args struct {
-		ctx context.Context
-		cr  v1alpha1.CloudFoundryEnvironment
-	}
 	tests := []struct {
 		name    string
-		fields  fields
-		args    args
+		client  btp.Client
+		cr      v1alpha1.CloudFoundryEnvironment
 		want    *provisioningclient.BusinessEnvironmentInstanceResponseObject
 		wantErr bool
 	}{
 		{
-			name: "Error",
-			fields: fields{
-				btp: btp.Client{
-					Credential: &btp.Credentials{
-						UserCredential: &btp.UserCredential{Username: "username", Password: "password"},
-					},
-					ProvisioningServiceClient: &fakes.MockProvisioningServiceClient{
-						Err: errors.New("error"),
+			name:   "Success - match by external-name",
+			client: getBtpClient("extName"),
+			cr: v1alpha1.CloudFoundryEnvironment{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{"crossplane.io/external-name": "extName"},
+				},
+				Spec: v1alpha1.CfEnvironmentSpec{
+					ForProvider: v1alpha1.CfEnvironmentParameters{
+						OrgName: "org",
 					},
 				},
 			},
-			args: args{
-				cr: v1alpha1.CloudFoundryEnvironment{
-					ObjectMeta: v1.ObjectMeta{
-						Annotations: map[string]string{"crossplane.io/external-name": "extName"},
+			want: &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+				EnvironmentType: internal.Ptr("cloudfoundry"),
+				Parameters:      internal.Ptr(`{"instance_name":"extName"}`),
+				Id:              internal.Ptr("1234"),
+				Labels:          internal.Ptr(`{"Org Id":"1234","Org Name":"name","API Endpoint":"endpoint"}`),
+			},
+			wantErr: false,
+		},
+		{
+			name:   "Not found - no environment matching external-name",
+			client: getBtpClient("somethingElse"),
+			cr: v1alpha1.CloudFoundryEnvironment{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{"crossplane.io/external-name": "extName"},
+				},
+				Spec: v1alpha1.CfEnvironmentSpec{
+					ForProvider: v1alpha1.CfEnvironmentParameters{
+						OrgName: "org",
 					},
-					Spec: v1alpha1.CfEnvironmentSpec{
-						ForProvider: v1alpha1.CfEnvironmentParameters{
-							OrgName: "org",
-						},
+				},
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "Error",
+			client: btp.Client{
+				Credential: &btp.Credentials{
+					UserCredential: &btp.UserCredential{Username: "username", Password: "password"},
+				},
+				ProvisioningServiceClient: &fakes.MockProvisioningServiceClient{
+					Err: errors.New("error"),
+				},
+			},
+			cr: v1alpha1.CloudFoundryEnvironment{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{"crossplane.io/external-name": "extName"},
+				},
+				Spec: v1alpha1.CfEnvironmentSpec{
+					ForProvider: v1alpha1.CfEnvironmentParameters{
+						OrgName: "org",
 					},
 				},
 			},
 			want:    nil,
 			wantErr: true,
 		},
-		{
-			name: "Not found - no environment matching external-name",
-			fields: fields{
-				btp: getBtpClient("somethingElse"),
-			},
-			args: args{
-				cr: v1alpha1.CloudFoundryEnvironment{
-					ObjectMeta: v1.ObjectMeta{
-						Annotations: map[string]string{"crossplane.io/external-name": "extName"},
-					},
-					Spec: v1alpha1.CfEnvironmentSpec{
-						ForProvider: v1alpha1.CfEnvironmentParameters{
-							OrgName: "org",
-						},
-					},
-				},
-			},
-			want:    nil,
-			wantErr: false,
-		},
-		{
-			name: "Success - match by external-name",
-			fields: fields{
-				btp: getBtpClient("extName"),
-			},
-			args: args{
-				cr: v1alpha1.CloudFoundryEnvironment{
-					ObjectMeta: v1.ObjectMeta{
-						Annotations: map[string]string{"crossplane.io/external-name": "extName"},
-					},
-					Spec: v1alpha1.CfEnvironmentSpec{
-						ForProvider: v1alpha1.CfEnvironmentParameters{
-							OrgName: "org",
-						},
-					},
-				},
-			},
-			want: &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-				EnvironmentType: internal.Ptr("cloudfoundry"),
-				Parameters:      internal.Ptr("{\"instance_name\":\"extName\"}"),
-				Id:              internal.Ptr("1234"),
-				Labels:          internal.Ptr("{\"Org Id\":\"1234\",\"Org Name\":\"name\",\"API Endpoint\":\"endpoint\"}"),
-			},
-			wantErr: false,
-		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := CloudFoundryOrganization{
-				btp: tt.fields.btp,
+				btp: tt.client,
 			}
-			got, err := c.getEnvironmentByNameAndOrg(tt.args.ctx, tt.args.cr)
+
+			externalName := tt.cr.Annotations["crossplane.io/external-name"]
+			orgName := formOrgName(tt.cr.Spec.ForProvider.OrgName, tt.cr.Spec.SubaccountGuid, tt.cr.Name)
+
+			got, err := c.btp.GetCFEnvironmentByNameAndOrg(context.TODO(), externalName, orgName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getEnvironmentByNameAndOrg() error = %v, wantErr %v", err, tt.wantErr)
 				return

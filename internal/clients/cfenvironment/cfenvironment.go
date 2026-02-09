@@ -51,51 +51,55 @@ func NewCloudFoundryOrganization(btp btp.Client) *CloudFoundryOrganization {
 func (c CloudFoundryOrganization) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.CloudFoundryEnvironment,
-) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, NeedsExternalNameFormatMigration, error) {
-	environment, needsExternalNameFormatMigration, err := c.getEnvironmentByExternalNameWithLegacyHandling(ctx, cr)
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+	environment, err := c.getEnvironmentByExternalNameWithLegacyHandling(ctx, cr)
 	if err != nil {
-		return nil, nil, needsExternalNameFormatMigration, err
+		return nil, nil, err
 	}
 	if environment == nil {
-		return nil, nil, needsExternalNameFormatMigration, nil
+		return nil, nil, nil
 	}
 
 	managers, err := c.getManagers(ctx, environment)
 	if err != nil {
-		return nil, nil, needsExternalNameFormatMigration, err
+		return nil, nil, err
 	}
 
-	return environment, managers, needsExternalNameFormatMigration, nil
+	return environment, managers, nil
 }
 
 // getEnvironmentByExternalName retrieves CF environment using external-name
 // Supports GUID format (new) and backwards compatibility with orgName and metadata.name (legacy)
 // returns (environment, needsExternalNameFormatMigration, error)
-func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, NeedsExternalNameFormatMigration, error) {
+func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	externalName := meta.GetExternalName(&cr)
+	annotationOrgId := cr.Annotations["createdOrgGuid"]
 
 	// Empty external-name check
-	if externalName == "" {
-		return nil, false, nil
+	if externalName == "" && annotationOrgId == "" {
+		return nil, nil
 	}
 
 	// Try GUID lookup first (new standard format)
 	if internal.IsValidUUID(externalName) {
-		environment, err := c.btp.GetEnvironmentsByIdNew(ctx, externalName)
-		if err != nil {
-			return nil, false, err
+		environment, notFound, err := c.btp.GetEnvironmentsByIdNew(ctx, externalName)
+		if notFound {
+			return nil, nil
 		}
-		return environment, false, nil
+		if err != nil {
+			return nil, err
+		}
+		return environment, nil
 	}
 
-	// Backwards compatibility: try legacy lookup by orgName
+	// Backwards compatibility: try legacy lookup by orgName and name. Name was set as external name in v1.1.0
 	// This handles migration from v1.1.0 (orgName) and v1.0.0 (metadata.name)
 	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	environment, err := c.btp.GetCFEnvironmentByNameAndOrg(ctx, externalName, orgName)
 	if err != nil {
-		return nil, true, err
+		return nil, err
 	}
-	return environment, true, nil
+	return environment, nil
 }
 
 func (c CloudFoundryOrganization) getManagers(ctx context.Context, environment *provisioningclient.BusinessEnvironmentInstanceResponseObject) ([]v1alpha1.User, error) {
@@ -145,7 +149,7 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error) {
 	adminServiceAccountEmail := c.btp.Credential.UserCredential.Email
 	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
-	org, err := c.btp.CreateCloudFoundryOrgIfNotExists(
+	instanceId, org, err := c.btp.CreateCloudFoundryOrgIfNotExists(
 		ctx, cr.Name, adminServiceAccountEmail, string(cr.UID),
 		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName,
 	)
@@ -164,7 +168,7 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 		}
 	}
 
-	return org.Id, nil
+	return instanceId, nil
 }
 
 func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
