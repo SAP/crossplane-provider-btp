@@ -66,16 +66,13 @@ func TestCloudFoundryOrganization_getEnvironmentByExternalNameWithLegacyHandling
 		},
 	}
 
-	got, needsMigration, err := c.getEnvironmentByExternalNameWithLegacyHandling(context.TODO(), cr)
+	got, err := c.getEnvironmentByExternalNameWithLegacyHandling(context.TODO(), cr)
 
 	if err != nil {
 		t.Errorf("Expected no error for empty external-name, got: %v", err)
 	}
 	if got != nil {
 		t.Errorf("Expected nil for empty external-name, got: %v", got)
-	}
-	if needsMigration {
-		t.Errorf("Expected needsMigration=false for empty external-name, got: true")
 	}
 }
 

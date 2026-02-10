@@ -72,8 +72,8 @@ func TestObserve(t *testing.T) {
 		},
 		"ValidGUID_ResourceNotFound_Drift": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
-					return nil, nil, false, nil // Resource not found
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return nil, nil, nil // Resource not found
 				}},
 				cr: environment(withAnnotaions(map[string]string{"crossplane.io/external-name": "550e8400-e29b-41d4-a716-446655440000"})),
 			},
@@ -87,12 +87,12 @@ func TestObserve(t *testing.T) {
 		},
 		"ValidGUID_SuccessfulObservation": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						Id:     internal.Ptr("550e8400-e29b-41d4-a716-446655440000"),
 						State:  internal.Ptr("OK"),
 						Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
-					}, []v1alpha1.User{aUser}, false, nil
+					}, []v1alpha1.User{aUser}, nil
 				}},
 				cr: environment(withAnnotaions(map[string]string{"crossplane.io/external-name": "550e8400-e29b-41d4-a716-446655440000"})),
 			},
@@ -118,12 +118,12 @@ func TestObserve(t *testing.T) {
 		},
 		"LegacyFormat_SuccessfulMigrationToGUID": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						Id:     internal.Ptr("550e8400-e29b-41d4-a716-446655440000"),
 						State:  internal.Ptr("OK"),
 						Labels: internal.Ptr("{\"Org Name\":\"legacy-org\"}"),
-					}, []v1alpha1.User{}, true, nil // needsExternalNameFormatMigration = true
+					}, []v1alpha1.User{}, nil
 				}},
 				cr: environment(withAnnotaions(map[string]string{"crossplane.io/external-name": "legacy-org-name"})),
 			},
@@ -149,8 +149,8 @@ func TestObserve(t *testing.T) {
 		},
 		"ErrorGettingCFEnvironment": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
-					return nil, nil, false, errors.New("Could not call backend")
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return nil, nil, errors.New("Could not call backend")
 				}},
 				cr: environment(),
 			},
@@ -162,8 +162,8 @@ func TestObserve(t *testing.T) {
 		},
 		"NeedsCreate": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
-					return nil, nil, false, nil
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return nil, nil, nil
 				}},
 				cr: environment(),
 			},
@@ -177,11 +177,11 @@ func TestObserve(t *testing.T) {
 		},
 		"SuccessfulAvailableAndUpToDate": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:  internal.Ptr("OK"),
 						Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
-					}, []v1alpha1.User{aUser}, false, nil
+					}, []v1alpha1.User{aUser}, nil
 				}, MockNeedsUpdate: func(cr v1alpha1.CloudFoundryEnvironment) bool {
 					return false
 				}},
@@ -216,11 +216,11 @@ func TestObserve(t *testing.T) {
 		},
 		"ExistingButNotAvailable": {
 			args: args{
-				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, environments.NeedsExternalNameFormatMigration, error) {
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
 						State:  internal.Ptr("CREATING"),
 						Labels: internal.Ptr("{}"),
-					}, []v1alpha1.User{aUser}, false, nil
+					}, []v1alpha1.User{aUser}, nil
 				}, MockNeedsUpdate: func(cr v1alpha1.CloudFoundryEnvironment) bool {
 					return false
 				}},
