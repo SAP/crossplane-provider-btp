@@ -188,11 +188,13 @@ func (o organizationClient) getManagerUsernames(ctx context.Context) ([]v1alpha1
 
 	managers := make([]v1alpha1.User, 0)
 	for _, u := range users {
-		m := v1alpha1.User{
-			Username: u.Username,
-			Origin:   u.Origin,
+		if u != nil && u.Username != nil && u.Origin != nil {
+			m := v1alpha1.User{
+				Username: *u.Username,
+				Origin:   *u.Origin,
+			}
+			managers = append(managers, m)
 		}
-		managers = append(managers, m)
 	}
 
 	return managers, nil
