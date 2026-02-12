@@ -139,7 +139,7 @@ jobs:
     if: always() && needs.prepare-matrix.result == 'success'  # only run if prepare-matrix was successful (requires manual approval) and then always run after e2e-test
     steps:
       - name: checkout repo
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
         with:
           # use github.base_ref to checkout the base branch, since the cleanup should always run on the base branch to make it harder for malicious code execution. Consequently, this will not pick up changes to the cleanup.go file in the PR, but that is accebtable.
           ref: ${{ github.base_ref }}
