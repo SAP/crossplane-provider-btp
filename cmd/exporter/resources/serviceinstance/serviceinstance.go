@@ -79,6 +79,7 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 		}
 		btpInstances = append(btpInstances, instances...)
 	}
+	slog.DebugContext(ctx, "Total service instances returned by BTP CLI", "count", len(btpInstances))
 
 	// Wrap service instances for internal processing and caching.
 	instances := make([]*servicemanager.ServiceInstance, len(btpInstances))
