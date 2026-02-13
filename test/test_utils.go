@@ -7,15 +7,22 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"testing"
+	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/logging"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metaApi "github.com/sap/crossplane-provider-btp/apis"
 	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/vladimirvivien/gexe"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,6 +36,7 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/pkg/features"
 )
 
 const (
@@ -93,17 +101,97 @@ func GetUserSecretOrPanic() map[string]string {
 	return userSecret
 }
 
-func CreateProviderConfigFn(namespace string, globalAccount string, cliServerUrl string, cisSecretName string, serviceUserSecretName string) func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+// CreateProviderConfig contains the core logic for creating or updating a ProviderConfig.
+// Returns an error if the operation fails.
+func CreateProviderConfig(
+	ctx context.Context,
+	cfg *envconf.Config,
+	namespace string,
+	globalAccount string,
+	cliServerUrl string,
+	cisSecretName string,
+	serviceUserSecretName string,
+) error {
+	r, err := res.New(cfg.Client().RESTConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create resources client: %w", err)
+	}
+
+	err = metaApi.AddToScheme(r.GetScheme())
+	if err != nil {
+		return fmt.Errorf("failed to add scheme: %w", err)
+	}
+
+	obj := ProviderConfig(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
+	err = r.Create(ctx, obj)
+	if kubeErrors.IsAlreadyExists(err) {
+		return r.Update(ctx, obj)
+	}
+
+	return err
+}
+
+// CreateProviderConfigFeatureFn returns a features.Func for use in feature.WithSetup.
+func CreateProviderConfigFeatureFn(
+	namespace string,
+	globalAccount string,
+	cliServerUrl string,
+	cisSecretName string,
+	serviceUserSecretName string,
+) features.Func {
+	return func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+		err := CreateProviderConfig(ctx, cfg, namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
+		if err != nil {
+			t.Errorf("failed to create ProviderConfig: %v", err)
+		}
+		return ctx
+	}
+}
+
+// CreateProviderConfigEnvFn returns an env.Func for use in env.Setup.
+func CreateProviderConfigEnvFn(
+	namespace string,
+	globalAccount string,
+	cliServerUrl string,
+	cisSecretName string,
+	serviceUserSecretName string,
+) env.Func {
 	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
-		r, _ := res.New(cfg.Client().RESTConfig())
-		_ = metaApi.AddToScheme(r.GetScheme())
+		err := CreateProviderConfig(ctx, cfg, namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
+		if err != nil {
+			return ctx, fmt.Errorf("failed to create ProviderConfig: %w", err)
+		}
+		return ctx, nil
+	}
+}
+
+func DeleteProviderConfigFn(
+	namespace string,
+	globalAccount string,
+	cliServerUrl string,
+	cisSecretName string,
+	serviceUserSecretName string,
+) features.Func {
+	return func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+		r, err := res.New(cfg.Client().RESTConfig())
+		if err != nil {
+			t.Errorf("failed to create resources client: %v", err)
+			return ctx
+		}
+
+		err = metaApi.AddToScheme(r.GetScheme())
+		if err != nil {
+			t.Errorf("failed to add scheme: %v", err)
+			return ctx
+		}
 
 		obj := ProviderConfig(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName)
-		err := r.Create(ctx, obj)
-		if kubeErrors.IsAlreadyExists(err) {
-			return ctx, r.Update(ctx, obj)
+		err = r.Delete(ctx, obj)
+		if err != nil && !kubeErrors.IsNotFound(err) {
+			t.Errorf("failed to delete ProviderConfig: %v", err)
 		}
-		return ctx, err
+
+		return ctx
 	}
 }
 
@@ -251,4 +339,138 @@ func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
 	uutController := imageMap[uutControllerKey]
 
 	return uutConfig, uutController
+}
+
+// LoadUpgradePackages resolves provider and controller packages for upgrade tests.
+//
+// It handles both local and remote tags, pulling images as needed:
+//   - "local" tag: Uses locally built images from the UUT_IMAGES env var
+//   - Other tags: Constructs image URLs from repositories and optionally pulls them
+//
+// Returns: fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
+func LoadUpgradePackages(
+	fromTag, toTag string,
+	fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository string,
+	uutImagesEnvVar, localTagName string,
+	pullPackages bool,
+) (string, string, string, string) {
+	isLocalFromTag := fromTag == localTagName
+	isLocalToTag := toTag == localTagName
+
+	var fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage string
+
+	// If either tag is local, parse UUT_IMAGES once.
+	if isLocalFromTag || isLocalToTag {
+		uutImages := os.Getenv(uutImagesEnvVar)
+		if uutImages == "" {
+			panic(uutImagesEnvVar + " environment variable is required when FROM_TAG or TO_TAG is set to \"" + localTagName + "\"")
+		}
+
+		localProviderPackage, localControllerPackage := GetImagesFromJsonOrPanic(uutImages)
+		localTag := strings.Split(localProviderPackage, ":")[1]
+
+		if isLocalFromTag {
+			fromTag = localTag
+			fromProviderPackage = localProviderPackage
+			fromControllerPackage = localControllerPackage
+		}
+
+		if isLocalToTag {
+			toTag = localTag
+			toProviderPackage = localProviderPackage
+			toControllerPackage = localControllerPackage
+		}
+	}
+
+	if !isLocalFromTag {
+		fromProviderPackage = fmt.Sprintf("%s:%s", fromProviderRepository, fromTag)
+		fromControllerPackage = fmt.Sprintf("%s:%s", fromControllerRepository, fromTag)
+
+		if pullPackages {
+			mustPullImage(fromProviderPackage)
+			mustPullImage(fromControllerPackage)
+		}
+	}
+
+	if !isLocalToTag {
+		toProviderPackage = fmt.Sprintf("%s:%s", toProviderRepository, toTag)
+		toControllerPackage = fmt.Sprintf("%s:%s", toControllerRepository, toTag)
+
+		if pullPackages {
+			mustPullImage(toProviderPackage)
+			mustPullImage(toControllerPackage)
+		}
+	}
+
+	return fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
+}
+
+func mustPullImage(image string) {
+	klog.V(4).Info("Pulling ", image)
+	runner := gexe.New()
+	p := runner.RunProc(fmt.Sprintf("docker pull %s", image))
+	if p.Err() != nil {
+		panic(fmt.Errorf("docker pull %v failed: %w: %s", image, p.Err(), p.Result()))
+	}
+	klog.V(4).Info("Pulled ", image)
+}
+
+func DeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeConfig {
+	return vendored.DeploymentRuntimeConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namePrefix + "-runtime-config",
+		},
+		Spec: vendored.DeploymentRuntimeConfigSpec{
+			DeploymentTemplate: &vendored.DeploymentTemplate{
+				Spec: &appsv1.DeploymentSpec{
+					Selector: &metav1.LabelSelector{},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "package-runtime",
+									Args: []string{"--debug", "--sync=10s"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func LoadDurationMins(envVar string, defaultValue int) time.Duration {
+	durationStr := os.Getenv(envVar)
+	if durationStr == "" {
+		klog.V(4).Infof("%s not found, defaulting to %d minutes", envVar, defaultValue)
+		return time.Duration(defaultValue) * time.Minute
+	}
+
+	durationMin, err := strconv.Atoi(durationStr)
+	if err != nil {
+		klog.Warningf("%s value \"%s\" is invalid, defaulting to %d minutes", envVar, durationStr, defaultValue)
+		return time.Duration(defaultValue) * time.Minute
+	}
+
+	if durationMin <= 0 {
+		klog.Warningf(
+			"%s value \"%d\" is invalid (must be > 0), defaulting to %d minutes",
+			envVar,
+			durationMin,
+			defaultValue,
+		)
+		return time.Duration(defaultValue) * time.Minute
+	}
+
+	klog.V(4).Infof("Using %s of %d minutes", envVar, durationMin)
+	return time.Duration(durationMin) * time.Minute
+}
+
+func GetEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+
+	return fallback
 }
