@@ -8,12 +8,11 @@ import (
 
 	"github.com/SAP/xp-clifford/cli/configparam"
 	"github.com/SAP/xp-clifford/cli/export"
-	"github.com/SAP/xp-clifford/yaml"
 
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicemanager"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
 const (
@@ -21,7 +20,7 @@ const (
 )
 
 var (
-	instanceCache resources.ResourceCache[*servicemanager.ServiceInstance]
+	instanceCache resources.ResourceCache[*serviceinstancebase.ServiceInstance]
 	instanceParam = configparam.StringSlice(KindName, "Service instance ID or regex expression for name.").
 		WithFlagName(KindName)
 )
@@ -58,41 +57,23 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 	return nil
 }
 
-func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*servicemanager.ServiceInstance], error) {
+func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*serviceinstancebase.ServiceInstance], error) {
 	if instanceCache != nil {
 		return instanceCache, nil
 	}
 
-	// Let the user select relevant subaccounts.
-	saCache, err := subaccount.Get(ctx, btpClient)
+	// Get complete list of service instances.
+	siCache, err := serviceinstancebase.Get(ctx, btpClient)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve subaccount cache: %w", err)
+		return nil, fmt.Errorf("failed to retrieve service instance cache: %w", err)
 	}
-	slog.DebugContext(ctx, "Subaccounts in cache after user selection", "count", saCache.Len())
+	slog.DebugContext(ctx, "Service instances in cache before user selection", "count", siCache.Len())
 
-	// Retrieve all service instances from selected subaccounts.
-	var btpInstances []btpcli.ServiceInstance
-	for _, saId := range saCache.AllIDs() {
-		instances, err := btpClient.ListServiceInstances(ctx, saId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get service instances for subaccount %s: %w", saId, err)
-		}
-		btpInstances = append(btpInstances, instances...)
+	// Create service instance cache.
+	cache := resources.NewResourceCache[*serviceinstancebase.ServiceInstance]()
+	for _, si := range siCache.All() {
+		cache.Set(si)
 	}
-	slog.DebugContext(ctx, "Total service instances returned by BTP CLI", "count", len(btpInstances))
-
-	// Wrap service instances for internal processing and caching.
-	instances := make([]*servicemanager.ServiceInstance, len(btpInstances))
-	for i, si := range btpInstances {
-		instances[i] = &servicemanager.ServiceInstance{
-			ServiceInstance:     &si,
-			ResourceWithComment: yaml.NewResourceWithComment(nil),
-		}
-	}
-
-	// Create a cache and store all service instances.
-	cache := resources.NewResourceCache[*servicemanager.ServiceInstance]()
-	cache.Store(instances...)
 
 	// Let the user select service instances that have to be exported.
 	widgetValues := cache.ValuesForSelection()
@@ -118,19 +99,6 @@ func convert(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to get cache with service instances", "error", err)
 		return
-	}
-
-	// Collect more required metadata.
-	for _, si := range cache.All() {
-		err := servicemanager.AddServiceAndBindingInfo(ctx, btpClient, si)
-		if err != nil {
-			slog.ErrorContext(ctx, "Failed to get service and binding data for instance", "id", si.GetID(), "error", err)
-		}
-
-		err = servicemanager.AddServiceManagerResourceName(ctx, btpClient, si)
-		if err != nil {
-			slog.ErrorContext(ctx, "Failed to set service manager name for service instance", "id", si.GetID(), "error", err)
-		}
 	}
 
 	// Export service instances that are not service manager. Note, which subaccounts are involved.

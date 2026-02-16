@@ -12,11 +12,11 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicemanager"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
-func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCli, si *servicemanager.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
 	serviceName := si.OfferingName
 	servicePlanName := si.PlanName
 	subAccountGuid := si.SubaccountID

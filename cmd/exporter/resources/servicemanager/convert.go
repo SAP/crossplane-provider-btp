@@ -12,10 +12,16 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
-func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+const (
+	defaultNamePrefix      = "managed-service-manager"
+	defaultSecretNamespace = "default"
+)
+
+func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
 	resourceName := si.GenerateK8sResourceName()
 	externalName := si.GetExternalName()
 	subAccountID := si.SubaccountID
@@ -41,7 +47,7 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 					},
 					WriteConnectionSecretToReference: &v1.SecretReference{
 						Name:      resourceName,
-						Namespace: DefaultSecretNamespace,
+						Namespace: defaultSecretNamespace,
 					},
 				},
 				ForProvider: v1beta1.ServiceManagerParameters{
@@ -106,7 +112,7 @@ func defaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 				ResourceSpec: v1.ResourceSpec{
 					WriteConnectionSecretToReference: &v1.SecretReference{
 						Name:      resourceName,
-						Namespace: DefaultSecretNamespace,
+						Namespace: defaultSecretNamespace,
 					},
 				},
 				ForProvider: v1beta1.ServiceManagerParameters{
@@ -146,4 +152,15 @@ func resolveReference(ctx context.Context, btpClient *btpcli.BtpCli, spec *v1bet
 	spec.SubaccountGuid = ""
 
 	return nil
+}
+
+func defaultServiceManagerResourceName(subaccountID string) string {
+	sm := serviceinstancebase.ServiceInstance{
+		ServiceInstance: &btpcli.ServiceInstance{
+			Name:         defaultNamePrefix,
+			SubaccountID: subaccountID,
+		},
+	}
+
+	return sm.GenerateK8sResourceName()
 }
