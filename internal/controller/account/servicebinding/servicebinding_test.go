@@ -271,11 +271,63 @@ func TestConnect(t *testing.T) {
 				err: errMockTracking,
 			},
 		},
-		"Success": {
-			reason: "should successfully create external client",
+		"MissingExternalName": {
+			reason: "should return error for missing external name/spec",
 			fields: fields{},
 			args: args{
-				mg: expectedServiceBinding(),
+				mg: &v1alpha1.ServiceBinding{
+				},
+			},
+			want: want{
+				err: errors.New(errInvalidExternalName),
+			},
+		},
+		"InvalidName": {
+			reason: "should return error for invalid external name",
+			fields: fields{},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("wrong-format", map[string]string{}),
+				),
+			},
+			want: want{
+				err: errors.New(errInvalidExternalName),
+			},
+		},
+ 		"Success": {
+			reason: "should successfully create external client with proper external name",
+			fields: fields{},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("subaccID,servinstID", map[string]string{}),
+				),
+			},
+			want: want{
+				err:            nil,
+				externalExists: true,
+			},
+		},
+ 		"Success contradicting": {
+			reason: "should successfully create external client with proper external name that contradicts the configuration",
+			fields: fields{},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("subaccID,servinstID", map[string]string{}),
+					withConfig("foo", "bar"),
+				),
+			},
+			want: want{
+				err:            nil,
+				externalExists: true,
+			},
+		},
+		"Success - backward compatible": {
+			reason: "should successfully create external client with proper configuration",
+			fields: fields{},
+			args: args{
+				mg: expectedServiceBinding(
+					withConfig("subaccID", "servinstID"),
+				),
 			},
 			want: want{
 				err:            nil,
@@ -554,6 +606,13 @@ func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceBinding)
 	}
 }
 
+func withConfig(subAccountID, serviceInstanceID string)func(*v1alpha1.ServiceBinding) {
+	return func(cr *v1alpha1.ServiceBinding) {
+		cr.Spec.ForProvider.SubaccountID = &subAccountID
+		cr.Spec.ForProvider.ServiceInstanceID = &serviceInstanceID
+	}
+}
+
 // Test Observe method - This validates the main observation logic
 func TestObserve(t *testing.T) {
 	type fields struct {
@@ -581,7 +640,7 @@ func TestObserve(t *testing.T) {
 	}{
 		"WrongResourceType": {
 			reason: "should return error for wrong resource type",
-			fields: fields{
+ 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
 					Client: &MockServiceBindingClient{},
 				},
