@@ -320,6 +320,54 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 			}(),
 		},
 		{
+			name: "missing service manager name",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         instanceName,
+					SubaccountID: subAccountGuid,
+					Usable:       true,
+				},
+				OfferingName:        serviceName,
+				PlanName:            planName,
+				ServiceManagerName:  "",
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.ServiceInstance{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.ServiceInstanceKind,
+							APIVersion: v1alpha1.CRDGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": externalName,
+							},
+						},
+						Spec: v1alpha1.ServiceInstanceSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{
+									v1.ManagementActionObserve,
+								},
+							},
+							ForProvider: v1alpha1.ServiceInstanceParameters{
+								Name:         instanceName,
+								OfferingName: serviceName,
+								PlanName:     planName,
+								SubaccountID: &subAccountGuid,
+								ServiceManagerRef: &v1.Reference{
+									Name: "",
+								},
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnMissingServiceManagerName)
+				return rwc
+			}(),
+		},
+		{
 			name: "multiple missing fields",
 			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
@@ -330,7 +378,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 				},
 				OfferingName:        "",
 				PlanName:            "",
-				ServiceManagerName:  smName,
+				ServiceManagerName:  "",
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -357,7 +405,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 								Name:         "",
 								SubaccountID: &empty,
 								ServiceManagerRef: &v1.Reference{
-									Name: smName,
+									Name: "",
 								},
 							},
 						},
@@ -369,6 +417,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 				rwc.AddComment(resources.WarnUndefinedExternalName)
 				rwc.AddComment(resources.WarnMissingInstanceId)
 				rwc.AddComment(resources.WarnServiceInstanceNotUsable)
+				rwc.AddComment(resources.WarnMissingServiceManagerName)
 				return rwc
 			}(),
 		},

@@ -15,7 +15,9 @@ import (
 )
 
 const (
-	OfferingServiceManager = "service-manager"
+	ServiceManagerOffering  = "service-manager"
+	CloudManagementOffering = "cis"
+	CloudManagementPlan     = "local"
 )
 
 var (
@@ -116,9 +118,13 @@ func (si *ServiceInstance) GetDisplayName() string {
 }
 
 func (si *ServiceInstance) GetExternalName() string {
-	if si.IsServiceManager() {
+	switch {
+	case si.IsCloudManagement():
+		return si.cloudManagementExternalName()
+	case si.IsServiceManager():
 		return si.serviceManagerExternalName()
 	}
+
 	return si.serviceInstanceExternalName()
 }
 
@@ -138,6 +144,11 @@ func (si *ServiceInstance) serviceManagerExternalName() string {
 	return fmt.Sprintf("%s/%s", si.GetID(), si.BindingID)
 }
 
+func (si *ServiceInstance) cloudManagementExternalName() string {
+	// Same format as for service manager.
+	return si.serviceManagerExternalName()
+}
+
 func (si *ServiceInstance) GenerateK8sResourceName() string {
 	name := si.GetDisplayName()
 	if name == "" || si.SubaccountID == "" {
@@ -155,5 +166,9 @@ func (si *ServiceInstance) GenerateK8sResourceName() string {
 }
 
 func (si *ServiceInstance) IsServiceManager() bool {
-	return si.OfferingName == OfferingServiceManager
+	return si.OfferingName == ServiceManagerOffering
+}
+
+func (si *ServiceInstance) IsCloudManagement() bool {
+	return si.OfferingName == CloudManagementOffering && si.PlanName == CloudManagementPlan
 }

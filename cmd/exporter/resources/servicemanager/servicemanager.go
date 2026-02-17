@@ -11,6 +11,10 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 )
 
+const (
+	defaultNamePrefix = "managed-service-manager"
+)
+
 var (
 	managerCache resources.ResourceCache[*serviceinstancebase.ServiceInstance]
 )
@@ -37,6 +41,26 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	slog.DebugContext(ctx, "Found service managers", "count", managerCache.Len())
 
 	return managerCache, nil
+}
+
+func AddServiceManagerResourceName(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance) error {
+	if si.IsServiceManager() {
+		// Service instance is service manager itself.
+		return nil
+	}
+
+	if si.ServiceManagerName != "" {
+		// Service manager name already present.
+		return nil
+	}
+
+	name, err := getServiceManagerResourceName(ctx, btpClient, si.SubaccountID)
+	if err != nil {
+		return fmt.Errorf("failed to get service manager name for subaccount %s: %w", si.SubaccountID, err)
+	}
+	si.ServiceManagerName = name
+
+	return nil
 }
 
 func Convert(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
@@ -71,4 +95,27 @@ func getServiceManager(ctx context.Context, btpClient *btpcli.BtpCli, subaccount
 	}
 
 	return nil, false, nil
+}
+
+func getServiceManagerResourceName(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string) (string, error) {
+	sm, found, err := getServiceManager(ctx, btpClient, subaccountID)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve service manager for subaccount %s: %w", subaccountID, err)
+	}
+	if !found {
+		return defaultServiceManagerResourceName(subaccountID), nil
+	}
+
+	return sm.GenerateK8sResourceName(), nil
+}
+
+func defaultServiceManagerResourceName(subaccountID string) string {
+	sm := serviceinstancebase.ServiceInstance{
+		ServiceInstance: &btpcli.ServiceInstance{
+			Name:         defaultNamePrefix,
+			SubaccountID: subaccountID,
+		},
+	}
+
+	return sm.GenerateK8sResourceName()
 }

@@ -83,6 +83,9 @@ func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCl
 	if !si.Usable {
 		serviceInstance.AddComment(resources.WarnServiceInstanceNotUsable)
 	}
+	if smName == "" {
+		serviceInstance.AddComment(resources.WarnMissingServiceManagerName)
+	}
 
 	// Reference subaccount resource, if requested.
 	if resolveReferences {

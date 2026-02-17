@@ -11,6 +11,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/cloudmanagement"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicemanager"
 )
@@ -101,21 +102,28 @@ func convert(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.
 		return
 	}
 
-	// Export service instances that are not service manager. Note, which subaccounts are involved.
+	// Export service instances. Note involved subaccounts.
 	subaccounts := make(map[string]bool)
-	for _, si := range cache.All() {
-		if !si.IsServiceManager() {
-			eventHandler.Resource(convertServiceInstanceResource(ctx, btpClient, si, eventHandler, resolveReferences))
-			subaccounts[si.SubaccountID] = true
-		}
-	}
-
-	// Export selected service managers as well and take a note of their subaccounts.
 	subaccountsWithSM := make(map[string]bool)
+
 	for _, si := range cache.All() {
-		if si.IsServiceManager() {
+		// Make sure that the service instance is linked to a service manager instance.
+		err = servicemanager.AddServiceManagerResourceName(ctx, btpClient, si)
+		if err != nil {
+			slog.ErrorContext(ctx, "Failed to set service manager name for service instance", "id", si.GetID(), "error", err)
+		}
+
+		// Instances of certain services, e.g. Service Manager, Cloud Management or XSUAA, require special handling.
+		switch {
+		case si.IsCloudManagement():
+			cloudmanagement.Convert(ctx, btpClient, si, eventHandler, resolveReferences)
+			subaccounts[si.SubaccountID] = true
+		case si.IsServiceManager():
 			servicemanager.Convert(ctx, btpClient, si, eventHandler, resolveReferences)
 			subaccountsWithSM[si.SubaccountID] = true
+		default:
+			eventHandler.Resource(convertServiceInstanceResource(ctx, btpClient, si, eventHandler, resolveReferences))
+			subaccounts[si.SubaccountID] = true
 		}
 	}
 

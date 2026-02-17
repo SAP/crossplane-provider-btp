@@ -41,7 +41,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					SubaccountID: subAccountGuid,
 					Usable:       true,
 				},
-				OfferingName:        serviceinstancebase.OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				BindingID:           bindingID,
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
@@ -64,7 +64,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 							WriteConnectionSecretToReference: &v1.SecretReference{
 								Name:      resourceName,
-								Namespace: defaultSecretNamespace,
+								Namespace: resources.DefaultSecretNamespace,
 							},
 						},
 						ForProvider: v1beta1.ServiceManagerParameters{
@@ -106,7 +106,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
-									Namespace: defaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -127,7 +127,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					SubaccountID: subAccountGuid,
 					Usable:       true,
 				},
-				OfferingName:        serviceinstancebase.OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				BindingID:           bindingID,
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
@@ -151,7 +151,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
-									Namespace: defaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -173,7 +173,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					SubaccountID: subAccountGuid,
 					Usable:       true,
 				},
-				OfferingName:        serviceinstancebase.OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				BindingID:           "",
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
@@ -197,7 +197,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
-									Namespace: defaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -219,7 +219,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					SubaccountID: "",
 					Usable:       true,
 				},
-				OfferingName:        serviceinstancebase.OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				BindingID:           bindingID,
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
@@ -243,7 +243,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
-									Namespace: defaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -265,7 +265,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					SubaccountID: subAccountGuid,
 					Usable:       false,
 				},
-				OfferingName:        serviceinstancebase.OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				BindingID:           bindingID,
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
@@ -289,7 +289,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
-									Namespace: defaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -310,7 +310,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					SubaccountID: "",
 					Usable:       false,
 				},
-				OfferingName:        serviceinstancebase.OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				PlanName:            "",
 				BindingID:           "",
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
@@ -335,7 +335,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
-									Namespace: defaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -406,7 +406,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 						ResourceSpec: v1.ResourceSpec{
 							WriteConnectionSecretToReference: &v1.SecretReference{
 								Name:      resourceName,
-								Namespace: defaultSecretNamespace,
+								Namespace: resources.DefaultSecretNamespace,
 							},
 						},
 						ForProvider: v1beta1.ServiceManagerParameters{
@@ -432,7 +432,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 							ResourceSpec: v1.ResourceSpec{
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
-									Namespace: defaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{

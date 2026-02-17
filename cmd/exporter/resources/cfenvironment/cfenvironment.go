@@ -50,7 +50,7 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 	if cache.Len() == 0 {
 		eventHandler.Warn(fmt.Errorf("no CF environment instances found"))
 	} else {
-		// TODO: convert
+		convert(ctx, btpClient, eventHandler, resolveReferences)
 	}
 
 	return nil
@@ -119,9 +119,22 @@ func isCloudFoundryEnvironment(instance *btpcli.EnvironmentInstance) bool {
 	return instance.EnvironmentType == CfServiceName
 }
 
+func convert(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, resolveReferences bool) {
+	cache, err := Get(ctx, btpClient)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to get cache with cloud foundry environments", "error", err)
+		return
+	}
+
+	for _, e := range cache.All() {
+		eventHandler.Resource(convertCloudFoundryEnvResource(ctx, btpClient, e, eventHandler, resolveReferences))
+	}
+}
+
 type CloudFoundryEnvironment struct {
 	*btpcli.EnvironmentInstance
 	*yaml.ResourceWithComment
+	CloudManagementName string
 }
 
 var _ resources.BtpResource = &CloudFoundryEnvironment{}
