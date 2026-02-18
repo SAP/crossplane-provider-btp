@@ -139,8 +139,12 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 		return "", errors.Wrap(err, instanceCreateFailed)
 	}
 
-	for _, managerEmail := range cr.Spec.ForProvider.Managers {
-		if err := cloudFoundryClient.addManager(ctx, managerEmail, defaultOrigin); err != nil {
+	for _, manager := range cr.Spec.ForProvider.Managers {
+		origin := manager.Origin
+		if origin == "" {
+			origin = defaultOrigin
+		}
+		if err := cloudFoundryClient.addManager(ctx, manager.Username, origin); err != nil {
 			return "", errors.Wrap(err, instanceCreateFailed)
 		}
 	}

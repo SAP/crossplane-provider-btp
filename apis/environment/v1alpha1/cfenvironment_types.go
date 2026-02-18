@@ -47,7 +47,7 @@ type CfEnvironmentParameters struct {
 	// Cannot be updated after creation --> initial creation only
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="OrgManagers can't be updated once set"
 	// +optional
-	Managers []string `json:"initialOrgManagers,omitempty"`
+	Managers []User `json:"initialOrgManagers,omitempty"`
 
 	// Landscape, region of the cloud foundry org, e.g. cf-eu12
 	// must be set, when cloud foundry name is set
