@@ -107,7 +107,7 @@ func (c CloudFoundryOrganization) createClient(environment *provisioningclient.B
 
 	cloudFoundryClient, err := newOrganizationClient(
 		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
-		c.btp.Credential.UserCredential.Password,
+		c.btp.Credential.UserCredential.Password, c.btp.Credential.UserCredential.Idp,
 	)
 	return cloudFoundryClient, err
 }
@@ -118,7 +118,7 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 ) {
 	cloudFoundryClient, err := newOrganizationClient(
 		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
-		c.btp.Credential.UserCredential.Password,
+		c.btp.Credential.UserCredential.Password, c.btp.Credential.UserCredential.Idp,
 	)
 	return cloudFoundryClient, err
 }
@@ -200,10 +200,14 @@ func (o organizationClient) getManagerUsernames(ctx context.Context) ([]v1alpha1
 	return managers, nil
 }
 
-func newOrganizationClient(organizationName string, url string, orgId string, username string, password string) (
+func newOrganizationClient(organizationName string, url string, orgId string, username string, password string, origin string) (
 	*organizationClient, error,
 ) {
-	cfv3config, err := config.New(url, config.UserPassword(username, password))
+	configOpts := []config.Option{config.UserPassword(username, password)}
+	if origin != "" {
+		configOpts = append(configOpts, config.Origin(origin))
+	}
+	cfv3config, err := config.New(url, configOpts...)
 
 	if organizationName == "" {
 		return nil, fmt.Errorf("missing or empty organization name")
