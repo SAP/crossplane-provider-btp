@@ -10,6 +10,7 @@ import (
 	"github.com/SAP/xp-clifford/yaml"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/cloudmanagement"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
@@ -127,7 +128,21 @@ func convert(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.
 	}
 
 	for _, e := range cache.All() {
+		exportPrerequisiteResources(ctx, btpClient, e, eventHandler, resolveReferences)
 		eventHandler.Resource(convertCloudFoundryEnvResource(ctx, btpClient, e, eventHandler, resolveReferences))
+	}
+}
+
+func exportPrerequisiteResources(ctx context.Context, btpClient *btpcli.BtpCli, e *CloudFoundryEnvironment, eventHandler export.EventHandler, resolveReferences bool) {
+	// Export subaccount Cloud Management resource.
+	cmName, err := cloudmanagement.ExportInstanceForSubaccount(ctx, btpClient, e.SubaccountGUID, eventHandler, resolveReferences)
+	if err != nil {
+		slog.WarnContext(ctx, "Failed to export cloud management for subaccount", "subaccount", e.SubaccountGUID, "error", err)
+	}
+
+	// Set Cloud Management name in CF environment resource for reference.
+	if cmName != "" {
+		e.CloudManagementName = cmName
 	}
 }
 

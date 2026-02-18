@@ -151,12 +151,12 @@ func (si *ServiceInstance) cloudManagementExternalName() string {
 
 func (si *ServiceInstance) GenerateK8sResourceName() string {
 	name := si.GetDisplayName()
-	if name == "" || si.SubaccountID == "" {
+	saID := si.SubaccountID
+	if name == "" || saID == "" {
 		return resources.UndefinedName
 	}
 
-	resourceName := fmt.Sprintf("%s-%s", name, si.SubaccountID)
-
+	resourceName := fmt.Sprintf("%s-%s", name, saID)
 	resourceName, err := resources.GenerateK8sResourceName("", resourceName, "")
 	if err != nil {
 		si.AddComment(fmt.Sprintf("cannot generate resource name: %s", err))

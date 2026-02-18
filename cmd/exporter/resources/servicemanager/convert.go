@@ -91,8 +91,9 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	return serviceManager
 }
 
-func defaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
-	resourceName := defaultServiceManagerResourceName(subaccountID)
+func convertDefaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+	resourceName := si.GenerateK8sResourceName()
+	subaccountID := si.SubaccountID
 
 	serviceManager := yaml.NewResourceWithComment(
 		&v1beta1.ServiceManager{
@@ -115,6 +116,9 @@ func defaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 				},
 			},
 		})
+
+	// Copy comments from the original resource.
+	serviceManager.CloneComment(si)
 
 	// Comment the resource out, if any of the required fields is missing.
 	if subaccountID == "" {

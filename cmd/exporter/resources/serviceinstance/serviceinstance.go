@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"maps"
 
 	"github.com/SAP/xp-clifford/cli/configparam"
 	"github.com/SAP/xp-clifford/cli/export"
@@ -102,40 +101,31 @@ func convert(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.
 		return
 	}
 
-	// Export service instances. Note involved subaccounts.
-	subaccounts := make(map[string]bool)
-	subaccountsWithSM := make(map[string]bool)
-
+	// Export service instances.
 	for _, si := range cache.All() {
-		// Make sure that the service instance is linked to a service manager instance.
-		err = servicemanager.AddServiceManagerResourceName(ctx, btpClient, si)
-		if err != nil {
-			slog.ErrorContext(ctx, "Failed to set service manager name for service instance", "id", si.GetID(), "error", err)
-		}
-
 		// Instances of certain services, e.g. Service Manager, Cloud Management or XSUAA, require special handling.
 		switch {
 		case si.IsCloudManagement():
 			cloudmanagement.Convert(ctx, btpClient, si, eventHandler, resolveReferences)
-			subaccounts[si.SubaccountID] = true
 		case si.IsServiceManager():
 			servicemanager.Convert(ctx, btpClient, si, eventHandler, resolveReferences)
-			subaccountsWithSM[si.SubaccountID] = true
 		default:
+			exportPrerequisiteResources(ctx, btpClient, si, eventHandler, resolveReferences)
 			eventHandler.Resource(convertServiceInstanceResource(ctx, btpClient, si, eventHandler, resolveReferences))
-			subaccounts[si.SubaccountID] = true
 		}
 	}
+}
 
-	// Because service instance resources cannot be applied to the cluster without an accompanying service manager resource,
-	// we export those service manager resources in addition, even if they we not explicitly selected by the user,
-	// or even if the don't physically exist in BTP yet.
-	for saID := range maps.Keys(subaccounts) {
-		if !subaccountsWithSM[saID] {
-			err := servicemanager.EnsureExportForSubaccount(ctx, btpClient, saID, eventHandler, resolveReferences)
-			if err != nil {
-				slog.ErrorContext(ctx, "Failed to export service manager for subaccount", "subaccount ID", saID)
-			}
-		}
+func exportPrerequisiteResources(ctx context.Context, btpClient *btpcli.BtpCli, cm *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
+	// Export subaccount service manager.
+	saID := cm.SubaccountID
+	smName, err := servicemanager.ExportInstanceForSubaccount(ctx, btpClient, saID, eventHandler, resolveReferences)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to export service manager for subaccount", "subaccount ID", saID)
+	}
+
+	// Set Service Manager reference.
+	if smName != "" {
+		cm.ServiceManagerName = smName
 	}
 }

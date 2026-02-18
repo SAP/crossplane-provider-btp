@@ -449,7 +449,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := defaultServiceManagerResource(t.Context(), nil, tt.subaccountID, nil, false)
+			result := convertDefaultServiceManagerResource(t.Context(), nil, defaultServiceManager(tt.subaccountID), nil, false)
 			r.NotNil(result)
 
 			// Verify comments.

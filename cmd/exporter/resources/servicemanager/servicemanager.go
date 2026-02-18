@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/SAP/xp-clifford/cli/export"
+	"github.com/SAP/xp-clifford/yaml"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
@@ -17,6 +18,7 @@ const (
 
 var (
 	managerCache resources.ResourceCache[*serviceinstancebase.ServiceInstance]
+	registry     = resources.NewRegistry()
 )
 
 func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*serviceinstancebase.ServiceInstance], error) {
@@ -43,42 +45,38 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	return managerCache, nil
 }
 
-func AddServiceManagerResourceName(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance) error {
-	if si.IsServiceManager() {
-		// Service instance is service manager itself.
-		return nil
+func Convert(ctx context.Context, btpClient *btpcli.BtpCli, sm *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
+	if register(ctx, sm) {
+		eventHandler.Resource(convertServiceManagerResource(ctx, btpClient, sm, eventHandler, resolveReferences))
 	}
-
-	if si.ServiceManagerName != "" {
-		// Service manager name already present.
-		return nil
-	}
-
-	name, err := getServiceManagerResourceName(ctx, btpClient, si.SubaccountID)
-	if err != nil {
-		return fmt.Errorf("failed to get service manager name for subaccount %s: %w", si.SubaccountID, err)
-	}
-	si.ServiceManagerName = name
-
-	return nil
 }
 
-func Convert(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
-	eventHandler.Resource(convertServiceManagerResource(ctx, btpClient, si, eventHandler, resolveReferences))
+func convertDefault(ctx context.Context, btpClient *btpcli.BtpCli, sm *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
+	if register(ctx, sm) {
+		eventHandler.Resource(convertDefaultServiceManagerResource(ctx, btpClient, sm, eventHandler, resolveReferences))
+	}
 }
 
-func EnsureExportForSubaccount(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string, eventHandler export.EventHandler, resolveReferences bool) error {
+func register(ctx context.Context, sm *serviceinstancebase.ServiceInstance) bool {
+	success := registry.Register(sm.ID)
+	if !success {
+		slog.DebugContext(ctx, "Service manager already exported", "subaccount", sm.SubaccountID, "instance", sm.GetID())
+	}
+	return success
+}
+
+func ExportInstanceForSubaccount(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string, eventHandler export.EventHandler, resolveReferences bool) (string, error) {
 	sm, found, err := getServiceManager(ctx, btpClient, subaccountID)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve service manager for subaccount %s: %w", subaccountID, err)
+		return "", fmt.Errorf("failed to retrieve service manager for subaccount %s: %w", subaccountID, err)
 	}
 	if found {
-		eventHandler.Resource(convertServiceManagerResource(ctx, btpClient, sm, eventHandler, resolveReferences))
+		Convert(ctx, btpClient, sm, eventHandler, resolveReferences)
 	} else {
-		eventHandler.Resource(defaultServiceManagerResource(ctx, btpClient, subaccountID, eventHandler, resolveReferences))
+		convertDefault(ctx, btpClient, sm, eventHandler, resolveReferences)
 	}
 
-	return nil
+	return sm.GenerateK8sResourceName(), nil
 }
 
 func getServiceManager(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string) (*serviceinstancebase.ServiceInstance, bool, error) {
@@ -94,28 +92,17 @@ func getServiceManager(ctx context.Context, btpClient *btpcli.BtpCli, subaccount
 		}
 	}
 
-	return nil, false, nil
+	return defaultServiceManager(subaccountID), false, nil
 }
 
-func getServiceManagerResourceName(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string) (string, error) {
-	sm, found, err := getServiceManager(ctx, btpClient, subaccountID)
-	if err != nil {
-		return "", fmt.Errorf("failed to retrieve service manager for subaccount %s: %w", subaccountID, err)
-	}
-	if !found {
-		return defaultServiceManagerResourceName(subaccountID), nil
-	}
-
-	return sm.GenerateK8sResourceName(), nil
-}
-
-func defaultServiceManagerResourceName(subaccountID string) string {
-	sm := serviceinstancebase.ServiceInstance{
+func defaultServiceManager(subaccountID string) *serviceinstancebase.ServiceInstance {
+	return &serviceinstancebase.ServiceInstance{
 		ServiceInstance: &btpcli.ServiceInstance{
+			ID:           fmt.Sprintf("%s-%s", defaultNamePrefix, subaccountID),
 			Name:         defaultNamePrefix,
 			SubaccountID: subaccountID,
+			Usable:       true,
 		},
+		ResourceWithComment: yaml.NewResourceWithComment(nil),
 	}
-
-	return sm.GenerateK8sResourceName()
 }
