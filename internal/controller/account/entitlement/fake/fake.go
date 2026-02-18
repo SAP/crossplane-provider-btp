@@ -23,6 +23,13 @@ func (c MockClient) CreateInstance(ctx context.Context, cr *apisv1alpha1.Entitle
 func (c MockClient) UpdateInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) error {
 	return nil
 }
+func (c MockClient) DescribeInstanceCached(ctx context.Context, cr *apisv1alpha1.Entitlement) (
+	*entitlement.Instance,
+	error,
+) {
+	return c.MockDescribeCluster(ctx, *cr)
+}
+func (c MockClient) ClearDescribeInstanceCache(cr *apisv1alpha1.Entitlement) {}
 func (c MockClient) DeleteInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) error {
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	entitlementclient "github.com/sap/crossplane-provider-btp/internal/clients/entitlement"
 	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -15,12 +16,14 @@ import (
 
 // Setup adds a controller that reconciles Entitlement managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
+	cache := entitlementclient.NewInstanceCache()
 	return providerconfig.DefaultSetup(mgr, o, &apisv1alpha1.Entitlement{}, apisv1alpha1.EntitlementGroupKind, apisv1alpha1.EntitlementGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 		return &connector{
 			kube:            kube,
 			usage:           usage,
 			resourcetracker: resourcetracker,
 			newServiceFn:    btp.NewBTPClient,
+			cache:           cache,
 		}
 	})
 }
