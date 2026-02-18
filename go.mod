@@ -25,6 +25,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/int128/kubelogin v1.28.0
 	github.com/json-iterator/go v1.1.12
+	github.com/maypok86/otter/v2 v2.3.0
 	github.com/mitchellh/reflectwalk v1.0.2
 	github.com/muvaf/typewriter v0.0.0-20240614220100-70f9d4a54ea0
 	github.com/pkg/errors v0.9.1
