@@ -163,7 +163,18 @@ spec:
                       A list of users (with username/email and origin) to assign as the Org Manager role.
                       Cannot be updated after creation --> initial creation only
                     items:
-                      type: string
+                      description: User identifies a user by username and origin
+                      properties:
+                        origin:
+                          default: sap.ids
+                          description: Origin picks the IDP
+                          type: string
+                        username:
+                          description: Username at the identity provider
+                          type: string
+                      required:
+                      - username
+                      type: object
                     type: array
                     x-kubernetes-validations:
                     - message: OrgManagers can't be updated once set

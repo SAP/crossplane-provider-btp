@@ -8,7 +8,8 @@
 #    cloudManagementRef:
 #      name: cis-local
 #    initialOrgManagers:
-#      - <EMAIL>
+#      - username: <EMAIL>
+#        origin: sap.ids  # optional, defaults to sap.ids
 #    landscape: cf-eu10
 #  SubaccountRef:
 #    name: test-123455
