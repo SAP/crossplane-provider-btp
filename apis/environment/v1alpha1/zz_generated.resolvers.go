@@ -306,3 +306,61 @@ func (mg *KymaModule) ResolveReferences(ctx context.Context, c client.Reader) er
 
 	return nil
 }
+
+// ResolveReferences of this KymaServiceInstance.
+func (mg *KymaServiceInstance) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPIResolver(c, mg)
+
+	var rsp reference.ResolutionResponse
+	var err error
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.KymaEnvironmentBindingId,
+		Extract:      reference.ExternalName(),
+		Reference:    mg.Spec.KymaEnvironmentBindingRef,
+		Selector:     mg.Spec.KymaEnvironmentBindingSelector,
+		To: reference.To{
+			List:    &KymaEnvironmentBindingList{},
+			Managed: &KymaEnvironmentBinding{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.KymaEnvironmentBindingId")
+	}
+	mg.Spec.KymaEnvironmentBindingId = rsp.ResolvedValue
+	mg.Spec.KymaEnvironmentBindingRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.KymaEnvironmentBindingSecret,
+		Extract:      KymaEnvironmentBindingSecret(),
+		Reference:    mg.Spec.KymaEnvironmentBindingRef,
+		Selector:     mg.Spec.KymaEnvironmentBindingSelector,
+		To: reference.To{
+			List:    &KymaEnvironmentBindingList{},
+			Managed: &KymaEnvironmentBinding{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.KymaEnvironmentBindingSecret")
+	}
+	mg.Spec.KymaEnvironmentBindingSecret = rsp.ResolvedValue
+	mg.Spec.KymaEnvironmentBindingRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: mg.Spec.KymaEnvironmentBindingSecretNamespace,
+		Extract:      KymaEnvironmentBindingSecretNamespace(),
+		Reference:    mg.Spec.KymaEnvironmentBindingRef,
+		Selector:     mg.Spec.KymaEnvironmentBindingSelector,
+		To: reference.To{
+			List:    &KymaEnvironmentBindingList{},
+			Managed: &KymaEnvironmentBinding{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.KymaEnvironmentBindingSecretNamespace")
+	}
+	mg.Spec.KymaEnvironmentBindingSecretNamespace = rsp.ResolvedValue
+	mg.Spec.KymaEnvironmentBindingRef = rsp.ResolvedReference
+
+	return nil
+}

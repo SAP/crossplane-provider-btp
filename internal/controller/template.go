@@ -5,6 +5,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/internal/controller/kymamodule"
+	"github.com/sap/crossplane-provider-btp/internal/controller/kymaserviceinstance"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/cloudmanagement"
@@ -47,6 +48,7 @@ func CustomSetup(mgr ctrl.Manager, o controller.Options) error {
 		servicebinding.Setup,
 		kymaenvironmentbinding.Setup,
 		kymamodule.Setup,
+		kymaserviceinstance.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err
