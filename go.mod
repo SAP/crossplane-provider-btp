@@ -13,17 +13,17 @@ require (
 	dario.cat/mergo v1.0.2
 	github.com/SAP/xp-clifford v0.0.0-20260202115841-f2ef82b7144e
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.12
+	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.18
 	github.com/crossplane-contrib/xp-testing v1.9.0
 	github.com/crossplane/crossplane-runtime v1.20.0
-	github.com/crossplane/crossplane-tools v0.0.0-20240522174801-1ad3d4c87f21
-	github.com/crossplane/upjet v1.9.0
+	github.com/crossplane/crossplane-tools v0.0.0-20251017183449-dd4517244339
+	github.com/crossplane/upjet v1.11.0
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/runtime v0.29.2
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/int128/kubelogin v1.28.0
+	github.com/int128/kubelogin v1.31.0
 	github.com/json-iterator/go v1.1.12
 	github.com/mitchellh/reflectwalk v1.0.2
 	github.com/muvaf/typewriter v0.0.0-20240614220100-70f9d4a54ea0
@@ -31,7 +31,7 @@ require (
 	github.com/samber/lo v1.52.0
 	github.com/stretchr/testify v1.11.1
 	github.com/vladimirvivien/gexe v0.5.0
-	golang.org/x/oauth2 v0.34.0
+	golang.org/x/oauth2 v0.35.0
 	golang.org/x/sync v0.19.0
 	gopkg.in/validator.v2 v2.0.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -39,7 +39,7 @@ require (
 	k8s.io/apimachinery v0.35.1
 	k8s.io/client-go v0.35.1
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
+	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/controller-runtime v0.20.0
 	sigs.k8s.io/controller-tools v0.16.5
 	sigs.k8s.io/e2e-framework v0.6.0
@@ -77,8 +77,8 @@ require (
 	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.15.1 // indirect
-	github.com/coreos/go-oidc/v3 v3.6.0 // indirect
-	github.com/dave/jennifer v1.7.0 // indirect
+	github.com/coreos/go-oidc/v3 v3.11.0 // indirect
+	github.com/dave/jennifer v1.7.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
@@ -95,7 +95,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
@@ -127,7 +127,7 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-containerregistry v0.20.2 // indirect
-	github.com/google/wire v0.5.0 // indirect
+	github.com/google/wire v0.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/hashicorp/go-cty v1.5.0 // indirect
@@ -149,7 +149,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/int128/listener v1.1.0 // indirect
 	github.com/int128/oauth2cli v1.14.0 // indirect
-	github.com/int128/oauth2dev v1.0.0 // indirect
+	github.com/int128/oauth2dev v1.0.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
