@@ -33,7 +33,7 @@ func (mg *SubaccountServiceBroker) GetTerraformResourceType() string {
 
 // GetConnectionDetailsMapping for this SubaccountServiceBroker
 func (tr *SubaccountServiceBroker) GetConnectionDetailsMapping() map[string]string {
-	return map[string]string{"password": "passwordSecretRef"}
+	return map[string]string{"cert": "certSecretRef", "key": "keySecretRef", "password": "passwordSecretRef"}
 }
 
 // GetObservation of this SubaccountServiceBroker
