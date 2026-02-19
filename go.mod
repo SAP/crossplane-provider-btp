@@ -13,7 +13,7 @@ require (
 	dario.cat/mergo v1.0.2
 	github.com/SAP/xp-clifford v0.0.0-20260202115841-f2ef82b7144e
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.12
+	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.18
 	github.com/crossplane-contrib/xp-testing v1.9.0
 	github.com/crossplane/crossplane-runtime v1.20.0
 	github.com/crossplane/crossplane-tools v0.0.0-20251017183449-dd4517244339
