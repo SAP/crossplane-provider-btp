@@ -58,7 +58,7 @@ func convertDefault(ctx context.Context, btpClient *btpcli.BtpCli, sm *servicein
 }
 
 func register(ctx context.Context, sm *serviceinstancebase.ServiceInstance) bool {
-	success := registry.Register(sm.ID)
+	success := registry.Register(sm.GetID())
 	if !success {
 		slog.DebugContext(ctx, "Service manager already exported", "subaccount", sm.SubaccountID, "instance", sm.GetID())
 	}

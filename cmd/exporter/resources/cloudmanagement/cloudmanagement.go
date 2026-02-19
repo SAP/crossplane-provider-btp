@@ -9,6 +9,7 @@ import (
 	"github.com/SAP/xp-clifford/yaml"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicemanager"
 )
@@ -54,12 +55,14 @@ func Convert(ctx context.Context, btpClient *btpcli.BtpCli, cm *serviceinstanceb
 }
 
 func convertDefault(ctx context.Context, btpClient *btpcli.BtpCli, cm *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
-	exportPrerequisiteResources(ctx, btpClient, cm, eventHandler, resolveReferences)
-	eventHandler.Resource(convertDefaultCloudManagementResource(ctx, btpClient, cm, eventHandler, resolveReferences))
+	if register(ctx, cm) {
+		exportPrerequisiteResources(ctx, btpClient, cm, eventHandler, resolveReferences)
+		eventHandler.Resource(convertDefaultCloudManagementResource(ctx, btpClient, cm, eventHandler, resolveReferences))
+	}
 }
 
 func register(ctx context.Context, cm *serviceinstancebase.ServiceInstance) bool {
-	success := registry.Register(cm.ID)
+	success := registry.Register(cm.GetID())
 	if !success {
 		slog.DebugContext(ctx, "Cloud management already exported", "subaccount", cm.SubaccountID, "instance", cm.GetID())
 	}
@@ -98,6 +101,22 @@ func getCloudManagement(ctx context.Context, btpClient *btpcli.BtpCli, subaccoun
 }
 
 func exportPrerequisiteResources(ctx context.Context, btpClient *btpcli.BtpCli, cm *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
+	exportPrerequisiteEntitlement(ctx, btpClient, cm, eventHandler, resolveReferences)
+	exportPrerequisiteSM(ctx, btpClient, cm, eventHandler, resolveReferences)
+}
+
+func exportPrerequisiteEntitlement(ctx context.Context, btpClient *btpcli.BtpCli, cm *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
+	saID := cm.SubaccountID
+	service := serviceinstancebase.CloudManagementOffering
+	plan := serviceinstancebase.CloudManagementPlan
+
+	err := entitlement.ExportEntitlement(ctx, btpClient, saID, service, plan, eventHandler, resolveReferences)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to cloud management for subaccount", "subaccount ID", saID)
+	}
+}
+
+func exportPrerequisiteSM(ctx context.Context, btpClient *btpcli.BtpCli, cm *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
 	// Export subaccount service manager.
 	saID := cm.SubaccountID
 	smName, err := servicemanager.ExportInstanceForSubaccount(ctx, btpClient, saID, eventHandler, resolveReferences)
