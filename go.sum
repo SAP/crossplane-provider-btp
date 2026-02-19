@@ -426,8 +426,8 @@ github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lpr
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
-github.com/SAP/xp-clifford v0.0.0-20260202115841-f2ef82b7144e h1:RXvWGonwppAxSMUpVQYQegKM3UtuDGx6XJxxOa8SCgA=
-github.com/SAP/xp-clifford v0.0.0-20260202115841-f2ef82b7144e/go.mod h1:Lqf+X8dX0Teg4Y9CJvsEpRYQn1B1KOfAA6HXU6dUOgg=
+github.com/SAP/xp-clifford v0.0.0-20260205091836-ee61a788e6da h1:JLZ4UnY6f74OSY0CQVSDNgl3vmphDMrNW174OGDX4P8=
+github.com/SAP/xp-clifford v0.0.0-20260205091836-ee61a788e6da/go.mod h1:Lqf+X8dX0Teg4Y9CJvsEpRYQn1B1KOfAA6HXU6dUOgg=
 github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=
 github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMxUHB2q5Ap20/P/eIdh4G0pI=
 github.com/VividCortex/gohistogram v1.0.0/go.mod h1:Pf5mBqqDxYaXu3hDrrU+w6nw50o/4+TcAqDqk/vUH7g=
