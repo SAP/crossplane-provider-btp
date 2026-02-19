@@ -136,6 +136,9 @@ func convertDefaultEntitlementResource(ctx context.Context, btpClient *btpcli.Bt
 	if resourceName == resources.UndefinedName {
 		managedEntitlement.AddComment(resources.WarnUndefinedResourceName)
 	}
+	if !isEnable {
+		managedEntitlement.AddComment(resources.WarnDefaultEntitlementEnableFalse)
+	}
 
 	// Reference subaccount resource, if requested.
 	if resolveReferences {

@@ -207,10 +207,10 @@ func getEntitlement(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID 
 		}
 	}
 
-	return defaultCloudManagement(subaccountID, serviceName, planName), false, nil
+	return defaultEntitlement(subaccountID, serviceName, planName), false, nil
 }
 
-func defaultCloudManagement(subaccountID string, serviceName string, planName string) *entitlement {
+func defaultEntitlement(subaccountID string, serviceName string, planName string) *entitlement {
 	return &entitlement{
 		serviceName: serviceName,
 		planName:    planName,
