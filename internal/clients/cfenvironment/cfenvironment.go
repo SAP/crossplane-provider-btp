@@ -82,7 +82,7 @@ func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling
 
 	// Try GUID lookup first (new standard format)
 	if internal.IsValidUUID(externalName) {
-		environment, notFound, err := c.btp.GetEnvironmentsByIdNew(ctx, externalName)
+		environment, notFound, err := c.btp.GetEnvironmentInstanceByID(ctx, externalName)
 		if notFound {
 			return nil, nil
 		}
@@ -149,7 +149,7 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error) {
 	adminServiceAccountEmail := c.btp.Credential.UserCredential.Email
 	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
-	instanceId, org, err := c.btp.CreateCloudFoundryOrgIfNotExists(
+	instanceId, org, err := c.btp.CreateCloudFoundryEnvironmentAndGetOrg(
 		ctx, cr.Name, adminServiceAccountEmail, string(cr.UID),
 		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName,
 	)
@@ -176,7 +176,7 @@ func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha
 
 	// Use external-name for deletion
 	// Legacy format does not need to be handled since the ID will be updated in Observe phase already to the GUID
-	return c.btp.DeleteEnvironmentById(ctx, externalName)
+	return c.btp.DeleteEnvironmentInstanceByID(ctx, externalName)
 }
 
 func formOrgName(orgName string, subaccountId string, crName string) string {

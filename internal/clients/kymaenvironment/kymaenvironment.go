@@ -76,7 +76,7 @@ func (c KymaEnvironments) DeleteInstance(ctx context.Context, cr v1alpha1.KymaEn
 	if cr.Status.AtProvider.ID == nil {
 		return errors.New(errInstanceIdNotFound)
 	}
-	_, err := c.btp.DeleteEnvironmentById(ctx, *cr.Status.AtProvider.ID)
+	_, err := c.btp.DeleteEnvironmentInstanceByID(ctx, *cr.Status.AtProvider.ID)
 	return err
 }
 
