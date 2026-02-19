@@ -167,6 +167,35 @@ func TestObserve(t *testing.T) {
 				}), WithExternalName("name1/plan2")),
 			},
 		},
+		"ObserveOnly_RequiresCorrectExternalNameFormat": {
+			reason: "Observe-only resource with default external-name should return validation error",
+			args: args{
+				cr: NewSubscription("test-subscription",
+					WithData(v1alpha1.SubscriptionSpec{
+						ForProvider: v1alpha1.SubscriptionParameters{
+							AppName:  "sapappstudio",
+							PlanName: "standard-edition",
+						},
+					}),
+					WithManagementPolicies(xpv1.ManagementActionObserve),
+					WithExternalName("test-subscription"), // Wrong - equals metadata.name
+				),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.New("For Observe-only Subscriptions, external-name must be set to 'appName/planName' format. Found: 'test-subscription'. Expected: 'sapappstudio/standard-edition'. Please set the annotation: crossplane.io/external-name: \"sapappstudio/standard-edition\""),
+				cr: NewSubscription("test-subscription",
+					WithData(v1alpha1.SubscriptionSpec{
+						ForProvider: v1alpha1.SubscriptionParameters{
+							AppName:  "sapappstudio",
+							PlanName: "standard-edition",
+						},
+					}),
+					WithManagementPolicies(xpv1.ManagementActionObserve),
+					WithExternalName("test-subscription"),
+				),
+			},
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -679,5 +708,56 @@ func WithExternalName(externalName string) SubscriptionModifier {
 func WithRecreateOnSubscriptionFailure() SubscriptionModifier {
 	return func(r *v1alpha1.Subscription) {
 		r.Spec.RecreateOnSubscriptionFailure = true
+	}
+}
+
+func TestIsObserveOnly(t *testing.T) {
+	tests := map[string]struct {
+		managementPolicies []xpv1.ManagementAction
+		expected           bool
+	}{
+		"ObserveOnly": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve},
+			expected:           true,
+		},
+		"AllActions": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionAll},
+			expected:           false,
+		},
+		"IncludesCreate": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve, xpv1.ManagementActionCreate},
+			expected:           false,
+		},
+		"ObserveAndUpdate": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve, xpv1.ManagementActionUpdate},
+			expected:           true,
+		},
+		"EmptyDefault": {
+			managementPolicies: []xpv1.ManagementAction{},
+			expected:           false,
+		},
+		"NilDefault": {
+			managementPolicies: nil,
+			expected:           false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cr := &v1alpha1.Subscription{
+				Spec: v1alpha1.SubscriptionSpec{},
+			}
+			cr.Spec.ManagementPolicies = tc.managementPolicies
+			got := isObserveOnly(cr)
+			if got != tc.expected {
+				t.Errorf("isObserveOnly() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func WithManagementPolicies(policies ...xpv1.ManagementAction) SubscriptionModifier {
+	return func(r *v1alpha1.Subscription) {
+		r.Spec.ManagementPolicies = policies
 	}
 }
