@@ -73,10 +73,9 @@ func (c CloudFoundryOrganization) DescribeInstance(
 // returns (environment, needsExternalNameFormatMigration, error)
 func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	externalName := meta.GetExternalName(&cr)
-	annotationOrgId := cr.Annotations["createdOrgGuid"]
 
 	// Empty external-name check
-	if externalName == "" && annotationOrgId == "" {
+	if externalName == "" {
 		return nil, nil
 	}
 
@@ -94,7 +93,7 @@ func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling
 
 	// Backwards compatibility: try legacy lookup by orgName and name. Name was set as external name in v1.1.0
 	// This handles migration from v1.1.0 (orgName) and v1.0.0 (metadata.name)
-	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	orgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	environment, err := c.btp.GetCFEnvironmentByNameAndOrg(ctx, externalName, orgName)
 	if err != nil {
 		return nil, err
@@ -148,7 +147,7 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 
 func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error) {
 	adminServiceAccountEmail := c.btp.Credential.UserCredential.Email
-	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	orgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	instanceId, org, err := c.btp.CreateCloudFoundryEnvironmentAndGetOrg(
 		ctx, cr.Name, adminServiceAccountEmail, string(cr.UID),
 		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName,
@@ -179,7 +178,7 @@ func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha
 	return c.btp.DeleteEnvironmentInstanceByID(ctx, externalName)
 }
 
-func formOrgName(orgName string, subaccountId string, crName string) string {
+func FormOrgName(orgName string, subaccountId string, crName string) string {
 	if orgName == "" {
 		return subaccountId + "-" + crName
 	}

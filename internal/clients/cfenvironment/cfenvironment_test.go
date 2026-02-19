@@ -45,7 +45,7 @@ func TestFormOrgName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := formOrgName(tt.orgName, tt.subaccountId, tt.crName); got != tt.want {
+			if got := FormOrgName(tt.orgName, tt.subaccountId, tt.crName); got != tt.want {
 				t.Errorf("formOrgName() = %v, want %v", got, tt.want)
 			}
 		})
@@ -144,7 +144,7 @@ func TestCloudFoundryOrganization_LegacyFormatHandling(t *testing.T) {
 
 	// Verify orgName is correctly formed for legacy lookup
 	expectedOrgName := "custom-org" // OrgName takes precedence
-	actualOrgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	actualOrgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	if actualOrgName != expectedOrgName {
 		t.Errorf("OrgName mismatch: got %v, want %v", actualOrgName, expectedOrgName)
 	}
@@ -249,7 +249,7 @@ func TestCloudFoundryOrganization_getEnvironmentByNameAndOrg_Legacy(t *testing.T
 			}
 
 			externalName := tt.cr.Annotations["crossplane.io/external-name"]
-			orgName := formOrgName(tt.cr.Spec.ForProvider.OrgName, tt.cr.Spec.SubaccountGuid, tt.cr.Name)
+			orgName := FormOrgName(tt.cr.Spec.ForProvider.OrgName, tt.cr.Spec.SubaccountGuid, tt.cr.Name)
 
 			got, err := c.btp.GetCFEnvironmentByNameAndOrg(context.TODO(), externalName, orgName)
 			if (err != nil) != tt.wantErr {

@@ -142,7 +142,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// Set external-name to GUID format if necessary. This means it migrates from old formats
-	if externalName != *instance.Id {
+	// Backwards compatibility:  > v1.1.0 (orgName) and v1.0.0 (metadata.name)
+	orgName := env.FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	if externalName == cr.Name || externalName == orgName {
 		meta.SetExternalName(cr, *instance.Id)
 		if err := c.kube.Update(ctx, cr); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, "failed to update external-name to GUID format")
@@ -190,7 +192,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
+		// external resource. These will be stored as the connection secret.x	x
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
