@@ -8,10 +8,10 @@ export TERRAFORM_VERSION ?= 1.3.9
 
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
-export TERRAFORM_PROVIDER_VERSION ?= 1.20.0
+export TERRAFORM_PROVIDER_VERSION ?= 1.18.0
 export TERRAFORM_PROVIDER_DOWNLOAD_NAME ?= terraform-provider-btp
 export TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX ?= https://releases.hashicorp.com/$(TERRAFORM_PROVIDER_DOWNLOAD_NAME)/$(TERRAFORM_PROVIDER_VERSION)
-export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.20.0_x5
+export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.18.0_x5
 export TERRAFORM_DOCS_PATH ?= docs/resources
 
 # set BUILD_ID if its not running in an action

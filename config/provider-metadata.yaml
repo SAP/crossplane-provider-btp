@@ -563,7 +563,7 @@ resources:
         importStatements: []
     btp_subaccount_destination:
         subCategory: ""
-        description: 'Manages a destination in a SAP BTP subaccount or in the scope of a specific service instance. This resource must be preferred only for HTTP destinations. We recommend using the resource ''btp_subaccount_destination_generic'' to accommodate all types. Tip: You must have the appropriate connectivity and destination permissions, such as: Subaccount Administrator Destination Administrator Connectivity and Destination Administrator Scope: Subaccount-level destination: Specify only the ''subaccount_id'' and ''name'' attribute.Service instance-level destination: Specify the ''subaccount_id'', ''service_instance_id'' and ''name'' attributes. Notes: ''service_instance_id'' is optional. When omitted, the destination is created at the subaccount level.'
+        description: 'Manages a destination in a SAP BTP subaccount or in the scope of a specific service instance. Tip: You must have the appropriate connectivity and destination permissions, such as: Subaccount Administrator Destination Administrator Connectivity and Destination Administrator Scope: Subaccount-level destination: Specify only the ''subaccount_id'' and ''name'' attribute.Service instance-level destination: Specify the ''subaccount_id'', ''service_instance_id'' and ''name'' attributes. Notes: ''service_instance_id'' is optional. When omitted, the destination is created at the subaccount level.'
         name: btp_subaccount_destination
         title: btp_subaccount_destination Resource - terraform-provider-btp
         examples:
@@ -580,76 +580,44 @@ resources:
                   "type": "HTTP",
                   "url": "https://myservice.example.com"
                 }
-            - name: destination-without-service-instance
+            - name: destination
               manifest: |-
                 {
                   "additional_configuration": "${jsonencode({\n    Abc = \"good\"\n  })}",
                   "authentication": "NoAuthentication",
                   "description": "resource",
-                  "name": "destination-without-service-instance",
+                  "name": "destination",
                   "proxy_type": "Internet",
                   "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
                   "type": "HTTP",
                   "url": "https://myservice.example.com"
                 }
-            - name: destination-without-additional-configuration
+            - name: destination
               manifest: |-
                 {
                   "authentication": "NoAuthentication",
                   "description": "resource",
-                  "name": "destination-without-additional-configuration",
+                  "name": "destination",
                   "proxy_type": "Internet",
                   "service_instance_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
                   "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
                   "type": "HTTP",
                   "url": "https://myservice.example.com"
                 }
-            - name: destination-with-additional-configuration
+            - name: destination
               manifest: |-
                 {
                   "additional_configuration": "${jsonencode({\n    ClientID            = \"\u003cclientid\u003e\"\n    ClientSecret        = \"\u003cclientsecret\u003e\"\n    TokenServiceURL     = \"https://tokenurl\"\n    TokenServiceURLType = \"dedicated\"\n  })}",
                   "authentication": "OAuth2ClientCredentials",
                   "description": "resource",
-                  "name": "destination-with-additional-configuration",
+                  "name": "destination",
                   "proxy_type": "Internet",
                   "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
                   "type": "HTTP",
                   "url": "https://myservice.example.com"
                 }
-            - name: rfc_dest
-              manifest: |-
-                {
-                  "additional_configuration": "${jsonencode({\n    \"jco.client.ashost\"                     = \"abc\"\n    \"jco.client.client\"                     = \"001\"\n    \"jco.client.delta\"                      = \"1\"\n    \"jco.client.network\"                    = \"LAN\"\n    \"jco.client.passwd\"                     = \"Welcome1\"\n    \"jco.client.serialization_format\"       = \"rowBased\"\n    \"jco.client.sysnr\"                      = \"00\"\n    \"jco.client.trace\"                      = \"0\"\n    \"jco.client.user\"                       = \"SAPIPS\"\n    \"jco.destination.auth_type\"             = \"CONFIGURED_USER\"\n    \"jco.destination.pool_check_connection\" = \"0\"\n    \"jco.destination.proxy_type\"            = \"OnPremise\"\n    \"jco.destination.description\"           = \"RFC destination test\"\n  })}",
-                  "name": "rfc_dest",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
-                  "type": "RFC"
-                }
-            - name: ldap_dest
-              manifest: |-
-                {
-                  "additional_configuration": "${jsonencode({\n    \"ldap.url\"            = \"ldap://ldap.example.com:389\"\n    \"ldap.proxyType\"      = \"Internet\"\n    \"ldap.description\"    = \"LDAP destination test\"\n    \"ldap.authentication\" = \"BasicAuthentication\"\n    \"ldap.user\"           = \"abc\"\n    \"ldap.password\"       = \"abc\"\n  })}",
-                  "name": "ldap_dest",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
-                  "type": "LDAP"
-                }
-            - name: mail_dest
-              manifest: |-
-                {
-                  "additional_configuration": "${jsonencode({\n    \"mail.smtp.host\"          = \"smtp.example.com\"\n    \"mail.smtp.port\"          = \"587\"\n    \"mail.smtp.auth\"          = \"true\"\n    \"mail.description\"        = \"MAIL destination test\"\n    \"mail.user\"               = \"user@example.com\"\n    \"mail.password\"           = \"secret\"\n    \"mail.transport.protocol\" = \"smtp\"\n    \"ProxyType\"               = \"Internet\"\n    \"Authentication\"          = \"BasicAuthentication\"\n  })}",
-                  "name": "mail_dest",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
-                  "type": "MAIL"
-                }
-            - name: tcp_dest
-              manifest: |-
-                {
-                  "additional_configuration": "${jsonencode({\n    \"Address\"     = \"host:1234\",\n    \"ProxyType\"   = \"OnPremise\",\n    \"Description\" = \"TCP destination example\"\n  })}",
-                  "name": "tcp_dest",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
-                  "type": "TCP"
-                }
         argumentDocs:
-            additional_configuration: (String, Sensitive) The additional configuration parameters for the destination.
+            additional_configuration: (String) The additional configuration parameters for the destination.
             authentication: (String) The authentication of the destination.
             creation_time: (String) The date and time when the resource was created in
             description: (String) The description of the destination.
@@ -737,65 +705,6 @@ resources:
             id: (String, Deprecated) The ID of the destination fragment used for import operations.
             name: (String) The name of the destination fragment.
             service_instance_id: (String) The ID of the service instance.
-            subaccount_id: (String) The ID of the subaccount.
-        importStatements: []
-    btp_subaccount_destination_generic:
-        subCategory: ""
-        description: 'Manages a destination in a SAP BTP subaccount or in the scope of a specific service instance. Tip: You must have the appropriate connectivity and destination permissions, such as: Subaccount Administrator Destination Administrator Connectivity and Destination Administrator Scope: Subaccount-level destination: Specify only the ''subaccount_id'' attribute.Service instance-level destination: Specify the ''subaccount_id'' and ''service_instance_id'' attributes. Notes: ''service_instance_id'' is optional. When omitted, the destination is created at the subaccount level.'
-        name: btp_subaccount_destination_generic
-        title: btp_subaccount_destination_generic Resource - terraform-provider-btp
-        examples:
-            - name: http_dest
-              manifest: |-
-                {
-                  "destination_configuration": "${jsonencode({\n    \"Name\"           = \"project\"\n    \"Type\"           = \"HTTP\"\n    \"ProxyType\"      = \"Internet\"\n    \"URL\"            = \"https://myservice.example.com\"\n    \"Authentication\" = \"NoAuthentication\"\n    \"Description\"    = \"trial destination of basic usecase with service instance\"\n\n  })}",
-                  "service_instance_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
-                }
-            - name: destination
-              manifest: |-
-                {
-                  "destination_configuration": "${jsonencode({\n    \"Name\"           = \"project\"\n    \"Type\"           = \"HTTP\"\n    \"ProxyType\"      = \"Internet\"\n    \"URL\"            = \"https://myservice.example.com\"\n    \"Authentication\" = \"NoAuthentication\"\n    \"Description\"    = \"trial destination of basic usecase \"\n  })}",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
-                }
-            - name: http_dest_with_destination_configuration_auth
-              manifest: |-
-                {
-                  "destination_configuration": "${jsonencode({\n    \"Name\"            = \"project_with_auth\"\n    \"Type\"            = \"HTTP\"\n    \"clientId\"        = \"abc\"\n    \"tokenServiceURL\" = \"https://myservice.example.com\"\n    \"ProxyType\"       = \"Internet\"\n    \"URL\"             = \"https://myservice.example.com\"\n    \"Authentication\"  = \"OAuth2ClientCredentials\"\n    \"Description\"     = \"trial destination of basic usecase with service instance and with addditional variables update\"\n  })}",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
-                }
-            - name: rfc_dest
-              manifest: |-
-                {
-                  "destination_configuration": "${jsonencode({\n    \"Name\"                                  = \"rfc_dest\"\n    \"Type\"                                  = \"RFC\"\n    \"jco.client.ashost\"                     = \"va4hci\"\n    \"jco.client.client\"                     = \"001\"\n    \"jco.client.delta\"                      = \"1\"\n    \"jco.client.network\"                    = \"LAN\"\n    \"jco.client.passwd\"                     = \"Welcome1\"\n    \"jco.client.serialization_format\"       = \"rowBased\"\n    \"jco.client.sysnr\"                      = \"00\"\n    \"jco.client.trace\"                      = \"0\"\n    \"jco.client.user\"                       = \"SAPIPS\"\n    \"jco.destination.auth_type\"             = \"CONFIGURED_USER\"\n    \"jco.destination.pool_check_connection\" = \"0\"\n    \"jco.destination.proxy_type\"            = \"OnPremise\"\n    \"jco.destination.description\"           = \"RFC destination test update\"\n  })}",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
-                }
-            - name: ldap_dest
-              manifest: |-
-                {
-                  "destination_configuration": "${jsonencode({\n    \"Name\"                = \"ldap_dest\"\n    \"Type\"                = \"LDAP\"\n    \"ldap.url\"            = \"ldap://ldap.example.com:389\"\n    \"ldap.proxyType\"      = \"Internet\"\n    \"ldap.description\"    = \"LDAP destination test update\"\n    \"ldap.authentication\" = \"BasicAuthentication\"\n    \"ldap.user\"           = \"abc\"\n    \"ldap.password\"       = \"abc\"\n  })}",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
-                }
-            - name: mail_dest
-              manifest: |-
-                {
-                  "destination_configuration": "${jsonencode({\n    \"Name\"             = \"mail_dest\"\n    \"Type\"             = \"MAIL\"\n    \"Authentication\"   = \"BasicAuthentication\"\n    \"ProxyType\"        = \"OnPremise\"\n    \"mail.description\" = \"MAIL destination test update\"\n    \"mail.user\"        = \"user@example.com\"\n    \"mail.password\"    = \"secret\"\n  })}",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
-                }
-            - name: tcp_dest
-              manifest: |-
-                {
-                  "destination_configuration": "${jsonencode({\n    \"Name\"        = \"tcp_dest\"\n    \"Type\"        = \"TCP\"\n    \"Address\"     = \"host:1234\"\n    \"ProxyType\"   = \"OnPremise\"\n    \"Description\" = \"TCP destination example update\"\n  })}",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
-                }
-        argumentDocs:
-            creation_time: (String) The date and time when the resource was created
-            destination_configuration: (String, Sensitive) The configuration parameters for the destination.
-            etag: (String) The etag for the destination resource
-            id: (String, Deprecated) The ID of the destination used for import operations.
-            modification_time: (String) The date and time when the resource was modified
-            name: (String) The descriptive name of the destination for subaccount
-            service_instance_id: (String) The service instance that becomes part of the path used to access the destination of the subaccount.
             subaccount_id: (String) The ID of the subaccount.
         importStatements: []
     btp_subaccount_entitlement:
@@ -1045,48 +954,6 @@ resources:
             role_collection_name: (String) The name of the role collection.
             subaccount_id: (String) The ID of the subaccount.
             user_name: (String) The username of the user to assign.
-        importStatements: []
-    btp_subaccount_role_collection_base:
-        subCategory: ""
-        description: Creates a role collection base in a subaccount. Prerequisites You must be assigned to the admin role of the subaccount. Conflict of Authority Warning [!CAUTION] Roles can be defined either directly using the
-        name: btp_subaccount_role_collection_base
-        title: btp_subaccount_role_collection_base Resource - terraform-provider-btp
-        examples:
-            - name: my_collection
-              manifest: |-
-                {
-                  "description": "A description of what the role collection is supposed to do.",
-                  "name": "My own role collection",
-                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
-                }
-        argumentDocs:
-            description: (String) The description of the role collection.
-            id: (String, Deprecated) The combined unique ID of the role collection as used for import operations.
-            name: (String) The name of the role collection.
-            subaccount_id: (String) The ID of the subaccount.
-        importStatements: []
-    btp_subaccount_role_collection_role:
-        subCategory: ""
-        description: Creates a role collection role in a subaccount. This resource is used to assign individual roles to a role collection container. Prerequisites You must be assigned to the admin role of the subaccount.A role collection container must already exist. This can be managed via the btp_subaccount_role_collection_base resource. Conflict of Authority Warning [!CAUTION] Roles within a collection can be managed either using the
-        name: btp_subaccount_role_collection_role
-        title: btp_subaccount_role_collection_role Resource - terraform-provider-btp
-        examples:
-            - name: my_collection_role
-              manifest: |-
-                {
-                  "name": "\u003ccollection_name\u003e",
-                  "role_name": "\u003crole_name\u003e",
-                  "role_template_app_id": "\u003crole_template_app_id\u003e",
-                  "role_template_name": "\u003crole_template_name\u003e",
-                  "subaccount_id": "\u003csubaccount_id\u003e"
-                }
-        argumentDocs:
-            id: (String, Deprecated) The combined unique ID of the role collection as used for import operations.
-            name: (String) The name of the role collection.
-            role_name: (String) The name of the referenced role.
-            role_template_app_id: (String) The name of the referenced template app id.
-            role_template_name: (String) The name of the referenced role template.
-            subaccount_id: (String) The ID of the subaccount.
         importStatements: []
     btp_subaccount_security_settings:
         subCategory: ""
