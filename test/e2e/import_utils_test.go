@@ -120,7 +120,7 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 
 				log("Creating resource on external system to be imported later", createResource, func() {
 					if err := cfg.Client().Resources().Create(ctx, createResource); err != nil {
-						t.Fatalf("Failed to create Subaccount for import test: %v", err)
+						t.Fatalf("Failed to create resource for import test: %v", err)
 					}
 					waitForResource(createResource, cfg, t, it.WaitCreateTimeout)
 				})
@@ -140,7 +140,7 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 				return ctx
 			},
 		).Assess(
-		"Check Imported Subaccount gets healthy", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+		"Check Imported Resource gets healthy", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			externalName := ctx.Value(importFeatureContextKey).(string)
 
 			//preare the resource for import

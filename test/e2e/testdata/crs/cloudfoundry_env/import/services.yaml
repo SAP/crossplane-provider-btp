@@ -1,0 +1,28 @@
+---
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: ServiceManager
+metadata:
+  name: service-manager-cf-import
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: service-manager-cf-import
+    namespace: default
+  forProvider:
+    subaccountRef:
+      name: cf-import-test-subaccount
+---
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: CloudManagement
+metadata:
+  name: cis-local-cf-import
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: cis-local-cf-import
+    namespace: default
+  forProvider:
+    serviceManagerRef:
+      name: service-manager-cf-import
+    subaccountRef:
+      name: cf-import-test-subaccount
