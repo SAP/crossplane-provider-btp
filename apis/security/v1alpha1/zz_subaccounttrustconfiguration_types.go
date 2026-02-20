@@ -55,6 +55,10 @@ type SubaccountTrustConfigurationInitParameters struct {
 	// The display name of the trust configuration.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
 
+	// (String) The origin of the identity provider.
+	// The origin of the identity provider.
+	Origin *string `json:"origin,omitempty" tf:"origin,omitempty"`
+
 	// (String) Determines whether the identity provider is currently 'active' or 'inactive'.
 	// Determines whether the identity provider is currently 'active' or 'inactive'.
 	Status *string `json:"status,omitempty" tf:"status,omitempty"`
@@ -170,6 +174,11 @@ type SubaccountTrustConfigurationParameters struct {
 	// The display name of the trust configuration.
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
+
+	// (String) The origin of the identity provider.
+	// The origin of the identity provider.
+	// +kubebuilder:validation:Optional
+	Origin *string `json:"origin,omitempty" tf:"origin,omitempty"`
 
 	// (String) Determines whether the identity provider is currently 'active' or 'inactive'.
 	// Determines whether the identity provider is currently 'active' or 'inactive'.

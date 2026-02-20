@@ -75,11 +75,54 @@ spec:
                 type: string
               forProvider:
                 properties:
+                  certSecretRef:
+                    description: |-
+                      encoded client certificate. cert and key must be supplied together.
+                      PEM-encoded client certificate. cert and key must be supplied together.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
                   description:
                     description: |-
                       (String) The description of the service broker.
                       The description of the service broker.
                     type: string
+                  keySecretRef:
+                    description: |-
+                      encoded private key matching the client certificate. cert and key must be supplied together.
+                      PEM-encoded private key matching the client certificate. cert and key must be supplied together.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  mtls:
+                    description: |-
+                      Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
+                      Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
+                    type: boolean
                   name:
                     description: |-
                       (String) The name of the service broker.
@@ -209,11 +252,54 @@ spec:
                   for example because of an external controller is managing them, like an
                   autoscaler.
                 properties:
+                  certSecretRef:
+                    description: |-
+                      encoded client certificate. cert and key must be supplied together.
+                      PEM-encoded client certificate. cert and key must be supplied together.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
                   description:
                     description: |-
                       (String) The description of the service broker.
                       The description of the service broker.
                     type: string
+                  keySecretRef:
+                    description: |-
+                      encoded private key matching the client certificate. cert and key must be supplied together.
+                      PEM-encoded private key matching the client certificate. cert and key must be supplied together.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  mtls:
+                    description: |-
+                      Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
+                      Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
+                    type: boolean
                   name:
                     description: |-
                       (String) The name of the service broker.
@@ -329,8 +415,6 @@ spec:
                       (String) The username for basic authentication against the service broker.
                       The username for basic authentication against the service broker.
                     type: string
-                required:
-                - passwordSecretRef
                 type: object
               managementPolicies:
                 default:
@@ -504,17 +588,10 @@ spec:
               rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
                 || ''Update'' in self.managementPolicies) || has(self.forProvider.name)
                 || (has(self.initProvider) && has(self.initProvider.name))'
-            - message: spec.forProvider.passwordSecretRef is a required parameter
-              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
-                || ''Update'' in self.managementPolicies) || has(self.forProvider.passwordSecretRef)'
             - message: spec.forProvider.url is a required parameter
               rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
                 || ''Update'' in self.managementPolicies) || has(self.forProvider.url)
                 || (has(self.initProvider) && has(self.initProvider.url))'
-            - message: spec.forProvider.username is a required parameter
-              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
-                || ''Update'' in self.managementPolicies) || has(self.forProvider.username)
-                || (has(self.initProvider) && has(self.initProvider.username))'
           status:
             description: SubaccountServiceBrokerStatus defines the observed state
               of SubaccountServiceBroker.
@@ -539,6 +616,11 @@ spec:
                       (String) The date and time when the resource was last modified in RFC3339 format.
                       The date and time when the resource was last modified in [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format.
                     type: string
+                  mtls:
+                    description: |-
+                      Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
+                      Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
+                    type: boolean
                   name:
                     description: |-
                       (String) The name of the service broker.
