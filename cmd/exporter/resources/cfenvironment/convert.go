@@ -3,12 +3,12 @@ package cfenvironment
 import (
 	"context"
 
-	"github.com/SAP/xp-clifford/erratt"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/SAP/xp-clifford/cli/export"
+	"github.com/SAP/xp-clifford/erratt"
 	"github.com/SAP/xp-clifford/yaml"
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
@@ -70,6 +70,9 @@ func convertCloudFoundryEnvResource(ctx context.Context, btpClient *btpcli.BtpCl
 	}
 	if externalName == "" {
 		cfEnvInstance.AddComment(resources.WarnMissingExternalName)
+	}
+	if externalName == resources.UndefinedExternalName {
+		cfEnvInstance.AddComment(resources.WarnUndefinedExternalName)
 	}
 	if landscape == "" {
 		cfEnvInstance.AddComment(resources.WarnMissingLandscapeLabel)

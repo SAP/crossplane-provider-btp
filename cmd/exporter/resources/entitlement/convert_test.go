@@ -3,11 +3,11 @@ package entitlement
 import (
 	"testing"
 
-	"github.com/SAP/xp-clifford/yaml"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/SAP/xp-clifford/yaml"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
@@ -423,14 +423,10 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 
+	subAccountUuid := "123e4567-e89b-12d3-a456-426614174000"
 	svcName := "test-service"
 	planName := "standard"
 	planId := svcName + "-" + planName
-	subAccountUuid := "123e4567-e89b-12d3-a456-426614174000"
-
-	var amount float64 = 1
-	var parentAmount float64 = 10
-	var parentRemainingAmount float64 = 5
 	resourceName := planId + "-" + subAccountUuid
 
 	tests := []struct {
@@ -467,9 +463,9 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 				planName:    planName,
 				assignment: &btpcli.AssignmentInfo{
 					EntityID:                subAccountUuid,
-					Amount:                  amount,
-					ParentAmount:            parentAmount,
-					ParentRemainingAmount:   float64Ptr(parentRemainingAmount),
+					Amount:                  1,
+					ParentAmount:            10,
+					ParentRemainingAmount:   float64Ptr(5),
 					UnlimitedAmountAssigned: false,
 				},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
