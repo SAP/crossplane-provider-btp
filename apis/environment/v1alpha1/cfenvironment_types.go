@@ -119,11 +119,10 @@ type EnvironmentStatus struct {
 //
 // External-Name Configuration:
 //   - Follows Standard: yes
-//   - Format: Cloud Foundry Organization GUID (UUID format)
+//   - Format: Environment Instance GUID (UUID format)
 //   - How to find:
-//     - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Cloud Foundry Environment → Organization ID
-//     - CLI: Use the Provisioning API to list environments and get the ID field
-//   - Migration: Supports backwards compatibility with legacy formats (orgName and metadata.name)
+//   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
+//   - CLI: Use BTP ClI: `btp list accounts/environment-instance`
 //
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
