@@ -12,6 +12,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 )
 
 func TestConvertServiceManagerResource(t *testing.T) {
@@ -28,19 +29,19 @@ func TestConvertServiceManagerResource(t *testing.T) {
 
 	tests := []struct {
 		name string
-		si   *ServiceInstance
+		si   *serviceinstancebase.ServiceInstance
 		want *yaml.ResourceWithComment
 	}{
 		{
 			name: "all required fields present",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
 					SubaccountID: subAccountGuid,
 					Usable:       true,
 				},
-				OfferingName:        OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				BindingID:           bindingID,
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
@@ -63,7 +64,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 							WriteConnectionSecretToReference: &v1.SecretReference{
 								Name:      resourceName,
-								Namespace: DefaultSecretNamespace,
+								Namespace: resources.DefaultSecretNamespace,
 							},
 						},
 						ForProvider: v1beta1.ServiceManagerParameters{
@@ -74,7 +75,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 		},
 		{
 			name: "not a service manager",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
@@ -105,7 +106,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -119,14 +120,14 @@ func TestConvertServiceManagerResource(t *testing.T) {
 		},
 		{
 			name: "missing instance id",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           "",
 					Name:         instanceName,
 					SubaccountID: subAccountGuid,
 					Usable:       true,
 				},
-				OfferingName:        OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				BindingID:           bindingID,
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
@@ -150,7 +151,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -165,14 +166,14 @@ func TestConvertServiceManagerResource(t *testing.T) {
 		},
 		{
 			name: "missing binding id",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
 					SubaccountID: subAccountGuid,
 					Usable:       true,
 				},
-				OfferingName:        OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				BindingID:           "",
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
@@ -196,7 +197,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -211,14 +212,14 @@ func TestConvertServiceManagerResource(t *testing.T) {
 		},
 		{
 			name: "missing subaccount guid",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
 					SubaccountID: "",
 					Usable:       true,
 				},
-				OfferingName:        OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				BindingID:           bindingID,
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
@@ -242,7 +243,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -257,14 +258,14 @@ func TestConvertServiceManagerResource(t *testing.T) {
 		},
 		{
 			name: "service manager not usable",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
 					SubaccountID: subAccountGuid,
 					Usable:       false,
 				},
-				OfferingName:        OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				BindingID:           bindingID,
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
@@ -288,7 +289,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -302,14 +303,14 @@ func TestConvertServiceManagerResource(t *testing.T) {
 		},
 		{
 			name: "multiple missing fields",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           "",
 					Name:         "",
 					SubaccountID: "",
 					Usable:       false,
 				},
-				OfferingName:        OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				PlanName:            "",
 				BindingID:           "",
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
@@ -334,7 +335,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -382,7 +383,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 	r := require.New(t)
 
 	subAccountGuid := "123e4567-e89b-12d3-a456-426614174000"
-	resourceName := fmt.Sprintf("%s-%s", DefaultNamePrefix, subAccountGuid)
+	resourceName := fmt.Sprintf("%s-%s", defaultNamePrefix, subAccountGuid)
 
 	tests := []struct {
 		name         string
@@ -405,7 +406,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 						ResourceSpec: v1.ResourceSpec{
 							WriteConnectionSecretToReference: &v1.SecretReference{
 								Name:      resourceName,
-								Namespace: DefaultSecretNamespace,
+								Namespace: resources.DefaultSecretNamespace,
 							},
 						},
 						ForProvider: v1beta1.ServiceManagerParameters{
@@ -431,7 +432,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 							ResourceSpec: v1.ResourceSpec{
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -448,7 +449,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := defaultServiceManagerResource(t.Context(), nil, tt.subaccountID, nil, false)
+			result := convertDefaultServiceManagerResource(t.Context(), nil, defaultServiceManager(tt.subaccountID), nil, false)
 			r.NotNil(result)
 
 			// Verify comments.

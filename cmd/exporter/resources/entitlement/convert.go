@@ -23,7 +23,7 @@ func convertEntitlementResource(ctx context.Context, btpClient *btpcli.BtpCli, e
 	entityType := e.assignment.EntityType
 	resourceName := e.GenerateK8sResourceName()
 
-	// Create Subaccount with required fields first.
+	// Create Entitlement with required fields first.
 	managedEntitlement := yaml.NewResourceWithComment(
 		&v1alpha1.Entitlement{
 			TypeMeta: metav1.TypeMeta{
@@ -76,6 +76,68 @@ func convertEntitlementResource(ctx context.Context, btpClient *btpcli.BtpCli, e
 	if !isEnable && amount >= 1 {
 		amountInt := int(amount)
 		managedEntitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider.Amount = &amountInt
+	}
+
+	// Reference subaccount resource, if requested.
+	if resolveReferences {
+		if err := resolveReference(ctx, btpClient, &managedEntitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider); err != nil {
+			eventHandler.Warn(erratt.Errorf("cannot resolve subaccount reference: %w", err).With("entitlement", e.GetID()))
+			managedEntitlement.AddComment(resources.WarnCannotResolveSubaccount + ": " + subAccountGuid)
+		}
+	}
+
+	return managedEntitlement
+}
+
+func convertDefaultEntitlementResource(ctx context.Context, btpClient *btpcli.BtpCli, e *entitlement, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+	serviceName := e.serviceName
+	servicePlanName := e.planName
+	subAccountGuid := e.assignment.EntityID
+	resourceName := e.GenerateK8sResourceName()
+
+	// Create Entitlement with required fields first.
+	managedEntitlement := yaml.NewResourceWithComment(
+		&v1alpha1.Entitlement{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       v1alpha1.EntitlementKind,
+				APIVersion: v1alpha1.CRDGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: resourceName,
+			},
+			Spec: v1alpha1.EntitlementSpec{
+				ForProvider: v1alpha1.EntitlementParameters{
+					ServicePlanName: servicePlanName,
+					ServiceName:     serviceName,
+					SubaccountGuid:  subAccountGuid,
+				},
+			},
+		})
+
+	// Copy comments from the original resource.
+	managedEntitlement.CloneComment(e)
+
+	// Set optional fields.
+	isEnable := e.isEnable()
+	if isEnable {
+		managedEntitlement.Object.(*v1alpha1.Entitlement).Spec.ForProvider.Enable = &isEnable
+	}
+
+	// Comment the resource out, if any of the required fields is missing.
+	if serviceName == "" {
+		managedEntitlement.AddComment(resources.WarnMissingServiceName)
+	}
+	if servicePlanName == "" {
+		managedEntitlement.AddComment(resources.WarnMissingServicePlanName)
+	}
+	if subAccountGuid == "" {
+		managedEntitlement.AddComment(resources.WarnMissingSubaccountGuid)
+	}
+	if resourceName == resources.UndefinedName {
+		managedEntitlement.AddComment(resources.WarnUndefinedResourceName)
+	}
+	if !isEnable {
+		managedEntitlement.AddComment(resources.WarnDefaultEntitlementEnableFalse)
 	}
 
 	// Reference subaccount resource, if requested.

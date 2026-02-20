@@ -6,13 +6,13 @@ import (
 
 	"github.com/SAP/xp-clifford/yaml"
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicemanager"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 )
 
 func TestConvertServiceInstanceResource(t *testing.T) {
@@ -30,12 +30,12 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 
 	tests := []struct {
 		name string
-		si   *servicemanager.ServiceInstance
+		si   *serviceinstancebase.ServiceInstance
 		want *yaml.ResourceWithComment
 	}{
 		{
 			name: "all required fields present",
-			si: &servicemanager.ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
@@ -79,7 +79,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 		},
 		{
 			name: "missing service name",
-			si: &servicemanager.ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
@@ -126,7 +126,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 		},
 		{
 			name: "missing service plan name",
-			si: &servicemanager.ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
@@ -173,7 +173,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 		},
 		{
 			name: "missing subaccount guid",
-			si: &servicemanager.ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
@@ -224,7 +224,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 		},
 		{
 			name: "missing instance id",
-			si: &servicemanager.ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           "",
 					Name:         instanceName,
@@ -273,7 +273,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 		},
 		{
 			name: "service instance not usable",
-			si: &servicemanager.ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
@@ -320,8 +320,56 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 			}(),
 		},
 		{
+			name: "missing service manager name",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         instanceName,
+					SubaccountID: subAccountGuid,
+					Usable:       true,
+				},
+				OfferingName:        serviceName,
+				PlanName:            planName,
+				ServiceManagerName:  "",
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.ServiceInstance{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.ServiceInstanceKind,
+							APIVersion: v1alpha1.CRDGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": externalName,
+							},
+						},
+						Spec: v1alpha1.ServiceInstanceSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{
+									v1.ManagementActionObserve,
+								},
+							},
+							ForProvider: v1alpha1.ServiceInstanceParameters{
+								Name:         instanceName,
+								OfferingName: serviceName,
+								PlanName:     planName,
+								SubaccountID: &subAccountGuid,
+								ServiceManagerRef: &v1.Reference{
+									Name: "",
+								},
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnMissingServiceManagerName)
+				return rwc
+			}(),
+		},
+		{
 			name: "multiple missing fields",
-			si: &servicemanager.ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           "",
 					Name:         "",
@@ -330,7 +378,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 				},
 				OfferingName:        "",
 				PlanName:            "",
-				ServiceManagerName:  smName,
+				ServiceManagerName:  "",
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -357,7 +405,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 								Name:         "",
 								SubaccountID: &empty,
 								ServiceManagerRef: &v1.Reference{
-									Name: smName,
+									Name: "",
 								},
 							},
 						},
@@ -369,6 +417,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 				rwc.AddComment(resources.WarnUndefinedExternalName)
 				rwc.AddComment(resources.WarnMissingInstanceId)
 				rwc.AddComment(resources.WarnServiceInstanceNotUsable)
+				rwc.AddComment(resources.WarnMissingServiceManagerName)
 				return rwc
 			}(),
 		},
