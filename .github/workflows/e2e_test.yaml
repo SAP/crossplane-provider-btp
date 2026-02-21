@@ -52,7 +52,7 @@ permissions:
 env:
   # hardcoded BTP CLI version
   btp_cli_version: 2.90.2
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
 
 jobs:
   prepare-matrix:

@@ -9,7 +9,7 @@
 name: Publish Release Candidate
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
 
 on:
     workflow_dispatch: {}

@@ -5,7 +5,7 @@ on:
 
 env:
   # it is important to use the exact same patch version here (compared to the go.mod) to avoid unexpected issues
-  GO_VERSION: '1.25.6'
+  GO_VERSION: '1.26'
 
 permissions:
   contents: read
