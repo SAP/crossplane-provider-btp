@@ -99,9 +99,9 @@ type CISCredential struct {
 }
 
 type CloudFoundryOrg struct {
-	Id          string `json:"Org Id,"`
-	Name        string `json:"Org Name,"`
-	ApiEndpoint string `json:"API Endpoint,"`
+	Id          string `json:"Org Id"`
+	Name        string `json:"Org Name"`
+	ApiEndpoint string `json:"API Endpoint"`
 }
 
 const (
