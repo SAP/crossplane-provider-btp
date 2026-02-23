@@ -202,7 +202,7 @@ The default is `0`.
 
 ### Upgrade Tests
 
-The provider also comes with upgrade tests that can be run locally. These upgrade tests ensure that resources created with an older version of the provider can be properly handled by the current version.
+The provider also comes with upgrade tests that can be run locally. These upgrade tests ensure that resources created with an older version of the provider can be properly handled by the current version. Find more detailed information in the [upgrade test docs](/docs/development/upgrade-tests.md).
 
 To run the upgrade tests, you can use the following command:
 
@@ -337,6 +337,8 @@ The credentials section of the service binding, which can be securely stored in 
 If you have a question always feel free to reach out on our official crossplane slack channel:
 
 :rocket: [**#provider-sap-btp**](https://crossplane.slack.com/archives/C07UZ3UJY7Q).
+
+💬 Also we are hosting an open community call and hope to see you there! Find more details [here](https://github.com/SAP/crossplane-provider-btp/discussions/515).
 
 This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/crossplane-provider-btp/issues). Contribution and feedback are encouraged and always welcome.
 
