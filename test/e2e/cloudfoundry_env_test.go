@@ -74,7 +74,7 @@ func TestCloudFoundryEnvironmentImportFlow(t *testing.T) {
 		cfImportName,
 		WithWaitCreateTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(10*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(10*time.Minute)),
-		WithDependentResourceDirectory[*v1alpha1.CloudFoundryEnvironment]("testdata/crs/cloudfoundry_env/import"),
+		WithDependentResourceDirectory[*v1alpha1.CloudFoundryEnvironment]("testdata/crs/cloudfoundry_env_import"),
 	)
 
 	importFeature := importTester.BuildTestFeature("BTP CF Environment Import Flow").Feature()
