@@ -21,7 +21,20 @@ import (
 )
 
 const (
-	errNotEntitlement = "managed resource is not a Entitlement custom resource"
+	errNotEntitlement      = "managed resource is not a Entitlement custom resource"
+	errConnect             = "while connecting to provider"
+	errObserve             = "while observing entitlement"
+	errUpdateObservation   = "while updating observation"
+	errDescribeInstance    = "while describing instance"
+	errFindRelated         = "while finding related entitlements"
+	errGenerateObservation = "while generating observation"
+	errCreate              = "while creating entitlement"
+	errCreateInstance      = "while creating instance"
+	errUpdate              = "while updating entitlement"
+	errUpdateInstance      = "while updating instance"
+	errDelete              = "while deleting entitlement"
+	errDeleteInstance      = "while deleting instance"
+	errListEntitlements    = "while listing entitlements"
 )
 
 var (
@@ -52,7 +65,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	btpclient, err := providerconfig.CreateClient(ctx, mg, c.kube, c.usage, c.newServiceFn, c.resourcetracker)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errConnect)
 	}
 	return &external{
 		kube:    c.kube,
@@ -87,7 +100,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.SetConditions(c.softValidation(cr))
 	c.tracker.SetConditions(ctx, cr)
 	if err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateObservation)
 	}
 
 	// Needs create?
@@ -140,15 +153,15 @@ func (c *external) updateObservation(ctx context.Context, cr *apisv1alpha1.Entit
 	instance, err := c.client.DescribeInstance(ctx, cr)
 
 	if err != nil {
-		return err
+		return errors.Wrap(err, errDescribeInstance)
 	}
 	entitlements, err := c.findRelatedEntitlements(ctx, cr, noOpFilter)
 	if err != nil {
-		return err
+		return errors.Wrap(err, errFindRelated)
 	}
 	cr.Status.AtProvider, err = entitlementclient.GenerateObservation(instance, entitlements)
 	if err != nil {
-		return err
+		return errors.Wrap(err, errGenerateObservation)
 	}
 	return nil
 }
@@ -162,11 +175,11 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	err := c.updateObservation(ctx, cr)
 
 	if err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errUpdateObservation)
 	}
 
 	if err := c.client.CreateInstance(ctx, cr); err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateInstance)
 	}
 
 	return managed.ExternalCreation{
@@ -191,7 +204,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	if err := c.client.UpdateInstance(ctx, cr); err != nil {
-		return managed.ExternalUpdate{}, err
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateInstance)
 	}
 	fmt.Printf("Updating: %+v", cr)
 
@@ -211,7 +224,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	instance, err := c.client.DescribeInstance(ctx, cr)
 
 	if err != nil {
-		return managed.ExternalDelete{}, err
+		return managed.ExternalDelete{}, errors.Wrap(err, errDescribeInstance)
 	}
 
 	if c.updateInProgress(cr) {
@@ -229,15 +242,15 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		func(entitlement apisv1alpha1.Entitlement) bool { return entitlement.UID != cr.UID },
 	)
 	if err != nil {
-		return managed.ExternalDelete{}, err
+		return managed.ExternalDelete{}, errors.Wrap(err, errFindRelated)
 	}
 	cr.Status.AtProvider, err = entitlementclient.GenerateObservation(instance, entitlements)
 	if err != nil {
-		return managed.ExternalDelete{}, err
+		return managed.ExternalDelete{}, errors.Wrap(err, errGenerateObservation)
 	}
 
 	if err := c.client.DeleteInstance(ctx, cr); err != nil {
-		return managed.ExternalDelete{}, err
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteInstance)
 	}
 
 	cr.SetConditions(xpv1.Deleting())
@@ -287,7 +300,7 @@ func (c *external) findRelatedEntitlements(
 	err := c.kube.List(ctx, allEntitlements)
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errListEntitlements)
 	}
 	relatedEntitlements := &apisv1alpha1.EntitlementList{}
 	for _, ent := range allEntitlements.Items {

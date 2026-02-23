@@ -30,6 +30,9 @@ const (
 	errTrackRUsage             = "cannot track ResourceUsage"
 	errTrackPCUsage            = "cannot track ProviderConfig usage"
 	errCreateConnectionDetails = "Cannot create connection details"
+	errDescribeInstance        = "while describing instance"
+	errCreate                  = "while creating instance"
+	errDelete                  = "while deleting instance"
 
 	errGetPC    = "cannot get ProviderConfig"
 	errGetCreds = "cannot get credentials"
@@ -131,7 +134,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	instance, managers, err := c.client.DescribeInstance(ctx, *cr)
 	if err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errDescribeInstance)
 	}
 
 	// If instance not found, it's a drift (external resource was deleted)
@@ -182,7 +185,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	createdInstanceId, err := c.client.CreateInstance(ctx, *cr)
 	if err != nil {
 		// Do not set external-name on error (including "already exists" errors)
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 
 	meta.SetExternalName(cr, createdInstanceId)
@@ -226,7 +229,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	raw, err := c.client.DeleteInstance(ctx, *cr)
 	// Don't treat 404 as error - resource was already deleted externally
 	if err != nil && raw.StatusCode != 404 {
-		return managed.ExternalDelete{}, err
+		return managed.ExternalDelete{}, errors.Wrap(err, errDelete)
 	}
 
 	return managed.ExternalDelete{}, nil

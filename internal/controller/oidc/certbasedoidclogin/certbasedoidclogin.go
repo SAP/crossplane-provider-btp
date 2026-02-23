@@ -27,6 +27,10 @@ const (
 	errCorruptedToken        = "Token loaded from secret does not match expected format"
 	errCouldNotJudgeToken    = "Could not introspect idToken"
 	errNoToken               = "No token to introspect"
+	errLogin                 = "cannot perform login"
+	errUpdateToken           = "cannot update token"
+	errRefreshToken          = "cannot refresh token"
+	errDeleteToken           = "cannot cleanup tokens"
 )
 
 type connector struct {
@@ -130,7 +134,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	tokenSet, loginErr := c.service.DoLogin(ctx)
 	if loginErr != nil {
-		return managed.ExternalCreation{}, loginErr
+		return managed.ExternalCreation{}, errors.Wrap(loginErr, errLogin)
 	}
 
 	return managed.ExternalCreation{
@@ -146,7 +150,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	token := resolvePublishedToken(ctx, cr, c.kube)
 	if token == nil {
-		return managed.ExternalUpdate{}, errors.New("Can not update token, because of missing secret")
+		return managed.ExternalUpdate{}, errors.Wrap(errors.New("missing secret"), errUpdateToken)
 	}
 
 	refresh, err := c.service.Refresh(ctx, token.RefreshToken)
@@ -154,7 +158,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		ctrl.Log.Info("Tokens could not be refreshed, attempting to reauthenticate")
 		tokenSet, loginErr := c.service.DoLogin(ctx)
 		if loginErr != nil {
-			return managed.ExternalUpdate{}, loginErr
+			return managed.ExternalUpdate{}, errors.Wrap(loginErr, errLogin)
 		}
 		ctrl.Log.Info("Reauthentication successful")
 		return managed.ExternalUpdate{
@@ -174,7 +178,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	cr.Status.SetConditions(xpv1.Deleting())
 
-	return managed.ExternalDelete{}, cleanupPublishedTokens(ctx, cr, c.kube)
+	return managed.ExternalDelete{}, errors.Wrap(cleanupPublishedTokens(ctx, cr, c.kube), errDeleteToken)
 }
 
 func createCertLoginService(ctx context.Context, cr *v1alpha1.CertBasedOIDCLogin, cert []byte, pw string) (*oidc.CertLogin, error) {

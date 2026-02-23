@@ -25,8 +25,9 @@ const (
 	errResolveOIDCSecret       = "Can't resolve a OIDC secret"
 	errResolveKubeconfigSecret = "Can't resolve a Kubeconfig secret"
 	errNoConnectionSecret      = "Need a .Spec.WriteConnectionSecretToReference"
-
-	errNewClient = "cannot create new Service"
+	errNewClient               = "cannot create new Service"
+	errGenerateKubeconfig      = "cannot generate kubeconfig"
+	errDeleteKubeconfig        = "cannot cleanup kubeconfig"
 )
 
 var (
@@ -137,7 +138,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	cr.Status.SetConditions(xpv1.Creating())
 	result, err := c.service.Generate(kubeConfigTemplate, token, generateConfiguration(cr))
 	if err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errGenerateKubeconfig)
 	}
 
 	updateStatus(cr, result)
@@ -174,7 +175,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	result, err := c.service.Generate(kubeConfigTemplate, token, generateConfiguration(cr))
 	if err != nil {
-		return managed.ExternalUpdate{}, err
+		return managed.ExternalUpdate{}, errors.Wrap(err, errGenerateKubeconfig)
 	}
 
 	updateStatus(cr, result)
@@ -192,7 +193,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.Status.SetConditions(xpv1.Deleting())
 
-	return managed.ExternalDelete{}, cleanupCreatedKubeConfig(ctx, cr, c.kube)
+	return managed.ExternalDelete{}, errors.Wrap(cleanupCreatedKubeConfig(ctx, cr, c.kube), errDeleteKubeconfig)
 }
 
 func newService(c *connector, cr *v1alpha1.KubeConfigGenerator) (oidc.KubeConfigClient, error) {

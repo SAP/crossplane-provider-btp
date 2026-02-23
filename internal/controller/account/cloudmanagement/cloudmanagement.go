@@ -32,6 +32,16 @@ const (
 	errGetCredentialsSecret = "Could not Get Secret"
 	errTrackRUsage          = "cannot track ResourceUsage"
 	errTrackPCUsage         = "cannot track ProviderConfig usage"
+	errInitServicePlanId    = "while initializing service plan ID"
+	errEnsureCompatibility  = "while ensuring compatibility"
+	errConnectResources     = "while connecting resources"
+	errObserve              = "while observing resources"
+	errSetStatus            = "while setting status"
+	errCreate               = "while creating resources"
+	errUpdate               = "while updating resources"
+	errDelete               = "while deleting resources"
+	errSaveId               = "while saving ID"
+	errGetPlanId            = "while getting plan ID"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -75,18 +85,18 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	err := c.InitializeServicePlanId(ctx, cr, secret)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errInitServicePlanId)
 	}
 
 	err = c.ensureCompatibility(ctx, cr)
 	if err != nil {
-		return nil, errors.Wrap(err, "Error While attempting version migration err")
+		return nil, errors.Wrap(err, errEnsureCompatibility)
 	}
 
 	tfClientInit := c.newClientInitalizerFn()
 	tfClient, err := tfClientInit.ConnectResources(ctx, cr)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errConnectResources)
 	}
 
 	return &external{
@@ -130,15 +140,15 @@ func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1beta1
 
 	sm, err := c.newPlanIdResolverFn(ctx, secret.Data)
 	if err != nil {
-		return err
+		return errors.Wrap(err, errGetPlanId)
 	}
 
 	id, err := sm.PlanIDByName(ctx, "cis", "local")
 	if err != nil {
-		return err
+		return errors.Wrap(err, errGetPlanId)
 	}
 
-	return c.saveId(ctx, cr, id)
+	return errors.Wrap(c.saveId(ctx, cr, id), errSaveId)
 }
 
 func (c *connector) saveId(ctx context.Context, cr *apisv1beta1.CloudManagement, id string) error {
@@ -173,10 +183,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
 	if statusErr != nil {
-		return managed.ExternalObservation{}, statusErr
+		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
 
-	return resStatus.ExternalObservation, err
+	return resStatus.ExternalObservation, errors.Wrap(err, errObserve)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -189,7 +199,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	sID, bID, err := c.tfClient.CreateResources(ctx, cr)
 	if err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 	meta.SetExternalName(cr, formExternalName(sID, bID))
 
@@ -204,7 +214,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	err := c.tfClient.UpdateResources(ctx, cr)
 	if err != nil {
-		return managed.ExternalUpdate{}, err
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 	}
 
 	return managed.ExternalUpdate{}, nil
@@ -224,7 +234,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
-	return managed.ExternalDelete{}, c.tfClient.DeleteResources(ctx, cr)
+	return managed.ExternalDelete{}, errors.Wrap(c.tfClient.DeleteResources(ctx, cr), errDelete)
 }
 
 func (c *external) setStatus(ctx context.Context, status cmclient.ResourcesStatus, cr *apisv1beta1.CloudManagement) error {

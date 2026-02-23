@@ -104,6 +104,6 @@ func SetupClusterWithCrossplane(namespace string) {
 	testenv.Setup(
 		testutil.ApplySecretInCrossplaneNamespace(CIS_SECRET_NAME, bindingSecretData),
 		testutil.ApplySecretInCrossplaneNamespace(SERVICE_USER_SECRET_NAME, userSecretData),
-		testutil.CreateProviderConfigFn(namespace, globalAccount, cliServerUrl, CIS_SECRET_NAME, SERVICE_USER_SECRET_NAME),
+		testutil.CreateProviderConfigEnvFn(namespace, globalAccount, cliServerUrl, CIS_SECRET_NAME, SERVICE_USER_SECRET_NAME),
 	)
 }

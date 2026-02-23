@@ -161,7 +161,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.New("Could not call backend"),
+				err: errors.Wrap(errors.New("Could not call backend"), "while describing instance"),
 				cr:  environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
 			},
 		},
@@ -319,7 +319,7 @@ func TestCreate(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalCreation{},
-				err: errors.New("Could not call backend"),
+				err: errors.Wrap(errors.New("Could not call backend"), "while creating instance"),
 				cr:  environment(),
 			},
 		},
@@ -403,7 +403,7 @@ func TestDelete(t *testing.T) {
 				cr: environment(),
 			},
 			want: want{
-				err: errors.New("Could not call backend"),
+				err: errors.Wrap(errors.New("Could not call backend"), "while deleting instance"),
 				cr:  environment(withConditions(xpv1.Deleting())),
 			},
 		},

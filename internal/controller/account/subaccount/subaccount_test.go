@@ -1089,7 +1089,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.New("external-name 'invalid-guid-format' is not a valid GUID format"),
+				err: errors.New("external-name is not a valid GUID format: external-name 'invalid-guid-format'"),
 			},
 		},
 		"ValidGUID404Response": {
@@ -1154,7 +1154,7 @@ func TestObserve(t *testing.T) {
 				}(),
 			},
 			want: want{
-				err: errors.New("external-name 'unittest-sa' is not a valid GUID format"),
+				err: errors.New("external-name is not a valid GUID format: external-name 'unittest-sa'"),
 			},
 		},
 	}
@@ -1303,7 +1303,7 @@ func TestCreate(t *testing.T) {
 				// External name should NOT be set - stays empty
 				cr:  NewSubaccount("unittest-sa"),
 				o:   managed.ExternalCreation{},
-				err: errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource: 409 Conflict"),
+				err: errors.New("while creating subaccount: creation failed - resource already exists. Please set external-name annotation to adopt the existing resource: 409 Conflict"),
 			},
 		},
 		"OtherCreationError": {
@@ -1569,7 +1569,7 @@ func TestDelete(t *testing.T) {
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
 			},
 			want: want{
-				err: errors.New("deletion of subaccount failed: apiError"),
+				err: errors.New("while deleting subaccount: deletion of subaccount failed: apiError"),
 			},
 		},
 		"TrackerBlocked": {

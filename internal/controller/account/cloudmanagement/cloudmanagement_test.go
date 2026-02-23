@@ -89,7 +89,7 @@ func TestConnect(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("ResolverInitError"),
+				err: errors.Wrap(errors.Wrap(errors.New("ResolverInitError"), "while getting plan ID"), "while initializing service plan ID"),
 				cr: NewCloudManagement("test",
 					WithData(v1beta1.CloudManagementParameters{
 						ServiceManagerSecretNamespace: "someNamespace",
@@ -299,7 +299,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				obs: managed.ExternalObservation{},
-				err: errors.New("observeError"),
+				err: errors.Wrap(errors.New("observeError"), "while observing resources"),
 				cr: NewCloudManagement("test",
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status: v1alpha1.CisStatusUnbound,
@@ -453,7 +453,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("createError"),
+				err: errors.Wrap(errors.New("createError"), "while creating resources"),
 				cr:  NewCloudManagement("test", WithConditions(xpv1.Creating())),
 			},
 		},
@@ -518,7 +518,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("deleteError"),
+				err: errors.Wrap(errors.New("deleteError"), "while deleting resources"),
 				cr:  NewCloudManagement("test", WithExternalName("someID/anotherID"), WithConditions(xpv1.Deleting())),
 			},
 		},
@@ -578,7 +578,7 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("updateError"),
+				err: errors.Wrap(errors.New("updateError"), "while updating resources"),
 			},
 		},
 		{

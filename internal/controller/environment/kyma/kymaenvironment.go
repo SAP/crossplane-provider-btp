@@ -43,6 +43,10 @@ const (
 	errServiceParsing       = "Parameters from service response seem to be corrupted"
 	errCantDescribe         = "Could not describe kyma instance"
 	errCircutBreak          = "circuit breaker is on; check retry status, update parameters or set annotation " + v1alpha1.IgnoreCircuitBreaker + " to any value"
+	errCreate               = "while creating instance"
+	errUpdate               = "while updating instance"
+	errDelete               = "while deleting instance"
+	errGetConnectionDetails = "while getting connection details"
 	maxRetriesDefault       = 3
 )
 
@@ -127,7 +131,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{
 			ResourceExists:   true,
 			ResourceUpToDate: true,
-		}, errors.Wrap(readErr, "can not obtain kubeConfig")
+		}, errors.Wrap(readErr, errGetConnectionDetails)
 	}
 	return managed.ExternalObservation{
 		ResourceExists:          true,
@@ -149,7 +153,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	guid, err := c.client.CreateInstance(ctx, *cr)
 	if err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 
 	meta.SetExternalName(cr, guid)
@@ -173,7 +177,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	err := c.client.UpdateInstance(ctx, *cr)
 
 	if err != nil {
-		return managed.ExternalUpdate{}, err
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 	}
 
 	return managed.ExternalUpdate{
@@ -197,7 +201,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, nil
 	}
 
-	return managed.ExternalDelete{}, c.client.DeleteInstance(ctx, *cr)
+	return managed.ExternalDelete{}, errors.Wrap(c.client.DeleteInstance(ctx, *cr), errDelete)
 }
 
 func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {

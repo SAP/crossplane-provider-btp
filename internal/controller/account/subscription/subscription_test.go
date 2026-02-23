@@ -71,7 +71,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.New("internalServerError"),
+				err: errors.Wrap(errors.New("internalServerError"), "while loading subscription"),
 				cr:  NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("name1/plan2")),
 			},
 		},
@@ -225,7 +225,7 @@ func TestCreate(t *testing.T) {
 			want: want{
 				o:   managed.ExternalCreation{},
 				cr:  NewSubscription("dir-unittests", WithConditions(xpv1.Creating()), WithStatus(v1alpha1.SubscriptionObservation{})),
-				err: errors.New("CreateError"),
+				err: errors.Wrap(errors.New("CreateError"), "while creating subscription"),
 			},
 		},
 		"Success": {
@@ -415,7 +415,7 @@ func TestDelete(t *testing.T) {
 			},
 			want: want{
 				cr:  NewSubscription("dir-unittests", WithConditions(xpv1.Deleting()), WithStatus(v1alpha1.SubscriptionObservation{})),
-				err: errors.New("DeleteError"),
+				err: errors.Wrap(errors.New("DeleteError"), "while deleting subscription"),
 			},
 		},
 		"Success": {
@@ -499,7 +499,7 @@ func TestUpdate(t *testing.T) {
 			want: want{
 				o:   managed.ExternalUpdate{},
 				cr:  NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{})),
-				err: errors.New("updateError"),
+				err: errors.Wrap(errors.New("updateError"), "while updating subscription"),
 			},
 		},
 		"Success": {
