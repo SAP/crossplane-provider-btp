@@ -1,0 +1,28 @@
+---
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: ServiceManager
+metadata:
+  name: service-manager-upgrade-cf
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: service-manager-upgrade-cf
+    namespace: default
+  forProvider:
+    subaccountRef:
+      name: upgrade-test-cf-sa
+---
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: CloudManagement
+metadata:
+  name: cis-local-upgrade-cf
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: cis-local-upgrade-cf
+    namespace: default
+  forProvider:
+    serviceManagerRef:
+      name: service-manager-upgrade-cf
+    subaccountRef:
+      name: upgrade-test-cf-sa
