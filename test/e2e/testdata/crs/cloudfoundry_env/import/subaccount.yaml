@@ -2,7 +2,7 @@ apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: Subaccount
 metadata:
   namespace: default
-  name: cf-import-test-subaccount
+  name: $BUILD_ID-cf-import-test-subaccount
 spec:
   forProvider:
     displayName: "$BUILD_ID-CF Environment Import Test"
