@@ -72,6 +72,7 @@ func TestCloudFoundryEnvironmentImportFlow(t *testing.T) {
 			},
 		},
 		cfImportName,
+		WithWaitDependentResourceTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(15*time.Minute)),
 		WithWaitCreateTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(10*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(10*time.Minute)),
 		WithDependentResourceDirectory[*v1alpha1.CloudFoundryEnvironment]("testdata/crs/cloudfoundry_env_import"),

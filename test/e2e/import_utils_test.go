@@ -46,7 +46,10 @@ type ImportTester[T resource.Managed] struct {
 	// the path to the dependent resource yaml files, if any
 	DependentResourceDirectory string
 
-	// the timeout for waiting till resource get healthy after creating (in setup and assess)
+	// the timeout for waiting till dependent resources get healthy (in setup)
+	WaitDependentResourceTimeout wait.Option
+
+	// the timeout for waiting till target resource get healthy after creating
 	WaitCreateTimeout wait.Option
 
 	// the timeout for waiting till resource get deleted (in setup and teardown)
@@ -54,6 +57,12 @@ type ImportTester[T resource.Managed] struct {
 }
 
 type ImportTesterOption[T resource.Managed] func(*ImportTester[T])
+
+func WithWaitDependentResourceTimeout[T resource.Managed](timeout wait.Option) ImportTesterOption[T] {
+	return func(it *ImportTester[T]) {
+		it.WaitDependentResourceTimeout = timeout
+	}
+}
 
 func WithWaitCreateTimeout[T resource.Managed](timeout wait.Option) ImportTesterOption[T] {
 	return func(it *ImportTester[T]) {
@@ -78,10 +87,11 @@ func WithDependentResourceDirectory[T resource.Managed](path string) ImportTeste
 // Additional options can be provided to customize timeouts using ImportTesterOption.
 func NewImportTester[T resource.Managed](baseResource T, baseName string, o ...ImportTesterOption[T]) *ImportTester[T] {
 	it := &ImportTester[T]{
-		BaseResource:        baseResource,
-		BaseName:            baseName,
-		WaitCreateTimeout:   wait.WithInterval(3 * time.Minute),
-		WaitDeletionTimeout: wait.WithInterval(3 * time.Minute),
+		BaseResource:                 baseResource,
+		BaseName:                     baseName,
+		WaitDependentResourceTimeout: wait.WithInterval(5 * time.Minute),
+		WaitCreateTimeout:            wait.WithInterval(3 * time.Minute),
+		WaitDeletionTimeout:          wait.WithInterval(3 * time.Minute),
 	}
 	it.BaseResource.SetName(it.GetPrefixedName())
 
@@ -107,7 +117,7 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 					log("Applying dependent resources from "+it.DependentResourceDirectory, it.BaseResource, func() {
 						resources.ImportResources(ctx, t, cfg, it.DependentResourceDirectory)
 
-						if err := resources.WaitForResourcesToBeSynced(ctx, cfg, it.DependentResourceDirectory, nil, wait.WithTimeout(time.Minute*5)); err != nil {
+						if err := resources.WaitForResourcesToBeSynced(ctx, cfg, it.DependentResourceDirectory, nil, it.WaitDependentResourceTimeout); err != nil {
 							resources.DumpManagedResources(ctx, t, cfg)
 							t.Fatal(err)
 						}
