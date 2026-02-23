@@ -349,7 +349,7 @@ func TestCreate(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalCreation{},
-				err: errors.New("resource already exists"),
+				err: errors.Wrap(errors.New("resource already exists"), errCreate),
 				cr:  environment(), // No external-name should be set
 			},
 		},
