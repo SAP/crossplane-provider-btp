@@ -4,7 +4,7 @@
 # To adress (1), we use an environment pr-e2e-approval that will only execute the job after an explicit approval from team member (after inspecting the code for non-malicious activity).
 # If the author of the PR is OWNER, MEMBER or COLLOBORATOR, the environment pr-e2e-no-approval is used that does not require an explicit approval.
 
-# Requiremenets: 
+# Requiremenets:
 # 1) pr-e2e-approval environment configured to require approval before running
 # 2) pr-e2e-no-approval environment configured that does not require approval.
 
@@ -19,7 +19,7 @@ on:
 permissions:
   contents: read
 
-jobs:    
+jobs:
   run-e2e-test:
     uses: ./.github/workflows/e2e_test.yaml
     with:

@@ -15,7 +15,6 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	instanceClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding/externalname"
 )
 
 const (
@@ -79,12 +78,8 @@ func (m *ServiceBindingClient) Create(ctx context.Context) (string, managed.Exte
 	if err != nil {
 		return "", managed.ExternalCreation{}, errors.Wrap(err, errCreateTfResource)
 	}
-	externalName := meta.GetExternalName(m.ssb)
-	if een := externalname.NewEncodedExternalName(m.ssb.Spec.ForProvider.SubaccountID, m.ssb.Spec.ForProvider.ServiceInstanceID); een != nil {
-		externalName = een.String()
-	}
 
-	return externalName, creation, nil
+	return meta.GetExternalName(m.ssb), creation, nil
 }
 
 func (m *ServiceBindingClient) Delete(ctx context.Context) (managed.ExternalDelete, error) {
@@ -123,16 +118,6 @@ func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *
 	}
 
 	targetUID := GenerateInstanceUID(sb.UID, externalName)
-	encodedExternalName := externalname.ParseEncodedExternalName(externalName)
-	var subAccountID *string
-	var serviceInstanceID *string
-	if encodedExternalName != nil {
-		subAccountID = &encodedExternalName.SubAccountID
-		serviceInstanceID = &encodedExternalName.ServiceInstanceID
-	} else {
-		subAccountID = sb.Spec.ForProvider.SubaccountID
-		serviceInstanceID = sb.Spec.ForProvider.ServiceInstanceID
-	}
 
 	sBinding := &v1alpha1.SubaccountServiceBinding{
 		TypeMeta: metav1.TypeMeta{
@@ -152,8 +137,8 @@ func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *
 				ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionAll},
 			},
 			ForProvider: v1alpha1.SubaccountServiceBindingParameters{
-				SubaccountID:      subAccountID,
-				ServiceInstanceID: serviceInstanceID,
+				SubaccountID:      sb.Spec.ForProvider.SubaccountID,
+				ServiceInstanceID: sb.Spec.ForProvider.ServiceInstanceID,
 				Name:              &name,
 				Parameters:        internal.Ptr(string(parameterJson)),
 			},

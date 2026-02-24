@@ -18,13 +18,11 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding/externalname"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
 	errNotServiceBinding    = "managed resource is not a ServiceBinding custom resource"
-	errInvalidExternalName  = "ServiceBinding without valid externalName"
 	errCreateBinding        = "cannot create servicebinding"
 	errObserveSaveBinding   = "cannot save observed data"
 	errUpdateStatus         = "cannot update status"
@@ -103,22 +101,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		targetName = cr.Spec.ForProvider.Name
 	}
 
-	externalName := meta.GetExternalName(cr)
-	een := externalname.ParseEncodedExternalName(externalName)
-	if een == nil {
-		een = externalname.NewEncodedExternalName(
-			cr.Spec.ForProvider.SubaccountID,
-			cr.Spec.ForProvider.ServiceInstanceID,
-		)
-		if een == nil {
-			return nil, errors.New(errInvalidExternalName)
-		} else {
-			externalName = een.String()
-		}
-
-	}
-
-	client, err := c.clientFactory.CreateClient(ctx, cr, targetName, externalName)
+	client, err := c.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create client")
 	}
