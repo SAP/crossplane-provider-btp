@@ -14,7 +14,7 @@ import (
 
 var (
 	cfFromCustomTag             = "v1.1.0"
-	cfToCustomTag               = "v1.7.0"
+	cfToCustomTag               = "local"
 	cfCustomResourceDirectories = []string{
 		"./testdata/customCRs/cloudfoundryExternalName",
 	}
