@@ -271,63 +271,11 @@ func TestConnect(t *testing.T) {
 				err: errMockTracking,
 			},
 		},
-		"MissingExternalName": {
-			reason: "should return error for missing external name/spec",
+		"Success": {
+			reason: "should successfully create external client",
 			fields: fields{},
 			args: args{
-				mg: &v1alpha1.ServiceBinding{
-				},
-			},
-			want: want{
-				err: errors.New(errInvalidExternalName),
-			},
-		},
-		"InvalidName": {
-			reason: "should return error for invalid external name",
-			fields: fields{},
-			args: args{
-				mg: expectedServiceBinding(
-					withMetadata("wrong-format", map[string]string{}),
-				),
-			},
-			want: want{
-				err: errors.New(errInvalidExternalName),
-			},
-		},
- 		"Success": {
-			reason: "should successfully create external client with proper external name",
-			fields: fields{},
-			args: args{
-				mg: expectedServiceBinding(
-					withMetadata("subaccID,servinstID", map[string]string{}),
-				),
-			},
-			want: want{
-				err:            nil,
-				externalExists: true,
-			},
-		},
- 		"Success contradicting": {
-			reason: "should successfully create external client with proper external name that contradicts the configuration",
-			fields: fields{},
-			args: args{
-				mg: expectedServiceBinding(
-					withMetadata("subaccID,servinstID", map[string]string{}),
-					withConfig("foo", "bar"),
-				),
-			},
-			want: want{
-				err:            nil,
-				externalExists: true,
-			},
-		},
-		"Success - backward compatible": {
-			reason: "should successfully create external client with proper configuration",
-			fields: fields{},
-			args: args{
-				mg: expectedServiceBinding(
-					withConfig("subaccID", "servinstID"),
-				),
+				mg: expectedServiceBinding(),
 			},
 			want: want{
 				err:            nil,
@@ -603,13 +551,6 @@ func withMetadata(externalName string, annotations map[string]string) func(*v1al
 func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceBinding) {
 	return func(cr *v1alpha1.ServiceBinding) {
 		cr.Status.Conditions = conditions
-	}
-}
-
-func withConfig(subAccountID, serviceInstanceID string)func(*v1alpha1.ServiceBinding) {
-	return func(cr *v1alpha1.ServiceBinding) {
-		cr.Spec.ForProvider.SubaccountID = &subAccountID
-		cr.Spec.ForProvider.ServiceInstanceID = &serviceInstanceID
 	}
 }
 
