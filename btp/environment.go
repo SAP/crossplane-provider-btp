@@ -76,7 +76,7 @@ func (c *Client) GetEnvironmentByNameAndType(
 }
 
 // GetEnvironmentById retrieves environment using its ID. It performs a list and filters client-side.
-// Deprecated: use GetEnvironmentsByID instead.
+// Deprecated: use GetEnvironmentInstanceByID instead.
 func (c *Client) GetEnvironmentById(
 	ctx context.Context, Id string,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
