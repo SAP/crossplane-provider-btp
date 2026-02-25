@@ -29,7 +29,6 @@ func (c *BtpCli) Login(ctx context.Context, params *LoginParameters) error {
 		args = append(args, "--sso")
 	} else {
 		args = append(args, "--user", params.UserName, "--password", params.Password)
-
 	}
 
 	cliServerUrl := DefaultServerURL
