@@ -21,7 +21,7 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
 
 ## Overview
 
-The exporter connects to your SAP BTP global account using the BTP CLI and retrieves resource information. It then converts this information into Crossplane resource manifests that can be applied to a Kubernetes cluster with the Crossplane BTP provider installed.
+The exporter connects to your SAP BTP global account using the BTP CLI and retrieves resource information. It then converts this information into Crossplane resource manifests that can be applied to a Managed Control Plane cluster with the Crossplane BTP provider installed. The approach is based on the "[Import Existing Resources](https://docs.crossplane.io/v2.2/guides/import-existing-resources/)" Crossplane documentation.
 
 **Key features:**
 - Interactive and non-interactive modes
@@ -29,11 +29,14 @@ The exporter connects to your SAP BTP global account using the BTP CLI and retri
 - Inter-resource reference resolution
 - Export to stdout or file
 
+> [!TIP]
+> While the exporter significantly accelerates the process of creating Crossplane manifests, the generated output should be reviewed before applying it to your cluster. Pay special attention to fields under `spec.forProvider`, as they define the desired state of your resources. Depending on your requirements, you may need to correct values or add additional configuration that the exporter could not infer from the source system.
+
 ## Prerequisites
 
-- **BTP CLI**: The `btp` command-line tool must be installed and available in your `$PATH` (or specify a custom path via `--btp-cli` or `BTP_EXPORT_BTP_CLI_PATH`)
+- **BTP CLI**: The `btp` command-line tool must be installed and available in your `$PATH` (or specify a custom path via `--btp-cli` or `$BTP_EXPORT_BTP_CLI_PATH`)
 - **BTP Global Account**: Access credentials for a SAP BTP global account
-- **Go** (if running from source): Go 1.21 or later
+- **Go** (if running from source): Go 1.25 or later
 
 ## Environment Variables
 
