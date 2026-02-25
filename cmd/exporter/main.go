@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	"github.com/SAP/xp-clifford/cli"
@@ -20,47 +19,19 @@ import (
 
 const (
 	shortName      = "btp"
-	observedSystem = "SAP Business Technology Platform"
+	observedSystem = "SAP BTP"
 
-	envVarBtpCliPath       = "BTP_EXPORT_BTP_CLI_PATH"
-	envVarBtpCliServer     = "BTP_EXPORT_BTP_CLI_SERVER_URL"
-	envVarUserName         = "BTP_EXPORT_USER_NAME"
-	envVarPassword         = "BTP_EXPORT_PASSWORD"
-	envVarGlobalAccount    = "BTP_EXPORT_GLOBAL_ACCOUNT"
-	envVarIdentityProvider = "BTP_EXPORT_IDP"
-
-	flagNameBtpCliPath       = "btp-cli"
-	flagNameBtpCliServer     = "url"
-	flagNameUser             = "username"
-	flagNamePassword         = "password"
-	flagNameGlobalAccount    = "subdomain"
-	flagNameIdentityProvider = "idp"
+	envVarBtpCliPath   = "BTP_EXPORT_BTP_CLI_PATH"
+	flagNameBtpCliPath = "btp-cli"
 )
 
 var (
 	paramResolveRefences = configparam.Bool("resolve-references", "Resolve inter-resource references").
 		WithShortName("r").
 		WithEnvVarName("RESOLVE_REFERENCES")
-	paramUserName = configparam.String(flagNameUser, "User name to log in to a global account of SAP BTP.").
-		WithFlagName(flagNameUser).
-		WithShortName("u").
-		WithEnvVarName(envVarUserName)
-	paramPassword = configparam.String(flagNamePassword, "User password to log in to a global account of SAP BTP.").
-		WithFlagName(flagNamePassword).
-		WithShortName("p").
-		WithEnvVarName(envVarPassword)
-	paramGlobalAccount = configparam.String(flagNameGlobalAccount, "The subdomain of the global account to export resources from.").
-		WithFlagName(flagNameGlobalAccount).
-		WithEnvVarName(envVarGlobalAccount)
 	paramBtpCliPath = configparam.String(flagNameBtpCliPath, "Path to the BTP CLI binary that should be used by the export tool to access BTP. Default: 'btp' in your $PATH.").
 		WithFlagName(flagNameBtpCliPath).
 		WithEnvVarName(envVarBtpCliPath)
-	paramBtpCliServer = configparam.String(flagNameBtpCliServer, "The URL of the BTP CLI server. Default: 'https://cli.btp.cloud.sap'").
-		WithFlagName(flagNameBtpCliServer).
-		WithEnvVarName(envVarBtpCliServer)
-	paramIdp = configparam.String(flagNameIdentityProvider, "Origin of the custom identity provider, if configured for the global account.").
-		WithFlagName(flagNameIdentityProvider).
-		WithEnvVarName(envVarIdentityProvider)
 )
 
 func main() {
@@ -69,12 +40,7 @@ func main() {
 	export.SetCommand(exportCmd)
 	export.AddConfigParams(
 		paramResolveRefences,
-		paramUserName,
-		paramPassword,
-		paramGlobalAccount,
 		paramBtpCliPath,
-		paramBtpCliServer,
-		paramIdp,
 	)
 	export.AddConfigParams(resources.ConfigParams()...)
 	export.AddResourceKinds(resources.KindNames()...)
@@ -91,19 +57,9 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 	}
 	slog.Debug("Kinds selected", "kinds", selectedResources)
 
-	// Connect to BTP API
-	btpClient, err := btpcli.NewClientAndLogin(ctx,
-		paramBtpCliPath.Value(),
-		&btpcli.LoginParameters{
-			UserName:               paramUserName.Value(),
-			Password:               paramPassword.Value(),
-			GlobalAccountSubdomain: paramGlobalAccount.Value(),
-			ServerURL:              paramBtpCliServer.Value(),
-			IdentityProvider:       paramIdp.Value(),
-		})
-	if err != nil {
-		return fmt.Errorf("failed to create BTP Client: %w", err)
-	}
+	// This client does not try to log in, thus relying on existing session.
+	// Explicit authentication can be done by a separate `login` command or by BTP CLI's `login` command.
+	btpClient := btpcli.NewClient(paramBtpCliPath.Value())
 
 	// Export selected kinds.
 	for _, kind := range selectedResources {
