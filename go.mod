@@ -11,7 +11,7 @@ replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20251202
 
 require (
 	dario.cat/mergo v1.0.2
-	github.com/SAP/xp-clifford v0.0.0-20260202115841-f2ef82b7144e
+	github.com/SAP/xp-clifford v0.0.0-20260205091836-ee61a788e6da
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.18
 	github.com/crossplane-contrib/xp-testing v1.9.0
