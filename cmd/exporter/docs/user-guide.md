@@ -8,6 +8,10 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
 - [Prerequisites](#prerequisites)
 - [Environment Variables](#environment-variables)
 - [Global Flags](#global-flags)
+- [Commands](#commands)
+  - [Completion Command](#completion-command)
+  - [Login Command](#login-command)
+  - [Export Command](#export-command)
 - [Supported Resource Kinds](#supported-resource-kinds)
   - [Subaccount](#subaccount)
   - [Entitlement](#entitlement)
@@ -40,41 +44,132 @@ The exporter connects to your SAP BTP global account using the BTP CLI and retri
 
 ## Environment Variables
 
-The following environment variables can be used to configure the exporter:
+The following environment variables apply to all commands:
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `BTP_EXPORT_BTP_CLI_PATH` | Path to the BTP CLI binary. Default: `btp` in your `$PATH` | No |
+
+## Global Flags
+
+The following flags are available for all commands:
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--btp-cli <path>` | | Path to the BTP CLI binary. Default: `btp` in your `$PATH` |
+| `--config <file>` | `-c` | Configuration file |
+| `--help` | `-h` | Help for btp-exporter |
+| `--verbose` | | Enable verbose logging output |
+
+## Commands
+
+### Completion Command
+
+The `completion` command generates shell autocompletion scripts for btp-exporter for the specified shell.
+
+> [!NOTE]
+> See each subcommand's help for detailed instructions on how to use the generated script for your specific shell (e.g., `btp-exporter completion zsh --help`).
+
+> [!NOTE]
+> The completion scripts only work with binaries. The name of the binary must be "btp-exporter".
+
+**Usage:**
+```bash
+btp-exporter completion [shell]
+```
+
+#### Available Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `bash` | Generate the autocompletion script for bash |
+| `fish` | Generate the autocompletion script for fish |
+| `powershell` | Generate the autocompletion script for powershell |
+| `zsh` | Generate the autocompletion script for zsh |
+
+#### Completion Flags
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--help` | `-h` | Help for completion |
+
+---
+
+### Login Command
+
+The `login` command authenticates against a SAP BTP global account. Authentication is required before running the `export` command.
+
+**Usage:**
+```bash
+btp-exporter login [flags]
+```
+
+#### Login Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `BTP_EXPORT_USER_NAME` | User name to log in to a global account of SAP BTP | Yes* |
 | `BTP_EXPORT_PASSWORD` | User password to log in to a global account of SAP BTP | Yes* |
 | `BTP_EXPORT_GLOBAL_ACCOUNT` | The subdomain of the global account to export resources from | Yes* |
-| `BTP_EXPORT_BTP_CLI_PATH` | Path to the BTP CLI binary. Default: `btp` in your `$PATH` | No |
 | `BTP_EXPORT_BTP_CLI_SERVER_URL` | The URL of the BTP CLI server. Default: `https://cli.btp.cloud.sap` | No |
 | `BTP_EXPORT_IDP` | Origin of the custom identity provider, if configured for the global account | No |
-| `RESOLVE_REFERENCES` | Enable inter-resource reference resolution (true/false) | No |
 
-*\* Required unless provided via command-line flags or in interactive mode*
+*\* Required unless provided via command-line flags, in interactive mode, or when using `--sso`*
 
-## Global Flags
-
-### Authentication & Connection
+#### Login Flags
 
 | Flag | Short | Description |
 |------|-------|-------------|
-| `--username <user>` | `-u` | User name to log in to a global account of SAP BTP |
-| `--password <password>` | `-p` | User password to log in to a global account of SAP BTP |
-| `--subdomain <subdomain>` | | The subdomain of the global account to export resources from |
-| `--btp-cli <path>` | | Path to the BTP CLI binary. Default: `btp` in your `$PATH` |
+| `--username <user>` | `-u` | User name to log in to a global account of SAP BTP, usually an e-mail address |
+| `--password <password>` | `-p` | User password (see [BTP CLI documentation](https://help.sap.com/docs/btp/btp-cli-command-reference/btp-login) for recommendations) |
+| `--subdomain <subdomain>` | | The subdomain of the global account to export resources from. Can be found in BTP Cockpit |
 | `--url <url>` | | The URL of the BTP CLI server. Default: `https://cli.btp.cloud.sap` |
 | `--idp <idp>` | | Origin of the custom identity provider, if configured for the global account |
+| `--sso` | | Opens a browser for single sign-on |
 
-### Export Options
+#### Login Examples
+
+```bash
+# Login with username and password
+btp-exporter login --username user@example.com --password mypassword --subdomain my-global-account
+
+# Login with SSO (opens browser)
+btp-exporter login --subdomain my-global-account --sso
+
+# Login with custom identity provider
+btp-exporter login --username user@example.com --subdomain my-global-account --idp my-custom-idp
+
+# Login interactively (prompts for credentials)
+btp-exporter login
+```
+
+> [!NOTE]
+> The login session is managed by the BTP CLI. Once authenticated, subsequent `export` commands will use the existing session until it expires or you log out.
+
+---
+
+### Export Command
+
+The `export` command generates Crossplane-compatible resource manifests from the connected BTP global account.
+
+**Usage:**
+```bash
+btp-exporter export [flags]
+```
+
+#### Export Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `RESOLVE_REFERENCES` | Enable inter-resource reference resolution (true/false) | No |
+
+#### Export Flags
 
 | Flag | Short | Description |
 |------|-------|-------------|
 | `--kind <kinds>` | | Comma-separated list of resource kinds to export |
 | `--resolve-references` | `-r` | Resolve inter-resource references (use resource names instead of IDs) |
 | `-o <file>` | | Output file path. If not specified, output is written to stdout |
-| `--verbose` | | Enable verbose logging output |
 
 ## Supported Resource Kinds
 
