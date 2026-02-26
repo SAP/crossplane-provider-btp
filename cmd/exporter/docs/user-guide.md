@@ -137,7 +137,7 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter login [flags]
 
 *\* Required in non-interactive mode unless provided via command-line flags*
 
-*\*\* Required unless provided via command-line flags. Same applies for use with `--sso`*
+*\*\* Required in non-interactive mode unless provided via command-line flags. Same applies for use with `--sso`*
 
 #### Login Flags
 
