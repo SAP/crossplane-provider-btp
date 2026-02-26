@@ -18,10 +18,17 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
   - [Service Instance](#service-instance)
   - [Cloud Foundry Environment](#cloud-foundry-environment)
 - [Usage Examples](#usage-examples)
+  - [Building the Exporter](#building-the-exporter)
   - [Interactive Mode](#interactive-mode)
   - [Non-Interactive Mode](#non-interactive-mode)
   - [Exporting Multiple Kinds](#exporting-multiple-kinds)
   - [Output to File](#output-to-file)
+- [Reference Resolution](#reference-resolution)
+- [Tips and Best Practices](#tips-and-best-practices)
+- [Troubleshooting](#troubleshooting)
+  - [Authentication Issues](#authentication-issues)
+  - [Missing BTP CLI](#missing-btp-cli)
+  - [No Resources Found](#no-resources-found)
 
 ## Overview
 
@@ -40,7 +47,10 @@ The exporter connects to your SAP BTP global account using the BTP CLI and retri
 
 - **BTP CLI**: The `btp` command-line tool must be installed and available in your `$PATH` (or specify a custom path via `--btp-cli` or `$BTP_EXPORT_BTP_CLI_PATH`)
 - **BTP Global Account**: Access credentials for a SAP BTP global account
-- **Go** (if running from source): Go 1.25 or later
+- **Go**): Go 1.25 or later
+
+> [!NOTE]
+> Most command examples in this guide run the tool directly from source using `go run`. This is the recommended approach, as the tool is in an early stage of development and is being actively enhanced. Once the tool stabilizes, an officially released binary will be provided.
 
 ## Environment Variables
 
@@ -101,7 +111,7 @@ The `login` command authenticates against a SAP BTP global account. Authenticati
 
 **Usage:**
 ```bash
-btp-exporter login [flags]
+go run github.com/sap/crossplane-provider-btp/cmd/exporter login [flags]
 ```
 
 #### Login Environment Variables
@@ -131,16 +141,16 @@ btp-exporter login [flags]
 
 ```bash
 # Login with username and password
-btp-exporter login --username user@example.com --password mypassword --subdomain my-global-account
+go run github.com/sap/crossplane-provider-btp/cmd/exporter login --username user@example.com --password mypassword --subdomain my-global-account
 
 # Login with SSO (opens browser)
-btp-exporter login --subdomain my-global-account --sso
+go run github.com/sap/crossplane-provider-btp/cmd/exporter login --subdomain my-global-account --sso
 
 # Login with custom identity provider
-btp-exporter login --username user@example.com --subdomain my-global-account --idp my-custom-idp
+go run github.com/sap/crossplane-provider-btp/cmd/exporter login --username user@example.com --subdomain my-global-account --idp my-custom-idp
 
 # Login interactively (prompts for credentials)
-btp-exporter login
+go run github.com/sap/crossplane-provider-btp/cmd/exporter login
 ```
 
 > [!NOTE]
@@ -154,7 +164,7 @@ The `export` command generates Crossplane-compatible resource manifests from the
 
 **Usage:**
 ```bash
-btp-exporter export [flags]
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export [flags]
 ```
 
 #### Export Environment Variables
@@ -276,6 +286,33 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind cloudfo
 ```
 
 ## Usage Examples
+
+### Building the Exporter
+
+To build the exporter binary locally, you can use one of the following methods:
+
+**Using Go directly:**
+```bash
+# Build the exporter binary
+go build -o btp-exporter github.com/sap/crossplane-provider-btp/cmd/exporter
+```
+
+**Using Make:**
+```bash
+# Build all project binaries (including the exporter)
+make go.build
+
+# The exporter binary will be located at:
+# _output/bin/<platform>/exporter
+# 
+# Rename and move to your desired location:
+mv _output/bin/$(go env GOOS)_$(go env GOARCH)/exporter ./btp-exporter
+```
+
+After building, you can run the exporter using:
+```bash
+./btp-exporter --help
+```
 
 ### Interactive Mode
 
