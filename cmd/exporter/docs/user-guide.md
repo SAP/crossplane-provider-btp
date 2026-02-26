@@ -50,7 +50,6 @@ The exporter connects to your SAP BTP global account using the BTP CLI and retri
 - **BTP CLI**: The `btp` command-line tool must be [installed](#missing-btp-cli) and available in your `$PATH` (or specify a custom path via `--btp-cli` or `$BTP_EXPORT_BTP_CLI_PATH`)
 - **BTP Global Account**: Access credentials for a SAP BTP global account
 - **Go**: Go 1.25 or later
-
     > [!NOTE]
     > Most command examples in this guide run the tool directly from source using `go run`. This is the recommended approach, as the tool is in an early stage of development and is being actively enhanced. Once the tool stabilizes, an officially released binary will be provided.
 
@@ -59,7 +58,6 @@ The exporter connects to your SAP BTP global account using the BTP CLI and retri
 - **Crossplane BTP Provider**: A Crossplane BTP provider must be installed in your cluster
 - **ProviderConfig**: Ensure that a default `ProviderConfig` is configured. The exported manifests do not explicitly reference a specific `ProviderConfig`, so the default one will be used when applying the generated manifests.
 - **Permissions**: Ensure that the user configured in the `ProviderConfig` has the necessary permissions in the affected BTP subaccounts 
-
     > [!NOTE]
     > A remark on namespaces: The exporter does not assign namespaces to the generated manifests. But, some resources require an explicit namespace for `WriteConnectionSecretToReference`, which is currently set to "*default*". You may need to adjust this value before applying the manifests.
 
