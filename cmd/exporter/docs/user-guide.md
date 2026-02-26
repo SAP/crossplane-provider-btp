@@ -41,16 +41,27 @@ The exporter connects to your SAP BTP global account using the BTP CLI and retri
 - Export to stdout or file
 
 > [!TIP]
-> While the exporter significantly accelerates the process of creating Crossplane manifests, the generated output should be reviewed before applying it to your cluster. Pay special attention to fields under `spec.forProvider`, as they define the desired state of your resources. Depending on your requirements, you may need to correct values or add additional configuration that the exporter could not infer from the source system.
+> While the exporter significantly accelerates the process of creating Crossplane manifests, **the generated output should be carefully reviewed before applying it to your cluster**. Pay special attention to fields under `spec.forProvider`, as they define the desired state of your resources. Depending on your requirements, to avoid faulty updates, you may need to correct values or add additional configuration that the exporter could not infer from the source system.
 
 ## Prerequisites
 
-- **BTP CLI**: The `btp` command-line tool must be installed and available in your `$PATH` (or specify a custom path via `--btp-cli` or `$BTP_EXPORT_BTP_CLI_PATH`)
-- **BTP Global Account**: Access credentials for a SAP BTP global account
-- **Go**): Go 1.25 or later
+**Running the export tool**:
 
-> [!NOTE]
-> Most command examples in this guide run the tool directly from source using `go run`. This is the recommended approach, as the tool is in an early stage of development and is being actively enhanced. Once the tool stabilizes, an officially released binary will be provided.
+- **BTP CLI**: The `btp` command-line tool must be [installed](#missing-btp-cli) and available in your `$PATH` (or specify a custom path via `--btp-cli` or `$BTP_EXPORT_BTP_CLI_PATH`)
+- **BTP Global Account**: Access credentials for a SAP BTP global account
+- **Go**: Go 1.25 or later
+
+    > [!NOTE]
+    > Most command examples in this guide run the tool directly from source using `go run`. This is the recommended approach, as the tool is in an early stage of development and is being actively enhanced. Once the tool stabilizes, an officially released binary will be provided.
+
+**Applying the generated manifests**:
+
+- **Crossplane BTP Provider**: A Crossplane BTP provider must be installed in your cluster
+- **ProviderConfig**: Ensure that a default `ProviderConfig` is configured. The exported manifests do not explicitly reference a specific `ProviderConfig`, so the default one will be used when applying the generated manifests.
+- **Permissions**: Ensure that the user configured in the `ProviderConfig` has the necessary permissions in the affected BTP subaccounts 
+
+    > [!NOTE]
+    > A remark on namespaces: The exporter does not assign namespaces to the generated manifests. But, some resources require an explicit namespace for `WriteConnectionSecretToReference`, which is currently set to "*default*". You may need to adjust this value before applying the manifests.
 
 ## Environment Variables
 
@@ -118,13 +129,15 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter login [flags]
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `BTP_EXPORT_USER_NAME` | User name to log in to a global account of SAP BTP | Yes* |
-| `BTP_EXPORT_PASSWORD` | User password to log in to a global account of SAP BTP | Yes* |
-| `BTP_EXPORT_GLOBAL_ACCOUNT` | The subdomain of the global account to export resources from | Yes* |
-| `BTP_EXPORT_BTP_CLI_SERVER_URL` | The URL of the BTP CLI server. Default: `https://cli.btp.cloud.sap` | No |
-| `BTP_EXPORT_IDP` | Origin of the custom identity provider, if configured for the global account | No |
+| `BTP_EXPORT_USER_NAME` | User name to log in to a global account of SAP BTP | Yes*     |
+| `BTP_EXPORT_PASSWORD` | User password to log in to a global account of SAP BTP | Yes*     |
+| `BTP_EXPORT_GLOBAL_ACCOUNT` | The subdomain of the global account to export resources from | Yes**    |
+| `BTP_EXPORT_BTP_CLI_SERVER_URL` | The URL of the BTP CLI server. Default: `https://cli.btp.cloud.sap` | No       |
+| `BTP_EXPORT_IDP` | Origin of the custom identity provider, if configured for the global account | No       |
 
-*\* Required unless provided via command-line flags, in interactive mode, or when using `--sso`*
+*\* Required in non-interactive mode unless provided via command-line flags*
+
+*\*\* Required unless provided via command-line flags. Same applies for use with `--sso`*
 
 #### Login Flags
 
@@ -219,15 +232,14 @@ Exports BTP service plan entitlements assigned to subaccounts.
 | `--entitlement-auto-assigned` | Include service plans that are automatically assigned to all subaccounts |
 
 **Selection criteria:**
-- Service plan name (exact match or regex)
-- Requires subaccount selection first
+- Service plan name pattern (regex)
 
 **Example:**
 ```bash
 # Export entitlements matching a pattern from all subaccounts
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind entitlement --subaccount '.*' --entitlement '.*postgre.*'
 
-# Include auto-assigned entitlements
+# Interactive selection, includes auto-assigned entitlements
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind entitlement --entitlement-auto-assigned
 ```
 
@@ -247,7 +259,7 @@ Exports BTP service instances.
 
 **Notes:**
 - When exporting service instances, the exporter automatically exports prerequisite resources such as Service Manager instances
-- Special handling is applied for Cloud Management and Service Manager instances
+- If a service instance is an instance of Cloud Management or Service Manager, it will be exported as a `CloudManagement` or `ServiceManager` resource respectively
 
 **Example:**
 ```bash
@@ -255,7 +267,7 @@ Exports BTP service instances.
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind serviceinstance --resolve-references
 
 # Export service instances matching a pattern
-go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind serviceinstance --serviceinstance '.*-prod-.*'
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind serviceinstance --serviceinstance '.*-destination-.*'
 ```
 
 ---
@@ -273,16 +285,12 @@ Exports Cloud Foundry environment instances from BTP subaccounts.
 - Regex expression matching CF environment name
 
 **Notes:**
-- Requires subaccount selection first
-- When exported, prerequisite Cloud Management resources are automatically included
+- When exported, prerequisite resources (Cloud Management etc.) are automatically included
 
 **Example:**
 ```bash
 # Export Cloud Foundry environments
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind cloudfoundry-environment
-
-# Export CF environments from a specific subaccount
-go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind cloudfoundry-environment --subaccount ec1cde20-1411-44b9-b092-9da6d7ebf99f
 ```
 
 ## Usage Examples
@@ -356,7 +364,7 @@ You can export multiple resource kinds in a single command by specifying a comma
 go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
   --kind subaccount,cloudfoundry-environment \
   --resolve-references \
-  -o demo-cf-env.yaml
+  -o output.yaml
 ```
 
 ### Output to File
@@ -368,13 +376,13 @@ Use the `-o` flag to write the generated manifests to a file instead of stdout.
 go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
   --kind serviceinstance \
   --resolve-references \
-  -o demo-si.yaml
+  -o output.yaml
 
 # Export multiple kinds to a single file
 go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
   --kind subaccount,entitlement,serviceinstance \
   --resolve-references \
-  -o full-export.yaml
+  -o output.yaml
 ```
 
 ## Reference Resolution
@@ -408,7 +416,7 @@ spec:
 
 3. **Enable reference resolution**: Use `--resolve-references` for production exports to maintain proper resource relationships.
 
-4. **Export in stages**: For complex environments, export resources kind by kind to review and customize each manifest.
+4. **Export in stages**: For complex environments, export resources subaccount by subaccount and kind by kind to review and customize each manifest.
 
 5. **Use regex patterns carefully**: Regex patterns are applied to resource display names. Test your patterns to ensure they match expected resources.
 
@@ -416,7 +424,13 @@ spec:
 
 ### Authentication Issues
 
-If you encounter login failures:
+If you encounter unclear failures with the `export` command:
+- Access BTP with BTP CLI and check, if there is an active session
+- Log in with the `login` command
+- Check if the user has necessary permissions in affected subaccounts, Cloud Foundry organizations etc.
+
+If you encounter failures with the `login` command:
+- Check the values of the respective environment variables or command-line flags
 - Verify your username and password
 - Check that the global account subdomain is correct
 - If using a custom IDP, ensure the `--idp` flag is set correctly
@@ -433,5 +447,3 @@ If the exporter cannot find the BTP CLI:
 If no resources are returned:
 - Verify you have access to the specified subaccounts
 - Check that your regex patterns are correct
-- Ensure the resource kind exists in your BTP account
-
