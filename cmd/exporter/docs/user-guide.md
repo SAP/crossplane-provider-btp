@@ -433,6 +433,7 @@ If you encounter failures with the `login` command:
 - Check the values of the respective environment variables or command-line flags
 - Verify your username and password
 - Check that the global account subdomain is correct
+- If you have enabled 2-Factor-Authentication, append your token to your password as per [btp login documentation](https://help.sap.com/docs/btp/btp-cli-command-reference/btp-login)
 - If using a custom IDP, ensure the `--idp` flag is set correctly
 
 ### Missing BTP CLI
