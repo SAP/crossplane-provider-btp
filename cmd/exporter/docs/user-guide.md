@@ -41,7 +41,7 @@ The exporter connects to your SAP BTP global account using the BTP CLI and retri
 - Export to stdout or file
 
 > [!TIP]
-> While the exporter significantly accelerates the process of creating Crossplane manifests, **the generated output should be carefully reviewed before applying it to your cluster**. Pay special attention to fields under `spec.forProvider`, as they define the desired state of your resources. Depending on your requirements, to avoid faulty updates, you may need to correct values or add additional configuration that the exporter could not infer from the source system.
+> While the exporter significantly accelerates the process of creating Crossplane manifests, **the generated output should be carefully reviewed before changing the management policy from `Observe` to something more permissive**. Pay special attention to fields under `spec.forProvider`, as they define the desired state of your resources. Depending on your requirements, to avoid faulty updates, you may need to correct values or add additional configuration that the exporter could not infer from the source system.
 
 ## Prerequisites
 
