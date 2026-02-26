@@ -157,12 +157,12 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter login [flags]
 go run github.com/sap/crossplane-provider-btp/cmd/exporter login --username user@example.com --password mypassword --subdomain my-global-account
 
 # Login with SSO (opens browser)
-go run github.com/sap/crossplane-provider-btp/cmd/exporter login --subdomain my-global-account --sso
+go run github.com/sap/crossplane-provider-btp/cmd/exporter login --subdomain my-global-account-guid --sso
 
 # Login with custom identity provider
-go run github.com/sap/crossplane-provider-btp/cmd/exporter login --username user@example.com --subdomain my-global-account --idp my-custom-idp
+go run github.com/sap/crossplane-provider-btp/cmd/exporter login --username user@example.com --subdomain my-global-account-guid --idp my-custom-idp
 
-# Login interactively (prompts for credentials)
+# Login interactively (prompts for credentials, if no environment variables are set, otherwise just logs in)
 go run github.com/sap/crossplane-provider-btp/cmd/exporter login
 ```
 
