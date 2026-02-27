@@ -2,7 +2,9 @@ package serviceinstance
 
 import (
 	"context"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -10,6 +12,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	ujresource "github.com/crossplane/upjet/pkg/resource"
 
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -122,6 +125,29 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
+
+	// ADR: Check if there's a conflict error from previous Create attempt
+	// AND external-name is not set (meaning user didn't intend to adopt)
+	// TODO: what if the user changes the specs? Then it will stay in crash loop that is in wanted
+	if meta.GetExternalName(cr) == "" {
+		// Check if the LastAsyncOperation has a conflict error
+		lastAsyncCond := cr.GetCondition(ujresource.TypeLastAsyncOperation)
+		if lastAsyncCond.Message != "" && strings.Contains(lastAsyncCond.Message, "Conflict") {
+			// ADR: Resource already exists but user hasn't set external-name
+			// Return ResourceExists: false to stay in error loop
+			// This forces user to set external-name to adopt the resource
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource")
+		}
+	}
+
+	if meta.GetExternalName(cr) != "" {
+		if !isValidUUID(meta.GetExternalName(cr)) {
+			return managed.ExternalObservation{}, errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation")
+		}
+	}
+
 	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
@@ -143,7 +169,10 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
 				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 			}
-			cr.SetConditions(xpv1.Available())
+			// Only set Available condition if ManagementPolicy is not only "Observe"
+			if !isObserveOnly(cr) {
+				cr.SetConditions(xpv1.Available())
+			}
 		}
 		return managed.ExternalObservation{
 			ResourceExists:    true,
@@ -159,6 +188,17 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotServiceInstance)
 	}
+
+	// ADR: User has added external-name annotation with the external resource identifier
+	// If external-name is set, this indicates an existing resource to be imported/adopted
+	if meta.GetExternalName(cr) != "" {
+		return managed.ExternalCreation{}, errors.New("cannot create: external-name already set. This resource appears to be managed/imported.")
+	}
+
+	// ADR: setting external-name not possible due to an async operation
+	// After creation, external-name will be populated by Observe() in the next reconciliation
+	// If creation fails with conflict, the AsyncOperation condition will be set by upjet's callback
+	// and will be handled in the next Observe() call (see conflict detection logic above)
 
 	cr.SetConditions(xpv1.Creating())
 	if err := e.tfClient.Create(ctx); err != nil {
@@ -202,6 +242,10 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	if err := c.tfClient.Delete(ctx); err != nil {
+		// If err is 404 not found, safely ignore as the resource is already deleted.
+		if isNotFound(err) {
+			return managed.ExternalDelete{}, nil
+		}
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteInstance)
 	}
 	return managed.ExternalDelete{}, nil
@@ -218,4 +262,25 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 	// we rely on status being saved in crossplane reconciler here
 	cr.Status.AtProvider.ID = sid.ID
 	return nil
+}
+
+func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
+	policies := cr.GetManagementPolicies()
+	if len(policies) == 0 {
+		return false
+	}
+	// Check if the only policy is "Observe"
+	if len(policies) == 1 && string(policies[0]) == "Observe" {
+		return true
+	}
+	return false
+}
+
+func isNotFound(err error) bool {
+	return false // TODO: implement proper not found error check based on the error type returned by the tf client
+}
+
+func isValidUUID(s string) bool {
+	_, err := uuid.Parse(s)
+	return err == nil
 }
