@@ -13,7 +13,7 @@ func (c *Client) GetEnvironment(
 	ctx context.Context, Id string, instanceName string, environmentType EnvironmentType,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	// Try to get the environment by id first
-	environmentInstance, _, err := c.GetEnvironmentInstanceByID(ctx, Id)
+	environmentInstance, err := c.GetEnvironmentById(ctx, Id)
 	if err != nil {
 		return nil, err
 	}
