@@ -48,7 +48,7 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 - How to find:
 
   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Services → Instances and Subscriptions → Instances -> Select Service Binding for the given instance -> in the JSON document find uaa.clientsecret -> the prefix of the string up to the '$' character is the ServinceBinding ID
-  - CLI: btp list services/bindings (field: service_instance_id)
+  - CLI: btp list services/bindings (field: id)
 
 ### Subaccount
 
