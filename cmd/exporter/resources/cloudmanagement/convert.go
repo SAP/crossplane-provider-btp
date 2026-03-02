@@ -21,6 +21,7 @@ func convertCloudManagementResource(ctx context.Context, btpClient *btpcli.BtpCl
 	externalName := si.GetExternalName()
 	subAccountID := si.SubaccountID
 	instanceID := si.ID
+	instanceName := si.Name
 	bindingID := si.BindingID
 	smName := si.ServiceManagerName
 
@@ -51,6 +52,7 @@ func convertCloudManagementResource(ctx context.Context, btpClient *btpcli.BtpCl
 					ServiceManagerRef: &v1.Reference{
 						Name: smName,
 					},
+					ServiceInstanceName: instanceName,
 				},
 			},
 		})
@@ -85,6 +87,9 @@ func convertCloudManagementResource(ctx context.Context, btpClient *btpcli.BtpCl
 	}
 	if smName == "" {
 		cm.AddComment(resources.WarnMissingServiceManagerName)
+	}
+	if instanceName == "" {
+		cm.AddComment(resources.WarnMissingInstanceName)
 	}
 
 	// Reference subaccount resource, if requested.
