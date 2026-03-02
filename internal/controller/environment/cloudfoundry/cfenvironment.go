@@ -2,6 +2,7 @@ package cloudfoundry
 
 import (
 	"context"
+	"net/http"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -226,9 +227,12 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		}
 	}
 
-	raw, err := c.client.DeleteInstance(ctx, *cr)
+	resp, err := c.client.DeleteInstance(ctx, *cr)
 	// Don't treat 404 as error - resource was already deleted externally
-	if err != nil && raw.StatusCode != 404 {
+	if err != nil && resp != nil && resp.StatusCode == http.StatusNotFound {
+		return managed.ExternalDelete{}, nil
+	}
+	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDelete)
 	}
 
