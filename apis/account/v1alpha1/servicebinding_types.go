@@ -155,7 +155,7 @@ type ServiceBindingStatus struct {
 //   - Format: ServiceInstance GUID (UUID format)
 //   - How to find:
 //     - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Services → Instances and Subscriptions → Instances -> Select Service Binding for the given instance -> in the JSON document find uaa.clientsecret -> the prefix of the string up to the '$' character is the ServinceBinding ID
-//     - CLI: btp list services/bindings (field: service_instance_id)
+//     - CLI: btp list services/bindings (field: id)
 //
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
