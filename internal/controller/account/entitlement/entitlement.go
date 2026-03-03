@@ -2,7 +2,6 @@ package entitlement
 
 import (
 	"context"
-	"log/slog"
 	"reflect"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"

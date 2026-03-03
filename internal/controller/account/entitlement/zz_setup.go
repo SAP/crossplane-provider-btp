@@ -1,6 +1,8 @@
 package entitlement
 
 import (
+	"time"
+
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -15,8 +17,8 @@ import (
 )
 
 // Setup adds a controller that reconciles Entitlement managed resources.
-func Setup(mgr ctrl.Manager, o controller.Options) error {
-	cache := entitlementclient.NewInstanceCache()
+func Setup(mgr ctrl.Manager, o controller.Options, cacheTTL time.Duration) error {
+	cache := entitlementclient.NewInstanceCache(cacheTTL)
 	return providerconfig.DefaultSetup(mgr, o, &apisv1alpha1.Entitlement{}, apisv1alpha1.EntitlementGroupKind, apisv1alpha1.EntitlementGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 		return &connector{
 			kube:            kube,
