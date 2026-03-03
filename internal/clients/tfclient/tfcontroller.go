@@ -103,7 +103,7 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 
 		// Extract additional observation fields from the terraform resource
 		if obs, err := t.tfResource.GetObservation(); err == nil {
-			if dashboardURL, ok := obs["dashboardUrl"].(string); ok {
+			if dashboardURL, ok := obs["dashboard_url"].(string); ok {
 				sid.DashboardURL = dashboardURL
 			}
 		}
