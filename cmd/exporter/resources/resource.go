@@ -18,6 +18,7 @@ const (
 	WarnMissingSubaccountGuid         = "WARNING: subaccount ID is missing"
 	WarnMissingBindingId              = "WARNING: binding ID is missing"
 	WarnMissingInstanceId             = "WARNING: service instance ID is missing"
+	WarnMissingInstanceName           = "WARNING: service instance name is missing"
 	WarnMissingExternalName           = "WARNING: external name is missing"
 	WarnUndefinedResourceName         = "WARNING: could not generate a valid resource name"
 	WarnUndefinedExternalName         = "WARNING: could not generate a valid external name"
