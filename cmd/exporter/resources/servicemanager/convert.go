@@ -12,10 +12,11 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
-func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
 	resourceName := si.GenerateK8sResourceName()
 	externalName := si.GetExternalName()
 	subAccountID := si.SubaccountID
@@ -41,7 +42,7 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 					},
 					WriteConnectionSecretToReference: &v1.SecretReference{
 						Name:      resourceName,
-						Namespace: DefaultSecretNamespace,
+						Namespace: resources.DefaultSecretNamespace,
 					},
 				},
 				ForProvider: v1beta1.ServiceManagerParameters{
@@ -90,8 +91,9 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	return serviceManager
 }
 
-func defaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
-	resourceName := defaultServiceManagerResourceName(subaccountID)
+func convertDefaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+	resourceName := si.GenerateK8sResourceName()
+	subaccountID := si.SubaccountID
 
 	serviceManager := yaml.NewResourceWithComment(
 		&v1beta1.ServiceManager{
@@ -106,7 +108,7 @@ func defaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 				ResourceSpec: v1.ResourceSpec{
 					WriteConnectionSecretToReference: &v1.SecretReference{
 						Name:      resourceName,
-						Namespace: DefaultSecretNamespace,
+						Namespace: resources.DefaultSecretNamespace,
 					},
 				},
 				ForProvider: v1beta1.ServiceManagerParameters{
@@ -114,6 +116,9 @@ func defaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 				},
 			},
 		})
+
+	// Copy comments from the original resource.
+	serviceManager.CloneComment(si)
 
 	// Comment the resource out, if any of the required fields is missing.
 	if subaccountID == "" {

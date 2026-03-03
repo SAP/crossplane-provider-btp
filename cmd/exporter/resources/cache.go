@@ -18,6 +18,7 @@ type ResourceCache[T BtpResource] interface {
 	AllIDs() []string
 	ValuesForSelection() *DisplayValues
 	KeepSelectedOnly(selectedValues []string)
+	Copy() ResourceCache[T]
 }
 
 // ResourceCache for BTP resources to avoid repeated CLI calls.
@@ -129,6 +130,20 @@ func (c *resourceCache[T]) KeepSelectedOnly(selectedValues []string) {
 			delete(c.resources, key)
 		}
 	}
+}
+
+// Copy creates a shallow copy of the cache. Note that the resources in the new cache will still reference
+// the same underlying objects as in the original cache, so changes to the resources themselves will affect both caches.
+func (c *resourceCache[T]) Copy() ResourceCache[T] {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	newCache := NewResourceCache[T]()
+	for _, r := range c.All() {
+		newCache.Set(r)
+	}
+
+	return newCache
 }
 
 type DisplayValues struct {
