@@ -111,6 +111,25 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
+	// When deleting, check if this CR's portion has already been removed from BTP.
+	// Sibling CRs will continue to manage the remaining entitlement amount.
+	if cr.GetDeletionTimestamp() != nil {
+		deleted, err := c.deletionComplete(ctx, cr)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errFindRelated)
+		}
+		if deleted {
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, nil
+		}
+		// BTP not yet updated — let Delete() handle it
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: true,
+		}, nil
+	}
+
 	// Needs Update?
 	if c.needsUpdate(cr) {
 		return managed.ExternalObservation{
@@ -287,6 +306,41 @@ func (c *external) needsUpdate(cr *apisv1alpha1.Entitlement) bool {
 
 func (c *external) needsCreate(cr *apisv1alpha1.Entitlement) bool {
 	return cr.Status.AtProvider.Assigned == nil
+}
+
+// deletionComplete checks whether this CR's portion has already been removed from BTP.
+// When sibling CRs exist for the same service/plan, the BTP entitlement is reduced (not
+// fully removed). We compare the current BTP assigned amount against the sum of the
+// remaining sibling CRs to determine if our portion has been subtracted.
+func (c *external) deletionComplete(ctx context.Context, cr *apisv1alpha1.Entitlement) (bool, error) {
+	remainingEntitlements, err := c.findRelatedEntitlements(ctx, cr,
+		func(e apisv1alpha1.Entitlement) bool { return e.UID != cr.UID },
+	)
+	if err != nil {
+		return false, err
+	}
+
+	// No sibling CRs — Delete() must fully remove the assignment from BTP
+	if len(remainingEntitlements.Items) == 0 {
+		return false, nil
+	}
+
+	remainingRequired, err := entitlementclient.MergeRelatedEntitlements(remainingEntitlements)
+	if err != nil {
+		return false, err
+	}
+
+	// Numeric quota: BTP amount reduced to sibling sum means our portion is gone
+	if remainingRequired.Amount != nil && cr.Status.AtProvider.Assigned.Amount != nil {
+		return *cr.Status.AtProvider.Assigned.Amount <= *remainingRequired.Amount, nil
+	}
+
+	// Non-numeric (enable-based): siblings will continue managing it
+	if remainingRequired.Enable != nil {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // findRelatedEntitlements resolves all relevant entitlements which do not match the filter function and other static functions
