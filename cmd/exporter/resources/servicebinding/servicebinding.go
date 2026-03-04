@@ -57,19 +57,20 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	return bindingCache, nil
 }
 
-func GetBindingIdByServiceInstanceId(ctx context.Context, btpClient *btpcli.BtpCli, instanceId string) (string, bool, error) {
+func GetServiceInstanceBindings(ctx context.Context, btpClient *btpcli.BtpCli, instanceId string) (resources.ResourceCache[*serviceBinding], error) {
 	cache, err := Get(ctx, btpClient)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to retrieve service binding cache: %w", err)
+		return nil, fmt.Errorf("failed to retrieve service binding cache: %w", err)
 	}
 
+	c := resources.NewResourceCache[*serviceBinding]()
 	for _, sb := range cache.All() {
 		if sb.ServiceInstanceID == instanceId {
-			return sb.ID, true, nil
+			c.Set(sb)
 		}
 	}
 
-	return "", false, nil
+	return c, nil
 }
 
 type serviceBinding struct {

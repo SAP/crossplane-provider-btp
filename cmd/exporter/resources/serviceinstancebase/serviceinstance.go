@@ -87,12 +87,24 @@ func addServiceAndBindingInfo(ctx context.Context, btpClient *btpcli.BtpCli, si 
 		si.PlanName = plan.Name
 	}
 
-	// Add service binding ID.
-	bindingId, found, err := servicebinding.GetBindingIdByServiceInstanceId(ctx, btpClient, si.ID)
+	// Add binding information to service instance.
+	return addBindingInfo(ctx, btpClient, si)
+}
+
+func addBindingInfo(ctx context.Context, btpClient *btpcli.BtpCli, si *ServiceInstance) error {
+	bindingIDs, err := servicebinding.GetServiceInstanceBindings(ctx, btpClient, si.ID)
 	if err != nil {
-		slog.WarnContext(ctx, "Failed to retrieve binding id from service instance", "id", si.ID)
-	} else if found {
-		si.BindingID = bindingId
+		slog.WarnContext(ctx, "Failed to retrieve binding IDs for service instance", "id", si.ID)
+		return fmt.Errorf("failed to retrieve binding IDs for service instance %q: %w", si.ID, err)
+	}
+
+	if bindingIDs.Len() == 0 {
+		return nil
+	}
+
+	si.BindingIDs = make([]string, bindingIDs.Len())
+	for i, bId := range bindingIDs.AllIDs() {
+		si.BindingIDs[i] = bindingIDs.Get(bId).ID
 	}
 
 	return nil
@@ -103,8 +115,12 @@ type ServiceInstance struct {
 	*yaml.ResourceWithComment
 	OfferingName       string
 	PlanName           string
-	BindingID          string
 	ServiceManagerName string
+
+	// Binding ID is part of the external name for service manager and cloud manager instances.
+	// So, it is required for correct export of those services.
+	// TODO: revisit after https://github.com/SAP/crossplane-provider-btp/issues/427 is implemented.
+	BindingIDs []string
 }
 
 var _ resources.BtpResource = &ServiceInstance{}
@@ -137,11 +153,16 @@ func (si *ServiceInstance) serviceInstanceExternalName() string {
 }
 
 func (si *ServiceInstance) serviceManagerExternalName() string {
-	if si.GetID() == "" || si.BindingID == "" {
+	if len(si.BindingIDs) != 1 {
 		return resources.UndefinedExternalName
 	}
 
-	return fmt.Sprintf("%s/%s", si.GetID(), si.BindingID)
+	bindingId := si.BindingIDs[0]
+	if si.GetID() == "" || bindingId == "" {
+		return resources.UndefinedExternalName
+	}
+
+	return fmt.Sprintf("%s/%s", si.GetID(), bindingId)
 }
 
 func (si *ServiceInstance) cloudManagementExternalName() string {

@@ -42,7 +42,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					Usable:       true,
 				},
 				OfferingName:        serviceinstancebase.ServiceManagerOffering,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: yaml.NewResourceWithComment(
@@ -84,7 +84,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					Usable:       true,
 				},
 				OfferingName:        "not-a-service-manager-offering",
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -130,7 +130,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					Usable:       true,
 				},
 				OfferingName:        serviceinstancebase.ServiceManagerOffering,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -177,7 +177,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					Usable:       true,
 				},
 				OfferingName:        serviceinstancebase.ServiceManagerOffering,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -224,7 +224,6 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					Usable:       true,
 				},
 				OfferingName:        serviceinstancebase.ServiceManagerOffering,
-				BindingID:           "",
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -262,6 +261,53 @@ func TestConvertServiceManagerResource(t *testing.T) {
 			}(),
 		},
 		{
+			name: "too many binding IDs",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         instanceName,
+					SubaccountID: subAccountGuid,
+					Usable:       true,
+				},
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
+				BindingIDs:          []string{bindingID, "another-binding-id"},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1beta1.ServiceManager{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1beta1.ServiceManagerKind,
+							APIVersion: v1beta1.SchemeGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
+						},
+						Spec: v1beta1.ServiceManagerSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{
+									v1.ManagementActionObserve,
+								},
+								WriteConnectionSecretToReference: &v1.SecretReference{
+									Name:      resourceName,
+									Namespace: resources.DefaultSecretNamespace,
+								},
+							},
+							ForProvider: v1beta1.ServiceManagerParameters{
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: instanceName,
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnUndefinedExternalName)
+				rwc.AddComment(fmt.Sprintf(resources.WarnTooManyBindingIDs, 2))
+				return rwc
+			}(),
+		},
+		{
 			name: "missing subaccount guid",
 			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
@@ -271,7 +317,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					Usable:       true,
 				},
 				OfferingName:        serviceinstancebase.ServiceManagerOffering,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -318,7 +364,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					Usable:       false,
 				},
 				OfferingName:        serviceinstancebase.ServiceManagerOffering,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -365,7 +411,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 				},
 				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				PlanName:            "",
-				BindingID:           "",
+				BindingIDs:          []string{},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {

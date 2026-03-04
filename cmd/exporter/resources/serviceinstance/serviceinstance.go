@@ -119,7 +119,7 @@ func convert(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.
 func exportPrerequisiteResources(ctx context.Context, btpClient *btpcli.BtpCli, cm *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
 	// Export subaccount service manager.
 	saID := cm.SubaccountID
-	smName, err := servicemanager.ExportInstanceForSubaccount(ctx, btpClient, saID, eventHandler, resolveReferences)
+	smName, err := servicemanager.ExportOperatorInstance(ctx, btpClient, saID, eventHandler, resolveReferences)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to export service manager for subaccount", "subaccount ID", saID)
 	}
