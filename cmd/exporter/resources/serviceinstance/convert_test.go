@@ -272,6 +272,55 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 			}(),
 		},
 		{
+			name: "missing instance name",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         "",
+					SubaccountID: subAccountGuid,
+					Usable:       true,
+				},
+				OfferingName:        serviceName,
+				PlanName:            planName,
+				ServiceManagerName:  smName,
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.ServiceInstance{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.ServiceInstanceKind,
+							APIVersion: v1alpha1.CRDGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": externalName,
+							},
+						},
+						Spec: v1alpha1.ServiceInstanceSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{
+									v1.ManagementActionObserve,
+								},
+							},
+							ForProvider: v1alpha1.ServiceInstanceParameters{
+								Name:         "",
+								OfferingName: serviceName,
+								PlanName:     planName,
+								SubaccountID: &subAccountGuid,
+								ServiceManagerRef: &v1.Reference{
+									Name: smName,
+								},
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnMissingInstanceName)
+				return rwc
+			}(),
+		},
+		{
 			name: "service instance not usable",
 			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
@@ -416,6 +465,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnUndefinedExternalName)
 				rwc.AddComment(resources.WarnMissingInstanceId)
+				rwc.AddComment(resources.WarnMissingInstanceName)
 				rwc.AddComment(resources.WarnServiceInstanceNotUsable)
 				rwc.AddComment(resources.WarnMissingServiceManagerName)
 				return rwc

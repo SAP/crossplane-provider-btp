@@ -30,7 +30,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 	labels := map[string][]string{"env": {"dev"}, "team": {"platform"}}
 	displayNameSpecial := "Test_Subaccount With Spaces & Special!@#"
 	empty := ""
-	wantResourceName := "test-subaccount"
+	wantResourceName := "test-subaccount-eu10"
 
 	tests := []struct {
 		name string
@@ -206,7 +206,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: wantResourceName,
+							Name: "subaccount-" + saGuid,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": saGuid,
 							},
@@ -352,7 +352,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 						APIVersion: v1alpha1.CRDGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-subaccount-with-spaces---special--at-x",
+						Name: "test-subaccount-with-spaces---special--at---eu10",
 						Annotations: map[string]string{
 							"crossplane.io/external-name": saGuid,
 						},
