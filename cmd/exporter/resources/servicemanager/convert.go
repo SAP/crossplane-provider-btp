@@ -22,6 +22,7 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	subAccountID := si.SubaccountID
 	instanceID := si.ID
 	bindingID := si.BindingID
+	instanceName := si.Name
 
 	serviceManager := yaml.NewResourceWithComment(
 		&v1beta1.ServiceManager{
@@ -46,7 +47,8 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 					},
 				},
 				ForProvider: v1beta1.ServiceManagerParameters{
-					SubaccountGuid: subAccountID,
+					SubaccountGuid:      subAccountID,
+					ServiceInstanceName: instanceName,
 				},
 			},
 		})
@@ -78,6 +80,9 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	}
 	if !si.Usable {
 		serviceManager.AddComment(resources.WarnServiceInstanceNotUsable)
+	}
+	if instanceName == "" {
+		serviceManager.AddComment(resources.WarnMissingInstanceName)
 	}
 
 	// Reference subaccount resource, if requested.

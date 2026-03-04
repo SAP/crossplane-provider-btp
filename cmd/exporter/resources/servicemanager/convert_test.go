@@ -68,7 +68,8 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 						},
 						ForProvider: v1beta1.ServiceManagerParameters{
-							SubaccountGuid: subAccountGuid,
+							SubaccountGuid:      subAccountGuid,
+							ServiceInstanceName: instanceName,
 						},
 					},
 				}),
@@ -110,7 +111,8 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: subAccountGuid,
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -155,12 +157,60 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: subAccountGuid,
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
 				rwc.AddComment(resources.WarnUndefinedExternalName)
 				rwc.AddComment(resources.WarnMissingInstanceId)
+				return rwc
+			}(),
+		},
+		{
+			name: "missing instance name",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         "",
+					SubaccountID: subAccountGuid,
+					Usable:       true,
+				},
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
+				BindingID:           bindingID,
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1beta1.ServiceManager{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1beta1.ServiceManagerKind,
+							APIVersion: v1beta1.SchemeGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": smExternalName,
+							},
+						},
+						Spec: v1beta1.ServiceManagerSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{
+									v1.ManagementActionObserve,
+								},
+								WriteConnectionSecretToReference: &v1.SecretReference{
+									Name:      resources.UndefinedName,
+									Namespace: resources.DefaultSecretNamespace,
+								},
+							},
+							ForProvider: v1beta1.ServiceManagerParameters{
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: "",
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnMissingInstanceName)
 				return rwc
 			}(),
 		},
@@ -201,7 +251,8 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: subAccountGuid,
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -247,7 +298,8 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: "",
+								SubaccountGuid:      "",
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -293,7 +345,8 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: subAccountGuid,
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -339,7 +392,8 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: "",
+								SubaccountGuid:      "",
+								ServiceInstanceName: "",
 							},
 						},
 					})
@@ -349,6 +403,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 				rwc.AddComment(resources.WarnMissingInstanceId)
 				rwc.AddComment(resources.WarnMissingBindingId)
 				rwc.AddComment(resources.WarnServiceInstanceNotUsable)
+				rwc.AddComment(resources.WarnMissingInstanceName)
 				return rwc
 			}(),
 		},
