@@ -23,6 +23,7 @@ func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCl
 	resourceName := si.GenerateK8sResourceName()
 	externalName := si.GetExternalName()
 	instanceID := si.ID
+	instanceName := si.Name
 	smName := si.ServiceManagerName
 
 	serviceInstance := yaml.NewResourceWithComment(
@@ -44,7 +45,7 @@ func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCl
 					},
 				},
 				ForProvider: v1alpha1.ServiceInstanceParameters{
-					Name:         si.Name,
+					Name:         instanceName,
 					OfferingName: serviceName,
 					PlanName:     servicePlanName,
 					SubaccountID: &subAccountGuid,
@@ -79,6 +80,9 @@ func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCl
 	}
 	if instanceID == "" {
 		serviceInstance.AddComment(resources.WarnMissingInstanceId)
+	}
+	if instanceName == "" {
+		serviceInstance.AddComment(resources.WarnMissingInstanceName)
 	}
 	if !si.Usable {
 		serviceInstance.AddComment(resources.WarnServiceInstanceNotUsable)

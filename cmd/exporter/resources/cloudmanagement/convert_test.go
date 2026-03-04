@@ -72,6 +72,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							ServiceManagerRef: &v1.Reference{
 								Name: smName,
 							},
+							ServiceInstanceName: instanceName,
 						},
 					},
 				}),
@@ -117,6 +118,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 								ServiceManagerRef: &v1.Reference{
 									Name: smName,
 								},
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -163,6 +165,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 								ServiceManagerRef: &v1.Reference{
 									Name: smName,
 								},
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -211,11 +214,62 @@ func TestConvertCloudManagementResource(t *testing.T) {
 								ServiceManagerRef: &v1.Reference{
 									Name: smName,
 								},
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
 				rwc.AddComment(resources.WarnUndefinedExternalName)
 				rwc.AddComment(resources.WarnMissingInstanceId)
+				return rwc
+			}(),
+		},
+		{
+			name: "missing instance name",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         "",
+					SubaccountID: subaccountID,
+					Usable:       true,
+				},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+				OfferingName:        serviceinstancebase.CloudManagementOffering,
+				PlanName:            serviceinstancebase.CloudManagementPlan,
+				BindingID:           bindingID,
+				ServiceManagerName:  smName,
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1beta1.CloudManagement{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1beta1.CloudManagementKind,
+							APIVersion: v1beta1.SchemeGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": externalName,
+							},
+						},
+						Spec: v1beta1.CloudManagementSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+								WriteConnectionSecretToReference: &v1.SecretReference{
+									Name:      resources.UndefinedName,
+									Namespace: resources.DefaultSecretNamespace,
+								},
+							},
+							ForProvider: v1beta1.CloudManagementParameters{
+								SubaccountGuid: subaccountID,
+								ServiceManagerRef: &v1.Reference{
+									Name: smName,
+								},
+								ServiceInstanceName: "",
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnMissingInstanceName)
 				return rwc
 			}(),
 		},
@@ -259,6 +313,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 								ServiceManagerRef: &v1.Reference{
 									Name: smName,
 								},
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -307,6 +362,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 								ServiceManagerRef: &v1.Reference{
 									Name: "",
 								},
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -355,6 +411,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 								ServiceManagerRef: &v1.Reference{
 									Name: smName,
 								},
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -393,6 +450,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 								ServiceManagerRef: &v1.Reference{
 									Name: "",
 								},
+								ServiceInstanceName: "",
 							},
 						},
 					})
@@ -404,6 +462,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 				rwc.AddComment(resources.WarnMissingBindingId)
 				rwc.AddComment(resources.WarnServiceInstanceNotUsable)
 				rwc.AddComment(resources.WarnMissingServiceManagerName)
+				rwc.AddComment(resources.WarnMissingInstanceName)
 				return rwc
 			}(),
 		},
@@ -452,6 +511,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 								ServiceManagerRef: &v1.Reference{
 									Name: smName,
 								},
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
