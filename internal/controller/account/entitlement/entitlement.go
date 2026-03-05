@@ -65,7 +65,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 	return &external{
 		kube:    c.kube,
-		client:  entitlementclient.NewEntitlementsClient(*btpclient, c.cache),
+		client:  entitlementclient.NewCachingClient(entitlementclient.NewEntitlementsClient(*btpclient), c.cache),
 		tracker: c.resourcetracker,
 	}, nil
 }
@@ -90,10 +90,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr, ok := mg.(*apisv1alpha1.Entitlement)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotEntitlement)
-	}
-
-	if cr.GetDeletionTimestamp() != nil {
-		c.client.ClearDescribeInstanceCache(cr)
 	}
 
 	err := c.updateObservation(ctx, cr)
@@ -169,7 +165,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) updateObservation(ctx context.Context, cr *apisv1alpha1.Entitlement) error {
-	instance, err := c.client.DescribeInstanceCached(ctx, cr)
+	instance, err := c.client.DescribeInstance(ctx, cr)
 
 	if err != nil {
 		return errors.Wrap(err, errDescribeInstance)
@@ -239,7 +235,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotEntitlement)
 	}
 
-	instance, err := c.client.DescribeInstanceCached(ctx, cr)
+	instance, err := c.client.DescribeInstance(ctx, cr)
 
 	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDescribeInstance)

@@ -19,8 +19,6 @@ const (
 
 type Client interface {
 	DescribeInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) (*Instance, error)
-	DescribeInstanceCached(ctx context.Context, cr *apisv1alpha1.Entitlement) (*Instance, error)
-	ClearDescribeInstanceCache(cr *apisv1alpha1.Entitlement)
 	CreateInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) error
 	DeleteInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) error
 	UpdateInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) error
