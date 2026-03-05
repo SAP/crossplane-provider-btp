@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -199,5 +201,41 @@ func TestCachingClient_MutationError_StillInvalidates(t *testing.T) {
 	_, _ = cc.DescribeInstance(ctx, cr)
 	if spy.describeCalls != 2 {
 		t.Errorf("after failed CreateInstance: inner DescribeInstance called %d times, want 2", spy.describeCalls)
+	}
+}
+
+func TestRegisterCacheMetrics_RegistersAllMetrics(t *testing.T) {
+	cache := NewInstanceCache(10 * time.Second)
+	registry := prometheus.NewRegistry()
+
+	// Should not panic
+	RegisterCacheMetrics(cache, registry)
+
+	// Gather all registered metrics
+	families, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+
+	expected := map[string]dto.MetricType{
+		"crossplane_entitlement_cache_hits_total":   dto.MetricType_COUNTER,
+		"crossplane_entitlement_cache_misses_total":  dto.MetricType_COUNTER,
+		"crossplane_entitlement_cache_hit_ratio":     dto.MetricType_GAUGE,
+	}
+
+	found := make(map[string]bool)
+	for _, family := range families {
+		if wantType, ok := expected[family.GetName()]; ok {
+			found[family.GetName()] = true
+			if family.GetType() != wantType {
+				t.Errorf("metric %s: expected %s type, got %s", family.GetName(), wantType, family.GetType())
+			}
+		}
+	}
+
+	for name := range expected {
+		if !found[name] {
+			t.Errorf("metric %q not registered", name)
+		}
 	}
 }
