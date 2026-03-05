@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/maypok86/otter/v2"
+	"github.com/maypok86/otter/v2/stats"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
@@ -50,11 +52,32 @@ func (c *CachingClient) DeleteInstance(ctx context.Context, cr *v1alpha1.Entitle
 }
 
 // NewInstanceCache creates a cache for entitlement instances with the given TTL.
+// Stats recording is enabled for Prometheus metrics exposure.
 func NewInstanceCache(ttl time.Duration) *otter.Cache[string, *Instance] {
 	return otter.Must(&otter.Options[string, *Instance]{
 		MaximumSize:      10_000,
 		ExpiryCalculator: otter.ExpiryWriting[string, *Instance](ttl),
+		StatsRecorder:    stats.NewCounter(),
 	})
+}
+
+// RegisterCacheMetrics registers Prometheus metrics for entitlement cache statistics.
+// Metrics are read from otter's stats on each Prometheus scrape — no background goroutine needed.
+func RegisterCacheMetrics(cache *otter.Cache[string, *Instance], registry prometheus.Registerer) {
+	registry.MustRegister(
+		prometheus.NewCounterFunc(prometheus.CounterOpts{
+			Name: "crossplane_entitlement_cache_hits_total",
+			Help: "Total number of entitlement cache hits.",
+		}, func() float64 { return float64(cache.Stats().Hits) }),
+		prometheus.NewCounterFunc(prometheus.CounterOpts{
+			Name: "crossplane_entitlement_cache_misses_total",
+			Help: "Total number of entitlement cache misses.",
+		}, func() float64 { return float64(cache.Stats().Misses) }),
+		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Name: "crossplane_entitlement_cache_hit_ratio",
+			Help: "Entitlement cache hit ratio (0.0-1.0).",
+		}, func() float64 { return cache.Stats().HitRatio() }),
+	)
 }
 
 func getCacheKey(cr *v1alpha1.Entitlement) string {
