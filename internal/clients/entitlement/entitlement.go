@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/maypok86/otter/v2"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -22,12 +21,11 @@ const (
 )
 
 type EntitlementsClient struct {
-	btp   btp.Client
-	cache *otter.Cache[string, *Instance]
+	btp btp.Client
 }
 
-func NewEntitlementsClient(btp btp.Client, cache *otter.Cache[string, *Instance]) *EntitlementsClient {
-	return &EntitlementsClient{btp: btp, cache: cache}
+func NewEntitlementsClient(btp btp.Client) *EntitlementsClient {
+	return &EntitlementsClient{btp: btp}
 }
 
 func (c EntitlementsClient) DescribeInstance(
@@ -66,36 +64,6 @@ func (c EntitlementsClient) DescribeInstance(
 		EntitledServicePlan: entitledServicePlan,
 		Assignment:          assignment,
 	}, nil
-}
-
-func getCacheKey(cr *v1alpha1.Entitlement) string {
-	return fmt.Sprintf("%s|%s|%s|%s",
-		cr.GetProviderConfigReference().Name,
-		cr.Spec.ForProvider.SubaccountGuid,
-		cr.Spec.ForProvider.ServiceName,
-		cr.Spec.ForProvider.ServicePlanName,
-	)
-}
-
-func (c EntitlementsClient) DescribeInstanceCached(
-	ctx context.Context,
-	cr *v1alpha1.Entitlement,
-) (*Instance, error) {
-	instance, err := c.cache.Get(ctx, getCacheKey(cr), otter.LoaderFunc[string, *Instance](
-		func(ctx context.Context, key string) (*Instance, error) {
-			return c.DescribeInstance(ctx, cr)
-		},
-	))
-
-	if err != nil {
-		return nil, err
-	}
-
-	return instance, nil
-}
-
-func (c EntitlementsClient) ClearDescribeInstanceCache(cr *v1alpha1.Entitlement) {
-	c.cache.Invalidate(getCacheKey(cr))
 }
 
 func (c EntitlementsClient) CreateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
@@ -155,8 +123,6 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 	)
 
 	_, _, err := c.btp.EntitlementsServiceClient.SetServicePlans(ctx).SubaccountServicePlansRequestPayloadCollection(*payload).Execute()
-
-	c.ClearDescribeInstanceCache(cr)
 
 	if err != nil {
 		return specifyAPIError(err, errors.Wrapf(err, errFailedSetEntitlements, serviceName, planName))
