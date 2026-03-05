@@ -217,5 +217,6 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 	}
 	// we rely on status being saved in crossplane reconciler here
 	cr.Status.AtProvider.ID = sid.ID
+	cr.Status.AtProvider.DashboardURL = sid.DashboardURL
 	return nil
 }

@@ -72,6 +72,9 @@ type ServiceInstanceObservation struct {
 
 	// The ID of the service plan as resolved by the ServiceManager
 	ServiceplanID string `json:"serviceplanId,omitempty"`
+
+	// The URL of the web-based management UI for the service instance.
+	DashboardURL string `json:"dashboardUrl,omitempty"`
 }
 
 // A ServiceInstanceSpec defines the desired state of a ServiceInstance.
