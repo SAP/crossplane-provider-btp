@@ -40,6 +40,68 @@ func toUserSlice(ss []string) []v1alpha1.User {
 	return us
 }
 
+func TestNewOrganizationClient_Validation(t *testing.T) {
+	tests := []struct {
+		name    string
+		orgName string
+		url     string
+		orgId   string
+		user    string
+		pass    string
+		origin  string
+		wantErr bool
+	}{
+		{
+			name:    "missing org name returns error",
+			orgName: "",
+			url:     "https://api.cf.example.com",
+			orgId:   "org-guid",
+			user:    "user",
+			pass:    "pass",
+			origin:  "",
+			wantErr: true,
+		},
+		{
+			name:    "missing orgGuid returns error",
+			orgName: "my-org",
+			url:     "https://api.cf.example.com",
+			orgId:   "",
+			user:    "user",
+			pass:    "pass",
+			origin:  "",
+			wantErr: true,
+		},
+		{
+			name:    "empty origin is accepted",
+			orgName: "my-org",
+			url:     "https://api.cf.example.com",
+			orgId:   "org-guid",
+			user:    "user",
+			pass:    "pass",
+			origin:  "",
+			wantErr: true, // will fail on CF API connect, but not on validation
+		},
+		{
+			name:    "non-empty origin is accepted",
+			orgName: "my-org",
+			url:     "https://api.cf.example.com",
+			orgId:   "org-guid",
+			user:    "user",
+			pass:    "pass",
+			origin:  "custom-idp",
+			wantErr: true, // will fail on CF API connect, but not on validation
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newOrganizationClient(tt.orgName, tt.url, tt.orgId, tt.user, tt.pass, tt.origin)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("newOrganizationClient() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestCloudFoundryOrganization_getEnvironmentByNameAndOrg(t *testing.T) {
 	getBtpClient := func(instanceName string) btp.Client {
 		return btp.Client{
