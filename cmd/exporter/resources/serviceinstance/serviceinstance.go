@@ -23,6 +23,7 @@ var (
 	instanceCache resources.ResourceCache[*serviceinstancebase.ServiceInstance]
 	instanceParam = configparam.StringSlice(KindName, "Service instance ID or regex expression for name.").
 		WithFlagName(KindName)
+	registry = resources.NewRegistry()
 )
 
 func init() {
@@ -50,8 +51,11 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 
 	if cache.Len() == 0 {
 		eventHandler.Warn(fmt.Errorf("no service instances found"))
-	} else {
-		convert(ctx, btpClient, eventHandler, resolveReferences)
+		return nil
+	}
+
+	for _, si := range cache.All() {
+		convert(ctx, btpClient, si, eventHandler, resolveReferences)
 	}
 
 	return nil
@@ -94,31 +98,58 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	return instanceCache, nil
 }
 
-func convert(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, resolveReferences bool) {
-	cache, err := Get(ctx, btpClient)
+func ExportInstance(ctx context.Context, btpClient *btpcli.BtpCli, instanceID string, eventHandler export.EventHandler, resolveReferences bool) (string, error) {
+	si, err := getServiceInstance(ctx, btpClient, instanceID)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to get cache with service instances", "error", err)
-		return
+		return "", fmt.Errorf("failed to retrieve service instance %s: %w", instanceID, err)
 	}
 
-	// Export service instances.
-	for _, si := range cache.All() {
-		// Instances of certain services, e.g. Service Manager, Cloud Management or XSUAA, require special handling.
-		switch {
-		case si.IsCloudManagement():
-			cloudmanagement.Convert(ctx, btpClient, si, eventHandler, resolveReferences)
-		case si.IsServiceManager():
-			servicemanager.Convert(ctx, btpClient, si, eventHandler, resolveReferences)
-		default:
+	convert(ctx, btpClient, si, eventHandler, resolveReferences)
+
+	return si.GenerateK8sResourceName(), nil
+}
+
+func getServiceInstance(ctx context.Context, btpClient *btpcli.BtpCli, instanceID string) (*serviceinstancebase.ServiceInstance, error) {
+	// Get complete list of service instances.
+	cache, err := serviceinstancebase.Get(ctx, btpClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve service instance cache: %w", err)
+	}
+
+	si := cache.Get(instanceID)
+	if si == nil {
+		return nil, fmt.Errorf("service instance with ID %q not found in cache", instanceID)
+	}
+
+	return si, nil
+}
+
+func convert(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
+	// Instances of certain services, e.g. Service Manager, Cloud Management or XSUAA, require special handling.
+	switch {
+	case si.IsCloudManagement():
+		cloudmanagement.Convert(ctx, btpClient, si, eventHandler, resolveReferences)
+	case si.IsServiceManager():
+		servicemanager.Convert(ctx, btpClient, si, eventHandler, resolveReferences)
+	default:
+		if register(ctx, si) {
 			exportPrerequisiteResources(ctx, btpClient, si, eventHandler, resolveReferences)
 			eventHandler.Resource(convertServiceInstanceResource(ctx, btpClient, si, eventHandler, resolveReferences))
 		}
 	}
 }
 
-func exportPrerequisiteResources(ctx context.Context, btpClient *btpcli.BtpCli, cm *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
+func register(ctx context.Context, si *serviceinstancebase.ServiceInstance) bool {
+	success := registry.Register(si.GetID())
+	if !success {
+		slog.DebugContext(ctx, "Service instance already exported", "id", si.GetID())
+	}
+	return success
+}
+
+func exportPrerequisiteResources(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
 	// Export subaccount service manager.
-	saID := cm.SubaccountID
+	saID := si.SubaccountID
 	smName, err := servicemanager.ExportOperatorInstance(ctx, btpClient, saID, eventHandler, resolveReferences)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to export service manager for subaccount", "subaccount ID", saID)
@@ -126,6 +157,6 @@ func exportPrerequisiteResources(ctx context.Context, btpClient *btpcli.BtpCli, 
 
 	// Set Service Manager reference.
 	if smName != "" {
-		cm.ServiceManagerName = smName
+		si.ServiceManagerName = smName
 	}
 }
