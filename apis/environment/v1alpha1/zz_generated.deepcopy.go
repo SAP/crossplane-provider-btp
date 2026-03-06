@@ -68,7 +68,7 @@ func (in *CfEnvironmentParameters) DeepCopyInto(out *CfEnvironmentParameters) {
 	*out = *in
 	if in.Managers != nil {
 		in, out := &in.Managers, &out.Managers
-		*out = make([]string, len(*in))
+		*out = make([]User, len(*in))
 		copy(*out, *in)
 	}
 }

@@ -16,7 +16,7 @@ import (
 )
 
 // crWithManagers returns a CloudFoundryEnvironment CR with the given managers.
-func _(specManagers []string, statusManagers []string) v1alpha1.CloudFoundryEnvironment {
+func _(specManagers []v1alpha1.User, statusManagers []string) v1alpha1.CloudFoundryEnvironment {
 	return v1alpha1.CloudFoundryEnvironment{
 		Spec: v1alpha1.CfEnvironmentSpec{
 			ForProvider: v1alpha1.CfEnvironmentParameters{

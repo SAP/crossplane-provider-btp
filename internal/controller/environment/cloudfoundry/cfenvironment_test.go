@@ -95,7 +95,7 @@ func TestObserve(t *testing.T) {
 					return false
 				}},
 				cr: environment(withUID("1234"),
-					withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", Managers: []string{aUser.Username}}),
+					withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", Managers: []v1alpha1.User{aUser}}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
 							State:  internal.Ptr("OK"),
@@ -112,7 +112,7 @@ func TestObserve(t *testing.T) {
 				},
 				err: nil,
 				cr: environment(withUID("1234"), withConditions(xpv1.Available()),
-					withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", Managers: []string{aUser.Username}}),
+					withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", Managers: []v1alpha1.User{aUser}}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
 							State:  internal.Ptr("OK"),
@@ -134,7 +134,7 @@ func TestObserve(t *testing.T) {
 					return false
 				}},
 				cr: environment(withUID("1234"),
-					withData(v1alpha1.CfEnvironmentParameters{Managers: []string{aUser.Username}}),
+					withData(v1alpha1.CfEnvironmentParameters{Managers: []v1alpha1.User{aUser}}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
 							State:  internal.Ptr("CREATING"),
@@ -151,7 +151,7 @@ func TestObserve(t *testing.T) {
 				},
 				err: nil,
 				cr: environment(withUID("1234"), withConditions(xpv1.Unavailable()),
-					withData(v1alpha1.CfEnvironmentParameters{Managers: []string{aUser.Username}}),
+					withData(v1alpha1.CfEnvironmentParameters{Managers: []v1alpha1.User{aUser}}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
 							State:  internal.Ptr("CREATING"),
