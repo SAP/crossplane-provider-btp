@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	KindName = servicebindingbase.KindName
+	KindName = "servicebinding"
 )
 
 var (
@@ -80,14 +80,14 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 		return widgetValues.Values(), nil
 	})
 
-	selectedEntitlements, err := bindingParam.ValueOrAsk(ctx)
+	selectedBindings, err := bindingParam.ValueOrAsk(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter value: %s, %w", bindingParam.GetName(), err)
 	}
-	slog.DebugContext(ctx, "Selected service bindings", "bindings", selectedEntitlements)
+	slog.DebugContext(ctx, "Selected service bindings", "bindings", selectedBindings)
 
 	// Keep only selected bindings in the cache.
-	cache.KeepSelectedOnly(selectedEntitlements)
+	cache.KeepSelectedOnly(selectedBindings)
 	selectedCache = cache
 
 	return selectedCache, nil

@@ -12,8 +12,6 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
-const KindName = "servicebinding"
-
 var fullCache resources.ResourceCache[*ServiceBinding]
 
 // ServiceBinding wraps the BTP CLI service binding with export metadata.
