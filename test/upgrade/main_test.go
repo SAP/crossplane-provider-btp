@@ -102,7 +102,7 @@ func TestMain(m *testing.M) {
 		fromTag, toTag,
 		fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository,
 		uutImagesEnvVar, localTagName,
-		false,
+		true,
 	)
 
 	setupClusterWithCrossplane(fromProviderPackage, fromControllerPackage)

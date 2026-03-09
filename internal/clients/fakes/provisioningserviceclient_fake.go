@@ -104,7 +104,7 @@ func (m *MockProvisioningServiceClient) GetAvailableEnvironmentsExecute(r client
 
 // GetEnvironmentInstance implements openapi.EnvironmentsAPI.
 func (m *MockProvisioningServiceClient) GetEnvironmentInstance(ctx context.Context, environmentInstanceId string) client.ApiGetEnvironmentInstanceRequest {
-	panic("unimplemented")
+	return client.ApiGetEnvironmentInstanceRequest{ApiService: m}
 }
 
 // GetEnvironmentInstanceBinding implements openapi.EnvironmentsAPI.
@@ -119,7 +119,18 @@ func (m *MockProvisioningServiceClient) GetEnvironmentInstanceBindingExecute(r c
 
 // GetEnvironmentInstanceExecute implements openapi.EnvironmentsAPI.
 func (m *MockProvisioningServiceClient) GetEnvironmentInstanceExecute(r client.ApiGetEnvironmentInstanceRequest) (*client.BusinessEnvironmentInstanceResponseObject, *http.Response, error) {
-	panic("unimplemented")
+	// When there's an error, return it (this handles the API error case)
+	if m.Err != nil {
+		return nil, &http.Response{}, m.Err
+	}
+
+	// When ApiResponse is empty or has no instances, return nil (not found case)
+	if m.ApiResponse == nil || len(m.ApiResponse.EnvironmentInstances) == 0 {
+		return nil, &http.Response{StatusCode: 404}, nil
+	}
+
+	// Return the first instance (for successful lookups by ID)
+	return &m.ApiResponse.EnvironmentInstances[0], &http.Response{}, nil
 }
 
 // GetEnvironmentInstanceLabels implements openapi.EnvironmentsAPI.
@@ -153,3 +164,35 @@ func (m *MockProvisioningServiceClient) UpdateEnvironmentInstanceExecute(r clien
 }
 
 var _ client.EnvironmentsAPI = &MockProvisioningServiceClient{}
+
+// MockProvisioningServiceClientWithGetByID mocks GetEnvironmentInstanceExecute for GUID lookups
+type MockProvisioningServiceClientWithGetByID struct {
+	MockProvisioningServiceClient
+	GetByIDResponse *client.BusinessEnvironmentInstanceResponseObject
+	GetByIDError    error
+}
+
+func (m *MockProvisioningServiceClientWithGetByID) GetEnvironmentInstanceExecute(r client.ApiGetEnvironmentInstanceRequest) (*client.BusinessEnvironmentInstanceResponseObject, *http.Response, error) {
+	return m.GetByIDResponse, &http.Response{}, m.GetByIDError
+}
+
+// MockProvisioningServiceClientWithCreate mocks CreateInstance
+type MockProvisioningServiceClientWithCreate struct {
+	MockProvisioningServiceClient
+	CreateOrgResponse *CloudFoundryOrg
+	CreateOrgError    error
+}
+
+// CloudFoundryOrg represents a CF org for testing - copy from btp package
+type CloudFoundryOrg struct {
+	Id          string
+	Name        string
+	ApiEndpoint string
+}
+
+// MockProvisioningServiceClientWithDelete mocks DeleteInstance
+type MockProvisioningServiceClientWithDelete struct {
+	MockProvisioningServiceClient
+	DeleteResponse *http.Response
+	DeleteError    error
+}

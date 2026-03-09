@@ -259,7 +259,7 @@ test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
 	@$(INFO) running integration tests
 	@echo UUT_CONFIG=$$UUT_CONFIG
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
-	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '$(testFilter)' -timeout 240m 2>&1 | tee test-output.log
+	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
@@ -276,7 +276,7 @@ test-acceptance: $(KIND) $(HELM3) build generate-test-crs
 	@echo UUT_CONFIG=$$UUT_CONFIG
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
 	@echo "UUT_IMAGES=$$UUT_IMAGES"
-	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
+	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
@@ -292,7 +292,7 @@ test-acceptance-debug: $(KIND) $(HELM3) build generate-test-crs
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
 	@echo "UUT_IMAGES=$$UUT_IMAGES"
 	go test -gcflags="all=-N -l" -c -v  $(PROJECT_REPO)/test/e2e/ -tags=e2e -o ./test/e2e/test-acceptance-debug.test -timeout 30m
-	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '$(testFilter)'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
+	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
 	@$(OK) integration tests passed
 
 .PHONY: generate-test-crs
@@ -374,7 +374,7 @@ build-upgrade-test-images:
 .PHONY: upgrade-test
 upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
-	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '$(testFilter)' -timeout 120m 2>&1 | tee upgrade-test-output.log
+	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee upgrade-test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" upgrade-test-output.log
 	@case `tail -n 1 upgrade-test-output.log` in \
@@ -385,7 +385,7 @@ upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upg
 .PHONY: upgrade-test-debug
 upgrade-test-debug: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
-	@cd test/upgrade && dlv test --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee upgrade-test-output.log
+	@cd test/upgrade && dlv test --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '^$(testFilter)$$' 2>&1 | tee upgrade-test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" upgrade-test-output.log
 	@case `tail -n 1 upgrade-test-output.log` in \

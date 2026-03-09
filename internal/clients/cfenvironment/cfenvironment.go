@@ -3,6 +3,7 @@ package environments
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	cfv3 "github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/config"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/internal"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 )
 
@@ -50,7 +52,7 @@ func (c CloudFoundryOrganization) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.CloudFoundryEnvironment,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
-	environment, err := c.getEnvironmentByNameAndOrg(ctx, cr)
+	environment, err := c.getEnvironmentByExternalNameWithLegacyHandling(ctx, cr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -66,15 +68,35 @@ func (c CloudFoundryOrganization) DescribeInstance(
 	return environment, managers, nil
 }
 
-func (c CloudFoundryOrganization) getEnvironmentByNameAndOrg(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
-	name := meta.GetExternalName(&cr)
-	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
-	environment, err := c.btp.GetCFEnvironmentByNameAndOrg(ctx, name, orgName)
+// getEnvironmentByExternalName retrieves CF environment using external-name
+// Supports GUID format (new) and backwards compatibility with orgName and metadata.name (legacy)
+// returns (environment, needsExternalNameFormatMigration, error)
+func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	externalName := meta.GetExternalName(&cr)
+
+	// Empty external-name check
+	if externalName == "" {
+		return nil, nil
+	}
+
+	// Try GUID lookup first (new standard format)
+	if internal.IsValidUUID(externalName) {
+		environment, notFound, err := c.btp.GetEnvironmentInstanceByID(ctx, externalName)
+		if notFound {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return environment, nil
+	}
+
+	// Backwards compatibility: try legacy lookup by orgName and name. Name was set as external name in v1.1.0
+	// This handles migration from v1.1.0 (orgName) and v1.0.0 (metadata.name)
+	orgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	environment, err := c.btp.GetCFEnvironmentByNameAndOrg(ctx, externalName, orgName)
 	if err != nil {
 		return nil, err
-	}
-	if environment == nil {
-		return nil, nil
 	}
 	return environment, nil
 }
@@ -125,8 +147,8 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 
 func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error) {
 	adminServiceAccountEmail := c.btp.Credential.UserCredential.Email
-	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
-	org, err := c.btp.CreateCloudFoundryOrgIfNotExists(
+	orgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	instanceId, org, err := c.btp.CreateCloudFoundryEnvironmentAndGetOrg(
 		ctx, cr.Name, adminServiceAccountEmail, string(cr.UID),
 		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName,
 	)
@@ -145,16 +167,18 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 		}
 	}
 
-	return org.Name, nil
+	return instanceId, nil
 }
 
-func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
-	name := meta.GetExternalName(&cr)
-	orgName := formOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
-	return c.btp.DeleteCloudFoundryEnvironment(ctx, name, orgName)
+func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
+	externalName := meta.GetExternalName(&cr)
+
+	// Use external-name for deletion
+	// Legacy format does not need to be handled since the ID will be updated in Observe phase already to the GUID
+	return c.btp.DeleteEnvironmentInstanceByID(ctx, externalName)
 }
 
-func formOrgName(orgName string, subaccountId string, crName string) string {
+func FormOrgName(orgName string, subaccountId string, crName string) string {
 	if orgName == "" {
 		return subaccountId + "-" + crName
 	}
