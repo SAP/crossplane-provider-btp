@@ -11,11 +11,12 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebindingbase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func convertServiceBindingResource(ctx context.Context, btpClient *btpcli.BtpCli, sb *serviceBinding, eventHandler export.EventHandler, resolveReferences bool) resource.Object {
+func convertServiceBindingResource(ctx context.Context, btpClient *btpcli.BtpCli, sb *servicebindingbase.ServiceBinding, eventHandler export.EventHandler, resolveReferences bool) resource.Object {
 	bindingName := sb.Name
 	resourceName := sb.GenerateK8sResourceName()
 	externalName := sb.GetExternalName()
@@ -52,6 +53,29 @@ func convertServiceBindingResource(ctx context.Context, btpClient *btpcli.BtpCli
 				},
 			},
 		})
+
+	// Comment the resource out, if any of the fields is missing.
+	if bindingName == "" {
+		managedBinding.AddComment(resources.WarnMissingBindingName)
+	}
+	if subaccountID == "" {
+		managedBinding.AddComment(resources.WarnMissingSubaccountGuid)
+	}
+	if instanceID == "" {
+		managedBinding.AddComment(resources.WarnMissingInstanceId)
+	}
+	if instanceName == "" {
+		managedBinding.AddComment(resources.WarnMissingInstanceName)
+	}
+	if resourceName == resources.UndefinedName {
+		managedBinding.AddComment(resources.WarnUndefinedResourceName)
+	}
+	if externalName == "" {
+		managedBinding.AddComment(resources.WarnMissingExternalName)
+	}
+	if externalName == resources.UndefinedExternalName {
+		managedBinding.AddComment(resources.WarnUndefinedExternalName)
+	}
 
 	// Reference subaccount resource, if requested.
 	if resolveReferences {

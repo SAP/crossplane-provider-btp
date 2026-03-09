@@ -9,7 +9,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebinding"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebindingbase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceplan"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
@@ -92,7 +92,7 @@ func addServiceAndBindingInfo(ctx context.Context, btpClient *btpcli.BtpCli, si 
 }
 
 func addBindingInfo(ctx context.Context, btpClient *btpcli.BtpCli, si *ServiceInstance) error {
-	bindingIDs, err := servicebinding.GetServiceInstanceBindings(ctx, btpClient, si.ID)
+	bindingIDs, err := servicebindingbase.GetServiceInstanceBindings(ctx, btpClient, si.ID)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to retrieve binding IDs for service instance", "id", si.ID)
 		return fmt.Errorf("failed to retrieve binding IDs for service instance %q: %w", si.ID, err)

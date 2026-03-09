@@ -20,6 +20,7 @@ const (
 	WarnTooManyBindingIDs             = "WARNING: one binding ID expected, got: %d"
 	WarnMissingInstanceId             = "WARNING: service instance ID is missing"
 	WarnMissingInstanceName           = "WARNING: service instance name is missing"
+	WarnMissingBindingName            = "WARNING: service binding name is missing"
 	WarnMissingExternalName           = "WARNING: external name is missing"
 	WarnUndefinedResourceName         = "WARNING: could not generate a valid resource name"
 	WarnUndefinedExternalName         = "WARNING: could not generate a valid external name"

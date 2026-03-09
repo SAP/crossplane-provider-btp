@@ -7,20 +7,18 @@ import (
 
 	"github.com/SAP/xp-clifford/cli/configparam"
 	"github.com/SAP/xp-clifford/cli/export"
-	"github.com/SAP/xp-clifford/yaml"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebindingbase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
 const (
-	KindName = "servicebinding"
+	KindName = servicebindingbase.KindName
 )
 
 var (
-	fullCache     resources.ResourceCache[*serviceBinding]
-	selectedCache resources.ResourceCache[*serviceBinding]
+	selectedCache resources.ResourceCache[*servicebindingbase.ServiceBinding]
 
 	bindingParam = configparam.StringSlice(KindName, "Service binding ID or regex expression for name.").
 		WithFlagName(KindName)
@@ -61,12 +59,12 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 	return nil
 }
 
-func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*serviceBinding], error) {
+func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*servicebindingbase.ServiceBinding], error) {
 	if selectedCache != nil {
 		return selectedCache, nil
 	}
 
-	fc, err := getFullCache(ctx, btpClient)
+	fc, err := servicebindingbase.Get(ctx, btpClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get full cache with service bindings: %w", err)
 	}
@@ -95,16 +93,16 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	return selectedCache, nil
 }
 
-func convert(ctx context.Context, btpClient *btpcli.BtpCli, sb *serviceBinding, eventHandler export.EventHandler, resolveReferences bool) {
+func convert(ctx context.Context, btpClient *btpcli.BtpCli, sb *servicebindingbase.ServiceBinding, eventHandler export.EventHandler, resolveReferences bool) {
 	exportPrerequisiteResources(ctx, btpClient, sb, eventHandler, resolveReferences)
 	eventHandler.Resource(convertServiceBindingResource(ctx, btpClient, sb, eventHandler, resolveReferences))
 }
 
-func exportPrerequisiteResources(ctx context.Context, btpClient *btpcli.BtpCli, sb *serviceBinding, eventHandler export.EventHandler, resolveReferences bool) {
+func exportPrerequisiteResources(ctx context.Context, btpClient *btpcli.BtpCli, sb *servicebindingbase.ServiceBinding, eventHandler export.EventHandler, resolveReferences bool) {
 	exportServiceInstance(ctx, btpClient, sb, eventHandler, resolveReferences)
 }
 
-func exportServiceInstance(ctx context.Context, btpClient *btpcli.BtpCli, sb *serviceBinding, eventHandler export.EventHandler, resolveReferences bool) {
+func exportServiceInstance(ctx context.Context, btpClient *btpcli.BtpCli, sb *servicebindingbase.ServiceBinding, eventHandler export.EventHandler, resolveReferences bool) {
 	siID := sb.ServiceInstanceID
 	siName, err := serviceinstance.ExportInstance(ctx, btpClient, siID, eventHandler, resolveReferences)
 	if err != nil {
@@ -115,85 +113,4 @@ func exportServiceInstance(ctx context.Context, btpClient *btpcli.BtpCli, sb *se
 	if siName != "" {
 		sb.ServiceInstanceName = siName
 	}
-}
-
-func getFullCache(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*serviceBinding], error) {
-	if fullCache != nil {
-		return fullCache, nil
-	}
-
-	// Let the user select relevant subaccounts.
-	saCache, err := subaccount.Get(ctx, btpClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve subaccount cache: %w", err)
-	}
-	slog.DebugContext(ctx, "Subaccounts in cache after user selection", "count", saCache.Len())
-
-	// Retrieve all service bindings from selected subaccounts.
-	var btpBindings []btpcli.ServiceBinding
-	for _, saId := range saCache.AllIDs() {
-		b, err := btpClient.ListServiceBindings(ctx, saId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get service bindings for subaccount %s: %w", saId, err)
-		}
-		btpBindings = append(btpBindings, b...)
-	}
-	slog.DebugContext(ctx, "Total service bindings returned by BTP CLI", "count", len(btpBindings))
-
-	// Store service bindings in cache.
-	bindings := make([]*serviceBinding, len(btpBindings))
-	for i, sb := range btpBindings {
-		bindings[i] = &serviceBinding{
-			ServiceBinding:      &sb,
-			ResourceWithComment: yaml.NewResourceWithComment(nil),
-		}
-	}
-	fullCache = resources.NewResourceCache[*serviceBinding]()
-	fullCache.Store(bindings...)
-
-	return fullCache, nil
-}
-
-func GetServiceInstanceBindings(ctx context.Context, btpClient *btpcli.BtpCli, instanceId string) (resources.ResourceCache[*serviceBinding], error) {
-	cache, err := getFullCache(ctx, btpClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve service binding cache: %w", err)
-	}
-
-	c := resources.NewResourceCache[*serviceBinding]()
-	for _, sb := range cache.All() {
-		if sb.ServiceInstanceID == instanceId {
-			c.Set(sb)
-		}
-	}
-
-	return c, nil
-}
-
-type serviceBinding struct {
-	*btpcli.ServiceBinding
-	*yaml.ResourceWithComment
-}
-
-var _ resources.BtpResource = &serviceBinding{}
-
-func (sb *serviceBinding) GetID() string {
-	return sb.ID
-}
-
-func (sb *serviceBinding) GetDisplayName() string {
-	return sb.Name
-}
-
-func (sb *serviceBinding) GetExternalName() string {
-	return sb.ID
-}
-
-func (sb *serviceBinding) GenerateK8sResourceName() string {
-	resourceName, err := resources.GenerateK8sResourceName(sb.GetID(), sb.GetDisplayName(), KindName)
-	if err != nil {
-		sb.AddComment(fmt.Sprintf("cannot generate service manager resource name: %s", err))
-	}
-
-	return resourceName
 }
