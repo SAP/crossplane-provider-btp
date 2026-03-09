@@ -1,0 +1,16 @@
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: CloudFoundryEnvironment
+metadata:
+  name: upgrade-test-cf-extn-env
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: cf-env-extn-upgrade-test
+    namespace: default
+  forProvider:
+    landscape: cf-eu10
+    environmentName: "$BUILD_ID-cfenv-extn-upgrade-test-env"
+  subaccountRef:
+    name: upgrade-test-cf-extn-sa
+  cloudManagementRef:
+    name: cis-local-cf-extn

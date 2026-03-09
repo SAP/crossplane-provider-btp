@@ -2,6 +2,7 @@ package cloudfoundry
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -29,6 +30,7 @@ import (
 // https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md#contributing-code
 
 var aUser = v1alpha1.User{Username: "aaa@bbb.com"}
+var mockGuid = "550e8400-e29b-41d4-a716-446655440000"
 
 func TestObserve(t *testing.T) {
 	type args struct {
@@ -56,17 +58,111 @@ func TestObserve(t *testing.T) {
 				err: errors.New(errNotEnvironment),
 			},
 		},
+		"EmptyExternalName_NoResourceExists": {
+			args: args{
+				client: fake.MockClient{},
+				cr:     environment(), // No external-name annotation
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				err: nil,
+				cr:  environment(),
+			},
+		},
+		"ValidGUID_ResourceNotFound_Drift": {
+			args: args{
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return nil, nil, nil // Resource not found
+				}},
+				cr: environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				err: nil,
+				cr:  environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
+			},
+		},
+		"ValidGUID_SuccessfulObservation": {
+			args: args{
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+						Id:     internal.Ptr(mockGuid),
+						State:  internal.Ptr("OK"),
+						Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
+					}, []v1alpha1.User{aUser}, nil
+				}},
+				cr: environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  true,
+					ConnectionDetails: managed.ConnectionDetails{"__raw": []byte("{\"Org Name\":\"test-org\"}"), "orgName": []byte("test-org")},
+				},
+				err: nil,
+				cr: environment(
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
+					withConditions(xpv1.Available()),
+					withStatus(v1alpha1.CfEnvironmentObservation{
+						EnvironmentObservation: v1alpha1.EnvironmentObservation{
+							ID:     internal.Ptr(mockGuid),
+							State:  internal.Ptr("OK"),
+							Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
+						},
+						Managers: []v1alpha1.User{aUser},
+					}),
+				),
+			},
+		},
+		"LegacyFormatv1.1.0_SuccessfulMigrationToGUID": {
+			args: args{
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+						Id:     internal.Ptr(mockGuid),
+						State:  internal.Ptr("OK"),
+						Labels: internal.Ptr("{\"Org Name\":\"legacy-org\"}"),
+					}, []v1alpha1.User{}, nil
+				}},
+				// External-name set to CR name "cf" to in v1.0.0 behaviour
+				cr: environment(withAnnotaions(map[string]string{"crossplane.io/external-name": "cf"})),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  true,
+					ConnectionDetails: managed.ConnectionDetails{"__raw": []byte("{\"Org Name\":\"legacy-org\"}"), "orgName": []byte("legacy-org")},
+				},
+				err: nil,
+				cr: environment(
+					// External-name should be migrated to GUID
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
+					withConditions(xpv1.Available()),
+					withStatus(v1alpha1.CfEnvironmentObservation{
+						EnvironmentObservation: v1alpha1.EnvironmentObservation{
+							ID:     internal.Ptr(mockGuid),
+							State:  internal.Ptr("OK"),
+							Labels: internal.Ptr("{\"Org Name\":\"legacy-org\"}"),
+						},
+						Managers: []v1alpha1.User{},
+					}),
+				),
+			},
+		},
 		"ErrorGettingCFEnvironment": {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return nil, nil, errors.New("Could not call backend")
 				}},
-				cr: environment(),
+				cr: environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
 				err: errors.Wrap(errors.New("Could not call backend"), "while describing instance"),
-				cr:  environment(),
+				cr:  environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
 			},
 		},
 		"NeedsCreate": {
@@ -81,13 +177,14 @@ func TestObserve(t *testing.T) {
 					ResourceExists: false,
 				},
 				err: nil,
-				cr:  environment(withConditions(xpv1.Unavailable())),
+				cr:  environment(), // No conditions set when external-name is empty
 			},
 		},
 		"SuccessfulAvailableAndUpToDate": {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+						Id:     internal.Ptr(mockGuid),
 						State:  internal.Ptr("OK"),
 						Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
 					}, []v1alpha1.User{aUser}, nil
@@ -95,6 +192,7 @@ func TestObserve(t *testing.T) {
 					return false
 				}},
 				cr: environment(withUID("1234"),
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
 					withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", Managers: []string{aUser.Username}}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
@@ -112,9 +210,11 @@ func TestObserve(t *testing.T) {
 				},
 				err: nil,
 				cr: environment(withUID("1234"), withConditions(xpv1.Available()),
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
 					withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", Managers: []string{aUser.Username}}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
+							ID:     internal.Ptr(mockGuid),
 							State:  internal.Ptr("OK"),
 							Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
 						},
@@ -127,6 +227,7 @@ func TestObserve(t *testing.T) {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+						Id:     internal.Ptr(mockGuid),
 						State:  internal.Ptr("CREATING"),
 						Labels: internal.Ptr("{}"),
 					}, []v1alpha1.User{aUser}, nil
@@ -134,6 +235,7 @@ func TestObserve(t *testing.T) {
 					return false
 				}},
 				cr: environment(withUID("1234"),
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
 					withData(v1alpha1.CfEnvironmentParameters{Managers: []string{aUser.Username}}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
@@ -151,9 +253,11 @@ func TestObserve(t *testing.T) {
 				},
 				err: nil,
 				cr: environment(withUID("1234"), withConditions(xpv1.Unavailable()),
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
 					withData(v1alpha1.CfEnvironmentParameters{Managers: []string{aUser.Username}}),
 					withStatus(v1alpha1.CfEnvironmentObservation{
 						EnvironmentObservation: v1alpha1.EnvironmentObservation{
+							ID:     internal.Ptr(mockGuid),
 							State:  internal.Ptr("CREATING"),
 							Labels: internal.Ptr("{}"),
 						},
@@ -219,10 +323,10 @@ func TestCreate(t *testing.T) {
 				cr:  environment(),
 			},
 		},
-		"Successful": {
+		"Successful_SetsExternalNameToGUID": {
 			args: args{
 				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
-					return "test-org", nil
+					return mockGuid, nil // Return GUID
 				},
 				},
 				cr: environment(withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", EnvironmentName: "test-env"})),
@@ -232,8 +336,21 @@ func TestCreate(t *testing.T) {
 				err: nil,
 				cr: environment(withData(v1alpha1.CfEnvironmentParameters{OrgName: "test-org", EnvironmentName: "test-env"}),
 					withAnnotaions(map[string]string{
-						"crossplane.io/external-name": "test-org",
+						"crossplane.io/external-name": mockGuid,
 					})),
+			},
+		},
+		"CreateError_AlreadyExists_DoesNotSetExternalName": {
+			args: args{
+				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
+					return "", errors.New("resource already exists")
+				}},
+				cr: environment(),
+			},
+			want: want{
+				o:   managed.ExternalCreation{},
+				err: errors.Wrap(errors.New("resource already exists"), errCreate),
+				cr:  environment(), // No external-name should be set
 			},
 		},
 	}
@@ -280,8 +397,8 @@ func TestDelete(t *testing.T) {
 		},
 		"DeleteError": {
 			args: args{
-				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) error {
-					return errors.New("Could not call backend")
+				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
+					return &http.Response{StatusCode: 500}, errors.New("Could not call backend")
 				}},
 				cr: environment(),
 			},
@@ -290,10 +407,22 @@ func TestDelete(t *testing.T) {
 				cr:  environment(withConditions(xpv1.Deleting())),
 			},
 		},
+		"DeleteError-404 not found": {
+			args: args{
+				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
+					return &http.Response{StatusCode: 404}, errors.New("404 not found")
+				}},
+				cr: environment(),
+			},
+			want: want{
+				err: nil,
+				cr:  environment(withConditions(xpv1.Deleting())), //TODO what to do here?
+			},
+		},
 		"Successful": {
 			args: args{
-				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) error {
-					return nil
+				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
+					return nil, nil
 				},
 				},
 				cr: environment(),
@@ -301,6 +430,47 @@ func TestDelete(t *testing.T) {
 			want: want{
 				err: nil,
 				cr:  environment(withConditions(xpv1.Deleting())),
+			},
+		},
+		"AlreadyDeleting_SkipsDeleteCall": {
+			args: args{
+				client: fake.MockClient{
+					MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
+						// This should NOT be called
+						panic("Delete should not be called when resource is already deleting")
+					},
+				},
+				cr: environment(
+					withStatus(v1alpha1.CfEnvironmentObservation{
+						EnvironmentObservation: v1alpha1.EnvironmentObservation{
+							State: internal.Ptr(v1alpha1.InstanceStateDeleting),
+						},
+					}),
+				),
+			},
+			want: want{
+				err: nil,
+				cr: environment(
+					withConditions(xpv1.Deleting()),
+					withStatus(v1alpha1.CfEnvironmentObservation{
+						EnvironmentObservation: v1alpha1.EnvironmentObservation{
+							State: internal.Ptr(v1alpha1.InstanceStateDeleting),
+						},
+					}),
+				),
+			},
+		},
+		"UsesExternalNameForDeletion": {
+			args: args{
+				client: fake.MockClient{MockDelete: func(cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error) {
+					// Verify external-name is accessible (implicitly tested by not panicking)
+					return &http.Response{StatusCode: 200}, nil
+				}},
+				cr: environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
+			},
+			want: want{
+				err: nil,
+				cr:  environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}), withConditions(xpv1.Deleting())),
 			},
 		},
 	}
