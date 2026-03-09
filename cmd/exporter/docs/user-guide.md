@@ -17,6 +17,7 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
   - [Entitlement](#entitlement)
   - [Service Instance](#service-instance)
   - [Cloud Foundry Environment](#cloud-foundry-environment)
+  - [Service Binding](#service-binding)
 - [Usage Examples](#usage-examples)
   - [Building the Exporter](#building-the-exporter)
   - [Interactive Mode](#interactive-mode)
@@ -25,6 +26,9 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
   - [Output to File](#output-to-file)
 - [Reference Resolution](#reference-resolution)
 - [Tips and Best Practices](#tips-and-best-practices)
+- [Known Limitations](#known-limitations)
+  - [`spec.forProvider.parameters` Is Always Null](#specforproviderparameters-is-always-null)
+  - [`spec.forProvider.shared` Cannot Be Retrieved](#specforprovidershared-cannot-be-retrieved)
 - [Troubleshooting](#troubleshooting)
   - [Authentication Issues](#authentication-issues)
   - [Missing BTP CLI](#missing-btp-cli)
@@ -293,6 +297,29 @@ Exports Cloud Foundry environment instances from BTP subaccounts.
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind cloudfoundry-environment
 ```
 
+---
+
+### Service Binding
+
+Exports BTP service bindings from subaccounts.
+
+**Kind name:** `servicebinding`
+
+**CLI flag:** `--servicebinding <value>`
+
+**Selection criteria:**
+- Service binding ID (exact match)
+- Regex expression matching service binding name
+
+**Notes:**
+- When exporting service bindings, the exporter automatically exports the associated service instance as a prerequisite resource
+
+**Example:**
+```bash
+# Export service bindings interactively to a file
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind servicebinding -o output.yaml
+```
+
 ## Usage Examples
 
 ### Building the Exporter
@@ -419,6 +446,28 @@ spec:
 4. **Export in stages**: For complex environments, export resources subaccount by subaccount and kind by kind to review and customize each manifest.
 
 5. **Use regex patterns carefully**: Regex patterns are applied to resource display names. Test your patterns to ensure they match expected resources.
+
+## Known Limitations
+
+### `spec.forProvider.parameters` Is Always Null
+
+**Affected kinds:** `serviceinstance`, `servicebinding`
+
+The `spec.forProvider.parameters` field is always exported as `null`. The BTP CLI does not return the configuration parameters that were supplied when the service instance or service binding was originally created.
+
+**Workaround:** Review the exported manifests and manually add the `parameters` field with the appropriate values before applying the manifests to the cluster.
+
+---
+
+### `spec.forProvider.shared` Cannot Be Retrieved
+
+**Affected kinds:** `serviceinstance`
+
+The `spec.forProvider.shared` field cannot be populated during export. The BTP CLI does not expose whether a service instance is shared.
+
+**Workaround:** Review the exported manifests and manually set the `shared` field to the correct value before applying the manifests to the cluster.
+
+---
 
 ## Troubleshooting
 
