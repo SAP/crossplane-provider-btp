@@ -1,0 +1,25 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: kyma-azure-entitlement-import
+  namespace: default
+spec:
+  forProvider:
+    serviceName: kymaruntime
+    servicePlanName: azure
+    amount: 1
+    subaccountRef:
+      name: kyma-import-test-subaccount
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: cis-local-entitlement-kyma-import
+  namespace: default
+spec:
+  forProvider:
+    serviceName: cis
+    servicePlanName: local
+    enable: true
+    subaccountRef:
+      name: kyma-import-test-subaccount

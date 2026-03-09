@@ -98,6 +98,26 @@ func (c *Client) GetCFEnvironmentByNameAndOrg(
 	return findCFEnvironment(envInstances, instanceName, orgName)
 }
 
+// GetCFEnvironmentByOrgId retrieves CF environment using orgId by doing a list with client side filtering
+func (c *Client) GetCFEnvironmentByOrgId(ctx context.Context, orgId string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	var environmentInstance *provisioningclient.BusinessEnvironmentInstanceResponseObject
+	// additional Authorization param needs to be set != nil to avoid client blocking the call due to mandatory condition in specs
+	envInstances, err := c.ListCFEnvironments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, instance := range envInstances {
+		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
+			continue
+		}
+		if instance.Id != nil && *instance.Id == orgId {
+			environmentInstance = &instance
+			break
+		}
+	}
+	return environmentInstance, err
+}
+
 // findCFEnvironment tries to find a Cloud Foundry environment instance by matching either the ID or the instance name/org name in parameters
 func findCFEnvironment(envInstances []provisioningclient.BusinessEnvironmentInstanceResponseObject, instanceName string, orgName string) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	// First check ID match

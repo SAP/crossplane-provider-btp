@@ -83,10 +83,30 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaEnvironment)
 	}
 
-	instance, hasUpdate, err := c.client.DescribeInstance(ctx, *cr)
+	// Check if external-name is empty first - resource needs creation
+	externalName := meta.GetExternalName(cr)
+	if externalName == "" {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	instance, err := c.client.DescribeInstance(ctx, *cr)
 
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errCantDescribe)
+	}
+
+	// If instance not found (nil), it's a drift scenario - resource was deleted externally
+	if instance == nil {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	// If the external name is not set yet (< v1.2.2), we set it to the ID of the environment and update it
+	if *instance.Id != meta.GetExternalName(cr) {
+		meta.SetExternalName(cr, *instance.Id)
 	}
 
 	lastModified := cr.Status.AtProvider.ModifiedDate
@@ -104,12 +124,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		cr.Status.SetConditions(xpv1.Available())
 	} else {
 		cr.Status.SetConditions(xpv1.Unavailable())
-	}
-
-	if needsCreation := c.needsCreation(cr); needsCreation {
-		return managed.ExternalObservation{
-			ResourceExists: !needsCreation,
-		}, nil
 	}
 
 	needsUpdate, diff, err := c.needsUpdateWithDiff(cr)
@@ -134,10 +148,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, errors.Wrap(readErr, errGetConnectionDetails)
 	}
 	return managed.ExternalObservation{
-		ResourceExists:          true,
-		ResourceUpToDate:        true,
-		ConnectionDetails:       details,
-		ResourceLateInitialized: hasUpdate,
+		ResourceExists:    true,
+		ResourceUpToDate:  true,
+		ConnectionDetails: details,
 	}, nil
 }
 
@@ -192,16 +205,32 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotKymaEnvironment)
 	}
+
 	c.tracker.SetConditions(ctx, cr)
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
 		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
-	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateDeleting {
-		return managed.ExternalDelete{}, nil
+	cr.SetConditions(xpv1.Deleting())
+
+	// Check if resource is already in deletion state
+	if cr.Status.AtProvider.State != nil {
+		state := *cr.Status.AtProvider.State
+		if state == v1alpha1.InstanceStateDeleting {
+			// Already deleting, no need to call delete again
+			return managed.ExternalDelete{}, nil
+		}
 	}
 
-	return managed.ExternalDelete{}, errors.Wrap(c.client.DeleteInstance(ctx, *cr), errDelete)
+	resp, err := c.client.DeleteInstance(ctx, *cr)
+	// Don't treat 404 as error - resource was already deleted externally
+	if err != nil && resp != nil && resp.StatusCode == http.StatusNotFound {
+		return managed.ExternalDelete{}, nil
+	}
+	if err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errDelete)
+	}
+	return managed.ExternalDelete{}, nil
 }
 
 func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {
