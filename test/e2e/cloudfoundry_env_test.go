@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	meta "github.com/sap/crossplane-provider-btp/apis"
+	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 
 	"sigs.k8s.io/e2e-framework/klient/wait"
@@ -49,4 +51,34 @@ func TestCloudFoundryEnvironment(t *testing.T) {
 		Feature()
 
 	testenv.Test(t, crudFeature)
+}
+
+func TestCloudFoundryEnvironmentImportFlow(t *testing.T) {
+	cfImportName := "e2e-cf-import-test"
+
+	importTester := NewImportTester(
+		&v1alpha1.CloudFoundryEnvironment{
+			Spec: v1alpha1.CfEnvironmentSpec{
+				ForProvider: v1alpha1.CfEnvironmentParameters{
+					Landscape:       "cf-eu10",
+					EnvironmentName: cfImportName,
+				},
+				SubaccountRef: &xpv1.Reference{
+					Name: "cf-import-test-subaccount",
+				},
+				CloudManagementRef: &xpv1.Reference{
+					Name: "cis-local-cf-import",
+				},
+			},
+		},
+		cfImportName,
+		WithWaitDependentResourceTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(15*time.Minute)),
+		WithWaitCreateTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(10*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(10*time.Minute)),
+		WithDependentResourceDirectory[*v1alpha1.CloudFoundryEnvironment]("testdata/crs/cloudfoundry_env_import"),
+	)
+
+	importFeature := importTester.BuildTestFeature("BTP CF Environment Import Flow").Feature()
+
+	testenv.Test(t, importFeature)
 }

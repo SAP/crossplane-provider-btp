@@ -42,6 +42,7 @@ type SaveConditionsFn func(ctx context.Context, kube client.Client, name string,
 type ObservationData struct {
 	ExternalName string `json:"externalName"`
 	ID           string `json:"id"`
+	DashboardURL string `json:"dashboardUrl"`
 	Conditions   []xpv1.Condition
 }
 
@@ -99,6 +100,14 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 		sid.ID = t.tfResource.GetID()
 		sid.ExternalName = meta.GetExternalName(t.tfResource)
 		sid.Conditions = []xpv1.Condition{xpv1.Available(), ujresource.AsyncOperationFinishedCondition()}
+
+		// Extract additional observation fields from the terraform resource
+		if obs, err := t.tfResource.GetObservation(); err == nil {
+			if dashboardURL, ok := obs["dashboard_url"].(string); ok {
+				sid.DashboardURL = dashboardURL
+			}
+		}
+
 		return sid
 	}
 	return nil
