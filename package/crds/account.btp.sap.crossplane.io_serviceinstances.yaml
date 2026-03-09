@@ -452,6 +452,10 @@ spec:
                 description: ServiceInstanceObservation are the observable fields
                   of a ServiceInstance.
                 properties:
+                  dashboardUrl:
+                    description: The URL of the web-based management UI for the service
+                      instance.
+                    type: string
                   id:
                     type: string
                   serviceplanId:
