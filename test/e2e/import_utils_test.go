@@ -150,7 +150,7 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 				return ctx
 			},
 		).Assess(
-		"Check Imported resource gets healthy", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+		"Check Imported Resource gets healthy", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			externalName := ctx.Value(importFeatureContextKey).(string)
 
 			//preare the resource for import
