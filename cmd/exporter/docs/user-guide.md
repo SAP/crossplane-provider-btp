@@ -6,6 +6,7 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
 
 - [Overview](#overview)
 - [Prerequisites](#prerequisites)
+- [Installation](#installation)
 - [Environment Variables](#environment-variables)
 - [Global Flags](#global-flags)
 - [Commands](#commands)
@@ -62,6 +63,25 @@ The exporter connects to your SAP BTP global account using the BTP CLI and retri
 
 > [!NOTE]
 > A remark on namespaces: The exporter does not assign namespaces to the generated manifests. But, some resources require an explicit namespace for `WriteConnectionSecretToReference`, which is currently set to "*default*". You may need to adjust this value before applying the manifests.
+
+## Installation
+
+Once released, download the latest binary for your OS (linux or darwin) and architecture and install it as `btp-exporter`:
+
+```bash
+OS=$(uname -s | tr '[:upper:]' '[:lower:]') && \
+ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
+VERSION=$(curl -sLI -o /dev/null -w '%{url_effective}' https://github.com/SAP/crossplane-provider-btp/releases/latest | sed 's|.*/||') && \
+curl -L -o btp-exporter \
+  "https://github.com/SAP/crossplane-provider-btp/releases/download/${VERSION}/crossplane-provider-btp_exporter_${VERSION}_${OS}_${ARCH}" && \
+chmod +x btp-exporter
+```
+
+Optionally, move the binary to a directory in your `$PATH` (e.g., `/usr/local/bin`):
+
+```bash
+sudo mv btp-exporter /usr/local/bin/btp-exporter
+```
 
 ## Environment Variables
 

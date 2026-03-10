@@ -39,19 +39,14 @@ builds:
     binary: "{{ .ProjectName }}_exporter_v{{ .Version }}"
 archives:
   - id: provider-archive
-    format: zip
-    builds:
+    formats: [zip]
+    ids:
       - binary-build
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
   - id: exporter-archive
-    format: zip
-    builds:
+    formats: [binary]
+    ids:
       - exporter-build
-    name_template: "{{ .ProjectName }}_exporter_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    files:
-      - LICENSE
-      - src: cmd/exporter/docs/user-guide.md
-        dst: .
-        strip_parent: true
+    name_template: "{{ .ProjectName }}_exporter_v{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 changelog:
   use: github-native
