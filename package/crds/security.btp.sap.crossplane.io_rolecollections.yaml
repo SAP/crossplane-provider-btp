@@ -34,8 +34,15 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A RoleCollection aggregates roles into a single entity to assign
-          it to users / groups
+        description: |-
+          A RoleCollection aggregates roles into a single entity to assign it to users / groups
+
+          External-Name Configuration:
+            - Follows Standard: no (uses name as identifier, not a GUID)
+            - Format: Role Collection Name (string)
+            - How to find:
+              - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
+              - CLI: btp get security/role-collection "<name>"→ `name`
         properties:
           apiVersion:
             description: |-

@@ -41,6 +41,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
   - CLI: btp list accounts/directory (field: guid)
 
+### RoleCollection
+
+- Follows Standard: no (uses name as identifier, not a GUID)
+- Format: Role Collection Name (string)
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
+  - CLI: btp get security/role-collection "<name>"→ `name`
+
 ### Subaccount
 
 - Follows Standard: yes
