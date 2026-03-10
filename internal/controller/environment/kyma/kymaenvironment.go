@@ -105,7 +105,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// If the external name is not set yet (< v1.2.2), we set it to the ID of the environment and update it
-	if *instance.Id != meta.GetExternalName(cr) {
+	if instance.Id != nil && *instance.Id != meta.GetExternalName(cr) {
 		meta.SetExternalName(cr, *instance.Id)
 	}
 
@@ -231,10 +231,6 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDelete)
 	}
 	return managed.ExternalDelete{}, nil
-}
-
-func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {
-	return cr.Status.AtProvider.State == nil
 }
 
 func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, string, error) {

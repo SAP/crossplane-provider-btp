@@ -18,7 +18,6 @@ const (
 	errKymaInstanceCreateFailed = "Could not create KymaEnvironment"
 	errKymaInstanceUpdateFailed = "Could not update KymaEnvironment"
 	errExternalNameNotFound     = "external-name not set"
-	errInstanceIdNotFound       = "instance ID not found in status for update operation"
 )
 
 type KymaEnvironments struct {

@@ -36,6 +36,8 @@ import (
 
 const kubeConfigData = "apiVersion: v1\nkind: Config\ncurrent-context: shoot--kyma-stage--c-5edf6ec\nclusters:\n- name: shoot--kyma-stage--c-5edf6ec\n  cluster:\n    certificate-authority-data: someCaData\n    server: someServerUrl\ncontexts:\n- name: shoot--kyma-stage--c-5edf6ec\n  context:\n    cluster: shoot--kyma-stage--c-5edf6ec\n    user: shoot--kyma-stage--c-5edf6ec\nusers:\n- name: shoot--kyma-stage--c-5edf6ec\n  user:\n    exec:\n      apiVersion: client.authentication.k8s.io/v1beta1\n      args:\n      - get-token\n      - \"--oidc-issuer-url=xxx\"\n      - \"--oidc-client-id=xxx\"\n      - \"--oidc-extra-scope=email\"\n      - \"--oidc-extra-scope=openid\"\n      command: kubectl-oidc_login\n      installHint: |\n        kubelogin plugin is required to proceed with authentication\n        # Homebrew (macOS and Linux)\n        brew install int128/kubelogin/kubelogin\n\n        # Krew (macOS, Linux, Windows and ARM)\n        kubectl krew install oidc-login\n\n        # Chocolatey (Windows)\n        choco install kubelogin\n"
 
+const testUUID = "12345678-1234-1234-1234-123456789012"
+
 func TestCreate(t *testing.T) {
 	type args struct {
 		cr         resource.Managed
@@ -139,12 +141,12 @@ func TestObserve(t *testing.T) {
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return nil, errors.New("Could not call backend")
 				}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012")),
+				cr: environment(withExternalName("testUUID")),
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
 				err: errors.Wrap(errors.New("Could not call backend"), "Could not describe kyma instance"),
-				cr:  environment(withExternalName("12345678-1234-1234-1234-123456789012")),
+				cr:  environment(withExternalName("testUUID")),
 			},
 		},
 		"NeedsCreate": {
@@ -166,7 +168,7 @@ func TestObserve(t *testing.T) {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:           internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:           internal.Ptr("testUUID"),
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("}corrupted{"),
@@ -174,7 +176,7 @@ func TestObserve(t *testing.T) {
 					}, nil
 				}},
 				httpClient: mockedHttpClient("someKubeConfigContent"),
-				cr:         environment(withExternalName("12345678-1234-1234-1234-123456789012"), withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}})),
+				cr:         environment(withExternalName("testUUID"), withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}})),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -183,19 +185,19 @@ func TestObserve(t *testing.T) {
 				},
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
 				err:           errors.Wrap(errors.New("invalid character '}' looking for beginning of value"), "while getting connection details"),
-				cr:            environment(withExternalName("12345678-1234-1234-1234-123456789012"), withUID("1234"), withConditions(xpv1.Available())),
+				cr:            environment(withExternalName("testUUID"), withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
 		"SuccessfulAvailable": {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:         internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:         internal.Ptr("testUUID"),
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
 					}, nil
 				}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withUID("1234")),
+				cr: environment(withExternalName("testUUID"), withUID("1234")),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -204,14 +206,14 @@ func TestObserve(t *testing.T) {
 				},
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
 				err:           errors.Wrap(errors.New("unexpected end of JSON input"), "while getting connection details"),
-				cr:            environment(withExternalName("12345678-1234-1234-1234-123456789012"), withUID("1234"), withConditions(xpv1.Available())),
+				cr:            environment(withExternalName("testUUID"), withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
 		"AvailableWithConnectionDetails": {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:           internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:           internal.Ptr("testUUID"),
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
@@ -219,7 +221,7 @@ func TestObserve(t *testing.T) {
 					}, nil
 				}},
 				httpClient: mockedHttpClient(kubeConfigData),
-				cr:         environment(withExternalName("12345678-1234-1234-1234-123456789012"), withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}})),
+				cr:         environment(withExternalName("testUUID"), withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}})),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -235,14 +237,14 @@ func TestObserve(t *testing.T) {
 				},
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
 				err:           nil,
-				cr:            environment(withExternalName("12345678-1234-1234-1234-123456789012"), withUID("1234"), withConditions(xpv1.Available())),
+				cr:            environment(withExternalName("testUUID"), withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
 		"AvailableWithPartialConnectionDetails": {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:           internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:           internal.Ptr("testUUID"),
 						State:        internal.Ptr("OK"),
 						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
 						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
@@ -250,7 +252,7 @@ func TestObserve(t *testing.T) {
 					}, nil
 				}},
 				httpClient: mockedHttpClient("someNotMatchingKubeConfigData"),
-				cr:         environment(withExternalName("12345678-1234-1234-1234-123456789012"), withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}})),
+				cr:         environment(withExternalName("testUUID"), withUID("1234"), withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}})),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -266,18 +268,18 @@ func TestObserve(t *testing.T) {
 				},
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
 				err:           nil,
-				cr:            environment(withExternalName("12345678-1234-1234-1234-123456789012"), withUID("1234"), withConditions(xpv1.Available())),
+				cr:            environment(withExternalName("testUUID"), withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
 		"UpdateInProgress": {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:    internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:    internal.Ptr("testUUID"),
 						State: internal.Ptr("UPDATING"),
 					}, nil
 				}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012")),
+				cr: environment(withExternalName("testUUID")),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -286,7 +288,7 @@ func TestObserve(t *testing.T) {
 				},
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
 				err:           nil,
-				cr:            environment(withExternalName("12345678-1234-1234-1234-123456789012"), withConditions(xpv1.Available())),
+				cr:            environment(withExternalName("testUUID"), withConditions(xpv1.Available())),
 			},
 		},
 		"Update with Json Parameters": {
@@ -294,12 +296,12 @@ func TestObserve(t *testing.T) {
 				client: fake.MockClient{
 					MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 						return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-							Id:         internal.Ptr("12345678-1234-1234-1234-123456789012"),
+							Id:         internal.Ptr("testUUID"),
 							State:      internal.Ptr("OK"),
 							Parameters: internal.Ptr(`{"foo": "bar"}`),
 						}, nil
 					}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+				cr: environment(withExternalName("testUUID"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 					Parameters: runtime.RawExtension{Raw: []byte(`{"foo": "baz"}`)},
 				})),
 			},
@@ -310,7 +312,7 @@ func TestObserve(t *testing.T) {
 				},
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
 				err:           nil,
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withConditions(xpv1.Available()),
+				cr: environment(withExternalName("testUUID"), withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 						Parameters: runtime.RawExtension{Raw: []byte(`{"foo": "baz"}`)},
 					})),
@@ -320,12 +322,12 @@ func TestObserve(t *testing.T) {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:         internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:         internal.Ptr("testUUID"),
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`foo: bar`),
 					}, nil
 				}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+				cr: environment(withExternalName("testUUID"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 					Parameters: runtime.RawExtension{Raw: []byte(`foo: baz`)},
 				})),
 			},
@@ -335,7 +337,7 @@ func TestObserve(t *testing.T) {
 					ResourceUpToDate: false,
 				},
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()}, err: nil,
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withConditions(xpv1.Available()),
+				cr: environment(withExternalName("testUUID"), withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 						Parameters: runtime.RawExtension{Raw: []byte(`foo: baz`)},
 					})),
@@ -345,12 +347,12 @@ func TestObserve(t *testing.T) {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:         internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:         internal.Ptr("testUUID"),
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`foo: bar`),
 					}, nil
 				}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+				cr: environment(withExternalName("testUUID"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 					Parameters: runtime.RawExtension{Raw: []byte(`{asd:y}`)},
 				})),
 			},
@@ -364,7 +366,7 @@ func TestObserve(t *testing.T) {
 						errors.New("ReadString: expects \" or n, but found a, error found in #2 byte of ...|{asd:y}|..., bigger context ...|{asd:y}|..."),
 						errParameterParsing),
 					errCheckUpdate),
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withConditions(xpv1.Available()),
+				cr: environment(withExternalName("testUUID"), withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 						Parameters: runtime.RawExtension{Raw: []byte(`{asd:y}`)},
 					})),
@@ -374,12 +376,12 @@ func TestObserve(t *testing.T) {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:         internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:         internal.Ptr("testUUID"),
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`foo: bar`),
 					}, nil
 				}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+				cr: environment(withExternalName("testUUID"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 					Parameters: runtime.RawExtension{Raw: []byte(`asd`)},
 				})),
 			},
@@ -393,7 +395,7 @@ func TestObserve(t *testing.T) {
 						errors.New("error unmarshaling JSON: while decoding JSON: json: cannot unmarshal string into Go value of type map[string]interface {}"),
 						errParameterParsing),
 					errCheckUpdate),
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withConditions(xpv1.Available()),
+				cr: environment(withExternalName("testUUID"), withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 						Parameters: runtime.RawExtension{Raw: []byte(`asd`)},
 					})),
@@ -403,12 +405,12 @@ func TestObserve(t *testing.T) {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:         internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:         internal.Ptr("testUUID"),
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`asd`),
 					}, nil
 				}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+				cr: environment(withExternalName("testUUID"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 					Parameters: runtime.RawExtension{Raw: []byte(`foo: bar`)},
 				})),
 			},
@@ -422,7 +424,7 @@ func TestObserve(t *testing.T) {
 						errors.New("error unmarshaling JSON: while decoding JSON: json: cannot unmarshal string into Go value of type map[string]interface {}"),
 						errServiceParsing),
 					errCheckUpdate),
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withConditions(xpv1.Available()),
+				cr: environment(withExternalName("testUUID"), withConditions(xpv1.Available()),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 						Parameters: runtime.RawExtension{Raw: []byte(`foo: bar`)},
 					})),
@@ -432,11 +434,11 @@ func TestObserve(t *testing.T) {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:    internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:    internal.Ptr("testUUID"),
 						State: internal.Ptr("DELETING"),
 					}, nil
 				}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012")),
+				cr: environment(withExternalName("testUUID")),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -445,18 +447,18 @@ func TestObserve(t *testing.T) {
 				},
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
 				err:           nil,
-				cr:            environment(withExternalName("12345678-1234-1234-1234-123456789012"), withConditions(xpv1.Deleting())),
+				cr:            environment(withExternalName("testUUID"), withConditions(xpv1.Deleting())),
 			},
 		},
 		"Creating": {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:    internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:    internal.Ptr("testUUID"),
 						State: internal.Ptr("CREATING"),
 					}, nil
 				}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012")),
+				cr: environment(withExternalName("testUUID")),
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -465,19 +467,19 @@ func TestObserve(t *testing.T) {
 				},
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
 				err:           nil,
-				cr:            environment(withExternalName("12345678-1234-1234-1234-123456789012"), withConditions(xpv1.Creating())),
+				cr:            environment(withExternalName("testUUID"), withConditions(xpv1.Creating())),
 			},
 		},
 		"CircuitBreakerOn": {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
-						Id:         internal.Ptr("12345678-1234-1234-1234-123456789012"),
+						Id:         internal.Ptr("testUUID"),
 						State:      internal.Ptr("OK"),
 						Parameters: internal.Ptr(`foo: bar1`),
 					}, nil
 				}},
-				cr: environment(withExternalName("12345678-1234-1234-1234-123456789012"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+				cr: environment(withExternalName("testUUID"), withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 					Parameters: runtime.RawExtension{Raw: []byte(`foo: bar2`)},
 				}), withRetryStatus(&v1alpha1.RetryStatus{
 					DesiredHash: hash(map[string]interface{}{
@@ -500,7 +502,7 @@ func TestObserve(t *testing.T) {
 				},
 				err: nil,
 				cr: environment(
-					withExternalName("12345678-1234-1234-1234-123456789012"),
+					withExternalName("testUUID"),
 					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
 						Parameters: runtime.RawExtension{Raw: []byte(`foo: bar2`)},
 					}),

@@ -13,7 +13,9 @@ import (
 )
 
 var (
-	kymaFromCustomTag             = "v1.2.1" // in v1.2.2. the external name was changed to instance id (guid) sow e test the behaviour from before to include the already included migration logic
+	// v1.2.1 used metadata.name or forProvider.name as external-name
+	// v1.2.2+ uses instance GUID as external-name --> we test from the version before to the current one
+	kymaFromCustomTag             = "v1.2.1"
 	kymaToCustomTag               = "local"
 	kymaCustomResourceDirectories = []string{
 		"./testdata/customCRs/kymaExternalName",

@@ -96,6 +96,7 @@ func (c *Client) GetEnvironmentByNameAndType(
 		if err != nil {
 			return nil, err
 		}
+		// keeping the old parameter to not potentially break systems, function is deprecated and should not be used anymore
 		if parameterList[cfenvironmentParameterInstanceName] == instanceName {
 			environmentInstance = &instance
 			break
