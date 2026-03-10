@@ -57,6 +57,14 @@ type RoleCollectionStatus struct {
 // +kubebuilder:object:root=true
 
 // A RoleCollection aggregates roles into a single entity to assign it to users / groups
+//
+// External-Name Configuration:
+//   - Follows Standard: no (uses name as identifier, not a GUID)
+//   - Format: Role Collection Name (string)
+//   - How to find:
+//     - UI: BTP Cockpit → Security → Role Collections → [Role Collection Name]
+//     - CLI: Use cf CLI with XSUAA commands (field: name)
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

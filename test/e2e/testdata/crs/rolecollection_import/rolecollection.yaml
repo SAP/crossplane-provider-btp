@@ -1,0 +1,18 @@
+apiVersion: security.btp.sap.crossplane.io/v1alpha1
+kind: RoleCollection
+metadata:
+  namespace: default
+  name: e2e-test-rolecollection-import
+spec:
+  forProvider:
+    name: "$BUILD_ID-e2e-test-rolecollection-import"
+    description: "E2E test role collection for import flow"
+    roles:
+      - name: "Subaccount Viewer"
+        roleTemplateAppId: "cis-local!b14"
+        roleTemplateName: "Subaccount_Viewer"
+      - name: "Destination Administrator"
+        roleTemplateAppId: "destination-xsappname!b404"
+        roleTemplateName: "Destination_Administrator"
+  subaccountApiCredentialRef:
+    name: e2e-rolecollection-import-xsuaa-cred
