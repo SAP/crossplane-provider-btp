@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	defaultNamePrefix = "managed-service-manager"
+	defaultNamePrefix   = "managed-service-manager"
+	serviceOperatorPlan = "service-operator-access"
 )
 
 var (
@@ -65,10 +66,13 @@ func register(ctx context.Context, sm *serviceinstancebase.ServiceInstance) bool
 	return success
 }
 
-func ExportInstanceForSubaccount(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string, eventHandler export.EventHandler, resolveReferences bool) (string, error) {
-	sm, found, err := getServiceManager(ctx, btpClient, subaccountID)
+// ExportOperatorInstance exports a service manager instance for the given subaccount.
+// If a service manager instance exists for the subaccount, it is exported. Otherwise, a default service manager instance is exported.
+// The service plan of the instance is "service-operator-access".
+func ExportOperatorInstance(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string, eventHandler export.EventHandler, resolveReferences bool) (string, error) {
+	sm, found, err := getServiceOperator(ctx, btpClient, subaccountID)
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve service manager for subaccount %s: %w", subaccountID, err)
+		return "", fmt.Errorf("failed to retrieve service manager (operator) for subaccount %s: %w", subaccountID, err)
 	}
 	if found {
 		Convert(ctx, btpClient, sm, eventHandler, resolveReferences)
@@ -79,7 +83,7 @@ func ExportInstanceForSubaccount(ctx context.Context, btpClient *btpcli.BtpCli, 
 	return sm.GenerateK8sResourceName(), nil
 }
 
-func getServiceManager(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string) (*serviceinstancebase.ServiceInstance, bool, error) {
+func getServiceOperator(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string) (*serviceinstancebase.ServiceInstance, bool, error) {
 	cache, err := Get(ctx, btpClient)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to retrieve service manager cache: %w", err)
@@ -87,7 +91,11 @@ func getServiceManager(ctx context.Context, btpClient *btpcli.BtpCli, subaccount
 
 	for _, id := range cache.AllIDs() {
 		sm := cache.Get(id)
-		if sm != nil && sm.SubaccountID == subaccountID && sm.Usable {
+		if sm != nil &&
+			sm.SubaccountID == subaccountID &&
+			sm.Usable &&
+			sm.PlanName == serviceOperatorPlan {
+
 			return sm, true, nil
 		}
 	}
