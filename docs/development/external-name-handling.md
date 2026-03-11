@@ -28,12 +28,18 @@ Based on this definition, common assumptions are:
 The external-name (string) identifies the external resource in the external system. 
 A provider can adopt two qualities:
 
-(1) The existance of the external-name express that there should be an external resource it identifies. So if the user creates a MR with the external-name set, the user explicitly states that this resource should exists in the external system (to its best knowledge) and should be adopted/matched. This prevents unintended adoption/matching of existing resources. This is also an advantage over capturing user intent via managment policies, as they would not prevent unintended matching of existing resources. (2) The identifier than contains the information the provider needs to identify the external resource. This can be an unique identifier or a compound key.
-
-Exceptions to this rule might be necessary and have to be stated clearly for the user and developer.
+1. The existance of the external-name express that there should be an external resource it identifies. So if the user creates a MR with the external-name set, the user explicitly states that this resource should exists in the external system (to its best knowledge) and should be adopted/matched. This prevents unintended adoption/matching of existing resources. This is also an advantage over capturing user intent via managment policies, as they would not prevent unintended matching of existing resources.
+2. The identifier should contain the information the provider needs to identify the external resource. Ideally this should be a unique external identifier. If no single unique can can be choosen, either a compound key might or additional spec fields should be used for the identification.
 
 In Create(), the external name is set based on the response of the API (if possible). Observe() use the external-name to match the external resource, Update() and Delete() also use the external-name. [4]
 This is easy in the case of a unique identifier. If we have a compound key, we deconstruct the compound key to perform the API requests.
+
+
+#### Compound-Key External Name Format
+
+If we have an external name that requires multiple values from the spec as key, the delimiter is `/`. The advantage is that this is part of the url path and therefore unlikely to be used in the identifying fields.
+The key should be case-sensitive, in the sense that the values from the compound keys are used directly for the API calls. By treating it case-sensitive, we cover APIs that are case-sensitive and insensitive. 
+Trailing/leading spaces are not allowed. Length limit for the external-name is 512 characters.
 
 ### Special Case: defaulting of external-name
 If external-name is unset, crossplane-runtime will run a default initializer that will set the external name to metadata.name before the first Observe() is called.
@@ -132,26 +138,14 @@ And append the file [docs/user/external-name.md](/docs/user/external-name.md)
  make docs.generate-external-name
  ```
 
-## Importing of existing external resources
-For importing, setting the right external-name will match the external resource no matter the values in `spec.ForProvider`.
-
-We set the `spec.forProvider` as required, the user can not create managed resources without those values and therefore must also set the required fields. 
+## Implication for spec fields in import scenario
+Despite how the external-name is structured the schema of resource might have required field. Those fields need to be set in any case, even in an import scenario.
 
 Since the matching between MR and external resource is done based on external-name, a wrongly filled spec would result in Update() calls to the resource changing it. To prevent this, the user would not set the managementPolicy to Update. If there is then a missmatch, the Observe() method would determines this, sets the externalObservation.Diff and it would be visible in the debug log. Additionally, we write it into the status field of the resource and write an event to make it visible to the user.
 
-## Compound-Key External Name Format
-
-If we have an external name that requires multiple values from the spec as key, the delimiter is `/`. The advantage is that this is part of the url path and therefore unlikely to be used in the identifying fields.
-The key should be case-sensitive, in the sense that the values from the compound keys are used directly for the API calls. By treating it case-sensitive, we cover APIs that are case-sensitive and insensitive. 
-Trailing/leading spaces are not allowed. Length limit for the external-name is 512 characters.
-
-
-There might be exceptions to this format. These need to be documented per resource.
-
-
 ## Exceptions
 
-Upjet resources are an exception as we dont controll how the external-name is defined and set by Upjet.
+Upjet resources are an exception as we dont control how the external-name is defined and set by Upjet.
 
 In general, all exceptions should be noted in the appropriate location: for user in the docs and for developer in the appropriate code location (Observe/Create/Update/Delete functions or API definition).
 
