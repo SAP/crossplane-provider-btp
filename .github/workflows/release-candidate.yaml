@@ -73,3 +73,24 @@ jobs:
         env:
           DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
           BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
+
+      - name: Build Exporter Binaries
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          for GOOS in linux darwin; do
+            for GOARCH in amd64 arm64; do
+              GOOS=$GOOS GOARCH=$GOARCH go build \
+                -trimpath \
+                -o dist/crossplane-provider-btp_exporter_${VERSION}_${GOOS}_${GOARCH} \
+                ./cmd/exporter
+            done
+          done
+
+      - name: Upload Exporter Binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          # The binaries will appear in the Artifacts section
+          # at the bottom of the workflow run summary page, downloadable as a zip.
+          name: exporter-binaries-${{ steps.version.outputs.version }}.zip
+          path: dist/crossplane-provider-btp_exporter_*
+          retention-days: 14
