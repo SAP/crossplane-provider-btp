@@ -2,6 +2,7 @@ package cloudmanagement
 
 import (
 	"context"
+	"fmt"
 
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,7 +23,6 @@ func convertCloudManagementResource(ctx context.Context, btpClient *btpcli.BtpCl
 	subAccountID := si.SubaccountID
 	instanceID := si.ID
 	instanceName := si.Name
-	bindingID := si.BindingID
 	smName := si.ServiceManagerName
 
 	cm := yaml.NewResourceWithComment(
@@ -79,8 +79,11 @@ func convertCloudManagementResource(ctx context.Context, btpClient *btpcli.BtpCl
 	if instanceID == "" {
 		cm.AddComment(resources.WarnMissingInstanceId)
 	}
-	if bindingID == "" {
+	if len(si.BindingIDs) == 0 {
 		cm.AddComment(resources.WarnMissingBindingId)
+	}
+	if len(si.BindingIDs) > 1 {
+		cm.AddComment(fmt.Sprintf(resources.WarnTooManyBindingIDs, len(si.BindingIDs)))
 	}
 	if !si.Usable {
 		cm.AddComment(resources.WarnServiceInstanceNotUsable)
