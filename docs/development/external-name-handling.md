@@ -50,6 +50,12 @@ This poses two problems:
 
 Consequently, we have to remove this initializer from running. We will have our own collection of default initializers that contain the set of crossplane default initializers without the external-name defaulting.
 
+## Exceptions
+
+Upjet resources are an exception as we dont control how the external-name is defined and set by Upjet.
+
+In general, all exceptions should be noted in the appropriate location: for user in the docs and for developer in the appropriate code location (Observe/Create/Update/Delete functions or API definition).
+
 ### Implementation guideline
 
 #### Observe()
@@ -142,12 +148,6 @@ And append the file [docs/user/external-name.md](/docs/user/external-name.md)
 Despite how the external-name is structured the schema of resource might have required field. Those fields need to be set in any case, even in an import scenario.
 
 Since the matching between MR and external resource is done based on external-name, a wrongly filled spec would result in Update() calls to the resource changing it. To prevent this, the user would not set the managementPolicy to Update. If there is then a missmatch, the Observe() method would determines this, sets the externalObservation.Diff and it would be visible in the debug log. Additionally, we write it into the status field of the resource and write an event to make it visible to the user.
-
-## Exceptions
-
-Upjet resources are an exception as we dont control how the external-name is defined and set by Upjet.
-
-In general, all exceptions should be noted in the appropriate location: for user in the docs and for developer in the appropriate code location (Observe/Create/Update/Delete functions or API definition).
 
 ## References
 [1] https://github.com/crossplane/crossplane/blob/main/design/one-pager-managed-resource-api-design.md?plain=1#L151
