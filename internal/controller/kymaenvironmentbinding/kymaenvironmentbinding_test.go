@@ -1264,3 +1264,168 @@ func (f fakeClient) DeleteInstances(ctx context.Context, bindings []v1alpha1.Bin
 }
 
 var _ kymaenvironmentbinding.Client = &fakeClient{}
+
+// fakeStatusWriter is a mock implementation for testing status update retry logic
+type fakeStatusWriter struct {
+	updateFn func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error
+}
+
+func (f *fakeStatusWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	if f.updateFn != nil {
+		return f.updateFn(ctx, obj, opts...)
+	}
+	return nil
+}
+
+func (f *fakeStatusWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	return nil
+}
+
+func (f *fakeStatusWriter) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+	return nil
+}
+
+// fakeKubeClient is a mock implementation for testing status update retry logic
+type fakeKubeClient struct {
+	test.MockClient
+	statusWriter *fakeStatusWriter
+}
+
+func (f *fakeKubeClient) Status() client.SubResourceWriter {
+	return f.statusWriter
+}
+
+func Test_external_updateStatusWithRetry(t *testing.T) {
+	type args struct {
+		ctx        context.Context
+		cr         *v1alpha1.KymaEnvironmentBinding
+		maxRetries int
+	}
+	tests := []struct {
+		name     string
+		args     args
+		updateFn func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error
+		wantErr  bool
+	}{
+		{
+			name: "success on first try",
+			args: args{
+				ctx: context.Background(),
+				cr: &v1alpha1.KymaEnvironmentBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-binding",
+						Namespace: "default",
+					},
+				},
+				maxRetries: 5,
+			},
+			updateFn: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				return nil
+			},
+			wantErr: false,
+		},
+		{
+			name: "success on second try",
+			args: args{
+				ctx: context.Background(),
+				cr: &v1alpha1.KymaEnvironmentBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-binding",
+						Namespace: "default",
+					},
+				},
+				maxRetries: 5,
+			},
+			updateFn: func() func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				attempt := 0
+				return func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					attempt++
+					if attempt == 1 {
+						return errors.New("transient error")
+					}
+					return nil
+				}
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "all retries fail",
+			args: args{
+				ctx: context.Background(),
+				cr: &v1alpha1.KymaEnvironmentBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-binding",
+						Namespace: "default",
+					},
+				},
+				maxRetries: 3,
+			},
+			updateFn: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				return errors.New("persistent error")
+			},
+			wantErr: true,
+		},
+		{
+			name: "status is preserved across retries",
+			args: args{
+				ctx: context.Background(),
+				cr: &v1alpha1.KymaEnvironmentBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            "test-binding",
+						Namespace:       "default",
+						ResourceVersion: "1",
+					},
+					Status: v1alpha1.KymaEnvironmentBindingStatus{
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+							Bindings: []v1alpha1.Binding{
+								{
+									Id:        "new-binding-id",
+									IsActive:  true,
+									CreatedAt: metav1.NewTime(timeNow),
+									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour)),
+								},
+							},
+						},
+					},
+				},
+				maxRetries: 5,
+			},
+			updateFn: func() func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				attempt := 0
+				return func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					attempt++
+					cr := obj.(*v1alpha1.KymaEnvironmentBinding)
+
+					// Verify status is preserved on each attempt
+					if len(cr.Status.AtProvider.Bindings) != 1 {
+						return errors.New("status was not preserved across retries")
+					}
+					if cr.Status.AtProvider.Bindings[0].Id != "new-binding-id" {
+						return errors.New("status binding ID was not preserved")
+					}
+
+					// Fail first attempt, succeed on second
+					if attempt == 1 {
+						return errors.New("transient error")
+					}
+					return nil
+				}
+			}(),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := &fakeKubeClient{
+				statusWriter: &fakeStatusWriter{
+					updateFn: tt.updateFn,
+				},
+			}
+			c := &external{kube: mockClient}
+			err := c.updateStatusWithRetry(tt.args.ctx, tt.args.cr, tt.args.maxRetries)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("updateStatusWithRetry() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

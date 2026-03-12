@@ -65,6 +65,30 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
+// updateStatusWithRetry attempts to update the status with exponential backoff retry logic.
+// This significantly reduces the chance of duplicate bindings being created due to status update failures.
+func (c *external) updateStatusWithRetry(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding, maxRetries int) error {
+	var lastErr error
+
+	for i := 0; i < maxRetries; i++ {
+		err := c.kube.Status().Update(ctx, cr)
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+
+		// If this isn't the last retry, wait before retrying
+		if i < maxRetries-1 {
+			// Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms
+			waitTime := time.Duration(100*(1<<uint(i))) * time.Millisecond
+			time.Sleep(waitTime)
+		}
+	}
+
+	return errors.Wrap(lastErr, "status update failed after retries")
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironmentBinding)
 	if !ok {
@@ -81,7 +105,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	validBindings, bindings := c.validateBindings(cr)
 	cr.Status.AtProvider.Bindings = bindings
-	_ = c.kube.Status().Update(ctx, cr)
+	_ = c.updateStatusWithRetry(ctx, cr, 3) // Use fewer retries in Observe (will retry on next reconcile anyway)
 	if !validBindings {
 		return managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: true}, nil
 	}
@@ -204,9 +228,18 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		"kubeconfig": []byte(clientBinding.Credentials.Kubeconfig),
 	}
 
+	// Try to update status with retry
+	statusErr := c.updateStatusWithRetry(ctx, cr, 5)
+	if statusErr != nil {
+		// Status update failed even after retries - store the binding ID
+		return managed.ExternalCreation{
+			ConnectionDetails: connectionDetails,
+		}, errors.Wrap(statusErr, errStatusUpdate)
+	}
+
 	return managed.ExternalCreation{
 		ConnectionDetails: connectionDetails,
-	}, errors.Wrap(c.kube.Status().Update(ctx, cr), errStatusUpdate)
+	}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
