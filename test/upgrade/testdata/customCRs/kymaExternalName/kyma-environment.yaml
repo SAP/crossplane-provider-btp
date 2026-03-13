@@ -1,0 +1,16 @@
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: KymaEnvironment
+metadata:
+  name: upgrade-test-kyma-extn-env
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: kyma-env-extn-upgrade-test
+    namespace: default
+  forProvider:
+    planName: azure
+    name: "$BUILD_ID-kyma-extn-upgrade-test-env"
+  subaccountRef:
+    name: upgrade-test-kyma-extn-sa
+  cloudManagementRef:
+    name: cis-local-kyma-extn

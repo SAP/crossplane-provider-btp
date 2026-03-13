@@ -1,0 +1,15 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subaccount
+metadata:
+  namespace: default
+  name: upgrade-test-kyma-extn-sa
+spec:
+  forProvider:
+    displayName: $BUILD_ID-upgrade-test-kyma-extn-sa
+    region: eu20
+    subdomain: $BUILD_ID-upgrade-test-kyma-extn-sa
+    labels:
+      safe-to-delete: ["yes"]
+      BUILD_ID: ["$BUILD_ID"]
+    subaccountAdmins:
+      - $TECHNICAL_USER_EMAIL
