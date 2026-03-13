@@ -13,76 +13,76 @@ import (
 )
 
 var (
-	saFromCustomTag             = "v1.5.0"
-	saToCustomTag               = "local"
-	saCustomResourceDirectories = []string{
-		"./testdata/customCRs/subaccountExternalName",
+	dirFromCustomTag             = "v1.5.0"
+	dirToCustomTag               = "local"
+	dirCustomResourceDirectories = []string{
+		"./testdata/customCRs/directoryExternalName",
 	}
 )
 
-// Test_Subaccount_External_Name verifies that the Subaccount external-name is correctly
+// Test_Directory_External_Name verifies that the Directory external-name is correctly
 // preserved and/or migrated during provider upgrades.
 //
-// The Subaccount controller has backwards compatibility logic that migrates
+// The Directory controller has backwards compatibility logic that migrates
 // external-names from old formats (metadata.name prior to ADR compliance) to GUID format.
 // This test ensures that:
 // 1. The external-name exists before upgrade
 // 2. After upgrade, the external-name is in GUID format (UUID)
 // 3. The resource remains healthy after upgrade
-func Test_Subaccount_External_Name(t *testing.T) {
-	const subaccountName = "upgrade-test-extn-sa"
+func Test_Directory_External_Name(t *testing.T) {
+	const directoryName = "upgrade-test-extn-dir"
 
-	upgradeTest := NewCustomUpgradeTest("subaccount-external-name-test").
-		FromVersion(saFromCustomTag).
-		ToVersion(saToCustomTag).
-		WithResourceDirectories(saCustomResourceDirectories).
+	upgradeTest := NewCustomUpgradeTest("directory-external-name-test").
+		FromVersion(dirFromCustomTag).
+		ToVersion(dirToCustomTag).
+		WithResourceDirectories(dirCustomResourceDirectories).
 		WithCustomPreUpgradeAssessment(
 			"verify external name before upgrade",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				subaccount := &accountv1alpha1.Subaccount{}
+				directory := &accountv1alpha1.Directory{}
 				r := cfg.Client().Resources()
 
-				err := r.Get(ctx, subaccountName, cfg.Namespace(), subaccount)
+				err := r.Get(ctx, directoryName, cfg.Namespace(), directory)
 				if err != nil {
-					t.Fatalf("Failed to get Subaccount resource: %v", err)
+					t.Fatalf("Failed to get Directory resource: %v", err)
 				}
 
 				// Get the external name annotation
-				annotations := subaccount.GetAnnotations()
+				annotations := directory.GetAnnotations()
 				externalName, exists := annotations["crossplane.io/external-name"]
 
 				if !exists {
 					t.Fatal("External name annotation does not exist")
 				}
 
-				klog.V(4).Infof("Pre-upgrade Subaccount external name: %s", externalName)
+				klog.V(4).Infof("Pre-upgrade Directory external name: %s", externalName)
 
 				// Store the external name in context for post-upgrade verification
 				// Note: In older versions, the external-name may be in metadata.name format.
 				// After upgrade it should be migrated to GUID format.
-				return context.WithValue(ctx, "preUpgradeSaExternalName", externalName)
+				return context.WithValue(ctx, "preUpgradeDirExternalName", externalName)
 			},
 		).
 		WithCustomPostUpgradeAssessment(
 			"verify external name after upgrade",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				subaccount := &accountv1alpha1.Subaccount{}
+				directory := &accountv1alpha1.Directory{}
 				r := cfg.Client().Resources()
 
-				err := r.Get(ctx, subaccountName, cfg.Namespace(), subaccount)
+				err := r.Get(ctx, directoryName, cfg.Namespace(), directory)
 				if err != nil {
-					t.Fatalf("Failed to get Subaccount resource: %v", err)
+					t.Fatalf("Failed to get Directory resource: %v", err)
 				}
 
 				// Get the external name annotation
-				annotations := subaccount.GetAnnotations()
+				annotations := directory.GetAnnotations()
 				externalName, exists := annotations["crossplane.io/external-name"]
 
 				if !exists {
 					t.Fatal("External name annotation does not exist after upgrade")
 				}
 
-				klog.V(4).Infof("Post-upgrade Subaccount external name: %s", externalName)
+				klog.V(4).Infof("Post-upgrade Directory external name: %s", externalName)
 
 				// After upgrade, the external-name should be in GUID format (UUID)
 				// The controller migrates from metadata.name format to GUID
@@ -91,7 +91,7 @@ func Test_Subaccount_External_Name(t *testing.T) {
 				}
 
 				// Retrieve pre-upgrade external name from context
-				preUpgradeExternalName, ok := ctx.Value("preUpgradeSaExternalName").(string)
+				preUpgradeExternalName, ok := ctx.Value("preUpgradeDirExternalName").(string)
 				if !ok {
 					t.Fatal("Could not retrieve pre-upgrade external name from context")
 				}
