@@ -581,7 +581,7 @@ func TestObserve(t *testing.T) {
 	}{
 		"WrongResourceType": {
 			reason: "should return error for wrong resource type",
-			fields: fields{
+ 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
 					Client: &MockServiceBindingClient{},
 				},
