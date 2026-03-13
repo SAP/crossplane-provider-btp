@@ -108,7 +108,7 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 				ProviderConfigReference: &xpv1.Reference{
 					Name: pcName(si),
 				},
-				ManagementPolicies:               si.GetManagementPolicies(),
+				ManagementPolicies:               xpv1.ManagementPolicies{"*"},
 				WriteConnectionSecretToReference: si.GetWriteConnectionSecretToReference(),
 			},
 			ForProvider: v1alpha1.SubaccountServiceInstanceParameters{

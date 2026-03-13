@@ -25,6 +25,11 @@ func ExternalNameConfigurations() config.ResourceOption {
 	return func(r *config.Resource) {
 		if e, ok := ExternalNameConfigs[r.Name]; ok {
 			r.ExternalName = e
+			// ADR: Disable the default name initializer for service instance
+			// to allow explicit external-name setting by users
+			if r.Name == "btp_subaccount_service_instance" {
+				r.ExternalName.DisableNameInitializer = true
+			}
 		}
 	}
 }
