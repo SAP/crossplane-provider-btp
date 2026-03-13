@@ -30,12 +30,12 @@ $(info VERSION is $(VERSION))
 -include build/makelib/output.mk
 
 # Setup Versions
-GO_REQUIRED_VERSION=1.23
-GOLANGCILINT_VERSION ?= 1.64.5
+GO_REQUIRED_VERSION=1.25
+GOLANGCILINT_VERSION ?= 2.8.0
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
-GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider
+GO_STATIC_PACKAGES = $(GO_PROJECT)/cmd/provider $(GO_PROJECT)/cmd/exporter
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.Version=$(VERSION)
 # this version will eventually be passed to the terraform provider
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.ProviderVersion=$(VERSION)
@@ -43,6 +43,10 @@ GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.ProviderVersion=$(VERSION)
 GO_SUBDIRS += cmd internal apis
 GO111MODULE = on
 -include build/makelib/golang.mk
+
+# Override the GO_LINT_ARGS from golang.mk to use updated golangci-lint parameters
+# this can potentially be removed when we update to a newer version of the build
+GO_LINT_ARGS = --output.checkstyle.path=$(GO_LINT_OUTPUT)/checkstyle.xml
 
 # kind-related versions
 KIND_VERSION ?= v0.23.0
@@ -255,7 +259,7 @@ test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
 	@$(INFO) running integration tests
 	@echo UUT_CONFIG=$$UUT_CONFIG
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
-	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '$(testFilter)' -timeout 240m 2>&1 | tee test-output.log
+	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
@@ -272,7 +276,7 @@ test-acceptance: $(KIND) $(HELM3) build generate-test-crs
 	@echo UUT_CONFIG=$$UUT_CONFIG
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
 	@echo "UUT_IMAGES=$$UUT_IMAGES"
-	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '$(testFilter)' -timeout 120m 2>&1 | tee test-output.log
+	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
@@ -288,7 +292,7 @@ test-acceptance-debug: $(KIND) $(HELM3) build generate-test-crs
 	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
 	@echo "UUT_IMAGES=$$UUT_IMAGES"
 	go test -gcflags="all=-N -l" -c -v  $(PROJECT_REPO)/test/e2e/ -tags=e2e -o ./test/e2e/test-acceptance-debug.test -timeout 30m
-	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '$(testFilter)'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
+	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
 	@$(OK) integration tests passed
 
 .PHONY: generate-test-crs
@@ -327,7 +331,7 @@ docs.generate-external-name:
 UPGRADE_TEST_CRS_TAG ?= $(UPGRADE_TEST_FROM_TAG)
 
 .PHONY: generate-upgrade-test-crs
-generate-upgrade-test-crs: TEST_CRS_PATH := test/upgrade/testdata/baseCRs
+generate-upgrade-test-crs: TEST_CRS_PATH := test/upgrade/testdata # Should also generate for custom CRs
 generate-upgrade-test-crs: generate-test-crs
 
 .PHONY: check-upgrade-test-vars
@@ -370,7 +374,7 @@ build-upgrade-test-images:
 .PHONY: upgrade-test
 upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
-	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '$(testFilter)' -timeout 120m 2>&1 | tee upgrade-test-output.log
+	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee upgrade-test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" upgrade-test-output.log
 	@case `tail -n 1 upgrade-test-output.log` in \
@@ -381,7 +385,7 @@ upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upg
 .PHONY: upgrade-test-debug
 upgrade-test-debug: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
-	@dlv test -tags=upgrade ./test/upgrade --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '$(testFilter)' 2>&1 | tee upgrade-test-output.log
+	@cd test/upgrade && dlv test --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '^$(testFilter)$$' 2>&1 | tee upgrade-test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" upgrade-test-output.log
 	@case `tail -n 1 upgrade-test-output.log` in \

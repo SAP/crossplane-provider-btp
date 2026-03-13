@@ -8,6 +8,9 @@
 
 name: Publish Release Candidate
 
+env:
+  GO_VERSION: '1.25'
+
 on:
     workflow_dispatch: {}
 
@@ -22,7 +25,7 @@ jobs:
       runs-on: ubuntu-latest
       steps:
       - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           submodules: true
       - name: Set Version
@@ -32,7 +35,7 @@ jobs:
         run: echo "Effective version ${{ steps.version.outputs.version }}"
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
         with:
           version: v0.15.1
           install: true
@@ -44,7 +47,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
-          go-version: '1.21'
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Vendor Dependencies
         run: make vendor vendor.check
@@ -70,3 +73,24 @@ jobs:
         env:
           DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
           BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
+
+      - name: Build Exporter Binaries
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          for GOOS in linux darwin; do
+            for GOARCH in amd64 arm64; do
+              GOOS=$GOOS GOARCH=$GOARCH go build \
+                -trimpath \
+                -o dist/crossplane-provider-btp_exporter_${VERSION}_${GOOS}_${GOARCH} \
+                ./cmd/exporter
+            done
+          done
+
+      - name: Upload Exporter Binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          # The binaries will appear in the Artifacts section
+          # at the bottom of the workflow run summary page, downloadable as a zip.
+          name: exporter-binaries-${{ steps.version.outputs.version }}.zip
+          path: dist/crossplane-provider-btp_exporter_*
+          retention-days: 14

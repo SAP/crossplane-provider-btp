@@ -52,6 +52,7 @@ permissions:
 env:
   # hardcoded BTP CLI version
   btp_cli_version: 2.90.2
+  GO_VERSION: '1.25'
 
 jobs:
   prepare-matrix:
@@ -61,7 +62,7 @@ jobs:
       test-names: ${{ steps.set-matrix.outputs.test-names }}
     steps:
       - name: checkout repo
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
@@ -84,7 +85,7 @@ jobs:
         testName: ${{ fromJson(needs.prepare-matrix.outputs.test-names) }}
     steps:
       - name: checkout repo
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
@@ -92,7 +93,7 @@ jobs:
 
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
-          go-version: '1.21'
+          go-version: ${{ env.GO_VERSION }}
       - run: go version
 
       - name: Install Helm
@@ -146,7 +147,7 @@ jobs:
 
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
         with:
-          go-version: '1.21'
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Install BTP CLI
         run: |

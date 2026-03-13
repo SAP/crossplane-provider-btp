@@ -22,7 +22,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/internal"
-	environments "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -44,6 +43,10 @@ const (
 	errServiceParsing       = "Parameters from service response seem to be corrupted"
 	errCantDescribe         = "Could not describe kyma instance"
 	errCircutBreak          = "circuit breaker is on; check retry status, update parameters or set annotation " + v1alpha1.IgnoreCircuitBreaker + " to any value"
+	errCreate               = "while creating instance"
+	errUpdate               = "while updating instance"
+	errDelete               = "while deleting instance"
+	errGetConnectionDetails = "while getting connection details"
 	maxRetriesDefault       = 3
 )
 
@@ -121,14 +124,14 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if connectionDetailsNeedUpdate(lastModified, cr) {
 		// remove the connection details from memoization map
 		// to force fetching a new ConnectionDetails object
-		environments.InvalidateConnectionDetails(instance)
+		kymaenv.InvalidateConnectionDetails(instance)
 	}
-	details, readErr := environments.GetConnectionDetails(instance, c.httpClient)
+	details, readErr := kymaenv.GetConnectionDetails(instance, c.httpClient)
 	if readErr != nil {
 		return managed.ExternalObservation{
 			ResourceExists:   true,
 			ResourceUpToDate: true,
-		}, errors.Wrap(readErr, "can not obtain kubeConfig")
+		}, errors.Wrap(readErr, errGetConnectionDetails)
 	}
 	return managed.ExternalObservation{
 		ResourceExists:          true,
@@ -150,7 +153,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	guid, err := c.client.CreateInstance(ctx, *cr)
 	if err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 
 	meta.SetExternalName(cr, guid)
@@ -174,7 +177,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	err := c.client.UpdateInstance(ctx, *cr)
 
 	if err != nil {
-		return managed.ExternalUpdate{}, err
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 	}
 
 	return managed.ExternalUpdate{
@@ -198,7 +201,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, nil
 	}
 
-	return managed.ExternalDelete{}, c.client.DeleteInstance(ctx, *cr)
+	return managed.ExternalDelete{}, errors.Wrap(c.client.DeleteInstance(ctx, *cr), errDelete)
 }
 
 func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {

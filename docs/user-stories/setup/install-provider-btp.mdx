@@ -1,0 +1,83 @@
+---
+sidebar_position: 1
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+# Install the provider
+
+This guide shows how to install our BTP provider (also known as *Crossplane provider for SAP BTP*).
+
+:::note
+You are an platform operator or administrator? Feel free to checkout the [OpenMCP project](https://openmcp-project.github.io/docs/) it's a project that makes it easier to enable more teams in your organization to use Crossplane by providing a managed control plane as a service.
+:::
+
+## 🚧 Prerequisites
+
+- You have a running control plane.
+
+## Procedure
+
+To install the provider on a managed or self-hosted control plane, choose the appropriate tab:
+
+<Tabs>
+    <TabItem value="managed" label="On a managed control plane">
+        1. Make sure you're connected to the Onboarding API.
+          
+        2. Update the YAML file for your `ManagedControlPlane` custom resource by adding the BTP provider to the `spec.components.crossplane.providers` field.
+
+            :::apply-to-provision-api
+              ```yaml title="managedcontrolplane.yaml" {10-12}
+              apiVersion: core.openmcp.cloud/v1alpha1
+              kind: ManagedControlPlane
+              metadata:
+                name: <managed-control-plane-name>
+                namespace: <workspace-namespace>
+              spec:
+                components:
+                  crossplane:
+                    version: :mcp_cv_crossplane:
+                    providers:
+                      - name: btp
+                        version: :mcp_cv_provider-btp:
+              ...
+              ```
+              :::
+
+        3. Apply the updated YAML file to the Onboarding API:
+
+            ```bash title="Run in Terminal"
+            kubectl apply -f managedcontrolplane.yaml
+            ```  
+    </TabItem>
+    <TabItem value="unmanaged" label="On a self-hosted control plane" default>
+        To use the provider in any control plane, apply the following `Provider` resource.
+
+        ```yaml
+        apiVersion: pkg.crossplane.io/v1
+        kind: Provider
+        metadata:
+          name: btp-provider
+        spec:
+          package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<version> # replace <version> with the desired version, e.g. 1.0.2
+          packagePullSecrets:
+            - name: artifactory-readonly-docker
+        ```
+
+        <br/>
+        <br/>
+
+        :::note Not using a managed control plane?
+        
+        Make sure you have the **`docker-registry secret`** configured.
+        
+        :::
+    </TabItem>
+</Tabs>
+
+## Next steps
+
+- [Configure the BTP provider](/docs/crossplane-provider-btp/docs/user-stories/setup/configure-provider-btp).
+
+## ⁉ FAQs

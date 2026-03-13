@@ -2,7 +2,6 @@ package entitlement
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
+	"github.com/pkg/errors"
 	entclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -69,7 +69,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.New(errClientAPI),
+				err: errors.Wrap(errors.Wrap(errors.New(errClientAPI), "while describing instance"), "while updating observation"),
 			},
 		},
 		"Error Describing, kube returns error": {
@@ -87,7 +87,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.New(errKubeAPI),
+				err: errors.Wrap(errors.Wrap(errors.Wrap(errors.New(errKubeAPI), "while listing entitlements"), "while finding related entitlements"), "while updating observation"),
 			},
 		},
 		"Simple Case, unique identifier passed": {
@@ -349,7 +349,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: false},
-				err: errors.New("negative integer not allowed for .Spec.ForProvider.Amount"),
+				err: errors.Wrap(errors.Wrap(errors.New("negative integer not allowed for .Spec.ForProvider.Amount"), "while generating observation"), "while updating observation"),
 			},
 		},
 
@@ -374,7 +374,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: false},
-				err: errors.New("multiple of kind Entitlement have colliding .Spec.ForProvider.Enable"),
+				err: errors.Wrap(errors.Wrap(errors.New("multiple of kind Entitlement have colliding .Spec.ForProvider.Enable"), "while generating observation"), "while updating observation"),
 			},
 		},
 

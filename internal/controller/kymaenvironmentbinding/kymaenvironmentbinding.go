@@ -30,6 +30,13 @@ const (
 	errGetCredentialsSecret      = "Could not get secret of local cloud management"
 	errTrackRUsage               = "cannot track ResourceUsage"
 	errNoSecretsToPublish        = "no secrets to publish, please set the write connection secret reference or publish connection details to reference"
+	errObserve                   = "while observing bindings"
+	errUpdateBindings            = "while updating bindings from service"
+	errDescribeInstance          = "while describing instance"
+	errCreate                    = "while creating binding"
+	errStatusUpdate              = "while updating status"
+	errDelete                    = "while deleting bindings"
+	errDeleteInstances           = "while deleting instances"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -70,7 +77,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	err := c.updateBindingsFromService(ctx, cr)
 	if err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateBindings)
 	}
 	validBindings, bindings := c.validateBindings(cr)
 	cr.Status.AtProvider.Bindings = bindings
@@ -89,7 +96,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 func (c *external) updateBindingsFromService(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding) error {
 	bindingsAtService, err := c.client.DescribeInstance(ctx, cr.Spec.KymaEnvironmentId)
 	if err != nil {
-		return err
+		return errors.Wrap(err, errDescribeInstance)
 	}
 
 	validBindings := []v1alpha1.Binding{}
@@ -176,7 +183,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	ttl := int(math.Round(cr.Spec.ForProvider.BindingTTl.Seconds()))
 	clientBinding, err := c.client.CreateInstance(ctx, cr.Spec.KymaEnvironmentId, ttl)
 	if err != nil {
-		return managed.ExternalCreation{}, err
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 
 	// Create new binding from client binding
@@ -199,7 +206,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	return managed.ExternalCreation{
 		ConnectionDetails: connectionDetails,
-	}, c.kube.Status().Update(ctx, cr)
+	}, errors.Wrap(c.kube.Status().Update(ctx, cr), errStatusUpdate)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -219,5 +226,5 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	err := c.client.DeleteInstances(ctx, cr.Status.AtProvider.Bindings, cr.Spec.KymaEnvironmentId)
-	return managed.ExternalDelete{}, err
+	return managed.ExternalDelete{}, errors.Wrap(err, errDeleteInstances)
 }

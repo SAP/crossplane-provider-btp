@@ -1,0 +1,12 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: cis-local-entitlement-cf-import
+  namespace: default
+spec:
+  forProvider:
+    serviceName: cis
+    servicePlanName: local
+    enable: true
+    subaccountRef:
+      name: cf-import-test-subaccount

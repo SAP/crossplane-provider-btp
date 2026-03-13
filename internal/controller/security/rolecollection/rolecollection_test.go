@@ -628,7 +628,7 @@ func withCredsUpjet() RoleCollectionModifier {
 }
 
 func WithConditions(c ...xpv1.Condition) RoleCollectionModifier {
-	return func(r *v1alpha1.RoleCollection) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *v1alpha1.RoleCollection) { r.Status.Conditions = c }
 }
 
 func WithExternalName(externalName string) RoleCollectionModifier {

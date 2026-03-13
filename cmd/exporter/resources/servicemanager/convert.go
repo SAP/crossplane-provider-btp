@@ -1,0 +1,162 @@
+package servicemanager
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/SAP/xp-clifford/cli/export"
+	"github.com/SAP/xp-clifford/erratt"
+	"github.com/SAP/xp-clifford/yaml"
+	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
+)
+
+func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+	resourceName := si.GenerateK8sResourceName()
+	externalName := si.GetExternalName()
+	subAccountID := si.SubaccountID
+	instanceID := si.ID
+	instanceName := si.Name
+
+	serviceManager := yaml.NewResourceWithComment(
+		&v1beta1.ServiceManager{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       v1beta1.ServiceManagerKind,
+				APIVersion: v1beta1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: resourceName,
+				Annotations: map[string]string{
+					"crossplane.io/external-name": externalName,
+				},
+			},
+			Spec: v1beta1.ServiceManagerSpec{
+				ResourceSpec: v1.ResourceSpec{
+					ManagementPolicies: []v1.ManagementAction{
+						v1.ManagementActionObserve,
+					},
+					WriteConnectionSecretToReference: &v1.SecretReference{
+						Name:      resourceName,
+						Namespace: resources.DefaultSecretNamespace,
+					},
+				},
+				ForProvider: v1beta1.ServiceManagerParameters{
+					SubaccountGuid:      subAccountID,
+					ServiceInstanceName: instanceName,
+				},
+			},
+		})
+
+	// Copy comments from the original resource.
+	serviceManager.CloneComment(si)
+
+	// Comment the resource out, if any of the required fields is missing.
+	if !si.IsServiceManager() {
+		serviceManager.AddComment(resources.WarnNotServiceManager)
+	}
+	if subAccountID == "" {
+		serviceManager.AddComment(resources.WarnMissingSubaccountGuid)
+	}
+	if resourceName == resources.UndefinedName {
+		serviceManager.AddComment(resources.WarnUndefinedResourceName)
+	}
+	if externalName == "" {
+		serviceManager.AddComment(resources.WarnMissingExternalName)
+	}
+	if externalName == resources.UndefinedExternalName {
+		serviceManager.AddComment(resources.WarnUndefinedExternalName)
+	}
+	if instanceID == "" {
+		serviceManager.AddComment(resources.WarnMissingInstanceId)
+	}
+	if len(si.BindingIDs) == 0 {
+		serviceManager.AddComment(resources.WarnMissingBindingId)
+	}
+	if len(si.BindingIDs) > 1 {
+		serviceManager.AddComment(fmt.Sprintf(resources.WarnTooManyBindingIDs, len(si.BindingIDs)))
+	}
+	if !si.Usable {
+		serviceManager.AddComment(resources.WarnServiceInstanceNotUsable)
+	}
+	if instanceName == "" {
+		serviceManager.AddComment(resources.WarnMissingInstanceName)
+	}
+
+	// Reference subaccount resource, if requested.
+	if resolveReferences {
+		if err := resolveReference(ctx, btpClient, &serviceManager.Object.(*v1beta1.ServiceManager).Spec.ForProvider); err != nil {
+			eventHandler.Warn(erratt.Errorf("cannot resolve subaccount reference: %w", err).With("service instance", si.GetID()))
+			serviceManager.AddComment(resources.WarnCannotResolveSubaccount + ": " + si.SubaccountID)
+		}
+	}
+
+	return serviceManager
+}
+
+func convertDefaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+	resourceName := si.GenerateK8sResourceName()
+	subaccountID := si.SubaccountID
+
+	serviceManager := yaml.NewResourceWithComment(
+		&v1beta1.ServiceManager{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       v1beta1.ServiceManagerKind,
+				APIVersion: v1beta1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: resourceName,
+			},
+			Spec: v1beta1.ServiceManagerSpec{
+				ResourceSpec: v1.ResourceSpec{
+					WriteConnectionSecretToReference: &v1.SecretReference{
+						Name:      resourceName,
+						Namespace: resources.DefaultSecretNamespace,
+					},
+				},
+				ForProvider: v1beta1.ServiceManagerParameters{
+					SubaccountGuid: subaccountID,
+				},
+			},
+		})
+
+	// Copy comments from the original resource.
+	serviceManager.CloneComment(si)
+
+	// Comment the resource out, if any of the required fields is missing.
+	if subaccountID == "" {
+		serviceManager.AddComment(resources.WarnMissingSubaccountGuid)
+	}
+	if resourceName == resources.UndefinedName {
+		serviceManager.AddComment(resources.WarnUndefinedResourceName)
+	}
+
+	// Reference subaccount resource, if requested.
+	if resolveReferences {
+		if err := resolveReference(ctx, btpClient, &serviceManager.Object.(*v1beta1.ServiceManager).Spec.ForProvider); err != nil {
+			eventHandler.Warn(erratt.Errorf("cannot resolve subaccount reference: %w", err).With("subaccount", subaccountID))
+			serviceManager.AddComment(resources.WarnCannotResolveSubaccount + ": " + subaccountID)
+		}
+	}
+
+	return serviceManager
+}
+
+func resolveReference(ctx context.Context, btpClient *btpcli.BtpCli, spec *v1beta1.ServiceManagerParameters) error {
+	saName, err := subaccount.GetK8sResourceNameByID(ctx, btpClient, spec.SubaccountGuid)
+	if err != nil {
+		return err
+	}
+
+	spec.SubaccountRef = &v1.Reference{
+		Name: saName,
+	}
+	spec.SubaccountGuid = ""
+
+	return nil
+}

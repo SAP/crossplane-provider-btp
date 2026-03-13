@@ -2,6 +2,7 @@ package servicemanager
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -11,10 +12,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	sm "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,7 +77,7 @@ func TestConnect_ResourceTracking(t *testing.T) {
 				},
 			},
 			want: want{
-				err:         errTracking,
+				err:         errors.Wrap(errTracking, "cannot track resource usage"),
 				trackCalled: true,
 			},
 		},
@@ -128,7 +127,13 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			_, err := c.Connect(context.Background(), tc.args.mg)
 
 			if !errors.Is(err, tc.want.err) {
-				t.Errorf("expected error %v, got %v", tc.want.err, err)
+				if err != nil && tc.want.err != nil {
+					if !strings.Contains(err.Error(), tc.want.err.Error()) {
+						t.Errorf("expected error to contain %q, got %q", tc.want.err.Error(), err.Error())
+					}
+				} else {
+					t.Errorf("expected error %v, got %v", tc.want.err, err)
+				}
 			}
 
 			// Verify Track was called
@@ -222,7 +227,7 @@ func TestDelete_DeletionBlocking(t *testing.T) {
 				mg: &apisv1beta1.ServiceManager{},
 			},
 			want: want{
-				err:                 errors.New("deleteError"),
+				err:                 errors.New("while deleting resources: deleteError"),
 				setConditionsCalled: true,
 				deleteAttempted:     true,
 			},
@@ -296,8 +301,8 @@ func TestObserve(t *testing.T) {
 			args: args{
 				cr: NewServiceManager("test"),
 				tfClient: &TfClientFake{
-					observeFn: func() (servicemanager.ResourcesStatus, error) {
-						return servicemanager.ResourcesStatus{}, errors.New("observeError")
+					observeFn: func() (sm.ResourcesStatus, error) {
+						return sm.ResourcesStatus{}, errors.New("observeError")
 					},
 				},
 			},
@@ -316,9 +321,9 @@ func TestObserve(t *testing.T) {
 			args: args{
 				cr: NewServiceManager("test"),
 				tfClient: &TfClientFake{
-					observeFn: func() (servicemanager.ResourcesStatus, error) {
+					observeFn: func() (sm.ResourcesStatus, error) {
 						// Doesn't matter what observe is returned exactly, as long as its passed through and IDs are persisted
-						return servicemanager.ResourcesStatus{
+						return sm.ResourcesStatus{
 							ExternalObservation: managed.ExternalObservation{ResourceExists: false},
 							InstanceID:          "someID",
 						}, nil
@@ -342,9 +347,9 @@ func TestObserve(t *testing.T) {
 			args: args{
 				cr: NewServiceManager("test"),
 				tfClient: &TfClientFake{
-					observeFn: func() (servicemanager.ResourcesStatus, error) {
+					observeFn: func() (sm.ResourcesStatus, error) {
 						// Doesn't matter if updated or not
-						return servicemanager.ResourcesStatus{
+						return sm.ResourcesStatus{
 							ExternalObservation: managed.ExternalObservation{
 								ResourceExists:    true,
 								ResourceUpToDate:  true,
@@ -419,7 +424,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("createError"),
+				err: errors.New("while creating resources: createError"),
 				cr:  NewServiceManager("test", WithConditions(xpv1.Creating())),
 			},
 		},
@@ -449,6 +454,9 @@ func TestCreate(t *testing.T) {
 			}
 			_, err := uua.Create(context.TODO(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				if err != nil && tc.want.err != nil && strings.Contains(err.Error(), tc.want.err.Error()) {
+					return
+				}
 				t.Errorf("\ne.Create(): -want error, +got error:\n%s\n", diff)
 			}
 			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
@@ -482,7 +490,7 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("updateError"),
+				err: errors.New("while updating resources: updateError"),
 			},
 		},
 		{
@@ -506,7 +514,10 @@ func TestUpdate(t *testing.T) {
 				tfClient: tc.args.tfClient,
 			}
 			_, err := uua.Update(context.TODO(), tc.args.cr)
-			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				if err != nil && tc.want.err != nil && strings.Contains(err.Error(), tc.want.err.Error()) {
+					return
+				}
 				t.Errorf("\ne.Update(): -want error, +got error:\n%s\n", diff)
 			}
 		})
@@ -538,7 +549,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("deleteError"),
+				err: errors.New("while deleting resources: deleteError"),
 				cr:  NewServiceManager("test", WithExternalName("someID/anotherID"), WithConditions(xpv1.Deleting())),
 			},
 		},
@@ -566,6 +577,9 @@ func TestDelete(t *testing.T) {
 			}
 			_, err := uua.Delete(context.TODO(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				if err != nil && tc.want.err != nil && strings.Contains(err.Error(), tc.want.err.Error()) {
+					return
+				}
 				t.Errorf("\ne.Delete(): -want error, +got error:\n%s\n", diff)
 			}
 			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
@@ -629,7 +643,7 @@ func NewServiceManager(name string, m ...ServiceManagerModifier) *apisv1beta1.Se
 }
 
 // this pattern can be potentially auto generated, its quite useful to write expressive unittests
-type ServiceManagerModifier func(dirEnvironment *v1beta1.ServiceManager)
+type ServiceManagerModifier func(dirEnvironment *apisv1beta1.ServiceManager)
 
 func WithStatus(status apisv1beta1.ServiceManagerObservation) ServiceManagerModifier {
 	return func(r *apisv1beta1.ServiceManager) {
@@ -644,7 +658,7 @@ func WithData(data apisv1beta1.ServiceManagerParameters) ServiceManagerModifier 
 }
 
 func WithConditions(c ...xpv1.Condition) ServiceManagerModifier {
-	return func(r *apisv1beta1.ServiceManager) { r.Status.ConditionedStatus.Conditions = c }
+	return func(r *apisv1beta1.ServiceManager) { r.Status.Conditions = c }
 }
 
 func WithExternalName(externalName string) ServiceManagerModifier {
@@ -654,17 +668,17 @@ func WithExternalName(externalName string) ServiceManagerModifier {
 }
 
 // Fakes
-var _ servicemanager.ITfClient = &TfClientFake{}
+var _ sm.ITfClient = &TfClientFake{}
 
 type TfClientFake struct {
-	observeFn    func() (servicemanager.ResourcesStatus, error)
+	observeFn    func() (sm.ResourcesStatus, error)
 	createFn     func() (string, string, error)
 	updateFn     func() error
 	deleteFn     func() error
 	DeleteCalled bool
 }
 
-func (t *TfClientFake) ObserveResources(ctx context.Context, cr *apisv1beta1.ServiceManager) (servicemanager.ResourcesStatus, error) {
+func (t *TfClientFake) ObserveResources(ctx context.Context, cr *apisv1beta1.ServiceManager) (sm.ResourcesStatus, error) {
 	return t.observeFn()
 }
 

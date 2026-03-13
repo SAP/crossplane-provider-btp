@@ -424,7 +424,7 @@ func TestCreate(t *testing.T) {
 			},
 			want: want{
 				obs: managed.ExternalCreation{},
-				err: errors.New("CRASH"),
+				err: errors.Wrap(errors.New("CRASH"), errCreateModule),
 			},
 		},
 	}
@@ -487,7 +487,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			want: want{
-				err: errors.New("CRASH"),
+				err: errors.Wrap(errors.New("CRASH"), errDeleteModule),
 			},
 		},
 		"BindingAlreadyDeleted": {
