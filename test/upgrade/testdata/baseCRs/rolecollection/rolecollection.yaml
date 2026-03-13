@@ -1,0 +1,21 @@
+apiVersion: security.btp.sap.crossplane.io/v1alpha1
+kind: RoleCollection
+metadata:
+  name: upgrade-test-rolecollection
+  namespace: default
+spec:
+  forProvider:
+    name: $BUILD_ID-upgrade-test-rolecollection
+    description: "Upgrade test role collection"
+    roles:
+      # Using standard roles that should be available in any subaccount
+      - name: "Subaccount Viewer"
+        roleTemplateAppId: "cis-local!b14"
+        roleTemplateName: "Subaccount_Viewer"
+      - name: "Subaccount Admin"
+        roleTemplateAppId: "cis-local!b14"
+        roleTemplateName: "Subaccount_Admin"
+  # Reference the SubaccountApiCredential managed resource
+  # This automatically gets XSUAA credentials from the subaccount
+  subaccountApiCredentialRef:
+    name: upgrade-test-xsuaa-cred

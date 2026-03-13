@@ -108,13 +108,23 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotRoleCollection)
 	}
 
-	obs, err := c.client.GenerateObservation(ctx, meta.GetExternalName(cr))
+	// Check if external-name is empty (ADR requirement)
+	externalName := meta.GetExternalName(cr)
+	if externalName == "" {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	// Use external-name to query the API
+	obs, err := c.client.GenerateObservation(ctx, externalName)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetRolecollection)
 	}
 
 	setObservation(cr, obs)
 
+	// If resource doesn't exist (404 case handled by client returning nil name), it's a drift
 	needsCreation := c.client.NeedsCreation(getObservation(cr))
 	if needsCreation {
 		return managed.ExternalObservation{
