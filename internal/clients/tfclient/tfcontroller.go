@@ -35,6 +35,8 @@ type TfProxyControllerI interface {
 	Delete(ctx context.Context) error
 	// QueryUpdatedData returns the relevant status data once the async creation is done
 	QueryAsyncData(ctx context.Context) *ObservationData
+	// GetTfResource returns the underlying Terraform resource for diff calculation
+	GetTfResource() resource.Managed
 }
 
 type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
@@ -117,6 +119,14 @@ func (t *TfProxyController[UPJETTED]) Update(ctx context.Context) error {
 func (t *TfProxyController[UPJETTED]) Delete(ctx context.Context) error {
 	_, err := t.tfClient.Delete(ctx, t.tfResource)
 	return err
+}
+
+// GetTfResource returns the underlying Upjet Terraform resource.
+// This is needed by native controllers (e.g. serviceinstance) to access both
+// spec.forProvider (desired state) and status.atProvider (observed state) for
+// drift calculation and diff reporting as required by the external-name ADR.
+func (t *TfProxyController[UPJETTED]) GetTfResource() resource.Managed {
+	return t.tfResource
 }
 
 // Observe implements TfProxyControllerI.

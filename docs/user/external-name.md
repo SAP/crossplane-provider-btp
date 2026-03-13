@@ -32,6 +32,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
   - CLI: btp list accounts/directory (field: guid)
 
+### ServiceInstance
+
+- Follows Standard: no
+- Format: ServiceInstance GUID (UUID format) and the SubaccountRef or SubaccountID field filled out
+- How to find:
+
+  - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
+  - CLI: btp list services/instance --subaccount-id <subaccount-guid> (field: id)
+
 ### Subaccount
 
 - Follows Standard: yes
