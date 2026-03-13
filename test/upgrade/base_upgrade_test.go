@@ -3,77 +3,62 @@
 package upgrade
 
 import (
-	"context"
 	"fmt"
+	"os"
 	"testing"
 
-	"github.com/crossplane-contrib/xp-testing/pkg/upgrade"
 	"github.com/sap/crossplane-provider-btp/test"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/e2e-framework/klient/wait"
-	"sigs.k8s.io/e2e-framework/pkg/envconf"
-	"sigs.k8s.io/e2e-framework/pkg/features"
 )
 
-func TestUpgradeProvider(t *testing.T) {
-	klog.V(2).Infof("Starting upgrade test from %s to %s", fromTag, toTag)
-	klog.V(2).Infof("Testing resources in directories: %v", resourceDirectories)
+var (
+	resourceDirectories []string
+	// Add any directories to ignore here, e.g.: ./testdata/baseCRs/ignore-this-dir
+	ignoreResourceDirectories []string
+)
 
-	// TODO: Make sure there are logs for the full package strings
+// Test_BaselineUpgradeProvider is the baseline upgrade test that verifies the provider can be
+// successfully upgraded from one version to another while maintaining resource health.
+//
+// This test demonstrates the use of the CustomUpgradeTestBuilder framework with
+// default baseline behavior. The test flow is:
+//  1. Install provider at the "from" version
+//  2. Import test resources from baseline directories
+//  3. Verify all resources are healthy
+//  4. Upgrade provider to the "to" version
+//  5. Verify all resources remain healthy after upgrade
+//  6. Clean up resources and provider
+func Test_BaselineUpgradeProvider(t *testing.T) {
+	resourceDirectories = loadResourceDirectories()
 
-	upgradeTest := upgrade.UpgradeTest{
-		ProviderName:        providerName,
-		ClusterName:         kindClusterName,
-		FromProviderPackage: fromProviderPackage,
-		ToProviderPackage:   toProviderPackage,
-		ResourceDirectories: resourceDirectories,
+	fromTag, toTag := loadTags()
+
+	upgradeTest := NewCustomUpgradeTest("baseline-upgrade-test").
+		FromVersion(fromTag).
+		ToVersion(toTag).
+		WithResourceDirectories(resourceDirectories)
+
+	testenv.Test(t, upgradeTest.Feature())
+}
+
+func loadTags() (string, string) {
+	fromTagVar := os.Getenv(fromTagEnvVar)
+	if fromTagVar == "" {
+		panic(fromTagEnvVar + " environment variable is required")
 	}
 
-	upgradeFeature := features.New(fmt.Sprintf("Upgrade %s from %s to %s", providerName, fromTag, toTag)).
-		WithSetup(
-			"Install provider with version "+fromTag,
-			upgrade.ApplyProvider(upgradeTest.ClusterName, upgradeTest.FromProviderInstallOptions()),
-		).
-		WithSetup(
-			"Import resources in "+resourceDirectoryRoot,
-			upgrade.ImportResources(upgradeTest.ResourceDirectories),
-		).
-		Assess(
-			"Verify resources before upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, verifyTimeout),
-		).
-		Assess("Upgrade provider to version "+toTag, upgrade.UpgradeProvider(upgrade.UpgradeProviderOptions{
-			ClusterName: upgradeTest.ClusterName,
-			ProviderOptions: test.InstallProviderOptionsWithController(
-				upgradeTest.ToProviderInstallOptions(),
-				toControllerPackage,
-			),
-			ResourceDirectories: upgradeTest.ResourceDirectories,
-			WaitForPause:        waitForPause,
-		})).
-		Assess(
-			"Verify resources after upgrade",
-			upgrade.VerifyResources(upgradeTest.ResourceDirectories, verifyTimeout),
-		).
-		WithTeardown(
-			"Delete resources",
-			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				err := test.DeleteResourcesFromDirsGracefully(
-					ctx,
-					cfg,
-					resourceDirectories,
-					wait.WithTimeout(verifyTimeout),
-				)
-				if err != nil {
-					t.Logf("failed to clean up resources: %v", err)
-				}
+	toTagVar := os.Getenv(toTagEnvVar)
+	if toTagVar == "" {
+		panic(toTagEnvVar + " environment variable is required")
+	}
 
-				return ctx
-			},
-		).
-		WithTeardown(
-			"Delete provider",
-			upgrade.DeleteProvider(upgradeTest.ProviderName),
-		)
-	testenv.Test(t, upgradeFeature.Feature())
+	return fromTagVar, toTagVar
+}
+
+func loadResourceDirectories() []string {
+	directories, err := test.LoadDirectoriesWithYAMLFiles(resourceDirectoryRoot, ignoreResourceDirectories)
+	if err != nil {
+		panic(fmt.Errorf("failed to read resource directories from %s: %w", resourceDirectoryRoot, err))
+	}
+
+	return directories
 }
