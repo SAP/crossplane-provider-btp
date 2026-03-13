@@ -70,6 +70,11 @@ func main() {
 		terraformVersion = app.Flag("terraform-version", "Terraform version.").Required().Envar("TERRAFORM_VERSION").String()
 		providerSource   = app.Flag("terraform-provider-source", "Terraform provider source.").Required().Envar("TERRAFORM_PROVIDER_SOURCE").String()
 		providerVersion  = app.Flag("terraform-provider-version", "Terraform provider version.").Required().Envar("TERRAFORM_PROVIDER_VERSION").String()
+
+		entitlementCacheTTL = app.Flag(
+			"entitlement-cache-ttl",
+			"Time-to-live for entitlement cache entries.",
+		).Default("10s").Envar("ENTITLEMENT_CACHE_TTL").Duration()
 	)
 
 	tfclient.TF_VERSION_CALLBACK = func() tfclient.TfEnvVersion {
@@ -118,7 +123,7 @@ func main() {
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
 	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, enableManagementPolicies, enableExternalSecretStores, namespace, terraformVersion, providerSource, providerVersion)
-	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, enableManagementPolicies, enableExternalSecretStores, namespace)
+	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, enableManagementPolicies, enableExternalSecretStores, namespace, entitlementCacheTTL)
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
@@ -171,7 +176,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
-func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string) {
+func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string, entitlementCacheTTL *time.Duration) {
 	co := controller.Options{
 		Logger:                  log,
 		MaxConcurrentReconciles: *maxReconcileRate,
@@ -209,5 +214,5 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 			), "cannot create default store config",
 		)
 	}
-	kingpin.FatalIfError(template.CustomSetup(mgr, co), "Cannot setup controllers")
+	kingpin.FatalIfError(template.CustomSetup(mgr, co, *entitlementCacheTTL), "Cannot setup controllers")
 }

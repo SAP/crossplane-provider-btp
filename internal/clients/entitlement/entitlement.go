@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -25,14 +26,12 @@ type EntitlementsClient struct {
 
 func NewEntitlementsClient(btp btp.Client) *EntitlementsClient {
 	return &EntitlementsClient{btp: btp}
-
 }
 
 func (c EntitlementsClient) DescribeInstance(
 	ctx context.Context,
 	cr *v1alpha1.Entitlement,
 ) (*Instance, error) {
-
 	response, _, err := c.btp.EntitlementsServiceClient.
 		GetDirectoryAssignments(ctx).
 		SubaccountGUID(cr.Spec.ForProvider.SubaccountGuid).
@@ -87,8 +86,12 @@ func (c EntitlementsClient) DeleteInstance(ctx context.Context, cr *v1alpha1.Ent
 	}
 
 	if isNumericQuota {
-		amount := 0
-		cr.Status.AtProvider.Required.Amount = &amount
+		if cr.Status.AtProvider.Required.Amount == nil {
+			amount := 0
+			cr.Status.AtProvider.Required.Amount = &amount
+		}
+		// else: Required.Amount already holds the correct sum of remaining CRs
+		// (computed by GenerateObservation in Delete() with the deleted CR excluded)
 	} else {
 		enabled := false
 		cr.Status.AtProvider.Required.Enable = &enabled
