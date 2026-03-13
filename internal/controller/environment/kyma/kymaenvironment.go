@@ -91,6 +91,11 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
+	// Validate external-name format - must be a valid UUID
+	if !internal.IsValidUUID(externalName) {
+		return managed.ExternalObservation{}, errors.New("external-name must be a valid UUID")
+	}
+
 	instance, err := c.client.DescribeInstance(ctx, *cr)
 
 	if err != nil {
@@ -127,12 +132,18 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	needsUpdate, diff, err := c.needsUpdateWithDiff(cr)
-	if needsUpdate || err != nil {
+	if err != nil {
 		return managed.ExternalObservation{
 			ResourceExists:   true,
 			ResourceUpToDate: !needsUpdate,
-			Diff:             diff,
 		}, errors.Wrap(err, errCheckUpdate)
+	}
+	if needsUpdate {
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: false,
+			Diff:             diff,
+		}, nil
 	}
 
 	if connectionDetailsNeedUpdate(lastModified, cr) {
@@ -145,12 +156,14 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{
 			ResourceExists:   true,
 			ResourceUpToDate: true,
+			Diff:             diff,
 		}, errors.Wrap(readErr, errGetConnectionDetails)
 	}
 	return managed.ExternalObservation{
 		ResourceExists:    true,
 		ResourceUpToDate:  true,
 		ConnectionDetails: details,
+		Diff:              diff, 
 	}, nil
 }
 
