@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	saFromCustomTag             = "v1.4.0"
+	saFromCustomTag             = "v1.5.0"
 	saToCustomTag               = "local"
 	saCustomResourceDirectories = []string{
 		"./testdata/customCRs/subaccountExternalName",

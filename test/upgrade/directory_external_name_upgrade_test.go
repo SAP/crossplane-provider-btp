@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	dirFromCustomTag             = "v1.4.0"
+	dirFromCustomTag             = "v1.5.0"
 	dirToCustomTag               = "local"
 	dirCustomResourceDirectories = []string{
 		"./testdata/customCRs/directoryExternalName",
