@@ -29,6 +29,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -56,6 +57,14 @@ func main() {
 			"max-reconcile-rate",
 			"The global maximum rate per second at which resources may checked for drift from the desired state.",
 		).Default("3").Int()
+		backoffBase = app.Flag(
+			"backoff-base",
+			"Base duration for exponential backoff for reconciling resources in error cases. Default is 1s",
+		).Default("1s").Duration()
+		backoffMax = app.Flag(
+			"backoff-max",
+			"Maximum duration for exponential backoff for reconciling resources in error cases. Default is 60s",
+		).Default("60s").Duration()
 
 		namespace = app.Flag(
 			"namespace",
@@ -118,7 +127,7 @@ func main() {
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
 	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, enableManagementPolicies, enableExternalSecretStores, namespace, terraformVersion, providerSource, providerVersion)
-	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, enableManagementPolicies, enableExternalSecretStores, namespace)
+	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, backoffBase, backoffMax, enableManagementPolicies, enableExternalSecretStores, namespace)
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
@@ -171,13 +180,17 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
-func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string) {
-	co := controller.Options{
-		Logger:                  log,
-		MaxConcurrentReconciles: *maxReconcileRate,
-		PollInterval:            *pollInterval,
-		GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
-		Features:                &feature.Flags{},
+func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string) {
+	co := internalopts.Options{
+		Options: controller.Options{
+			Logger:                  log,
+			MaxConcurrentReconciles: *maxReconcileRate,
+			PollInterval:            *pollInterval,
+			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
+			Features:                &feature.Flags{},
+		},
+		BaseBackoff: *backoffBase,
+		MaxBackoff:  *backoffMax,
 	}
 
 	if *enableManagementPolicies {

@@ -1,10 +1,10 @@
 package controller
 
 import (
-	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/internal/controller/kymamodule"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/cloudmanagement"
@@ -27,8 +27,8 @@ import (
 
 // CustomSetup creates all Template controllers with the supplied logger and adds them to
 // the supplied manager.
-func CustomSetup(mgr ctrl.Manager, o controller.Options) error {
-	for _, setup := range []func(ctrl.Manager, controller.Options) error{
+func CustomSetup(mgr ctrl.Manager, o internalopts.Options) error {
+	for _, setup := range []func(ctrl.Manager, internalopts.Options) error{
 		globalaccount.Setup,
 		subaccount.Setup,
 		cloudfoundry.Setup,
