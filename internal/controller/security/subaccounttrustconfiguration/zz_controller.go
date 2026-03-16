@@ -36,7 +36,7 @@ import (
 
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	features "github.com/sap/crossplane-provider-btp/internal/features"
-	internallimiter "github.com/sap/crossplane-provider-btp/internal/ratelimiter"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 )
 
 // Setup adds a controller that reconciles SubaccountTrustConfiguration managed resources.
@@ -98,7 +98,7 @@ func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(internallimiter.ForControllerRuntime(o.Options)).
+		WithOptions(internalopts.ForControllerRuntime(o.Options)).
 		WithEventFilter(xpresource.DesiredStateChanged()).
 		Watches(&v1alpha1.SubaccountTrustConfiguration{}, eventHandler).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))

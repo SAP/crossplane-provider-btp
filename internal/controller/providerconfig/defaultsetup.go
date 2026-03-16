@@ -8,7 +8,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/internal/features"
-	internallimiter "github.com/sap/crossplane-provider-btp/internal/ratelimiter"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,7 +50,7 @@ func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, 
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(internallimiter.ForControllerRuntime(o)).
+		WithOptions(internalopts.ForControllerRuntime(o)).
 		For(object).
 		WithEventFilter(resource.DesiredStateChanged()).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
@@ -83,7 +83,7 @@ func DefaultSetupWithoutDefaultInitializer(mgr ctrl.Manager, o controller.Option
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(internallimiter.ForControllerRuntime(o)).
+		WithOptions(internalopts.ForControllerRuntime(o)).
 		For(object).
 		WithEventFilter(resource.DesiredStateChanged()).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))

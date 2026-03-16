@@ -1,13 +1,13 @@
-// Package ratelimiter provides rate limiter helpers for controllers in this provider.
-package ratelimiter
+// Package options provides controller options helpers for controllers in this provider.
+package options
 
 import (
 	"time"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/pkg/controller"
+	"k8s.io/client-go/util/workqueue"
 	crcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"k8s.io/client-go/util/workqueue"
 )
 
 // maxExponentialBackoff is the maximum delay for the per-item exponential
