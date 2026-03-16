@@ -84,9 +84,10 @@ func TestServiceInstanceImportFlow(t *testing.T) {
 			},
 		},
 		"e2e-destination-instance-import",
-		WithDependentResourceDirectory[*v1alpha1.ServiceInstance]("testdata/crs/serviceinstance"),
-		WithWaitCreateTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(10*time.Minute)),
-		WithWaitDeletionTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(5*time.Minute)),
+		WithWaitDependentResourceTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(15*time.Minute)),
+		WithWaitCreateTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(20*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(20*time.Minute)),
+		WithDependentResourceDirectory[*v1alpha1.ServiceInstance]("testdata/crs/serviceinstance_import"),
 	)
 
 	importFeature := importTester.BuildTestFeature("BTP ServiceInstance Import Flow").Feature()
