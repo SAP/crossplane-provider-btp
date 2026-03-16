@@ -2,6 +2,7 @@ package servicemanager
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SAP/xp-clifford/cli/export"
 	"github.com/SAP/xp-clifford/erratt"
@@ -21,7 +22,6 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	externalName := si.GetExternalName()
 	subAccountID := si.SubaccountID
 	instanceID := si.ID
-	bindingID := si.BindingID
 	instanceName := si.Name
 
 	serviceManager := yaml.NewResourceWithComment(
@@ -75,8 +75,11 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	if instanceID == "" {
 		serviceManager.AddComment(resources.WarnMissingInstanceId)
 	}
-	if bindingID == "" {
+	if len(si.BindingIDs) == 0 {
 		serviceManager.AddComment(resources.WarnMissingBindingId)
+	}
+	if len(si.BindingIDs) > 1 {
+		serviceManager.AddComment(fmt.Sprintf(resources.WarnTooManyBindingIDs, len(si.BindingIDs)))
 	}
 	if !si.Usable {
 		serviceManager.AddComment(resources.WarnServiceInstanceNotUsable)

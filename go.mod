@@ -11,7 +11,7 @@ replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20251202
 
 require (
 	dario.cat/mergo v1.0.2
-	github.com/SAP/xp-clifford v0.0.0-20260205091836-ee61a788e6da
+	github.com/SAP/xp-clifford v0.0.0-20260312105548-6c739d63b4f1
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.18
 	github.com/crossplane-contrib/xp-testing v1.9.0
@@ -223,11 +223,11 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
-	golang.org/x/mod v0.32.0 // indirect
+	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/time v0.13.0 // indirect
 	golang.org/x/tools v0.41.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect

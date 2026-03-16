@@ -1,6 +1,7 @@
 package cloudmanagement
 
 import (
+	"fmt"
 	"testing"
 
 	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -44,7 +45,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 				OfferingName:        serviceinstancebase.CloudManagementOffering,
 				PlanName:            serviceinstancebase.CloudManagementPlan,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ServiceManagerName:  smName,
 			},
 			want: yaml.NewResourceWithComment(
@@ -89,7 +90,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 				OfferingName:        "other-offering",
 				PlanName:            "other-plan",
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ServiceManagerName:  smName,
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -137,7 +138,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 				OfferingName:        serviceinstancebase.CloudManagementOffering,
 				PlanName:            serviceinstancebase.CloudManagementPlan,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ServiceManagerName:  smName,
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -185,7 +186,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 				OfferingName:        serviceinstancebase.CloudManagementOffering,
 				PlanName:            serviceinstancebase.CloudManagementPlan,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ServiceManagerName:  smName,
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -235,7 +236,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 				OfferingName:        serviceinstancebase.CloudManagementOffering,
 				PlanName:            serviceinstancebase.CloudManagementPlan,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ServiceManagerName:  smName,
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -323,6 +324,56 @@ func TestConvertCloudManagementResource(t *testing.T) {
 			}(),
 		},
 		{
+			name: "too many binding IDs",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         instanceName,
+					SubaccountID: subaccountID,
+					Usable:       true,
+				},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+				OfferingName:        serviceinstancebase.CloudManagementOffering,
+				PlanName:            serviceinstancebase.CloudManagementPlan,
+				BindingIDs:          []string{bindingID, "binding-id-2"},
+				ServiceManagerName:  smName,
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1beta1.CloudManagement{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1beta1.CloudManagementKind,
+							APIVersion: v1beta1.SchemeGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
+						},
+						Spec: v1beta1.CloudManagementSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
+								WriteConnectionSecretToReference: &v1.SecretReference{
+									Name:      resourceName,
+									Namespace: resources.DefaultSecretNamespace,
+								},
+							},
+							ForProvider: v1beta1.CloudManagementParameters{
+								SubaccountGuid: subaccountID,
+								ServiceManagerRef: &v1.Reference{
+									Name: smName,
+								},
+								ServiceInstanceName: instanceName,
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnUndefinedExternalName)
+				rwc.AddComment(fmt.Sprintf(resources.WarnTooManyBindingIDs, 2))
+				return rwc
+			}(),
+		},
+		{
 			name: "missing service manager name",
 			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
@@ -334,7 +385,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 				OfferingName:        serviceinstancebase.CloudManagementOffering,
 				PlanName:            serviceinstancebase.CloudManagementPlan,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -382,7 +433,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 				OfferingName:        serviceinstancebase.CloudManagementOffering,
 				PlanName:            serviceinstancebase.CloudManagementPlan,
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ServiceManagerName:  smName,
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -481,7 +532,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 					ResourceWithComment: rwc,
 					OfferingName:        serviceinstancebase.CloudManagementOffering,
 					PlanName:            serviceinstancebase.CloudManagementPlan,
-					BindingID:           bindingID,
+					BindingIDs:          []string{bindingID},
 					ServiceManagerName:  smName,
 				}
 			}(),

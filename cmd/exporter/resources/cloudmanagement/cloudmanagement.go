@@ -119,7 +119,7 @@ func exportPrerequisiteEntitlement(ctx context.Context, btpClient *btpcli.BtpCli
 func exportPrerequisiteSM(ctx context.Context, btpClient *btpcli.BtpCli, cm *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) {
 	// Export subaccount service manager.
 	saID := cm.SubaccountID
-	smName, err := servicemanager.ExportInstanceForSubaccount(ctx, btpClient, saID, eventHandler, resolveReferences)
+	smName, err := servicemanager.ExportOperatorInstance(ctx, btpClient, saID, eventHandler, resolveReferences)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to export service manager for subaccount", "subaccount ID", saID)
 	}
