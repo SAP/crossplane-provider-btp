@@ -32,15 +32,15 @@ import (
 	"github.com/crossplane/upjet/pkg/controller/handler"
 	"github.com/crossplane/upjet/pkg/terraform"
 	"github.com/pkg/errors"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	features "github.com/sap/crossplane-provider-btp/internal/features"
-	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 )
 
 // Setup adds a controller that reconciles DirectoryEntitlement managed resources.
-func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	name := managed.ControllerName(v1alpha1.DirectoryEntitlement_GroupVersionKind.String())
 	var initializers managed.InitializerChain
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
@@ -98,7 +98,7 @@ func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(internalopts.ForControllerRuntime(o.Options)).
+		WithOptions(o.ForControllerRuntimeWithBackoff()).
 		WithEventFilter(xpresource.DesiredStateChanged()).
 		Watches(&v1alpha1.DirectoryEntitlement{}, eventHandler).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))

@@ -22,7 +22,7 @@ const (
 
 // Setup adds a controller that reconciles ResourceUsages by accounting for
 // their current usage.
-func Setup(mgr ctrl.Manager, o internalopts.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	name := providerconfig.ControllerName(v1alpha1.ResourceUsageGroupKind)
 
 	r := NewReconciler(
@@ -33,7 +33,7 @@ func Setup(mgr ctrl.Manager, o internalopts.Options) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(internalopts.ForControllerRuntimeWithBackoff(o)).
+		WithOptions(o.ForControllerRuntimeWithBackoff()).
 		For(&v1alpha1.ResourceUsage{}).
 		Watches(&v1alpha1.ResourceUsage{}, &EnqueueRequestForResourceUsage{}).
 		WithEventFilter(resource.DesiredStateChanged()).

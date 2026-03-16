@@ -13,7 +13,7 @@ import (
 )
 
 // Setup adds a controller that reconciles RoleCollection managed resources.
-func Setup(mgr ctrl.Manager, o internalopts.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.RoleCollection{}, v1alpha1.RoleCollectionGroupKind, v1alpha1.RoleCollectionGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 		return &connector{
 			kube:            kube,

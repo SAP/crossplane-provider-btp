@@ -5,29 +5,66 @@ import (
 	"time"
 
 	xpcontroller "github.com/crossplane/crossplane-runtime/pkg/controller"
+	tjcontroller "github.com/crossplane/upjet/pkg/controller"
 	"k8s.io/client-go/util/workqueue"
 	crcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// Options is a wrapper for merging controller specific options to generic xp controller options.
-type Options struct {
+// RuntimeOptionsGenerator abstracts the generation of controller-runtime options from native xp options and upjet options
+type RuntimeOptionsGenerator interface {
+	ForControllerRuntime() crcontroller.Options
+	ForControllerRuntimeWithBackoff() crcontroller.Options
+}
+
+var _ RuntimeOptionsGenerator = CrossplaneOptions{}
+
+// CrossplaneOptions is a wrapper for adding more configuration on top of default xp controller options
+type CrossplaneOptions struct {
 	xpcontroller.Options
-	BaseBackoff time.Duration
-	MaxBackoff  time.Duration
+
+	BackoffBase time.Duration
+	BackoffMax  time.Duration
 }
 
 // ForControllerRuntime returns default controller-runtime options. Its basically just an alias.
-func ForControllerRuntime(o xpcontroller.Options) crcontroller.Options {
-	return o.ForControllerRuntime()
+func (co CrossplaneOptions) ForControllerRuntime() crcontroller.Options {
+	return co.ForControllerRuntime()
 }
 
 // ForControllerRuntimeWithBackoff returns controller-runtime options with an exponential backoff rate limiter.
-func ForControllerRuntimeWithBackoff(o Options) crcontroller.Options {
+func (co CrossplaneOptions) ForControllerRuntimeWithBackoff() crcontroller.Options {
+	// this is essentially replicated from xp default ForControllerRuntime() function. It should only add back configuration
 	recoverPanic := true
 	return crcontroller.Options{
-		MaxConcurrentReconciles: o.MaxConcurrentReconciles,
-		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](o.BaseBackoff, o.MaxBackoff),
+		MaxConcurrentReconciles: co.MaxConcurrentReconciles,
+		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](co.BackoffBase, co.BackoffMax),
+		RecoverPanic:            &recoverPanic,
+	}
+}
+
+var _ RuntimeOptionsGenerator = UpjetOptions{}
+
+// UpjetOptions is a wrapper for adding more configuration on top of upjet controller options
+type UpjetOptions struct {
+	tjcontroller.Options
+
+	BackoffBase time.Duration
+	BackoffMax  time.Duration
+}
+
+// ForControllerRuntime returns default controller-runtime options. Its basically just an alias.
+func (co UpjetOptions) ForControllerRuntime() crcontroller.Options {
+	return co.ForControllerRuntime()
+}
+
+// ForControllerRuntimeWithBackoff returns controller-runtime options with an exponential backoff rate limiter.
+func (co UpjetOptions) ForControllerRuntimeWithBackoff() crcontroller.Options {
+	// this is essentially replicated from xp default ForControllerRuntime() function. It should only add back configuration
+	recoverPanic := true
+	return crcontroller.Options{
+		MaxConcurrentReconciles: co.MaxConcurrentReconciles,
+		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](co.BackoffBase, co.BackoffMax),
 		RecoverPanic:            &recoverPanic,
 	}
 }

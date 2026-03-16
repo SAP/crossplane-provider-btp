@@ -13,7 +13,7 @@ import (
 )
 
 // Setup adds a controller that reconciles ServiceBinding managed resources.
-func Setup(mgr ctrl.Manager, o internalopts.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.ServiceBinding{}, v1alpha1.ServiceBindingGroupKind, v1alpha1.ServiceBindingGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 		tfConnector := newTfConnectorFn(kube)
 		return &connector{

@@ -13,7 +13,7 @@ import (
 )
 
 // Setup adds a controller that reconciles GlobalAccount managed resources.
-func Setup(mgr ctrl.Manager, o internalopts.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	return providerconfig.DefaultSetup(mgr, o, &oidcapisv1alpha1.KubeConfigGenerator{}, oidcapisv1alpha1.KubeConfigGeneratorGroupKind, oidcapisv1alpha1.KubeConfigGeneratorGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 		return &connector{
 			kube:         kube,

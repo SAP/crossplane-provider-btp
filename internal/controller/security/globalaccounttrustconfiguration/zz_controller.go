@@ -40,7 +40,7 @@ import (
 )
 
 // Setup adds a controller that reconciles GlobalaccountTrustConfiguration managed resources.
-func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	name := managed.ControllerName(v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind.String())
 	var initializers managed.InitializerChain
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
@@ -98,7 +98,7 @@ func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(internalopts.ForControllerRuntime(o.Options)).
+		WithOptions(o.ForControllerRuntimeWithBackoff()).
 		WithEventFilter(xpresource.DesiredStateChanged()).
 		Watches(&v1alpha1.GlobalaccountTrustConfiguration{}, eventHandler).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))

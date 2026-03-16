@@ -126,26 +126,30 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
-	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, enableManagementPolicies, enableExternalSecretStores, namespace, terraformVersion, providerSource, providerVersion)
+	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, backoffBase, backoffMax, enableManagementPolicies, enableExternalSecretStores, namespace, terraformVersion, providerSource, providerVersion)
 	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, backoffBase, backoffMax, enableManagementPolicies, enableExternalSecretStores, namespace)
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
 
-func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string, terraformVersion *string, providerSource *string, providerVersion *string) {
-	o := tjcontroller.Options{
-		Options: controller.Options{
-			Logger:                  log,
-			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
-			PollInterval:            pollInterval,
-			MaxConcurrentReconciles: 1,
-			Features:                &feature.Flags{},
+func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string, terraformVersion *string, providerSource *string, providerVersion *string) {
+	o := internalopts.UpjetOptions{
+		Options: tjcontroller.Options{
+			Options: controller.Options{
+				Logger:                  log,
+				GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
+				PollInterval:            pollInterval,
+				MaxConcurrentReconciles: 1,
+				Features:                &feature.Flags{},
+			},
+			Provider: config.GetProvider(),
+			// use the following WorkspaceStoreOption to enable the shared gRPC mode
+			// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
+			WorkspaceStore: terraform.NewWorkspaceStore(log),
+			SetupFn:        tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
 		},
-		Provider: config.GetProvider(),
-		// use the following WorkspaceStoreOption to enable the shared gRPC mode
-		// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
-		WorkspaceStore: terraform.NewWorkspaceStore(log),
-		SetupFn:        tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
+		BackoffBase: *backoffBase,
+		BackoffMax:  *backoffMax,
 	}
 
 	if *enableManagementPolicies {
@@ -181,7 +185,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
 func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string) {
-	co := internalopts.Options{
+	co := internalopts.CrossplaneOptions{
 		Options: controller.Options{
 			Logger:                  log,
 			MaxConcurrentReconciles: *maxReconcileRate,
@@ -189,8 +193,8 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
 			Features:                &feature.Flags{},
 		},
-		BaseBackoff: *backoffBase,
-		MaxBackoff:  *backoffMax,
+		BackoffBase: *backoffBase,
+		BackoffMax:  *backoffMax,
 	}
 
 	if *enableManagementPolicies {

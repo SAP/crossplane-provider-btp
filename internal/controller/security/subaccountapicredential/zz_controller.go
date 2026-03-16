@@ -40,7 +40,7 @@ import (
 )
 
 // Setup adds a controller that reconciles SubaccountApiCredential managed resources.
-func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	name := managed.ControllerName(v1alpha1.SubaccountApiCredential_GroupVersionKind.String())
 	var initializers managed.InitializerChain
 	for _, i := range o.Provider.Resources["btp_subaccount_api_credential"].InitializerFns {
@@ -98,7 +98,7 @@ func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(internalopts.ForControllerRuntime(o.Options)).
+		WithOptions(o.ForControllerRuntimeWithBackoff()).
 		WithEventFilter(xpresource.DesiredStateChanged()).
 		Watches(&v1alpha1.SubaccountApiCredential{}, eventHandler).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))

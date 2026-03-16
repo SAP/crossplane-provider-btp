@@ -27,8 +27,8 @@ import (
 
 // CustomSetup creates all Template controllers with the supplied logger and adds them to
 // the supplied manager.
-func CustomSetup(mgr ctrl.Manager, o internalopts.Options) error {
-	for _, setup := range []func(ctrl.Manager, internalopts.Options) error{
+func CustomSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
+	for _, setup := range []func(ctrl.Manager, internalopts.CrossplaneOptions) error{
 		globalaccount.Setup,
 		subaccount.Setup,
 		cloudfoundry.Setup,
