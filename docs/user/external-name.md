@@ -39,7 +39,7 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 - How to find:
 
   - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
-  - CLI: btp list services/instance --subaccount-id <subaccount-guid> (field: id)
+  - CLI: btp list services/instance --subaccount <subaccount-guid> (field: id)
 
 ### Subaccount
 
