@@ -2,6 +2,7 @@ package servicemanager
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SAP/xp-clifford/cli/export"
 	"github.com/SAP/xp-clifford/erratt"
@@ -12,15 +13,16 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
-func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
 	resourceName := si.GenerateK8sResourceName()
 	externalName := si.GetExternalName()
 	subAccountID := si.SubaccountID
 	instanceID := si.ID
-	bindingID := si.BindingID
+	instanceName := si.Name
 
 	serviceManager := yaml.NewResourceWithComment(
 		&v1beta1.ServiceManager{
@@ -41,11 +43,12 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 					},
 					WriteConnectionSecretToReference: &v1.SecretReference{
 						Name:      resourceName,
-						Namespace: DefaultSecretNamespace,
+						Namespace: resources.DefaultSecretNamespace,
 					},
 				},
 				ForProvider: v1beta1.ServiceManagerParameters{
-					SubaccountGuid: subAccountID,
+					SubaccountGuid:      subAccountID,
+					ServiceInstanceName: instanceName,
 				},
 			},
 		})
@@ -72,11 +75,17 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	if instanceID == "" {
 		serviceManager.AddComment(resources.WarnMissingInstanceId)
 	}
-	if bindingID == "" {
+	if len(si.BindingIDs) == 0 {
 		serviceManager.AddComment(resources.WarnMissingBindingId)
+	}
+	if len(si.BindingIDs) > 1 {
+		serviceManager.AddComment(fmt.Sprintf(resources.WarnTooManyBindingIDs, len(si.BindingIDs)))
 	}
 	if !si.Usable {
 		serviceManager.AddComment(resources.WarnServiceInstanceNotUsable)
+	}
+	if instanceName == "" {
+		serviceManager.AddComment(resources.WarnMissingInstanceName)
 	}
 
 	// Reference subaccount resource, if requested.
@@ -90,8 +99,9 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 	return serviceManager
 }
 
-func defaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, subaccountID string, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
-	resourceName := defaultServiceManagerResourceName(subaccountID)
+func convertDefaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+	resourceName := si.GenerateK8sResourceName()
+	subaccountID := si.SubaccountID
 
 	serviceManager := yaml.NewResourceWithComment(
 		&v1beta1.ServiceManager{
@@ -106,7 +116,7 @@ func defaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 				ResourceSpec: v1.ResourceSpec{
 					WriteConnectionSecretToReference: &v1.SecretReference{
 						Name:      resourceName,
-						Namespace: DefaultSecretNamespace,
+						Namespace: resources.DefaultSecretNamespace,
 					},
 				},
 				ForProvider: v1beta1.ServiceManagerParameters{
@@ -114,6 +124,9 @@ func defaultServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 				},
 			},
 		})
+
+	// Copy comments from the original resource.
+	serviceManager.CloneComment(si)
 
 	// Comment the resource out, if any of the required fields is missing.
 	if subaccountID == "" {

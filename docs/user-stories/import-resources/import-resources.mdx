@@ -1,0 +1,17 @@
+---
+sidebar_position: 0
+---
+
+# Import Existing BTP Resources
+
+The [BTP Resource Exporter](https://github.com/SAP/crossplane-provider-btp/blob/main/cmd/exporter/) is a CLI tool that helps you bring existing SAP BTP resources under Crossplane management. The approach is based on the "[Import Existing Resources](https://docs.crossplane.io/v2.2/guides/import-existing-resources/)" Crossplane documentation.
+
+Given an existing BTP global account, the exporter connects to it via the [BTP CLI](https://help.sap.com/docs/btp/btp-cli-command-reference/btp-cli-command-reference), discovers resources such as subaccounts, entitlements, service instances, etc., and generates ready-to-apply Crossplane manifests in YAML format. You can then review the output and gradually transition resources to full Crossplane management at your own pace.
+
+**Key capabilities:**
+
+- Interactive and non-interactive modes
+- Resource selection by ID or name pattern (regex)
+- Output to stdout or file
+
+For installation instructions, command reference, and usage examples, see the [BTP Resource Exporter User Guide](https://github.com/SAP/crossplane-provider-btp/blob/main/cmd/exporter/docs/user-guide.md).

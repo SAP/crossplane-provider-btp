@@ -23,6 +23,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 
 ## Generated Data Below
 
+### CloudFoundryEnvironment
+
+- Follows Standard: yes
+- Format: Environment Instance GUID (UUID format)
+- How to find:
+
+  - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
+  - CLI: Use BTP ClI: `btp list accounts/environment-instance`
+
 ### Directory
 
 - Follows Standard: yes
