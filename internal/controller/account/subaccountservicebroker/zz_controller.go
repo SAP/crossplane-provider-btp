@@ -36,6 +36,7 @@ import (
 
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	features "github.com/sap/crossplane-provider-btp/internal/features"
+	internallimiter "github.com/sap/crossplane-provider-btp/internal/ratelimiter"
 )
 
 // Setup adds a controller that reconciles SubaccountServiceBroker managed resources.
@@ -97,7 +98,7 @@ func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(o.ForControllerRuntime()).
+		WithOptions(internallimiter.ForControllerRuntime(o.Options)).
 		WithEventFilter(xpresource.DesiredStateChanged()).
 		Watches(&v1alpha1.SubaccountServiceBroker{}, eventHandler).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))

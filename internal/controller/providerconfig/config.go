@@ -18,6 +18,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	internallimiter "github.com/sap/crossplane-provider-btp/internal/ratelimiter"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -52,7 +53,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(o.ForControllerRuntime()).
+		WithOptions(internallimiter.ForControllerRuntime(o.Options)).
 		For(&v1alpha1.ProviderConfig{}).
 		Watches(&v1alpha1.ProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
 		WithEventFilter(resource.DesiredStateChanged()).

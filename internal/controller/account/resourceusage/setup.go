@@ -10,6 +10,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/providerconfig"
 
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	internallimiter "github.com/sap/crossplane-provider-btp/internal/ratelimiter"
 )
 
 const (
@@ -33,7 +34,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(o.ForControllerRuntime()).
+		WithOptions(internallimiter.ForControllerRuntime(o)).
 		For(&v1alpha1.ResourceUsage{}).
 		Watches(&v1alpha1.ResourceUsage{}, &EnqueueRequestForResourceUsage{}).
 		WithEventFilter(resource.DesiredStateChanged()).
