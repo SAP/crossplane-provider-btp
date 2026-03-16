@@ -6,21 +6,18 @@
 
 ## About this project
 
-`crossplane-provider-btp` is a [Crossplane](https://crossplane.io/) provider that handles the orchestration of account related resources on [SAP Business Technology Platform](https://www.sap.com/products/technology-platform.html):
+**crossplane-provider-btp** is a [Crossplane](https://crossplane.io/) provider that handles the orchestration of account *(e.g. `Subaccount`, `Entitlements`, `ServiceInstances`...)* related resources on [SAP Business Technology Platform](https://www.sap.com/products/technology-platform.html):
 
-- Subaccount
-- User Management
-- Entitlements
-- Service Manager
-- Cloud Management
-- Environments
-- Service Instances & Bindings
+All available CRDs can be found in the [API reference](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp).
 
-Have a look on all available CRDs in the [API reference](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp).
-Check the documentation for more detailed information on available capabilities for different kinds.
+## 📆 Roadmap
 
-You can find upcoming features in our Roadmap project.
-- https://github.com/orgs/SAP/projects/118
+This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/crossplane-provider-btp/issues). 
+
+We share our current activities on this **[Roadmap Board](https://github.com/orgs/SAP/projects/141/views/5)**
+
+Contribution and feedback are encouraged and always welcome. You will find our contribution enablement material here [*coming soon*](https://github.com/SAP/crossplane-provider-docs)
+
 
 ## 📊 Installation
 
@@ -333,12 +330,12 @@ python3 provider-config-setup.py \
 
 The credentials section of the service binding, which can be securely stored in SAP Vault or similar secrets manager.
 
-## 👐 Support, Feedback, Contributing
-If you have a question always feel free to reach out on our official crossplane slack channel:
+## 👐 Support, Feedback
+If you have a question always feel free to reach out on our official crossplane slack channel: 
 
 :rocket: [**#provider-sap-btp**](https://crossplane.slack.com/archives/C07UZ3UJY7Q).
 
-This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/crossplane-provider-btp/issues). Contribution and feedback are encouraged and always welcome.
+💬 Also we are hosting an open community call and hope to see you there! Find more details [here](https://github.com/SAP/crossplane-provider-btp/discussions/515).
 
 For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 

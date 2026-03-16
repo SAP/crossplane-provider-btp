@@ -402,7 +402,7 @@ func (c *external) createBTPSubaccount(
 		Execute()
 	if err != nil {
 		// Check if error is "resource already exists"
-		if resp.StatusCode == http.StatusConflict {
+		if resp != nil && resp.StatusCode == http.StatusConflict {
 			// ADR: Do NOT set external-name, stay in error loop
 			// User must set external-name manually to resolve
 			return errors.Wrap(err, "creation failed - resource already exists. Please set external-name annotation to adopt the existing resource")
