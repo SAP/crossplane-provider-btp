@@ -15,25 +15,28 @@ func KymaEnvironmentType() EnvironmentType {
 	}
 }
 
-// First tries to get the environment by id, if not found, it tries to get it by name and type (legacy behaviour)
+// GetKymaEnvironment retrieves a Kyma environment using either UUID-based lookup (new format, >= v1.2.2)
+// or name-based lookup (legacy format, < v1.2.2).
+//
+// For UUID external-names: directly retrieves by ID, returns nil if not found (drift scenario).
+// For legacy name external-names: falls back to GetEnvironmentByNameAndType which lists and filters client-side.
 func (c *Client) GetKymaEnvironment(
 	ctx context.Context, Id string, instanceName string, environmentType EnvironmentType,
 ) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
-	// Try to get the environment by id first
-	environmentInstance, notFound, err := c.GetEnvironmentInstanceByID(ctx, Id)
-	if notFound {
-		// 404 is not an error - resource doesn't exist (drift scenario)
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	if environmentInstance != nil {
+	if internal.IsValidUUID(Id) {
+		// New format (>= v1.2.2): external-name is a UUID, use direct ID lookup
+		environmentInstance, notFound, err := c.GetEnvironmentInstanceByID(ctx, Id)
+		if notFound {
+			// 404 is not an error - resource doesn't exist (drift scenario)
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
 		return environmentInstance, nil
 	}
 
-	// If not found by id, try to get it by name and type
+	// Legacy format (< v1.2.2): external-name is the instance name, use name-based lookup
 	return c.GetEnvironmentByNameAndType(ctx, instanceName, environmentType)
 }
 

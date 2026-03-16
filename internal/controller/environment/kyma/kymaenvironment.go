@@ -91,9 +91,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	// Validate external-name format - must be a valid UUID
-	if !internal.IsValidUUID(externalName) {
-		return managed.ExternalObservation{}, errors.New("external-name must be a valid UUID")
+	// Validate external-name format:
+	// - New format (>= v1.2.2): must be a valid UUID
+	// - Legacy format (< v1.2.2): must match the CR name
+	// Legacy external-names are automatically migrated to UUID format below
+	if !internal.IsValidUUID(externalName) && externalName != cr.Name {
+		return managed.ExternalObservation{}, errors.New("external-name must be a valid UUID or legacy name format (name)")
 	}
 
 	instance, err := c.client.DescribeInstance(ctx, *cr)
@@ -109,9 +112,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	// If the external name is not set yet (< v1.2.2), we set it to the ID of the environment and update it
+	// Migrate legacy external-name (< v1.2.2) to UUID format
+	// This happens when instance exists with a name-based external-name
 	if instance.Id != nil && *instance.Id != meta.GetExternalName(cr) {
 		meta.SetExternalName(cr, *instance.Id)
+		if err := c.kube.Update(ctx, cr); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, "failed to update external-name to GUID format")
+		}
 	}
 
 	lastModified := cr.Status.AtProvider.ModifiedDate
@@ -163,7 +170,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		ResourceExists:    true,
 		ResourceUpToDate:  true,
 		ConnectionDetails: details,
-		Diff:              diff, 
+		Diff:              diff,
 	}, nil
 }
 

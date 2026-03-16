@@ -28,6 +28,9 @@ func NewKymaEnvironments(btp btp.Client) *KymaEnvironments {
 	return &KymaEnvironments{btp: btp}
 }
 
+// DescribeInstance retrieves a Kyma environment instance using the external-name annotation.
+// Supports both UUID-based (>= v1.2.2) and name-based (< v1.2.2) external-name formats.
+// Returns nil if the instance doesn't exist (without error).
 func (c KymaEnvironments) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.KymaEnvironment,
@@ -38,6 +41,7 @@ func (c KymaEnvironments) DescribeInstance(
 		return nil, nil
 	}
 
+	// GetKymaEnvironment handles both UUID-based and legacy name-based lookups
 	environment, err := c.btp.GetKymaEnvironment(ctx, externalName, GetKymaEnvironmentName(cr), btp.KymaEnvironmentType())
 
 	if err != nil {
