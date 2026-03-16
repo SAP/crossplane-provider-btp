@@ -10,18 +10,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// maxExponentialBackoff is the maximum delay for the per-item exponential
-// backoff rate limiter used by all controllers in this provider.
-const maxExponentialBackoff = 120 * time.Second
+// Options is a wrapper for merging controller specific options to generic xp controller options.
+type Options struct {
+	xpcontroller.Options
+	BaseBackoff time.Duration
+	MaxBackoff  time.Duration
+}
 
-// ForControllerRuntime returns controller-runtime options equivalent to
-// [xpcontroller.Options.ForControllerRuntime], but with a maximum exponential
-// backoff of [maxExponentialBackoff] instead of the upstream default of 60s.
+// ForControllerRuntime returns default controller-runtime options. Its basically just an alias.
 func ForControllerRuntime(o xpcontroller.Options) crcontroller.Options {
+	return o.ForControllerRuntime()
+}
+
+// ForControllerRuntimeWithBackoff returns controller-runtime options with an exponential backoff rate limiter.
+func ForControllerRuntimeWithBackoff(o Options) crcontroller.Options {
 	recoverPanic := true
 	return crcontroller.Options{
 		MaxConcurrentReconciles: o.MaxConcurrentReconciles,
-		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, maxExponentialBackoff),
+		RateLimiter:             workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](o.BaseBackoff, o.MaxBackoff),
 		RecoverPanic:            &recoverPanic,
 	}
 }
