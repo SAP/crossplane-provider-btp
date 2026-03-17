@@ -208,12 +208,6 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotServiceInstance)
 	}
 
-	// ADR: User has added external-name annotation with the external resource identifier
-	// If external-name is set, this indicates an existing resource to be imported/adopted
-	if meta.GetExternalName(cr) != "" {
-		return managed.ExternalCreation{}, errors.New("cannot create: external-name already set. This resource appears to be managed/imported.")
-	}
-
 	// ADR: setting external-name not possible due to an async operation
 	// After creation, external-name will be populated by Observe() in the next reconciliation
 	// If creation fails with conflict, the AsyncOperation condition will be set by upjet's callback
