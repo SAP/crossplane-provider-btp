@@ -29,7 +29,7 @@ type CrossplaneOptions struct {
 
 // ForControllerRuntime returns default controller-runtime options. Its basically just an alias.
 func (co CrossplaneOptions) ForControllerRuntime() crcontroller.Options {
-	return co.ForControllerRuntime()
+	return co.Options.ForControllerRuntime()
 }
 
 // ForControllerRuntimeWithBackoff returns controller-runtime options with an exponential backoff rate limiter.
@@ -55,7 +55,7 @@ type UpjetOptions struct {
 
 // ForControllerRuntime returns default controller-runtime options. Its basically just an alias.
 func (co UpjetOptions) ForControllerRuntime() crcontroller.Options {
-	return co.ForControllerRuntime()
+	return co.Options.ForControllerRuntime()
 }
 
 // ForControllerRuntimeWithBackoff returns controller-runtime options with an exponential backoff rate limiter.
