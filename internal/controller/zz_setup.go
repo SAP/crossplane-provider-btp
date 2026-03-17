@@ -19,9 +19,10 @@ package controller
 import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
+
 	directoryentitlement "github.com/sap/crossplane-provider-btp/internal/controller/account/directoryentitlement"
 	subaccountservicebroker "github.com/sap/crossplane-provider-btp/internal/controller/account/subaccountservicebroker"
-	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	providerconfig "github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	globalaccounttrustconfiguration "github.com/sap/crossplane-provider-btp/internal/controller/security/globalaccounttrustconfiguration"
 	subaccountapicredential "github.com/sap/crossplane-provider-btp/internal/controller/security/subaccountapicredential"
