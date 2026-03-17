@@ -107,7 +107,6 @@ func convertCloudManagementResource(ctx context.Context, btpClient *btpcli.BtpCl
 }
 
 func convertDefaultCloudManagementResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
-	resourceID := si.GetID()
 	resourceName := si.GenerateK8sResourceName()
 	subAccountID := si.SubaccountID
 	smName := si.ServiceManagerName
@@ -141,9 +140,6 @@ func convertDefaultCloudManagementResource(ctx context.Context, btpClient *btpcl
 	cm.CloneComment(si)
 
 	// Comment the resource out, if any of the required fields is missing.
-	if resourceID == "" {
-		cm.AddComment(resources.WarnMissingInstanceId)
-	}
 	if subAccountID == "" {
 		cm.AddComment(resources.WarnMissingSubaccountGuid)
 	}

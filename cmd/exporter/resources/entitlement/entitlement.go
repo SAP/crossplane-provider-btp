@@ -254,9 +254,7 @@ func (e *entitlement) GenerateK8sResourceName() string {
 		return resources.UndefinedName
 	}
 
-	resourceName := fmt.Sprintf("%s-%s-%s", e.serviceName, e.planName, e.assignment.EntityID)
-
-	resourceName, err := resources.GenerateK8sResourceName("", resourceName, "")
+	resourceName, err := resources.GenerateK8sResourceName(e.assignment.EntityID, fmt.Sprintf("%s.%s", e.serviceName, e.planName))
 	if err != nil {
 		e.AddComment(fmt.Sprintf("cannot generate entitlement resource name: %s", err))
 	}

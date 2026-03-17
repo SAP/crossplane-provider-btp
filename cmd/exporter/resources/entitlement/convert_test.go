@@ -94,14 +94,14 @@ func TestConvertEntitlementResource(t *testing.T) {
 
 	svcName := "test-service"
 	planName := "standard"
-	planId := svcName + "-" + planName
-	subAccountUuid := "123e4567-e89b-12d3-a456-426614174000"
+	planId := svcName + "." + planName
+	subAccountUuid := "x123e4567-e89b-12d3-a456-42661417400"
 	typeSubaccount := "SUBACCOUNT"
 	typeDirectory := "DIRECTORY"
 	var amount float64 = 1
 	var parentAmount float64 = 10
 	var parentRemainingAmount float64 = 5
-	resourceName := planId + "-" + subAccountUuid
+	resourceName := planId + "." + subAccountUuid
 
 	tests := []struct {
 		name string
@@ -423,11 +423,11 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 
-	subAccountUuid := "123e4567-e89b-12d3-a456-426614174000"
+	subAccountUuid := "x23e4567-e89b-12d3-a456-42661417400"
 	svcName := "test-service"
 	planName := "standard"
-	planId := svcName + "-" + planName
-	resourceName := planId + "-" + subAccountUuid
+	planId := svcName + "." + planName
+	resourceName := planId + "." + subAccountUuid
 
 	tests := []struct {
 		name string

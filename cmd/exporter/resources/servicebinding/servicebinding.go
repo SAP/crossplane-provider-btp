@@ -143,6 +143,6 @@ func exportServiceInstance(ctx context.Context, btpClient *btpcli.BtpCli, sb *se
 
 	// Set Service Instance reference.
 	if siName != "" {
-		sb.ServiceInstanceName = siName
+		sb.ServiceInstanceK8sName = siName
 	}
 }
