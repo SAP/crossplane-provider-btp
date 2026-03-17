@@ -3,7 +3,6 @@ package servicemanager
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -11,6 +10,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -18,7 +18,7 @@ import (
 )
 
 // Setup adds a controller that reconciles GlobalAccount managed resources.
-func Setup(mgr ctrl.Manager, o controller.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	return providerconfig.DefaultSetup(
 		mgr,
 		o,
