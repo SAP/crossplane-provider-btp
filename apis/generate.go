@@ -37,7 +37,7 @@ limitations under the License.
 //go:generate go run ../cmd/generator/main.go ..
 
 // Inject custom ratelimiter settings on top of generated controllers
-//go:generate ../scripts/helpers/ctrl_inject_ratelimiter.sh
+//go:generate ../hack/helpers/ctrl_inject_ratelimiter.sh
 
 // Run e2e test generator
 //go:generate go run ../test/e2e/generator/main.go ..
