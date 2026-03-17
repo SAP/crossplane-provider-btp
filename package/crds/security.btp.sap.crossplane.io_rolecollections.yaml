@@ -144,6 +144,9 @@ spec:
                   name:
                     description: Name of the role collection
                     type: string
+                    x-kubernetes-validations:
+                    - message: name can't be updated once set
+                      rule: self == oldSelf
                   roles:
                     description: RoleReferences are the roles that are part of the
                       role collection

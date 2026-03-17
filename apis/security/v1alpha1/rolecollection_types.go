@@ -21,6 +21,7 @@ type RoleReference struct {
 // RoleCollectionParameters are the configurable fields of a RoleCollection
 type RoleCollectionParameters struct {
 	// Name of the role collection
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name can't be updated once set"
 	Name string `json:"name"`
 	// +kubebuilder:validation:Optional
 	Description *string `json:"description,omitempty"`
