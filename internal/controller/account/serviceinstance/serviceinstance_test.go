@@ -682,20 +682,21 @@ func TestCreate(t *testing.T) {
 				),
 			},
 		},
-		// ADR: external-name already set → user intends to import/adopt; Create must be blocked
-		"ExternalNameAlreadySet_BlocksCreate": {
-			reason: "should return error and not call the API when external-name is already set",
+		// ADR: external-name already set means the resource was not found by Observe() (e.g. externally deleted).
+		// Create() should proceed normally and recreate it.
+		"ExternalNameAlreadySet_ProceedsWithCreate": {
+			reason: "should proceed with creation when external-name is already set (resource not found by Observe)",
 			fields: fields{
-				client: &TfProxyMock{}, // create must NOT be called
+				client: &TfProxyMock{},
 			},
 			args: args{
 				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
 			},
 			want: want{
-				err: errors.New("cannot create: external-name already set. This resource appears to be managed/imported."),
+				err: nil,
 				cr: expectedServiceInstance(
 					withExternalName("550e8400-e29b-41d4-a716-446655440000"),
-					// No Creating condition — we return before cr.SetConditions
+					withConditions(xpv1.Creating()),
 				),
 			},
 		},
