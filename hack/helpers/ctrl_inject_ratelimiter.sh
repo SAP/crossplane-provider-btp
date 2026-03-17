@@ -4,6 +4,7 @@
 # so we amend this code afterwards
 set -euo pipefail
 
-find . -name "*.go" -print0 | xargs -0 perl -i -pe \
+find . -name "zz_controller.go" -print0 | xargs -0 perl -i -0777 -pe \
   's/o tjcontroller\.Options/o internalopts.UpjetOptions/g;
-   s/internalopts\.ForControllerRuntime\(o\.Options\)/o.ForControllerRuntimeWithBackoff()/g'
+   s/o\.ForControllerRuntime\(\)/o.ForControllerRuntimeWithBackoff()/g;
+   s/(ctrl "sigs\.k8s\.io\/controller-runtime")/$1\n\tinternalopts "github.com\/sap\/crossplane-provider-btp\/internal\/controller\/options"/ unless /internalopts "github\.com\/sap\/crossplane-provider-btp\/internal\/controller\/options"/;'

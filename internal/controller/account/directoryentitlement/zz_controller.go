@@ -32,8 +32,8 @@ import (
 	"github.com/crossplane/upjet/pkg/controller/handler"
 	"github.com/crossplane/upjet/pkg/terraform"
 	"github.com/pkg/errors"
-	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	ctrl "sigs.k8s.io/controller-runtime"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	features "github.com/sap/crossplane-provider-btp/internal/features"
