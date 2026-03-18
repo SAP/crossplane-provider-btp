@@ -22,7 +22,7 @@ func convertServiceBindingResource(ctx context.Context, btpClient *btpcli.BtpCli
 	externalName := sb.GetExternalName()
 	subaccountID := sb.SubaccountID
 	instanceID := sb.ServiceInstanceID
-	instanceName := sb.ServiceInstanceName
+	instanceName := sb.ServiceInstanceK8sName
 
 	// Create Entitlement with required fields first.
 	managedBinding := yaml.NewResourceWithComment(
