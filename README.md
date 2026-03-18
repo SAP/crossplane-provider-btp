@@ -207,12 +207,12 @@ To run the upgrade tests, you can use the following command:
 make upgrade-test
 ```
 
-> [!WARNING]  
+> [!WARNING]
 > Please be aware that as part of the upgrade tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/upgrade/testdata/baseCRs` after running the command. Make sure to not commit those changes into git.
 
 #### Required configuration
 
-> [!NOTE]  
+> [!NOTE]
 > The same environment variables as for the e2e tests are required:
 > `BTP_TECHNICAL_USER`, `CIS_CENTRAL_BINDING`, `CLI_SERVER_URL`, `GLOBAL_ACCOUNT`, `IDP_URL`, `SECOND_DIRECTORY_ADMIN_EMAIL`, `TECHNICAL_USER_EMAIL`
 
@@ -232,7 +232,7 @@ Version to which the upgrade should be performed, for example:
 v1.5.0
 ```
 
-> [!NOTE]  
+> [!NOTE]
 > The `UPGRADE_TEST_FROM_TAG` and `UPGRADE_TEST_TO_TAG` variables may be set to "local" to indicate that the current local build should be used as source or target version respectively.
 
 #### Optional configuration

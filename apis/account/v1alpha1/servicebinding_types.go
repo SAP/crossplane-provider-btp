@@ -149,6 +149,14 @@ type ServiceBindingStatus struct {
 // +kubebuilder:object:root=true
 
 // A ServiceBinding allows to manage a binding to a service instance in BTP
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: ServiceInstance GUID (UUID format)
+//   - How to find:
+//     - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Services → Instances and Subscriptions → Instances -> Select Service Binding for the given instance -> in the JSON document find uaa.clientsecret -> the prefix of the string up to the '$' character is the ServinceBinding ID
+//     - CLI: btp list services/bindings (field: id)
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

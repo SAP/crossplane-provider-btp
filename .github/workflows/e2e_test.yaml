@@ -66,14 +66,14 @@ jobs:
         with:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
-          
+
       - name: Set matrix with test names
         id: set-matrix
         run: |
           echo "test-names=$(grep -rh --include='**_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/e2e | sed 's/func //;s/(t \*testing.T)//' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
 
       - name: Print test names
-        run: | 
+        run: |
           echo "Test names: ${{ steps.set-matrix.outputs.test-names }}"
 
   e2e-test:
@@ -172,7 +172,7 @@ jobs:
   # required for test matrix status reporting. Ignores cleanup-e2e job failure/success.
   e2e-test-success:
     runs-on: ubuntu-latest
-    needs: 
+    needs:
       - prepare-matrix
       - e2e-test
     timeout-minutes: 1
@@ -180,11 +180,11 @@ jobs:
     steps:
       - name: Fail for failed prepare-matrix job
         if: |
-          needs.prepare-matrix.result == 'failure' || 
+          needs.prepare-matrix.result == 'failure' ||
           needs.prepare-matrix.result == 'cancelled'
         run: exit 1
       - name: Fail for failed matrix jobs
         if: |
-          needs.e2e-test.result == 'failure' || 
+          needs.e2e-test.result == 'failure' ||
           needs.e2e-test.result == 'cancelled'
         run: exit 1
