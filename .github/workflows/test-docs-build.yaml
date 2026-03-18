@@ -1,0 +1,28 @@
+name: Test Docs Hub Build
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+
+jobs:
+  test-docs-hub-build-pr:
+    if: github.event_name == 'pull_request'
+    uses: SAP/crossplane-provider-docs/.github/workflows/test-submodule-build.yml@main
+    with:
+      provider-repo: ${{ github.event.pull_request.head.repo.full_name }}
+      provider-ref: ${{ github.event.pull_request.head.sha }}
+      submodule-path: docs/crossplane-provider-btp
+
+  test-docs-hub-build-push:
+    if: github.event_name == 'push'
+    uses: SAP/crossplane-provider-docs/.github/workflows/test-submodule-build.yml@main
+    with:
+      provider-repo: ${{ github.repository }}
+      provider-ref: ${{ github.sha }}
+      submodule-path: docs/crossplane-provider-btp
