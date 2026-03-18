@@ -171,14 +171,12 @@ func (e *CloudFoundryEnvironment) GetExternalName() string {
 }
 
 func (e *CloudFoundryEnvironment) GenerateK8sResourceName() string {
-	name := e.GetDisplayName()
-	if name == "" || e.SubaccountGUID == "" {
+	if e.GetDisplayName() == "" || e.Labels.OrgName == "" || e.LandscapeLabel == "" {
 		return resources.UndefinedName
 	}
 
-	resourceName := fmt.Sprintf("%s-%s", name, e.SubaccountGUID)
-
-	resourceName, err := resources.GenerateK8sResourceName("", resourceName, "")
+	name := fmt.Sprintf("%s.%s.%s", e.GetDisplayName(), e.Labels.OrgName, e.LandscapeLabel)
+	resourceName, err := resources.GenerateK8sResourceName("", name)
 	if err != nil {
 		e.AddComment(fmt.Sprintf("cannot generate CF environment resource name: %s", err))
 	}
