@@ -38,7 +38,7 @@ func TestRoleCollectionImportFlow(t *testing.T) {
 							RoleTemplateAppId: "cis-local!b14",
 							RoleTemplateName:  "Subaccount_Viewer",
 							Name:              "Subaccount Viewer",
-						}
+						},
 					},
 				},
 				XSUAACredentialsReference: v1alpha1.XSUAACredentialsReference{
