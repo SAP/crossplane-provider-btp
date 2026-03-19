@@ -20,11 +20,11 @@ func TestConvertCloudFoundryEnvResource(t *testing.T) {
 	// Test data
 	envID := "1234-5678-9abc-def0-1234-5678-9abc-def0"
 	envName := "cf-environment-1"
-	subaccountGUID := "sa-12345678-1234-1234-1234-123456789abc"
+	subaccountGUID := "sa-12345678-1234-1234-1234-123456789"
 	landscapeLabel := "cf-eu10"
 	orgName := "my-cf-org"
 	cmName := "cloud-management-ref"
-	resourceName := envName + "-" + subaccountGUID
+	resourceName := envName + "." + orgName + "." + landscapeLabel
 
 	tests := []struct {
 		name  string
@@ -100,7 +100,7 @@ func TestConvertCloudFoundryEnvResource(t *testing.T) {
 							APIVersion: v1alpha1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resources.UndefinedName,
+							Name: resourceName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": envID,
 							},
@@ -117,14 +117,13 @@ func TestConvertCloudFoundryEnvResource(t *testing.T) {
 							ResourceSpec: v1.ResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resources.UndefinedName,
+									Name:      resourceName,
 									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 						},
 					})
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
-				rwc.AddComment(resources.WarnUndefinedResourceName)
 				return rwc
 			}(),
 		},
@@ -200,7 +199,7 @@ func TestConvertCloudFoundryEnvResource(t *testing.T) {
 							APIVersion: v1alpha1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: resources.UndefinedName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": envID,
 							},
@@ -217,12 +216,13 @@ func TestConvertCloudFoundryEnvResource(t *testing.T) {
 							ResourceSpec: v1.ResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resourceName,
+									Name:      resources.UndefinedName,
 									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 						},
 					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnMissingLandscapeLabel)
 				return rwc
 			}(),
@@ -248,7 +248,7 @@ func TestConvertCloudFoundryEnvResource(t *testing.T) {
 							APIVersion: v1alpha1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: resources.UndefinedName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": envID,
 							},
@@ -265,12 +265,13 @@ func TestConvertCloudFoundryEnvResource(t *testing.T) {
 							ResourceSpec: v1.ResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resourceName,
+									Name:      resources.UndefinedName,
 									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 						},
 					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnMissingOrgName)
 				return rwc
 			}(),

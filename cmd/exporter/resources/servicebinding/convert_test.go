@@ -22,9 +22,10 @@ func TestConvertServiceBindingResource(t *testing.T) {
 	bindingID := "aabbccdd-1234-5678-abcd-aabbccddeeff"
 	bindingName := "my-binding"
 	subaccountID := "123e4567-e89b-12d3-a456-426614174000"
-	instanceID := "987f6543-b21a-43c9-b321-876543210000"
-	instanceName := "my-instance-resource"
-	resourceName := fmt.Sprintf("%s-%s", bindingName, instanceID)
+	instanceID := "x987f6543-b21a-43c9-b321-87654321000"
+	instanceName := "my-instance"
+	instanceK8sName := "my-instance-resource"
+	resourceName := fmt.Sprintf("%s.%s.%s", bindingName, instanceName, bindingID)
 
 	tests := []struct {
 		name string
@@ -35,13 +36,14 @@ func TestConvertServiceBindingResource(t *testing.T) {
 			name: "all required fields present",
 			sb: &servicebindingbase.ServiceBinding{
 				ServiceBinding: &btpcli.ServiceBinding{
-					ID:                bindingID,
-					Name:              bindingName,
-					SubaccountID:      subaccountID,
-					ServiceInstanceID: instanceID,
+					ID:                  bindingID,
+					Name:                bindingName,
+					SubaccountID:        subaccountID,
+					ServiceInstanceID:   instanceID,
+					ServiceInstanceName: instanceName,
 				},
-				ServiceInstanceName: instanceName,
-				ResourceWithComment: yaml.NewResourceWithComment(nil),
+				ServiceInstanceK8sName: instanceK8sName,
+				ResourceWithComment:    yaml.NewResourceWithComment(nil),
 			},
 			want: yaml.NewResourceWithComment(
 				&v1alpha1.ServiceBinding{
@@ -66,7 +68,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 							SubaccountID:      &subaccountID,
 							ServiceInstanceID: &instanceID,
 							ServiceInstanceRef: &v1.Reference{
-								Name: instanceName,
+								Name: instanceK8sName,
 							},
 						},
 					},
@@ -76,13 +78,14 @@ func TestConvertServiceBindingResource(t *testing.T) {
 			name: "missing binding name",
 			sb: &servicebindingbase.ServiceBinding{
 				ServiceBinding: &btpcli.ServiceBinding{
-					ID:                bindingID,
-					Name:              "",
-					SubaccountID:      subaccountID,
-					ServiceInstanceID: instanceID,
+					ID:                  bindingID,
+					Name:                "",
+					SubaccountID:        subaccountID,
+					ServiceInstanceID:   instanceID,
+					ServiceInstanceName: instanceName,
 				},
-				ServiceInstanceName: instanceName,
-				ResourceWithComment: yaml.NewResourceWithComment(nil),
+				ServiceInstanceK8sName: instanceK8sName,
+				ResourceWithComment:    yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -108,7 +111,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 								SubaccountID:      &subaccountID,
 								ServiceInstanceID: &instanceID,
 								ServiceInstanceRef: &v1.Reference{
-									Name: instanceName,
+									Name: instanceK8sName,
 								},
 							},
 						},
@@ -122,13 +125,14 @@ func TestConvertServiceBindingResource(t *testing.T) {
 			name: "missing subaccount id",
 			sb: &servicebindingbase.ServiceBinding{
 				ServiceBinding: &btpcli.ServiceBinding{
-					ID:                bindingID,
-					Name:              bindingName,
-					SubaccountID:      "",
-					ServiceInstanceID: instanceID,
+					ID:                  bindingID,
+					Name:                bindingName,
+					SubaccountID:        "",
+					ServiceInstanceID:   instanceID,
+					ServiceInstanceName: instanceName,
 				},
-				ServiceInstanceName: instanceName,
-				ResourceWithComment: yaml.NewResourceWithComment(nil),
+				ServiceInstanceK8sName: instanceK8sName,
+				ResourceWithComment:    yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
 				empty := ""
@@ -155,7 +159,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 								SubaccountID:      &empty,
 								ServiceInstanceID: &instanceID,
 								ServiceInstanceRef: &v1.Reference{
-									Name: instanceName,
+									Name: instanceK8sName,
 								},
 							},
 						},
@@ -168,16 +172,62 @@ func TestConvertServiceBindingResource(t *testing.T) {
 			name: "missing service instance id",
 			sb: &servicebindingbase.ServiceBinding{
 				ServiceBinding: &btpcli.ServiceBinding{
-					ID:                bindingID,
-					Name:              bindingName,
-					SubaccountID:      subaccountID,
-					ServiceInstanceID: "",
+					ID:                  bindingID,
+					Name:                bindingName,
+					SubaccountID:        subaccountID,
+					ServiceInstanceID:   "",
+					ServiceInstanceName: instanceName,
 				},
-				ServiceInstanceName: instanceName,
-				ResourceWithComment: yaml.NewResourceWithComment(nil),
+				ServiceInstanceK8sName: instanceK8sName,
+				ResourceWithComment:    yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
 				empty := ""
+				rwc := yaml.NewResourceWithComment(
+					&v1alpha1.ServiceBinding{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.ServiceBindingKind,
+							APIVersion: v1alpha1.CRDGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": bindingID,
+							},
+						},
+						Spec: v1alpha1.ServiceBindingSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{
+									v1.ManagementActionObserve,
+								},
+							},
+							ForProvider: v1alpha1.ServiceBindingParameters{
+								Name:              bindingName,
+								SubaccountID:      &subaccountID,
+								ServiceInstanceID: &empty,
+								ServiceInstanceRef: &v1.Reference{
+									Name: instanceK8sName,
+								},
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnMissingInstanceId)
+				return rwc
+			}(),
+		},
+		{
+			name: "missing service instance name",
+			sb: &servicebindingbase.ServiceBinding{
+				ServiceBinding: &btpcli.ServiceBinding{
+					ID:                bindingID,
+					Name:              bindingName,
+					SubaccountID:      subaccountID,
+					ServiceInstanceID: instanceID,
+				},
+				ServiceInstanceK8sName: "",
+				ResourceWithComment:    yaml.NewResourceWithComment(nil),
+			},
+			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
 					&v1alpha1.ServiceBinding{
 						TypeMeta: metav1.TypeMeta{
@@ -199,52 +249,6 @@ func TestConvertServiceBindingResource(t *testing.T) {
 							ForProvider: v1alpha1.ServiceBindingParameters{
 								Name:              bindingName,
 								SubaccountID:      &subaccountID,
-								ServiceInstanceID: &empty,
-								ServiceInstanceRef: &v1.Reference{
-									Name: instanceName,
-								},
-							},
-						},
-					})
-				rwc.AddComment(resources.WarnMissingInstanceId)
-				rwc.AddComment(resources.WarnUndefinedResourceName)
-				return rwc
-			}(),
-		},
-		{
-			name: "missing service instance name",
-			sb: &servicebindingbase.ServiceBinding{
-				ServiceBinding: &btpcli.ServiceBinding{
-					ID:                bindingID,
-					Name:              bindingName,
-					SubaccountID:      subaccountID,
-					ServiceInstanceID: instanceID,
-				},
-				ServiceInstanceName: "",
-				ResourceWithComment: yaml.NewResourceWithComment(nil),
-			},
-			want: func() *yaml.ResourceWithComment {
-				rwc := yaml.NewResourceWithComment(
-					&v1alpha1.ServiceBinding{
-						TypeMeta: metav1.TypeMeta{
-							Kind:       v1alpha1.ServiceBindingKind,
-							APIVersion: v1alpha1.CRDGroupVersion.String(),
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
-							Annotations: map[string]string{
-								"crossplane.io/external-name": bindingID,
-							},
-						},
-						Spec: v1alpha1.ServiceBindingSpec{
-							ResourceSpec: v1.ResourceSpec{
-								ManagementPolicies: []v1.ManagementAction{
-									v1.ManagementActionObserve,
-								},
-							},
-							ForProvider: v1alpha1.ServiceBindingParameters{
-								Name:              bindingName,
-								SubaccountID:      &subaccountID,
 								ServiceInstanceID: &instanceID,
 								ServiceInstanceRef: &v1.Reference{
 									Name: "",
@@ -253,6 +257,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment(resources.WarnMissingInstanceName)
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				return rwc
 			}(),
 		},
@@ -260,13 +265,14 @@ func TestConvertServiceBindingResource(t *testing.T) {
 			name: "missing binding id (empty external name)",
 			sb: &servicebindingbase.ServiceBinding{
 				ServiceBinding: &btpcli.ServiceBinding{
-					ID:                "",
-					Name:              bindingName,
-					SubaccountID:      subaccountID,
-					ServiceInstanceID: instanceID,
+					ID:                  "",
+					Name:                bindingName,
+					SubaccountID:        subaccountID,
+					ServiceInstanceID:   instanceID,
+					ServiceInstanceName: instanceName,
 				},
-				ServiceInstanceName: instanceName,
-				ResourceWithComment: yaml.NewResourceWithComment(nil),
+				ServiceInstanceK8sName: instanceK8sName,
+				ResourceWithComment:    yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
 				rwc := yaml.NewResourceWithComment(
@@ -276,7 +282,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: resources.UndefinedName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": "",
 							},
@@ -292,11 +298,12 @@ func TestConvertServiceBindingResource(t *testing.T) {
 								SubaccountID:      &subaccountID,
 								ServiceInstanceID: &instanceID,
 								ServiceInstanceRef: &v1.Reference{
-									Name: instanceName,
+									Name: instanceK8sName,
 								},
 							},
 						},
 					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnMissingExternalName)
 				return rwc
 			}(),
@@ -304,13 +311,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 		{
 			name: "multiple missing fields",
 			sb: &servicebindingbase.ServiceBinding{
-				ServiceBinding: &btpcli.ServiceBinding{
-					ID:                "",
-					Name:              "",
-					SubaccountID:      "",
-					ServiceInstanceID: "",
-				},
-				ServiceInstanceName: "",
+				ServiceBinding:      &btpcli.ServiceBinding{},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
