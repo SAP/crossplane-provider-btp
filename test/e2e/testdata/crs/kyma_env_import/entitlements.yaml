@@ -2,7 +2,6 @@ apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: Entitlement
 metadata:
   name: kyma-azure-entitlement-import
-  namespace: default
 spec:
   forProvider:
     serviceName: kymaruntime
@@ -15,7 +14,6 @@ apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: Entitlement
 metadata:
   name: cis-local-entitlement-kyma-import
-  namespace: default
 spec:
   forProvider:
     serviceName: cis
