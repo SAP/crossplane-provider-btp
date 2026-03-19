@@ -46,6 +46,11 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
   - CLI: btp list accounts/directory (field: guid)
 
+### KubeConfigGenerator
+
+- Follows Standard: no - This resource does not support external name as it does not represent an external resource. Instead of using external name for importing, you can just create an instance of this resource.
+- Format: Not applicable
+
 ### KymaEnvironment
 
 - Follows Standard: yes
@@ -54,11 +59,6 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 
   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
   - CLI: Use BTP ClI: `btp list accounts/environment-instance`
-
-### KubeConfigGenerator
-
-- Follows Standard: no - This resource does not support external name as it does not represent an external resource. Instead of using external name for importing, you can just create an instance of this resource.
-- Format: Not applicable
 
 ### Subaccount
 
