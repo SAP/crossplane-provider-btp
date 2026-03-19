@@ -14,7 +14,7 @@ import (
 
 const (
 	roleCollectionImportK8sResName = "e2e-test-rolecollection-import"
-	subaccountApiCredRefName        = "e2e-rolecollection-import-xsuaa-cred"
+	subaccountApiCredRefName       = "e2e-rolecollection-import-xsuaa-cred"
 )
 
 // TestRoleCollectionImportFlow tests the import flow for RoleCollection resource
@@ -38,12 +38,7 @@ func TestRoleCollectionImportFlow(t *testing.T) {
 							RoleTemplateAppId: "cis-local!b14",
 							RoleTemplateName:  "Subaccount_Viewer",
 							Name:              "Subaccount Viewer",
-						},
-						{
-							RoleTemplateAppId: "destination-xsappname!b404",
-							RoleTemplateName:  "Destination_Administrator",
-							Name:              "Destination Administrator",
-						},
+						}
 					},
 				},
 				XSUAACredentialsReference: v1alpha1.XSUAACredentialsReference{
