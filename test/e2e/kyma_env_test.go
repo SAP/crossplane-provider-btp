@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"sigs.k8s.io/yaml"
+	"encoding/json"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
@@ -79,7 +79,7 @@ func TestKymaEnvironmentImportFlow(t *testing.T) {
 		"region":         "westeurope",
 		"administrators": []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
 	}
-	parametersYAML, err := yaml.Marshal(parameters)
+	parametersJSON, err := json.Marshal(parameters)
 	if err != nil {
 		t.Fatalf("failed to marshal parameters: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestKymaEnvironmentImportFlow(t *testing.T) {
 				ForProvider: v1alpha1.KymaEnvironmentParameters{
 					PlanName:   "azure",
 					Name:       &kymaImportName,
-					Parameters: runtime.RawExtension{Raw: parametersYAML},
+					Parameters: runtime.RawExtension{Raw: parametersJSON},
 				},
 				SubaccountRef: &xpv1.Reference{
 					Name: "kyma-import-test-subaccount",
