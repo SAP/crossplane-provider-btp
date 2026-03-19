@@ -1,5 +1,5 @@
 ---
-apiVersion: account.btp.sap.crossplane.io/v1alpha1
+apiVersion: account.btp.sap.crossplane.io/v1beta1
 kind: ServiceManager
 metadata:
   name: service-manager-kyma-extn
@@ -12,7 +12,7 @@ spec:
     subaccountRef:
       name: upgrade-test-kyma-extn-sa
 ---
-apiVersion: account.btp.sap.crossplane.io/v1alpha1
+apiVersion: account.btp.sap.crossplane.io/v1beta1
 kind: CloudManagement
 metadata:
   name: cis-local-kyma-extn
