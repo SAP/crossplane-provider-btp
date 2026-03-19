@@ -8,9 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"sigs.k8s.io/yaml"
+
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 
 	meta "github.com/sap/crossplane-provider-btp/apis"
@@ -71,14 +74,23 @@ func TestKymaEnvironmentImportFlow(t *testing.T) {
 
 	kymaImportName := "e2e-kyma-import-test"
 
+	// Prepare parameters as RawExtension
+	parameters := map[string]interface{}{
+		"region":         "westeurope",
+		"administrators": []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
+	}
+	parametersYAML, err := yaml.Marshal(parameters)
+	if err != nil {
+		t.Fatalf("failed to marshal parameters: %v", err)
+	}
+
 	importTester := NewImportTester(
 		&v1alpha1.KymaEnvironment{
 			Spec: v1alpha1.KymaEnvironmentSpec{
 				ForProvider: v1alpha1.KymaEnvironmentParameters{
-					PlanName:       "azure",
-					Name:           &kymaImportName,
-					Region:         Ptr("westeurope"),
-					Administrators: []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
+					PlanName:   "azure",
+					Name:       &kymaImportName,
+					Parameters: runtime.RawExtension{Raw: parametersYAML},
 				},
 				SubaccountRef: &xpv1.Reference{
 					Name: "kyma-import-test-subaccount",
