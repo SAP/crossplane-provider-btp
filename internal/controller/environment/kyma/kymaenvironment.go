@@ -105,7 +105,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errCantDescribe)
 	}
 
-	// If instance not found (nil), it's a drift scenario - resource was deleted externally
+	// If instance not found (nil), it's a drift scenario - resource was deleted externally or user defined external-name does not relate to an external resource
 	if instance == nil {
 		return managed.ExternalObservation{
 			ResourceExists: false,
