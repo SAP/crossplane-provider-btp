@@ -83,7 +83,7 @@ func TestKymaEnvironmentImportFlow(t *testing.T) {
 						Object: &unstructured.Unstructured{
 							Object: map[string]any{
 								"region":         "westeurope",
-								"administrators": []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
+								"administrators": []any{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
 							},
 						},
 					},
