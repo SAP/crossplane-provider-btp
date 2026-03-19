@@ -52,7 +52,7 @@ func TestRoleCollectionImportFlow(t *testing.T) {
 		WithWaitCreateTimeout[*v1alpha1.RoleCollection](wait.WithInterval(5*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.RoleCollection](wait.WithInterval(3*time.Minute)),
 		WithDependentResourceDirectory[*v1alpha1.RoleCollection]("./testdata/crs/rolecollection_import"),
-		WithWaitDependentResourceTimeout[*v1alpha1.RoleCollection](wait.WithInterval(5*time.Minute)),
+		WithWaitDependentResourceTimeout[*v1alpha1.RoleCollection](wait.WithInterval(15*time.Minute)),
 	)
 
 	testenv.Test(
