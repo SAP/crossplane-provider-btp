@@ -33,13 +33,14 @@ import (
 	"github.com/crossplane/upjet/pkg/terraform"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	features "github.com/sap/crossplane-provider-btp/internal/features"
 )
 
 // Setup adds a controller that reconciles SubaccountApiCredential managed resources.
-func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	name := managed.ControllerName(v1alpha1.SubaccountApiCredential_GroupVersionKind.String())
 	var initializers managed.InitializerChain
 	for _, i := range o.Provider.Resources["btp_subaccount_api_credential"].InitializerFns {
@@ -97,7 +98,7 @@ func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(o.ForControllerRuntime()).
+		WithOptions(o.ForControllerRuntimeWithBackoff()).
 		WithEventFilter(xpresource.DesiredStateChanged()).
 		Watches(&v1alpha1.SubaccountApiCredential{}, eventHandler).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))

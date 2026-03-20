@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/SAP/xp-clifford/yaml"
-
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebindingbase"
@@ -117,6 +117,10 @@ type ServiceInstance struct {
 	PlanName           string
 	ServiceManagerName string
 
+	// UseSubaccountID is explicitly set to true, if subaccount ID must be used instead of instance ID.
+	// Used in particular for generation of k8s resource names.
+	UseSubaccountID bool
+
 	// Binding ID is part of the external name for service manager and cloud manager instances.
 	// So, it is required for correct export of those services.
 	// TODO: revisit after https://github.com/SAP/crossplane-provider-btp/issues/427 is implemented.
@@ -171,16 +175,28 @@ func (si *ServiceInstance) cloudManagementExternalName() string {
 }
 
 func (si *ServiceInstance) GenerateK8sResourceName() string {
-	name := si.GetDisplayName()
-	saID := si.SubaccountID
-	if name == "" || saID == "" {
+	if si.GetDisplayName() == "" {
 		return resources.UndefinedName
 	}
 
-	resourceName := fmt.Sprintf("%s-%s", name, saID)
-	resourceName, err := resources.GenerateK8sResourceName("", resourceName, "")
+	var id string
+	if si.UseSubaccountID {
+		id = si.SubaccountID
+	} else {
+		id = si.GetID()
+	}
+	if id == "" {
+		return resources.UndefinedName
+	}
+
+	resourceName, err := resources.GenerateK8sResourceName(id, si.GetDisplayName())
 	if err != nil {
 		si.AddComment(fmt.Sprintf("cannot generate resource name: %s", err))
+	}
+
+	if !si.IsServiceManager() && !si.IsCloudManagement() {
+		// Dot as delimiter looks nice, but dot isn't allowed in terraform resource names (upjet).
+		resourceName = strings.ReplaceAll(resourceName, ".", "-")
 	}
 
 	return resourceName

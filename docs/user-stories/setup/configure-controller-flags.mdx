@@ -1,0 +1,79 @@
+---
+sidebar_position: 4
+---
+
+# Advanced: Configure Controller Flags
+
+The BTP provider exposes a set of controller flags that let you tune reconciliation behavior — for example, how aggressively the provider retries failed operations or how often it checks for drift. 
+These flags are passed as arguments to the provider's container process and can be configured via a [`DeploymentRuntimeConfig`](https://docs.crossplane.io/latest/packages/providers/#runtime-configuration).
+
+## Available Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--sync` / `-s` | `1h` | How often **all** resources are re-checked for drift from the desired state (full sync interval). |
+| `--poll` | `1m` | How often **individual** resources are checked for drift from the desired state. |
+| `--max-reconcile-rate` | `3` | Global maximum number of resources reconciled per second. |
+| `--backoff-base` | `1s` | Base duration for exponential backoff when a reconcile fails. The wait time after the first failure. |
+| `--backoff-max` | `60s` | Maximum duration for exponential backoff. The wait time will never exceed this value, regardless of how many failures have occurred. |
+| `--leader-election` / `-l` | `false` | Enable leader election for the controller manager. Can also be set via the `LEADER_ELECTION` environment variable. |
+| `--debug` / `-d` | `false` | Run with debug logging. |
+
+### Exponential Backoff Details
+
+The `--backoff-base` and `--backoff-max` flags control how the provider handles transient errors. When a reconciliation fails, the provider waits before retrying using an exponential backoff strategy:
+
+- After the 1st failure: waits approximately `--backoff-base`
+- Each subsequent failure doubles the wait time
+- The wait time is capped at `--backoff-max`
+
+Tuning these values is useful when:
+- The BTP API is rate-limiting your requests (increase `--backoff-base` and `--backoff-max`)
+- You want faster recovery from transient errors in a low-traffic environment (decrease `--backoff-base`)
+
+## Configure Flags via a `DeploymentRuntimeConfig`
+
+Crossplane manages the provider's `Deployment` directly. To pass custom arguments to the provider container, use a [`DeploymentRuntimeConfig`](https://docs.crossplane.io/latest/packages/providers/#runtime-configuration) to override the container's `args`.
+
+### Example
+
+The following example configures a slower poll interval and a more conservative backoff strategy, which is useful when the provider manages a large number of resources or when the BTP API enforces strict rate limits.
+
+1. Create and apply `DeploymentRuntimeConfig`:
+
+    ```yaml title="provider-btp-runtime-config.yaml"
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    metadata:
+      name: provider-btp-runtime
+      namespace: crossplane-system
+    spec:
+      deploymentTemplate:
+        spec:
+          selector: {}
+          template:
+            spec:
+              containers:
+                - name: package-runtime
+                  args:
+                    - --sync=2h
+                    - --poll=5m
+                    - --max-reconcile-rate=5
+                    - --backoff-base=5s
+                    - --backoff-max=120s
+    ```
+
+2. Reference the `DeploymentRuntimeConfig` from your `Provider` resource:
+
+    ```yaml title="provider-btp.yaml"
+    apiVersion: pkg.crossplane.io/v1
+    kind: Provider
+    metadata:
+      name: provider-btp
+    spec:
+      package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<version>
+      runtimeConfigRef:
+        name: provider-btp-runtime
+    ```
+
+    Replace `<version>` with the desired provider version, e.g. `v1.3.0`.

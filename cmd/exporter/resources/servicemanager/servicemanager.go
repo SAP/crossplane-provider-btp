@@ -106,11 +106,12 @@ func getServiceOperator(ctx context.Context, btpClient *btpcli.BtpCli, subaccoun
 func defaultServiceManager(subaccountID string) *serviceinstancebase.ServiceInstance {
 	return &serviceinstancebase.ServiceInstance{
 		ServiceInstance: &btpcli.ServiceInstance{
-			ID:           fmt.Sprintf("%s-%s", defaultNamePrefix, subaccountID),
 			Name:         defaultNamePrefix,
 			SubaccountID: subaccountID,
 			Usable:       true,
 		},
+		OfferingName:        serviceinstancebase.ServiceManagerOffering,
+		UseSubaccountID:     true,
 		ResourceWithComment: yaml.NewResourceWithComment(nil),
 	}
 }

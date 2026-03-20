@@ -18,9 +18,9 @@ var fullCache resources.ResourceCache[*ServiceBinding]
 type ServiceBinding struct {
 	*btpcli.ServiceBinding
 	*yaml.ResourceWithComment
-	// ServiceInstanceName is the K8s resource name of the parent service instance,
+	// ServiceInstanceK8sName is the K8s resource name of the parent service instance,
 	// resolved during export and used as a reference in the generated manifest.
-	ServiceInstanceName string
+	ServiceInstanceK8sName string
 }
 
 var _ resources.BtpResource = &ServiceBinding{}
@@ -38,14 +38,11 @@ func (sb *ServiceBinding) GetExternalName() string {
 }
 
 func (sb *ServiceBinding) GenerateK8sResourceName() string {
-	sbName := sb.GetDisplayName()
-	siID := sb.ServiceInstanceID
-	if sbName == "" || siID == "" {
+	if sb.GetDisplayName() == "" || sb.GetID() == "" || sb.ServiceInstanceName == "" {
 		return resources.UndefinedName
 	}
 
-	resourceName := fmt.Sprintf("%s-%s", sbName, siID)
-	resourceName, err := resources.GenerateK8sResourceName("", resourceName, "")
+	resourceName, err := resources.GenerateK8sResourceName(sb.GetID(), fmt.Sprintf("%s.%s", sb.GetDisplayName(), sb.ServiceInstanceName))
 	if err != nil {
 		sb.AddComment(fmt.Sprintf("cannot generate resource name: %s", err))
 	}

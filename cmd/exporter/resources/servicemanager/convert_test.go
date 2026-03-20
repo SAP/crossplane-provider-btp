@@ -19,13 +19,14 @@ func TestConvertServiceManagerResource(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 
-	instanceID := "987f6543-b21a-43c9-b321-876543210000"
+	instanceID := "x987f6543-b21a-43c9-b321-87654321000"
 	bindingID := "456a7890-c12d-45e6-b987-654321098765"
 	instanceName := "service-manager-instance"
-	subAccountGuid := "123e4567-e89b-12d3-a456-426614174000"
+	subAccountGuid := "x123e4567-e89b-12d3-a456-42661417400"
 	smExternalName := fmt.Sprintf("%s/%s", instanceID, bindingID)
 	siExternalName := fmt.Sprintf("%s,%s", subAccountGuid, instanceID)
-	resourceName := fmt.Sprintf("%s-%s", instanceName, subAccountGuid)
+	resourceName := fmt.Sprintf("%s.%s", instanceName, instanceID)
+	siResourceName := fmt.Sprintf("%s-%s", instanceName, instanceID)
 
 	tests := []struct {
 		name string
@@ -95,7 +96,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							APIVersion: v1beta1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: siResourceName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": siExternalName,
 							},
@@ -106,7 +107,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 									v1.ManagementActionObserve,
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resourceName,
+									Name:      siResourceName,
 									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
@@ -141,7 +142,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							APIVersion: v1beta1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: resources.UndefinedName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": resources.UndefinedExternalName,
 							},
@@ -152,7 +153,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 									v1.ManagementActionObserve,
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resourceName,
+									Name:      resources.UndefinedName,
 									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
@@ -162,6 +163,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 						},
 					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnUndefinedExternalName)
 				rwc.AddComment(resources.WarnMissingInstanceId)
 				return rwc
@@ -328,7 +330,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							APIVersion: v1beta1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resources.UndefinedName,
+							Name: resourceName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": fmt.Sprintf("%s/%s", instanceID, bindingID),
 							},
@@ -339,7 +341,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 									v1.ManagementActionObserve,
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resources.UndefinedName,
+									Name:      resourceName,
 									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
@@ -350,7 +352,6 @@ func TestConvertServiceManagerResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
-				rwc.AddComment(resources.WarnUndefinedResourceName)
 				return rwc
 			}(),
 		},
@@ -483,8 +484,8 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 
-	subAccountGuid := "123e4567-e89b-12d3-a456-426614174000"
-	resourceName := fmt.Sprintf("%s-%s", defaultNamePrefix, subAccountGuid)
+	subAccountGuid := "x123e4567-e89b-12d3-a456-42661417400"
+	resourceName := fmt.Sprintf("%s.%s", defaultNamePrefix, subAccountGuid)
 
 	tests := []struct {
 		name         string

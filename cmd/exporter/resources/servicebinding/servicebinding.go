@@ -74,6 +74,11 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	// so that the full cache remains unchanged for other resources that might need it during their export.
 	cache := fc.Copy()
 
+	// If the user has already selected service instances, restrict bindings to those instances only.
+	if err := filterBySelectedInstances(ctx, btpClient, cache); err != nil {
+		return nil, fmt.Errorf("failed to filter service bindings: %w", err)
+	}
+
 	// Let the user select service bindings to export.
 	widgetValues := cache.ValuesForSelection()
 	bindingParam.WithPossibleValuesFn(func() ([]string, error) {
@@ -91,6 +96,33 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	selectedCache = cache
 
 	return selectedCache, nil
+}
+
+func filterBySelectedInstances(ctx context.Context, btpClient *btpcli.BtpCli, cache resources.ResourceCache[*servicebindingbase.ServiceBinding]) error {
+	siCache, err := serviceinstance.Get(ctx, btpClient)
+	if err != nil {
+		return fmt.Errorf("failed to get service instance cache: %w", err)
+	}
+	if siCache.Len() == 0 {
+		return nil
+	}
+
+	selectedInstanceIDs := make(map[string]bool, siCache.Len())
+	for _, id := range siCache.AllIDs() {
+		selectedInstanceIDs[id] = true
+	}
+
+	var bindingsToKeep []string
+	for _, sb := range cache.All() {
+		if selectedInstanceIDs[sb.ServiceInstanceID] {
+			bindingsToKeep = append(bindingsToKeep, sb.GetID())
+		}
+	}
+
+	cache.KeepSelectedOnly(bindingsToKeep)
+	slog.DebugContext(ctx, "Service bindings after filtering by selected service instances", "count", cache.Len())
+
+	return nil
 }
 
 func convert(ctx context.Context, btpClient *btpcli.BtpCli, sb *servicebindingbase.ServiceBinding, eventHandler export.EventHandler, resolveReferences bool) {
@@ -111,6 +143,6 @@ func exportServiceInstance(ctx context.Context, btpClient *btpcli.BtpCli, sb *se
 
 	// Set Service Instance reference.
 	if siName != "" {
-		sb.ServiceInstanceName = siName
+		sb.ServiceInstanceK8sName = siName
 	}
 }
