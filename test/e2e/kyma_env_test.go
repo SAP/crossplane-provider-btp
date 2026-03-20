@@ -8,10 +8,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 
 	meta "github.com/sap/crossplane-provider-btp/apis"
+	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -58,4 +63,47 @@ func TestKymaEnvironment(t *testing.T) {
 		Feature()
 
 	testenv.Test(t, crudFeature)
+}
+
+func TestKymaEnvironmentImportFlow(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping kyma import in short mode")
+		return
+	}
+
+	kymaImportName := "e2e-kyma-import-test"
+
+	importTester := NewImportTester(
+		&v1alpha1.KymaEnvironment{
+			Spec: v1alpha1.KymaEnvironmentSpec{
+				ForProvider: v1alpha1.KymaEnvironmentParameters{
+					PlanName: "azure",
+					Name:     &kymaImportName,
+					Parameters: runtime.RawExtension{
+						Object: &unstructured.Unstructured{
+							Object: map[string]any{
+								"region":         "westeurope",
+								"administrators": []any{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
+							},
+						},
+					},
+				},
+				SubaccountRef: &xpv1.Reference{
+					Name: "kyma-import-test-subaccount",
+				},
+				CloudManagementRef: &xpv1.Reference{
+					Name: "cis-local-kyma-import",
+				},
+			},
+		},
+		kymaImportName,
+		WithWaitDependentResourceTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(15*time.Minute)),
+		WithWaitCreateTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(50*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(50*time.Minute)),
+		WithDependentResourceDirectory[*v1alpha1.KymaEnvironment]("testdata/crs/kyma_env_import"),
+	)
+
+	importFeature := importTester.BuildTestFeature("BTP Kyma Environment Import Flow").Feature()
+
+	testenv.Test(t, importFeature)
 }
