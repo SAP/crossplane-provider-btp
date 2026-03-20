@@ -109,6 +109,14 @@ type RetryStatus struct {
 // +kubebuilder:object:root=true
 
 // A KymaEnvironment is a managed resource that represents a Kyma environment in the SAP Business Technology Platform
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: Environment Instance GUID (UUID format)
+//   - How to find:
+//   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
+//   - CLI: Use BTP ClI: `btp list accounts/environment-instance`
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
