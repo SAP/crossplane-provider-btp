@@ -2,6 +2,7 @@ package environments
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -16,7 +17,7 @@ import (
 const (
 	errKymaInstanceCreateFailed = "Could not create KymaEnvironment"
 	errKymaInstanceUpdateFailed = "Could not update KymaEnvironment"
-	errInstanceIdNotFound       = "Could not update kyma instance .status.AtProvider.Id is empty"
+	errExternalNameNotFound     = "external-name not set"
 )
 
 type KymaEnvironments struct {
@@ -27,28 +28,31 @@ func NewKymaEnvironments(btp btp.Client) *KymaEnvironments {
 	return &KymaEnvironments{btp: btp}
 }
 
+// DescribeInstance retrieves a Kyma environment instance using the external-name annotation.
+// Supports both UUID-based (>= v1.2.2) and name-based (< v1.2.2) external-name formats.
+// Returns nil if the instance doesn't exist (without error).
 func (c KymaEnvironments) DescribeInstance(
 	ctx context.Context,
 	cr v1alpha1.KymaEnvironment,
-) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	// If external-name is empty, resource needs to be created. Should be checked by the caller already
+	externalName := meta.GetExternalName(&cr)
+	if externalName == "" {
+		return nil, nil
+	}
 
-	environment, err := c.btp.GetEnvironment(ctx, meta.GetExternalName(&cr), GetKymaEnvironmentName(cr), btp.KymaEnvironmentType())
+	// GetKymaEnvironment handles both UUID-based and legacy name-based lookups
+	environment, err := c.btp.GetKymaEnvironment(ctx, externalName, GetKymaEnvironmentName(cr), btp.KymaEnvironmentType())
 
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	if environment == nil {
-		return nil, false, nil
+		return nil, nil
 	}
 
-	// If the external name is not set yet, we set it to the ID of the environment. And force an update.
-	if *environment.Id != meta.GetExternalName(&cr) {
-		meta.SetExternalName(&cr, *environment.Id)
-		return environment, true, nil
-	}
-
-	return environment, false, nil
+	return environment, nil
 }
 
 func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error) {
@@ -72,18 +76,24 @@ func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEn
 	return guid, nil
 }
 
-func (c KymaEnvironments) DeleteInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error {
-	if cr.Status.AtProvider.ID == nil {
-		return errors.New(errInstanceIdNotFound)
+// DeleteInstance deletes the Kyma environment using the external-name (GUID).
+// Returns the HTTP response for status code checking and any error.
+func (c KymaEnvironments) DeleteInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (*http.Response, error) {
+	externalName := meta.GetExternalName(&cr)
+
+	// Use external-name (GUID) for deletion
+	if externalName == "" {
+		return nil, errors.New(errExternalNameNotFound)
 	}
-	_, err := c.btp.DeleteEnvironmentInstanceByID(ctx, *cr.Status.AtProvider.ID)
-	return err
+
+	return c.btp.DeleteEnvironmentInstanceByID(ctx, externalName)
 }
 
 func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error {
+	externalName := meta.GetExternalName(&cr)
 
-	if cr.Status.AtProvider.ID == nil {
-		return errors.New(errInstanceIdNotFound)
+	if externalName == "" {
+		return errors.New(errExternalNameNotFound)
 	}
 
 	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
@@ -93,7 +103,7 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 	}
 	err = c.btp.UpdateKymaEnvironment(
 		ctx,
-		*cr.Status.AtProvider.ID,
+		externalName,
 		cr.Spec.ForProvider.PlanName,
 		parameters,
 		string(cr.UID),

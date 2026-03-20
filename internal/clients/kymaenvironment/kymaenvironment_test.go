@@ -16,38 +16,23 @@ import (
 )
 
 func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
+	// Valid UUID for testing GUID-based lookups
+	testUUID := "12345678-1234-1234-1234-123456789012"
+
 	tests := []struct {
 		name                string
 		mockEnvironmentsApi *fakes.MockProvisioningServiceClient
 		mockCr              v1alpha1.KymaEnvironment
 
-		wantErr        error
-		wantInitialize bool
-		wantResponse   *client.BusinessEnvironmentInstanceResponseObject
+		wantErr      error
+		wantResponse *client.BusinessEnvironmentInstanceResponseObject
 	}{
 		{
-			name: "APIerror",
-			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
-				Err:         errors.New("apiError"),
-				ApiResponse: nil,
-			},
-
-			wantErr: errors.New("apiError"),
-		},
-		{
-			name: "EmptyResponse",
-			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
-				Err:         nil,
-				ApiResponse: &client.BusinessEnvironmentInstancesResponseCollection{},
-			},
-			wantErr:      nil,
-			wantResponse: nil,
-		},
-		{
-			name: "SuccessByExternalNameLookup",
+			name: "EmptyExternalName",
 			mockCr: v1alpha1.KymaEnvironment{
 				ObjectMeta: v1.ObjectMeta{
-					Annotations: map[string]string{"crossplane.io/external-name": "1234"},
+					Name: "kyma",
+					// No external-name annotation
 				},
 			},
 			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
@@ -56,24 +41,72 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 					EnvironmentInstances: []client.BusinessEnvironmentInstanceResponseObject{
 						{
 							Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
-							Id:         internal.Ptr("1234"),
+							Id:         internal.Ptr(testUUID),
 						},
 					},
 				},
 			},
-			wantErr:        nil,
-			wantInitialize: false,
+			wantErr:      nil,
+			wantResponse: nil, // Empty external-name returns nil (needs creation)
+		},
+		{
+			name: "APIerror",
+			mockCr: v1alpha1.KymaEnvironment{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{"crossplane.io/external-name": testUUID},
+				},
+			},
+			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
+				Err:         errors.New("apiError"),
+				ApiResponse: nil,
+			},
+
+			wantErr: errors.New("apiError"),
+		},
+		{
+			name: "NotFoundByGUID",
+			mockCr: v1alpha1.KymaEnvironment{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{"crossplane.io/external-name": testUUID},
+				},
+			},
+			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
+				Err:         nil,
+				ApiResponse: &client.BusinessEnvironmentInstancesResponseCollection{},
+			},
+			wantErr:      nil,
+			wantResponse: nil, // 404 returns nil (drift scenario)
+		},
+		{
+			name: "SuccessByGUIDLookup",
+			mockCr: v1alpha1.KymaEnvironment{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{"crossplane.io/external-name": testUUID},
+				},
+			},
+			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
+				Err: nil,
+				ApiResponse: &client.BusinessEnvironmentInstancesResponseCollection{
+					EnvironmentInstances: []client.BusinessEnvironmentInstanceResponseObject{
+						{
+							Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
+							Id:         internal.Ptr(testUUID),
+						},
+					},
+				},
+			},
+			wantErr: nil,
 			wantResponse: &client.BusinessEnvironmentInstanceResponseObject{
 				Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
-				Id:         internal.Ptr("1234"),
+				Id:         internal.Ptr(testUUID),
 			},
 		},
 		{
-			name: "SuccessByNameAndTypeLookup",
+			name: "LegacyLookupByNameAndType",
 			mockCr: v1alpha1.KymaEnvironment{
 				ObjectMeta: v1.ObjectMeta{
 					Name:        "kyma",
-					Annotations: map[string]string{"crossplane.io/external-name": "kyma"},
+					Annotations: map[string]string{"crossplane.io/external-name": "kyma"}, // non-UUID triggers legacy lookup
 				},
 			},
 			mockEnvironmentsApi: &fakes.MockProvisioningServiceClient{
@@ -83,26 +116,26 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 						{
 							Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
 							Name:       internal.Ptr("kyma"),
-							Id:         internal.Ptr("1234"),
+							Id:         internal.Ptr(testUUID),
 							Type:       internal.Ptr(btp.KymaEnvironmentType().Identifier),
 						},
 					},
 				},
 			},
-			wantErr:        nil,
-			wantInitialize: true,
+			wantErr: nil,
 			wantResponse: &client.BusinessEnvironmentInstanceResponseObject{
 				Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
 				Name:       internal.Ptr("kyma"),
-				Id:         internal.Ptr("1234"),
+				Id:         internal.Ptr(testUUID),
 				Type:       internal.Ptr(btp.KymaEnvironmentType().Identifier),
 			},
 		},
 		{
-			name: "SuccessByForProviderName",
+			name: "LegacyLookupByForProviderName",
 			mockCr: v1alpha1.KymaEnvironment{
 				ObjectMeta: v1.ObjectMeta{
-					Name: "wrong-lookup-name",
+					Name:        "wrong-lookup-name",
+					Annotations: map[string]string{"crossplane.io/external-name": "right-lookup-name"}, // non-UUID triggers legacy lookup
 				},
 				Spec: v1alpha1.KymaEnvironmentSpec{
 					ForProvider: v1alpha1.KymaEnvironmentParameters{
@@ -117,18 +150,17 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 						{
 							Parameters: internal.Ptr("{\"name\":\"right-lookup-name\"}"),
 							Name:       internal.Ptr("right-lookup-name"),
-							Id:         internal.Ptr("1234"),
+							Id:         internal.Ptr(testUUID),
 							Type:       internal.Ptr(btp.KymaEnvironmentType().Identifier),
 						},
 					},
 				},
 			},
-			wantErr:        nil,
-			wantInitialize: true,
+			wantErr: nil,
 			wantResponse: &client.BusinessEnvironmentInstanceResponseObject{
 				Parameters: internal.Ptr("{\"name\":\"right-lookup-name\"}"),
 				Name:       internal.Ptr("right-lookup-name"),
-				Id:         internal.Ptr("1234"),
+				Id:         internal.Ptr(testUUID),
 				Type:       internal.Ptr(btp.KymaEnvironmentType().Identifier),
 			},
 		},
@@ -139,7 +171,7 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 				btp: btp.Client{ProvisioningServiceClient: tc.mockEnvironmentsApi},
 			}
 
-			res, lateInitialize, err := uut.DescribeInstance(context.TODO(), tc.mockCr)
+			res, err := uut.DescribeInstance(context.TODO(), tc.mockCr)
 
 			if diff := cmp.Diff(tc.wantErr, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\nGetEnvironment(...): -want error, +got error:\n%s\n", diff)
@@ -147,10 +179,6 @@ func TestEnvironmentsApiHandler_GetEnvironments(t *testing.T) {
 
 			if diff := cmp.Diff(tc.wantResponse, res); diff != "" {
 				t.Errorf("\nGetEnvironment(...): -want, +got:\n%s\n", diff)
-			}
-
-			if diff := cmp.Diff(tc.wantInitialize, lateInitialize, test.EquateErrors()); diff != "" {
-				t.Errorf("\nGetEnvironment(...): -want initialize, +got initialize:\n%s\n", diff)
 			}
 		})
 	}

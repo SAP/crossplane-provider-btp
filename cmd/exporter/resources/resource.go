@@ -2,6 +2,7 @@ package resources
 
 import (
 	"fmt"
+	"unicode"
 
 	"github.com/SAP/xp-clifford/parsan"
 )
@@ -44,23 +45,27 @@ type BtpResource interface {
 	GenerateK8sResourceName() string
 }
 
-func GenerateK8sResourceName(id, name, kind string) (string, error) {
-	resourceName := UndefinedName
-	hasId := id != ""
-	hasName := name != ""
-	hasKind := kind != ""
-
-	switch {
-	case hasName:
-		names := parsan.ParseAndSanitize(name, parsan.RFC1035LowerSubdomain)
-		if len(names) == 0 {
-			return UndefinedName, fmt.Errorf("cannot sanitize name: %s", name)
-		} else {
-			resourceName = names[0]
-		}
-	case hasId && hasKind:
-		resourceName = kind + "-" + id
+func GenerateK8sResourceName(guid, name string) (string, error) {
+	if name == "" {
+		return UndefinedName, nil
 	}
 
-	return resourceName, nil
+	candidate := name
+	if guid != "" {
+		// Resource name is a DNS subdomain name: subdomain := label("." label)*
+		// RFC 1123 label names must start with an alphabetic character
+		// See also https://kubernetes.io/docs/concepts/overview/working-with-objects/names/
+		candidate += "."
+		if unicode.IsDigit(rune(guid[0])) {
+			candidate += "x"
+		}
+		candidate += guid
+	}
+
+	names := parsan.ParseAndSanitize(candidate, parsan.RFC1035LowerSubdomain)
+	if len(names) == 0 {
+		return UndefinedName, fmt.Errorf("cannot sanitize name: %s", name)
+	}
+
+	return names[0], nil
 }

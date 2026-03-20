@@ -4,12 +4,12 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/providerconfig"
 
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 
 // Setup adds a controller that reconciles ResourceUsages by accounting for
 // their current usage.
-func Setup(mgr ctrl.Manager, o controller.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	name := providerconfig.ControllerName(v1alpha1.ResourceUsageGroupKind)
 
 	r := NewReconciler(
@@ -33,7 +33,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(o.ForControllerRuntime()).
+		WithOptions(o.ForControllerRuntimeWithBackoff()).
 		For(&v1alpha1.ResourceUsage{}).
 		Watches(&v1alpha1.ResourceUsage{}, &EnqueueRequestForResourceUsage{}).
 		WithEventFilter(resource.DesiredStateChanged()).
