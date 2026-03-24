@@ -1,0 +1,28 @@
+---
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: ServiceManager
+metadata:
+  name: service-manager-kyma-extn
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: service-manager-kyma-extn
+    namespace: default
+  forProvider:
+    subaccountRef:
+      name: upgrade-test-kyma-extn-sa
+---
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: CloudManagement
+metadata:
+  name: cis-local-kyma-extn
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: cis-local-kyma-extn
+    namespace: default
+  forProvider:
+    serviceManagerRef:
+      name: service-manager-kyma-extn
+    subaccountRef:
+      name: upgrade-test-kyma-extn-sa
