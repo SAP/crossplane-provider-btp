@@ -12,9 +12,6 @@ spec:
       - name: "Subaccount Viewer"
         roleTemplateAppId: "cis-local!b14"
         roleTemplateName: "Subaccount_Viewer"
-      - name: "Subaccount Admin"
-        roleTemplateAppId: "cis-local!b14"
-        roleTemplateName: "Subaccount_Admin"
   # Reference the SubaccountApiCredential managed resource
   # This automatically gets XSUAA credentials from the subaccount
   subaccountApiCredentialRef:
