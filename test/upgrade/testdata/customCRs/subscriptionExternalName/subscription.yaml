@@ -1,0 +1,13 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subscription
+metadata:
+  namespace: default
+  name: upgrade-test-extn-subscription
+spec:
+  forProvider:
+    appName: auditlog-viewer
+    planName: free
+    parameters:
+      key1: value1
+  cloudManagementRef:
+    name: upgrade-test-extn-subscription-cm

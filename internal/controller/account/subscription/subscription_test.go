@@ -50,14 +50,77 @@ func TestObserve(t *testing.T) {
 				err: errors.New(errNotSubscription),
 			},
 		},
-		"NoExternalName": {
-			reason: "When externalName isn't in expected format, it has never been created",
+		"EmptyExternalName": {
+			reason: "Empty external-name means resource doesn't exist yet (ADR compliance)",
 			args: args{
-				cr: NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("dir-unittests")),
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("")),
 			},
 			want: want{
 				o:  managed.ExternalObservation{ResourceExists: false},
-				cr: NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("dir-unittests")),
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("")),
+			},
+		},
+		"NoExternalName_NewResource": {
+			reason: "When externalName equals resource name and subscription doesn't exist, it needs creation",
+			args: args{
+				cr: NewSubscription("dir-unittests",
+					WithData(v1alpha1.SubscriptionSpec{
+						ForProvider: v1alpha1.SubscriptionParameters{
+							AppName:  "test-app",
+							PlanName: "test-plan",
+						},
+					}),
+					WithStatus(v1alpha1.SubscriptionObservation{}),
+					WithExternalName("dir-unittests")),
+				mockApiHandler: &MockApiHandler{
+					returnGet: nil, // Subscription doesn't exist
+					returnErr: nil,
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{ResourceExists: false},
+				cr: NewSubscription("dir-unittests",
+					WithData(v1alpha1.SubscriptionSpec{
+						ForProvider: v1alpha1.SubscriptionParameters{
+							AppName:  "test-app",
+							PlanName: "test-plan",
+						},
+					}),
+					WithStatus(v1alpha1.SubscriptionObservation{}),
+					WithExternalName("dir-unittests")),
+			},
+		},
+		"InvalidExternalNameFormat": {
+			reason: "Invalid external-name format should return error",
+			args: args{
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("invalid-format-without-slash")),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.Wrap(errors.New("invalid external-name format: invalid-format-without-slash, expected format: <appName>/<planName>"), "while loading subscription"),
+				cr:  NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("invalid-format-without-slash")),
+			},
+		},
+		"InvalidExternalNameFormatOnlySlash": {
+			reason: "Invalid external-name format with only slash should return error",
+			args: args{
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("/")),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.Wrap(errors.New("invalid external-name format: /, expected format: <appName>/<planName>"), "while loading subscription"),
+				cr:  NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("/")),
+			},
+		},
+		"InvalidExternalNameFormatEmptyParts": {
+			reason: "Invalid external-name format with empty parts should return error",
+			args: args{
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("appname/")),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.Wrap(errors.New("invalid external-name format: appname/, expected format: <appName>/<planName>"), "while loading subscription"),
+				cr:  NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("appname/")),
 			},
 		},
 		"APIErrorOnRead": {
@@ -302,7 +365,7 @@ func TestCreate(t *testing.T) {
 
 func TestRecreateOnFailed(t *testing.T) {
 	mockKube := testutils.NewFakeKubeClientBuilder().Build()
-	extName := "test-ext-name"
+	extName := "test-app/test-plan"
 	ctrl := external{
 		tracker: nil,
 		kube:    &mockKube,

@@ -68,3 +68,12 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 
   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
   - CLI: btp list accounts/subaccount (field: guid)
+
+### Subscription
+
+- Follows Standard: yes
+- Format: <appName>/<planName> (e.g., "auditlog-viewer/free")
+- How to find:
+
+  - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Application name and Plan
+  - API: Use SAP SaaS Provisioning Service API: GET /saas-manager/v1/applications

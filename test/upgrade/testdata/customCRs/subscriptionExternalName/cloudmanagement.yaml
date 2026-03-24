@@ -1,0 +1,9 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: CloudManagement
+metadata:
+  namespace: default
+  name: upgrade-test-extn-subscription-cm
+spec:
+  forProvider:
+    servicePlanType: local
+    subaccountId: $TEST_SUBACCOUNT_ID

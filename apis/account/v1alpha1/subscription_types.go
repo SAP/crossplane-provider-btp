@@ -80,7 +80,14 @@ type SubscriptionStatus struct {
 
 // A Subscription encodes a subscription of a subaccount to a service
 // It requires a references CloudManagement instance of plan type "local" to authenticate and map to subaccount.
-// To import a subscription use the pattern <app name>/<plan name> as externalName annotation
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: <appName>/<planName> (e.g., "auditlog-viewer/free")
+//   - How to find:
+//   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Application name and Plan
+//   - API: Use SAP SaaS Provisioning Service API: GET /saas-manager/v1/applications
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
@@ -106,7 +113,7 @@ type SubscriptionList struct {
 
 // Subscription type metadata.
 var (
-	SubscriptionKind             = reflect.TypeOf(Subscription{}).Name()
+	SubscriptionKind             = reflect.TypeFor[Subscription]().Name()
 	SubscriptionGroupKind        = schema.GroupKind{Group: CRDGroup, Kind: SubscriptionKind}.String()
 	SubscriptionKindAPIVersion   = SubscriptionKind + "." + CRDGroupVersion.String()
 	SubscriptionGroupVersionKind = CRDGroupVersion.WithKind(SubscriptionKind)
