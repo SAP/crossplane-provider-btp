@@ -116,7 +116,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	// Use external-name to query the API
+	// Use external-name to query the API. If the resource is not found, GenerateObservation will return with an empty name that will be later used in NeedsCreation.
 	obs, err := c.client.GenerateObservation(ctx, externalName)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetRolecollection)
@@ -124,7 +124,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	setObservation(cr, obs)
 
-	// If resource doesn't exist (404 case handled by client returning nil name), it's a drift
 	needsCreation := c.client.NeedsCreation(getObservation(cr))
 	if needsCreation {
 		return managed.ExternalObservation{
