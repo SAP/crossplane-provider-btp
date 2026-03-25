@@ -1,5 +1,5 @@
 #!/bin/bash
-# This script injects using a custom ratelimiter for backoff into upjet based controllers
+# This script injects using custom backoff settings into upjet based controllers
 # since the controller generation is part of upjet we can't do that while generating,
 # so we amend this code afterwards
 set -euo pipefail
