@@ -87,8 +87,12 @@ func (c EntitlementsClient) DeleteInstance(ctx context.Context, cr *v1alpha1.Ent
 	}
 
 	if isNumericQuota {
-		amount := 0
-		cr.Status.AtProvider.Required.Amount = &amount
+		// Only zero out if no other entitlements remain. If survivors exist,
+		// Required.Amount already holds the correct merged value from GenerateObservation.
+		if relatedEntitlements == nil || *relatedEntitlements == 0 {
+			amount := 0
+			cr.Status.AtProvider.Required.Amount = &amount
+		}
 	} else {
 		enabled := false
 		cr.Status.AtProvider.Required.Enable = &enabled
