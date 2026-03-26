@@ -1,0 +1,26 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: sub-import-test-cis-entitlement
+  namespace: default
+spec:
+  forProvider:
+    serviceName: cis
+    servicePlanName: local
+    enable: true
+    subaccountRef:
+      name: sub-import-sa-test
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: sub-import-test-auditlog-viewer-entitlement
+  namespace: default
+spec:
+  forProvider:
+    serviceName: auditlog-viewer
+    servicePlanName: free
+    enable: true
+    subaccountRef:
+      name: sub-import-sa-test
+

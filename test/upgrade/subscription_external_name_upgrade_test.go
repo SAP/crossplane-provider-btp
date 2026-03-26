@@ -7,28 +7,29 @@ import (
 	"strings"
 	"testing"
 
+	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
 	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 )
 
-func Test_Subscription_External_Name(t *testing.T) {
+func Test_Subscription_External_Name_Migration(t *testing.T) {
 	const subscriptionName = "upgrade-test-extn-subscription"
 
 	var (
-		fromCustomTag             = "v1.5.0" // Version before external name implementation
-		toCustomTag               = "main"   // Current version with external name support
+		fromCustomTag             = "v1.0.0"
+		toCustomTag               = "local"
 		customResourceDirectories = []string{
 			"./testdata/customCRs/subscriptionExternalName",
 		}
 	)
 
-	upgradeTest := NewCustomUpgradeTest("subscription-external-name-test").
+	upgradeTest := NewCustomUpgradeTest("subscription-external-name-migration-test").
 		FromVersion(fromCustomTag).
 		ToVersion(toCustomTag).
 		WithResourceDirectories(customResourceDirectories).
 		WithCustomPreUpgradeAssessment(
-			"verify external name before upgrade",
+			"verify external-name before upgrade (old format)",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				subscription := &accountv1alpha1.Subscription{}
 				r := cfg.Client().Resources()
@@ -39,26 +40,24 @@ func Test_Subscription_External_Name(t *testing.T) {
 				}
 
 				// Get the external name annotation
-				annotations := subscription.GetAnnotations()
-				externalName, exists := annotations["crossplane.io/external-name"]
+				externalName := xpmeta.GetExternalName(subscription)
+				klog.V(4).Infof("Pre-upgrade external-name: %s", externalName)
 
-				if !exists {
-					t.Fatal("External name annotation does not exist")
+				// Before upgrade, external-name should equal metadata.name (old default behavior)
+				if externalName != subscriptionName {
+					t.Logf("Warning: External-name '%s' doesn't match metadata.name '%s'. This might be expected if testing from a version that already has the fix.", externalName, subscriptionName)
 				}
 
-				klog.V(4).Infof("Pre-upgrade external name: %s", externalName)
+				// Store values for post-upgrade verification
+				ctx = context.WithValue(ctx, "preUpgradeExternalName", externalName)
+				ctx = context.WithValue(ctx, "appName", subscription.Spec.ForProvider.AppName)
+				ctx = context.WithValue(ctx, "planName", subscription.Spec.ForProvider.PlanName)
 
-				// Verify external name matches format <appName>/<planName>
-				if !isValidSubscriptionExternalName(externalName) {
-					t.Fatalf("External name '%s' does not match expected format <appName>/<planName>", externalName)
-				}
-
-				// Store the external name in context for post-upgrade verification
-				return context.WithValue(ctx, "preUpgradeExternalName", externalName)
+				return ctx
 			},
 		).
 		WithCustomPostUpgradeAssessment(
-			"verify external name after upgrade",
+			"verify external-name after upgrade (migrated to new format)",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				subscription := &accountv1alpha1.Subscription{}
 				r := cfg.Client().Resources()
@@ -68,34 +67,36 @@ func Test_Subscription_External_Name(t *testing.T) {
 					t.Fatalf("Failed to get Subscription resource: %v", err)
 				}
 
-				// Get the external name annotation
-				annotations := subscription.GetAnnotations()
-				externalName, exists := annotations["crossplane.io/external-name"]
+				// Get the external name annotation after upgrade
+				externalName := xpmeta.GetExternalName(subscription)
+				klog.V(4).Infof("Post-upgrade external-name: %s", externalName)
 
-				if !exists {
-					t.Fatal("External name annotation does not exist after upgrade")
-				}
+				// Retrieve pre-upgrade values from context
+				appName, _ := ctx.Value("appName").(string)
+				planName, _ := ctx.Value("planName").(string)
 
-				klog.V(4).Infof("Post-upgrade external name: %s", externalName)
+				// After upgrade, external-name should be in appName/planName format
+				expectedExternalName := appName + "/" + planName
 
-				// Verify external name matches format <appName>/<planName>
 				if !isValidSubscriptionExternalName(externalName) {
-					t.Fatalf("External name '%s' does not match expected format <appName>/<planName> after upgrade", externalName)
+					t.Fatalf("External-name '%s' does not match expected format <appName>/<planName> after upgrade", externalName)
 				}
 
-				// Verify external name hasn't changed during upgrade
-				preUpgradeExternalName, ok := ctx.Value("preUpgradeExternalName").(string)
-				if !ok {
-					t.Fatal("Could not retrieve pre-upgrade external name from context")
-				}
-
-				if externalName != preUpgradeExternalName {
+				// Verify it was migrated to the correct format
+				if externalName != expectedExternalName {
 					t.Fatalf(
-						"External name changed during upgrade. Before: %s, After: %s",
-						preUpgradeExternalName,
+						"External-name was not migrated correctly. Expected: %s, Got: %s",
+						expectedExternalName,
 						externalName,
 					)
 				}
+
+				// Verify the subscription is still healthy after migration
+				if subscription.Status.AtProvider.State == nil {
+					t.Fatal("Subscription state is nil after upgrade")
+				}
+
+				klog.V(4).Infof("Successfully verified external-name migration from old format to new format: %s", externalName)
 
 				return ctx
 			},

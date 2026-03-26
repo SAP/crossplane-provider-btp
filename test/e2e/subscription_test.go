@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	crossplane_meta "github.com/crossplane/crossplane-runtime/pkg/meta"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -187,4 +188,31 @@ func createSubscriptionAPI(t *testing.T, apiClient *saas_client.APIClient, exter
 	if err != nil {
 		t.Errorf("Cannot create subscription over API")
 	}
+}
+
+// TestSubscriptionImportWithTester tests the import flow using the generic ImportTester utility.
+// This validates that subscriptions can be imported using the external-name annotation with appName/planName format.
+func TestSubscriptionImportWithTester(t *testing.T) {
+	baseSubscription := &v1alpha1.Subscription{
+		Spec: v1alpha1.SubscriptionSpec{
+			ForProvider: v1alpha1.SubscriptionParameters{
+				AppName:  "auditlog-viewer",
+				PlanName: "free",
+			},
+			CloudManagementRef: &xpv1.Reference{
+				Name: "e2e-sub-import-tester-cis-local",
+			},
+		},
+	}
+
+	importTester := NewImportTester(
+		baseSubscription,
+		"sub-import-tester",
+		WithDependentResourceDirectory[*v1alpha1.Subscription]("testdata/crs/subscription/import_tester/environment"),
+		WithWaitCreateTimeout[*v1alpha1.Subscription](wait.WithTimeout(10*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.Subscription](wait.WithTimeout(7*time.Minute)),
+		WithWaitDependentResourceTimeout[*v1alpha1.Subscription](wait.WithTimeout(15*time.Minute)),
+	)
+
+	testenv.Test(t, importTester.BuildTestFeature("Subscription Import Flow with ImportTester").Feature())
 }
