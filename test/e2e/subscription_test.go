@@ -25,10 +25,6 @@ import (
 
 var (
 	subscriptionCreateName = "sub-test"
-
-	subscriptionImportName         = "sub-import-test"
-	subscriptionCisImportName      = "e2e-sub-import-cis-local"
-	subscriptionImportExternalName = "auditlog-viewer/free"
 )
 
 func TestSubscriptionCRUDFlow(t *testing.T) {
@@ -111,55 +107,28 @@ func TestSubscriptionCRUDFlow(t *testing.T) {
 }
 
 func TestSubscriptionImport(t *testing.T) {
-	crudFeatureSuite := features.New("Subscription Import Flow").
-		Setup(
-			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/subscription/import/environment")
-				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = meta_api.AddToScheme(r.GetScheme())
-
-				// The local cloudmanagement instance is the requirement for the next steps, so we wait for it to be healthy
-				waitForResource(&v1alpha1.CloudManagement{
-					ObjectMeta: metav1.ObjectMeta{Name: subscriptionCisImportName, Namespace: cfg.Namespace()},
-				}, cfg, t, wait.WithTimeout(15*time.Minute))
-
-				cis := &v1alpha1.CloudManagement{}
-				MustGetResource(t, cfg, subscriptionCisImportName, nil, cis)
-
-				apiClient := configureSaasProvisioningAPIClient(t, cfg, cis)
-				createSubscriptionAPI(t, apiClient, subscriptionImportExternalName)
-
-				return ctx
+	baseSubscription := &v1alpha1.Subscription{
+		Spec: v1alpha1.SubscriptionSpec{
+			ForProvider: v1alpha1.SubscriptionParameters{
+				AppName:  "auditlog-viewer",
+				PlanName: "free",
 			},
-		).
-		Assess(
-			"Check Imported Subscription gets healthy", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/subscription/import/resource")
-				waitForResource(&v1alpha1.Subscription{
-					ObjectMeta: metav1.ObjectMeta{Name: subscriptionImportName, Namespace: cfg.Namespace()},
-				}, cfg, t)
-
-				sub := &v1alpha1.Subscription{}
-				MustGetResource(t, cfg, subscriptionImportName, nil, sub)
-
-				if sub.Status.AtProvider.State == nil || *sub.Status.AtProvider.State != v1alpha1.SubscriptionStateSubscribed {
-					t.Error("Subscription State not as expected")
-				}
-				return ctx
+			CloudManagementRef: &xpv1.Reference{
+				Name: "e2e-sub-import-cis-local",
 			},
-		).Teardown(
-		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			sub := &v1alpha1.Subscription{}
-			MustGetResource(t, cfg, subscriptionImportName, nil, sub)
-
-			resources.AwaitResourceDeletionOrFail(ctx, t, cfg, sub)
-
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "subscription/import/environment", wait.WithTimeout(time.Minute*15))
-			return ctx
 		},
-	).Feature()
+	}
 
-	testenv.Test(t, crudFeatureSuite)
+	importTester := NewImportTester(
+		baseSubscription,
+		"sub-import-test",
+		WithDependentResourceDirectory[*v1alpha1.Subscription]("testdata/crs/subscription/import/environment"),
+		WithWaitCreateTimeout[*v1alpha1.Subscription](wait.WithTimeout(10*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.Subscription](wait.WithTimeout(7*time.Minute)),
+		WithWaitDependentResourceTimeout[*v1alpha1.Subscription](wait.WithTimeout(15*time.Minute)),
+	)
+
+	testenv.Test(t, importTester.BuildTestFeature("Subscription Import Flow").Feature())
 }
 
 func assertSubscriptionAPIExists(t *testing.T, apiClient *saas_client.APIClient, cr *v1alpha1.Subscription, expectExist bool) {
@@ -176,43 +145,4 @@ func assertSubscriptionAPIExists(t *testing.T, apiClient *saas_client.APIClient,
 	if !expectExist && response != nil && *response.State != v1alpha1.SubscriptionStateNotSubscribed {
 		t.Errorf("Error verifying not existing instance")
 	}
-}
-
-func createSubscriptionAPI(t *testing.T, apiClient *saas_client.APIClient, externalName string) {
-	fragments := strings.Split(externalName, "/")
-	_, err := apiClient.SubscriptionOperationsForAppConsumersAPI.
-		CreateSubscriptionAsync(context.TODO(), fragments[0]).
-		CreateSubscriptionRequestPayload(saas_client.CreateSubscriptionRequestPayload{PlanName: internal.Ptr(fragments[1])}).
-		Execute()
-
-	if err != nil {
-		t.Errorf("Cannot create subscription over API")
-	}
-}
-
-// TestSubscriptionImportWithTester tests the import flow using the generic ImportTester utility.
-// This validates that subscriptions can be imported using the external-name annotation with appName/planName format.
-func TestSubscriptionImportWithTester(t *testing.T) {
-	baseSubscription := &v1alpha1.Subscription{
-		Spec: v1alpha1.SubscriptionSpec{
-			ForProvider: v1alpha1.SubscriptionParameters{
-				AppName:  "auditlog-viewer",
-				PlanName: "free",
-			},
-			CloudManagementRef: &xpv1.Reference{
-				Name: "e2e-sub-import-tester-cis-local",
-			},
-		},
-	}
-
-	importTester := NewImportTester(
-		baseSubscription,
-		"sub-import-tester",
-		WithDependentResourceDirectory[*v1alpha1.Subscription]("testdata/crs/subscription/import_tester/environment"),
-		WithWaitCreateTimeout[*v1alpha1.Subscription](wait.WithTimeout(10*time.Minute)),
-		WithWaitDeletionTimeout[*v1alpha1.Subscription](wait.WithTimeout(7*time.Minute)),
-		WithWaitDependentResourceTimeout[*v1alpha1.Subscription](wait.WithTimeout(15*time.Minute)),
-	)
-
-	testenv.Test(t, importTester.BuildTestFeature("Subscription Import Flow with ImportTester").Feature())
 }
