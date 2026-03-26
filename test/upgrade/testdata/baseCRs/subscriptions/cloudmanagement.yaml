@@ -6,4 +6,5 @@ metadata:
 spec:
   forProvider:
     servicePlanType: local
-    subaccountId: $TEST_SUBACCOUNT_ID
+    subaccountRef:
+      name: upgrade-test-subscription-sa
