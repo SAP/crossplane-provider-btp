@@ -85,8 +85,8 @@ type SubscriptionStatus struct {
 //   - Follows Standard: yes
 //   - Format: <appName>/<planName> (e.g., "auditlog-viewer/free")
 //   - How to find:
-//   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Application name and Plan
-//   - API: Use SAP SaaS Provisioning Service API: GET /saas-manager/v1/applications
+//   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → [Select Subscription] → Application Technical Name and Plan
+//   - CLI: `btp list accounts/subscription` fields `app name` and `plan name`
 //
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
