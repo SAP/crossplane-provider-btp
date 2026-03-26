@@ -129,6 +129,20 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotSubscription)
 	}
+	externalName := meta.GetExternalName(cr)
+	if externalName == cr.Name {
+		// Set correct external-name format for import/observe scenarios
+		if isObserveOnly(cr) && cr.Spec.ForProvider.AppName != "" && cr.Spec.ForProvider.PlanName != "" {
+			expectedExternalName := fmt.Sprintf("%s/%s", cr.Spec.ForProvider.AppName, cr.Spec.ForProvider.PlanName)
+			return managed.ExternalObservation{}, errors.Errorf(
+				"For Observe-only Subscriptions, external-name must be set to 'appName/planName' format. "+
+					"Found: '%s'. Expected: '%s'. "+
+					"Please set the annotation: crossplane.io/external-name: \"%s\"",
+				externalName, expectedExternalName, expectedExternalName,
+			)
+
+		}
+	}
 
 	apiRes, err := c.loadSubscription(ctx, cr)
 	if err != nil {
@@ -259,4 +273,19 @@ func (c *external) shouldRecreateOnFailure(cr *v1alpha1.Subscription, apiRes *su
 		}
 	}
 	return false
+}
+
+func isObserveOnly(cr *v1alpha1.Subscription) bool {
+	if len(cr.Spec.ManagementPolicies) == 0 {
+		return false // default is full management
+	}
+	for _, policy := range cr.Spec.ManagementPolicies {
+		if policy == xpv1.ManagementActionCreate {
+			return false // allowed to create
+		}
+		if policy == xpv1.ManagementActionAll {
+			return false // allowed to create
+		}
+	}
+	return true // only Observe/Update/Delete, no Create
 }
