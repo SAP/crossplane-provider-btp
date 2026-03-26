@@ -83,7 +83,7 @@ type SubscriptionStatus struct {
 //
 // External-Name Configuration:
 //   - Follows Standard: yes
-//   - Format: <appName>/<planName> (e.g., "auditlog-viewer/free")
+//   - Format: `<appName>/<planName>`
 //   - How to find:
 //   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → [Select Subscription] → Application Technical Name and Plan
 //   - CLI: `btp list accounts/subscription` fields `app name` and `plan name`
