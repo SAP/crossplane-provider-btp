@@ -170,8 +170,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			Status:             corev1.ConditionFalse,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "DriftDetected",
-			//Message:            fmt.Sprintf("Drift detected: %s", truncateDiff(diff, 500)),
-			Message: fmt.Sprintf("Drift detected: %s", diff),
+			Message:            fmt.Sprintf("Drift detected: %s", diff),
 		})
 
 		return managed.ExternalObservation{
