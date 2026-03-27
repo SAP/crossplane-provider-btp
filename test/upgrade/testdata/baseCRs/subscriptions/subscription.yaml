@@ -10,4 +10,4 @@ spec:
     parameters:
       key1: value1
   cloudManagementRef:
-    name: upgrade-test-extn-subscription-cm
+    name: cis-local-upgrade-subscription
