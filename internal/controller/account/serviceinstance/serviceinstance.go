@@ -238,14 +238,12 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 func (e *external) checkAsyncOperationFailure(cr *v1alpha1.ServiceInstance) bool {
 	lastAsyncOp := cr.GetCondition(xpv1.ConditionType("LastAsyncOperation"))
 	if lastAsyncOp.Status == corev1.ConditionFalse && lastAsyncOp.Reason == "ApplyFailure" {
-		cr.SetConditions(xpv1.Unavailable().WithMessage(lastAsyncOp.Message))
 		return true
 	}
 
 	// Also check AsyncOperation as fallback
 	asyncOp := cr.GetCondition(ujresource.TypeAsyncOperation)
 	if asyncOp.Status == corev1.ConditionFalse && asyncOp.Reason == "ApplyFailure" {
-		cr.SetConditions(xpv1.Unavailable().WithMessage(asyncOp.Message))
 		return true
 	}
 
