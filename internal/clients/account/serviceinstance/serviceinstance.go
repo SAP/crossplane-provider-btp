@@ -108,6 +108,9 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 				ProviderConfigReference: &xpv1.Reference{
 					Name: pcName(si),
 				},
+				// ADR(external-name): We need to set the management policies to * for the tf resource,
+				// this way the behaivor of the crossplane resource is the same but TF uses refresh() instead of import()
+				// which allows to set the external name to the service instance id and the subaccount id in the spec for imports
 				ManagementPolicies:               xpv1.ManagementPolicies{"*"},
 				WriteConnectionSecretToReference: si.GetWriteConnectionSecretToReference(),
 			},
