@@ -279,14 +279,7 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 
 func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
 	policies := cr.GetManagementPolicies()
-	if len(policies) == 0 {
-		return false
-	}
-	// Check if the only policy is "Observe"
-	if len(policies) == 1 && string(policies[0]) == "Observe" {
-		return true
-	}
-	return false
+	return len(policies) == 1 && policies[0] == xpv1.ManagementActionObserve
 }
 
 func isNotFound(err error) bool {
