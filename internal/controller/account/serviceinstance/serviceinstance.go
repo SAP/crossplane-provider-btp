@@ -279,15 +279,6 @@ func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
 	return len(policies) == 1 && policies[0] == xpv1.ManagementActionObserve
 }
 
-func isNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	// The BTP CLI client formats HTTP errors as "[Status: <code>; Correlation ID: ...]"
-	// We match the exact format to avoid false positives (e.g. resource IDs containing "404")
-	return strings.Contains(err.Error(), "[Status: 404;")
-}
-
 // calculateDiff compares the desired state (spec) with the observed state from the API
 // Returns a human-readable diff string following the ADR(external-name) requirement for drift reporting
 func (e *external) calculateDiff(cr *v1alpha1.ServiceInstance) string {
