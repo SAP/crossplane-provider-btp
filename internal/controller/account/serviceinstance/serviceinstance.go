@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -130,14 +129,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
 
-	// ADR: Check if there's a conflict error from previous Create attempt
+	// ADR(external-name): Check if there's a conflict error from previous Create attempt
 	// AND external-name is not set (meaning user didn't intend to adopt)
 	// TODO: what if the user changes the specs? Then it will stay in crash loop that is in wanted
 	if meta.GetExternalName(cr) == "" {
 		// Check if the LastAsyncOperation has a conflict error
 		lastAsyncCond := cr.GetCondition(ujresource.TypeLastAsyncOperation)
 		if lastAsyncCond.Message != "" && strings.Contains(lastAsyncCond.Message, "Conflict") {
-			// ADR: Resource already exists but user hasn't set external-name
+			// ADR(external-name): Resource already exists but user hasn't set external-name
 			// Return ResourceExists: false to stay in error loop
 			// This forces user to set external-name to adopt the resource
 			return managed.ExternalObservation{
@@ -147,7 +146,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	if meta.GetExternalName(cr) != "" {
-		if !isValidUUID(meta.GetExternalName(cr)) {
+		if !internal.IsValidUUID(meta.GetExternalName(cr)) {
 			return managed.ExternalObservation{}, errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one")
 		}
 	}
@@ -161,10 +160,10 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	case tfClient.NotExisting:
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	case tfClient.Drift:
-		// ADR: Calculate and report diff between desired state and what was observed from the API
+		// ADR(external-name): Calculate and report diff between desired state and what was observed from the API
 		diff := e.calculateDiff(cr)
 
-		// ADR: Set condition with drift information so it appears in events
+		// ADR(external-name): Set condition with drift information so it appears in events
 		cr.SetConditions(xpv1.Condition{
 			Type:               xpv1.TypeReady,
 			Status:             corev1.ConditionFalse,
@@ -187,7 +186,8 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
 				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 			}
-			// Only set Available condition if ManagementPolicy is not only "Observe"
+			// Only set Available condition if ManagementPolicy is not only "Observe", since Available condition sets Ready to True
+			// and we don't want that for Observe-only resources
 			if !isObserveOnly(cr) {
 				cr.SetConditions(xpv1.Available())
 			}
@@ -207,7 +207,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotServiceInstance)
 	}
 
-	// ADR: setting external-name not possible due to an async operation
+	// ADR(external-name): setting external-name not possible due to an async operation
 	// After creation, external-name will be populated by Observe() in the next reconciliation
 	// If creation fails with conflict, the AsyncOperation condition will be set by upjet's callback
 	// and will be handled in the next Observe() call (see conflict detection logic above)
@@ -296,13 +296,9 @@ func isNotFound(err error) bool {
 	return strings.Contains(err.Error(), "404")
 }
 
-func isValidUUID(s string) bool {
-	_, err := uuid.Parse(s)
-	return err == nil
-}
 
 // calculateDiff compares the desired state (spec) with the observed state from the API
-// Returns a human-readable diff string following the ADR requirement for drift reporting
+// Returns a human-readable diff string following the ADR(external-name) requirement for drift reporting
 func (e *external) calculateDiff(cr *v1alpha1.ServiceInstance) string {
 	// Get the Terraform resource to access both desired and observed state
 	tfResource := e.tfClient.GetTfResource()
