@@ -254,10 +254,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	if err := c.tfClient.Delete(ctx); err != nil {
-		// If err is 404 not found, safely ignore as the resource is already deleted.
-		if isNotFound(err) {
-			return managed.ExternalDelete{}, nil
-		}
+		// 404 not found, does not need to be handeled since already done by upjet/terrarform
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteInstance)
 	}
 	return managed.ExternalDelete{}, nil
@@ -286,9 +283,10 @@ func isNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(err.Error(), "404")
+	// The BTP CLI client formats HTTP errors as "[Status: <code>; Correlation ID: ...]"
+	// We match the exact format to avoid false positives (e.g. resource IDs containing "404")
+	return strings.Contains(err.Error(), "[Status: 404;")
 }
-
 
 // calculateDiff compares the desired state (spec) with the observed state from the API
 // Returns a human-readable diff string following the ADR(external-name) requirement for drift reporting
