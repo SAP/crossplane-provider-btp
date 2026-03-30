@@ -67,7 +67,7 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 - How to find:
 
   - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
-  - CLI: btp get security/role-collection "<name>"→ `name`
+  - CLI: btp get security/role-collection `"<name>"` → `name`
 
 ### Subaccount
 
