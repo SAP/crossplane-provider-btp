@@ -28,7 +28,7 @@ var (
 	cmImportName  = "cm-import-test"
 )
 
-func TestCloudManagemen(t *testing.T) {
+func TestCloudManagement(t *testing.T) {
 	crudFeatureSuite := features.New("CloudManagement Controller Test").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
@@ -106,13 +106,13 @@ func TestCloudManagementImport(t *testing.T) {
 	importFeatureSuite := features.New("CloudManagement Import Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/cloudmanagement/env")
+				resources.ImportResources(ctx, t, cfg, "testdata/crs/cloudmanagement/import-env")
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
 				// Wait for the ServiceManager to be ready before creating CloudManagement
 				waitForResource(&v1beta1.ServiceManager{
-					ObjectMeta: metav1.ObjectMeta{Name: "e2e-sm-cis", Namespace: cfg.Namespace()},
+					ObjectMeta: metav1.ObjectMeta{Name: "e2e-sm-cis-import", Namespace: cfg.Namespace()},
 				}, cfg, t, wait.WithTimeout(15*time.Minute))
 
 				cm := &v1beta1.CloudManagement{
@@ -134,8 +134,8 @@ func TestCloudManagementImport(t *testing.T) {
 							},
 						},
 						ForProvider: v1beta1.CloudManagementParameters{
-							ServiceManagerRef: &xpv1.Reference{Name: "e2e-sm-cis"},
-							SubaccountRef:     &xpv1.Reference{Name: "cis-sa-test"},
+							ServiceManagerRef: &xpv1.Reference{Name: "e2e-sm-cis-import"},
+							SubaccountRef:     &xpv1.Reference{Name: "cis-sa-import-test"},
 						},
 					},
 				}
@@ -181,8 +181,8 @@ func TestCloudManagementImport(t *testing.T) {
 							},
 						},
 						ForProvider: v1beta1.CloudManagementParameters{
-							ServiceManagerRef: &xpv1.Reference{Name: "e2e-sm-cis"},
-							SubaccountRef:     &xpv1.Reference{Name: "cis-sa-test"},
+							ServiceManagerRef: &xpv1.Reference{Name: "e2e-sm-cis-import"},
+							SubaccountRef:     &xpv1.Reference{Name: "cis-sa-import-test"},
 						},
 					},
 				}
@@ -218,7 +218,7 @@ func TestCloudManagementImport(t *testing.T) {
 
 			AwaitResourceDeletionOrFail(ctx, t, cfg, cm, wait.WithTimeout(time.Minute*10))
 
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "cloudmanagement/env", wait.WithTimeout(time.Minute*15))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, "cloudmanagement/import-env", wait.WithTimeout(time.Minute*15))
 			return ctx
 		},
 	).Feature()

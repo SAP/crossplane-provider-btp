@@ -2,15 +2,14 @@ apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: Subaccount
 metadata:
   namespace: default
-  name: sac-int-subaccount
+  name: e2e-rolecollection-import-subaccount
 spec:
   forProvider:
-    displayName: $BUILD_ID-subaccount-subaccountapicredentials-int
+    displayName: $BUILD_ID-rolecollection-import-sa
     region: eu10
-    subdomain: $BUILD_ID-e2e-test-subaccount-subaccountapicredentials-int
+    subdomain: $BUILD_ID-e2e-test-rolecollection-import
     labels:
       safe-to-delete: [ "yes" ]
       BUILD_ID: [ "$BUILD_ID" ]
     subaccountAdmins:
       - $TECHNICAL_USER_EMAIL
-
