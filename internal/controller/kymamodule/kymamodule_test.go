@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -213,11 +214,28 @@ func TestObserve(t *testing.T) {
 		args args
 		want want
 	}{
+		"EmptyExternalName": {
+			args: args{
+				cr:     module(withBindingRef("test-binding")),
+				client: &fake.MockKymaModuleClient{},
+				kube:   &test.MockClient{},
+				tracker: &fake.MockTracker{},
+				secretfetcher: &fake.MockSecretFetcher{
+					MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+						return []byte("VALID KUBECONFIG"), nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: false},
+				err: nil,
+			},
+		},
 		"HappyPath": {
 			args: args{
-				cr: module(withBindingRef("test-binding")),
+				cr: module(withBindingRef("test-binding"), withExternalName("testModule")),
 				client: &fake.MockKymaModuleClient{
-					MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
+					MockObserve: func(moduleName string) (*v1alpha1.ModuleStatus, error) {
 						return &v1alpha1.ModuleStatus{}, nil
 					},
 				},
@@ -247,9 +265,9 @@ func TestObserve(t *testing.T) {
 		},
 		"NeedsCreation": {
 			args: args{
-				cr: module(withBindingRef("test-binding")),
+				cr: module(withBindingRef("test-binding"), withExternalName("testModule")),
 				client: &fake.MockKymaModuleClient{
-					MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
+					MockObserve: func(moduleName string) (*v1alpha1.ModuleStatus, error) {
 						return nil, nil
 					},
 				},
@@ -276,9 +294,9 @@ func TestObserve(t *testing.T) {
 		},
 		"ApiNotAvailable": {
 			args: args{
-				cr: module(withBindingRef("test-binding")),
+				cr: module(withBindingRef("test-binding"), withExternalName("testModule")),
 				client: &fake.MockKymaModuleClient{
-					MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
+					MockObserve: func(moduleName string) (*v1alpha1.ModuleStatus, error) {
 						return nil, errors.New("CRASH")
 					},
 				},
@@ -305,9 +323,9 @@ func TestObserve(t *testing.T) {
 		},
 		"BindingNotFound": {
 			args: args{
-				cr: module(withBindingRef("missing-binding")),
+				cr: module(withBindingRef("missing-binding"), withExternalName("testModule")),
 				client: &fake.MockKymaModuleClient{
-					MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
+					MockObserve: func(moduleName string) (*v1alpha1.ModuleStatus, error) {
 						return &v1alpha1.ModuleStatus{}, nil
 					},
 				},
@@ -331,9 +349,9 @@ func TestObserve(t *testing.T) {
 		},
 		"BindingBeingDeleted": {
 			args: args{
-				cr: module(withBindingRef("deleting-binding")),
+				cr: module(withBindingRef("deleting-binding"), withExternalName("testModule")),
 				client: &fake.MockKymaModuleClient{
-					MockObserve: func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
+					MockObserve: func(moduleName string) (*v1alpha1.ModuleStatus, error) {
 						return &v1alpha1.ModuleStatus{}, nil
 					},
 				},
@@ -659,5 +677,11 @@ func withResolvedSecret(secretName, secretNamespace string) moduleModifier {
 	return func(km *v1alpha1.KymaModule) {
 		km.Spec.KymaEnvironmentBindingSecret = secretName
 		km.Spec.KymaEnvironmentBindingSecretNamespace = secretNamespace
+	}
+}
+
+func withExternalName(name string) moduleModifier {
+	return func(km *v1alpha1.KymaModule) {
+		meta.SetExternalName(km, name)
 	}
 }

@@ -11,14 +11,14 @@ import (
 )
 
 type MockKymaModuleClient struct {
-	MockObserve func(moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error)
+	MockObserve func(moduleName string) (*v1alpha1.ModuleStatus, error)
 	MockCreate  func(moduleName string, moduleChannel string, customResourcePolicy string) error
 	MockDelete  func(moduleName string) error
 }
 
 // ObserveModule implements KymaModuleClient.ObserveModule
-func (m *MockKymaModuleClient) ObserveModule(ctx context.Context, moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
-	return m.MockObserve(moduleCr)
+func (m *MockKymaModuleClient) ObserveModule(ctx context.Context, moduleName string) (*v1alpha1.ModuleStatus, error) {
+	return m.MockObserve(moduleName)
 }
 
 // CreateModule implements KymaModuleClient.CreateModule
