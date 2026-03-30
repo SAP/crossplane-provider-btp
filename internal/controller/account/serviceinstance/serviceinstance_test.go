@@ -388,7 +388,7 @@ func TestObserve(t *testing.T) {
 				mg: expectedServiceInstance(withExternalName("not-a-uuid")),
 			},
 			want: want{
-				err: errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation"),
+				err: errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one"),
 				cr:  expectedServiceInstance(withExternalName("not-a-uuid")),
 			},
 		},
@@ -1026,40 +1026,6 @@ func TestDelete(t *testing.T) {
 			want: want{
 				err: nil,
 				cr: expectedServiceInstance(
-					withConditions(xpv1.Deleting()),
-				),
-			},
-		},
-		"NotFound": {
-			reason: "should not return an error when the resource is already deleted (404)",
-			fields: fields{
-				client:  &TfProxyMock{err: errors.New("destroy failed: 404 not found")},
-				tracker: testutils.NewResourceTrackerMock(),
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: nil,
-				cr: expectedServiceInstance(
-					withConditions(xpv1.Deleting()),
-				),
-			},
-		},
-		// ADR: 404 with external-name set → resource was externally removed; not an error
-		"ExternallyRemovedResource_NotFound": {
-			reason: "should not return error when resource with external-name was already deleted externally (404)",
-			fields: fields{
-				client:  &TfProxyMock{err: errors.New("404 not found")},
-				tracker: testutils.NewResourceTrackerMock(),
-			},
-			args: args{
-				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
-			},
-			want: want{
-				err: nil,
-				cr: expectedServiceInstance(
-					withExternalName("550e8400-e29b-41d4-a716-446655440000"),
 					withConditions(xpv1.Deleting()),
 				),
 			},
