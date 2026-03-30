@@ -60,14 +60,6 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
   - CLI: Use BTP ClI: `btp list accounts/environment-instance`
 
-### ServiceInstance
-
-- Follows Standard: no
-- Format: ServiceInstance GUID (UUID format) and the spec.ForProvider.SubaccountRef or spec.ForProvider.SubaccountID field filled out
-- How to find:
-
-  - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
-  - CLI: btp list services/instance --subaccount <subaccount-guid> (field: id)
 ### RoleCollection
 
 - Follows Standard: no (uses name as identifier, not a GUID)
@@ -76,6 +68,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 
   - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
   - CLI: btp get security/role-collection "<name>"→ `name`
+
+### ServiceInstance
+
+- Follows Standard: no
+- Format: ServiceInstance GUID (UUID format) and the spec.ForProvider.SubaccountRef or spec.ForProvider.SubaccountID field filled out
+- How to find:
+
+  - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
+  - CLI: btp list services/instance --subaccount <subaccount-guid> (field: id)
 
 ### Subaccount
 
