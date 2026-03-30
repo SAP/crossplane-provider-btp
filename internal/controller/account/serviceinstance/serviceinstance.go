@@ -68,6 +68,11 @@ var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube clie
 		return errors.Wrap(kErr, errGetInstance)
 	}
 
+	// Store the CR's current generation on each condition so that Observe() can
+	// detect whether the spec has changed since the async operation was triggered.
+	for i := range conditions {
+		conditions[i].ObservedGeneration = si.Generation
+	}
 	si.SetConditions(conditions...)
 
 	uErr := kube.Status().Update(ctx, si)
@@ -130,18 +135,20 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// ADR(external-name): Check if there's a conflict error from previous Create attempt
-	// AND external-name is not set (meaning user didn't intend to adopt)
-	// TODO: what if the user changes the specs? Then it will stay in crash loop that is in wanted
+	// AND external-name is not set (meaning user didn't intend to adopt).
+	// ObservedGeneration is set by saveCallback — if the spec changed since the conflict
+	// (cr.Generation > lastAsyncCond.ObservedGeneration), we allow a new Create() attempt since it is a new version/generation.
 	if meta.GetExternalName(cr) == "" {
-		// Check if the LastAsyncOperation has a conflict error
 		lastAsyncCond := cr.GetCondition(ujresource.TypeLastAsyncOperation)
-		if lastAsyncCond.Message != "" && strings.Contains(lastAsyncCond.Message, "Conflict") {
+		if lastAsyncCond.Message != "" &&
+			strings.Contains(lastAsyncCond.Message, "Conflict") &&
+			lastAsyncCond.ObservedGeneration == cr.Generation {
 			// ADR(external-name): Resource already exists but user hasn't set external-name
 			// Return ResourceExists: false to stay in error loop
 			// This forces user to set external-name to adopt the resource
 			return managed.ExternalObservation{
 				ResourceExists: false,
-			}, errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource")
+			}, errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
 		}
 	}
 

@@ -346,7 +346,7 @@ func TestObserve(t *testing.T) {
 		args   args
 		want   want
 	}{
-		// ADR: external-name empty without conflict → no creation attempt, not existing
+		// ADR(external-name):: external-name empty without conflict → no creation attempt, not existing
 		"EmptyExternalName_NoConflict": {
 			reason: "should return resourceExists:false when external-name is empty and no conflict error present",
 			fields: fields{
@@ -363,7 +363,7 @@ func TestObserve(t *testing.T) {
 				cr: expectedServiceInstance(),
 			},
 		},
-		// ADR: external-name empty + conflict in LastAsyncOperation → stay in error loop
+		// ADR(external-name):: external-name empty + conflict in LastAsyncOperation → stay in error loop
 		"EmptyExternalName_ConflictError": {
 			reason: "should return error and resourceExists:false when external-name is empty but creation failed with Conflict",
 			fields: fields{
@@ -373,12 +373,40 @@ func TestObserve(t *testing.T) {
 				mg: withConflictCondition(&v1alpha1.ServiceInstance{}),
 			},
 			want: want{
-				err: errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource"),
+				err: errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one"),
 				o:   managed.ExternalObservation{ResourceExists: false},
 				cr:  withConflictCondition(expectedServiceInstance()),
 			},
 		},
-		// ADR: external-name set but not a valid UUID → return error
+		// ADR(external-name):: external-name empty + conflict condition but spec changed → allow new Create attempt
+		"EmptyExternalName_ConflictError_SpecChanged": {
+			reason: "should not stay in error loop when spec changed since conflict (Generation > ObservedGeneration in condition)",
+			fields: fields{
+				client: &TfProxyMock{status: tfclient.NotExisting},
+			},
+			args: args{
+				// Generation=2 simulates a spec change after the conflict (condition has ObservedGeneration=1)
+				mg: func() *v1alpha1.ServiceInstance {
+					cr := &v1alpha1.ServiceInstance{}
+					cr.Generation = 1
+					withConflictCondition(cr) // stamps ObservedGeneration=1
+					cr.Generation = 2         // simulate spec change
+					return cr
+				}(),
+			},
+			want: want{
+				err: nil,
+				o:   managed.ExternalObservation{ResourceExists: false},
+				cr: func() *v1alpha1.ServiceInstance {
+					cr := expectedServiceInstance()
+					cr.Generation = 2
+					withConflictCondition(cr)
+					cr.Generation = 2
+					return cr
+				}(),
+			},
+		},
+		// ADR(external-name):: external-name set but not a valid UUID → return error
 		"InvalidUUIDExternalName": {
 			reason: "should return error when external-name is set but not a valid UUID",
 			fields: fields{
@@ -392,7 +420,7 @@ func TestObserve(t *testing.T) {
 				cr:  expectedServiceInstance(withExternalName("not-a-uuid")),
 			},
 		},
-		// ADR: valid UUID in external-name, resource not found → trigger Create()
+		// ADR(external-name):: valid UUID in external-name, resource not found → trigger Create()
 		"ValidUUID_NotFound": {
 			reason: "should return resourceExists:false when valid UUID is set but resource does not exist (404)",
 			fields: fields{
@@ -438,7 +466,7 @@ func TestObserve(t *testing.T) {
 				cr: expectedServiceInstance(), // No annotations, observation data, or conditions
 			},
 		},
-		// ADR: drift detected → diff set in observation and condition on CR
+		// ADR(external-name):: drift detected → diff set in observation and condition on CR
 		"DriftDetected_DiffReported": {
 			reason: "should set drift condition on CR and return non-empty diff in observation when drift is detected",
 			fields: fields{
@@ -474,7 +502,7 @@ func TestObserve(t *testing.T) {
 				wantDiffContains: []string{"desired-name", "actual-name"},
 			},
 		},
-		// ADR: external-name set via Observe() after async creation (external-name flows through saveInstanceData)
+		// ADR(external-name):: external-name set via Observe() after async creation (external-name flows through saveInstanceData)
 		"ExternalNameSetFromObservationData": {
 			reason: "should set external-name on CR from ObservationData when async creation completes",
 			fields: fields{
@@ -682,7 +710,7 @@ func TestCreate(t *testing.T) {
 				),
 			},
 		},
-		// ADR: external-name already set means the resource was not found by Observe() (e.g. externally deleted).
+		// ADR(external-name):: external-name already set means the resource was not found by Observe() (e.g. externally deleted).
 		// Create() should proceed normally and recreate it.
 		"ExternalNameAlreadySet_ProceedsWithCreate": {
 			reason: "should proceed with creation when external-name is already set (resource not found by Observe)",
@@ -805,7 +833,7 @@ func TestUpdate(t *testing.T) {
 				cr:  expectedServiceInstance(),
 			},
 		},
-		// ADR: Update uses external-name to identify the resource; external-name must be preserved
+		// ADR(external-name):: Update uses external-name to identify the resource; external-name must be preserved
 		"HappyPath_WithExternalName": {
 			reason: "should update successfully and preserve the external-name on the CR",
 			fields: fields{
@@ -1175,12 +1203,14 @@ func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceInstance
 
 // withConflictCondition sets the LastAsyncOperation condition with a Conflict message,
 // simulating a failed Create() that hit an "already exists" error.
+// ObservedGeneration defaults to 0, matching a CR with Generation=0 (no spec change yet).
 func withConflictCondition(cr *v1alpha1.ServiceInstance) *v1alpha1.ServiceInstance {
 	cr.SetConditions(xpv1.Condition{
-		Type:    ujresource.TypeLastAsyncOperation,
-		Status:  "False",
-		Reason:  "ReconcileError",
-		Message: "Conflict: resource already exists",
+		Type:               ujresource.TypeLastAsyncOperation,
+		Status:             "False",
+		Reason:             "ReconcileError",
+		Message:            "Conflict: resource already exists",
+		ObservedGeneration: cr.Generation,
 	})
 	return cr
 }
