@@ -37,8 +37,15 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A KymaModule is an object to manage the configuration for a specific
-          Module in the Kyma cluster.
+        description: |-
+          A KymaModule is an object to manage the configuration for a specific Module in the Kyma cluster.
+
+          External-Name Configuration:
+            - Follows Standard: yes
+            - Format: Kyma module name (e.g. "keda", "serverless")
+            - How to find:
+            - UI: Kyma Dashboard → Modules → [Module Name]
+            - CLI: kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'
         properties:
           apiVersion:
             description: |-
