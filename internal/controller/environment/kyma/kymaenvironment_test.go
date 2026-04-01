@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -85,7 +86,7 @@ func TestCreate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient()}
+			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient(), record: event.NewNopRecorder()}
 			if tc.args.httpClient != nil {
 				e.httpClient = tc.args.httpClient
 			}
@@ -564,7 +565,7 @@ func TestObserve(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient()}
+			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient(), record: event.NewNopRecorder()}
 			if tc.args.httpClient != nil {
 				e.httpClient = tc.args.httpClient
 			}
@@ -639,7 +640,7 @@ func TestCircuitBreaker(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client}
+			e := external{client: tc.args.client, record: event.NewNopRecorder()}
 			got, err := e.Update(context.Background(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Update(...): -want error, +got error:\n%s\n", diff)
