@@ -190,7 +190,6 @@ To allow Crossplane to communicate with the SAP Cloud Management service, you ne
       - If you followed the steps in [Set up the SAP Cloud Management service](#set-up-the-sap-cloud-management-service), the binding credentials should already be copied to your clipboard.<br/>
       <br/>
 
-      :::apply-to-mcp
       ```yaml title="examples/provider/cis-provider-secret.yaml" {9-41}
       apiVersion: v1
       kind: Secret
@@ -234,7 +233,6 @@ To allow Crossplane to communicate with the SAP Cloud Management service, you ne
                 }
               }
       ```
-      :::
 
 2. Save the updated YAML content to `cis-provider-secret.yaml`.
 
@@ -278,7 +276,6 @@ You can create a `Secret` using the technical user (P-user) credentials.
 
 1. Save the following YAML content to `sa-provider-secret.yaml`.
 
-    :::apply-to-mcp
     ```yaml title="sa-provider-secret.yaml" {10-12}
     apiVersion: v1
     kind: Secret
@@ -294,7 +291,6 @@ You can create a `Secret` using the technical user (P-user) credentials.
               "password": "<technical-user-password>"
             }
     ```
-    :::
 
     Replace the following:
     
@@ -321,7 +317,6 @@ In the `ProviderConfig`, you'll reference the Kubernetes secrets created in [Cre
 1. Save the following YAML content to `config.yaml`:
     <br/>
 
-    :::apply-to-mcp
     ```yaml title="config.yaml" {6}
     apiVersion: btp.sap.crossplane.io/v1alpha1
     kind: ProviderConfig
@@ -343,7 +338,6 @@ In the `ProviderConfig`, you'll reference the Kubernetes secrets created in [Cre
                 namespace: default
             source: Secret
     ```
-    :::
 
     Replace `<global-account-subdomain>` with the subdomain of your BTP global account.
 

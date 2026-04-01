@@ -1,0 +1,137 @@
+---
+sidebar_position: 1
+title: Consume services
+---
+
+# Consume services
+
+This guide shows how to **create an instance of SAP HANA Cloud service** using Crossplane BTP Provider and use the corresponding HANA Provider to **orchestrate content** inside the newly created instance.
+
+![Big picture](/img/overview-orchestrate-service-all.png)
+
+This pattern is relevant for any service you want to provision and configure.
+The following table lists commonly used services and their corresponding service-specific providers.
+
+| Service name               | Service specific provider                                                                                             |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| HANA Cloud service         | [Crossplane HANA provider](/docs/crossplane-provider-hana/docs/user-stories/setup#install-provider)            |
+| More                       | coming soon...                                                                                                        |
+
+## 🚧 Prerequisites
+
+- You've [created and set up a subaccount managed in code](/docs/crossplane-provider-btp/docs/user-stories/account/subaccount).
+- You've [created an `Entitlement` and a `ServiceInstance` for the SAP HANA Cloud service](/docs/crossplane-provider-hana/docs/user-stories/setup).
+
+## Install the HANA provider
+
+To consume the HANA Cloud service, you must first install the HANA provider. Follow the [Install Provider](/docs/crossplane-provider-hana/docs/user-stories/setup#install-provider) guide.
+
+## Configure the HANA provider
+
+To configure the HANA provider, you need a binding for the SAP HANA Cloud service instance. To create a service binding in code, follow these steps:
+
+### Create a `ServiceBinding`
+
+1. Save the following YAML content as `binding-hana.yaml`.
+
+    ```yaml title="binding-hana.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: ServiceBinding
+    metadata:
+      name: my-hana-binding
+    spec:
+      forProvider:
+        name: hana-binding
+        serviceInstanceRef:
+          name: my-hana
+        subaccountRef:
+          name: my-subaccount
+      writeConnectionSecretToRef:
+        name: hana-binding-secret
+        namespace: default
+      providerConfigRef:
+        name: account-provider-config # Please reference your providerConfig here!
+    ```
+
+    See [full CRD reference](https://github.com/SAP/crossplane-provider-hana/tree/main/apis)
+
+2. Apply `binding-hana.yaml` to your managed control plane:
+
+    ```sh title="Run in Terminal"
+    kubectl create -f binding-hana.yaml
+    ```
+
+### Create a `ProviderConfig`
+
+To enable the control plane to communicate with the HANA Cloud service, create a secret with the connection details and reference it in the `ProviderConfig`.
+
+1. Save the following YAML content to `config-hana.yaml`.
+
+    ```yaml title="config-hana.yaml"
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      namespace: default
+      name: hana-provider-secret
+    type: Opaque
+    data:
+      endpoint: <base64-encoded-endpoint> # E.g. Base64-encode: my-hana-domain.prod-eu10.hanacloud.ondemand.com
+      port: NDQz # E.g. Base64-encode: 443
+      username: REJBRE1JTg== # E.g. Base64-encode: DBADMIN
+      password: <base64-encoded-password> # Same password as set during service instance creation
+    ---
+    apiVersion: objects.hana.orchestrate.cloud.sap/v1alpha1
+    kind: ProviderConfig
+    metadata:
+      name: hana-providerconfig
+    spec:
+      credentials:
+        source: Secret
+        connectionSecretRef:
+          namespace: default
+          name: hana-provider-secret
+    ```
+
+    See [full CRD reference](https://github.com/SAP/crossplane-provider-hana/tree/main/apis)
+
+2. Apply `config-hana.yaml` to your managed control plane:
+
+    ```sh title="Run in Terminal"
+    kubectl apply -f config-hana.yaml
+    ```
+
+## Create DB Schema
+
+You can now populate the HANA Cloud instance with content such as schemas. With the following steps, you can create a `DbSchema`.
+
+1. Save the following YAML content to `schema.yaml`.
+
+    ```yaml title="schema.yaml"
+    apiVersion: schema.hana.sap.crossplane.io/v1alpha1
+    kind: DbSchema
+    metadata:
+      name: my-orchestrated-schema
+    spec:
+      forProvider:
+        schemaName: MYSCHEMA
+        owner: DBADMIN
+      providerConfigRef:
+        name: hana-providerconfig
+    ```
+
+    See [full CRD reference](https://github.com/SAP/crossplane-provider-hana/tree/main/apis)
+
+2. Apply `schema.yaml` to your managed control plane:
+
+    ```sh title="Run in Terminal"
+    kubectl create -f schema.yaml
+    ```
+
+## Next steps
+
+- Learn how to [manage HANA users](/docs/crossplane-provider-hana/docs/user-stories/users).
+- Learn how to [manage HANA tables](/docs/crossplane-provider-hana/docs/user-stories/table).
+
+## ⁉ FAQs
+
+No FAQs yet. Got a question? Reach out to us and help us build this section.
