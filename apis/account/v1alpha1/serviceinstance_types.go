@@ -98,7 +98,7 @@ type ServiceInstanceStatus struct {
 //   - Format: ServiceInstance GUID (UUID format) and the spec.ForProvider.SubaccountRef or spec.ForProvider.SubaccountID field filled out
 //   - How to find:
 //   - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
-//   - CLI: btp list services/instance --subaccount <subaccount-guid> (field: id)
+//   - CLI: btp list services/instance --subaccount `<subaccount-guid>` (field: id)
 //
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
