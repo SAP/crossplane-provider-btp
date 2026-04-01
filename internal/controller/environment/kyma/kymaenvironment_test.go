@@ -271,6 +271,46 @@ func TestObserve(t *testing.T) {
 				cr:            environment(withExternalName(testUUID), withUID("1234"), withConditions(xpv1.Available())),
 			},
 		},
+		"DriftWithConnectionDetails": {
+			// Regression test: connection details must be populated even when there is
+			// parameter drift (e.g. observe-only mode with external changes).
+			args: args{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+						Id:           internal.Ptr(testUUID),
+						State:        internal.Ptr("OK"),
+						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
+						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
+						Parameters:   internal.Ptr("{\"name\":\"kyma\", \"extra\": \"external-change\"}"),
+					}, nil
+				}},
+				httpClient: mockedHttpClient(kubeConfigData),
+				cr: environment(withExternalName(testUUID), withUID("1234"),
+					withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}}),
+					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+						Parameters: runtime.RawExtension{Raw: []byte(`{"name":"kyma"}`)},
+					})),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+					ConnectionDetails: managed.ConnectionDetails{
+						"kubeconfig":                 []byte(kubeConfigData),
+						"name":                       []byte("kyma"),
+						"KubeconfigURL":              []byte("someUrl"),
+						"server":                     []byte("someServerUrl"),
+						"certificate-authority-data": []byte("someCaData"),
+					},
+				},
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           nil,
+				cr: environment(withExternalName(testUUID), withUID("1234"), withConditions(xpv1.Available()),
+					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+						Parameters: runtime.RawExtension{Raw: []byte(`{"name":"kyma"}`)},
+					})),
+			},
+		},
 		"UpdateInProgress": {
 			args: args{
 				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
