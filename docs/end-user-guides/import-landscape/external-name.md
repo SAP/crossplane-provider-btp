@@ -1,3 +1,7 @@
+---
+sidebar_position: 3
+---
+
 # External name
 
 `External name` in `Crossplane` is a key concept that maps `Crossplane` resources to their corresponding external resources in the managed infrastructure.
