@@ -193,11 +193,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
 				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 			}
-			// Only set Available condition if ManagementPolicy is not only "Observe", since Available condition sets Ready to True
-			// and we don't want that for Observe-only resources
-			if !isObserveOnly(cr) {
-				cr.SetConditions(xpv1.Available())
-			}
+		}
+		// ADR(external-name): Set Available regardless of async data, covers both:
+		// - normal flow: data != nil after async creation completes
+		// - fresh environment (CI/import): data == nil because async callback not yet fired,
+		//   but resource already exists and is UpToDate per TF observe
+		// Only skip if ManagementPolicy is only "Observe", since Available sets Ready to True
+		if !isObserveOnly(cr) {
+			cr.SetConditions(xpv1.Available())
 		}
 		return managed.ExternalObservation{
 			ResourceExists:    true,

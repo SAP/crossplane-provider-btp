@@ -333,11 +333,12 @@ func TestObserve(t *testing.T) {
 	}
 
 	type want struct {
-		o                managed.ExternalObservation
-		err              error
-		cr               *v1alpha1.ServiceInstance // Expected complete CR
-		wantDriftCond    bool                      // Whether a DriftDetected condition should be set
-		wantDiffContains []string                  // Substrings that must appear in the Diff field
+		o                 managed.ExternalObservation
+		err               error
+		cr                *v1alpha1.ServiceInstance // Expected complete CR
+		wantDriftCond     bool                      // Whether a DriftDetected condition should be set
+		wantAvailableCond bool                      // Whether an Available condition should be set
+		wantDiffContains  []string                  // Substrings that must appear in the Diff field
 	}
 
 	cases := map[string]struct {
@@ -584,7 +585,31 @@ func TestObserve(t *testing.T) {
 					ResourceUpToDate:  true,
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
-				cr: expectedServiceInstance(), // No annotations, observation data, or conditions
+				wantAvailableCond: true,
+				cr:                expectedServiceInstance(), // No annotations, observation data, or conditions
+			},
+		},
+		"UpToDate_NilData_WithExternalName_SetsAvailable": {
+			reason: "import flow: resource is UpToDate, no async data, external-name is set - should become Available",
+			fields: fields{
+				client: &TfProxyMock{
+					status:  tfclient.UpToDate,
+					data:    nil,
+					details: map[string][]byte{},
+				},
+			},
+			args: args{
+				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
+			},
+			want: want{
+				err: nil,
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  true,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				wantAvailableCond: true,
+				cr:                expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
 			},
 		},
 		"Happy, no drift": {
@@ -667,6 +692,14 @@ func TestObserve(t *testing.T) {
 				}
 				if readyCond.Message == "" {
 					t.Errorf("\n%s\nexpected non-empty drift condition message", tc.reason)
+				}
+			}
+
+			// Verify available condition was set when expected
+			if tc.want.wantAvailableCond {
+				readyCond := cr.GetCondition(xpv1.TypeReady)
+				if readyCond.Reason != xpv1.ReasonAvailable {
+					t.Errorf("\n%s\nexpected Available condition, got reason=%q", tc.reason, readyCond.Reason)
 				}
 			}
 		})
