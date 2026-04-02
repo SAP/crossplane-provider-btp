@@ -10,15 +10,6 @@
 
 All available CRDs can be found in the [API reference](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp).
 
-## 📆 Roadmap
-
-This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/crossplane-provider-btp/issues). 
-
-We share our current activities on this **[Roadmap Board](https://github.com/orgs/SAP/projects/141/views/5)**
-
-Contribution and feedback are encouraged and always welcome. You will find our contribution enablement material here [*coming soon*](https://github.com/SAP/crossplane-provider-docs)
-
-
 ## 📊 Installation
 
 To install this provider in a kubernetes cluster running crossplane, you can use the provider custom resource, replacing the `<version>`placeholder with the current version of this provider:
@@ -33,6 +24,23 @@ spec:
 ```
 
 Crossplane will take care to create a deployment for this provider. Once it becomes healthy, you can configure your provider using proper credentials and start orchestrating :rocket:.
+
+## 👐 Support, Feedback
+If you have a question always feel free to reach out on our official crossplane slack channel: 
+
+:rocket: [**#provider-sap-btp**](https://crossplane.slack.com/archives/C07UZ3UJY7Q).
+
+💬 Also we are hosting an open community call and hope to see you there! Find more details [here](https://github.com/SAP/crossplane-provider-btp/discussions/515).
+
+For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
+
+## 📆 Roadmap
+
+This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/crossplane-provider-btp/issues). 
+
+We share our current activities on this **[Roadmap Board](https://github.com/orgs/SAP/projects/141/views/5)**
+
+Contribution and feedback are encouraged and always welcome. You will find our contribution enablement material here [*coming soon*](https://github.com/SAP/crossplane-provider-docs)
 
 ## 🔬 Developing
 
@@ -329,15 +337,6 @@ python3 provider-config-setup.py \
 ### Output
 
 The credentials section of the service binding, which can be securely stored in SAP Vault or similar secrets manager.
-
-## 👐 Support, Feedback
-If you have a question always feel free to reach out on our official crossplane slack channel: 
-
-:rocket: [**#provider-sap-btp**](https://crossplane.slack.com/archives/C07UZ3UJY7Q).
-
-💬 Also we are hosting an open community call and hope to see you there! Find more details [here](https://github.com/SAP/crossplane-provider-btp/discussions/515).
-
-For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 
 ## 🔒 Security / Disclosure
 
