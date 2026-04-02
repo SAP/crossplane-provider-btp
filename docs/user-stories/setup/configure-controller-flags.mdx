@@ -69,19 +69,18 @@ The following example configures a slower poll interval and a more conservative 
 
 2. This `DeploymentRuntimeConfig` needs to be referenced by the provider's `Provider` resource.
 
-    :::warning
-    Depending on your setup, the `Provider` resource may already exist and be managed by your platform or tooling — do not modify it in that case. This applies, for example, when using [Open Control Plane (OCP)](https://www.opencontrolplane.io/), where the `Provider` resource is typically managed for you.
-    :::
+> [!WARNING]  
+> Depending on your setup, the `Provider` resource may already exist and be managed by your platform or tooling — do not modify it in that case. This applies, for example, when using [Open Control Plane (OCPL)](https://github.com/openmcp-project/), where the `Provider` resource is typically managed for you.
 
-    ```yaml title="provider-btp.yaml"
-    apiVersion: pkg.crossplane.io/v1
-    kind: Provider
-    metadata:
-      name: provider-btp
-    spec:
-      package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<version>
-      runtimeConfigRef:
-        name: provider-btp
-    ```
+```yaml title="provider-btp.yaml"
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-btp
+spec:
+  package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<version>
+  runtimeConfigRef:
+    name: provider-btp
+```
 
-    Replace `<version>` with the desired provider version, e.g. `v1.3.0`.
+Replace `<version>` with the desired provider version, e.g. `v1.3.0`.

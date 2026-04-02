@@ -54,9 +54,10 @@ spec:
 ```
 
 3. This `DeploymentRuntimeConfig` needs to be referenced by the provider's `Provider` resource.
-    :::warning
-    Depending on your setup, the `Provider` resource may already exist and be managed by your platform or tooling — do not modify it in that case. This applies, for example, when using [Open Control Plane (OCP)](https://www.opencontrolplane.io/), where the `Provider` resource is typically managed for you.
-    :::
+    
+
+> [!WARNING]  
+> Depending on your setup, the `Provider` resource may already exist and be managed by your platform or tooling — do not modify it in that case. This applies, for example, when using [Open Control Plane (OCPL)](https://github.com/openmcp-project/), where the `Provider` resource is typically managed for you.
 
 ```yaml
 apiVersion: pkg.crossplane.io/v1
