@@ -3,6 +3,7 @@ package kymaenvironmentbinding
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,7 +12,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironmentbinding"
@@ -1264,3 +1268,249 @@ func (f fakeClient) DeleteInstances(ctx context.Context, bindings []v1alpha1.Bin
 }
 
 var _ kymaenvironmentbinding.Client = &fakeClient{}
+
+func Test_external_updateStatusWithRetry(t *testing.T) {
+	conflictErr := kerrors.NewConflict(schema.GroupResource{}, "test", errors.New("conflict"))
+
+	tests := []struct {
+		name            string
+		statusUpdateFns []test.MockSubResourceUpdateFn
+		getFn           test.MockGetFn
+		cancelCtx       bool
+		wantErr         bool
+		wantErrContains string
+	}{
+		{
+			name: "success on first attempt",
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(nil),
+			},
+			wantErr: false,
+		},
+		{
+			name: "conflict on first attempt, success on retry after re-fetch",
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(nil),
+			},
+			getFn:   test.NewMockGetFn(nil),
+			wantErr: false,
+		},
+		{
+			name: "non-conflict error returns immediately without retrying",
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(errors.New("some other error")),
+			},
+			wantErr:         true,
+			wantErrContains: "some other error",
+		},
+		{
+			name: "conflict exhausts all retries",
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+			},
+			getFn:           test.NewMockGetFn(nil),
+			wantErr:         true,
+			wantErrContains: errStatusUpdate,
+		},
+		{
+			name: "re-fetch fails returns immediately",
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(conflictErr),
+			},
+			getFn:           test.NewMockGetFn(errors.New("get failed")),
+			wantErr:         true,
+			wantErrContains: "get failed",
+		},
+		{
+			name: "context cancelled during backoff returns immediately",
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(conflictErr),
+			},
+			getFn:           test.NewMockGetFn(nil),
+			cancelCtx:       true,
+			wantErr:         true,
+			wantErrContains: errStatusUpdate,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			callIdx := 0
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			kube := &test.MockClient{
+				MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					if tt.cancelCtx {
+						cancel()
+					}
+					if tt.getFn != nil {
+						return tt.getFn(ctx, key, obj)
+					}
+					return nil
+				},
+				MockStatusUpdate: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					fn := tt.statusUpdateFns[callIdx]
+					callIdx++
+					return fn(ctx, obj, opts...)
+				},
+			}
+			c := &external{kube: kube}
+			cr := &v1alpha1.KymaEnvironmentBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+			}
+			desiredBindings := []v1alpha1.Binding{{Id: "id1", IsActive: true}}
+			err := c.updateStatusWithRetry(ctx, cr, desiredBindings)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("updateStatusWithRetry() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErrContains != "" && err != nil {
+				if !strings.Contains(err.Error(), tt.wantErrContains) {
+					t.Errorf("expected error containing %q, got %v", tt.wantErrContains, err)
+				}
+			}
+		})
+	}
+}
+
+func Test_external_Create_statusRetryAndRollback(t *testing.T) {
+	conflictErr := kerrors.NewConflict(schema.GroupResource{}, "test", errors.New("conflict"))
+
+	newBinding := &kymaenvironmentbinding.Binding{
+		Metadata: &kymaenvironmentbinding.Metadata{
+			Id:        "new-id",
+			ExpiresAt: timeNow.Add(time.Hour * 2),
+		},
+		Credentials: &kymaenvironmentbinding.Credentials{
+			Kubeconfig: "kubeconfig-data",
+		},
+	}
+
+	tests := []struct {
+		name                  string
+		statusUpdateFns       []test.MockSubResourceUpdateFn
+		getFn                 test.MockGetFn
+		rollbackErr           error
+		wantErr               bool
+		wantRollbackCalled    bool
+		wantConnectionDetails bool
+		wantErrContains       string
+	}{
+		{
+			name: "status write succeeds after re-fetch",
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(nil),
+			},
+			getFn:                 test.NewMockGetFn(nil),
+			wantErr:               false,
+			wantRollbackCalled:    false,
+			wantConnectionDetails: true,
+		},
+		{
+			name: "status conflict resolved on retry",
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(nil),
+			},
+			getFn:                 test.NewMockGetFn(nil),
+			wantErr:               false,
+			wantRollbackCalled:    false,
+			wantConnectionDetails: true,
+		},
+		{
+			name: "all retries exhausted triggers rollback",
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+			},
+			getFn:                 test.NewMockGetFn(nil),
+			wantErr:               true,
+			wantRollbackCalled:    true,
+			wantConnectionDetails: false,
+		},
+		{
+			name: "all retries exhausted and rollback also fails",
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+			},
+			getFn:                 test.NewMockGetFn(nil),
+			rollbackErr:           errors.New("rollback failed"),
+			wantErr:               true,
+			wantRollbackCalled:    true,
+			wantConnectionDetails: false,
+			wantErrContains:       errRollbackBinding,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rollbackCalled := false
+			callIdx := 0
+
+			kube := &test.MockClient{
+				MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					if tt.getFn != nil {
+						return tt.getFn(ctx, key, obj)
+					}
+					return nil
+				},
+				MockStatusUpdate: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					fn := tt.statusUpdateFns[callIdx]
+					callIdx++
+					return fn(ctx, obj, opts...)
+				},
+			}
+
+			fc := &fakeClient{
+				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
+					return newBinding, nil
+				},
+				deleteInstanceFunc: func(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error {
+					rollbackCalled = true
+					return tt.rollbackErr
+				},
+			}
+
+			c := &external{kube: kube, client: fc}
+			mg := &v1alpha1.KymaEnvironmentBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec: v1alpha1.KymaEnvironmentBindingSpec{
+					KymaEnvironmentId: "kyma-id",
+				},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+						Bindings: []v1alpha1.Binding{},
+					},
+				},
+			}
+
+			got, err := c.Create(context.Background(), mg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if rollbackCalled != tt.wantRollbackCalled {
+				t.Errorf("Create() rollbackCalled = %v, want %v", rollbackCalled, tt.wantRollbackCalled)
+			}
+			if tt.wantConnectionDetails && len(got.ConnectionDetails) == 0 {
+				t.Errorf("Create() expected connection details, got none")
+			}
+			if !tt.wantConnectionDetails && len(got.ConnectionDetails) > 0 {
+				t.Errorf("Create() expected no connection details on failure, got %v", got.ConnectionDetails)
+			}
+			if tt.wantErrContains != "" && err != nil {
+				if !strings.Contains(err.Error(), tt.wantErrContains) {
+					t.Errorf("expected error containing %q, got %v", tt.wantErrContains, err)
+				}
+			}
+		})
+	}
+}

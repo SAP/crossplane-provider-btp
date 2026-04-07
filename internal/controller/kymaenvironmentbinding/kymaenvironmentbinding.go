@@ -8,7 +8,9 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/pkg/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -37,6 +39,9 @@ const (
 	errStatusUpdate              = "while updating status"
 	errDelete                    = "while deleting bindings"
 	errDeleteInstances           = "while deleting instances"
+	errRollbackBinding           = "while rolling back binding after status update failure"
+
+	statusUpdateMaxRetries = 5
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -63,6 +68,36 @@ type external struct {
 // Since we dont need this, we only have it to fullfil the interface.
 func (c *external) Disconnect(ctx context.Context) error {
 	return nil
+}
+
+// updateStatusWithRetry writes desiredBindings to the CR status, retrying up to statusUpdateMaxRetries
+// times on conflict errors. On each attempt the CR is re-fetched to get the latest resourceVersion.
+// Non-conflict errors are returned immediately. If all retries are exhausted the last error is returned.
+func (c *external) updateStatusWithRetry(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding, desiredBindings []v1alpha1.Binding) error {
+	var lastErr error
+	for i := 0; i < statusUpdateMaxRetries; i++ {
+		if i > 0 {
+			select {
+			case <-time.After(time.Duration(100*(1<<uint(i-1))) * time.Millisecond):
+			case <-ctx.Done():
+				return errors.Wrap(ctx.Err(), errStatusUpdate)
+			}
+		}
+
+		if err := c.kube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+			return errors.Wrap(err, errStatusUpdate)
+		}
+		cr.Status.AtProvider.Bindings = desiredBindings
+
+		lastErr = c.kube.Status().Update(ctx, cr)
+		if lastErr == nil {
+			return nil
+		}
+		if !kerrors.IsConflict(lastErr) {
+			return errors.Wrap(lastErr, errStatusUpdate)
+		}
+	}
+	return errors.Wrap(lastErr, errStatusUpdate)
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -194,9 +229,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		ExpiresAt: metav1.NewTime(clientBinding.Metadata.ExpiresAt.UTC()),
 	}
 
-	// Add new binding to status
-	cr.Status.AtProvider.Bindings = append(cr.Status.AtProvider.Bindings, newBinding)
-	// Prepare connection details
 	connectionDetails := managed.ConnectionDetails{
 		"binding_id": []byte(newBinding.Id),
 		"expires_at": []byte(newBinding.ExpiresAt.UTC().String()),
@@ -204,9 +236,23 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		"kubeconfig": []byte(clientBinding.Credentials.Kubeconfig),
 	}
 
+	// Re-fetch cr and write status with retry to handle optimistic concurrency conflicts.
+	// updateStatusWithRetry is self-contained: it re-fetches on every attempt.
+	desiredBindings := append(cr.Status.AtProvider.Bindings, newBinding)
+
+	if err := c.updateStatusWithRetry(ctx, cr, desiredBindings); err != nil {
+		// Status update failed after all retries. Roll back the binding on the provisioning API
+		// to prevent it from becoming orphaned and consuming one of the 10-binding slots.
+		rollbackErr := c.client.DeleteInstances(ctx, []v1alpha1.Binding{newBinding}, cr.Spec.KymaEnvironmentId)
+		if rollbackErr != nil {
+			return managed.ExternalCreation{}, errors.Errorf("%s; %s: %s", err, errRollbackBinding, rollbackErr)
+		}
+		return managed.ExternalCreation{}, err
+	}
+
 	return managed.ExternalCreation{
 		ConnectionDetails: connectionDetails,
-	}, errors.Wrap(c.kube.Status().Update(ctx, cr), errStatusUpdate)
+	}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
