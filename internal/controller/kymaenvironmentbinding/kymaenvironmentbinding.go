@@ -7,6 +7,7 @@ import (
 	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,6 +20,10 @@ import (
 	"github.com/sap/crossplane-provider-btp/btp"
 	kymabinding "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironmentbinding"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
+)
+
+const (
+	reasonStatusUpdate event.Reason = "StatusUpdate"
 )
 
 const (
@@ -45,6 +50,7 @@ type connector struct {
 	kube            client.Client
 	usage           resource.Tracker
 	resourcetracker tracking.ReferenceResolverTracker
+	record          event.Recorder
 
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
 }
@@ -54,6 +60,7 @@ type connector struct {
 type external struct {
 	client  kymabinding.Client
 	tracker tracking.ReferenceResolverTracker
+	record  event.Recorder
 
 	httpClient *http.Client
 	kube       client.Client
@@ -105,7 +112,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	validBindings, bindings := c.validateBindings(cr)
 	cr.Status.AtProvider.Bindings = bindings
-	_ = c.updateStatusWithRetry(ctx, cr, 3) // Use fewer retries in Observe (will retry on next reconcile anyway)
+	if err := c.updateStatusWithRetry(ctx, cr, 3); err != nil {
+		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, errStatusUpdate)))
+	}
 	if !validBindings {
 		return managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: true}, nil
 	}
