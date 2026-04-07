@@ -854,48 +854,38 @@ func Test_external_Observe(t *testing.T) {
 }
 
 func Test_external_Delete(t *testing.T) {
-	type args struct {
-		ctx context.Context
-		mg  resource.Managed
-	}
 	tests := []struct {
 		name    string
-		args    args
+		mg      resource.Managed
 		client  *fakeClient
 		wantErr bool
 	}{
 		{
-			name: "not a KymaEnvironmentBinding",
-			args: args{
-				ctx: context.Background(),
-				mg:  &v1alpha1.KymaEnvironment{},
-			},
+			name:    "not a KymaEnvironmentBinding",
+			mg:      &v1alpha1.KymaEnvironment{},
 			client:  &fakeClient{},
 			wantErr: true,
 		},
 		{
 			name: "successful deletion with multiple bindings",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaEnvironmentId: "test-instance",
-					},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
-							Bindings: []v1alpha1.Binding{
-								{
-									Id:        "id1",
-									IsActive:  true,
-									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
-								},
-								{
-									Id:        "id2",
-									IsActive:  false,
-									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -2)),
-									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 1)),
-								},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				Spec: v1alpha1.KymaEnvironmentBindingSpec{
+					KymaEnvironmentId: "test-instance",
+				},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+						Bindings: []v1alpha1.Binding{
+							{
+								Id:        "id1",
+								IsActive:  true,
+								CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+								ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
+							},
+							{
+								Id:        "id2",
+								IsActive:  false,
+								CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -2)),
+								ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 1)),
 							},
 						},
 					},
@@ -910,21 +900,18 @@ func Test_external_Delete(t *testing.T) {
 		},
 		{
 			name: "service returns error during deletion",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaEnvironmentId: "error-instance",
-					},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
-							Bindings: []v1alpha1.Binding{
-								{
-									Id:        "id1",
-									IsActive:  true,
-									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
-								},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				Spec: v1alpha1.KymaEnvironmentBindingSpec{
+					KymaEnvironmentId: "error-instance",
+				},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+						Bindings: []v1alpha1.Binding{
+							{
+								Id:        "id1",
+								IsActive:  true,
+								CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+								ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 							},
 						},
 					},
@@ -939,21 +926,18 @@ func Test_external_Delete(t *testing.T) {
 		},
 		{
 			name: "service returns error for non-existent binding",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaEnvironmentId: "non-existent-instance",
-					},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
-							Bindings: []v1alpha1.Binding{
-								{
-									Id:        "non-existent-id",
-									IsActive:  true,
-									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
-								},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				Spec: v1alpha1.KymaEnvironmentBindingSpec{
+					KymaEnvironmentId: "non-existent-instance",
+				},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+						Bindings: []v1alpha1.Binding{
+							{
+								Id:        "non-existent-id",
+								IsActive:  true,
+								CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+								ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 							},
 						},
 					},
@@ -968,16 +952,13 @@ func Test_external_Delete(t *testing.T) {
 		},
 		{
 			name: "successful deletion with no bindings",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaEnvironmentId: "test-instance",
-					},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
-							Bindings: []v1alpha1.Binding{},
-						},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				Spec: v1alpha1.KymaEnvironmentBindingSpec{
+					KymaEnvironmentId: "test-instance",
+				},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+						Bindings: []v1alpha1.Binding{},
 					},
 				},
 			},
@@ -992,7 +973,7 @@ func Test_external_Delete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &external{kube: test.NewMockClient(), client: tt.client, tracker: tracking.NewDefaultReferenceResolverTracker(test.NewMockClient())}
-			_, err := c.Delete(tt.args.ctx, tt.args.mg)
+			_, err := c.Delete(context.Background(), tt.mg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Delete() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -1017,13 +998,9 @@ func Test_external_Create(t *testing.T) {
 		rollbackCalled    bool
 		connectionDetails managed.ConnectionDetails
 	}
-	type args struct {
-		ctx context.Context
-		mg  resource.Managed
-	}
 	tests := []struct {
 		name            string
-		args            args
+		mg              resource.Managed
 		client          *fakeClient
 		statusUpdateFns []test.MockSubResourceUpdateFn
 		getFn           test.MockGetFn
@@ -1031,35 +1008,29 @@ func Test_external_Create(t *testing.T) {
 		want            wantResult
 	}{
 		{
-			name: "not a KymaEnvironmentBinding",
-			args: args{
-				ctx: context.Background(),
-				mg:  &v1alpha1.KymaEnvironment{},
-			},
+			name:            "not a KymaEnvironmentBinding",
+			mg:              &v1alpha1.KymaEnvironment{},
 			client:          &fakeClient{},
 			statusUpdateFns: []test.MockSubResourceUpdateFn{},
 			want:            wantResult{err: true},
 		},
 		{
 			name: "create new binding when no valid bindings exist",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaEnvironmentId: "test-instance",
-						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
-						},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				Spec: v1alpha1.KymaEnvironmentBindingSpec{
+					KymaEnvironmentId: "test-instance",
+					ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
+						RotationInterval: metav1.Duration{Duration: time.Hour * 1},
 					},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
-							Bindings: []v1alpha1.Binding{
-								{
-									Id:        "id",
-									IsActive:  true,
-									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(timeNow.Add(time.Minute * 10 * -1)),
-								},
+				},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+						Bindings: []v1alpha1.Binding{
+							{
+								Id:        "id",
+								IsActive:  true,
+								CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+								ExpiresAt: metav1.NewTime(timeNow.Add(time.Minute * 10 * -1)),
 							},
 						},
 					},
@@ -1083,24 +1054,21 @@ func Test_external_Create(t *testing.T) {
 		},
 		{
 			name: "reuse existing valid binding",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaEnvironmentId: "test-instance",
-						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
-						},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				Spec: v1alpha1.KymaEnvironmentBindingSpec{
+					KymaEnvironmentId: "test-instance",
+					ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
+						RotationInterval: metav1.Duration{Duration: time.Hour * 2},
 					},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
-							Bindings: []v1alpha1.Binding{
-								{
-									Id:        "valid-id",
-									IsActive:  true,
-									CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
-									ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
-								},
+				},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
+						Bindings: []v1alpha1.Binding{
+							{
+								Id:        "valid-id",
+								IsActive:  true,
+								CreatedAt: metav1.NewTime(timeNow.Add(time.Hour * -1)),
+								ExpiresAt: metav1.NewTime(timeNow.Add(time.Hour * 2)),
 							},
 						},
 					},
@@ -1124,18 +1092,15 @@ func Test_external_Create(t *testing.T) {
 		},
 		{
 			name: "service returns error during creation",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaEnvironmentId: "error-instance",
-						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
-						},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				Spec: v1alpha1.KymaEnvironmentBindingSpec{
+					KymaEnvironmentId: "error-instance",
+					ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
+						RotationInterval: metav1.Duration{Duration: time.Hour * 1},
 					},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
-					},
+				},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
 				},
 			},
 			client: &fakeClient{
@@ -1148,18 +1113,15 @@ func Test_external_Create(t *testing.T) {
 		},
 		{
 			name: "service returns error for invalid instance",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaEnvironmentId: "invalid-instance",
-						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
-						},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				Spec: v1alpha1.KymaEnvironmentBindingSpec{
+					KymaEnvironmentId: "invalid-instance",
+					ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
+						RotationInterval: metav1.Duration{Duration: time.Hour * 1},
 					},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
-					},
+				},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
 				},
 			},
 			client: &fakeClient{
@@ -1172,14 +1134,11 @@ func Test_external_Create(t *testing.T) {
 		},
 		{
 			name: "status write succeeds after re-fetch",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-					Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
-					},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
 				},
 			},
 			client:          &fakeClient{createInstanceFunc: defaultCreateFn},
@@ -1194,14 +1153,11 @@ func Test_external_Create(t *testing.T) {
 		},
 		{
 			name: "status conflict resolved on retry",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-					Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
-					},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
 				},
 			},
 			client: &fakeClient{createInstanceFunc: defaultCreateFn},
@@ -1219,14 +1175,11 @@ func Test_external_Create(t *testing.T) {
 		},
 		{
 			name: "all retries exhausted triggers rollback",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-					Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
-					},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
 				},
 			},
 			client: &fakeClient{createInstanceFunc: defaultCreateFn},
@@ -1242,14 +1195,11 @@ func Test_external_Create(t *testing.T) {
 		},
 		{
 			name: "all retries exhausted and rollback also fails",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-					Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
-					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
-					},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
+				Status: v1alpha1.KymaEnvironmentBindingStatus{
+					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
 				},
 			},
 			client: &fakeClient{createInstanceFunc: defaultCreateFn},
@@ -1292,7 +1242,7 @@ func Test_external_Create(t *testing.T) {
 			}
 
 			c := &external{kube: kube, client: fc}
-			got, err := c.Create(tt.args.ctx, tt.args.mg)
+			got, err := c.Create(context.Background(), tt.mg)
 			if (err != nil) != tt.want.err {
 				t.Errorf("Create() error = %v, want.err %v", err, tt.want.err)
 				return
@@ -1314,34 +1264,24 @@ func Test_external_Create(t *testing.T) {
 }
 
 func Test_external_Update(t *testing.T) {
-	type args struct {
-		ctx context.Context
-		mg  resource.Managed
-	}
 	tests := []struct {
 		name    string
-		args    args
+		mg      resource.Managed
 		client  *fakeClient
 		want    managed.ExternalUpdate
 		wantErr bool
 	}{
 		{
-			name: "not a KymaEnvironmentBinding",
-			args: args{
-				ctx: context.Background(),
-				mg:  &v1alpha1.KymaEnvironment{},
-			},
+			name:    "not a KymaEnvironmentBinding",
+			mg:      &v1alpha1.KymaEnvironment{},
 			want:    managed.ExternalUpdate{},
 			wantErr: true,
 		},
 		{
 			name: "update not implemented",
-			args: args{
-				ctx: context.Background(),
-				mg: &v1alpha1.KymaEnvironmentBinding{
-					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						KymaEnvironmentId: "test-instance",
-					},
+			mg: &v1alpha1.KymaEnvironmentBinding{
+				Spec: v1alpha1.KymaEnvironmentBindingSpec{
+					KymaEnvironmentId: "test-instance",
 				},
 			},
 			want:    managed.ExternalUpdate{},
@@ -1351,7 +1291,7 @@ func Test_external_Update(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &external{kube: test.NewMockClient(), client: tt.client}
-			got, err := c.Update(tt.args.ctx, tt.args.mg)
+			got, err := c.Update(context.Background(), tt.mg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Update() error = %v, wantErr %v", err, tt.wantErr)
 				return
