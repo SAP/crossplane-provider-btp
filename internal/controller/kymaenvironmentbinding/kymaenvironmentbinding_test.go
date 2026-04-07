@@ -1001,16 +1001,26 @@ func Test_external_Delete(t *testing.T) {
 }
 
 func Test_external_Create(t *testing.T) {
+	conflictErr := kerrors.NewConflict(schema.GroupResource{}, "test", errors.New("conflict"))
+
+	type wantResult struct {
+		err               bool
+		errContains       string
+		rollbackCalled    bool
+		connectionDetails managed.ConnectionDetails
+	}
 	type args struct {
 		ctx context.Context
 		mg  resource.Managed
 	}
 	tests := []struct {
-		name    string
-		args    args
-		client  *fakeClient
-		want    managed.ExternalCreation
-		wantErr bool
+		name            string
+		args            args
+		client          *fakeClient
+		statusUpdateFns []test.MockSubResourceUpdateFn
+		getFn           test.MockGetFn
+		rollbackErr     error
+		want            wantResult
 	}{
 		{
 			name: "not a KymaEnvironmentBinding",
@@ -1018,9 +1028,9 @@ func Test_external_Create(t *testing.T) {
 				ctx: context.Background(),
 				mg:  &v1alpha1.KymaEnvironment{},
 			},
-			client:  &fakeClient{},
-			want:    managed.ExternalCreation{},
-			wantErr: true,
+			client:          &fakeClient{},
+			statusUpdateFns: []test.MockSubResourceUpdateFn{},
+			want:            wantResult{err: true},
 		},
 		{
 			name: "create new binding when no valid bindings exist",
@@ -1050,23 +1060,18 @@ func Test_external_Create(t *testing.T) {
 			client: &fakeClient{
 				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
 					return &kymaenvironmentbinding.Binding{
-						Metadata: &kymaenvironmentbinding.Metadata{
-							Id:        "new-binding-id",
-							ExpiresAt: timeNow.Add(time.Hour * 2),
-						},
-						Credentials: &kymaenvironmentbinding.Credentials{
-							Kubeconfig: "new-binding-secret",
-						},
+						Metadata:    &kymaenvironmentbinding.Metadata{Id: "new-binding-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
+						Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "new-binding-secret"},
 					}, nil
 				},
 			},
-			want: managed.ExternalCreation{
-				ConnectionDetails: managed.ConnectionDetails{
+			statusUpdateFns: []test.MockSubResourceUpdateFn{test.NewMockSubResourceUpdateFn(nil)},
+			want: wantResult{
+				connectionDetails: managed.ConnectionDetails{
 					"binding_id": []byte("new-binding-id"),
 					"kubeconfig": []byte("new-binding-secret"),
 				},
 			},
-			wantErr: false,
 		},
 		{
 			name: "reuse existing valid binding",
@@ -1096,23 +1101,18 @@ func Test_external_Create(t *testing.T) {
 			client: &fakeClient{
 				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
 					return &kymaenvironmentbinding.Binding{
-						Metadata: &kymaenvironmentbinding.Metadata{
-							Id:        "valid-id",
-							ExpiresAt: timeNow.Add(time.Hour * 2),
-						},
-						Credentials: &kymaenvironmentbinding.Credentials{
-							Kubeconfig: "valid-id",
-						},
+						Metadata:    &kymaenvironmentbinding.Metadata{Id: "valid-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
+						Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "valid-id"},
 					}, nil
 				},
 			},
-			want: managed.ExternalCreation{
-				ConnectionDetails: managed.ConnectionDetails{
+			statusUpdateFns: []test.MockSubResourceUpdateFn{test.NewMockSubResourceUpdateFn(nil)},
+			want: wantResult{
+				connectionDetails: managed.ConnectionDetails{
 					"binding_id": []byte("valid-id"),
 					"kubeconfig": []byte("valid-id"),
 				},
 			},
-			wantErr: false,
 		},
 		{
 			name: "service returns error during creation",
@@ -1126,9 +1126,7 @@ func Test_external_Create(t *testing.T) {
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
-							Bindings: []v1alpha1.Binding{},
-						},
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
 					},
 				},
 			},
@@ -1137,8 +1135,8 @@ func Test_external_Create(t *testing.T) {
 					return nil, errors.New("service error")
 				},
 			},
-			want:    managed.ExternalCreation{},
-			wantErr: true,
+			statusUpdateFns: []test.MockSubResourceUpdateFn{},
+			want:            wantResult{err: true},
 		},
 		{
 			name: "service returns error for invalid instance",
@@ -1152,9 +1150,7 @@ func Test_external_Create(t *testing.T) {
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
-						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
-							Bindings: []v1alpha1.Binding{},
-						},
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
 					},
 				},
 			},
@@ -1163,24 +1159,175 @@ func Test_external_Create(t *testing.T) {
 					return nil, errors.New("invalid instance")
 				},
 			},
-			want:    managed.ExternalCreation{},
-			wantErr: true,
+			statusUpdateFns: []test.MockSubResourceUpdateFn{},
+			want:            wantResult{err: true},
+		},
+		{
+			name: "status write succeeds after re-fetch",
+			args: args{
+				ctx: context.Background(),
+				mg: &v1alpha1.KymaEnvironmentBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+					Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
+					Status: v1alpha1.KymaEnvironmentBindingStatus{
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
+					},
+				},
+			},
+			client: &fakeClient{
+				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
+					return &kymaenvironmentbinding.Binding{
+						Metadata:    &kymaenvironmentbinding.Metadata{Id: "new-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
+						Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "kubeconfig-data"},
+					}, nil
+				},
+			},
+			statusUpdateFns: []test.MockSubResourceUpdateFn{test.NewMockSubResourceUpdateFn(nil)},
+			getFn:           test.NewMockGetFn(nil),
+			want: wantResult{
+				connectionDetails: managed.ConnectionDetails{
+					"binding_id": []byte("new-id"),
+					"kubeconfig": []byte("kubeconfig-data"),
+				},
+			},
+		},
+		{
+			name: "status conflict resolved on retry",
+			args: args{
+				ctx: context.Background(),
+				mg: &v1alpha1.KymaEnvironmentBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+					Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
+					Status: v1alpha1.KymaEnvironmentBindingStatus{
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
+					},
+				},
+			},
+			client: &fakeClient{
+				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
+					return &kymaenvironmentbinding.Binding{
+						Metadata:    &kymaenvironmentbinding.Metadata{Id: "new-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
+						Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "kubeconfig-data"},
+					}, nil
+				},
+			},
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(nil),
+			},
+			getFn: test.NewMockGetFn(nil),
+			want: wantResult{
+				connectionDetails: managed.ConnectionDetails{
+					"binding_id": []byte("new-id"),
+					"kubeconfig": []byte("kubeconfig-data"),
+				},
+			},
+		},
+		{
+			name: "all retries exhausted triggers rollback",
+			args: args{
+				ctx: context.Background(),
+				mg: &v1alpha1.KymaEnvironmentBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+					Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
+					Status: v1alpha1.KymaEnvironmentBindingStatus{
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
+					},
+				},
+			},
+			client: &fakeClient{
+				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
+					return &kymaenvironmentbinding.Binding{
+						Metadata:    &kymaenvironmentbinding.Metadata{Id: "new-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
+						Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "kubeconfig-data"},
+					}, nil
+				},
+			},
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+			},
+			getFn: test.NewMockGetFn(nil),
+			want:  wantResult{err: true, rollbackCalled: true},
+		},
+		{
+			name: "all retries exhausted and rollback also fails",
+			args: args{
+				ctx: context.Background(),
+				mg: &v1alpha1.KymaEnvironmentBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+					Spec:       v1alpha1.KymaEnvironmentBindingSpec{KymaEnvironmentId: "kyma-id"},
+					Status: v1alpha1.KymaEnvironmentBindingStatus{
+						AtProvider: v1alpha1.KymaEnvironmentBindingObservation{Bindings: []v1alpha1.Binding{}},
+					},
+				},
+			},
+			client: &fakeClient{
+				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
+					return &kymaenvironmentbinding.Binding{
+						Metadata:    &kymaenvironmentbinding.Metadata{Id: "new-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
+						Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "kubeconfig-data"},
+					}, nil
+				},
+			},
+			statusUpdateFns: []test.MockSubResourceUpdateFn{
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+				test.NewMockSubResourceUpdateFn(conflictErr),
+			},
+			getFn:       test.NewMockGetFn(nil),
+			rollbackErr: errors.New("rollback failed"),
+			want:        wantResult{err: true, rollbackCalled: true, errContains: errRollbackBinding},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &external{kube: test.NewMockClient(), client: tt.client}
+			rollbackCalled := false
+			callIdx := 0
+
+			kube := &test.MockClient{
+				MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					if tt.getFn != nil {
+						return tt.getFn(ctx, key, obj)
+					}
+					return nil
+				},
+				MockStatusUpdate: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					fn := tt.statusUpdateFns[callIdx]
+					callIdx++
+					return fn(ctx, obj, opts...)
+				},
+			}
+			fc := &fakeClient{
+				createInstanceFunc: tt.client.createInstanceFunc,
+				deleteInstanceFunc: func(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error {
+					rollbackCalled = true
+					return tt.rollbackErr
+				},
+			}
+
+			c := &external{kube: kube, client: fc}
 			got, err := c.Create(tt.args.ctx, tt.args.mg)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
+			if (err != nil) != tt.want.err {
+				t.Errorf("Create() error = %v, want.err %v", err, tt.want.err)
 				return
 			}
-			if diff := cmp.Diff(tt.want, got,
+			if rollbackCalled != tt.want.rollbackCalled {
+				t.Errorf("Create() rollbackCalled = %v, want %v", rollbackCalled, tt.want.rollbackCalled)
+			}
+			if tt.want.errContains != "" && !strings.Contains(err.Error(), tt.want.errContains) {
+				t.Errorf("expected error containing %q, got %v", tt.want.errContains, err)
+			}
+			if diff := cmp.Diff(tt.want.connectionDetails, got.ConnectionDetails,
 				cmp.FilterPath(func(p cmp.Path) bool {
 					return p.Last().String() == "[\"created_at\"]" || p.Last().String() == "[\"expires_at\"]"
-				}, cmp.Ignore()),
-				cmp.AllowUnexported(managed.ExternalCreation{})); diff != "" {
-				t.Errorf("Create() mismatch (-want +got):\n%s", diff)
+				}, cmp.Ignore())); diff != "" {
+				t.Errorf("Create() connectionDetails mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -1376,141 +1523,3 @@ func Test_external_updateStatusWithRetry(t *testing.T) {
 	}
 }
 
-func Test_external_Create_statusRetryAndRollback(t *testing.T) {
-	conflictErr := kerrors.NewConflict(schema.GroupResource{}, "test", errors.New("conflict"))
-
-	newBinding := &kymaenvironmentbinding.Binding{
-		Metadata: &kymaenvironmentbinding.Metadata{
-			Id:        "new-id",
-			ExpiresAt: timeNow.Add(time.Hour * 2),
-		},
-		Credentials: &kymaenvironmentbinding.Credentials{
-			Kubeconfig: "kubeconfig-data",
-		},
-	}
-
-	tests := []struct {
-		name                  string
-		statusUpdateFns       []test.MockSubResourceUpdateFn
-		getFn                 test.MockGetFn
-		rollbackErr           error
-		wantErr               bool
-		wantRollbackCalled    bool
-		wantConnectionDetails bool
-		wantErrContains       string
-	}{
-		{
-			name: "status write succeeds after re-fetch",
-			statusUpdateFns: []test.MockSubResourceUpdateFn{
-				test.NewMockSubResourceUpdateFn(nil),
-			},
-			getFn:                 test.NewMockGetFn(nil),
-			wantErr:               false,
-			wantRollbackCalled:    false,
-			wantConnectionDetails: true,
-		},
-		{
-			name: "status conflict resolved on retry",
-			statusUpdateFns: []test.MockSubResourceUpdateFn{
-				test.NewMockSubResourceUpdateFn(conflictErr),
-				test.NewMockSubResourceUpdateFn(nil),
-			},
-			getFn:                 test.NewMockGetFn(nil),
-			wantErr:               false,
-			wantRollbackCalled:    false,
-			wantConnectionDetails: true,
-		},
-		{
-			name: "all retries exhausted triggers rollback",
-			statusUpdateFns: []test.MockSubResourceUpdateFn{
-				test.NewMockSubResourceUpdateFn(conflictErr),
-				test.NewMockSubResourceUpdateFn(conflictErr),
-				test.NewMockSubResourceUpdateFn(conflictErr),
-				test.NewMockSubResourceUpdateFn(conflictErr),
-				test.NewMockSubResourceUpdateFn(conflictErr),
-			},
-			getFn:                 test.NewMockGetFn(nil),
-			wantErr:               true,
-			wantRollbackCalled:    true,
-			wantConnectionDetails: false,
-		},
-		{
-			name: "all retries exhausted and rollback also fails",
-			statusUpdateFns: []test.MockSubResourceUpdateFn{
-				test.NewMockSubResourceUpdateFn(conflictErr),
-				test.NewMockSubResourceUpdateFn(conflictErr),
-				test.NewMockSubResourceUpdateFn(conflictErr),
-				test.NewMockSubResourceUpdateFn(conflictErr),
-				test.NewMockSubResourceUpdateFn(conflictErr),
-			},
-			getFn:                 test.NewMockGetFn(nil),
-			rollbackErr:           errors.New("rollback failed"),
-			wantErr:               true,
-			wantRollbackCalled:    true,
-			wantConnectionDetails: false,
-			wantErrContains:       errRollbackBinding,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rollbackCalled := false
-			callIdx := 0
-
-			kube := &test.MockClient{
-				MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
-					if tt.getFn != nil {
-						return tt.getFn(ctx, key, obj)
-					}
-					return nil
-				},
-				MockStatusUpdate: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-					fn := tt.statusUpdateFns[callIdx]
-					callIdx++
-					return fn(ctx, obj, opts...)
-				},
-			}
-
-			fc := &fakeClient{
-				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
-					return newBinding, nil
-				},
-				deleteInstanceFunc: func(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error {
-					rollbackCalled = true
-					return tt.rollbackErr
-				},
-			}
-
-			c := &external{kube: kube, client: fc}
-			mg := &v1alpha1.KymaEnvironmentBinding{
-				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-				Spec: v1alpha1.KymaEnvironmentBindingSpec{
-					KymaEnvironmentId: "kyma-id",
-				},
-				Status: v1alpha1.KymaEnvironmentBindingStatus{
-					AtProvider: v1alpha1.KymaEnvironmentBindingObservation{
-						Bindings: []v1alpha1.Binding{},
-					},
-				},
-			}
-
-			got, err := c.Create(context.Background(), mg)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if rollbackCalled != tt.wantRollbackCalled {
-				t.Errorf("Create() rollbackCalled = %v, want %v", rollbackCalled, tt.wantRollbackCalled)
-			}
-			if tt.wantConnectionDetails && len(got.ConnectionDetails) == 0 {
-				t.Errorf("Create() expected connection details, got none")
-			}
-			if !tt.wantConnectionDetails && len(got.ConnectionDetails) > 0 {
-				t.Errorf("Create() expected no connection details on failure, got %v", got.ConnectionDetails)
-			}
-			if tt.wantErrContains != "" && err != nil {
-				if !strings.Contains(err.Error(), tt.wantErrContains) {
-					t.Errorf("expected error containing %q, got %v", tt.wantErrContains, err)
-				}
-			}
-		})
-	}
-}
