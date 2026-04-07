@@ -78,6 +78,11 @@ type CertBasedOIDCLoginStatus struct {
 // +kubebuilder:object:root=true
 
 // A CertBasedOIDCLogin is a managed resource that represents a OIDC login flow using a certificate for authentication
+//
+// External-Name Configuration:
+//   - Follows Standard: no - This resource does not support external name as it does not represent an external resource. Instead of using external name for importing, you can just create an instance of this resource.
+//   - Format: Not applicable
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

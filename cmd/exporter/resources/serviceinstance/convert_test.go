@@ -19,14 +19,14 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 
-	instanceID := "987f6543-b21a-43c9-b321-876543210000"
+	instanceID := "x987f6543-b21a-43c9-b321-87654321000"
 	instanceName := "my-instance"
 	serviceName := "test-service"
 	planName := "standard"
-	subAccountGuid := "123e4567-e89b-12d3-a456-426614174000"
+	subAccountGuid := "x123e4567-e89b-12d3-a456-42661417400"
 	externalName := fmt.Sprintf("%s,%s", subAccountGuid, instanceID)
 	smName := "service-manager-resource"
-	resourceName := fmt.Sprintf("%s-%s", instanceName, subAccountGuid)
+	resourceName := fmt.Sprintf("%s-%s", instanceName, instanceID)
 
 	tests := []struct {
 		name string
@@ -194,7 +194,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resources.UndefinedName,
+							Name: resourceName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": resources.UndefinedExternalName,
 							},
@@ -217,7 +217,6 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
-				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),
@@ -244,7 +243,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: resources.UndefinedName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": resources.UndefinedExternalName,
 							},
@@ -266,6 +265,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 							},
 						},
 					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnUndefinedExternalName)
 				rwc.AddComment(resources.WarnMissingInstanceId)
 				return rwc

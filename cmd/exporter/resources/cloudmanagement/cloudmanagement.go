@@ -133,11 +133,13 @@ func exportPrerequisiteSM(ctx context.Context, btpClient *btpcli.BtpCli, cm *ser
 func defaultCloudManagement(subaccountID string) *serviceinstancebase.ServiceInstance {
 	return &serviceinstancebase.ServiceInstance{
 		ServiceInstance: &btpcli.ServiceInstance{
-			ID:           fmt.Sprintf("%s-%s", defaultNamePrefix, subaccountID),
 			Name:         defaultNamePrefix,
 			SubaccountID: subaccountID,
 			Usable:       true,
 		},
+		OfferingName:        serviceinstancebase.CloudManagementOffering,
+		PlanName:            serviceinstancebase.CloudManagementPlan,
+		UseSubaccountID:     true,
 		ResourceWithComment: yaml.NewResourceWithComment(nil),
 	}
 }

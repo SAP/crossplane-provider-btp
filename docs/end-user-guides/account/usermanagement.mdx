@@ -1,0 +1,343 @@
+---
+sidebar_position: 1
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Badge, { CONCEPT, IN_DEV, BETA } from '@site/src/components/Badge.jsx'
+import Link from '@docusaurus/Link'
+
+# Configure user access
+
+This guide shows how to use Crossplane to configure user access to your global accounts, directories, and subaccounts. 
+
+## 🚧 Prerequisites
+
+- You've created a control plane.
+- You've [configured the BTP provider](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp).
+- You've [created and set up a subaccount managed in code](/docs/crossplane-provider-btp/docs/end-user-guides/account/subaccount).
+- You're connected to your control plane.
+
+## Enable XSUAA
+:::warning
+
+The `SubaccountApiCredentials` can not be imported from an existing BTP landscape. Its generated secret is only correct when Crossplane initially creates the resource from scratch. 
+
+:::
+To orchestrate users and roles in BTP, you need to have access to the underlying XSUAA. The role collections can be managed on **subaccount, global-account, and directory** level. 
+
+<Tabs queryString="type">
+    <TabItem value="subaccount" label="Subaccount">
+        On the subaccount level, you can enable XSUAA via the `SubaccountApiCredentials` resource. To create a `SubaccountApiCredentialsCredentials` resource, follow these steps:
+
+        1. Save the YAML content below as `api-credentials.yaml`.
+
+        ```yaml title="api-credentials.yaml"
+        apiVersion: security.btp.sap.crossplane.io/v1alpha1
+        kind: SubaccountApiCredential
+        metadata:
+          name: my-subaccount-xsuaa-credentials
+        spec:
+          forProvider:
+            subaccountRef:
+              name: my-subaccount
+          writeConnectionSecretToRef:
+            name: xsuaa-creds-my-subaccount
+            namespace: default
+        ```
+
+        2. Apply `api-credentials.yaml` to your control plane:
+
+            ```sh title="Run in Terminal"
+            kubectl apply -f api-credentials.yaml
+            ```
+    </TabItem>
+    <TabItem value="global" label="Global account">
+        To enable XSUAA at the global account level, you need to manually create secrets and make them accessible to the provider as a linked secret. For that, you have to use the btp CLI and kubectl.
+        
+        Create a `Secret` named `xsuaa-globalaccount-credentials`:
+
+        ```sh title="Run in Terminal" {1}
+        btp --format json create security/api-credential --global-account <global-account-subdomain>  > /tmp/binding.json
+        kubectl create secret generic xsuaa-globalaccount-credentials -n default --from-file=credentials=/tmp/binding.json -o json
+        ```
+
+        Make sure to replace the `<global-account-subdomain>` with the subdomain of your global account.
+
+    </TabItem>
+    <TabItem value="dir" label="Directory">
+        To enable XSUAA at the global account level, you need to manually create secrets and make them accessible to the provider as a linked secret. For that, you have to use the btp CLI and kubectl.
+        
+        Create a `Secret` named `xsuaa-globalaccount-credentials`:
+
+        ```sh title="Run in Terminal" {1}
+        btp --format json create security/api-credential --directory <directory-id> > /tmp/binding.json
+        kubectl create secret generic xsuaa-directory-credentials -n default --from-file=credentials=/tmp/binding.json -o json
+        ```
+
+        Make sure to replace the `<directory-id>` with the ID of your directory.
+
+    
+    </TabItem>
+</Tabs>
+
+Now you can assign role collections to users or user groups using our `RoleCollectionAssignment` resource.
+
+## Assign users and user groups to role collections <Badge isHeadline={true} type={BETA}/>
+
+:::info
+
+To learn more about role collections, see [Role Collections and Roles in Global Accounts, Directories, and Subaccounts](https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts?locale=en-US&version=LATEST).
+
+:::
+
+### Assign users to role collections
+
+<Tabs queryString="type">
+    <TabItem value="subaccount" label="Subaccount">
+        1. Save the following YAML content as `user-assignment.yaml`.
+
+            ```yaml title="user-assignment.yaml" {10}
+            apiVersion: security.btp.sap.crossplane.io/v1alpha1 
+            kind: RoleCollectionAssignment
+            metadata:
+              namespace: default
+              name: example-user
+            spec:
+              forProvider:
+                origin: "sap.default"
+                roleCollectionName: "Subaccount Administrator"
+                userName: <user-email>
+              subaccountApiCredentialRef:
+                name: my-subaccount-xsuaa-credentials
+            ```
+
+             Replace `<user-email>` with the email address of the user you want to assign to the role collection.
+
+            :::info Default role collections
+
+            The specification in `user-assignment.yaml` assigns the user to the **Subaccount Administrator** role collection. You can learn more about this and other default role collections from the SAP Help Portal: [Role Collections and Roles in Global Accounts, Directories, and Subaccounts](https://help.sap.com/docs/btp/sap-business-technology-platform/role-collections-and-roles-in-global-accounts-directories-and-subaccounts?locale=en-US&version=LATEST).
+            
+            :::
+
+        2. Apply `user-assignment.yaml` to your control plane:
+
+            ```sh title="Run in Terminal"
+            kubectl apply -f user-assignment.yaml
+            ```
+    </TabItem>
+    <TabItem value="global-account" label="Global account">
+        1. Save the following YAML content as `user-assignment.yaml`.
+
+
+            ```yaml title="user-assignment.yaml" {10}
+            apiVersion: security.btp.sap.crossplane.io/v1alpha1 
+            kind: RoleCollectionAssignment
+            metadata:
+              namespace: default
+              name: example-user
+            spec:
+              forProvider:
+                origin: "sap.default"
+                roleCollectionName: "Global Account Administrator"
+                userName: <user-email>
+              apiCredentials: 
+                source: "Secret"
+                secretRef:
+                  name: xsuaa-subaccount-credentials
+                  namespace: default
+                  key: credentials
+            ```
+
+             Replace `<user-email>` with the email address of the user you want to assign the role collection to.
+
+        2. Apply `user-assignment.yaml` to your control plane:
+
+            ```sh title="Run in Terminal"
+            kubectl apply -f user-assignment.yaml
+            ```
+    </TabItem>
+    <TabItem value="directory" label="Directory">
+        1. Save the following YAML content as `user-assignment.yaml`.
+
+            ```yaml title="user-assignment.yaml" {10}
+            apiVersion: security.btp.sap.crossplane.io/v1alpha1 
+            kind: RoleCollectionAssignment
+            metadata:
+              namespace: default
+              name: example-user
+            spec:
+              forProvider:
+                origin: "sap.default"
+                roleCollectionName: "Directory Administrator"
+                userName: <user-email>
+              apiCredentials: 
+                source: "Secret"
+                secretRef:
+                  name: xsuaa-subaccount-credentials
+                  namespace: default
+                  key: credentials
+            ```
+
+            :::
+
+             Replace `<user-email>` with the email address of the user you want to assign the role collection to.
+             
+        2. Apply `user-assignment.yaml` to your control plane:
+
+            ```sh title="Run in Terminal"
+            kubectl apply -f user-assignment.yaml
+            ```
+    </TabItem>  
+</Tabs>
+
+### Assign user groups to role collections
+
+:::info User groups
+
+To assign user groups to role collections, you need to have an identity provider configured. Otherwise, you can only assign individual users to role collections.
+
+:::
+
+<Tabs queryString="type">
+    <TabItem value="subaccount" label="Subaccount">
+        1. Save the following YAML content as `group-assignment.yaml`.
+
+            ```yaml title="group-assignment.yaml" {10}
+            apiVersion: security.btp.sap.crossplane.io/v1alpha1
+            kind: RoleCollectionAssignment
+            metadata:
+              namespace: default
+              name: example-group
+            spec:
+              forProvider:
+                origin: "sap.default"
+                roleCollectionName: "Subaccount Administrator"
+                groupName: <group-name>
+              subaccountApiCredentialRef:
+                name: my-subaccount-xsuaa-credentials
+            ```
+
+            Replace `<group-name>` with the name of the user group. When connecting an IDP, it provides possible group names to BTP, which can then be used as input to the provider resources.
+
+        2. Apply `group-assignment.yaml` to your control plane:
+
+            ```sh title="Run in Terminal"
+            kubectl apply -f group-assignment.yaml
+            ```
+
+    </TabItem>
+    <TabItem value="global-account" label="Global account">
+        1. Save the following YAML content to `group-assignment.yaml`.
+
+            ```yaml title="group-assignment.yaml" {10}
+            apiVersion: security.btp.sap.crossplane.io/v1alpha1
+            kind: RoleCollectionAssignment
+            metadata:
+              namespace: default
+              name: example-group
+            spec:
+              forProvider:
+                origin: "sap.default"
+                roleCollectionName: "Global Account Administrator"
+                groupName: <group-name>
+              apiCredentials: 
+                source: "Secret"
+                secretRef:
+                  name: xsuaa-subaccount-credentials
+                  namespace: default
+                  key: credentials
+            ```
+
+            Replace `<group-name>` with the name of the user group. When connecting an IDP, it provides possible group names to BTP, which can then be used as input to the provider resources.
+             
+
+        2. Apply `group-assignment.yaml` to your control plane:
+
+            ```sh title="Run in Terminal"
+            kubectl apply -f group-assignment.yaml
+            ```
+    </TabItem>
+        <TabItem value="directory" label="Directory">
+        1. Save the following YAML content as `group-assignment.yaml`.
+
+            ```yaml title="group-assignment.yaml" {10}
+            apiVersion: security.btp.sap.crossplane.io/v1alpha1
+            kind: RoleCollectionAssignment
+            metadata:
+              namespace: default
+              name: example-group
+            spec:
+              forProvider:
+                origin: "sap.default"
+                roleCollectionName: "Directory Administrator"
+                groupName: <group-name>
+              apiCredentials: 
+                source: "Secret"
+                secretRef:
+                  name: xsuaa-subaccount-credentials
+                  namespace: default
+                  key: credentials
+            ```
+
+            Replace `<group-name>` with the name of the user group. When an identity provider (IDP) is connected, it exposes available group names to BTP. The group names can then be referenced in provider resources.
+             
+
+        2. Apply `group-assignment.yaml` to your control plane:
+
+            ```sh title="Run in Terminal"
+            kubectl apply -f group-assignment.yaml
+            ```
+    </TabItem>
+</Tabs>
+
+
+## Create a role collection <Badge isHeadline={true} type={BETA}/>
+
+With custom role collections, you can define a set of roles that can be assigned to users or groups.
+You can create a role collection using the `RoleCollection` custom resource.
+
+With the following steps, you can create a custom role collection for your subaccount.
+
+1. Save the following YAML content as `custom-collection.yaml`.
+
+    ```yaml title="custom-collection.yaml"
+    apiVersion: security.btp.sap.crossplane.io/v1alpha1
+    kind: RoleCollection
+    metadata:
+      namespace: default
+      name: custom-role-collection
+    spec:
+      forProvider:
+        name: "Custom Role Collection"
+        description: "This is a custom role collection"
+        roles:
+          - name: "Subaccount Admin"
+            roleTemplateAppId: "cis-local!b14" # Ensure this value matches your landscape configuration
+            roleTemplateName: "Subaccount_Admin"
+      subaccountApiCredentialRef:
+        name: my-subaccount-xsuaa-credentials
+    ```
+
+    :::warning
+
+    `RoleTemplateAppIds` are landscape-specific. Make sure to use the right one for your landscape. You can figure this out by looking at the roles in your subaccount or by using the btp CLI.
+
+    ::: 
+
+2. Apply `custom-collection.yaml` to your control plane:
+
+    ```sh title="Run in Terminal"
+    kubectl apply -f custom-collection.yaml
+    ```
+
+
+## Next steps
+
+- [Create managed services](/docs/crossplane-provider-btp/docs/end-user-guides/services/create-services).
+
+## ⁉ FAQs
+
+### Can I handle user management via external IDP?
+
+Yes, you can. For more information, see our guide: [Advanced: Custom IDP/IAS](/docs/crossplane-provider-btp/docs/end-user-guides/account/idp_usergroups).

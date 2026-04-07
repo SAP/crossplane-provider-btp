@@ -1,0 +1,209 @@
+---
+sidebar_position: 0
+---
+
+# Create and set up a subaccount
+
+This guide shows how to provision and set up an SAP BTP subaccount in an existing global account using code.
+
+## 🚧 Prerequisites
+
+- You've created a control plane.
+- You've [installed](/docs/crossplane-provider-btp/docs/end-user-guides/setup/install-provider-btp) and [configured](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp) the BTP provider.
+- You're connected to your control plane.
+
+## Create a `Subaccount`
+
+1. Save the following YAML content to `subaccount.yaml`.
+
+
+    ```yaml title="subaccount.yaml" {9,12,13}
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: Subaccount
+    metadata:
+      name: my-subaccount
+    spec:
+      forProvider:
+        betaEnabled: true
+        description: hello subaccount
+        displayName: <display-name> # This value will be displayed as a subaccount name in the BTP cockpit
+        region: eu12 # Adjust if needed
+        subaccountAdmins:
+          - <admin-email> # Use the email address of your technical user
+        subdomain: <subaccount-subdomain>  # This value must be unique across all BTP subaccounts
+        usedForProduction: "NOT_USED_FOR_PRODUCTION" # Other supported values are "USED_FOR_PRODUCTION" and "UNSET"
+      providerConfigRef:
+        name: account-provider-config
+
+    ```
+
+    Make sure to replace all placeholders:
+    
+    - `<display-name>`: The subaccount name as it should appear in the BTP cockpit
+    - `<admin-email>`: The email address of [your technical user](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp/#create-and-validate-a-technical-user)
+    - `<subaccount-subdomain>`: A unique subdomain name for your subaccount
+    <p></p>
+
+    <details>
+    <summary> View available regions </summary>
+
+        To view the available regions, you can use the btp CLI:
+
+        ```sh title="Run in Terminal"
+        btp login --sso
+        btp list accounts/available-region --global-account <global-account-subdomain> # The subdomain of your global account can be found in BTP cost center global account view page.
+        ```
+    </details>
+
+2. Apply `subaccount.yaml` to your control plane:
+
+    ```sh title="Run in Terminal"
+    kubectl apply -f subaccount.yaml
+    ```
+        
+    It may take a few moments before the changes are reflected.
+
+## Set up your subaccount
+
+### Create a `ServiceManager` instance
+
+SAP Service Manager allows you to create, update, and delete services within your BTP subaccount from code.
+It's a prerequisite for orchestrating other resources like environments (Cloud Foundry and Kyma) and service instances.
+
+More information on the Service Manager can be found on the SAP Help Portal: [About SAP Service Manager](https://help.sap.com/docs/service-manager/sap-service-manager/sap-service-manager?locale=en-US&version=LATEST).
+
+You can create an instance of the Service Manager service with the `ServiceManager` resource:
+
+1. Save the following YAML content to `servicemanager.yaml`.
+    ```yaml title="servicemanager.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1beta1
+    kind: ServiceManager
+    metadata:
+      name: my-subaccount-service-manager
+    spec:
+      writeConnectionSecretToRef:
+        name: sap-btp-service-operator
+        namespace: default
+      forProvider:
+        subaccountRef:
+          name: my-subaccount
+      providerConfigRef:
+        name: account-provider-config
+    ```
+
+    <br/><br/>
+
+:::warning Subaccount Administrator
+Please ensure the user (used in the `Secret` referenced from the `ProviderConfig`) needs to be part of the Subaccounts `subaccountAdmins` field (See [FAQs](#-faqs) below)
+:::
+
+
+2. Apply `servicemanager.yaml` to your control plane:
+
+    ```sh title="Run in Terminal"
+    kubectl create -f servicemanager.yaml
+    ```
+
+3. You can import existing instances using the `external-name` annotation in the following way:
+
+    ```yaml {4}
+    ...
+    metadata:
+      annotations:
+        # crossplane.io/external-name: <instanceID>/<instanceBindingID>
+        crossplane.io/external-name: 7433f9b1-2905-4ce0-8945-c6370a0077b2/ba92eafd-b549-448d-a58a-06e2b09e999c
+    ...
+    ```
+
+### Create a `CloudManagement` instance
+
+The Cloud Management service is essential for provisioning and maintaining other cloud resources like environments (CloudFoundry and Kyma) or subscriptions on SAP BTP. A local instance needs to be running in each subaccount you wish to orchestrate.
+
+More information on the Cloud Management service can be found [in the SAP Help Portal](https://help.sap.com/docs/btp/sap-business-technology-platform/account-administration-using-apis-of-sap-cloud-management-service?locale=en-US&version=LATEST).
+
+To create a Cloud Management service instance, you first need to entitle it. You can do that in code using [our `Entitlement` custom resource](/docs/crossplane-provider-btp/docs/end-user-guides/services/create-services#create-an-entitlement). 
+
+1. Save the following YAML content to `entitlement-service-manager.yaml`.
+
+    ```yaml title="entitlement-service-manager.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: Entitlement
+    metadata:
+      name: cis-entitlement
+    spec:
+      forProvider:
+        serviceName: cis
+        servicePlanName: local
+        enable: true
+        subaccountRef:
+          name: my-subaccount
+      providerConfigRef:
+        name: account-provider-config
+    ```
+
+2. Apply `entitlement-service-manager.yaml` to your control plane:
+
+    ```sh title="Run in Terminal"
+    kubectl create -f entitlement-service-manager.yaml
+    ```
+
+    Learn more about how to entitle services from our guide: [Order service instances and subscriptions](/docs/crossplane-provider-btp/docs/end-user-guides/services/create-services).
+
+You can then create a Cloud Management service using the `CloudManagement` custom resource, as explained in the following steps.
+
+3. Save the following YAML content to `cloudmanagement.yaml`.
+
+    ```yaml title="cloudmanagement.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: CloudManagement
+    metadata:
+      name: my-subaccount-cis
+    spec:
+      writeConnectionSecretToRef:
+        name: cis-local
+        namespace: default
+      forProvider:
+        serviceManagerRef:
+          name: my-subaccount-service-manager # Use the ServiceManager resource created in the previous step
+        subaccountRef:
+          name: my-subaccount
+      providerConfigRef:
+        name: account-provider-config
+    ```
+
+
+2. Apply `cloudmanagement.yaml` to your control plane:
+
+    ```sh title="Run in Terminal"
+    kubectl create -f cloudmanagement.yaml
+    ```
+
+## Next steps
+
+- [Configure the user access to your subaccount](/docs/crossplane-provider-btp/docs/end-user-guides/account/usermanagement).
+- [Create services instances and subscriptions](/docs/crossplane-provider-btp/docs/end-user-guides/services/create-services).
+- [Consume services](/docs/crossplane-provider-btp/docs/end-user-guides/services/consume-services).
+
+## ⁉ FAQs
+
+### How can I manage BTP subaccount admins?
+
+There is no reconciliation of `.spec.forProvider.subaccountAdmins` after initial creation, and the field can't be updated once set. This is a limitation of the underlying SAP BTP API.
+To manage subaccount admins, use offerings such as [XSUAA](/docs/crossplane-provider-btp/docs/end-user-guides/account/usermanagement).
+
+### When creating a `ServiceManager` instance, I receive the error message `Cannot create: Login failed. Check your credentials (401)`.
+
+This error indicates an authentication failure. Please make sure the users in the secrets referenced in the `ProviderConfig` are listed as `subaccountAdmins` in your `Subaccount`.
+
+###  When creating a `ServiceManager` instance, I receive a response with unexpected status (404).
+
+The error indicates that the client cannot recognize the specified subaccount. To resolve this issue, please verify the following:
+
+1. [The `ProviderConfig`](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp#create-a-providerconfig) references the correct global account subdomain.
+2. The `ServiceManager` references the correct `Subaccount` name.
+
+###  When creating a `ServiceManager` instance, I receive a response with unexpected status (405).
+
+The error indicates that the operation is not allowed via the requested endpoint.
+The most likely cause is that the `cliServerUrl` in the `ProviderConfig` is not correct.
+Please verify that the `cliServerUrl`is set to `https://cli.btp.cloud.sap`if you are on canary or other enviroments please check what the correct URL is for your environment and update the `ProviderConfig` accordingly.

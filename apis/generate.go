@@ -36,6 +36,9 @@ limitations under the License.
 // Run Upjet generator
 //go:generate go run ../cmd/generator/main.go ..
 
+// Inject custom backoff settings on top of generated controllers
+//go:generate ../hack/helpers/ctrl_inject_backoff.sh
+
 // Run e2e test generator
 //go:generate go run ../test/e2e/generator/main.go ..
 
@@ -49,7 +52,7 @@ limitations under the License.
 //go:generate ../hack/helpers/disable_crds.sh account/subaccountserviceinstance account/subaccountservicebinding
 
 // Generate documentation for the external-name
-//go:generate go run ../scripts/generate-external-name-docs.go -apis-dir=. -docs-file=../docs/user/external-name.md
+//go:generate go run ../scripts/generate-external-name-docs.go -apis-dir=. -docs-file=../docs/end-user-guides/import-landscape/external-name.md
 
 package apis
 

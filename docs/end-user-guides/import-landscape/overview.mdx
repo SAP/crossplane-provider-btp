@@ -1,0 +1,48 @@
+---
+sidebar_position: 0
+---
+
+# Import Landscape
+
+The Import Landscape section covers all guides and tools for bringing existing SAP BTP resources under Crossplane management — without having to recreate them from scratch.
+
+## Why Import?
+
+When you adopt the BTP Crossplane provider in an environment that already has existing BTP resources (subaccounts, service instances, entitlements, etc.), you typically do not want to delete and recreate them. Instead, you import them into Crossplane so they can be managed as code going forward.
+
+Crossplane supports this through the `crossplane.io/external-name` annotation, which tells the provider to adopt an existing resource rather than create a new one.
+
+## Automated: BTP Resource Exporter (recommended for large environments)
+
+The [BTP Resource Exporter](/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/exporter-user-guide) is a CLI tool that connects to your BTP global account via the [BTP CLI](https://help.sap.com/docs/btp/btp-cli-command-reference/btp-cli-command-reference), discovers existing resources such as subaccounts, entitlements, and service instances, and generates ready-to-apply Crossplane manifests in YAML format. You can then review the output and gradually transition resources to full Crossplane management at your own pace. The approach is based on the [Import Existing Resources](https://docs.crossplane.io/v2.2/guides/import-existing-resources/) Crossplane documentation.
+
+**Key capabilities:**
+- Interactive and non-interactive modes
+- Resource selection by ID or name pattern (regex)
+- Output to stdout or file
+
+Use this when:
+- You have many resources to import
+- You want a consistent, repeatable export process
+- You need to bootstrap a new control plane from an existing BTP landscape
+
+For installation instructions, command reference, and usage examples, see the [BTP Resource Exporter User Guide](/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/exporter-user-guide).
+
+## Manual: External Name Annotation
+
+For individual resources or fine-grained control, you can manually create a Crossplane manifest and set the `crossplane.io/external-name` annotation to the existing resource's identifier. This tells the provider to adopt the existing resource rather than create a new one.
+
+```yaml
+metadata:
+  annotations:
+    crossplane.io/external-name: <resource-id>
+```
+
+Use this when:
+- You are importing a single resource or a small set
+- You want full control over the manifest content
+- You are already familiar with the resource identifiers
+
+## Reference: External Name per Resource Type
+
+Not sure which identifier to use for a given resource type? The [External Name Reference](/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/external-name) lists the expected format and where to find the identifier for each supported BTP resource — both in the BTP Cockpit UI and via the BTP CLI.

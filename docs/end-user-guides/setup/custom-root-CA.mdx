@@ -1,0 +1,72 @@
+---
+sidebar_position: 3
+---
+
+# Advanced: Custom Root Certificate
+
+The BTP Provider as it is works with the BTP in public cloud using public root certificate authorities for TLS. 
+**In a sovereign/private cloud, the BTP can use custom root/intermediate certificates that are not part of the provider's default trust store.**
+
+This guide describes how you can add your own certificates for root/intermediate certificate authorities.
+
+## High-Level Idea
+
+Our provider uses the system-level trust store of the alpine container, installed in the [Dockerfile](https://github.com/SAP/crossplane-provider-btp/blob/main/cluster/images/crossplane-provider-btp-controller/Dockerfile#L23). This results in the certificate files in `/etc/ssl/certs/` and mainly in `/etc/ssl/certs/ca-certificates.cert`. We can overwrite this folder with a volume mount to contain only our trusted certificates, with crossplane handling Deployment and Pod creation, we use a [`DeploymentRuntimeConfig`](https://docs.crossplane.io/latest/packages/providers/#runtime-configuration) to overwrite the Pod template to mount a volume from a secret.
+
+## Requirements
+- ClusterAdmin 
+
+
+## Step-by-Step
+1. Create Secret with the key name ca-certificates.crt in `crossplane-system` namespace:
+
+```
+k create secret generic custom-root-ca --from-file=ca-certificates.crt -n crossplane-system
+```
+This should contain root CA and intermediate CA.
+
+2. Create a [`DeploymentRuntimeConfig`](https://docs.crossplane.io/latest/packages/providers/#runtime-configuration) that mounts this secret:
+```yaml
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: provider-btp
+  namespace: crossplane-system
+spec:
+  serviceAccountTemplate:
+    metadata:
+      name: provider-btp
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          containers:
+            - name: package-runtime
+              volumeMounts:
+                - name: custom-root-ca
+                  mountPath: /etc/ssl/certs/
+                  readOnly: true
+          volumes:
+            - name: custom-root-ca-integrate
+              secret:
+                secretName: custom-root-ca
+```
+
+3. This `DeploymentRuntimeConfig` needs to be referenced by the provider's `Provider` resource.
+    
+
+> [!WARNING]  
+> Depending on your setup, the `Provider` resource may already exist and be managed by your platform or tooling — do not modify it in that case. This applies, for example, when using [Open Control Plane (OCPL)](https://github.com/openmcp-project/), where the `Provider` resource is typically managed for you.
+
+```yaml
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-btp
+spec:
+  package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<version>
+  runtimeConfigRef:
+    name: provider-btp
+```
+Replace `<version>` with the desired provider version, e.g. `v1.3.0`.

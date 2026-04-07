@@ -23,9 +23,9 @@ func TestConvertCloudManagementResource(t *testing.T) {
 	instanceID := "instance-12345678-1234-1234-1234-123456789abc"
 	bindingID := "binding-12345678-1234-1234-1234-123456789abc"
 	instanceName := "cis-instance"
-	subaccountID := "sa-12345678-1234-1234-1234-123456789abc"
+	subaccountID := "sa-12345678-1234-1234-1234-123456789"
 	smName := "service-manager-ref"
-	resourceName := instanceName + "-" + subaccountID
+	resourceName := instanceName + "." + instanceID
 	externalName := instanceID + "/" + bindingID
 
 	tests := []struct {
@@ -94,6 +94,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 				ServiceManagerName:  smName,
 			},
 			want: func() *yaml.ResourceWithComment {
+				siResourceName := instanceName + "-" + instanceID
 				rwc := yaml.NewResourceWithComment(
 					&v1beta1.CloudManagement{
 						TypeMeta: metav1.TypeMeta{
@@ -101,7 +102,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							APIVersion: v1beta1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: siResourceName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": subaccountID + "," + instanceID, // service instance format
 							},
@@ -110,7 +111,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							ResourceSpec: v1.ResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resourceName,
+									Name:      siResourceName,
 									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
@@ -149,7 +150,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							APIVersion: v1beta1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resources.UndefinedName,
+							Name: resourceName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": externalName,
 							},
@@ -158,7 +159,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							ResourceSpec: v1.ResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resources.UndefinedName,
+									Name:      resourceName,
 									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
@@ -171,7 +172,6 @@ func TestConvertCloudManagementResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
-				rwc.AddComment(resources.WarnUndefinedResourceName)
 				return rwc
 			}(),
 		},
@@ -197,7 +197,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							APIVersion: v1beta1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: resources.UndefinedName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": resources.UndefinedExternalName,
 							},
@@ -206,7 +206,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							ResourceSpec: v1.ResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resourceName,
+									Name:      resources.UndefinedName,
 									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
@@ -219,6 +219,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							},
 						},
 					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnUndefinedExternalName)
 				rwc.AddComment(resources.WarnMissingInstanceId)
 				return rwc
@@ -601,9 +602,9 @@ func TestConvertDefaultCloudManagementResource(t *testing.T) {
 	r := require.New(t)
 
 	// Test data
-	subaccountID := "123e4567-e89b-12d3-a456-426614174000"
+	subaccountID := "x123e4567-e89b-12d3-a456-42661417400"
 	smName := "service-manager-ref"
-	resourceName := defaultNamePrefix + "-" + subaccountID
+	resourceName := defaultNamePrefix + "." + subaccountID
 
 	tests := []struct {
 		name string
