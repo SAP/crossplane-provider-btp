@@ -1003,6 +1003,14 @@ func Test_external_Delete(t *testing.T) {
 func Test_external_Create(t *testing.T) {
 	conflictErr := kerrors.NewConflict(schema.GroupResource{}, "test", errors.New("conflict"))
 
+	defaultBinding := &kymaenvironmentbinding.Binding{
+		Metadata:    &kymaenvironmentbinding.Metadata{Id: "new-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
+		Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "kubeconfig-data"},
+	}
+	defaultCreateFn := func(ctx context.Context, _ string, _ int) (*kymaenvironmentbinding.Binding, error) {
+		return defaultBinding, nil
+	}
+
 	type wantResult struct {
 		err               bool
 		errContains       string
@@ -1174,14 +1182,7 @@ func Test_external_Create(t *testing.T) {
 					},
 				},
 			},
-			client: &fakeClient{
-				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
-					return &kymaenvironmentbinding.Binding{
-						Metadata:    &kymaenvironmentbinding.Metadata{Id: "new-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
-						Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "kubeconfig-data"},
-					}, nil
-				},
-			},
+			client:          &fakeClient{createInstanceFunc: defaultCreateFn},
 			statusUpdateFns: []test.MockSubResourceUpdateFn{test.NewMockSubResourceUpdateFn(nil)},
 			getFn:           test.NewMockGetFn(nil),
 			want: wantResult{
@@ -1203,14 +1204,7 @@ func Test_external_Create(t *testing.T) {
 					},
 				},
 			},
-			client: &fakeClient{
-				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
-					return &kymaenvironmentbinding.Binding{
-						Metadata:    &kymaenvironmentbinding.Metadata{Id: "new-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
-						Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "kubeconfig-data"},
-					}, nil
-				},
-			},
+			client: &fakeClient{createInstanceFunc: defaultCreateFn},
 			statusUpdateFns: []test.MockSubResourceUpdateFn{
 				test.NewMockSubResourceUpdateFn(conflictErr),
 				test.NewMockSubResourceUpdateFn(nil),
@@ -1235,14 +1229,7 @@ func Test_external_Create(t *testing.T) {
 					},
 				},
 			},
-			client: &fakeClient{
-				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
-					return &kymaenvironmentbinding.Binding{
-						Metadata:    &kymaenvironmentbinding.Metadata{Id: "new-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
-						Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "kubeconfig-data"},
-					}, nil
-				},
-			},
+			client: &fakeClient{createInstanceFunc: defaultCreateFn},
 			statusUpdateFns: []test.MockSubResourceUpdateFn{
 				test.NewMockSubResourceUpdateFn(conflictErr),
 				test.NewMockSubResourceUpdateFn(conflictErr),
@@ -1265,14 +1252,7 @@ func Test_external_Create(t *testing.T) {
 					},
 				},
 			},
-			client: &fakeClient{
-				createInstanceFunc: func(ctx context.Context, kymaInstanceId string, ttl int) (*kymaenvironmentbinding.Binding, error) {
-					return &kymaenvironmentbinding.Binding{
-						Metadata:    &kymaenvironmentbinding.Metadata{Id: "new-id", ExpiresAt: timeNow.Add(time.Hour * 2)},
-						Credentials: &kymaenvironmentbinding.Credentials{Kubeconfig: "kubeconfig-data"},
-					}, nil
-				},
-			},
+			client: &fakeClient{createInstanceFunc: defaultCreateFn},
 			statusUpdateFns: []test.MockSubResourceUpdateFn{
 				test.NewMockSubResourceUpdateFn(conflictErr),
 				test.NewMockSubResourceUpdateFn(conflictErr),
