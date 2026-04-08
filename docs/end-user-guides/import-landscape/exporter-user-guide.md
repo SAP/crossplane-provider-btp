@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+---
+
 # BTP Resource Exporter User Guide
 
 The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible resource manifests from SAP Business Technology Platform (BTP). It allows you to export existing BTP resources into YAML manifests that can be managed by Crossplane.

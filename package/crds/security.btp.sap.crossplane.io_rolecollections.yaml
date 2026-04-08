@@ -42,7 +42,7 @@ spec:
             - Format: Role Collection Name (string)
             - How to find:
               - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
-              - CLI: btp get security/role-collection "<name>"→ `name`
+              - CLI: btp get security/role-collection `"<name>"` → `name`
         properties:
           apiVersion:
             description: |-
