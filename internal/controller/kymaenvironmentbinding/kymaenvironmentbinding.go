@@ -96,7 +96,7 @@ func (c *external) updateStatusWithRetry(ctx context.Context, cr *v1alpha1.KymaE
 
 		mutate(cr)
 
-		lastErr := c.kube.Status().Update(ctx, cr)
+		lastErr = c.kube.Status().Update(ctx, cr)
 		if lastErr == nil {
 			return nil
 		}
@@ -270,7 +270,8 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 			return managed.ExternalCreation{}, errors.Wrap(rollbackErr, "failed to roll back binding after status update failure: "+errCreate)
 		}
 		return managed.ExternalCreation{
-			ConnectionDetails: connectionDetails,
+			// In case the status update errored, we return ConnectionDetails nil and an error. Due to the error return, existing connectionDetails will not be updated by crossplane.
+			ConnectionDetails: nil,
 		}, errors.Wrap(statusErr, errStatusUpdate)
 	}
 
