@@ -1339,7 +1339,7 @@ func Test_external_updateStatusWithRetry(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "all retries fail",
+			name: "all retries fail with conflict",
 			args: args{
 				ctx: context.Background(),
 				cr: &v1alpha1.KymaEnvironmentBinding{
@@ -1352,7 +1352,7 @@ func Test_external_updateStatusWithRetry(t *testing.T) {
 				return nil
 			},
 			updateFn: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-				return errors.New("persistent error")
+				return apierrors.NewConflict(schema.GroupResource{}, "test-binding", errors.New("conflict"))
 			},
 			wantErr: true,
 		},
