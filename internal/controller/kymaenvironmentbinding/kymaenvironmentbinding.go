@@ -2,7 +2,6 @@ package kymaenvironmentbinding
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"net/http"
 	"time"
@@ -145,8 +144,6 @@ func (c *external) updateBindingsFromService(ctx context.Context, cr *v1alpha1.K
 	if err != nil {
 		return errors.Wrap(err, errDescribeInstance)
 	}
-
-	fmt.Println("Bindings at service:", len(bindingsAtService))
 
 	validBindings := []v1alpha1.Binding{}
 
