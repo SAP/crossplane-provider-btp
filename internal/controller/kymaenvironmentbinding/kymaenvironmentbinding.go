@@ -10,6 +10,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/pkg/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -82,6 +83,12 @@ func (c *external) updateStatusWithRetry(ctx context.Context, cr *v1alpha1.KymaE
 
 	for i := 0; i < maxRetries; i++ {
 		if i > 0 {
+			select {
+			case <-time.After(time.Duration(100*(1<<uint(i-1))) * time.Millisecond):
+			case <-ctx.Done():
+				return errors.Wrap(ctx.Err(), errStatusUpdate)
+			}
+
 			// Re-fetch to resolve resource version conflicts before retrying
 			if err := c.kube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
 				return errors.Wrap(err, "re-fetch before status retry failed")
@@ -90,15 +97,12 @@ func (c *external) updateStatusWithRetry(ctx context.Context, cr *v1alpha1.KymaE
 
 		mutate(cr)
 
-		err := c.kube.Status().Update(ctx, cr)
-		if err == nil {
+		lastErr := c.kube.Status().Update(ctx, cr)
+		if lastErr == nil {
 			return nil
 		}
-		lastErr = err
-
-		// Exponential backoff after failure, but not after the last attempt
-		if i < maxRetries-1 {
-			time.Sleep(time.Duration(100*(1<<uint(i))) * time.Millisecond)
+		if !kerrors.IsConflict(lastErr) {
+			return errors.Wrap(lastErr, errStatusUpdate)
 		}
 	}
 
@@ -261,7 +265,12 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		cr.Status.AtProvider.Bindings = appendIfNotExists(cr.Status.AtProvider.Bindings, newBinding)
 	})
 	if statusErr != nil {
-		// Status update failed even after retries - store the binding ID
+		// Status update failed after all retries. Roll back the binding on the provisioning API
+		// to prevent it from becoming orphaned and consuming quota.
+		rollbackErr := c.client.DeleteInstances(ctx, []v1alpha1.Binding{newBinding}, cr.Spec.KymaEnvironmentId)
+		if rollbackErr != nil {
+			return managed.ExternalCreation{}, errors.Wrap(rollbackErr, "failed to roll back binding after status update failure: "+errCreate)
+		}
 		return managed.ExternalCreation{
 			ConnectionDetails: connectionDetails,
 		}, errors.Wrap(statusErr, errStatusUpdate)
