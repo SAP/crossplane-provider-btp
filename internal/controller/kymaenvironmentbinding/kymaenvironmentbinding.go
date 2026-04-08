@@ -126,7 +126,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if err := c.updateStatusWithRetry(ctx, cr, 3, func(cr *v1alpha1.KymaEnvironmentBinding) {
 		validBindings, cr.Status.AtProvider.Bindings = c.validateBindings(cr)
 	}); err != nil {
-		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, errStatusUpdate)))
+		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, "while updating status during observe")))
 	}
 	if !validBindings {
 		return managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: true}, nil
@@ -262,6 +262,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		cr.Status.AtProvider.Bindings = appendIfNotExists(cr.Status.AtProvider.Bindings, newBinding)
 	})
 	if statusErr != nil {
+		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(statusErr, "while updating status during creation - rolling back binding (binding will be deleted again)")))
 		// Status update failed after all retries. Roll back the binding on the provisioning API
 		// to prevent it from becoming orphaned and consuming quota.
 		rollbackErr := c.client.DeleteInstances(ctx, []v1alpha1.Binding{newBinding}, cr.Spec.KymaEnvironmentId)
