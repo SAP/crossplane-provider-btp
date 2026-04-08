@@ -11,7 +11,9 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
@@ -1378,7 +1380,7 @@ func Test_external_updateStatusWithRetry(t *testing.T) {
 				return func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 					attempt++
 					if attempt == 1 {
-						return errors.New("conflict")
+						return apierrors.NewConflict(schema.GroupResource{}, "test-binding", errors.New("conflict"))
 					}
 					// On second attempt verify the mutate was re-applied after re-fetch
 					cr := obj.(*v1alpha1.KymaEnvironmentBinding)
@@ -1404,7 +1406,7 @@ func Test_external_updateStatusWithRetry(t *testing.T) {
 				return errors.New("api server down")
 			},
 			updateFn: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-				return errors.New("conflict")
+				return apierrors.NewConflict(schema.GroupResource{}, "test-binding", errors.New("conflict"))
 			},
 			wantErr: true,
 		},
