@@ -2,6 +2,7 @@ package kymaenvironmentbinding
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"net/http"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -73,23 +75,30 @@ func (c *external) Disconnect(ctx context.Context) error {
 }
 
 // updateStatusWithRetry attempts to update the status with exponential backoff retry logic.
-// This significantly reduces the chance of duplicate bindings being created due to status update failures.
-func (c *external) updateStatusWithRetry(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding, maxRetries int) error {
+// On conflict errors it re-fetches the object and re-applies the mutate function before retrying.
+// The mutate function is expected to modify the provided KymaEnvironmentBinding's status based on its current state.
+func (c *external) updateStatusWithRetry(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding, maxRetries int, mutate func(*v1alpha1.KymaEnvironmentBinding)) error {
 	var lastErr error
 
 	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			// Re-fetch to resolve resource version conflicts before retrying
+			if err := c.kube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
+				return errors.Wrap(err, "re-fetch before status retry failed")
+			}
+		}
+
+		mutate(cr)
+
 		err := c.kube.Status().Update(ctx, cr)
 		if err == nil {
 			return nil
 		}
-
 		lastErr = err
 
-		// If this isn't the last retry, wait before retrying
+		// Exponential backoff after failure, but not after the last attempt
 		if i < maxRetries-1 {
-			// Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms
-			waitTime := time.Duration(100*(1<<uint(i))) * time.Millisecond
-			time.Sleep(waitTime)
+			time.Sleep(time.Duration(100*(1<<uint(i))) * time.Millisecond)
 		}
 	}
 
@@ -110,9 +119,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateBindings)
 	}
-	validBindings, bindings := c.validateBindings(cr)
-	cr.Status.AtProvider.Bindings = bindings
-	if err := c.updateStatusWithRetry(ctx, cr, 3); err != nil {
+	var validBindings bool
+	if err := c.updateStatusWithRetry(ctx, cr, 3, func(cr *v1alpha1.KymaEnvironmentBinding) {
+		validBindings, cr.Status.AtProvider.Bindings = c.validateBindings(cr)
+	}); err != nil {
 		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, errStatusUpdate)))
 	}
 	if !validBindings {
@@ -131,6 +141,8 @@ func (c *external) updateBindingsFromService(ctx context.Context, cr *v1alpha1.K
 	if err != nil {
 		return errors.Wrap(err, errDescribeInstance)
 	}
+
+	fmt.Println("Bindings at service:", len(bindingsAtService))
 
 	validBindings := []v1alpha1.Binding{}
 
@@ -201,6 +213,15 @@ func ttlIsExpired(b *v1alpha1.Binding, now time.Time) bool {
 	return b.ExpiresAt.Time.Before(now)
 }
 
+func appendIfNotExists(bindings []v1alpha1.Binding, newBinding v1alpha1.Binding) []v1alpha1.Binding {
+	for _, b := range bindings {
+		if b.Id == newBinding.Id {
+			return bindings
+		}
+	}
+	return append(bindings, newBinding)
+}
+
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironmentBinding)
 	if !ok {
@@ -227,8 +248,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		ExpiresAt: metav1.NewTime(clientBinding.Metadata.ExpiresAt.UTC()),
 	}
 
-	// Add new binding to status
-	cr.Status.AtProvider.Bindings = append(cr.Status.AtProvider.Bindings, newBinding)
 	// Prepare connection details
 	connectionDetails := managed.ConnectionDetails{
 		"binding_id": []byte(newBinding.Id),
@@ -237,8 +256,10 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		"kubeconfig": []byte(clientBinding.Credentials.Kubeconfig),
 	}
 
-	// Try to update status with retry
-	statusErr := c.updateStatusWithRetry(ctx, cr, 5)
+	// Try to update status with retry, re-applying the new binding on conflict re-fetch
+	statusErr := c.updateStatusWithRetry(ctx, cr, 5, func(cr *v1alpha1.KymaEnvironmentBinding) {
+		cr.Status.AtProvider.Bindings = appendIfNotExists(cr.Status.AtProvider.Bindings, newBinding)
+	})
 	if statusErr != nil {
 		// Status update failed even after retries - store the binding ID
 		return managed.ExternalCreation{
