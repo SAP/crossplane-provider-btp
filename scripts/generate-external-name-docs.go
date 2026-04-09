@@ -1,6 +1,6 @@
 // This tool scans all *_types.go files in the apis directory, extracts External-Name
 // Configuration comments from resource type definitions, and generates comprehensive
-// documentation in docs/user/external-name.md.
+// documentation in docs/end-user-guides/import-landscape/external-name.md.
 //
 // The External-Name Configuration comment format should be:
 //
@@ -39,7 +39,7 @@ const (
 	// defaultApisDir is the default directory containing API type definitions
 	defaultApisDir = "apis"
 	// defaultDocsFile is the default path to the external-name documentation file
-	defaultDocsFile = "docs/user/external-name.md"
+	defaultDocsFile = "docs/end-user-guides/import-landscape/external-name.md"
 )
 
 var (

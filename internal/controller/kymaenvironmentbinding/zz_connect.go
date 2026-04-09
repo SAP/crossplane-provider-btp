@@ -68,6 +68,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	return &external{
 			client:     kymaenvironmentbinding.NewKymaBindings(*svc),
 			tracker:    c.resourcetracker,
+			record:     c.record,
 			httpClient: btp.DebugPrintHTTPClient(btp.WithHttpClient(&http.Client{Timeout: 10 * time.Second})),
 			kube:       c.kube,
 		},
