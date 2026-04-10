@@ -113,7 +113,7 @@ type SubscriptionList struct {
 
 // Subscription type metadata.
 var (
-	SubscriptionKind             = reflect.TypeFor[Subscription]().Name()
+	SubscriptionKind             = reflect.TypeOf(Subscription{}).Name()
 	SubscriptionGroupKind        = schema.GroupKind{Group: CRDGroup, Kind: SubscriptionKind}.String()
 	SubscriptionKindAPIVersion   = SubscriptionKind + "." + CRDGroupVersion.String()
 	SubscriptionGroupVersionKind = CRDGroupVersion.WithKind(SubscriptionKind)
