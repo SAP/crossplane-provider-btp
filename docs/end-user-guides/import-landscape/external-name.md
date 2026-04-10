@@ -1,3 +1,7 @@
+---
+sidebar_position: 3
+---
+
 # External name
 
 `External name` in `Crossplane` is a key concept that maps `Crossplane` resources to their corresponding external resources in the managed infrastructure.
@@ -59,6 +63,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 
   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
   - CLI: Use BTP ClI: `btp list accounts/environment-instance`
+
+### RoleCollection
+
+- Follows Standard: no (uses name as identifier, not a GUID)
+- Format: Role Collection Name (string)
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
+  - CLI: btp get security/role-collection `"<name>"` → `name`
 
 ### Subaccount
 

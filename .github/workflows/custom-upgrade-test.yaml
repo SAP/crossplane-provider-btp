@@ -8,87 +8,63 @@
 # TECHNICAL_USER_EMAIL contains the email of the BTP_TECHNICAL_USER
 # More information in the README.md
 
-name: E2E Test
+name: Custom Upgrade Test Workflow
 
-on:
-  workflow_dispatch:
-  workflow_call:
-    inputs:
-      checkout-ref:
-        description: 'the ref for the repo checkout step'
-        default: ''
-        required: false
-        type: string
-      environment:
-        description: 'the environment to run in'
-        default: 'pr-e2e-approval'
-        required: false
-        type: string
-    secrets:
-      CLI_SERVER_URL:
-        description: contains the CLI server URL
-        required: true
-      GLOBAL_ACCOUNT:
-        description: contains the subdomain of the global account
-        required: true
-      IDP_URL:
-        description: contains the URL of an IDP that can be connected to the global account
-        required: true
-      SECOND_DIRECTORY_ADMIN_EMAIL:
-        description: contains a second email (different from the technical user's email) for the directory
-        required: true
-      CIS_CENTRAL_BINDING:
-        description: contents from the service binding of a `cis-central` service
-        required: true
-      BTP_TECHNICAL_USER:
-        required: true
-      TECHNICAL_USER_EMAIL:
-        description: contains the email of the BTP_TECHNICAL_USER
-        required: true
+env:
+  GO_VERSION: '1.25'
 
 permissions:
   contents: read
+  packages: write
 
-env:
-  # hardcoded BTP CLI version
-  btp_cli_version: 2.90.2
-  GO_VERSION: '1.25'
+on:
+  workflow_dispatch:
+    inputs:
+      testFilter:
+        description: "Go test regex filter passed to 'go test -run'. Leave empty to auto-discover and run all custom upgrade tests"
+        required: false
+        type: string
 
 jobs:
   prepare-matrix:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
     outputs:
       test-names: ${{ steps.set-matrix.outputs.test-names }}
     steps:
       - name: checkout repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
-          ref: ${{ inputs.checkout-ref }}
-          
+          submodules: true
+
       - name: Set matrix with test names
         id: set-matrix
         run: |
-          echo "test-names=$(grep -rh --include='**_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/e2e | sed 's/func //;s/(t \*testing.T)//' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
+          if [ -n "${{ github.event.inputs.testFilter }}" ]; then
+            # Use the provided filter as a single test entry
+            echo "test-names=$(echo '${{ github.event.inputs.testFilter }}' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
+          else
+            # Discover all upgrade tests, excluding the baseline upgrade test
+            echo "test-names=$(grep -rh --include='*_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/upgrade | sed 's/func //;s/(t \*testing.T)//' | grep -v 'Test_BaselineUpgradeProvider' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
+          fi
 
       - name: Print test names
-        run: | 
+        run: |
           echo "Test names: ${{ steps.set-matrix.outputs.test-names }}"
 
-  e2e-test:
+  custom-upgrade-test:
     runs-on: ubuntu-latest
-    needs: prepare-matrix #required to depend on prepare-matrix to be able to use its outputs and its environment manual approval
+    needs: prepare-matrix
     strategy:
       fail-fast: false
       matrix:
         testName: ${{ fromJson(needs.prepare-matrix.outputs.test-names) }}
+    env:
+      # hardcoded BTP CLI version
+      btp_cli_version: 2.90.2
     steps:
       - name: checkout repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
-          ref: ${{ inputs.checkout-ref }}
           submodules: true
 
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
@@ -105,7 +81,7 @@ jobs:
           sudo apt-get install -y helm
 
       - name: Install BTP CLI
-      #hardcoded version
+        #hardcoded version
         run: |
           curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
           tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
@@ -119,10 +95,10 @@ jobs:
       - name: Install gettext for envsubst
         run: sudo apt-get update && sudo apt-get install -y gettext
 
-      - name: Run e2e test
+      - name: Run custom upgrade test
         timeout-minutes: 120
         run: |
-          make e2e testFilter=${{ matrix.testName }}
+          make upgrade-test testFilter=${{ matrix.testName }}
         env:
           BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
@@ -131,25 +107,27 @@ jobs:
           GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
-          IDP_URL: ${{ secrets.IDP_URL }}
+          IDP_URL: ${{ secrets.SECOND_IDP_URL }} # Use a different IDP for the upgrade tests to avoid conflicts
+          UPGRADE_TEST_FROM_TAG: "v1.0.3"
+          UPGRADE_TEST_TO_TAG: "local"
 
-  cleanup-e2e:
+  cleanup-custom-upgrade-test:
     runs-on: ubuntu-latest
-    needs: [prepare-matrix, e2e-test]
-    if: always() && needs.prepare-matrix.result == 'success'  # only run if prepare-matrix was successful (requires manual approval) and then always run after e2e-test
+    needs: [prepare-matrix, custom-upgrade-test]
+    if: always() && needs.prepare-matrix.result == 'success'
     steps:
       - name: checkout repo
-        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          # use github.base_ref to checkout the base branch, since the cleanup should always run on the base branch to make it harder for malicious code execution. Consequently, this will not pick up changes to the cleanup.go file in the PR, but that is accebtable.
-          ref: ${{ github.base_ref }}
           submodules: true
 
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Install BTP CLI
+        env:
+          btp_cli_version: 2.90.2
         run: |
           curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
           tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
@@ -169,22 +147,22 @@ jobs:
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
           GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
 
-  # required for test matrix status reporting. Ignores cleanup-e2e job failure/success.
-  e2e-test-success:
+  # required for test matrix status reporting
+  custom-upgrade-test-success:
     runs-on: ubuntu-latest
-    needs: 
+    needs:
       - prepare-matrix
-      - e2e-test
+      - custom-upgrade-test
     timeout-minutes: 1
     if: always()
     steps:
       - name: Fail for failed prepare-matrix job
         if: |
-          needs.prepare-matrix.result == 'failure' || 
+          needs.prepare-matrix.result == 'failure' ||
           needs.prepare-matrix.result == 'cancelled'
         run: exit 1
       - name: Fail for failed matrix jobs
         if: |
-          needs.e2e-test.result == 'failure' || 
-          needs.e2e-test.result == 'cancelled'
+          needs.custom-upgrade-test.result == 'failure' ||
+          needs.custom-upgrade-test.result == 'cancelled'
         run: exit 1
