@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -59,6 +60,7 @@ type connector struct {
 
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
 	log          logr.Logger
+	record       event.Recorder
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
@@ -69,6 +71,7 @@ type external struct {
 	kube       client.Client
 	httpClient *http.Client
 	log        logr.Logger
+	record     event.Recorder
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -138,34 +141,43 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		cr.Status.SetConditions(xpv1.Unavailable())
 	}
 
-	needsUpdate, diff, err := c.needsUpdateWithDiff(cr)
-	if err != nil {
-		return managed.ExternalObservation{
-			ResourceExists:   true,
-			ResourceUpToDate: !needsUpdate,
-		}, errors.Wrap(err, errCheckUpdate)
-	}
-	if needsUpdate {
-		return managed.ExternalObservation{
-			ResourceExists:   true,
-			ResourceUpToDate: false,
-			Diff:             diff,
-		}, nil
-	}
-
 	if connectionDetailsNeedUpdate(lastModified, cr) {
 		// remove the connection details from memoization map
 		// to force fetching a new ConnectionDetails object
 		kymaenv.InvalidateConnectionDetails(instance)
 	}
 	details, readErr := kymaenv.GetConnectionDetails(instance, c.httpClient)
+
+	needsUpdate, diff, err := c.needsUpdateWithDiff(cr)
+	if err != nil {
+		return managed.ExternalObservation{
+			ResourceExists:    true,
+			ResourceUpToDate:  !needsUpdate,
+			ConnectionDetails: details,
+		}, errors.Wrap(err, errCheckUpdate)
+	}
+	if needsUpdate {
+		if readErr != nil {
+			// we want to emit an event if there was an error during reading the connection details, because we want to return the details in any case and if it was an error, the details will just be empty. We logged the error below.
+			c.record.Event(cr, event.Warning("ConnectionDetailsReadFailed - Failed to read connection details. While the resource needs update, this can be ignored. Once the resource is updated, the connection details will be refreshed or it will result in an error", readErr))
+		}
+
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: false,
+			// we set the ConnectionDetails even if there was an error during reading them, because we want to return the details in any case and if it was an error, the details will just be empty. We logged the error above.
+			ConnectionDetails: details,
+			Diff:              diff,
+		}, nil
+	}
 	if readErr != nil {
 		return managed.ExternalObservation{
 			ResourceExists:   true,
-			ResourceUpToDate: true,
+			ResourceUpToDate: !needsUpdate,
 			Diff:             diff,
 		}, errors.Wrap(readErr, errGetConnectionDetails)
 	}
+
 	return managed.ExternalObservation{
 		ResourceExists:    true,
 		ResourceUpToDate:  true,
