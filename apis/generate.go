@@ -52,7 +52,7 @@ limitations under the License.
 //go:generate ../hack/helpers/disable_crds.sh account/subaccountserviceinstance account/subaccountservicebinding
 
 // Generate documentation for the external-name
-//go:generate go run ../scripts/generate-external-name-docs.go -apis-dir=. -docs-file=../docs/user/external-name.md
+//go:generate go run ../scripts/generate-external-name-docs.go -apis-dir=. -docs-file=../docs/end-user-guides/import-landscape/external-name.md
 
 package apis
 
