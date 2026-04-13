@@ -290,6 +290,18 @@ age: 30`)
 	assert.Equal(t, float64(30), mapped.SubscriptionParams["age"])
 }
 
+func TestSubscriptionTypeMapper_ConvertToCreatePayloadEmptyPlan(t *testing.T) {
+	raw := rawExtension(`{}`)
+	cr := NewSubscription("someName", "name1", "", raw)
+
+	uut := NewSubscriptionTypeMapper()
+	mapped := uut.ConvertToCreatePayload(cr)
+
+	assert.NotNil(t, mapped)
+	assert.Equal(t, "name1", mapped.appName)
+	assert.Nil(t, mapped.PlanName)
+}
+
 func TestSubscriptionTypeMapper_IsSynced(t *testing.T) {
 	raw := rawExtension(`{"name": "John", "age": 30}`)
 	cr := NewSubscription("someName", "name1", "plan2", raw)
