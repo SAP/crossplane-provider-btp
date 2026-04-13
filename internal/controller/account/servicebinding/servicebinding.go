@@ -167,7 +167,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	e.keyRotator.ValidateRotationSettings(cr)
 
 	// Retire binding conditionally
-	if !e.keyRotator.RetireBinding(cr) {
+	if !e.keyRotator.NeedRetirement(cr) {
 		if !cr.GetDeletionTimestamp().IsZero() {
 			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 		}
