@@ -3,6 +3,7 @@ package tfclient
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -10,6 +11,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	ujresource "github.com/crossplane/upjet/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -39,11 +41,25 @@ type TfProxyControllerI interface {
 
 type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
 
+// ObservationData is the bridge struct that carries data from the Terraform resource to the Crossplane CR.
+// It is filled by QueryAsyncData() and then saved to the CR status by saveInstanceData().
 type ObservationData struct {
+	// ExternalName is the name used to identify the resource in the external system (BTP)
 	ExternalName string `json:"externalName"`
-	ID           string `json:"id"`
+	// ID is the unique identifier of the resource in BTP
+	ID string `json:"id"`
+	// DashboardURL is the URL of the web-based management UI for the resource
 	DashboardURL string `json:"dashboardUrl"`
-	Conditions   []xpv1.Condition
+	// Conditions are the Crossplane conditions to set on the CR (e.g. Available, AsyncOperationFinished)
+	Conditions []xpv1.Condition
+
+	// Additional observation fields populated from the Terraform resource
+	CreatedDate  *metav1.Time `json:"createdDate,omitempty"`
+	LastModified *metav1.Time `json:"lastModified,omitempty"`
+	State        string       `json:"state,omitempty"`
+	Ready        *bool        `json:"ready,omitempty"`
+	Usable       *bool        `json:"usable,omitempty"`
+	PlatformID   string       `json:"platformId,omitempty"`
 }
 
 // TfMapper is a generic interface to map a native resource to an upjet resource that will be used for applying to terraform
@@ -105,6 +121,31 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 		if obs, err := t.tfResource.GetObservation(); err == nil {
 			if dashboardURL, ok := obs["dashboard_url"].(string); ok {
 				sid.DashboardURL = dashboardURL
+			}
+			// Parse RFC3339 date strings into metav1.Time for Kubernetes compatibility
+			if createdDate, ok := obs["created_date"].(string); ok {
+				if t, err := time.Parse(time.RFC3339, createdDate); err == nil {
+					mt := metav1.NewTime(t)
+					sid.CreatedDate = &mt
+				}
+			}
+			if lastModified, ok := obs["last_modified"].(string); ok {
+				if t, err := time.Parse(time.RFC3339, lastModified); err == nil {
+					mt := metav1.NewTime(t)
+					sid.LastModified = &mt
+				}
+			}
+			if state, ok := obs["state"].(string); ok {
+				sid.State = state
+			}
+			if ready, ok := obs["ready"].(bool); ok {
+				sid.Ready = &ready
+			}
+			if usable, ok := obs["usable"].(bool); ok {
+				sid.Usable = &usable
+			}
+			if platformID, ok := obs["platform_id"].(string); ok {
+				sid.PlatformID = platformID
 			}
 		}
 
