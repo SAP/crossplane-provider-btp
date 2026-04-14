@@ -149,8 +149,8 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	if observation.ResourceUpToDate && tfResource != nil {
-		if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) {
-			_ = e.updateServiceBindingFromTfResource(cr, tfResource)
+		if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) error {
+			return e.updateServiceBindingFromTfResource(cr, tfResource)
 		}); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
 		}
@@ -174,8 +174,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return observation, nil
 	}
 
-	if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 5, func(cr *v1alpha1.ServiceBinding) {
+	if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 5, func(cr *v1alpha1.ServiceBinding) error {
 		e.keyRotator.RetireBinding(cr)
+		return nil
 	}); err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
 	}
@@ -235,8 +236,9 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	// store the result in the status even if errors are returned,
 	// to remove keys for those where deletion was successfull
-	if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) {
+	if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) error {
 		cr.Status.RetiredKeys = newRetiredKeys
+		return nil
 	}); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
 	}

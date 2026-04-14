@@ -88,8 +88,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateBindings)
 	}
 	var validBindings bool
-	if err := reconcilerutil.UpdateStatusWithRetry(ctx, c.kube, cr, 3, func(cr *v1alpha1.KymaEnvironmentBinding) {
+	if err := reconcilerutil.UpdateStatusWithRetry(ctx, c.kube, cr, 3, func(cr *v1alpha1.KymaEnvironmentBinding) error {
 		validBindings, cr.Status.AtProvider.Bindings = c.validateBindings(cr)
+		return nil
 	}); err != nil {
 		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, "while updating status during observe")))
 	}
@@ -223,8 +224,9 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	// Try to update status with retry, re-applying the new binding on conflict re-fetch
-	statusErr := reconcilerutil.UpdateStatusWithRetry(ctx, c.kube, cr, 5, func(cr *v1alpha1.KymaEnvironmentBinding) {
+	statusErr := reconcilerutil.UpdateStatusWithRetry(ctx, c.kube, cr, 5, func(cr *v1alpha1.KymaEnvironmentBinding) error {
 		cr.Status.AtProvider.Bindings = appendIfNotExists(cr.Status.AtProvider.Bindings, newBinding)
+		return nil
 	})
 	if statusErr != nil {
 		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(statusErr, "while updating status during creation - rolling back binding (binding will be deleted again)")))

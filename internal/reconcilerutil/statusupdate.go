@@ -14,7 +14,7 @@ import (
 // backoff retry logic. On conflict errors it re-fetches the object and re-applies the mutate
 // function before retrying. The mutate function is expected to modify the object's status based
 // on its current state.
-func UpdateStatusWithRetry[T client.Object](ctx context.Context, kube client.Client, cr T, maxRetries int, mutate func(T)) error {
+func UpdateStatusWithRetry[T client.Object](ctx context.Context, kube client.Client, cr T, maxRetries int, mutate func(T) error) error {
 	var lastErr error
 
 	for i := 0; i < maxRetries; i++ {
@@ -31,7 +31,9 @@ func UpdateStatusWithRetry[T client.Object](ctx context.Context, kube client.Cli
 			}
 		}
 
-		mutate(cr)
+		if err := mutate(cr); err != nil {
+			return errors.Wrap(err, "mutate function failed")
+		}
 
 		lastErr = kube.Status().Update(ctx, cr)
 		if lastErr == nil {

@@ -58,10 +58,10 @@ func TestUpdateStatusWithRetry(t *testing.T) {
 		ctx        context.Context
 		cr         *v1alpha1.KymaEnvironmentBinding
 		maxRetries int
-		mutate     func(*v1alpha1.KymaEnvironmentBinding)
+		mutate     func(*v1alpha1.KymaEnvironmentBinding) error
 	}
 
-	noop := func(*v1alpha1.KymaEnvironmentBinding) {}
+	noop := func(*v1alpha1.KymaEnvironmentBinding) error { return nil }
 
 	tests := []struct {
 		name     string
@@ -111,8 +111,9 @@ func TestUpdateStatusWithRetry(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "test-binding", Namespace: "default", ResourceVersion: "1"},
 				},
 				maxRetries: 3,
-				mutate: func(cr *v1alpha1.KymaEnvironmentBinding) {
+				mutate: func(cr *v1alpha1.KymaEnvironmentBinding) error {
 					cr.Status.AtProvider.Bindings = append(cr.Status.AtProvider.Bindings, v1alpha1.Binding{Id: "new-id", IsActive: true})
+					return nil
 				},
 			},
 			getFn: func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
