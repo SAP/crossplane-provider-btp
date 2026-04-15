@@ -56,17 +56,41 @@ KIND_NODE_IMAGE_TAG ?= v1.30.2
 -include build/makelib/k8s_tools.mk
 
 # Setup Images
-DOCKER_REGISTRY ?= crossplane
-IMAGES = $(PROJECT_NAME) $(PROJECT_NAME)-controller
--include build/makelib/image.mk
+IMAGES = provider-btp
+-include build/makelib/imagelight.mk
 
-export UUT_CONFIG = $(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME)):$(VERSION)
-export UUT_CONTROLLER = $(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME))-controller:$(VERSION)
-export UUT_IMAGES = {"crossplane/provider-btp":"$(UUT_CONFIG)","crossplane/provider-btp-controller":"$(UUT_CONTROLLER)"}
+export UUT_CONFIG = $(BUILD_REGISTRY)/provider-btp-$(ARCH):latest
+export UUT_IMAGES = {"crossplane/provider-btp":"$(UUT_CONFIG)"}
 testFilter ?= .*
+
+# local-deploy builds the provider image, sideloads the xpkg into a local kind
+# cluster via local.xpkg.mk, and waits for the provider to become healthy.
+# E2E_REUSE_CLUSTER/E2E_CLUSTER_NAME tell xp-testing to reuse this cluster
+# instead of creating a new one and trying to install the provider itself.
+KIND_CLUSTER_NAME ?= local-dev
+CROSSPLANE_VERSION ?= 1.20.1
+export E2E_REUSE_CLUSTER = $(KIND_CLUSTER_NAME)
+export E2E_CLUSTER_NAME = $(KIND_CLUSTER_NAME)
+-include build/makelib/local.xpkg.mk
+-include build/makelib/controlplane.mk
+
+.PHONY: local-deploy
+local-deploy: build controlplane.up local.xpkg.deploy.provider.provider-btp
+	@$(INFO) waiting for provider to become healthy
+	@$(KUBECTL) wait provider.pkg provider-btp --for condition=Healthy --timeout 5m
+	@$(KUBECTL) -n crossplane-system wait --for=condition=Available deployment --all --timeout=5m
+	@$(OK) provider is healthy
+
+# ====================================================================================
+# Setup XPKG
+
+XPKGS ?= provider-btp
+XPKG_REG_ORGS ?= ghcr.io/sap/crossplane-provider-btp/crossplane
+-include build/makelib/xpkg.mk
+
 # NOTE(hasheddan): we force image building to happen prior to xpkg build so that
 # we ensure image is present in daemon.
-xpkg.build.crossplane-provider-btp-controller: do.build.images
+xpkg.build.provider-btp: do.build.images
 
 # NOTE(hasheddan): we ensure up is installed prior to running platform-specific
 # build steps in parallel to avoid encountering an installation race condition.
@@ -251,14 +275,13 @@ e2e.run: test-acceptance
 test-e2e: $(KIND) $(HELM3) build generate-test-crs
 	@$(INFO) running e2e tests
 	@$(INFO) Skipping long running tests
-	@UUT_CONFIG=$(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME)):$(VERSION) UUT_CONTROLLER=$(BUILD_REGISTRY)/$(subst crossplane-,crossplane/,$(PROJECT_NAME))-controller:$(VERSION) go test $(PROJECT_REPO)/test/... -tags=e2e -short -count=1 -timeout 30m
+	@UUT_CONFIG=$(BUILD_REGISTRY)/provider-btp:$(VERSION) go test $(PROJECT_REPO)/test/... -tags=e2e -short -count=1 -timeout 30m
 	@$(OK) e2e tests passed
 
 #run single test-e2e-long test with <make e2e testFilter=functionNameOfTest>
 test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
 	@$(INFO) running integration tests
 	@echo UUT_CONFIG=$$UUT_CONFIG
-	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
 	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
 	@echo "===========Test Summary==========="
@@ -270,12 +293,9 @@ test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
 
 #run single e2e test with <make e2e testFilter=functionNameOfTest>
 .PHONY: test-acceptance
-test-acceptance: $(KIND) $(HELM3) build generate-test-crs
+test-acceptance: local-deploy $(HELM3) generate-test-crs
 	@$(INFO) running integration tests
 	@$(INFO) Skipping long running tests
-	@echo UUT_CONFIG=$$UUT_CONFIG
-	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
-	@echo "UUT_IMAGES=$$UUT_IMAGES"
 	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
@@ -289,8 +309,6 @@ test-acceptance-debug: $(KIND) $(HELM3) build generate-test-crs
 	@$(INFO) running integration tests
 	@$(INFO) Skipping long running tests
 	@echo UUT_CONFIG=$$UUT_CONFIG
-	@echo UUT_CONTROLLER=$$UUT_CONTROLLER
-	@echo "UUT_IMAGES=$$UUT_IMAGES"
 	go test -gcflags="all=-N -l" -c -v  $(PROJECT_REPO)/test/e2e/ -tags=e2e -o ./test/e2e/test-acceptance-debug.test -timeout 30m
 	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
 	@$(OK) integration tests passed
@@ -305,16 +323,6 @@ generate-test-crs:
 	@$(OK) CRS generated
 
 
-PUBLISH_IMAGES ?= crossplane/provider-btp crossplane/provider-btp-controller
-
-.PHONY: publish
-publish:
-	@$(INFO) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
-	@for image in $(PUBLISH_IMAGES); do \
-		echo "Publishing image $(DOCKER_REGISTRY)/$${image}:$(VERSION)"; \
-		docker push $(DOCKER_REGISTRY)/$${image}:$(VERSION); \
-	done
-	@$(OK) "Publishing images $(PUBLISH_IMAGES) to $(DOCKER_REGISTRY)"
 
 # Generate external-name documentation from *_types.go files
 .PHONY: docs.generate-external-name
@@ -368,7 +376,7 @@ build-upgrade-test-images:
 	@if [ "$(UPGRADE_TEST_FROM_TAG)" == "local" ] || [ "$(UPGRADE_TEST_TO_TAG)" == "local" ]; then \
 		$(INFO) "Building local images (UPGRADE_TEST_FROM_TAG or UPGRADE_TEST_TO_TAG is \"local\")"; \
 		$(MAKE) build; \
-		$(OK) "Built local images: $(UUT_IMAGES)"; \
+		$(OK) "Built local images: $(UUT_CONFIG)"; \
 	fi
 
 .PHONY: upgrade-test
