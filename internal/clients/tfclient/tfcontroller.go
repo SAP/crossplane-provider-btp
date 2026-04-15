@@ -24,6 +24,8 @@ const (
 	UpToDate    Status = "UpToDate"
 )
 
+const iso8601Date = "2006-01-02T15:04:05Z0700"
+
 // TfProxyConnectorI is an generic interface that prepares a TfProxyController and returns it for the given native resource
 type TfProxyConnectorI[NATIVE resource.Managed] interface {
 	Connect(context.Context, NATIVE) (TfProxyControllerI, error)
@@ -117,21 +119,24 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 		sid.ExternalName = meta.GetExternalName(t.tfResource)
 		sid.Conditions = []xpv1.Condition{xpv1.Available(), ujresource.AsyncOperationFinishedCondition()}
 
-		// Extract additional observation fields from the terraform resource
+		// GetObservation() returns the raw key-value map from the Terraform state.
+		// Each field is typed as "any", so we use type assertions e.g. .(string) to safely extract values.
+		// The ", ok" pattern means: if the field is missing or the wrong type, skip it instead of crashing.
 		if obs, err := t.tfResource.GetObservation(); err == nil {
 			if dashboardURL, ok := obs["dashboard_url"].(string); ok {
 				sid.DashboardURL = dashboardURL
 			}
-			// Parse RFC3339 date strings into metav1.Time for Kubernetes compatibility
+			// Dates come as RFC3339 strings e.g. "2026-01-01T10:00:00Z".
+			// We parse them into Go time.Time and then wrap in metav1.Time for Kubernetes compatibility.
 			if createdDate, ok := obs["created_date"].(string); ok {
-				if t, err := time.Parse(time.RFC3339, createdDate); err == nil {
-					mt := metav1.NewTime(t)
+				if t, err := time.Parse(iso8601Date, createdDate); err == nil {
+					mt := metav1.NewTime(t.UTC())
 					sid.CreatedDate = &mt
 				}
 			}
 			if lastModified, ok := obs["last_modified"].(string); ok {
-				if t, err := time.Parse(time.RFC3339, lastModified); err == nil {
-					mt := metav1.NewTime(t)
+				if t, err := time.Parse(iso8601Date, lastModified); err == nil {
+					mt := metav1.NewTime(t.UTC())
 					sid.LastModified = &mt
 				}
 			}
