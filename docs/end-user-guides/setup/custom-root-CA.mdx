@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # Advanced: Custom Root Certificate
 
-The BTP Provider as it is works with the BTP in public cloud using public root certificate authorities for TLS. 
+The BTP Provider as it is works with the BTP in public cloud using public root certificate authorities for TLS.
 **In a sovereign/private cloud, the BTP can use custom root/intermediate certificates that are not part of the provider's default trust store.**
 
 This guide describes how you can add your own certificates for root/intermediate certificate authorities.
@@ -14,7 +14,7 @@ This guide describes how you can add your own certificates for root/intermediate
 Our provider uses the system-level trust store of the alpine container, installed in the [Dockerfile](https://github.com/SAP/crossplane-provider-btp/blob/main/cluster/images/crossplane-provider-btp-controller/Dockerfile#L23). This results in the certificate files in `/etc/ssl/certs/` and mainly in `/etc/ssl/certs/ca-certificates.cert`. We can overwrite this folder with a volume mount to contain only our trusted certificates, with crossplane handling Deployment and Pod creation, we use a [`DeploymentRuntimeConfig`](https://docs.crossplane.io/latest/packages/providers/#runtime-configuration) to overwrite the Pod template to mount a volume from a secret.
 
 ## Requirements
-- ClusterAdmin 
+- ClusterAdmin
 
 
 ## Step-by-Step
@@ -30,7 +30,7 @@ This should contain root CA and intermediate CA.
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
-  name: provider-btp-runtime
+  name: provider-btp
   namespace: crossplane-system
 spec:
   serviceAccountTemplate:
@@ -52,14 +52,23 @@ spec:
               secret:
                 secretName: custom-root-ca
 ```
-3. Finally, create a `Provider` CR to install the actual btp provider (can not use the ManagedControlPlane managed provider) with the DeploymentRuntimeConfig reference:
+
+3. This `DeploymentRuntimeConfig` needs to be referenced by the provider's `Provider` resource.
+
+:::warning
+
+Depending on your setup, the `Provider` resource may already exist and be managed by your platform or tooling — do not modify it in that case. This applies, for example, when using [Open Control Plane (OCPL)](https://github.com/openmcp-project/), where the `Provider` resource is typically managed for you.
+
+:::
+
 ```yaml
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-btp
 spec:
-  package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v1.3.0
+  package: ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:<version>
   runtimeConfigRef:
-    name: provider-btp-runtime
+    name: provider-btp
 ```
+Replace `<version>` with the desired provider version, e.g. `v1.3.0`.

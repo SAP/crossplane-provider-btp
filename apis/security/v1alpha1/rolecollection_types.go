@@ -64,7 +64,7 @@ type RoleCollectionStatus struct {
 //   - Format: Role Collection Name (string)
 //   - How to find:
 //     - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
-//     - CLI: btp get security/role-collection "<name>"→ `name`
+//     - CLI: btp get security/role-collection `"<name>"` → `name`
 //
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
