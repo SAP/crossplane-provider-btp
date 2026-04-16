@@ -155,7 +155,7 @@ resources:
             id: (String) The ID of the entitled service plan.
             plan_id: (String) The ID of the entitled service plan.
             plan_name: (String) The name of the entitled service plan.
-            plan_unique_identifier: (String) The unique identifier of the service plan.
+            plan_unique_identifier: (String) The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
             service_name: (String) The name of the entitled service.
         importStatements: []
     btp_directory_role:
@@ -515,6 +515,7 @@ resources:
             parent_features: (Set of String) The features of parent entity of the subaccount.
             parent_id: (String) The ID of the subaccount’s parent entity. If the subaccount is located directly in the global account (not in a directory), then this is the ID of the global account.
             region: (String) The region in which the subaccount was created.
+            skip_auto_entitlement: (Boolean) Specifies if the subaccount creation excludes the auto-assignment of base entitlements, allowing quicker setup with potentially reduced resource consumption. When not set or set to 'false' the standard auto-assigned plans are included.
             state: '(String) The current state of the subaccount. Possible values are:'
             subdomain: (String) The subdomain that becomes part of the path used to access the authorization tenant of the subaccount. Must be unique within the defined region and cannot be changed after the subaccount has been created.
             usage: '(String) Shows whether the subaccount is used for production purposes. This flag can help your cloud operator to take appropriate action when handling incidents that are related to mission-critical accounts in production systems. Do not apply for subaccounts that are used for nonproduction purposes, such as development, testing, and demos. Applying this setting this does not modify the subaccount. Possible values are:'
@@ -560,6 +561,152 @@ resources:
             subaccount_id: (String) The ID of the subaccount.
             token_url: (String) The URL to be used to fetch the access token to make use of the XSUAA REST APIs.
         importStatements: []
+    btp_subaccount_destination:
+        subCategory: ""
+        description: 'Manages a destination in a SAP BTP subaccount or in the scope of a specific service instance. Tip: You must have the appropriate connectivity and destination permissions, such as: Subaccount Administrator Destination Administrator Connectivity and Destination Administrator Scope: Subaccount-level destination: Specify only the ''subaccount_id'' and ''name'' attribute.Service instance-level destination: Specify the ''subaccount_id'', ''service_instance_id'' and ''name'' attributes. Notes: ''service_instance_id'' is optional. When omitted, the destination is created at the subaccount level.'
+        name: btp_subaccount_destination
+        title: btp_subaccount_destination Resource - terraform-provider-btp
+        examples:
+            - name: destination
+              manifest: |-
+                {
+                  "additional_configuration": "${jsonencode({\n    Abc = \"good\"\n  })}",
+                  "authentication": "NoAuthentication",
+                  "description": "resource",
+                  "name": "destination",
+                  "proxy_type": "Internet",
+                  "service_instance_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
+                  "type": "HTTP",
+                  "url": "https://myservice.example.com"
+                }
+            - name: destination
+              manifest: |-
+                {
+                  "additional_configuration": "${jsonencode({\n    Abc = \"good\"\n  })}",
+                  "authentication": "NoAuthentication",
+                  "description": "resource",
+                  "name": "destination",
+                  "proxy_type": "Internet",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
+                  "type": "HTTP",
+                  "url": "https://myservice.example.com"
+                }
+            - name: destination
+              manifest: |-
+                {
+                  "authentication": "NoAuthentication",
+                  "description": "resource",
+                  "name": "destination",
+                  "proxy_type": "Internet",
+                  "service_instance_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
+                  "type": "HTTP",
+                  "url": "https://myservice.example.com"
+                }
+            - name: destination
+              manifest: |-
+                {
+                  "additional_configuration": "${jsonencode({\n    ClientID            = \"\u003cclientid\u003e\"\n    ClientSecret        = \"\u003cclientsecret\u003e\"\n    TokenServiceURL     = \"https://tokenurl\"\n    TokenServiceURLType = \"dedicated\"\n  })}",
+                  "authentication": "OAuth2ClientCredentials",
+                  "description": "resource",
+                  "name": "destination",
+                  "proxy_type": "Internet",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
+                  "type": "HTTP",
+                  "url": "https://myservice.example.com"
+                }
+        argumentDocs:
+            additional_configuration: (String) The additional configuration parameters for the destination.
+            authentication: (String) The authentication of the destination.
+            creation_time: (String) The date and time when the resource was created in
+            description: (String) The description of the destination.
+            etag: (String) The etag for the destination resource
+            id: (String, Deprecated) The ID of the destination used for import operations.
+            modification_time: (String) The date and time when the resource was modified
+            name: (String) The descriptive name of the destination for subaccount
+            proxy_type: (String) The proxytype of the destination.
+            service_instance_id: (String) The service instance that becomes part of the path used to access the destination of the subaccount.
+            subaccount_id: (String) The ID of the subaccount.
+            type: (String) The type of request from destination.
+            url: (String) The url of the destination.
+        importStatements: []
+    btp_subaccount_destination_certificate:
+        subCategory: ""
+        description: Creates a destination certificate in a subaccount.
+        name: btp_subaccount_destination_certificate
+        title: btp_subaccount_destination_certificate Resource - terraform-provider-btp
+        examples:
+            - name: dest_cert_for_sa
+              manifest: |-
+                {
+                  "certificate_content": "${filebase64(\"path_to_file\")}",
+                  "certificate_name": "test.pem",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
+                }
+            - name: dest_cert_for_si
+              manifest: |-
+                {
+                  "certificate_content": "${filebase64(\"path_to_file\")}",
+                  "certificate_name": "test.pem",
+                  "service_instance_id": "bc8a216f-1184-49dc-b4b4-17cfe2828965",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
+                }
+        argumentDocs:
+            algorithm: (String) The cryptographic algorithm used in the key.
+            alias: (String) An identifier used for the key.
+            auto_renew: (Boolean) Specifies whether the certificate is automatically renewed before it expires.
+            certificate: (String, Sensitive) The complete X.509 certificate in PEM format, encoded as base64.
+            certificate_content: (String, Sensitive) The content of the certificate in base64 format.
+            certificate_name: (String) The name of the certificate with a valid certificate extension. Supported certificate types include .pem, .p12, .jks and .pfx
+            certificate_nodes: (Attributes List) List of certificate nodes containing details about the certificate and private key components. (see below for nested schema)
+            certification_creation_details: (Attributes) Details about how the destination certificate was created and its configuration settings. (see below for nested schema)
+            common_name: (String) The common name (CN) extracted from the certificate subject. May be null if not specified in the certificate.
+            format: (String) The format of the certificate or key.
+            generation_method: (String) Specifies the method used to create the certificate.
+            has_password: (Boolean) Indicates whether the certificate is protected with a password.
+            issuer: (String) The certificate issuer which identifies the certificate authority that signed the certificate.
+            not_after: (String) The expiration date and time (in ISO 8601 format) after which the certificate is no longer valid.
+            not_before: (String) The start date and time (in ISO 8601 format) from which the certificate is valid.
+            service_instance_id: (String) The ID of the service instance associated with this certificate.
+            subaccount_id: (String) The ID of the subaccount which contains the certificate.
+            subject: (String) The certificate subject which identifies the owner of the certificate.
+            type: (String) Denotes the type of the node i.e., 'private_key' or 'x509_certificate'.
+            validity_duration: (String) The numeric duration for which the certificate is valid.
+            validity_time_units: (String) The time unit associated with the validity duration, such as DAYS, MONTHS, or YEARS.
+        importStatements: []
+    btp_subaccount_destination_fragment:
+        subCategory: ""
+        description: 'Manages a destination fragment in a SAP BTP subaccount or in the scope of a specific service instance. Tip: You must have the appropriate connectivity and destination permissions, such as: Subaccount AdministratorDestination AdministratorConnectivity and Destination Administrator To learn more about these roles, see the SAP Help documentation:https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/user-roles?q=role+collection Scope: Subaccount-level fragment: Specify only the ''subaccount_id'' and ''name'' attribute.Service instance-level fragment: Specify the ''subaccount_id'', ''service_instance_id'' and ''name'' attributes. Notes: ''service_instance_id'' is optional. When omitted, the fragment is created at the subaccount level.The fragment content is defined using the ''fragment_content'' map and the API requires the ''FragmentName'' field, which is automatically handled by the provider.'
+        name: btp_subaccount_destination_fragment
+        title: btp_subaccount_destination_fragment Resource - terraform-provider-btp
+        examples:
+            - name: dest_fragment_for_sa
+              manifest: |-
+                {
+                  "fragment_content": {
+                    "key1": "value1"
+                  },
+                  "name": "my-fragment",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
+                }
+            - name: dest_fragment_for_si
+              manifest: |-
+                {
+                  "fragment_content": {
+                    "key1": "value1"
+                  },
+                  "name": "my-fragment",
+                  "service_instance_id": "bc8a216f-1184-49dc-b4b4-17cfe2828965",
+                  "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
+                }
+        argumentDocs:
+            fragment_content: (Map of String) The content of the destination fragment.
+            id: (String, Deprecated) The ID of the destination fragment used for import operations.
+            name: (String) The name of the destination fragment.
+            service_instance_id: (String) The ID of the service instance.
+            subaccount_id: (String) The ID of the subaccount.
+        importStatements: []
     btp_subaccount_entitlement:
         subCategory: ""
         description: 'Assigns the entitlement plan of a service, multitenant application, or environment, to a subaccount. Note that some environments, such as Cloud Foundry, are available by default to all global accounts and their subaccounts, and therefore are not made available as entitlements. Tip: You must be assigned to the admin role of the global account. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas'
@@ -602,7 +749,7 @@ resources:
             last_modified: (String) The date and time when the resource was last modified in RFC3339 format.
             plan_id: (String) The ID of the entitled service plan.
             plan_name: (String) The name of the entitled service plan.
-            plan_unique_identifier: (String) The unique identifier of the service plan.
+            plan_unique_identifier: (String) The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
             service_name: (String) The name of the entitled service.
             state: '(String) The current state of the entitlement. Possible values are:'
             subaccount_id: (String) The ID of the subaccount.
@@ -747,7 +894,7 @@ resources:
             read_only: (Boolean) Shows whether the role can be modified or not.
             role_template_name: (String) The name of the role template.
             subaccount_id: (String) The ID of the subaccount.
-            value_required: (Boolean) Shows whether the value is required.
+            value_required: (Boolean, Deprecated) Do not use this attribute as it is defined is defined in the security descriptor (see https://help.sap.com/docs/btp/sap-business-technology-platform/application-security-descriptor-configuration-syntax?#loio517895a9612241259d6941dbf9ad81cb__section_pv5_5qr_xs).
         importStatements: []
     btp_subaccount_role_collection:
         subCategory: ""
@@ -895,10 +1042,13 @@ resources:
                   "username": "platform_user"
                 }
         argumentDocs:
+            cert: (String, Sensitive) PEM-encoded client certificate. cert and key must be supplied together.
             created_date: (String) The date and time when the resource was created in RFC3339 format.
             description: (String) The description of the service broker.
             id: (String) The ID of the service broker.
+            key: (String, Sensitive) PEM-encoded private key matching the client certificate. cert and key must be supplied together.
             last_modified: (String) The date and time when the resource was last modified in RFC3339 format.
+            mtls: (Boolean) Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
             name: (String) The name of the service broker.
             password: (String, Sensitive) The password for basic authentication against the service broker.
             ready: (Boolean) Shows whether the service broker is ready.
@@ -1044,6 +1194,7 @@ resources:
                   "description": "my-description",
                   "identity_provider": "terraformint.accounts400.ondemand.com",
                   "name": "my-name",
+                  "origin": "my-origin-key",
                   "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f"
                 }
         argumentDocs:
