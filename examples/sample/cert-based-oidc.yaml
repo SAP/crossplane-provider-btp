@@ -22,7 +22,5 @@ spec:
   writeConnectionSecretToRef:
     name: oidc-token
     namespace: crossplane-system
----
 # To generate cert secret from downloaded cert:
 # kubectl create secret generic example-login-cert-secret --namespace=crossplane-system --from-file=cert=/tmp/personal.p12
----
