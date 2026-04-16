@@ -1,6 +1,7 @@
 package kymaenvironmentbinding
 
 import (
+	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -15,12 +16,14 @@ import (
 
 // Setup adds a controller that reconciles KymaEnvironment managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
+	name := managed.ControllerName(v1alpha1.KymaEnvironmentBindingKind)
 	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.KymaEnvironmentBinding{}, v1alpha1.KymaEnvironmentBindingKind, v1alpha1.KymaEnvironmentBindingGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 		return &connector{
 			kube:            kube,
 			usage:           usage,
 			newServiceFn:    btp.NewBTPClient,
 			resourcetracker: resourcetracker,
+			record:          event.NewAPIRecorder(mgr.GetEventRecorderFor(name)),
 		}
 	})
 }

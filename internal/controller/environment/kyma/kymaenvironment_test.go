@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -85,7 +86,7 @@ func TestCreate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient()}
+			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient(), record: event.NewNopRecorder()}
 			if tc.args.httpClient != nil {
 				e.httpClient = tc.args.httpClient
 			}
@@ -269,6 +270,46 @@ func TestObserve(t *testing.T) {
 				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
 				err:           nil,
 				cr:            environment(withExternalName(testUUID), withUID("1234"), withConditions(xpv1.Available())),
+			},
+		},
+		"DriftWithConnectionDetails": {
+			// Regression test: connection details must be populated even when there is
+			// parameter drift (e.g. observe-only mode with external changes).
+			args: args{
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+						Id:           internal.Ptr(testUUID),
+						State:        internal.Ptr("OK"),
+						ModifiedDate: internal.Ptr(float32(2000000000000.000000)),
+						Labels:       internal.Ptr("{\"name\": \"kyma\", \"KubeconfigURL\": \"someUrl\"}"),
+						Parameters:   internal.Ptr("{\"name\":\"kyma\", \"extra\": \"external-change\"}"),
+					}, nil
+				}},
+				httpClient: mockedHttpClient(kubeConfigData),
+				cr: environment(withExternalName(testUUID), withUID("1234"),
+					withObservation(v1alpha1.KymaEnvironmentObservation{EnvironmentObservation: v1alpha1.EnvironmentObservation{ModifiedDate: internal.Ptr("1000000000000.000000")}}),
+					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+						Parameters: runtime.RawExtension{Raw: []byte(`{"name":"kyma"}`)},
+					})),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+					ConnectionDetails: managed.ConnectionDetails{
+						"kubeconfig":                 []byte(kubeConfigData),
+						"name":                       []byte("kyma"),
+						"KubeconfigURL":              []byte("someUrl"),
+						"server":                     []byte("someServerUrl"),
+						"certificate-authority-data": []byte("someCaData"),
+					},
+				},
+				crCompareOpts: []cmp.Option{ignoreCircuitBreakerStatus()},
+				err:           nil,
+				cr: environment(withExternalName(testUUID), withUID("1234"), withConditions(xpv1.Available()),
+					withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+						Parameters: runtime.RawExtension{Raw: []byte(`{"name":"kyma"}`)},
+					})),
 			},
 		},
 		"UpdateInProgress": {
@@ -524,7 +565,7 @@ func TestObserve(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient()}
+			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient(), record: event.NewNopRecorder()}
 			if tc.args.httpClient != nil {
 				e.httpClient = tc.args.httpClient
 			}
@@ -599,7 +640,7 @@ func TestCircuitBreaker(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client}
+			e := external{client: tc.args.client, record: event.NewNopRecorder()}
 			got, err := e.Update(context.Background(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Update(...): -want error, +got error:\n%s\n", diff)

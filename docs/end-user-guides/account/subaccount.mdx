@@ -9,7 +9,7 @@ This guide shows how to provision and set up an SAP BTP subaccount in an existin
 ## 🚧 Prerequisites
 
 - You've created a control plane.
-- You've [installed](/docs/crossplane-provider-btp/docs/user-stories/setup/install-provider-btp) and [configured](/docs/crossplane-provider-btp/docs/user-stories/setup/configure-provider-btp) the BTP provider.
+- You've [installed](/docs/crossplane-provider-btp/docs/end-user-guides/setup/install-provider-btp) and [configured](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp) the BTP provider.
 - You're connected to your control plane.
 
 ## Create a `Subaccount`
@@ -38,9 +38,9 @@ This guide shows how to provision and set up an SAP BTP subaccount in an existin
     ```
 
     Make sure to replace all placeholders:
-    
+
     - `<display-name>`: The subaccount name as it should appear in the BTP cockpit
-    - `<admin-email>`: The email address of [your technical user](/docs/crossplane-provider-btp/docs/user-stories/setup/configure-provider-btp/#create-and-validate-a-technical-user)
+    - `<admin-email>`: The email address of [your technical user](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp/#create-and-validate-a-technical-user)
     - `<subaccount-subdomain>`: A unique subdomain name for your subaccount
     <p></p>
 
@@ -60,7 +60,7 @@ This guide shows how to provision and set up an SAP BTP subaccount in an existin
     ```sh title="Run in Terminal"
     kubectl apply -f subaccount.yaml
     ```
-        
+
     It may take a few moments before the changes are reflected.
 
 ## Set up your subaccount
@@ -121,7 +121,7 @@ The Cloud Management service is essential for provisioning and maintaining other
 
 More information on the Cloud Management service can be found [in the SAP Help Portal](https://help.sap.com/docs/btp/sap-business-technology-platform/account-administration-using-apis-of-sap-cloud-management-service?locale=en-US&version=LATEST).
 
-To create a Cloud Management service instance, you first need to entitle it. You can do that in code using [our `Entitlement` custom resource](/docs/crossplane-provider-btp/docs/user-stories/services/create-services#create-an-entitlement). 
+To create a Cloud Management service instance, you first need to entitle it. You can do that in code using [our `Entitlement` custom resource](/docs/crossplane-provider-btp/docs/end-user-guides/services/create-services#create-an-entitlement).
 
 1. Save the following YAML content to `entitlement-service-manager.yaml`.
 
@@ -147,7 +147,7 @@ To create a Cloud Management service instance, you first need to entitle it. You
     kubectl create -f entitlement-service-manager.yaml
     ```
 
-    Learn more about how to entitle services from our guide: [Order service instances and subscriptions](/docs/crossplane-provider-btp/docs/user-stories/services/create-services).
+    Learn more about how to entitle services from our guide: [Order service instances and subscriptions](/docs/crossplane-provider-btp/docs/end-user-guides/services/create-services).
 
 You can then create a Cloud Management service using the `CloudManagement` custom resource, as explained in the following steps.
 
@@ -180,16 +180,14 @@ You can then create a Cloud Management service using the `CloudManagement` custo
 
 ## Next steps
 
-- [Configure the user access to your subaccount](/docs/crossplane-provider-btp/docs/user-stories/account/usermanagement).
-- [Create services instances and subscriptions](/docs/crossplane-provider-btp/docs/user-stories/services/create-services).
-- [Consume services](/docs/crossplane-provider-btp/docs/user-stories/services/consume-services).
+- [Configure the user access to your subaccount](/docs/crossplane-provider-btp/docs/end-user-guides/account/usermanagement).
 
 ## ⁉ FAQs
 
 ### How can I manage BTP subaccount admins?
 
 There is no reconciliation of `.spec.forProvider.subaccountAdmins` after initial creation, and the field can't be updated once set. This is a limitation of the underlying SAP BTP API.
-To manage subaccount admins, use offerings such as [XSUAA](/docs/crossplane-provider-btp/docs/user-stories/account/usermanagement).
+To manage subaccount admins, use offerings such as [XSUAA](/docs/crossplane-provider-btp/docs/end-user-guides/account/usermanagement).
 
 ### When creating a `ServiceManager` instance, I receive the error message `Cannot create: Login failed. Check your credentials (401)`.
 
@@ -199,7 +197,7 @@ This error indicates an authentication failure. Please make sure the users in th
 
 The error indicates that the client cannot recognize the specified subaccount. To resolve this issue, please verify the following:
 
-1. [The `ProviderConfig`](/docs/crossplane-provider-btp/docs/user-stories/setup/configure-provider-btp#create-a-providerconfig) references the correct global account subdomain.
+1. [The `ProviderConfig`](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp#create-a-providerconfig) references the correct global account subdomain.
 2. The `ServiceManager` references the correct `Subaccount` name.
 
 ###  When creating a `ServiceManager` instance, I receive a response with unexpected status (405).
