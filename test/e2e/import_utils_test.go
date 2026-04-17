@@ -113,12 +113,17 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = meta.AddToScheme(r.GetScheme())
 
+				defer func() {
+					if t.Failed() {
+						resources.DumpManagedResources(ctx, t, cfg)
+					}
+				}()
+
 				if it.DependentResourceDirectory != "" {
 					log("Applying dependent resources from "+it.DependentResourceDirectory, it.BaseResource, func() {
 						resources.ImportResources(ctx, t, cfg, it.DependentResourceDirectory)
 
 						if err := resources.WaitForResourcesToBeSynced(ctx, cfg, it.DependentResourceDirectory, nil, it.WaitDependentResourceTimeout); err != nil {
-							resources.DumpManagedResources(ctx, t, cfg)
 							t.Fatal(err)
 						}
 					})
@@ -151,6 +156,12 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 			},
 		).Assess(
 		"Check Imported Resource gets healthy", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+			defer func() {
+				if t.Failed() {
+					resources.DumpManagedResources(ctx, t, cfg)
+				}
+			}()
+
 			externalName := ctx.Value(importFeatureContextKey).(string)
 
 			//preare the resource for import
@@ -172,6 +183,12 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+			defer func() {
+				if t.Failed() {
+					resources.DumpManagedResources(ctx, t, cfg)
+				}
+			}()
+
 			resource := it.BaseResource.DeepCopyObject().(T)
 			MustGetResource(t, cfg, it.GetPrefixedName(), nil, resource)
 

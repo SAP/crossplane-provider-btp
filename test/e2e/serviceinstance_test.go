@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 
@@ -67,4 +68,28 @@ func TestServiceInstance_CreationFlow(t *testing.T) {
 	).Feature()
 
 	testenv.Test(t, crudFeatureSuite)
+}
+
+func TestServiceInstanceImportFlow(t *testing.T) {
+	importTester := NewImportTester(
+		&v1alpha1.ServiceInstance{
+			Spec: v1alpha1.ServiceInstanceSpec{
+				ForProvider: v1alpha1.ServiceInstanceParameters{
+					Name:              "e2e-destination-instance-import",
+					OfferingName:      "destination",
+					PlanName:          "lite",
+					ServiceManagerRef: &xpv1.Reference{Name: "e2e-sm-serviceinstance"},
+					SubaccountRef:     &xpv1.Reference{Name: "e2e-test-serviceinstance"},
+				},
+			},
+		},
+		"e2e-destination-instance-import",
+		WithWaitDependentResourceTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(15*time.Minute)),
+		WithWaitCreateTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(20*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(20*time.Minute)),
+		WithDependentResourceDirectory[*v1alpha1.ServiceInstance]("testdata/crs/serviceinstance_import"),
+	)
+
+	importFeature := importTester.BuildTestFeature("BTP ServiceInstance Import Flow").Feature()
+	testenv.Test(t, importFeature)
 }

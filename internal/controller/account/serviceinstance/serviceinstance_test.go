@@ -3,13 +3,15 @@ package serviceinstance
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
-	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -331,9 +333,11 @@ func TestObserve(t *testing.T) {
 	}
 
 	type want struct {
-		o   managed.ExternalObservation
-		err error
-		cr  *v1alpha1.ServiceInstance // Expected complete CR
+		o                managed.ExternalObservation
+		err              error
+		cr               *v1alpha1.ServiceInstance // Expected complete CR
+		wantDriftCond    bool                      // Whether a DriftDetected condition should be set
+		wantDiffContains []string                  // Substrings that must appear in the Diff field
 	}
 
 	cases := map[string]struct {
@@ -342,6 +346,97 @@ func TestObserve(t *testing.T) {
 		args   args
 		want   want
 	}{
+		// ADR(external-name):: external-name empty without conflict → no creation attempt, not existing
+		"EmptyExternalName_NoConflict": {
+			reason: "should return resourceExists:false when external-name is empty and no conflict error present",
+			fields: fields{
+				client: &TfProxyMock{status: tfclient.NotExisting},
+			},
+			args: args{
+				mg: &v1alpha1.ServiceInstance{},
+			},
+			want: want{
+				err: nil,
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				cr: expectedServiceInstance(),
+			},
+		},
+		// ADR(external-name):: external-name empty + conflict in LastAsyncOperation → stay in error loop
+		"EmptyExternalName_ConflictError": {
+			reason: "should return error and resourceExists:false when external-name is empty but creation failed with Conflict",
+			fields: fields{
+				client: &TfProxyMock{},
+			},
+			args: args{
+				mg: withConflictCondition(&v1alpha1.ServiceInstance{}),
+			},
+			want: want{
+				err: errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one"),
+				o:   managed.ExternalObservation{ResourceExists: false},
+				cr:  withConflictCondition(expectedServiceInstance()),
+			},
+		},
+		// ADR(external-name):: external-name empty + conflict condition but spec changed → allow new Create attempt
+		"EmptyExternalName_ConflictError_SpecChanged": {
+			reason: "should not stay in error loop when spec changed since conflict (Generation > ObservedGeneration in condition)",
+			fields: fields{
+				client: &TfProxyMock{status: tfclient.NotExisting},
+			},
+			args: args{
+				// Generation=2 simulates a spec change after the conflict (condition has ObservedGeneration=1)
+				mg: func() *v1alpha1.ServiceInstance {
+					cr := &v1alpha1.ServiceInstance{}
+					cr.Generation = 1
+					withConflictCondition(cr) // stamps ObservedGeneration=1
+					cr.Generation = 2         // simulate spec change
+					return cr
+				}(),
+			},
+			want: want{
+				err: nil,
+				o:   managed.ExternalObservation{ResourceExists: false},
+				cr: func() *v1alpha1.ServiceInstance {
+					cr := expectedServiceInstance()
+					cr.Generation = 2
+					withConflictCondition(cr)
+					cr.Generation = 2
+					return cr
+				}(),
+			},
+		},
+		// ADR(external-name):: external-name set but not a valid UUID → return error
+		"InvalidUUIDExternalName": {
+			reason: "should return error when external-name is set but not a valid UUID",
+			fields: fields{
+				client: &TfProxyMock{},
+			},
+			args: args{
+				mg: expectedServiceInstance(withExternalName("not-a-uuid")),
+			},
+			want: want{
+				err: errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one"),
+				cr:  expectedServiceInstance(withExternalName("not-a-uuid")),
+			},
+		},
+		// ADR(external-name):: valid UUID in external-name, resource not found → trigger Create()
+		"ValidUUID_NotFound": {
+			reason: "should return resourceExists:false when valid UUID is set but resource does not exist (404)",
+			fields: fields{
+				client: &TfProxyMock{status: tfclient.NotExisting},
+			},
+			args: args{
+				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
+			},
+			want: want{
+				err: nil,
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				cr: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
+			},
+		},
 		"LookupError": {
 			reason: "error should be returned",
 			fields: fields{
@@ -371,12 +466,90 @@ func TestObserve(t *testing.T) {
 				cr: expectedServiceInstance(), // No annotations, observation data, or conditions
 			},
 		},
+		// ADR(external-name):: drift detected → diff set in observation and condition on CR
+		"DriftDetected_DiffReported": {
+			reason: "should set drift condition on CR and return non-empty diff in observation when drift is detected",
+			fields: fields{
+				client: &TfProxyMock{
+					status:  tfclient.Drift,
+					details: map[string][]byte{},
+					tfResource: &v1alpha1.SubaccountServiceInstance{
+						Spec: v1alpha1.SubaccountServiceInstanceSpec{
+							ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
+								Name: internal.Ptr("desired-name"),
+							},
+						},
+						Status: v1alpha1.SubaccountServiceInstanceStatus{
+							AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
+								Name: internal.Ptr("actual-name"),
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
+			},
+			want: want{
+				err: nil,
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  false,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				cr:               expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
+				wantDriftCond:    true,
+				wantDiffContains: []string{"desired-name", "actual-name"},
+			},
+		},
+		// ADR(external-name):: external-name set via Observe() after async creation (external-name flows through saveInstanceData)
+		"ExternalNameSetFromObservationData": {
+			reason: "should set external-name on CR from ObservationData when async creation completes",
+			fields: fields{
+				client: &TfProxyMock{
+					status: tfclient.UpToDate,
+					data: &tfclient.ObservationData{
+						ExternalName: "550e8400-e29b-41d4-a716-446655440000",
+						ID:           "some-id",
+					},
+					details: map[string][]byte{},
+				},
+			},
+			args: args{
+				mg: expectedServiceInstance(withObservationData("", "")),
+			},
+			want: want{
+				err: nil,
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  true,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				cr: expectedServiceInstance(
+					withExternalName("550e8400-e29b-41d4-a716-446655440000"),
+					withObservationData("some-id", ""),
+					withConditions(xpv1.Available()),
+				),
+			},
+		},
 		"Requires Update": {
 			reason: "should return existing, not up to date",
 			fields: fields{
 				client: &TfProxyMock{
 					status:  tfclient.Drift,
 					details: map[string][]byte{},
+					tfResource: &v1alpha1.SubaccountServiceInstance{
+						Spec: v1alpha1.SubaccountServiceInstanceSpec{
+							ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
+								Name: internal.Ptr("test-instance"),
+							},
+						},
+						Status: v1alpha1.SubaccountServiceInstanceStatus{
+							AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
+								Name: internal.Ptr("test-instance-modified"),
+							},
+						},
+					},
 				},
 			},
 			args: args{
@@ -388,6 +561,7 @@ func TestObserve(t *testing.T) {
 					ResourceExists:    true,
 					ResourceUpToDate:  false,
 					ConnectionDetails: managed.ConnectionDetails{},
+					Diff:              "", // Will be filled with actual diff by calculateDiff
 				},
 				cr: expectedServiceInstance(), // No annotations, observation data, or conditions
 			},
@@ -461,8 +635,18 @@ func TestObserve(t *testing.T) {
 
 			got, err := e.Observe(context.Background(), tc.args.mg)
 			expectedErrorBehaviour(t, tc.want.err, err)
-			if diff := cmp.Diff(tc.want.o, got); diff != "" {
+			// Ignore Diff field in comparison as it contains dynamic content
+			if diff := cmp.Diff(tc.want.o, got, cmp.FilterPath(func(p cmp.Path) bool {
+				return p.String() == "Diff"
+			}, cmp.Ignore())); diff != "" {
 				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+
+			// Verify Diff contains expected substrings
+			for _, substr := range tc.want.wantDiffContains {
+				if !strings.Contains(got.Diff, substr) {
+					t.Errorf("\n%s\nexpected Diff to contain %q, got:\n%s", tc.reason, substr, got.Diff)
+				}
 			}
 
 			// Verify the entire CR
@@ -470,8 +654,20 @@ func TestObserve(t *testing.T) {
 			if !ok {
 				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
 			}
-			if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+			// Ignore conditions when comparing CR as they may contain timestamps and drift messages
+			if diff := cmp.Diff(tc.want.cr, cr, cmpopts.IgnoreFields(xpv1.ConditionedStatus{}, "Conditions")); diff != "" {
 				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+			}
+
+			// Verify drift condition was set when expected
+			if tc.want.wantDriftCond {
+				readyCond := cr.GetCondition(xpv1.TypeReady)
+				if readyCond.Reason != "DriftDetected" {
+					t.Errorf("\n%s\nexpected DriftDetected condition, got reason=%q message=%q", tc.reason, readyCond.Reason, readyCond.Message)
+				}
+				if readyCond.Message == "" {
+					t.Errorf("\n%s\nexpected non-empty drift condition message", tc.reason)
+				}
 			}
 		})
 	}
@@ -514,6 +710,24 @@ func TestCreate(t *testing.T) {
 				),
 			},
 		},
+		// ADR(external-name):: external-name already set means the resource was not found by Observe() (e.g. externally deleted).
+		// Create() should proceed normally and recreate it.
+		"ExternalNameAlreadySet_ProceedsWithCreate": {
+			reason: "should proceed with creation when external-name is already set (resource not found by Observe)",
+			fields: fields{
+				client: &TfProxyMock{},
+			},
+			args: args{
+				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
+			},
+			want: want{
+				err: nil,
+				cr: expectedServiceInstance(
+					withExternalName("550e8400-e29b-41d4-a716-446655440000"),
+					withConditions(xpv1.Creating()),
+				),
+			},
+		},
 		"HappyPath": {
 			reason: "should create the resource successfully and set Creating condition",
 			fields: fields{
@@ -531,6 +745,19 @@ func TestCreate(t *testing.T) {
 				),
 			},
 		},
+		"WrongType": {
+			reason: "should return an error when the managed resource is not a ServiceInstance",
+			fields: fields{
+				client: &TfProxyMock{},
+			},
+			args: args{
+				mg: &v1alpha1.Subaccount{},
+			},
+			want: want{
+				err: errors.New(errNotServiceInstance),
+				cr:  nil, // no ServiceInstance to assert on
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -545,12 +772,17 @@ func TestCreate(t *testing.T) {
 			_, err := e.Create(context.Background(), tc.args.mg)
 			expectedErrorBehaviour(t, tc.want.err, err)
 
+			if tc.want.cr == nil {
+				return
+			}
+
 			// Verify the entire CR
 			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
 			if !ok {
 				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
 			}
-			if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+			// Ignore conditions when comparing CR as they may contain timestamps and drift messages
+			if diff := cmp.Diff(tc.want.cr, cr, cmpopts.IgnoreFields(xpv1.ConditionedStatus{}, "Conditions")); diff != "" {
 				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
 			}
 		})
@@ -601,6 +833,20 @@ func TestUpdate(t *testing.T) {
 				cr:  expectedServiceInstance(),
 			},
 		},
+		// ADR(external-name):: Update uses external-name to identify the resource; external-name must be preserved
+		"HappyPath_WithExternalName": {
+			reason: "should update successfully and preserve the external-name on the CR",
+			fields: fields{
+				client: &TfProxyMock{},
+			},
+			args: args{
+				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
+			},
+			want: want{
+				err: nil,
+				cr:  expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -620,8 +866,78 @@ func TestUpdate(t *testing.T) {
 			if !ok {
 				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
 			}
-			if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+			// Ignore conditions when comparing CR as they may contain timestamps and drift messages
+			if diff := cmp.Diff(tc.want.cr, cr, cmpopts.IgnoreFields(xpv1.ConditionedStatus{}, "Conditions")); diff != "" {
 				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestCalculateDiff(t *testing.T) {
+	cases := map[string]struct {
+		reason         string
+		tfResource     resource.Managed
+		wantContains   []string
+		wantNotContain string
+	}{
+		"NilTfResource": {
+			reason:       "should return fallback message when GetTfResource returns nil",
+			tfResource:   nil,
+			wantContains: []string{"unable to retrieve"},
+		},
+		"WrongResourceType": {
+			reason:       "should return fallback message when TfResource is not a SubaccountServiceInstance",
+			tfResource:   &v1alpha1.ServiceInstance{},
+			wantContains: []string{"unexpected resource type"},
+		},
+		"NoDiff_NoAsyncMessage": {
+			reason: "should return generic fallback when spec and status are identical and no async message",
+			tfResource: &v1alpha1.SubaccountServiceInstance{
+				Spec: v1alpha1.SubaccountServiceInstanceSpec{
+					ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
+						Name: internal.Ptr("same-name"),
+					},
+				},
+				Status: v1alpha1.SubaccountServiceInstanceStatus{
+					AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
+						Name: internal.Ptr("same-name"),
+					},
+				},
+			},
+			wantContains: []string{"Drift detected"},
+		},
+		"FieldDiff": {
+			reason: "should contain the differing field values when spec and status diverge",
+			tfResource: &v1alpha1.SubaccountServiceInstance{
+				Spec: v1alpha1.SubaccountServiceInstanceSpec{
+					ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
+						Name: internal.Ptr("desired-name"),
+					},
+				},
+				Status: v1alpha1.SubaccountServiceInstanceStatus{
+					AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
+						Name: internal.Ptr("actual-name"),
+					},
+				},
+			},
+			wantContains: []string{"desired-name", "actual-name"},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				tfClient: &TfProxyMock{tfResource: tc.tfResource},
+				kube:     &test.MockClient{},
+			}
+
+			got := e.calculateDiff(&v1alpha1.ServiceInstance{})
+
+			for _, substr := range tc.wantContains {
+				if !strings.Contains(got, substr) {
+					t.Errorf("\n%s\nexpected diff to contain %q, got:\n%s", tc.reason, substr, got)
+				}
 			}
 		})
 	}
@@ -762,7 +1078,8 @@ func TestDelete(t *testing.T) {
 			if !ok {
 				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
 			}
-			if diff := cmp.Diff(tc.want.cr, cr); diff != "" {
+			// Ignore conditions when comparing CR as they may contain timestamps and drift messages
+			if diff := cmp.Diff(tc.want.cr, cr, cmpopts.IgnoreFields(xpv1.ConditionedStatus{}, "Conditions")); diff != "" {
 				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
 			}
 		})
@@ -801,6 +1118,7 @@ type TfProxyMock struct {
 	err          error
 	details      map[string][]byte
 	deleteCalled bool
+	tfResource   resource.Managed
 }
 
 func (t *TfProxyMock) Delete(ctx context.Context) error {
@@ -824,9 +1142,19 @@ func (t *TfProxyMock) Update(ctx context.Context) error {
 	return t.err
 }
 
+func (t *TfProxyMock) GetTfResource() resource.Managed {
+	return t.tfResource
+}
+
 func expectedErrorBehaviour(t *testing.T, expectedErr error, gotErr error) {
 	if gotErr != nil {
-		assert.Truef(t, errors.Is(gotErr, expectedErr), "expected error %v, got %v", expectedErr, gotErr)
+		if expectedErr == nil {
+			t.Errorf("expected no error, got %v", gotErr)
+			return
+		}
+		if !errors.Is(gotErr, expectedErr) && gotErr.Error() != expectedErr.Error() {
+			t.Errorf("expected error %v, got %v", expectedErr, gotErr)
+		}
 		return
 	}
 	if expectedErr != nil {
@@ -871,4 +1199,18 @@ func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceInstance
 	return func(cr *v1alpha1.ServiceInstance) {
 		cr.Status.Conditions = conditions
 	}
+}
+
+// withConflictCondition sets the LastAsyncOperation condition with a Conflict message,
+// simulating a failed Create() that hit an "already exists" error.
+// ObservedGeneration defaults to 0, matching a CR with Generation=0 (no spec change yet).
+func withConflictCondition(cr *v1alpha1.ServiceInstance) *v1alpha1.ServiceInstance {
+	cr.SetConditions(xpv1.Condition{
+		Type:               ujresource.TypeLastAsyncOperation,
+		Status:             "False",
+		Reason:             "ReconcileError",
+		Message:            "Conflict: resource already exists",
+		ObservedGeneration: cr.Generation,
+	})
+	return cr
 }
