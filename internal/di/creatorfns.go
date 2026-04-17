@@ -14,5 +14,5 @@ func NewPlanIdResolverFn(ctx context.Context, secretData map[string][]byte) (ser
 	if err != nil {
 		return nil, err
 	}
-	return servicemanager.NewServiceManagerClient(btp.AddDebugPrintHTTPClientToContext(ctx), &binding)
+	return servicemanager.NewServiceManagerClient(btp.NewBackgroundContextWithDebugPrintHTTPClient(), &binding)
 }
