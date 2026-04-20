@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -870,5 +872,89 @@ func withObservationData(id string, planId string) func(*v1alpha1.ServiceInstanc
 func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceInstance) {
 	return func(cr *v1alpha1.ServiceInstance) {
 		cr.Status.Conditions = conditions
+	}
+}
+
+// Option to set the full AtProvider observation struct
+func withAtProvider(obs v1alpha1.ServiceInstanceObservation) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Status.AtProvider = obs
+	}
+}
+
+func TestSaveInstanceData(t *testing.T) {
+	ready := true
+	usable := true
+	createdDate := metav1.NewTime(time.Date(2023, 1, 15, 10, 30, 0, 0, time.UTC))
+	lastModified := metav1.NewTime(time.Date(2023, 1, 16, 10, 30, 0, 0, time.UTC))
+
+	cases := map[string]struct {
+		reason string
+		cr     *v1alpha1.ServiceInstance
+		sid    tfclient.ObservationData
+		want   *v1alpha1.ServiceInstance
+	}{
+		"SavesBasicFields": {
+			reason: "should save ID and DashboardURL to the CR status",
+			cr:     &v1alpha1.ServiceInstance{},
+			sid: tfclient.ObservationData{
+				ExternalName: "some-ext-name",
+				ID:           "some-id",
+				DashboardURL: "https://dashboard.example.com",
+			},
+			want: expectedServiceInstance(
+				withExternalName("some-ext-name"),
+				withAtProvider(v1alpha1.ServiceInstanceObservation{
+					ID:           "some-id",
+					DashboardURL: "https://dashboard.example.com",
+				}),
+			),
+		},
+		"SavesAllObservationFields": {
+			reason: "should save all new observation fields (CreatedDate, LastModified, State, Ready, Usable, PlatformID) to the CR status",
+			cr:     &v1alpha1.ServiceInstance{},
+			sid: tfclient.ObservationData{
+				ExternalName: "some-ext-name",
+				ID:           "some-id",
+				DashboardURL: "https://dashboard.example.com",
+				CreatedDate:  &createdDate,
+				LastModified: &lastModified,
+				State:        "succeeded",
+				Ready:        &ready,
+				Usable:       &usable,
+				PlatformID:   "test-platform",
+			},
+			want: expectedServiceInstance(
+				withExternalName("some-ext-name"),
+				withAtProvider(v1alpha1.ServiceInstanceObservation{
+					ID:           "some-id",
+					DashboardURL: "https://dashboard.example.com",
+					CreatedDate:  &createdDate,
+					LastModified: &lastModified,
+					State:        "succeeded",
+					Ready:        &ready,
+					Usable:       &usable,
+					PlatformID:   "test-platform",
+				}),
+			),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				kube: &test.MockClient{
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			}
+
+			err := e.saveInstanceData(context.Background(), tc.cr, tc.sid)
+			if err != nil {
+				t.Errorf("saveInstanceData() unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.want, tc.cr); diff != "" {
+				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+			}
+		})
 	}
 }
