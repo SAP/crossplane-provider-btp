@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"time"
+
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/internal/controller/kymamodule"
@@ -27,13 +29,12 @@ import (
 
 // CustomSetup creates all Template controllers with the supplied logger and adds them to
 // the supplied manager.
-func CustomSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
+func CustomSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions, entitlementCacheTTL time.Duration) error {
 	for _, setup := range []func(ctrl.Manager, internalopts.CrossplaneOptions) error{
 		globalaccount.Setup,
 		subaccount.Setup,
 		cloudfoundry.Setup,
 		kyma.Setup,
-		entitlement.Setup,
 		cloudmanagement.Setup,
 		servicemanager.Setup,
 		resourceusage.Setup,
@@ -52,5 +53,5 @@ func CustomSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 			return err
 		}
 	}
-	return nil
+	return entitlement.Setup(mgr, o, entitlementCacheTTL)
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -25,14 +26,12 @@ type EntitlementsClient struct {
 
 func NewEntitlementsClient(btp btp.Client) *EntitlementsClient {
 	return &EntitlementsClient{btp: btp}
-
 }
 
 func (c EntitlementsClient) DescribeInstance(
 	ctx context.Context,
 	cr *v1alpha1.Entitlement,
 ) (*Instance, error) {
-
 	response, _, err := c.btp.EntitlementsServiceClient.
 		GetDirectoryAssignments(ctx).
 		SubaccountGUID(cr.Spec.ForProvider.SubaccountGuid).
