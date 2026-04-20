@@ -9,7 +9,7 @@ replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20260319
 
 require (
 	dario.cat/mergo v1.0.2
-	github.com/SAP/xp-clifford v0.0.0-20260320095944-ad159065df3c
+	github.com/SAP/xp-clifford v0.0.0-20260420062843-efc3bf3491d1
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.18
 	github.com/crossplane-contrib/xp-testing v1.9.2
