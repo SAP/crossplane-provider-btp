@@ -365,11 +365,9 @@ pull-upgrade-test-version-crs:
 
 .PHONY: build-upgrade-test-images
 build-upgrade-test-images:
-	@if [ "$(UPGRADE_TEST_FROM_TAG)" == "local" ] || [ "$(UPGRADE_TEST_TO_TAG)" == "local" ]; then \
-		$(INFO) "Building local images (UPGRADE_TEST_FROM_TAG or UPGRADE_TEST_TO_TAG is \"local\")"; \
-		$(MAKE) build; \
-		$(OK) "Built local images: $(UUT_IMAGES)"; \
-	fi
+	@$(INFO) "Building images for upgrade tests"
+	@$(MAKE) build
+	@$(OK) "Built images: $(UUT_IMAGES)"
 
 .PHONY: upgrade-test
 upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
