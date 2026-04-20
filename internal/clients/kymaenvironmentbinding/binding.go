@@ -78,7 +78,7 @@ func (c KymaBindings) DeleteInstances(ctx context.Context, bindings []v1alpha1.B
 	for _, binding := range bindings {
 		if _, http, err := c.btp.ProvisioningServiceClient.DeleteEnvironmentInstanceBinding(ctx, kymaInstanceId, binding.Id).Execute(); err != nil {
 			if http != nil && http.StatusCode != 404 {
-				return fmt.Errorf("%s: KymaEnvironmentBinding ID %s: %w", errKymaBindingDeleteFailed, binding.Id, err)
+				return fmt.Errorf("%s: KymaEnvironmentBinding ID %s: http status %s: %w", errKymaBindingDeleteFailed, binding.Id, http.Status, err)
 			}
 		}
 	}
