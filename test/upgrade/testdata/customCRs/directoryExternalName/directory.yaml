@@ -1,0 +1,16 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Directory
+metadata:
+  name: upgrade-test-extn-dir
+spec:
+  forProvider:
+    description: "$BUILD_ID-created by external name upgrade tests"
+    directoryAdmins:
+      - "$SECOND_DIRECTORY_ADMIN_EMAIL"
+      - "$TECHNICAL_USER_EMAIL"
+    directoryFeatures:
+      - "DEFAULT"
+    displayName: $BUILD_ID-upgrade-test-extn-dir
+    labels:
+      safe-to-delete: ["yes"]
+      BUILD_ID: ["$BUILD_ID"]

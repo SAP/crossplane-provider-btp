@@ -179,10 +179,18 @@ func (s *SubscriptionTypeMapper) SyncStatus(get *SubscriptionGet, crStatus *v1al
 }
 
 func (s *SubscriptionTypeMapper) ConvertToCreatePayload(cr *v1alpha1.Subscription) SubscriptionPost {
+	// Passing { "planName": "" } to the SAP SaaS Provisioning Service API when subscribing creates a new entitled application instead of subscribing to the existing one.
+	// This leaves the existing one with "state": "NOT_SUBSCRIBED".
+	// Observe gets the existing one, tries to subscribe and receives a HTTP 409 Conflict because the subaccount is already subscribed to the application.
+	// We avoid this by omitting the planName when it's empty.
+	var planName *string
+	if cr.Spec.ForProvider.PlanName != "" {
+		planName = &cr.Spec.ForProvider.PlanName
+	}
 	return SubscriptionPost{
 		appName: cr.Spec.ForProvider.AppName,
 		CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
-			PlanName:           &cr.Spec.ForProvider.PlanName,
+			PlanName:           planName,
 			SubscriptionParams: s.ConvertToClientParams(cr),
 		},
 	}
