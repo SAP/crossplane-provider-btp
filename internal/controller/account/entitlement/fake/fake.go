@@ -8,7 +8,8 @@ import (
 )
 
 type MockClient struct {
-	MockDescribeCluster func(ctx context.Context, input apisv1alpha1.Entitlement) (*entitlement.Instance, error)
+	MockDescribeCluster  func(ctx context.Context, input apisv1alpha1.Entitlement) (*entitlement.Instance, error)
+	MockDeleteInstanceFn func(ctx context.Context, cr *apisv1alpha1.Entitlement) error
 }
 
 func (c MockClient) DescribeInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) (
@@ -24,5 +25,8 @@ func (c MockClient) UpdateInstance(ctx context.Context, cr *apisv1alpha1.Entitle
 	return nil
 }
 func (c MockClient) DeleteInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) error {
+	if c.MockDeleteInstanceFn != nil {
+		return c.MockDeleteInstanceFn(ctx, cr)
+	}
 	return nil
 }

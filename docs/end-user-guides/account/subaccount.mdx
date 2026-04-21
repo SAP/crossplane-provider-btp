@@ -38,7 +38,7 @@ This guide shows how to provision and set up an SAP BTP subaccount in an existin
     ```
 
     Make sure to replace all placeholders:
-    
+
     - `<display-name>`: The subaccount name as it should appear in the BTP cockpit
     - `<admin-email>`: The email address of [your technical user](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp/#create-and-validate-a-technical-user)
     - `<subaccount-subdomain>`: A unique subdomain name for your subaccount
@@ -60,7 +60,7 @@ This guide shows how to provision and set up an SAP BTP subaccount in an existin
     ```sh title="Run in Terminal"
     kubectl apply -f subaccount.yaml
     ```
-        
+
     It may take a few moments before the changes are reflected.
 
 ## Set up your subaccount
@@ -121,7 +121,7 @@ The Cloud Management service is essential for provisioning and maintaining other
 
 More information on the Cloud Management service can be found [in the SAP Help Portal](https://help.sap.com/docs/btp/sap-business-technology-platform/account-administration-using-apis-of-sap-cloud-management-service?locale=en-US&version=LATEST).
 
-To create a Cloud Management service instance, you first need to entitle it. You can do that in code using [our `Entitlement` custom resource](/docs/crossplane-provider-btp/docs/end-user-guides/services/create-services#create-an-entitlement). 
+To create a Cloud Management service instance, you first need to entitle it. You can do that in code using [our `Entitlement` custom resource](/docs/crossplane-provider-btp/docs/end-user-guides/services/create-services#create-an-entitlement).
 
 1. Save the following YAML content to `entitlement-service-manager.yaml`.
 
@@ -181,8 +181,6 @@ You can then create a Cloud Management service using the `CloudManagement` custo
 ## Next steps
 
 - [Configure the user access to your subaccount](/docs/crossplane-provider-btp/docs/end-user-guides/account/usermanagement).
-- [Create services instances and subscriptions](/docs/crossplane-provider-btp/docs/end-user-guides/services/create-services).
-- [Consume services](/docs/crossplane-provider-btp/docs/end-user-guides/services/consume-services).
 
 ## ⁉ FAQs
 

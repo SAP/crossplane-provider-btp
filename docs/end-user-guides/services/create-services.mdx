@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 # Create service instances and subscriptions
 
-This guide shows how to create service entitlements, instances, and subscriptions using the BTP provider. As examples, we'll use the SAP Message Queuing service and [SAP Business Application Studio](https://www.sap.com/germany/products/technology-platform/business-application-studio.html).
+This guide shows how to create entitlements, service instances, and subscriptions using the BTP provider. As examples, we'll use the [SAP HANA Cloud](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/using-sap-btp-command-line-interface-btp-cli-with-sap-hana-cloud?locale=en-US&version=LATEST) service and [SAP HANA Cloud Administration Tools](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/subscribing-to-sap-hana-cloud-administration-tools?locale=en-US&version=LATEST) subscription.
 
 ## 🚧 Prerequisites
 
@@ -18,185 +18,196 @@ This guide shows how to create service entitlements, instances, and subscription
 
 ## Service instance
 
-With the `Entitlement` and `ServiceInstance` custom resources, you can orchestrate [entitlements](https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas?locale=en-US&version=LATEST) and service instances on SAP BTP. The following steps show how to entitle the Message Queuing service to your managed subaccount and then create a Message Queuing service instance. 
+With the `Entitlement` and `ServiceInstance` custom resources, you can orchestrate [entitlements and service instances](https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas?locale=en-US&version=LATEST) on SAP BTP. The following steps show how to entitle the SAP HANA Cloud service to your managed subaccount and then create a SAP HANA Cloud service instance.
 
 ### Create an `Entitlement`
 
-To entitle the Message Queuing service to your subaccount, apply the `Entitlement` custom resource as described below.
+To entitle the SAP HANA Cloud service to your subaccount, apply the `Entitlement` custom resource as described below.
 
-1. Save the following YAML content to `entitlement-msq.yaml`.
+1. Save the following YAML content to `hana-cloud-entitlement.yaml`:
 
-    ```yaml title="entitlement-msq.yaml"
+    ```yaml title="hana-cloud-entitlement.yaml"
     apiVersion: account.btp.sap.crossplane.io/v1alpha1
     kind: Entitlement
     metadata:
-      name: msq-entitlement
+      name: hana-cloud-entitlement
     spec:
       forProvider:
-        serviceName: message-queuing
-        servicePlanName: standard
-        amount: 1
+        serviceName: hana-cloud
+        servicePlanName: hana
+        servicePlanUniqueIdentifier: hana-cloud-hana
+        enable: true
         subaccountRef:
           name: my-subaccount
       providerConfigRef:
         name: account-provider-config
     ```
 
-:::note Want to create an HANA Cloud instance?
-Don't forget to set the `spec.forProvider.servicePlanUniqueIdentifier` field. Use `servicePlanUniqueIdentifier: hana-cloud-hana-sap_eu-de-1` for the SAP Europe Data Center or `servicePlanUniqueIdentifier: hana-cloud-hana` for other supported data centers.
+    :::note
+    Don't forget to set the `spec.forProvider.servicePlanUniqueIdentifier` field. Use `servicePlanUniqueIdentifier: hana-cloud-hana-sap_eu-de-1` for the SAP Europe Data Center or `servicePlanUniqueIdentifier: hana-cloud-hana` for other supported data centers.
+    :::
 
-Check out our [crossplane-provider-hana](https://github.com/SAP/crossplane-provider-hana).
-:::
+    <button onClick={() => window.open("https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/Entitlement/v1alpha1@v1.6.0", "_blank")} className='button button--secondary'>See full CRD reference</button>
 
-2. Apply `entitlement-msq.yaml` to your control plane:
+2. Apply `hana-cloud-entitlement.yaml` to your control plane:
 
-    ```sh title="Run in Terminal"
-    kubectl create -f entitlement-msq.yaml
+    ```sh title="Run in terminal"
+    kubectl create -f hana-cloud-entitlement.yaml
     ```
 
 ### Create a `ServiceInstance`
 
-Once the Message Queuing service is entitled, you can create your first managed service instance. The steps below show how to create a Message Queuing service instance using our `ServiceInstance` custom resource.
+Once the SAP HANA Cloud service is entitled, you can create your first managed service instance. The steps below show how to create a SAP HANA Cloud service instance using our `ServiceInstance` custom resource.
 
-1. Save the following YAML content to `instance-msq.yaml`.
+1. Save the following YAML content to `hana-cloud-instance.yaml`:
 
     <Tabs groupId="service-instance">
       <TabItem value="yaml" label="YAML params" default>
-        ```yaml title="instance-msq.yaml"
+        ```yaml {17} title="hana-cloud-instance.yaml"
         apiVersion: account.btp.sap.crossplane.io/v1alpha1
         kind: ServiceInstance
         metadata:
-          name: message-instance
+          name: hana-cloud-instance
         spec:
           forProvider:
-            name: message-instance
+            name: hana-cloud-instance
             serviceManagerRef:
               name: my-subaccount-service-manager
             subaccountRef:
               name: my-subaccount
-            offeringName: message-queuing
-            planName: standard
+            offeringName: hana-cloud
+            planName: hana
             parameters:
-              sourceIPs: 0.0.0.0/0
-              resources:
-                units: "100"
+              data:
+                memory: 16
+                systempassword: Cloud-12345! # TODO change
+                edition: cloud
           providerConfigRef:
-            name: account-provider-config # Please reference your providerConfig here!
+            name: account-provider-config
         ```
       </TabItem>
       <TabItem value="json" label="JSON params">
-
-        ```yaml title="instance-msq.json"
+        ```yaml {18} title="hana-cloud-instance.yaml"
         apiVersion: account.btp.sap.crossplane.io/v1alpha1
         kind: ServiceInstance
         metadata:
-          name: message-instance
+          name: hana-cloud-instance
         spec:
           forProvider:
-        name: message-instance
-        serviceManagerRef:
-          name: my-subaccount-service-manager
-        subaccountRef:
-          name: my-subaccount
-        offeringName: message-queuing
-        planName: standard
-        parameters: |
-          {
-            "sourceIPs": "0.0.0.0/0",
-            "resources": {
-              "units": "100"
-            }
-          }
-        providerConfigRef:
-          name: account-provider-config # Please reference your providerConfig here!
+            name: hana-cloud-instance
+            serviceManagerRef:
+              name: my-subaccount-service-manager
+            subaccountRef:
+              name: my-subaccount
+            offeringName: hana-cloud
+            planName: hana
+            parameters: |
+              {
+                "data": {
+                  "memory": 16,
+                  "systempassword": "Cloud-12345!", # TODO change
+                  "edition": "cloud"
+                }
+              }
+          providerConfigRef:
+            name: account-provider-config
         ```
-
       </TabItem>
     </Tabs>
 
-2. Apply `instance-msq.yaml` to your control plane:
+      :::info
+      Check out all supported parameters for the creation of the SAP HANA Cloud service instance in the [SAP HANA Cloud Administration Guide](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/create-sap-hana-database-instance-using-cli?locale=en-US&version=LATEST).
+      :::
 
-    ```sh title="Run in Terminal"
-    kubectl create -f instance-msq.yaml
+      <button onClick={() => window.open("https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceInstance/v1alpha1@v1.6.0", "_blank")} className='button button--secondary'>See full CRD reference</button>
+
+2. Apply `hana-cloud-instance.yaml` to your control plane:
+
+    ```sh title="Run in terminal"
+    kubectl create -f hana-cloud-instance.yaml
     ```
 
-That's it! You now have a managed instance of the Message Queuing service. Your Message Queuing service instance will be visible in the SAP BTP cockpit too.
+That's it! You now have a managed instance of the SAP HANA Cloud service. Your SAP HANA Cloud service instance will be visible in the SAP BTP cockpit too.
 
 ## Subscription
 
-With the BTP provider, you can also subscribe to SAP BTP services. The following example guides you through creating a managed subscription to SAP Business Application Studio.
+With the BTP provider, you can also subscribe to SAP BTP services. The following example guides you through creating a managed subscription to SAP HANA Cloud Administration Tools.
 
 ### Create an `Entitlement`
 
-Before subscribing to Business Application Studio, you must entitle the service to your subaccount.
+Before subscribing to SAP HANA Cloud Administration Tools, you must entitle the service to your subaccount.
 
-1. Save the following YAML content as `entitlement-bas.yaml`.
+1. Save the following YAML content as `hana-cloud-tools-entitlement.yaml`:
 
-    ```yaml title="entitlement-bas.yaml"
+    ```yaml title="hana-cloud-tools-entitlement.yaml"
     apiVersion: account.btp.sap.crossplane.io/v1alpha1
     kind: Entitlement
     metadata:
-      name: bas-entitlement
+      name: hana-cloud-tools-entitlement
     spec:
       forProvider:
-        serviceName: sapappstudio
-        servicePlanName: standard-edition
+        serviceName: hana-cloud-tools
+        servicePlanName: tools
         enable: true
         subaccountRef:
           name: my-subaccount
       providerConfigRef:
-        name: account-provider-config # Please reference your providerConfig here!  
+        name: account-provider-config
     ```
 
-2. Apply `entitlement-bas.yaml` to your control plane:
+2. Apply `hana-cloud-tools-entitlement.yaml` to your control plane:
 
-    ```sh title="Run in Terminal"
-    kubectl create -f entitlement-bas.yaml
+    ```sh title="Run in terminal"
+    kubectl create -f hana-cloud-tools-entitlement.yaml
     ```
 
 ### Create a `Subscription`
 
-Once the entitlement is in place, you can subscribe to Business Application Studio by using the `Subscription` custom resource.
+Once the entitlement is in place, you can subscribe to SAP HANA Cloud Administration Tools by using the `Subscription` custom resource.
 
-1. Save the following YAML content as `subscription-sapappstudio.yaml`.
+1. Save the following YAML content as `hana-cloud-tools-subscription.yaml`:
 
-    ```yaml
+    ```yaml title="hana-cloud-tools-subscription.yaml"
     apiVersion: account.btp.sap.crossplane.io/v1alpha1
     kind: Subscription
     metadata:
-      name: subscription-sapappstudio
+      name: hana-cloud-tools-subscription
     spec:
       forProvider:
-        appName: sapappstudio
-        planName: standard-edition
+        appName: hana-cloud-tools
+        planName: tools
       cloudManagementRef:
         name: my-subaccount-cis
     ```
 
+    <button onClick={() => window.open("https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/Subscription/v1alpha1@v1.6.0", "_blank")} className='button button--secondary'>See full CRD reference</button>
 
-2. Apply `subscription-sapappstudio.yaml` to your control plane:
+2. Apply `hana-cloud-tools-subscription.yaml` to your control plane:
 
-    ```sh title="Run in Terminal"
-    kubectl create -f subscription-sapappstudio.yaml
+    ```sh title="Run in terminal"
+    kubectl create -f hana-cloud-tools-subscription.yaml
     ```
 
+:::tip
+SAP HANA Cloud Administration Tools provides [multiple role collections](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/role-collections-for-sap-hana-cloud?locale=en-US&version=LATEST). To assign these to users or user groups, see [Configure user access](/docs/crossplane-provider-btp/docs/end-user-guides/account/usermanagement).
+:::
+
 ## Next steps
-- Consume services (coming soon...)
+
+- [Consume services](/docs/crossplane-provider-btp/docs/end-user-guides/services/consume-service.mdx)
 
 ## ⁉ FAQs
 
 ### What entitlements are available in my subaccount?
-To list available services and plans in your subaccount, run the following commands.
 
-```sh title="Run in Terminal"
-#!/bin/sh
-SUBACCOUNTID=$1
+To list available services and plans in your subaccount, run the following commands:
 
-btp --format=json list accounts/entitlement --filter-by-subaccount $SUBACCOUNTID | jq "[.entitledServices[] | {service: .name, service_plans: (.servicePlans | map( { (.name|tostring): {quota: .amount,unlimited:.unlimited,beta:.beta} } ) | add)}]"
+```sh title="Run in terminal"
+btp target # target your subaccount
+btp --format=json list accounts/entitlement | jq '.quotas[] | {service, plan, uniqueIdentifier, quota, unlimited}'
 ```
 
-### Whats the difference between Crossplane BTP Provider and BTP Service Operator
-
+### What's the difference between Crossplane BTP Provider and BTP Service Operator
 
 #### Service Instance Feature Comparison Matrix
 
@@ -223,8 +234,8 @@ btp --format=json list accounts/entitlement --filter-by-subaccount $SUBACCOUNTID
 | Binding parameters                        | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-forProvider-parameters)                                                                                                                                               | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#specifying-parameters) `.spec.parameters`                      |
 | Parameters from secrets                   | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-forProvider-parameterSecretRefs)                                                                                                                                      | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#specifying-parameters) `.spec.parametersFrom`                  |
 | Custom secret name                        | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-writeConnectionSecretToRef)                                                                                                                                           | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#spec-1) `.spec.secretName`                                     |
-| Secret key mapping                        | ❌ Create [Github Feature Request](https://github.com/SAP/crossplane-provider-btp/issues)                                                                                                                                                                                                                    | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#spec-1) `.spec.secretKey`                                      |
-| Secret root key                           | ❌ Create [Github Feature Request](https://github.com/SAP/crossplane-provider-btp/issues)                                                                                                                                                                                                                    | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#spec-1) `.spec.secretRootKey`                                  |
+| Secret key mapping                        | ❌ Create [GitHub Feature Request](https://github.com/SAP/crossplane-provider-btp/issues)                                                                                                                                                                                                                    | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#spec-1) `.spec.secretKey`                                      |
+| Secret root key                           | ❌ Create [GitHub Feature Request](https://github.com/SAP/crossplane-provider-btp/issues)                                                                                                                                                                                                                    | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#spec-1) `.spec.secretRootKey`                                  |
 | Custom secret template                    | ❌ [Pending implementation](https://github.com/SAP/crossplane-provider-btp/issues/350)                                                                                                                                                                                                                       | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#custom-formats) `.spec.secretTemplate` (Go templates)          |
 | Credentials rotation                      | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-rotation) (RotationParameters)                                                                                                                                        | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#enabling-automatic-rotation) `.spec.credentialsRotationPolicy` |
 | Rotation frequency                        | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-rotation)                                                                                                                                                             | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#enabling-automatic-rotation) `.spec.credentialsRotationPolicy` |
