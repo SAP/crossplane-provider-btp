@@ -1,107 +1,124 @@
 package btp_subaccount_api_credential
 
 import (
-	"context"
+"context"
 
-	"github.com/pkg/errors"
+"github.com/pkg/errors"
 
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/upjet/pkg/config"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+"github.com/crossplane/crossplane-runtime/pkg/meta"
+"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+"github.com/crossplane/crossplane-runtime/pkg/resource"
+"github.com/crossplane/upjet/pkg/config"
+corev1 "k8s.io/api/core/v1"
+"sigs.k8s.io/controller-runtime/pkg/client"
 
-	accountsv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-
-	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
-	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/internal/tracking"
+accountsv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
+providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
-	errTrackRUsage   = "cannot track ResourceUsage"
-	errTypeAssertion = "managed resource is not of type SubaccountApiCredential"
+errTrackRUsage         = "cannot track ResourceUsage"
+errTypeAssertion       = "managed resource is not of type SubaccountApiCredential"
+errMissingClientSecret = "can not read client_secret from source, please delete external resource and re-create Crossplane resource"
 )
 
 // Configure configures individual resources by adding custom ResourceConfigurators.
 func Configure(p *config.Provider) {
-	p.AddResourceConfigurator("btp_subaccount_api_credential", func(r *config.Resource) {
-		r.ShortGroup = "security"
-		r.Kind = "SubaccountApiCredential"
-		r.UseAsync = false
+p.AddResourceConfigurator("btp_subaccount_api_credential", func(r *config.Resource) {
+r.ShortGroup = "security"
+r.Kind = "SubaccountApiCredential"
+r.UseAsync = false
 
-		// Mark all as sensitive to exclude them from the status
-		r.TerraformResource.Schema["client_secret"].Sensitive = true
-		r.TerraformResource.Schema["client_id"].Sensitive = true
-		r.TerraformResource.Schema["token_url"].Sensitive = true
-		r.TerraformResource.Schema["api_url"].Sensitive = true
+// Mark all as sensitive to exclude them from the status
+r.TerraformResource.Schema["client_secret"].Sensitive = true
+r.TerraformResource.Schema["client_id"].Sensitive = true
+r.TerraformResource.Schema["token_url"].Sensitive = true
+r.TerraformResource.Schema["api_url"].Sensitive = true
 
-		r.ExternalName.SetIdentifierArgumentFn = func(base map[string]any, name string) {
-			if name == "" {
-				base["name"] = "managed-subbaccount-api-credential"
-			} else {
-				base["name"] = name
-			}
-		}
+r.ExternalName.SetIdentifierArgumentFn = func(base map[string]any, name string) {
+if name == "" {
+base["name"] = "managed-subbaccount-api-credential"
+} else {
+base["name"] = name
+}
+}
 
-		r.MetaResource.ArgumentDocs["name"] = "The name if left unset defaults to managedsubbaccountapicredential"
+r.MetaResource.ArgumentDocs["name"] = "The name if left unset defaults to managedsubbaccountapicredential"
 
-		r.ExternalName.GetExternalNameFn = func(tfstate map[string]any) (string, error) {
-			return tfstate["name"].(string), nil
-		}
+r.ExternalName.GetExternalNameFn = func(tfstate map[string]any) (string, error) {
+return tfstate["name"].(string), nil
+}
 
-		r.References["subaccount_id"] = config.Reference{
-			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
-			Extractor:         "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()",
-			RefFieldName:      "SubaccountRef",
-			SelectorFieldName: "SubaccountSelector",
-		}
+r.References["subaccount_id"] = config.Reference{
+Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
+Extractor:         "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()",
+RefFieldName:      "SubaccountRef",
+SelectorFieldName: "SubaccountSelector",
+}
 
-		// Add pre-delete hook using InitializerFns for finalizer management
-		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
-			return &DeletionProtectionInitializer{Kube: kube}
-		})
-	})
+// Add pre-delete hook using InitializerFns for finalizer management
+r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
+return &DeletionProtectionInitializer{Kube: kube}
+})
+})
 
-	p.ConfigureResources()
+p.ConfigureResources()
 }
 
 // DeletionProtectionInitializer implements the managed.Initializer interface
 type DeletionProtectionInitializer struct {
-	Kube client.Client
+Kube client.Client
 }
 
 // Implement the managed.Initializer interface
 func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resource.Managed) error {
 
-	// Default reference tracker for tracking references
-	referenceTracker := tracking.NewDefaultReferenceResolverTracker(
-		d.Kube,
-	)
+// Default reference tracker for tracking references
+referenceTracker := tracking.NewDefaultReferenceResolverTracker(
+d.Kube,
+)
 
-	cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
+cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
 
-	if !ok {
-		return errors.New(errTypeAssertion)
-	}
+if !ok {
+return errors.New(errTypeAssertion)
+}
 
-	// Manually define reference tracking for relevant fields
-	if cr.Spec.ForProvider.SubaccountID != nil {
+// Manually define reference tracking for relevant fields
+if cr.Spec.ForProvider.SubaccountID != nil && cr.Spec.ForProvider.SubaccountRef != nil {
 
-		// Use a custom reference tracker to track the subaccount reference
-		err := referenceTracker.CreateTrackingReference(ctx, cr, *cr.Spec.ForProvider.SubaccountRef, accountsv1alpha1.SubaccountGroupVersionKind)
+// Use a custom reference tracker to track the subaccount reference
+err := referenceTracker.CreateTrackingReference(ctx, cr, *cr.Spec.ForProvider.SubaccountRef, accountsv1alpha1.SubaccountGroupVersionKind)
 
-		if err != nil {
-			return errors.Wrap(err, errTrackRUsage)
-		}
-	}
+if err != nil {
+return errors.Wrap(err, errTrackRUsage)
+}
+}
 
-	if meta.WasDeleted(mg) {
+if meta.WasDeleted(mg) {
 
-		referenceTracker.SetConditions(ctx, mg)
-		if blocked := referenceTracker.DeleteShouldBeBlocked(mg); blocked {
-			return errors.New(providerv1alpha1.ErrResourceInUse)
-		}
-	}
-	return nil
+referenceTracker.SetConditions(ctx, mg)
+if blocked := referenceTracker.DeleteShouldBeBlocked(mg); blocked {
+return errors.New(providerv1alpha1.ErrResourceInUse)
+}
+}
+
+if cr.Spec.ForProvider.CertificatePassed == nil {
+secretRef := cr.GetWriteConnectionSecretToReference()
+if secretRef != nil && secretRef.Name != "" {
+secret := &corev1.Secret{}
+err := d.Kube.Get(ctx, client.ObjectKey{
+Name:      secretRef.Name,
+Namespace: secretRef.Namespace,
+}, secret)
+if err == nil {
+if _, ok := secret.Data["attribute.client_secret"]; !ok {
+return errors.New(errMissingClientSecret)
+}
+}
+}
+}
+return nil
 }
