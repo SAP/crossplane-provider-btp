@@ -21,7 +21,7 @@ export TEST_CRS_PATH ?= test/e2e/testdata/crs
 
 PLATFORMS ?= linux_amd64
 #get version from current git release tag
-VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || git rev-parse HEAD)
+VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || echo "v0.0.0-$$(git rev-parse HEAD)")
 $(info VERSION is $(VERSION))
 
 -include build/makelib/common.mk
@@ -75,7 +75,7 @@ export E2E_CLUSTER_NAME = $(KIND_CLUSTER_NAME)
 -include build/makelib/controlplane.mk
 
 .PHONY: local-deploy
-local-deploy: build controlplane.up local.xpkg.deploy.provider.provider-btp
+local-deploy: build xpkg.build.provider-btp controlplane.up local.xpkg.deploy.provider.provider-btp
 	@$(INFO) waiting for provider to become healthy
 	@$(KUBECTL) wait provider.pkg provider-btp --for condition=Healthy --timeout 5m
 	@$(KUBECTL) -n crossplane-system wait --for=condition=Available deployment --all --timeout=5m
