@@ -105,6 +105,9 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 		}
 	}
 
+	// According to the Terraform BTP provider docs, client_secret is only generated
+	// "if the certificate is omitted". Certificate-based credentials never have a
+	// client_secret, so this check must be skipped for them to avoid false positives.
 	if cr.Spec.ForProvider.CertificatePassed == nil {
 		secretRef := cr.GetWriteConnectionSecretToReference()
 		if secretRef != nil && secretRef.Name != "" {
