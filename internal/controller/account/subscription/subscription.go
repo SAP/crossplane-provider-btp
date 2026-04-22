@@ -249,29 +249,6 @@ func (c *external) loadSubscription(ctx context.Context, cr *v1alpha1.Subscripti
 		return nil, nil
 	}
 
-	// Migration path: if external-name equals metadata.name (old default), it needs migration
-	// We have appName and planName in the spec, so we can construct the proper external-name
-	if externalName == cr.Name {
-		// Try to load using spec values to see if the subscription exists
-		expectedExternalName := subscription.FormExternalName(cr.Spec.ForProvider.AppName, cr.Spec.ForProvider.PlanName)
-		apiRes, err := c.apiHandler.GetSubscription(ctx, expectedExternalName)
-		if err != nil {
-			return nil, err
-		}
-
-		// If subscription exists, migrate the external-name
-		if apiRes != nil {
-			meta.SetExternalName(cr, expectedExternalName)
-			if err := c.kube.Update(ctx, cr); err != nil {
-				return nil, errors.Wrap(err, "failed to migrate external-name to appName/planName format")
-			}
-			return apiRes, nil
-		}
-
-		// If subscription doesn't exist, this is a new resource that needs creation
-		return nil, nil
-	}
-
 	// Validate external-name format (should be appName/planName)
 	if !isValidExternalNameFormat(externalName) {
 		return nil, errors.Errorf("invalid external-name format: %s, expected format: <appName>/<planName>", externalName)

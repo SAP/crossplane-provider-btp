@@ -60,36 +60,6 @@ func TestObserve(t *testing.T) {
 				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("")),
 			},
 		},
-		"NoExternalName_NewResource": {
-			reason: "When externalName equals resource name and subscription doesn't exist, it needs creation",
-			args: args{
-				cr: NewSubscription("dir-unittests",
-					WithData(v1alpha1.SubscriptionSpec{
-						ForProvider: v1alpha1.SubscriptionParameters{
-							AppName:  "test-app",
-							PlanName: "test-plan",
-						},
-					}),
-					WithStatus(v1alpha1.SubscriptionObservation{}),
-					WithExternalName("dir-unittests")),
-				mockApiHandler: &MockApiHandler{
-					returnGet: nil, // Subscription doesn't exist
-					returnErr: nil,
-				},
-			},
-			want: want{
-				o: managed.ExternalObservation{ResourceExists: false},
-				cr: NewSubscription("dir-unittests",
-					WithData(v1alpha1.SubscriptionSpec{
-						ForProvider: v1alpha1.SubscriptionParameters{
-							AppName:  "test-app",
-							PlanName: "test-plan",
-						},
-					}),
-					WithStatus(v1alpha1.SubscriptionObservation{}),
-					WithExternalName("dir-unittests")),
-			},
-		},
 		"InvalidExternalNameFormat": {
 			reason: "Invalid external-name format should return error",
 			args: args{
