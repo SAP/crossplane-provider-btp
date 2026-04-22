@@ -21,7 +21,7 @@ import (
 const (
 	errTrackRUsage         = "cannot track ResourceUsage"
 	errTypeAssertion       = "managed resource is not of type SubaccountApiCredential"
-	errMissingClientSecret = "can not read client_secret from source, please delete external resource and re-create Crossplane resource"
+	errMissingClientSecret = "cannot read client_secret from source, please delete external resource and re-create Crossplane resource"
 )
 
 // Configure configures individual resources by adding custom ResourceConfigurators.
@@ -114,7 +114,11 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 				Namespace: secretRef.Namespace,
 			}, secret)
 			if err == nil {
-				if _, ok := secret.Data["attribute.client_secret"]; !ok {
+				_, hasClientID := secret.Data["attribute.client_id"]
+				_, hasTokenURL := secret.Data["attribute.token_url"]
+				_, hasAPIURL := secret.Data["attribute.api_url"]
+				_, hasClientSecret := secret.Data["attribute.client_secret"]
+				if hasClientID && hasTokenURL && hasAPIURL && !hasClientSecret {
 					return errors.New(errMissingClientSecret)
 				}
 			}

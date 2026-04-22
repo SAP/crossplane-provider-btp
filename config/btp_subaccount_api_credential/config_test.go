@@ -52,7 +52,32 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 			},
 			want: want{err: nil},
 		},
-		"secret missing client_secret": {
+		"secret missing client_secret with other keys present": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ResourceSpec: xpv1.ResourceSpec{
+						WriteConnectionSecretToReference: &xpv1.SecretReference{
+							Name:      "my-secret",
+							Namespace: "default",
+						},
+					},
+				},
+			},
+			kube: &test.MockClient{
+				MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+					if secret, ok := obj.(*corev1.Secret); ok {
+						secret.Data = map[string][]byte{
+							"attribute.client_id": []byte("some-id"),
+							"attribute.token_url": []byte("https://token-url"),
+							"attribute.api_url":   []byte("https://api-url"),
+						}
+					}
+					return nil
+				}),
+			},
+			want: want{err: errors.New(errMissingClientSecret)},
+		},
+		"secret incomplete - only client_id present - no error": {
 			cr: &securityv1alpha1.SubaccountApiCredential{
 				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
 					ResourceSpec: xpv1.ResourceSpec{
@@ -73,7 +98,7 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 					return nil
 				}),
 			},
-			want: want{err: errors.New(errMissingClientSecret)},
+			want: want{err: nil},
 		},
 	}
 
