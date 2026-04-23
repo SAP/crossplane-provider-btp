@@ -218,6 +218,11 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
+	creation.ConnectionDetails, err = flattenSecretData(creation.ConnectionDetails)
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errFlattenSecret)
+	}
+
 	return creation, nil
 }
 
