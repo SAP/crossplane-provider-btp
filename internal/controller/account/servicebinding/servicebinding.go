@@ -229,6 +229,13 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errFlattenSecret)
 	}
 
+	if cr.Spec.SecretFormat == SecretFormatSAPKubernetes && creation.ConnectionDetails != nil {
+		creation.ConnectionDetails, err = e.enrichWithSAPMetadata(ctx, cr, creation.ConnectionDetails)
+		if err != nil {
+			return managed.ExternalCreation{}, errors.Wrap(err, "cannot enrich connection details")
+		}
+	}
+
 	return creation, nil
 }
 
