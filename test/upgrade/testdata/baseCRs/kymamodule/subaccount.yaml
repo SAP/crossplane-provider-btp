@@ -6,7 +6,7 @@ metadata:
 spec:
   forProvider:
     displayName: $BUILD_ID-upgrade-test-kyma-module-sa
-    region: eu20
+    region: eu10
     subdomain: $BUILD_ID-upgrade-test-kyma-module-sa
     labels:
       safe-to-delete: ["yes"]
