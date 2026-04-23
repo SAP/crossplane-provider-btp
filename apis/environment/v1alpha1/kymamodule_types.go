@@ -83,7 +83,7 @@ type ModuleStatus struct {
 //   - Format: Kyma module name (e.g. "keda", "serverless")
 //   - How to find:
 //   - UI: Kyma Dashboard → Modules → [Module Name]
-//   - CLI: kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'
+//   - CLI: `kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'`
 //
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"

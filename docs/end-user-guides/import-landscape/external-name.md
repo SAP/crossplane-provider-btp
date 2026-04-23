@@ -77,7 +77,7 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 - How to find:
 
   - UI: Kyma Dashboard → Modules → [Module Name]
-  - CLI: kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'
+  - CLI: `kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'`
 
 ### RoleCollection
 
