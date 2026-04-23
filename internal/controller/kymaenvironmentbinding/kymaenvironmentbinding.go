@@ -88,6 +88,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateBindings)
 	}
 	var validBindings bool
+	var expiredBindings []v1alpha1.Binding
 	if err := reconcilerutil.UpdateStatusWithRetry(ctx, c.kube, cr, 3, func(cr *v1alpha1.KymaEnvironmentBinding) error {
 		validBindings, cr.Status.AtProvider.Bindings, expiredBindings = c.validateBindings(cr)
 		return nil
