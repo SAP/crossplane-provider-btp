@@ -89,10 +89,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	var validBindings bool
 	if err := reconcilerutil.UpdateStatusWithRetry(ctx, c.kube, cr, 3, func(cr *v1alpha1.KymaEnvironmentBinding) error {
-		validBindings, cr.Status.AtProvider.Bindings = c.validateBindings(cr)
+		validBindings, cr.Status.AtProvider.Bindings, expiredBindings = c.validateBindings(cr)
 		return nil
 	}); err != nil {
 		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, "while updating status during observe")))
+	}
+
+	// Delete expired bindings from BTP API to prevent orphaned resources
+	if len(expiredBindings) > 0 {
+		if err := c.client.DeleteInstances(ctx, expiredBindings, cr.Spec.KymaEnvironmentId); err != nil {
+			c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, "while deleting expired bindings. This binding will be orphanedd in the external system")))
+		}
 	}
 	if !validBindings {
 		return managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: true}, nil
@@ -131,15 +138,17 @@ func (c *external) updateBindingsFromService(ctx context.Context, cr *v1alpha1.K
 	return nil
 }
 
-// validateBindings checks if bindings in status are still active (did not reach rotation deadline) or not yet expired (reached time to live)
-func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, []v1alpha1.Binding) {
+// validateBindings checks if bindings in status are still active (did not reach rotation deadline) or not yet expired (reached time to live).
+// Returns: hasActiveBinding, validBindings (non-expired), expiredBindings (TTL-expired, to be deleted from BTP API).
+func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, []v1alpha1.Binding, []v1alpha1.Binding) {
 	bindings := cr.Status.AtProvider.Bindings
 	if bindings == nil {
-		return false, nil
+		return false, nil, nil
 	}
 
 	hasActiveBinding := false
 	validBindings := []v1alpha1.Binding{}
+	expiredBindings := []v1alpha1.Binding{}
 	now := time.Now()
 
 	// First pass: deactivate bindings that need rotation or are expired
@@ -161,14 +170,16 @@ func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, 
 		}
 	}
 
-	// Second pass: keep non-expired bindings (active or inactive)
+	// Second pass: separate non-expired from expired bindings
 	for _, b := range bindings {
 		if !ttlIsExpired(&b, now) {
 			validBindings = append(validBindings, b)
+		} else {
+			expiredBindings = append(expiredBindings, b)
 		}
 	}
 
-	return hasActiveBinding, validBindings
+	return hasActiveBinding, validBindings, expiredBindings
 }
 
 func reachedRotationDeadline(now time.Time, b *v1alpha1.Binding, cr *v1alpha1.KymaEnvironmentBinding) bool {
