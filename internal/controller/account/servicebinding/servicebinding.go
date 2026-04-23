@@ -163,6 +163,13 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFlattenSecret)
 	}
 
+	if cr.Spec.SecretFormat == SecretFormatSAPKubernetes && observation.ConnectionDetails != nil {
+		observation.ConnectionDetails, err = e.enrichWithSAPMetadata(ctx, cr, observation.ConnectionDetails)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, "cannot enrich connection details")
+		}
+	}
+
 	observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
 
 	// Validate rotation settings and set status condition
