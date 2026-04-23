@@ -116,6 +116,7 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 				defer func() {
 					if t.Failed() {
 						resources.DumpManagedResources(ctx, t, cfg)
+						DumpProviderLogs(ctx, t, cfg)
 					}
 				}()
 
@@ -159,6 +160,7 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 			defer func() {
 				if t.Failed() {
 					resources.DumpManagedResources(ctx, t, cfg)
+					DumpProviderLogs(ctx, t, cfg)
 				}
 			}()
 
@@ -186,6 +188,7 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 			defer func() {
 				if t.Failed() {
 					resources.DumpManagedResources(ctx, t, cfg)
+					DumpProviderLogs(ctx, t, cfg)
 				}
 			}()
 

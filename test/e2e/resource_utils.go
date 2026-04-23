@@ -4,8 +4,10 @@
 package e2e
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
@@ -14,6 +16,8 @@ import (
 	"github.com/sap/crossplane-provider-btp/test"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
@@ -130,4 +134,46 @@ func GetResourcesWithRESTConfig(cfg *envconf.Config) (*wairres.Resources, error)
 // Identifier returns k8s object name
 func identifier(object k8s.Object) string {
 	return fmt.Sprintf("%s/%s", object.GetObjectKind().GroupVersionKind().String(), object.GetName())
+}
+
+// DumpProviderLogs fetches and logs the pod logs from all pods in the crossplane-system namespace.
+// Only runs when the ACTIONS_RUNNER_DEBUG environment variable is set to "true".
+func DumpProviderLogs(ctx context.Context, t *testing.T, cfg *envconf.Config) {
+	if os.Getenv("ACTIONS_RUNNER_DEBUG") != "true" {
+		return
+	}
+
+	clientset, err := kubernetes.NewForConfig(cfg.Client().RESTConfig())
+	if err != nil {
+		t.Logf("DumpProviderLogs: failed to create clientset: %v", err)
+		return
+	}
+
+	pods, err := clientset.CoreV1().Pods("crossplane-system").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Logf("DumpProviderLogs: failed to list pods in crossplane-system: %v", err)
+		return
+	}
+
+	for _, pod := range pods.Items {
+		for _, container := range pod.Spec.Containers {
+			req := clientset.CoreV1().Pods("crossplane-system").GetLogs(pod.Name, &v1.PodLogOptions{
+				Container: container.Name,
+			})
+			logStream, err := req.Stream(ctx)
+			if err != nil {
+				t.Logf("DumpProviderLogs: failed to stream logs for pod %s container %s: %v", pod.Name, container.Name, err)
+				continue
+			}
+			defer logStream.Close()
+			t.Logf("=== Provider logs: pod=%s container=%s ===", pod.Name, container.Name)
+			scanner := bufio.NewScanner(logStream)
+			for scanner.Scan() {
+				t.Log(scanner.Text())
+			}
+			if err := scanner.Err(); err != nil {
+				t.Logf("DumpProviderLogs: error reading logs for pod %s container %s: %v", pod.Name, container.Name, err)
+			}
+		}
+	}
 }
