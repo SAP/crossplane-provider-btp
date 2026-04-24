@@ -11,6 +11,7 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
@@ -78,6 +79,7 @@ func TestServiceInstanceImportFlow(t *testing.T) {
 					Name:              "e2e-destination-instance-import",
 					OfferingName:      "destination",
 					PlanName:          "lite",
+					Parameters:        runtime.RawExtension{Raw: []byte(`{"HTML5Runtime_enabled":false}`)},
 					ServiceManagerRef: &xpv1.Reference{Name: "e2e-sm-serviceinstance"},
 					SubaccountRef:     &xpv1.Reference{Name: "e2e-test-serviceinstance"},
 				},
