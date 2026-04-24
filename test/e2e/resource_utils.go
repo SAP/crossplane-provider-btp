@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
@@ -137,12 +136,7 @@ func identifier(object k8s.Object) string {
 }
 
 // DumpProviderLogs fetches and logs the pod logs from all pods in the crossplane-system namespace.
-// Only runs when the ACTIONS_RUNNER_DEBUG environment variable is set to "true".
 func DumpProviderLogs(ctx context.Context, t *testing.T, cfg *envconf.Config) {
-	if os.Getenv("ACTIONS_RUNNER_DEBUG") != "true" {
-		return
-	}
-
 	clientset, err := kubernetes.NewForConfig(cfg.Client().RESTConfig())
 	if err != nil {
 		t.Logf("DumpProviderLogs: failed to create clientset: %v", err)
@@ -157,23 +151,29 @@ func DumpProviderLogs(ctx context.Context, t *testing.T, cfg *envconf.Config) {
 
 	for _, pod := range pods.Items {
 		for _, container := range pod.Spec.Containers {
-			req := clientset.CoreV1().Pods("crossplane-system").GetLogs(pod.Name, &v1.PodLogOptions{
-				Container: container.Name,
-			})
-			logStream, err := req.Stream(ctx)
-			if err != nil {
-				t.Logf("DumpProviderLogs: failed to stream logs for pod %s container %s: %v", pod.Name, container.Name, err)
-				continue
-			}
-			defer logStream.Close()
-			t.Logf("=== Provider logs: pod=%s container=%s ===", pod.Name, container.Name)
-			scanner := bufio.NewScanner(logStream)
-			for scanner.Scan() {
-				t.Log(scanner.Text())
-			}
-			if err := scanner.Err(); err != nil {
-				t.Logf("DumpProviderLogs: error reading logs for pod %s container %s: %v", pod.Name, container.Name, err)
-			}
+			dumpContainerLogs(ctx, t, clientset, pod.Name, container.Name)
 		}
+	}
+}
+
+func dumpContainerLogs(ctx context.Context, t *testing.T, clientset *kubernetes.Clientset, podName, containerName string) {
+	req := clientset.CoreV1().Pods("crossplane-system").GetLogs(podName, &v1.PodLogOptions{
+		Container: containerName,
+	})
+	logStream, err := req.Stream(ctx)
+	if err != nil {
+		t.Logf("DumpProviderLogs: failed to stream logs for pod %s container %s: %v", podName, containerName, err)
+		return
+	}
+	defer logStream.Close()
+
+	t.Logf("=== Provider logs: pod=%s container=%s ===", podName, containerName)
+	scanner := bufio.NewScanner(logStream)
+	scanner.Buffer(make([]byte, 256*1024), 256*1024)
+	for scanner.Scan() {
+		t.Log(scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		t.Logf("DumpProviderLogs: error reading logs for pod %s container %s: %v", podName, containerName, err)
 	}
 }
