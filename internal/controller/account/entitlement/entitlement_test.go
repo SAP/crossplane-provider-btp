@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	entclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -289,6 +290,180 @@ func TestObserve(t *testing.T) {
 				err: nil,
 			},
 		},
+		"Deletion with siblings, numeric quota, BTP already reduced": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList: test.NewMockListFn(nil, ListEntitlements(
+						// CR being deleted — filtered out by UID and Deleting condition
+						entitlement(withName("deleting-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a"), withConditions(xpv1.Deleting())),
+						// Sibling CR — remains active
+						entitlement(withName("sibling-cr"), withUID("uid-2"), withServiceName("Alpha"), withServicePlan("One"), withAmount(3), withSubaccountGuid("a")),
+					)),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							// BTP amount already reduced to sibling sum
+							Amount: internal.Ptr(float32(3)),
+						},
+					}, nil
+				}},
+				cr: entitlement(withName("deleting-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a"), withDeletionTimestamp(), withConditions(xpv1.Deleting())),
+			},
+			want: want{
+				o:   managed.ExternalObservation{ResourceExists: false},
+				err: nil,
+			},
+		},
+		"Deletion with siblings, numeric quota, BTP not yet reduced": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList: test.NewMockListFn(nil, ListEntitlements(
+						// CR being deleted — filtered out
+						entitlement(withName("deleting-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a"), withConditions(xpv1.Deleting())),
+						// Sibling CR
+						entitlement(withName("sibling-cr"), withUID("uid-2"), withServiceName("Alpha"), withServicePlan("One"), withAmount(3), withSubaccountGuid("a")),
+					)),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							// BTP still has the full amount (not yet reduced)
+							Amount: internal.Ptr(float32(5)),
+						},
+					}, nil
+				}},
+				cr: entitlement(withName("deleting-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a"), withDeletionTimestamp(), withConditions(xpv1.Deleting())),
+			},
+			want: want{
+				o:   managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+			},
+		},
+		"Deletion with no siblings, sole CR, Delete() handles removal": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList: test.NewMockListFn(nil, ListEntitlements(
+						// Only the CR being deleted — filtered out, no siblings remain
+						entitlement(withName("sole-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a"), withConditions(xpv1.Deleting())),
+					)),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount: internal.Ptr(float32(2)),
+						},
+					}, nil
+				}},
+				cr: entitlement(withName("sole-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a"), withDeletionTimestamp(), withConditions(xpv1.Deleting())),
+			},
+			want: want{
+				// No siblings → deletionComplete returns false → let Delete() fully remove it
+				o:   managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+			},
+		},
+		"Deletion with siblings, enable-based, deletion complete": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList: test.NewMockListFn(nil, ListEntitlements(
+						// CR being deleted — filtered out
+						entitlement(withName("deleting-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withEnabled(true), withSubaccountGuid("a"), withConditions(xpv1.Deleting())),
+						// Sibling CR continues managing the entitlement
+						entitlement(withName("sibling-cr"), withUID("uid-2"), withServiceName("Alpha"), withServicePlan("One"), withEnabled(true), withSubaccountGuid("a")),
+					)),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount: internal.Ptr(float32(1)),
+						},
+					}, nil
+				}},
+				cr: entitlement(withName("deleting-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withEnabled(true), withSubaccountGuid("a"), withDeletionTimestamp(), withConditions(xpv1.Deleting())),
+			},
+			want: want{
+				// Enable-based with siblings → deletionComplete returns true
+				o:   managed.ExternalObservation{ResourceExists: false},
+				err: nil,
+			},
+		},
+		"Deletion with siblings, findRelatedEntitlements error propagated": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					// First List call (updateObservation) succeeds, second (deletionComplete) also uses this mock.
+					// We use a stateful mock that fails on the second call.
+					MockList: func() test.MockListFn {
+						callCount := 0
+						return func(ctx context.Context, obj client.ObjectList, opts ...client.ListOption) error {
+							callCount++
+							if callCount <= 1 {
+								// First call in updateObservation — return empty list
+								l := obj.(*v1alpha1.EntitlementList)
+								l.Items = []v1alpha1.Entitlement{}
+								return nil
+							}
+							// Second call in deletionComplete — return error
+							return errors.New(errKubeAPI)
+						}
+					}(),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount: internal.Ptr(float32(2)),
+						},
+					}, nil
+				}},
+				cr: entitlement(withName("err-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a"), withDeletionTimestamp(), withConditions(xpv1.Deleting())),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.Wrap(errors.Wrap(errors.New(errKubeAPI), errListEntitlements), errFindRelated),
+			},
+		},
+		"Sibling being deleted, active CR computes reduced required amount and triggers update": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList: test.NewMockListFn(nil, ListEntitlements(
+						// CR-A: active, being observed — amount=2
+						entitlement(withName("cr-a"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a")),
+						// CR-B: sibling being deleted — excluded from required sum by Deleting condition
+						entitlement(withName("cr-b"), withUID("uid-2"), withServiceName("Alpha"), withServicePlan("One"), withAmount(3), withSubaccountGuid("a"), withConditions(xpv1.Deleting())),
+					)),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							// BTP still has the old combined amount (2+3=5)
+							Amount: internal.Ptr(float32(5)),
+						},
+					}, nil
+				}},
+				// CR-A: the active CR being observed (no DeletionTimestamp, no Deleting condition)
+				cr: entitlement(withName("cr-a"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a")),
+			},
+			want: want{
+				// Required.Amount should be 2 (only CR-A), not 5 (old combined), triggering an update
+				o:   managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false},
+				err: nil,
+				comparefn: func(cr *v1alpha1.Entitlement) string {
+					return cmp.Diff(cr.Status.AtProvider.Required.Amount, internal.Ptr(2))
+				},
+			},
+		},
 		"Multiple Entitlements for multiple plans, amount needs update": {
 			args: args{
 				kube: &test.MockClient{
@@ -495,6 +670,29 @@ func withEnabled(enabled bool) entitlementModifier {
 	return func(r *v1alpha1.Entitlement) { r.Spec.ForProvider.Enable = &enabled }
 }
 
+func withUID(uid string) entitlementModifier {
+	return func(r *v1alpha1.Entitlement) { r.UID = types.UID(uid) }
+}
+
+func withDeletionTimestamp() entitlementModifier {
+	return func(r *v1alpha1.Entitlement) {
+		now := metav1.Now()
+		r.DeletionTimestamp = &now
+	}
+}
+
+func withAssignedStatus(amount *int, entityState string) entitlementModifier {
+	return func(r *v1alpha1.Entitlement) {
+		if r.Status.AtProvider == nil {
+			r.Status.AtProvider = &v1alpha1.EntitlementObservation{}
+		}
+		r.Status.AtProvider.Assigned = &v1alpha1.Assignable{
+			Amount:      amount,
+			EntityState: entityState,
+		}
+	}
+}
+
 func withConditions(c ...xpv1.Condition) entitlementModifier {
 	return func(r *v1alpha1.Entitlement) {
 		r.Status.SetConditions(c...)
@@ -632,6 +830,144 @@ func TestObserveSoftvalidation(t *testing.T) {
 
 				}
 
+			},
+		)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	type args struct {
+		cr     *v1alpha1.Entitlement
+		client fake.MockClient
+		kube   client.Client
+	}
+
+	type want struct {
+		err            error
+		requiredAmount *int
+	}
+
+	var cases = map[string]struct {
+		args args
+		want want
+	}{
+		"Delete with sibling, numeric quota, amount sent is sibling sum not zero": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList: test.NewMockListFn(nil, ListEntitlements(
+						// CR being deleted — filtered out by UID
+						entitlement(withName("deleting-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a")),
+						// Sibling CR with amount=3 — should be the remaining sum
+						entitlement(withName("sibling-cr"), withUID("uid-2"), withServiceName("Alpha"), withServicePlan("One"), withAmount(3), withSubaccountGuid("a")),
+					)),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{
+							Category: internal.Ptr("ELASTIC_SERVICE"),
+						},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount:      internal.Ptr(float32(5)),
+							EntityState: internal.Ptr("OK"),
+						},
+					}, nil
+				}},
+				cr: entitlement(withName("deleting-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a"), withAssignedStatus(internal.Ptr(5), "OK")),
+			},
+			want: want{
+				err:            nil,
+				requiredAmount: internal.Ptr(3), // sibling sum
+			},
+		},
+		"Delete with multiple siblings, numeric quota, amount is sum of all siblings": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList: test.NewMockListFn(nil, ListEntitlements(
+						// CR being deleted
+						entitlement(withName("deleting-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a")),
+						// Sibling 1
+						entitlement(withName("sibling-1"), withUID("uid-2"), withServiceName("Alpha"), withServicePlan("One"), withAmount(3), withSubaccountGuid("a")),
+						// Sibling 2
+						entitlement(withName("sibling-2"), withUID("uid-3"), withServiceName("Alpha"), withServicePlan("One"), withAmount(4), withSubaccountGuid("a")),
+					)),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{
+							Category: internal.Ptr("ELASTIC_SERVICE"),
+						},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount:      internal.Ptr(float32(9)),
+							EntityState: internal.Ptr("OK"),
+						},
+					}, nil
+				}},
+				cr: entitlement(withName("deleting-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a"), withAssignedStatus(internal.Ptr(9), "OK")),
+			},
+			want: want{
+				err:            nil,
+				requiredAmount: internal.Ptr(7), // 3 + 4
+			},
+		},
+		"Delete sole CR, no siblings, amount set to zero for full removal": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList: test.NewMockListFn(nil, ListEntitlements(
+						// Only the CR being deleted — filtered out by UID, no siblings remain
+						entitlement(withName("sole-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a")),
+					)),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{
+							Category: internal.Ptr("ELASTIC_SERVICE"),
+						},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount:      internal.Ptr(float32(2)),
+							EntityState: internal.Ptr("OK"),
+						},
+					}, nil
+				}},
+				cr: entitlement(withName("sole-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(2), withSubaccountGuid("a"), withAssignedStatus(internal.Ptr(2), "OK")),
+			},
+			want: want{
+				err:            nil,
+				requiredAmount: nil, // no siblings → MergeRelatedEntitlements returns nil Amount
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(
+			name, func(t *testing.T) {
+				var capturedAmount *int
+				deleteCalled := false
+
+				tc.args.client.MockDeleteInstanceFn = func(ctx context.Context, cr *v1alpha1.Entitlement) error {
+					deleteCalled = true
+					if cr.Status.AtProvider != nil && cr.Status.AtProvider.Required != nil {
+						capturedAmount = cr.Status.AtProvider.Required.Amount
+					}
+					return nil
+				}
+
+				e := external{client: tc.args.client, kube: tc.args.kube, tracker: test2.NoOpReferenceResolverTracker{}}
+				_, err := e.Delete(context.Background(), tc.args.cr)
+				if diff := compareErrorMessages(err, tc.want.err); diff != "" {
+					t.Errorf("\ne.Delete(...): -want error %v, +got error:\n%s\n", tc.want.err, err)
+				}
+
+				if !deleteCalled {
+					t.Errorf("\ne.Delete(...): expected DeleteInstance to be called, but it wasn't")
+					return
+				}
+
+				if diff := cmp.Diff(tc.want.requiredAmount, capturedAmount); diff != "" {
+					t.Errorf("\ne.Delete(...) Required.Amount passed to DeleteInstance: -want, +got:\n%s\n", diff)
+				}
 			},
 		)
 	}

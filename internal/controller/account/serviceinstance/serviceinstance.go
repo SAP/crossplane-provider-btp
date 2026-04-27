@@ -278,6 +278,13 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 	// we rely on status being saved in crossplane reconciler here
 	cr.Status.AtProvider.ID = sid.ID
 	cr.Status.AtProvider.DashboardURL = sid.DashboardURL
+	// Save additional observation fields from the Terraform resource
+	cr.Status.AtProvider.CreatedDate = sid.CreatedDate
+	cr.Status.AtProvider.LastModified = sid.LastModified
+	cr.Status.AtProvider.State = sid.State
+	cr.Status.AtProvider.Ready = sid.Ready
+	cr.Status.AtProvider.Usable = sid.Usable
+	cr.Status.AtProvider.PlatformID = sid.PlatformID
 	return nil
 }
 

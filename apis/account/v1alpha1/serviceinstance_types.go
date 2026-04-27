@@ -75,6 +75,24 @@ type ServiceInstanceObservation struct {
 
 	// The URL of the web-based management UI for the service instance.
 	DashboardURL string `json:"dashboardUrl,omitempty"`
+
+	// The date and time when the resource was created.
+	CreatedDate *metav1.Time `json:"createdDate,omitempty"`
+
+	// The date and time when the resource was last modified.
+	LastModified *metav1.Time `json:"lastModified,omitempty"`
+
+	// The current state of the service instance.
+	State string `json:"state,omitempty"`
+
+	// Shows whether the service instance is ready.
+	Ready *bool `json:"ready,omitempty"`
+
+	// Shows whether the resource can be used.
+	Usable *bool `json:"usable,omitempty"`
+
+	// The platform ID of the service instance.
+	PlatformID string `json:"platformId,omitempty"`
 }
 
 // A ServiceInstanceSpec defines the desired state of a ServiceInstance.

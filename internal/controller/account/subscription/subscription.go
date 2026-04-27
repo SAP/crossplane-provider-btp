@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -242,12 +243,25 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 // loadSubscription gets a Subscription using the APIHandler if a proper externalName has been set, otherwise returns nil
 func (c *external) loadSubscription(ctx context.Context, cr *v1alpha1.Subscription) (*subscription.SubscriptionGet, error) {
 	externalName := meta.GetExternalName(cr)
-	if externalName == cr.Name {
-		// in case a subscription has never been created (or imported) the externalName will be set from the resource name
-		// -> resource needs creation in this case
+
+	// Check if external-name is empty - means resource doesn't exist yet
+	if externalName == "" {
 		return nil, nil
 	}
-	return c.apiHandler.GetSubscription(ctx, meta.GetExternalName(cr))
+
+	// Validate external-name format (should be appName/planName)
+	if !isValidExternalNameFormat(externalName) {
+		return nil, errors.Errorf("invalid external-name format: %s, expected format: <appName>/<planName>", externalName)
+	}
+
+	// Get subscription from API - if it returns nil, it means resource doesn't exist (drift scenario)
+	return c.apiHandler.GetSubscription(ctx, externalName)
+}
+
+// isValidExternalNameFormat validates that the external name is in the format appName/planName
+func isValidExternalNameFormat(externalName string) bool {
+	parts := strings.Split(externalName, "/")
+	return len(parts) == 2 && parts[0] != "" && parts[1] != ""
 }
 
 // syncStatus delegates saving the observation based on external resource to the typemapper

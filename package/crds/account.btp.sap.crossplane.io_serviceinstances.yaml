@@ -459,15 +459,35 @@ spec:
                 description: ServiceInstanceObservation are the observable fields
                   of a ServiceInstance.
                 properties:
+                  createdDate:
+                    description: The date and time when the resource was created.
+                    format: date-time
+                    type: string
                   dashboardUrl:
                     description: The URL of the web-based management UI for the service
                       instance.
                     type: string
                   id:
                     type: string
+                  lastModified:
+                    description: The date and time when the resource was last modified.
+                    format: date-time
+                    type: string
+                  platformId:
+                    description: The platform ID of the service instance.
+                    type: string
+                  ready:
+                    description: Shows whether the service instance is ready.
+                    type: boolean
                   serviceplanId:
                     description: The ID of the service plan as resolved by the ServiceManager
                     type: string
+                  state:
+                    description: The current state of the service instance.
+                    type: string
+                  usable:
+                    description: Shows whether the resource can be used.
+                    type: boolean
                 type: object
               conditions:
                 description: Conditions of the resource.

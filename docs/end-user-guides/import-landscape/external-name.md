@@ -90,3 +90,12 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 
   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
   - CLI: btp list accounts/subaccount (field: guid)
+
+### Subscription
+
+- Follows Standard: yes
+- Format: `<appName>/<planName>`
+- How to find:
+
+  - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → [Select Subscription] → Application Technical Name and Plan
+  - CLI: `btp list accounts/subscription` fields `app name` and `plan name`

@@ -29,11 +29,12 @@ func Test_external_validateBindings(t *testing.T) {
 		cr *v1alpha1.KymaEnvironmentBinding
 	}
 	tests := []struct {
-		name            string
-		args            args
-		wantValid       bool
-		wantValidCount  int
-		wantActiveCount int
+		name             string
+		args             args
+		wantValid        bool
+		wantValidCount   int
+		wantActiveCount  int
+		wantExpiredCount int
 	}{
 		{
 			name: "needs rotation, secret expired before time.now()",
@@ -53,9 +54,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  0,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   0,
+			wantActiveCount:  0,
+			wantExpiredCount: 1,
 		},
 		{
 			name: "needs rotation, rotation interval reached",
@@ -80,9 +82,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  1,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   1,
+			wantActiveCount:  0,
+			wantExpiredCount: 0,
 		},
 		{
 			name: "no need to rotate, rotation interval not reached",
@@ -107,9 +110,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       true,
-			wantValidCount:  1,
-			wantActiveCount: 1,
+			wantValid:        true,
+			wantValidCount:   1,
+			wantActiveCount:  1,
+			wantExpiredCount: 0,
 		},
 		{
 			name: "needs to rotate, secret expired, rotation interval not reached",
@@ -134,9 +138,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  0,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   0,
+			wantActiveCount:  0,
+			wantExpiredCount: 1,
 		},
 		{
 			name: "no need to rotate, no bindings",
@@ -149,9 +154,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  0,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   0,
+			wantActiveCount:  0,
+			wantExpiredCount: 0,
 		},
 		{
 			name: "no need to rotate, bindings is nil",
@@ -164,9 +170,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  0,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   0,
+			wantActiveCount:  0,
+			wantExpiredCount: 0,
 		},
 		{
 			name: "no need to rotate, no active bindings",
@@ -186,9 +193,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  1,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   1,
+			wantActiveCount:  0,
+			wantExpiredCount: 0,
 		},
 		{
 			name: "needs to rotate, multiple bindings with one active and expired",
@@ -214,9 +222,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  1,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   1,
+			wantActiveCount:  0,
+			wantExpiredCount: 1,
 		},
 		{
 			name: "needs to rotate, exactly at expiration time",
@@ -236,9 +245,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  0,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   0,
+			wantActiveCount:  0,
+			wantExpiredCount: 1,
 		},
 		{
 			name: "needs to rotate, exactly at rotation interval",
@@ -263,9 +273,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  1,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   1,
+			wantActiveCount:  0,
+			wantExpiredCount: 0,
 		},
 		{
 			name: "keep inactive but non-expired bindings",
@@ -296,9 +307,10 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  2,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   2,
+			wantActiveCount:  0,
+			wantExpiredCount: 0,
 		},
 		{
 			name: "remove expired inactive bindings",
@@ -329,15 +341,16 @@ func Test_external_validateBindings(t *testing.T) {
 					},
 				},
 			},
-			wantValid:       false,
-			wantValidCount:  1,
-			wantActiveCount: 0,
+			wantValid:        false,
+			wantValidCount:   1,
+			wantActiveCount:  0,
+			wantExpiredCount: 1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &external{kube: test.NewMockClient()}
-			gotValid, gotValidBindings := c.validateBindings(tt.args.cr)
+			gotValid, gotValidBindings, gotExpiredBindings := c.validateBindings(tt.args.cr)
 
 			// Count active bindings
 			activeCount := 0
@@ -356,6 +369,9 @@ func Test_external_validateBindings(t *testing.T) {
 			if activeCount != tt.wantActiveCount {
 				t.Errorf("validateBindings() active count = %v, want %v", activeCount, tt.wantActiveCount)
 			}
+			if len(gotExpiredBindings) != tt.wantExpiredCount {
+				t.Errorf("validateBindings() expired count = %v, want %v", len(gotExpiredBindings), tt.wantExpiredCount)
+			}
 		})
 	}
 }
@@ -366,12 +382,13 @@ func Test_external_Observe(t *testing.T) {
 		mg  resource.Managed
 	}
 	tests := []struct {
-		name           string
-		args           args
-		client         *fakeClient
-		want           managed.ExternalObservation
-		wantErr        bool
-		expectedStatus v1alpha1.KymaEnvironmentBindingObservation
+		name               string
+		args               args
+		client             *fakeClient
+		want               managed.ExternalObservation
+		wantErr            bool
+		expectedStatus     v1alpha1.KymaEnvironmentBindingObservation
+		wantDeletedIds     []string
 	}{
 		{
 			name: "not a KymaEnvironmentBinding",
@@ -435,6 +452,7 @@ func Test_external_Observe(t *testing.T) {
 			expectedStatus: v1alpha1.KymaEnvironmentBindingObservation{
 				Bindings: []v1alpha1.Binding{},
 			},
+			wantDeletedIds: []string{"id"},
 		},
 		{
 			name: "valid binding exists",
@@ -830,7 +848,23 @@ func Test_external_Observe(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &external{kube: test.NewMockClient(), client: tt.client}
+			// Track which binding IDs are deleted via the BTP API
+			var deletedIds []string
+			testClient := tt.client
+			if testClient != nil {
+				originalDeleteFunc := testClient.deleteInstanceFunc
+				testClient.deleteInstanceFunc = func(ctx context.Context, bindings []v1alpha1.Binding, kymaInstanceId string) error {
+					for _, b := range bindings {
+						deletedIds = append(deletedIds, b.Id)
+					}
+					if originalDeleteFunc != nil {
+						return originalDeleteFunc(ctx, bindings, kymaInstanceId)
+					}
+					return nil
+				}
+			}
+
+			c := &external{kube: test.NewMockClient(), client: testClient}
 			got, err := c.Observe(tt.args.ctx, tt.args.mg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Observe() error = %v, wantErr %v", err, tt.wantErr)
@@ -847,6 +881,10 @@ func Test_external_Observe(t *testing.T) {
 			cr := tt.args.mg.(*v1alpha1.KymaEnvironmentBinding)
 			if diff := cmp.Diff(tt.expectedStatus, cr.Status.AtProvider); diff != "" {
 				t.Errorf("Status mismatch (-want +got):\n%s", diff)
+			}
+			// Assert expired bindings were deleted via BTP API
+			if diff := cmp.Diff(tt.wantDeletedIds, deletedIds); diff != "" {
+				t.Errorf("Deleted binding IDs mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
