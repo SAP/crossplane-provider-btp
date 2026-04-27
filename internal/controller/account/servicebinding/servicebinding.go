@@ -161,6 +161,13 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFlattenSecret)
 	}
 
+	if cr.Spec.SecretFormat == SecretFormatSAPKubernetes && observation.ConnectionDetails != nil {
+		observation.ConnectionDetails, err = e.enrichWithSAPMetadata(ctx, cr, observation.ConnectionDetails)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, "cannot enrich connection details")
+		}
+	}
+
 	observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
 
 	// Validate rotation settings and set status condition
@@ -221,6 +228,13 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	creation.ConnectionDetails, err = flattenSecretData(creation.ConnectionDetails)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errFlattenSecret)
+	}
+
+	if cr.Spec.SecretFormat == SecretFormatSAPKubernetes && creation.ConnectionDetails != nil {
+		creation.ConnectionDetails, err = e.enrichWithSAPMetadata(ctx, cr, creation.ConnectionDetails)
+		if err != nil {
+			return managed.ExternalCreation{}, errors.Wrap(err, "cannot enrich connection details")
+		}
 	}
 
 	return creation, nil
