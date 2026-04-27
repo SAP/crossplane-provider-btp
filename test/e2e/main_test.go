@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -94,6 +95,10 @@ func SetupClusterWithCrossplane(namespace string) {
 	cfg.Configure(testenv, &kind.Cluster{})
 
 	testenv.Setup(
+		func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+			cfg.WithNamespace(namespace)
+			return ctx, nil
+		},
 		testutil.ApplySecretInCrossplaneNamespace(CIS_SECRET_NAME, bindingSecretData),
 		testutil.ApplySecretInCrossplaneNamespace(SERVICE_USER_SECRET_NAME, userSecretData),
 		testutil.CreateProviderConfigEnvFn(namespace, globalAccount, cliServerUrl, CIS_SECRET_NAME, SERVICE_USER_SECRET_NAME),
