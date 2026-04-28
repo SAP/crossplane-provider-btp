@@ -249,9 +249,9 @@ func (c *external) loadSubscription(ctx context.Context, cr *v1alpha1.Subscripti
 		return nil, nil
 	}
 
-	// Validate external-name format (should be appName/planName)
+	// Validate external-name format (should be appName/planName, planName may be empty)
 	if !isValidExternalNameFormat(externalName) {
-		return nil, errors.Errorf("invalid external-name format: %s, expected format: <appName>/<planName>", externalName)
+		return nil, errors.Errorf("invalid external-name format: %s, expected format: <appName>/<planName> (planName may be empty)", externalName)
 	}
 
 	// Get subscription from API - if it returns nil, it means resource doesn't exist (drift scenario)
@@ -259,9 +259,10 @@ func (c *external) loadSubscription(ctx context.Context, cr *v1alpha1.Subscripti
 }
 
 // isValidExternalNameFormat validates that the external name is in the format appName/planName
+// planName may be empty
 func isValidExternalNameFormat(externalName string) bool {
 	parts := strings.Split(externalName, "/")
-	return len(parts) == 2 && parts[0] != "" && parts[1] != ""
+	return len(parts) == 2 && parts[0] != ""
 }
 
 // syncStatus delegates saving the observation based on external resource to the typemapper
