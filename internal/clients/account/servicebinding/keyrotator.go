@@ -34,7 +34,11 @@ type BindingDeleter interface {
 type KeyRotator interface {
 	// RetireBinding checks if the binding should be retired based on the rotation frequency
 	// and the force rotation annotation. If it should be retired, it adds the retired key to the status.
+	// Returns a bool indicating whether the binding was retired (true) or not (false).
 	RetireBinding(cr *v1alpha1.ServiceBinding) bool
+
+	// NeedRetirement checks if the service binding needs to be retired based on the rotation frequency and the force rotation annotation. It returns true if retirement is needed, false otherwise.
+	NeedRetirement(cr *v1alpha1.ServiceBinding) bool
 
 	// HasExpiredKeys checks if there are any retired keys that have expired based on the rotation TTL.
 	HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool
@@ -70,7 +74,7 @@ func (r *SBKeyRotator) isRotationConfigured(cr *v1alpha1.ServiceBinding) bool {
 	return cr.Spec.Rotation != nil
 }
 
-func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
+func (r *SBKeyRotator) NeedRetirement(cr *v1alpha1.ServiceBinding) bool {
 	forceRotation := v1.HasAnnotation(cr.ObjectMeta, ForceRotationKey)
 
 	// If force rotation is requested but rotation is not configured, ignore the request
@@ -89,6 +93,20 @@ func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 	}
 
 	// If the binding is already retired, do not retire it again.
+	for _, retiredKey := range cr.Status.RetiredKeys {
+		if retiredKey.ID == cr.Status.AtProvider.ID {
+			return true
+		}
+	}
+	return true
+}
+
+func (r *SBKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
+	if !r.NeedRetirement(cr) {
+		return false
+	}
+
+	// Idempotency guard: if the current binding is already in RetiredKeys, do not append again.
 	for _, retiredKey := range cr.Status.RetiredKeys {
 		if retiredKey.ID == cr.Status.AtProvider.ID {
 			return true
