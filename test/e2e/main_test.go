@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
 	"sigs.k8s.io/e2e-framework/third_party/kind"
 )
 
@@ -95,6 +96,7 @@ func SetupClusterWithCrossplane(namespace string) {
 	cfg.Configure(testenv, &kind.Cluster{})
 
 	testenv.Setup(
+		envfuncs.CreateNamespace(namespace),
 		func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 			cfg.WithNamespace(namespace)
 			return ctx, nil
