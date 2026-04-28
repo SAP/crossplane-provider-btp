@@ -69,17 +69,25 @@ testFilter ?= .*
 # instead of creating a new one and trying to install the provider itself.
 KIND_CLUSTER_NAME ?= local-dev
 CROSSPLANE_VERSION ?= 1.20.1
+TEST_REUSE_CLUSTER ?= 0
 export E2E_REUSE_CLUSTER = $(KIND_CLUSTER_NAME)
 export E2E_CLUSTER_NAME = $(KIND_CLUSTER_NAME)
 -include build/makelib/local.xpkg.mk
 -include build/makelib/controlplane.mk
 
 .PHONY: local-deploy
-local-deploy: build xpkg.build.provider-btp controlplane.up local.xpkg.deploy.provider.provider-btp
+local-deploy: build xpkg.build.provider-btp local-deploy-reuse-check controlplane.up local.xpkg.deploy.provider.provider-btp
 	@$(INFO) waiting for provider to become healthy
 	@$(KUBECTL) wait provider.pkg provider-btp --for condition=Healthy --timeout 5m
 	@$(KUBECTL) -n crossplane-system wait --for=condition=Available deployment --all --timeout=5m
 	@$(OK) provider is healthy
+
+.PHONY: local-deploy-reuse-check
+local-deploy-reuse-check:
+ifeq ($(TEST_REUSE_CLUSTER),0)
+	@$(INFO) deleting any existing kind cluster named $(KIND_CLUSTER_NAME)
+	@$(KIND) delete cluster --name=$(KIND_CLUSTER_NAME) 2>/dev/null || true
+endif
 
 # ====================================================================================
 # Setup XPKG
