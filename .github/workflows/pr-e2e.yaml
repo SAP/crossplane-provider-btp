@@ -23,7 +23,7 @@ jobs:
     uses: ./.github/workflows/e2e_test.yaml
     with:
       checkout-ref: ${{ github.event.pull_request.head.sha }}
-      environment: 'pr-e2e-approval' # environment that requires approval for execution
+      environment: pr-e2e-approval # environment that requires approval for execution
     secrets:
       CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
       GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
