@@ -36,8 +36,8 @@ const (
 	cliServerUrlEnvVar  = "CLI_SERVER_URL"
 	uutImagesEnvVar     = "UUT_IMAGES"
 
-	fromTagEnvVar              = "UPGRADE_TEST_FROM_TAG"
-	toTagEnvVar                = "UPGRADE_TEST_TO_TAG"
+	fromTagEnvVar                = "UPGRADE_TEST_FROM_TAG"
+	toTagEnvVar                  = "UPGRADE_TEST_TO_TAG"
 	fromProviderRepositoryEnvVar = "UPGRADE_TEST_FROM_PROVIDER_REPOSITORY"
 	toProviderRepositoryEnvVar   = "UPGRADE_TEST_TO_PROVIDER_REPOSITORY"
 
@@ -112,7 +112,8 @@ func setupClusterWithCrossplane(providerPackage string) {
 	cfg := setup.ClusterSetup{
 		ProviderName: providerName,
 		Images: images.ProviderImages{
-			Package: providerPackage,
+			Package:         providerPackage,
+			ControllerImage: &providerPackage,
 		},
 		CrossplaneSetup: setup.CrossplaneSetup{
 			Version:  crossplaneVersion,
