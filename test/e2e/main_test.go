@@ -3,11 +3,11 @@
 package e2e
 
 import (
+	"context"
 	"os"
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
-	"github.com/crossplane-contrib/xp-testing/pkg/images"
 	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	testutil "github.com/sap/crossplane-provider-btp/test"
@@ -16,12 +16,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
 	"sigs.k8s.io/e2e-framework/third_party/kind"
 )
 
 var (
-	UUT_IMAGES_KEY = "UUT_IMAGES"
-
 	CIS_SECRET_NAME              = "cis-provider-secret"
 	SERVICE_USER_SECRET_NAME     = "sa-provider-secret"
 	TECHNICAL_USER_EMAIL_ENV_KEY = "TECHNICAL_USER_EMAIL"
@@ -50,9 +49,6 @@ func SetupClusterWithCrossplane(namespace string) {
 	// e.g. pr-16-3... defaults to empty string if not set
 	BUILD_ID = envvar.Get(UUT_BUILD_ID_KEY)
 
-	uutImages := envvar.GetOrPanic(UUT_IMAGES_KEY)
-	uutConfig, uutController := testutil.GetImagesFromJsonOrPanic(uutImages)
-
 	testenv = env.New()
 
 	bindingSecretData := testutil.GetBindingSecretOrPanic()
@@ -62,6 +58,8 @@ func SetupClusterWithCrossplane(namespace string) {
 
 	// Setup uses pre-defined funcs to create kind cluster
 	// and create a namespace for the environment
+	// The provider is pre-installed via `local-deploy` (local.xpkg.deploy),
+	// and E2E_REUSE_CLUSTER is set so xp-testing reuses the existing cluster.
 
 	deploymentRuntimeConfig := vendored.DeploymentRuntimeConfig{
 		ObjectMeta: metav1.ObjectMeta{
@@ -88,10 +86,6 @@ func SetupClusterWithCrossplane(namespace string) {
 
 	cfg := setup.ClusterSetup{
 		ProviderName: "btp-account",
-		Images: images.ProviderImages{
-			Package:         uutConfig,
-			ControllerImage: &uutController,
-		},
 		CrossplaneSetup: setup.CrossplaneSetup{
 			Version:  "1.20.1",
 			Registry: setup.DockerRegistry,
@@ -102,6 +96,11 @@ func SetupClusterWithCrossplane(namespace string) {
 	cfg.Configure(testenv, &kind.Cluster{})
 
 	testenv.Setup(
+		envfuncs.CreateNamespace(namespace),
+		func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+			cfg.WithNamespace(namespace)
+			return ctx, nil
+		},
 		testutil.ApplySecretInCrossplaneNamespace(CIS_SECRET_NAME, bindingSecretData),
 		testutil.ApplySecretInCrossplaneNamespace(SERVICE_USER_SECRET_NAME, userSecretData),
 		testutil.CreateProviderConfigEnvFn(namespace, globalAccount, cliServerUrl, CIS_SECRET_NAME, SERVICE_USER_SECRET_NAME),
