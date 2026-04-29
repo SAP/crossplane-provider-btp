@@ -2,7 +2,6 @@
 # DANGEROUS: 1) with access to secrets it is possible to steal those by a pull request that executes code that reads the secrets and exfiltrates those.
 # DANGEROUS: 2) the GITHUB_TOKEN has read and write permissions by default. Therefore, restrict the permissions with the permissions field
 # To adress (1), we use an environment pr-e2e-approval that will only execute the job after an explicit approval from team member (after inspecting the code for non-malicious activity).
-# If the author of the PR is OWNER, MEMBER or COLLOBORATOR, the environment pr-e2e-no-approval is used that does not require an explicit approval.
 
 # Requiremenets: 
 # 1) pr-e2e-approval environment configured to require approval before running
@@ -24,7 +23,7 @@ jobs:
     uses: ./.github/workflows/e2e_test.yaml
     with:
       checkout-ref: ${{ github.event.pull_request.head.sha }}
-      environment: ${{ github.event_name == 'pull_request_target' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) && 'pr-e2e-no-approval' || 'pr-e2e-approval' }}
+      environment: pr-e2e-approval # environment that requires approval for execution
     secrets:
       CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
       GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}

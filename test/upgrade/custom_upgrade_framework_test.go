@@ -175,7 +175,7 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 		panic("Both fromTag and toTag must be specified before building an upgrade test feature")
 	}
 
-	fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage := loadPackages(b.fromTag, b.toTag)
+	fromProviderPackage, toProviderPackage := loadPackages(b.fromTag, b.toTag)
 
 	upgradeTest := upgrade.UpgradeTest{
 		ProviderName:        providerName,
@@ -189,10 +189,7 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 	feature := features.New(featureName).
 		WithSetup(
 			"Install provider with version "+b.fromTag,
-			upgrade.ApplyProvider(upgradeTest.ClusterName, test.InstallProviderOptionsWithController(
-				upgradeTest.FromProviderInstallOptions(),
-				fromControllerPackage,
-			)),
+			upgrade.ApplyProvider(upgradeTest.ClusterName, upgradeTest.FromProviderInstallOptions()),
 		).
 		WithSetup(
 			"Apply ProviderConfig",
@@ -218,11 +215,8 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 	feature = feature.Assess(
 		"Upgrade provider to version "+b.toTag,
 		upgrade.UpgradeProvider(upgrade.UpgradeProviderOptions{
-			ClusterName: upgradeTest.ClusterName,
-			ProviderOptions: test.InstallProviderOptionsWithController(
-				upgradeTest.ToProviderInstallOptions(),
-				toControllerPackage,
-			),
+			ClusterName:         upgradeTest.ClusterName,
+			ProviderOptions:     upgradeTest.ToProviderInstallOptions(),
 			ResourceDirectories: upgradeTest.ResourceDirectories,
 			WaitForPause:        b.waitForPause,
 		}),
@@ -269,10 +263,10 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 	return feature.Feature()
 }
 
-func loadPackages(fromTag, toTag string) (string, string, string, string) {
+func loadPackages(fromTag, toTag string) (string, string) {
 	return test.LoadUpgradePackages(
 		fromTag, toTag,
-		fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository,
+		fromProviderRepository, toProviderRepository,
 		uutImagesEnvVar, localTagName,
 		true,
 	)
