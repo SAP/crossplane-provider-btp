@@ -10,6 +10,10 @@ spec:
   forProvider:
     planName: azure
     name: "$BUILD_ID-kyma-extn-upgrade-test-env"
+    parameters:
+      region: westeurope
+      administrators:
+        - $TECHNICAL_USER_EMAIL
   subaccountRef:
     name: upgrade-test-kyma-extn-sa
   cloudManagementRef:
