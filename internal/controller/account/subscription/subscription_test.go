@@ -67,7 +67,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.Wrap(errors.New("invalid external-name format: invalid-format-without-slash, expected format: <appName>/<planName>"), "while loading subscription"),
+				err: errors.Wrap(errors.New("invalid external-name format: invalid-format-without-slash, expected format: <appName>/<planName> (planName may be empty)"), "while loading subscription"),
 				cr:  NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("invalid-format-without-slash")),
 			},
 		},
@@ -78,19 +78,33 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.Wrap(errors.New("invalid external-name format: /, expected format: <appName>/<planName>"), "while loading subscription"),
+				err: errors.Wrap(errors.New("invalid external-name format: /, expected format: <appName>/<planName> (planName may be empty)"), "while loading subscription"),
 				cr:  NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("/")),
 			},
 		},
-		"InvalidExternalNameFormatEmptyParts": {
-			reason: "Invalid external-name format with empty parts should return error",
+		"InvalidExternalNameFormatEmptyAppName": {
+			reason: "Invalid external-name format with empty app name should return error",
 			args: args{
-				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("appname/")),
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("/planName")),
 			},
 			want: want{
 				o:   managed.ExternalObservation{},
-				err: errors.Wrap(errors.New("invalid external-name format: appname/, expected format: <appName>/<planName>"), "while loading subscription"),
-				cr:  NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("appname/")),
+				err: errors.Wrap(errors.New("invalid external-name format: /planName, expected format: <appName>/<planName> (planName may be empty)"), "while loading subscription"),
+				cr:  NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("/planName")),
+			},
+		},
+		"ValidExternalNameFormatEmptyPlanName": {
+			reason: "External-name format with empty plan name should be valid",
+			args: args{
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("appname/")),
+				mockApiHandler: &MockApiHandler{
+					returnGet: nil,
+					returnErr: nil,
+				},
+			},
+			want: want{
+				o:  managed.ExternalObservation{ResourceExists: false},
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("appname/")),
 			},
 		},
 		"APIErrorOnRead": {

@@ -134,6 +134,14 @@ type ServiceBindingSpec struct {
 	// Rotation defines the parameters for rotating the service credential binding.
 	// +kubebuilder:validation:Optional
 	Rotation *RotationParameters `json:"rotation,omitempty"`
+
+	// SecretFormat controls the format of the connection secret.
+	// When set to "sap-kubernetes", the secret follows the SAP Kubernetes Service Binding specification
+	// with metadata properties (type, label, plan, tags, instance_name, instance_guid) and a .metadata descriptor.
+	// When omitted or empty, only the raw credentials are stored (default, backward-compatible).
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum="";"sap-kubernetes"
+	SecretFormat string `json:"secretFormat,omitempty"`
 }
 
 // A ServiceBindingStatus represents the observed state of a ServiceBinding.
