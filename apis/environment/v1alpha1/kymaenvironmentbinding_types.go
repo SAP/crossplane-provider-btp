@@ -81,6 +81,12 @@ type KymaEnvironmentBindingStatus struct {
 // +kubebuilder:object:root=true
 
 // A KymaEnvironmentBinding is an API to retrieve a binding for a specific Kyma Instance.
+//
+// External-Name Configuration:
+//   - Follows Standard: no - This resource does not support external-name based importing.
+//     Instead of importing, create a new KymaEnvironmentBinding resource.
+//   - Format: Not applicable
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

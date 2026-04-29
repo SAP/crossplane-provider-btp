@@ -17,7 +17,7 @@ import (
 // Setup adds a controller that reconciles KymaEnvironment managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	name := managed.ControllerName(v1alpha1.KymaEnvironmentBindingKind)
-	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.KymaEnvironmentBinding{}, v1alpha1.KymaEnvironmentBindingKind, v1alpha1.KymaEnvironmentBindingGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
+	return providerconfig.DefaultSetupWithoutDefaultInitializer(mgr, o, &v1alpha1.KymaEnvironmentBinding{}, v1alpha1.KymaEnvironmentBindingKind, v1alpha1.KymaEnvironmentBindingGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
 		return &connector{
 			kube:            kube,
 			usage:           usage,
