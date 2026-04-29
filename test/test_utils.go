@@ -40,8 +40,7 @@ import (
 )
 
 const (
-	uutConfigKey     = "crossplane/provider-btp"
-	uutControllerKey = "crossplane/provider-btp-controller"
+	uutConfigKey = "crossplane/provider-btp"
 )
 
 type mockList struct {
@@ -319,14 +318,7 @@ func LoadDirectoriesWithYAMLFiles(path string, ignoreDirectories []string) ([]st
 	return directories, nil
 }
 
-func InstallProviderOptionsWithController(
-	options xpenvfuncs.InstallCrossplaneProviderOptions, controllerPackage string,
-) xpenvfuncs.InstallCrossplaneProviderOptions {
-	options.ControllerImage = &controllerPackage
-	return options
-}
-
-func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
+func GetImagesFromJsonOrPanic(imagesJson string) string {
 	imageMap := map[string]string{}
 
 	err := json.Unmarshal([]byte(imagesJson), &imageMap)
@@ -336,28 +328,27 @@ func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
 	}
 
 	uutConfig := imageMap[uutConfigKey]
-	uutController := imageMap[uutControllerKey]
 
-	return uutConfig, uutController
+	return uutConfig
 }
 
-// LoadUpgradePackages resolves provider and controller packages for upgrade tests.
+// LoadUpgradePackages resolves provider packages for upgrade tests.
 //
 // It handles both local and remote tags, pulling images as needed:
 //   - "local" tag: Uses locally built images from the UUT_IMAGES env var
 //   - Other tags: Constructs image URLs from repositories and optionally pulls them
 //
-// Returns: fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
+// Returns: fromProviderPackage, toProviderPackage
 func LoadUpgradePackages(
 	fromTag, toTag string,
-	fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository string,
+	fromProviderRepository, toProviderRepository string,
 	uutImagesEnvVar, localTagName string,
 	pullPackages bool,
-) (string, string, string, string) {
+) (string, string) {
 	isLocalFromTag := fromTag == localTagName
 	isLocalToTag := toTag == localTagName
 
-	var fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage string
+	var fromProviderPackage, toProviderPackage string
 
 	// If either tag is local, parse UUT_IMAGES once.
 	if isLocalFromTag || isLocalToTag {
@@ -366,43 +357,37 @@ func LoadUpgradePackages(
 			panic(uutImagesEnvVar + " environment variable is required when FROM_TAG or TO_TAG is set to \"" + localTagName + "\"")
 		}
 
-		localProviderPackage, localControllerPackage := GetImagesFromJsonOrPanic(uutImages)
+		localProviderPackage := GetImagesFromJsonOrPanic(uutImages)
 		localTag := strings.Split(localProviderPackage, ":")[1]
 
 		if isLocalFromTag {
 			fromTag = localTag
 			fromProviderPackage = localProviderPackage
-			fromControllerPackage = localControllerPackage
 		}
 
 		if isLocalToTag {
 			toTag = localTag
 			toProviderPackage = localProviderPackage
-			toControllerPackage = localControllerPackage
 		}
 	}
 
 	if !isLocalFromTag {
 		fromProviderPackage = fmt.Sprintf("%s:%s", fromProviderRepository, fromTag)
-		fromControllerPackage = fmt.Sprintf("%s:%s", fromControllerRepository, fromTag)
 
 		if pullPackages {
 			mustPullImage(fromProviderPackage)
-			mustPullImage(fromControllerPackage)
 		}
 	}
 
 	if !isLocalToTag {
 		toProviderPackage = fmt.Sprintf("%s:%s", toProviderRepository, toTag)
-		toControllerPackage = fmt.Sprintf("%s:%s", toControllerRepository, toTag)
 
 		if pullPackages {
 			mustPullImage(toProviderPackage)
-			mustPullImage(toControllerPackage)
 		}
 	}
 
-	return fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
+	return fromProviderPackage, toProviderPackage
 }
 
 func mustPullImage(image string) {
