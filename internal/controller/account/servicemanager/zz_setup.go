@@ -19,7 +19,7 @@ import (
 
 // Setup adds a controller that reconciles GlobalAccount managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
-	return providerconfig.DefaultSetup(
+	return providerconfig.DefaultSetupWithoutDefaultInitializer(
 		mgr,
 		o,
 		&apisv1beta1.ServiceManager{},
