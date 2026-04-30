@@ -334,6 +334,7 @@ func expectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.
 // Helper function to build a complete SubaccountServiceInstance CR dynamically
 func expectedTfSerivceInstance(opts ...func(*v1alpha1.SubaccountServiceInstance)) *v1alpha1.SubaccountServiceInstance {
 	cr := &v1alpha1.SubaccountServiceInstance{}
+	cr.Name = "TF-"
 	cr.Spec.ForProvider.Name = internal.Ptr("")
 
 	// Apply each option to modify the CR
