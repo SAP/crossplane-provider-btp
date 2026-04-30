@@ -76,7 +76,8 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 ### ServiceInstance
 
 - Follows Standard: no
-- Format: ServiceInstance GUID (UUID format) and the spec.ForProvider.SubaccountRef or spec.ForProvider.SubaccountID field filled out
+- Format: ServiceInstance GUID (UUID format)
+- Note: spec.ForProvider.SubaccountRef, spec.ForProvider.SubaccountSelector, or spec.ForProvider.SubaccountID must be set for adoption to work
 - How to find:
 
   - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
