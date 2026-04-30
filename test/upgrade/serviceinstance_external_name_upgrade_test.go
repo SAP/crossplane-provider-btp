@@ -13,7 +13,9 @@ import (
 )
 
 var (
-	// v1.9.0 has no external-name support for ServiceInstance
+	// v1.9.0 used Terraform import() for ServiceInstance adoption, requiring a different external-name format.
+	// This branch switches to Terraform refresh() with management policy "*", which requires the external-name
+	// to be the ServiceInstance GUID (UUID format) → we test from the version before to the current one.
 	siFromCustomTag             = "v1.9.0"
 	siToCustomTag               = "local"
 	siCustomResourceDirectories = []string{
@@ -24,8 +26,11 @@ var (
 // Test_ServiceInstance_External_Name verifies that the ServiceInstance external-name is correctly
 // set during provider upgrades.
 //
-// Before this change (v1.9.0 and earlier), ServiceInstance had no external-name handling.
-// After upgrade, the controller must set the external-name to the ServiceInstance GUID (UUID format).
+// Before this change (v1.9.0 and earlier), ServiceInstance used Terraform import() to adopt existing
+// resources. With this change, the controller switches to Terraform refresh() (management policy "*")
+// and requires the external-name to be set to the ServiceInstance GUID (UUID format).
+// This test ensures that after upgrading from the old import()-based behavior to the new refresh()-based
+// behavior, the external-name is correctly set to a valid UUID and the resource remains healthy.
 // This test ensures that:
 // 1. After upgrade, the external-name is in GUID format (UUID)
 // 2. If the external-name was already a GUID before upgrade, it remains unchanged
