@@ -85,6 +85,14 @@ type ServiceManagerStatus struct {
 // +kubebuilder:object:root=true
 
 // A ServiceManager is a managed resource that represents a service manager instance and its API credentials in the SAP Business Technology Platform
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: `<serviceInstanceID>/<serviceBindingID>` (both UUIDs)
+//   - How to find:
+//     - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Look for service-manager instance and binding IDs
+//     - CLI: `btp list services/instance` and `btp list services/binding` in the subaccount context
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

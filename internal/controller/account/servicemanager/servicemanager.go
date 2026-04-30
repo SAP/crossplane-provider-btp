@@ -2,6 +2,7 @@ package servicemanager
 
 import (
 	"context"
+	"strings"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -12,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -133,6 +135,21 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceManager)
 	}
 
+	externalName := meta.GetExternalName(cr)
+
+	// Empty external-name means resource doesn't exist yet — trigger Create
+	if externalName == "" {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
+
+	// Validate external-name format
+	if !isValidExternalNameFormat(externalName) {
+		return managed.ExternalObservation{}, errors.Errorf(
+			"invalid external-name format: %q, expected format: <serviceInstanceID> or <serviceInstanceID>/<serviceBindingID> (UUIDs)",
+			externalName,
+		)
+	}
+
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
@@ -214,4 +231,19 @@ func formExternalName(serviceInstanceID, serviceBindingID string) string {
 		return serviceInstanceID
 	}
 	return serviceInstanceID + "/" + serviceBindingID
+}
+
+// isValidExternalNameFormat validates that the external name is a valid UUID
+// or a compound key of two UUIDs separated by "/".
+// A single UUID is valid during mid-creation when only the instance exists.
+func isValidExternalNameFormat(externalName string) bool {
+	parts := strings.Split(externalName, "/")
+	switch len(parts) {
+	case 1:
+		return internal.IsValidUUID(parts[0])
+	case 2:
+		return internal.IsValidUUID(parts[0]) && internal.IsValidUUID(parts[1])
+	default:
+		return false
+	}
 }
