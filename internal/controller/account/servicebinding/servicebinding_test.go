@@ -68,6 +68,10 @@ func (m *MockKeyRotator) ValidateRotationSettings(cr *v1alpha1.ServiceBinding) {
 	m.validateRotationSettingsCalled = true
 }
 
+func (m *MockKeyRotator) NeedRetirement(cr *v1alpha1.ServiceBinding) bool {
+	return m.retireBindingResult
+}
+
 func (m *MockKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
 	return m.retireBindingResult
 }

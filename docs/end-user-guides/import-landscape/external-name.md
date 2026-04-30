@@ -64,6 +64,12 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
   - CLI: Use BTP ClI: `btp list accounts/environment-instance`
 
+### KymaEnvironmentBinding
+
+- Follows Standard: no - This resource does not support external-name based importing.
+Instead of importing, create a new KymaEnvironmentBinding resource.
+- Format: Not applicable
+
 ### RoleCollection
 
 - Follows Standard: no (uses name as identifier, not a GUID)
