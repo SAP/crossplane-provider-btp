@@ -2,15 +2,14 @@ package entitlement
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/pkg/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/maypok86/otter/v2"
+	"github.com/pkg/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -23,16 +22,12 @@ import (
 const (
 	errNotEntitlement      = "managed resource is not a Entitlement custom resource"
 	errConnect             = "while connecting to provider"
-	errObserve             = "while observing entitlement"
 	errUpdateObservation   = "while updating observation"
 	errDescribeInstance    = "while describing instance"
 	errFindRelated         = "while finding related entitlements"
 	errGenerateObservation = "while generating observation"
-	errCreate              = "while creating entitlement"
 	errCreateInstance      = "while creating instance"
-	errUpdate              = "while updating entitlement"
 	errUpdateInstance      = "while updating instance"
-	errDelete              = "while deleting entitlement"
 	errDeleteInstance      = "while deleting instance"
 	errListEntitlements    = "while listing entitlements"
 )
@@ -50,6 +45,7 @@ type connector struct {
 	usage           resource.Tracker
 	resourcetracker tracking.ReferenceResolverTracker
 	newServiceFn    func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
+	cache           *otter.Cache[string, *entitlementclient.Instance]
 }
 
 // Connect typically produces an ExternalClient by:
@@ -69,7 +65,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 	return &external{
 		kube:    c.kube,
-		client:  entitlementclient.NewEntitlementsClient(*btpclient),
+		client:  entitlementclient.NewCachingClient(entitlementclient.NewEntitlementsClient(*btpclient), c.cache),
 		tracker: c.resourcetracker,
 	}, nil
 }
@@ -225,7 +221,6 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err := c.client.UpdateInstance(ctx, cr); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateInstance)
 	}
-	fmt.Printf("Updating: %+v", cr)
 
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the
