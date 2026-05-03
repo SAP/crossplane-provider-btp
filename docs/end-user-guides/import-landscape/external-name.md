@@ -105,7 +105,7 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 - How to find:
 
   - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Select Credential] → Name
-  - CLI: btp list security/api-credential --subaccount-id <subaccount-id> (field: name)
+  - CLI: btp list security/api-credential --subaccount-id `<subaccount-id>` (field: name)
 
 ### Subscription
 
