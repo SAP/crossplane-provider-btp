@@ -2,6 +2,7 @@ package servicebinding
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -65,6 +66,10 @@ func (m *MockKeyRotator) HasExpiredKeys(cr *v1alpha1.ServiceBinding) bool {
 
 func (m *MockKeyRotator) ValidateRotationSettings(cr *v1alpha1.ServiceBinding) {
 	m.validateRotationSettingsCalled = true
+}
+
+func (m *MockKeyRotator) NeedRetirement(cr *v1alpha1.ServiceBinding) bool {
+	return m.retireBindingResult
 }
 
 func (m *MockKeyRotator) RetireBinding(cr *v1alpha1.ServiceBinding) bool {
@@ -554,6 +559,14 @@ func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceBinding)
 	}
 }
 
+func mustMarshalJSON(v interface{}) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 // Test Observe method - This validates the main observation logic
 func TestObserve(t *testing.T) {
 	type fields struct {
@@ -814,6 +827,175 @@ func TestObserve(t *testing.T) {
 						cr.Status.AtProvider.CreatedDate = &metav1.Time{Time: createdTime}
 						lastModifiedTime, _ := time.Parse(time.RFC3339, "2023-10-21T15:45:00Z")
 						cr.Status.AtProvider.LastModified = &metav1.Time{Time: lastModifiedTime}
+					},
+				),
+			},
+		},
+		"SAPFormatEnrichesConnectionDetails": {
+			reason: "should enrich connection details when secretFormat is sap-kubernetes",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						observation: managed.ExternalObservation{
+							ResourceExists:   true,
+							ResourceUpToDate: false,
+							ConnectionDetails: managed.ConnectionDetails{
+								"url":       []byte("https://api.example.com"),
+								"client_id": []byte("admin"),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: false,
+				},
+				tracker: &MockTracker{},
+				kube: &test.MockClient{
+					MockGet: func(_ context.Context, key kubeclient.ObjectKey, obj kubeclient.Object) error {
+						if si, ok := obj.(*v1alpha1.ServiceInstance); ok {
+							si.Spec.ForProvider.Name = "my-instance"
+							si.Spec.ForProvider.OfferingName = "xsuaa"
+							si.Spec.ForProvider.PlanName = "application"
+							si.Status.AtProvider.ID = "instance-guid-123"
+							return nil
+						}
+						return errors.New("unexpected Get call")
+					},
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.SecretFormat = "sap-kubernetes"
+						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
+					},
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+					ConnectionDetails: managed.ConnectionDetails{
+						"url":           []byte("https://api.example.com"),
+						"client_id":     []byte("admin"),
+						"type":          []byte("xsuaa"),
+						"label":         []byte("xsuaa"),
+						"plan":          []byte("application"),
+						"instance_name": []byte("my-instance"),
+						"instance_guid": []byte("instance-guid-123"),
+						"tags":          []byte("[]"),
+						".metadata":     mustMarshalJSON(secretMetadata{
+							MetaDataProperties: []secretMetadataProperty{
+								{Name: "instance_name", Format: "text"},
+								{Name: "instance_guid", Format: "text"},
+								{Name: "plan", Format: "text"},
+								{Name: "label", Format: "text"},
+								{Name: "type", Format: "text"},
+								{Name: "tags", Format: "json"},
+							},
+							CredentialProperties: []secretMetadataProperty{
+								{Name: "client_id", Format: "text"},
+								{Name: "url", Format: "text"},
+							},
+						}),
+					},
+				},
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.SecretFormat = "sap-kubernetes"
+						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
+					},
+				),
+			},
+		},
+		"SAPFormatNoRefGracefulDegradation": {
+			reason: "should return unenriched details when secretFormat is sap-kubernetes but no ServiceInstanceRef",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						observation: managed.ExternalObservation{
+							ResourceExists:   true,
+							ResourceUpToDate: false,
+							ConnectionDetails: managed.ConnectionDetails{
+								"url": []byte("https://api.example.com"),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: false,
+				},
+				tracker: &MockTracker{},
+				kube:    &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.SecretFormat = "sap-kubernetes"
+						// No ServiceInstanceRef set
+					},
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+					ConnectionDetails: managed.ConnectionDetails{
+						"url": []byte("https://api.example.com"),
+					},
+				},
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.SecretFormat = "sap-kubernetes"
+					},
+				),
+			},
+		},
+		"DefaultFormatNoEnrichment": {
+			reason: "should not enrich connection details when secretFormat is empty",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						observation: managed.ExternalObservation{
+							ResourceExists:   true,
+							ResourceUpToDate: false,
+							ConnectionDetails: managed.ConnectionDetails{
+								"url": []byte("https://api.example.com"),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: false,
+				},
+				tracker: &MockTracker{},
+				kube:    &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
+						// No SecretFormat set
+					},
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+					ConnectionDetails: managed.ConnectionDetails{
+						"url": []byte("https://api.example.com"),
+					},
+				},
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
 					},
 				),
 			},

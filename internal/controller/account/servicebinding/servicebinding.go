@@ -18,13 +18,13 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/reconcilerutil"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
 	errNotServiceBinding    = "managed resource is not a ServiceBinding custom resource"
 	errCreateBinding        = "cannot create servicebinding"
-	errObserveSaveBinding   = "cannot save observed data"
 	errUpdateStatus         = "cannot update status"
 	errGetBinding           = "cannot get servicebinding"
 	errDeleteExpiredKeys    = "cannot delete expired keys"
@@ -149,11 +149,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	if observation.ResourceUpToDate && tfResource != nil {
-		if err := e.updateServiceBindingFromTfResource(cr, tfResource); err != nil {
-			return managed.ExternalObservation{}, errors.Wrap(err, errObserveSaveBinding)
-		}
-
-		if err := e.kube.Status().Update(ctx, cr); err != nil {
+		if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) error {
+			return e.updateServiceBindingFromTfResource(cr, tfResource)
+		}); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
 		}
 	}
@@ -163,20 +161,30 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errFlattenSecret)
 	}
 
+	if cr.Spec.SecretFormat == SecretFormatSAPKubernetes && observation.ConnectionDetails != nil {
+		observation.ConnectionDetails, err = e.enrichWithSAPMetadata(ctx, cr, observation.ConnectionDetails)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, "cannot enrich connection details")
+		}
+	}
+
 	observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
 
 	// Validate rotation settings and set status condition
 	e.keyRotator.ValidateRotationSettings(cr)
 
 	// Retire binding conditionally
-	if !e.keyRotator.RetireBinding(cr) {
+	if !e.keyRotator.NeedRetirement(cr) {
 		if !cr.GetDeletionTimestamp().IsZero() {
 			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 		}
 		return observation, nil
 	}
 
-	if err := e.kube.Status().Update(ctx, cr); err != nil {
+	if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 5, func(cr *v1alpha1.ServiceBinding) error {
+		e.keyRotator.RetireBinding(cr)
+		return nil
+	}); err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
 	}
 
@@ -222,6 +230,13 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errFlattenSecret)
 	}
 
+	if cr.Spec.SecretFormat == SecretFormatSAPKubernetes && creation.ConnectionDetails != nil {
+		creation.ConnectionDetails, err = e.enrichWithSAPMetadata(ctx, cr, creation.ConnectionDetails)
+		if err != nil {
+			return managed.ExternalCreation{}, errors.Wrap(err, "cannot enrich connection details")
+		}
+	}
+
 	return creation, nil
 }
 
@@ -238,11 +253,12 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	// Clean up expired keys if there are any retired keys
 	newRetiredKeys, deleteErr := e.keyRotator.DeleteExpiredKeys(ctx, cr)
 
-	cr.Status.RetiredKeys = newRetiredKeys
-
 	// store the result in the status even if errors are returned,
 	// to remove keys for those where deletion was successfull
-	if err := e.kube.Status().Update(ctx, cr); err != nil {
+	if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) error {
+		cr.Status.RetiredKeys = newRetiredKeys
+		return nil
+	}); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
 	}
 	if deleteErr != nil {
