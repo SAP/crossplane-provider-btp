@@ -98,6 +98,15 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
   - CLI: btp list accounts/subaccount (field: guid)
 
+### SubaccountApiCredential
+
+- Follows Standard: no (ADR exception: the SAP BTP Terraform provider uses the credential name as its resource identifier)
+- Format: The name of the API credential (e.g. "my-api-credential"), set via spec.forProvider.name
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Select Credential] → Name
+  - CLI: btp list security/api-credential --subaccount-id `<subaccount-id>` (field: name)
+
 ### Subscription
 
 - Follows Standard: yes
