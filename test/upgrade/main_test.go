@@ -112,8 +112,7 @@ func setupClusterWithCrossplane(providerPackage string) {
 	cfg := setup.ClusterSetup{
 		ProviderName: providerName,
 		Images: images.ProviderImages{
-			Package:         providerPackage,
-			ControllerImage: &providerPackage,
+			Package: providerPackage,
 		},
 		CrossplaneSetup: setup.CrossplaneSetup{
 			Version:  crossplaneVersion,
