@@ -23,6 +23,10 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/features"
 )
 
+const (
+	kymaModuleImportBindingRefName = "kyma-module-import-binding"
+)
+
 func TestKymaEnvironment(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping kyma in short mode")
@@ -104,6 +108,45 @@ func TestKymaEnvironmentImportFlow(t *testing.T) {
 	)
 
 	importFeature := importTester.BuildTestFeature("BTP Kyma Environment Import Flow").Feature()
+
+	testenv.Test(t, importFeature)
+}
+
+// TestKymaModuleImportFlow tests the import flow for KymaModule resource
+// according to the External Name Handling ADR.
+//
+// This test verifies that:
+// 1. A KymaModule can be created with its dependencies (KymaEnvironment + KymaEnvironmentBinding)
+// 2. The external-name is properly set to the module name (e.g. "cloud-manager")
+// 3. The resource can be imported using the external-name annotation
+// 4. Imported resources transition to healthy state
+func TestKymaModuleImportFlow(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping kyma module import in short mode")
+		return
+	}
+
+	kymaModuleImportName := "cloud-manager"
+
+	importTester := NewImportTester(
+		&v1alpha1.KymaModule{
+			Spec: v1alpha1.KymaModuleSpec{
+				ForProvider: v1alpha1.KymaModuleParameters{
+					Name: kymaModuleImportName,
+				},
+				KymaEnvironmentBindingRef: &xpv1.Reference{
+					Name: kymaModuleImportBindingRefName,
+				},
+			},
+		},
+		kymaModuleImportName,
+		WithWaitDependentResourceTimeout[*v1alpha1.KymaModule](wait.WithTimeout(60*time.Minute)),
+		WithWaitCreateTimeout[*v1alpha1.KymaModule](wait.WithTimeout(15*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.KymaModule](wait.WithTimeout(15*time.Minute)),
+		WithDependentResourceDirectory[*v1alpha1.KymaModule]("testdata/crs/kyma_module_import"),
+	)
+
+	importFeature := importTester.BuildTestFeature("BTP Kyma Module Import Flow").Feature()
 
 	testenv.Test(t, importFeature)
 }

@@ -77,6 +77,14 @@ type ModuleStatus struct {
 // +kubebuilder:object:root=true
 
 // A KymaModule is an object to manage the configuration for a specific Module in the Kyma cluster.
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: Kyma module name (e.g. "keda", "serverless")
+//   - How to find:
+//   - UI: Kyma Dashboard → Modules → [Module Name]
+//   - CLI: `kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'`
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

@@ -25,7 +25,7 @@ const (
 )
 
 type Client interface {
-	ObserveModule(ctx context.Context, moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error)
+	ObserveModule(ctx context.Context, moduleName string) (*v1alpha1.ModuleStatus, error)
 	CreateModule(ctx context.Context, moduleName string, moduleChannel string, customResourcePolicy string) error
 	DeleteModule(ctx context.Context, moduleName string) error
 }
@@ -58,7 +58,7 @@ func NewKymaModuleClient(kymaEnvironmentKubeconfig []byte) (Client, error) {
 	return &KymaModuleClient{kube: kube}, nil
 }
 
-func (c *KymaModuleClient) ObserveModule(ctx context.Context, moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
+func (c *KymaModuleClient) ObserveModule(ctx context.Context, moduleName string) (*v1alpha1.ModuleStatus, error) {
 	kyma, err := getDefaultKyma(ctx, c)
 	if err != nil {
 		return nil, err
@@ -68,8 +68,7 @@ func (c *KymaModuleClient) ObserveModule(ctx context.Context, moduleCr *v1alpha1
 	// Reason: we use one managed resource per module while kyma bundles it all in one cr.
 	// To resolve this many to one mapping, for every one of our module managed resource, we query the same kyma cr and find the correct name in it.
 	for _, module := range kyma.Status.Modules {
-		if module.Name == moduleCr.Spec.ForProvider.Name {
-			moduleCr.Status.AtProvider = module
+		if module.Name == moduleName {
 			return &module, nil
 		}
 	}

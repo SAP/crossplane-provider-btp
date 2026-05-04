@@ -1,0 +1,34 @@
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: KymaEnvironment
+metadata:
+  name: kyma-module-import-env
+  namespace: default
+spec:
+  forProvider:
+    planName: azure
+    name: "$BUILD_ID-kyma-module-import-env"
+    parameters:
+      region: westeurope
+      administrators:
+        - $TECHNICAL_USER_EMAIL
+  subaccountRef:
+    name: kyma-module-import-subaccount
+  cloudManagementRef:
+    name: cis-local-kyma-module-import
+---
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: KymaEnvironmentBinding
+metadata:
+  name: kyma-module-import-binding
+  namespace: default
+spec:
+  kymaEnvironmentRef:
+    name: kyma-module-import-env
+  writeConnectionSecretToRef:
+    name: kyma-module-import-binding
+    namespace: default
+  cloudManagementRef:
+    name: cis-local-kyma-module-import
+  forProvider:
+    rotationInterval: 3m
+    ttl: 10m
