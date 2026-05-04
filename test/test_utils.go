@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/logging"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
@@ -40,7 +41,12 @@ import (
 )
 
 const (
-	uutConfigKey = "crossplane/provider-btp"
+	uutConfigKey           = "crossplane/provider-btp"
+	uutControllerConfigKey = "crossplane/provider-btp-controller"
+
+	// firstSingleImageVersion is the first release that uses the single-image build
+	// (controller embedded in the package). Versions before this have a separate controller image.
+	firstSingleImageVersion = "1.10.0"
 )
 
 type mockList struct {
@@ -318,7 +324,7 @@ func LoadDirectoriesWithYAMLFiles(path string, ignoreDirectories []string) ([]st
 	return directories, nil
 }
 
-func GetImagesFromJsonOrPanic(imagesJson string) string {
+func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
 	imageMap := map[string]string{}
 
 	err := json.Unmarshal([]byte(imagesJson), &imageMap)
@@ -328,8 +334,15 @@ func GetImagesFromJsonOrPanic(imagesJson string) string {
 	}
 
 	uutConfig := imageMap[uutConfigKey]
+	uutController := imageMap[uutControllerConfigKey]
 
-	return uutConfig
+	// For single-image builds, the controller key may not exist.
+	// In that case, the controller image is the same as the package image.
+	if uutController == "" {
+		uutController = uutConfig
+	}
+
+	return uutConfig, uutController
 }
 
 // LoadUpgradePackages resolves provider packages for upgrade tests.
@@ -338,17 +351,18 @@ func GetImagesFromJsonOrPanic(imagesJson string) string {
 //   - "local" tag: Uses locally built images from the UUT_IMAGES env var
 //   - Other tags: Constructs image URLs from repositories and optionally pulls them
 //
-// Returns: fromProviderPackage, toProviderPackage
+// Returns: fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
 func LoadUpgradePackages(
 	fromTag, toTag string,
 	fromProviderRepository, toProviderRepository string,
+	fromControllerRepository, toControllerRepository string,
 	uutImagesEnvVar, localTagName string,
 	pullPackages bool,
-) (string, string) {
+) (string, string, string, string) {
 	isLocalFromTag := fromTag == localTagName
 	isLocalToTag := toTag == localTagName
 
-	var fromProviderPackage, toProviderPackage string
+	var fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage string
 
 	// If either tag is local, parse UUT_IMAGES once.
 	if isLocalFromTag || isLocalToTag {
@@ -357,37 +371,72 @@ func LoadUpgradePackages(
 			panic(uutImagesEnvVar + " environment variable is required when FROM_TAG or TO_TAG is set to \"" + localTagName + "\"")
 		}
 
-		localProviderPackage := GetImagesFromJsonOrPanic(uutImages)
+		localProviderPackage, localControllerPackage := GetImagesFromJsonOrPanic(uutImages)
 		localTag := strings.Split(localProviderPackage, ":")[1]
 
 		if isLocalFromTag {
 			fromTag = localTag
 			fromProviderPackage = localProviderPackage
+			fromControllerPackage = localControllerPackage
 		}
 
 		if isLocalToTag {
 			toTag = localTag
 			toProviderPackage = localProviderPackage
+			toControllerPackage = localControllerPackage
 		}
 	}
 
 	if !isLocalFromTag {
 		fromProviderPackage = fmt.Sprintf("%s:%s", fromProviderRepository, fromTag)
 
+		if isSingleImageVersion(fromTag) {
+			fromControllerPackage = fromProviderPackage
+		} else {
+			fromControllerPackage = fmt.Sprintf("%s:%s", fromControllerRepository, fromTag)
+		}
+
 		if pullPackages {
 			mustPullImage(fromProviderPackage)
+			if fromControllerPackage != fromProviderPackage {
+				mustPullImage(fromControllerPackage)
+			}
 		}
 	}
 
 	if !isLocalToTag {
 		toProviderPackage = fmt.Sprintf("%s:%s", toProviderRepository, toTag)
 
+		if isSingleImageVersion(toTag) {
+			toControllerPackage = toProviderPackage
+		} else {
+			toControllerPackage = fmt.Sprintf("%s:%s", toControllerRepository, toTag)
+		}
+
 		if pullPackages {
 			mustPullImage(toProviderPackage)
+			if toControllerPackage != toProviderPackage {
+				mustPullImage(toControllerPackage)
+			}
 		}
 	}
 
-	return fromProviderPackage, toProviderPackage
+	return fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
+}
+
+// isSingleImageVersion returns true if the given tag uses the single-image build
+// (controller embedded in the package). For these versions, no separate controller image exists.
+func isSingleImageVersion(tag string) bool {
+	threshold, err := semver.Parse(firstSingleImageVersion)
+	if err != nil {
+		return false
+	}
+	v, err := semver.Parse(strings.TrimPrefix(tag, "v"))
+	if err != nil {
+		// Non-semver tags (e.g. commit hashes) are assumed to be from main/latest and single-image
+		return true
+	}
+	return v.GE(threshold)
 }
 
 func mustPullImage(image string) {
@@ -423,6 +472,16 @@ func DeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeConfig
 			},
 		},
 	}
+}
+
+// InstallProviderOptionsWithController overrides the ControllerImage in the given options
+// with the correct controller package image. This is needed for pre-single-image builds
+// where the controller image is separate from the package image.
+func InstallProviderOptionsWithController(
+	options xpenvfuncs.InstallCrossplaneProviderOptions, controllerPackage string,
+) xpenvfuncs.InstallCrossplaneProviderOptions {
+	options.ControllerImage = &controllerPackage
+	return options
 }
 
 func LoadDurationMins(envVar string, defaultValue int) time.Duration {

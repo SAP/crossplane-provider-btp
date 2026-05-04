@@ -36,15 +36,18 @@ const (
 	cliServerUrlEnvVar  = "CLI_SERVER_URL"
 	uutImagesEnvVar     = "UUT_IMAGES"
 
-	fromTagEnvVar              = "UPGRADE_TEST_FROM_TAG"
-	toTagEnvVar                = "UPGRADE_TEST_TO_TAG"
-	fromProviderRepositoryEnvVar = "UPGRADE_TEST_FROM_PROVIDER_REPOSITORY"
-	toProviderRepositoryEnvVar   = "UPGRADE_TEST_TO_PROVIDER_REPOSITORY"
+	fromTagEnvVar                  = "UPGRADE_TEST_FROM_TAG"
+	toTagEnvVar                    = "UPGRADE_TEST_TO_TAG"
+	fromProviderRepositoryEnvVar   = "UPGRADE_TEST_FROM_PROVIDER_REPOSITORY"
+	toProviderRepositoryEnvVar     = "UPGRADE_TEST_TO_PROVIDER_REPOSITORY"
+	fromControllerRepositoryEnvVar = "UPGRADE_TEST_FROM_CONTROLLER_REPOSITORY"
+	toControllerRepositoryEnvVar   = "UPGRADE_TEST_TO_CONTROLLER_REPOSITORY"
 
 	verifyTimeoutEnvVar = "UPGRADE_TEST_VERIFY_TIMEOUT"
 	waitForPauseEnvVar  = "UPGRADE_TEST_WAIT_FOR_PAUSE"
 
-	defaultProviderRepository = "ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp"
+	defaultProviderRepository   = "ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp"
+	defaultControllerRepository = "ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp-controller"
 
 	defaultVerifyTimeoutMins = 30
 	defaultWaitForPauseMins  = 1
@@ -59,8 +62,10 @@ var (
 	globalAccount     string
 	cliServerUrl      string
 
-	fromProviderRepository string
-	toProviderRepository   string
+	fromProviderRepository   string
+	toProviderRepository     string
+	fromControllerRepository string
+	toControllerRepository   string
 
 	kindClusterName string
 	namespace       string
@@ -83,6 +88,8 @@ func TestMain(m *testing.M) {
 	// Load repositories
 	fromProviderRepository = test.GetEnv(fromProviderRepositoryEnvVar, defaultProviderRepository)
 	toProviderRepository = test.GetEnv(toProviderRepositoryEnvVar, defaultProviderRepository)
+	fromControllerRepository = test.GetEnv(fromControllerRepositoryEnvVar, defaultControllerRepository)
+	toControllerRepository = test.GetEnv(toControllerRepositoryEnvVar, defaultControllerRepository)
 
 	// Load timeouts
 	globalVerifyTimeout = test.LoadDurationMins(verifyTimeoutEnvVar, defaultVerifyTimeoutMins)
@@ -91,14 +98,15 @@ func TestMain(m *testing.M) {
 	// Setup cluster
 	fromTag, toTag := LoadUpgradeTags()
 
-	fromProviderPackage, _ := test.LoadUpgradePackages(
+	fromProviderPackage, _, fromControllerPackage, _ := test.LoadUpgradePackages(
 		fromTag, toTag,
 		fromProviderRepository, toProviderRepository,
+		fromControllerRepository, toControllerRepository,
 		uutImagesEnvVar, localTagName,
 		true,
 	)
 
-	setupClusterWithCrossplane(fromProviderPackage)
+	setupClusterWithCrossplane(fromProviderPackage, fromControllerPackage)
 
 	os.Exit(testenv.Run(m))
 }
@@ -106,13 +114,14 @@ func TestMain(m *testing.M) {
 // setupClusterWithCrossplane sets up a kind cluster with Crossplane and the specified provider version.
 // It does not create a ProviderConfig, as this is done in the individual tests.
 // Setting up the provider is technically not necessary for upgrade tests, but that's what xp-testing's setup does.
-func setupClusterWithCrossplane(providerPackage string) {
+func setupClusterWithCrossplane(providerPackage, controllerPackage string) {
 	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName)
 
 	cfg := setup.ClusterSetup{
 		ProviderName: providerName,
 		Images: images.ProviderImages{
-			Package: providerPackage,
+			Package:         providerPackage,
+			ControllerImage: &controllerPackage,
 		},
 		CrossplaneSetup: setup.CrossplaneSetup{
 			Version:  crossplaneVersion,
