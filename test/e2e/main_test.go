@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
-	"github.com/crossplane-contrib/xp-testing/pkg/images"
 	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	testutil "github.com/sap/crossplane-provider-btp/test"
@@ -28,7 +27,6 @@ var (
 	SECONDARY_DIRC_ADMIN_ENV_KEY = "SECOND_DIRECTORY_ADMIN_EMAIL"
 
 	UUT_BUILD_ID_KEY = "BUILD_ID"
-	UUT_IMAGES_KEY   = "UUT_IMAGES"
 )
 
 var (
@@ -59,10 +57,9 @@ func SetupClusterWithCrossplane(namespace string) {
 	cliServerUrl := envvar.GetOrPanic("CLI_SERVER_URL")
 
 	// Setup uses pre-defined funcs to create kind cluster
-	// and create a namespace for the environment.
-	// When E2E_REUSE_CLUSTER is set (via local-deploy), the provider is already
-	// installed and xp-testing skips installation. Otherwise (e.g. long e2e tests),
-	// we load images from UUT_IMAGES and install the provider ourselves.
+	// and create a namespace for the environment
+	// The provider is pre-installed via `local-deploy` (local.xpkg.deploy),
+	// and E2E_REUSE_CLUSTER is set so xp-testing reuses the existing cluster.
 
 	deploymentRuntimeConfig := vendored.DeploymentRuntimeConfig{
 		ObjectMeta: metav1.ObjectMeta{
@@ -89,7 +86,6 @@ func SetupClusterWithCrossplane(namespace string) {
 
 	cfg := setup.ClusterSetup{
 		ProviderName: "btp-account",
-		Images:       loadProviderImages(),
 		CrossplaneSetup: setup.CrossplaneSetup{
 			Version:  "1.20.1",
 			Registry: setup.DockerRegistry,
@@ -109,20 +105,4 @@ func SetupClusterWithCrossplane(namespace string) {
 		testutil.ApplySecretInCrossplaneNamespace(SERVICE_USER_SECRET_NAME, userSecretData),
 		testutil.CreateProviderConfigEnvFn(namespace, globalAccount, cliServerUrl, CIS_SECRET_NAME, SERVICE_USER_SECRET_NAME),
 	)
-}
-
-// loadProviderImages loads provider images from UUT_IMAGES env var if set.
-// When E2E_REUSE_CLUSTER is used, the provider is already installed so images
-// are not needed and this returns an empty ProviderImages.
-func loadProviderImages() images.ProviderImages {
-	uutImages := os.Getenv(UUT_IMAGES_KEY)
-	if uutImages == "" {
-		return images.ProviderImages{}
-	}
-
-	uutConfig, uutController := testutil.GetImagesFromJsonOrPanic(uutImages)
-	return images.ProviderImages{
-		Package:         uutConfig,
-		ControllerImage: &uutController,
-	}
 }
