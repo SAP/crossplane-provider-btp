@@ -152,7 +152,10 @@ type SubaccountApiCredentialStatus struct {
 // +kubebuilder:storageversion
 //
 // External-Name Configuration:
-//   - Follows Standard: no (ADR exception: the SAP BTP Terraform provider uses the credential name as its resource identifier)
+//   - Follows Standard: no (ADR exception: the SAP BTP Terraform provider uses the credential name as its
+//     resource identifier. Import is not supported — BTP only returns client_secret at creation time and
+//     never on subsequent reads. Importing an existing credential will always result in a missing
+//     client_secret in the connection secret, making it unusable.)
 //   - Format: The name of the API credential (e.g. "my-api-credential"), set via spec.forProvider.name
 //   - How to find:
 //   - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Select Credential] → Name
