@@ -98,14 +98,6 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
   - CLI: btp list accounts/subaccount (field: guid)
 
-### SubaccountApiCredential
-
-- Follows Standard: no (ADR exception: the SAP BTP Terraform provider uses the credential name as its
-resource identifier. Import is not supported — BTP only returns client_secret at creation time and
-never on subsequent reads. Importing an existing credential will always result in a missing
-client_secret in the connection secret, making it unusable.)
-- Format: Not applicable (import not supported)
-
 ### Subscription
 
 - Follows Standard: yes
