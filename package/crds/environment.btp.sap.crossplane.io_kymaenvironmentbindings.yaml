@@ -34,8 +34,13 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A KymaEnvironmentBinding is an API to retrieve a binding for
-          a specific Kyma Instance.
+        description: |-
+          A KymaEnvironmentBinding is an API to retrieve a binding for a specific Kyma Instance.
+
+          External-Name Configuration:
+            - Follows Standard: no - This resource does not support external-name based importing.
+              Instead of importing, create a new KymaEnvironmentBinding resource.
+            - Format: Not applicable
         properties:
           apiVersion:
             description: |-
