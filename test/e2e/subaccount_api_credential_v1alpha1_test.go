@@ -92,18 +92,17 @@ func assertApiCredentialSecret(t *testing.T, ctx context.Context, cfg *envconf.C
 	}
 }
 
-// TestSubaccountApiCredentialOrphanImportFails verifies that importing an orphaned
-// SubaccountApiCredential results in a connection secret with an empty/missing client_secret.
-// BTP only returns client_secret at creation time — a Terraform read succeeds but does not
-// return the secret, so the connection secret will not contain a usable client_secret.
-// This is expected and documented behavior (ADR exception).
+// TestSubaccountApiCredentialOrphanImport verifies that importing an orphaned
+// SubaccountApiCredential by its external name (credential name) works correctly.
+// BTP stores service key credentials and returns them on every read, so the connection
+// secret will contain a valid client_secret after import.
 // See: https://github.com/SAP/crossplane-provider-btp/issues/553
-func TestSubaccountApiCredentialOrphanImportFails(t *testing.T) {
+func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 	var orphanManifestDir = "testdata/crs/SubaccountApiCredentialOrphanImport"
 	var orphanSacName = "sac-orphan-import"
 	importName := NewID("sac-orphan-reimport", BUILD_ID)
 
-	orphanImportFeature := features.New("SubaccountApiCredential Orphan Import Has Missing Client Secret").
+	orphanImportFeature := features.New("SubaccountApiCredential Orphan Import Has Valid Client Secret").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				r, _ := kres.New(cfg.Client().RESTConfig())
@@ -139,7 +138,7 @@ func TestSubaccountApiCredentialOrphanImportFails(t *testing.T) {
 			},
 		).
 		Assess(
-			"Import of orphaned credential results in missing client_secret in connection secret",
+			"Import of orphaned credential results in a valid client_secret in connection secret",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				externalName := ctx.Value(importFeatureContextKey).(string)
 				subaccountRef, _ := ctx.Value("sacSubaccountRef").(*xpv1.Reference)
@@ -170,9 +169,9 @@ func TestSubaccountApiCredentialOrphanImportFails(t *testing.T) {
 					t.Fatalf("Failed to create import CR: %v", err)
 				}
 
-				// Wait for the resource to become synced (Available). BTP returns the credential
-				// metadata on read but NOT the client_secret, so the resource will become Available
-				// but the connection secret will have an empty/missing client_secret.
+				// Wait for the resource to become Available. BTP stores service key credentials
+				// and returns them on every read, so the connection secret will contain a valid
+				// client_secret after import.
 				c := conditions.New(cfg.Client().Resources())
 				err := wait.For(c.ResourceMatch(importSac, func(object k8sobj.Object) bool {
 					cr := object.(*v1alpha1.SubaccountApiCredential)
@@ -181,22 +180,14 @@ func TestSubaccountApiCredentialOrphanImportFails(t *testing.T) {
 				}), wait.WithTimeout(time.Minute*5))
 
 				if err != nil {
-					t.Logf("Import CR did not become Available within timeout: %v — checking connection secret anyway", err)
-				}
-
-				// Verify the connection secret is missing a usable client_secret.
-				// BTP only returns client_secret at creation time, so importing always produces an
-				// empty or absent client_secret, making the imported credential unusable.
-				secret := &corev1.Secret{}
-				if getErr := cfg.Client().Resources().Get(ctx, importName+"-secret", cfg.Namespace(), secret); getErr != nil {
-					// No secret written at all is also acceptable — the credential is unusable either way
-					t.Logf("Connection secret not found (imported credential has no usable client_secret): %v", getErr)
+					t.Errorf("Import CR did not become Available within timeout: %v", err)
 					return ctx
 				}
-				clientSecret := secret.Data["attribute.client_secret"]
-				if len(clientSecret) > 0 {
-					t.Errorf("Expected client_secret to be empty/missing after import, but got a non-empty value — BTP unexpectedly returned the secret")
-				}
+
+				// Verify the connection secret contains a valid client_secret.
+				// BTP stores service key credentials server-side and returns them on read,
+				// so an imported credential has a fully usable client_secret.
+				assertApiCredentialSecret(t, ctx, cfg, importSac)
 
 				return ctx
 			},
