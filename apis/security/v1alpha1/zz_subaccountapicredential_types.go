@@ -156,10 +156,7 @@ type SubaccountApiCredentialStatus struct {
 //     resource identifier. Import is not supported — BTP only returns client_secret at creation time and
 //     never on subsequent reads. Importing an existing credential will always result in a missing
 //     client_secret in the connection secret, making it unusable.)
-//   - Format: The name of the API credential (e.g. "my-api-credential"), set via spec.forProvider.name
-//   - How to find:
-//   - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Select Credential] → Name
-//   - CLI: btp list security/api-credential --subaccount-id `<subaccount-id>` (field: name)
+//   - Format: Not applicable (import not supported)
 //
 // SubaccountApiCredential is the Schema for the SubaccountApiCredentials API. Manage API Credentials at the Subaccount level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted subaccount. Tip: You must be assigned to the subaccount admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/managing-api-credentials-for-calling-rest-apis-of-sap-authorization-and-trust-management-service
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
