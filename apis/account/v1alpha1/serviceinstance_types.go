@@ -110,6 +110,15 @@ type ServiceInstanceStatus struct {
 // +kubebuilder:object:root=true
 
 // A ServiceInstance allows to manage a ServiceInstance in BTP [Environment: 'Other']
+//
+// External-Name Configuration:
+//   - Follows Standard: no
+//   - Format: ServiceInstance GUID (UUID format)
+//   - Note: spec.ForProvider.SubaccountRef, spec.ForProvider.SubaccountSelector, or spec.ForProvider.SubaccountID must be set for adoption to work
+//   - How to find:
+//   - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
+//   - CLI: btp list services/instance --subaccount `<subaccount-guid>` (field: id)
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
