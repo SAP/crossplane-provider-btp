@@ -98,7 +98,8 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: si.Name,
+			// since terraform resources are not allowed to start with a number we ensure it by prefixing them with "TF-"
+			Name: "TF-" + si.Name,
 			// make sure no naming conflicts are there for upjet tmp folder creation
 			UID:               si.UID + "-service-instance",
 			DeletionTimestamp: si.DeletionTimestamp,
@@ -108,7 +109,10 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 				ProviderConfigReference: &xpv1.Reference{
 					Name: pcName(si),
 				},
-				ManagementPolicies:               si.GetManagementPolicies(),
+				// ADR(external-name): We need to set the management policies to * for the tf resource,
+				// this way the behaivor of the crossplane resource is the same but TF uses refresh() instead of import()
+				// which allows to set the external name to the service instance id and the subaccount id in the spec for imports
+				ManagementPolicies:               xpv1.ManagementPolicies{"*"},
 				WriteConnectionSecretToReference: si.GetWriteConnectionSecretToReference(),
 			},
 			ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
