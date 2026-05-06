@@ -3,7 +3,6 @@ package serviceinstance
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -291,6 +290,8 @@ func (e *external) checkAsyncOperationFailure(cr *v1alpha1.ServiceInstance) bool
 	}
 
 	return false
+}
+
 func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
 	policies := cr.GetManagementPolicies()
 	return len(policies) == 1 && policies[0] == xpv1.ManagementActionObserve
