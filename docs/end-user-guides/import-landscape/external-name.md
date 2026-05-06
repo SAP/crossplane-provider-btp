@@ -98,6 +98,15 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
   - CLI: btp list accounts/subaccount (field: guid)
 
+### SubaccountApiCredential
+
+- Follows Standard: no (uses credential name as identifier, not a GUID)
+- Format: Credential Name (string)
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Client Name]
+  - CLI: btp list security/app --subaccount <subaccount-id> → `name`
+
 ### Subscription
 
 - Follows Standard: yes
