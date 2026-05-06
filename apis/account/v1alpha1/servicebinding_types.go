@@ -142,6 +142,14 @@ type ServiceBindingSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum="";"sap-kubernetes"
 	SecretFormat string `json:"secretFormat,omitempty"`
+
+	// SecretKey controls how credentials are stored in the connection secret.
+	// When set, all credential properties are bundled into a single JSON key with this name
+	// instead of being flattened into individual top-level keys.
+	// Combined with secretFormat "sap-kubernetes", the .metadata descriptor marks this key
+	// with "container: true" per the SAP Kubernetes Service Binding specification.
+	// +kubebuilder:validation:Optional
+	SecretKey *string `json:"secretKey,omitempty"`
 }
 
 // A ServiceBindingStatus represents the observed state of a ServiceBinding.

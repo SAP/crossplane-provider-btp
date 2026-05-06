@@ -156,7 +156,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 
-	observation.ConnectionDetails, err = flattenSecretData(observation.ConnectionDetails)
+	observation.ConnectionDetails, err = processConnectionDetails(cr, observation.ConnectionDetails)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errFlattenSecret)
 	}
@@ -225,7 +225,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
-	creation.ConnectionDetails, err = flattenSecretData(creation.ConnectionDetails)
+	creation.ConnectionDetails, err = processConnectionDetails(cr, creation.ConnectionDetails)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errFlattenSecret)
 	}

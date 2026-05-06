@@ -1000,6 +1000,132 @@ func TestObserve(t *testing.T) {
 				),
 			},
 		},
+		"SAPFormatWithSecretKey": {
+			reason: "should bundle credentials under secretKey and mark container:true in .metadata",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						observation: managed.ExternalObservation{
+							ResourceExists:   true,
+							ResourceUpToDate: false,
+							ConnectionDetails: managed.ConnectionDetails{
+								"attribute.credentials": []byte(`{"clientid":"x","clientsecret":"y","url":"https://api.example.com"}`),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: false,
+				},
+				tracker: &MockTracker{},
+				kube: &test.MockClient{
+					MockGet: func(_ context.Context, key kubeclient.ObjectKey, obj kubeclient.Object) error {
+						if si, ok := obj.(*v1alpha1.ServiceInstance); ok {
+							si.Spec.ForProvider.Name = "my-instance"
+							si.Spec.ForProvider.OfferingName = "destination"
+							si.Spec.ForProvider.PlanName = "lite"
+							si.Status.AtProvider.ID = "instance-guid-123"
+							return nil
+						}
+						return errors.New("unexpected Get call")
+					},
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.SecretFormat = "sap-kubernetes"
+						sk := "credentials"
+						cr.Spec.SecretKey = &sk
+						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
+					},
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+					ConnectionDetails: managed.ConnectionDetails{
+						"credentials":   []byte(`{"clientid":"x","clientsecret":"y","url":"https://api.example.com"}`),
+						"type":          []byte("destination"),
+						"label":         []byte("destination"),
+						"plan":          []byte("lite"),
+						"instance_name": []byte("my-instance"),
+						"instance_guid": []byte("instance-guid-123"),
+						"tags":          []byte("[]"),
+						".metadata": mustMarshalJSON(secretMetadata{
+							MetaDataProperties: []secretMetadataProperty{
+								{Name: "instance_name", Format: "text"},
+								{Name: "instance_guid", Format: "text"},
+								{Name: "plan", Format: "text"},
+								{Name: "label", Format: "text"},
+								{Name: "type", Format: "text"},
+								{Name: "tags", Format: "json"},
+							},
+							CredentialProperties: []secretMetadataProperty{
+								{Name: "credentials", Format: "json", Container: true},
+							},
+						}),
+					},
+				},
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.SecretFormat = "sap-kubernetes"
+						sk := "credentials"
+						cr.Spec.SecretKey = &sk
+						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
+					},
+				),
+			},
+		},
+		"SecretKeyWithoutSAPFormat": {
+			reason: "should bundle credentials under secretKey without metadata when no secretFormat",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						observation: managed.ExternalObservation{
+							ResourceExists:   true,
+							ResourceUpToDate: false,
+							ConnectionDetails: managed.ConnectionDetails{
+								"attribute.credentials": []byte(`{"clientid":"x","url":"https://api"}`),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: false,
+				},
+				tracker: &MockTracker{},
+				kube:    &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						sk := "credentials"
+						cr.Spec.SecretKey = &sk
+					},
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+					ConnectionDetails: managed.ConnectionDetails{
+						"credentials": []byte(`{"clientid":"x","url":"https://api"}`),
+					},
+				},
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						sk := "credentials"
+						cr.Spec.SecretKey = &sk
+					},
+				),
+			},
+		},
 		"RetireBindingTriggered": {
 			reason: "should return ResourceExists=false when binding needs retirement",
 			fields: fields{
