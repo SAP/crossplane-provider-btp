@@ -3,6 +3,7 @@ package serviceinstance
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -16,6 +17,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	ujresource "github.com/crossplane/upjet/pkg/resource"
+
+	"regexp"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -42,6 +45,8 @@ const (
 	errConnectClient   = "while connecting to service"
 	errDeleteInstance  = "cannot delete serviceinstance"
 )
+
+var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Dependency Injection
 var newClientCreatorFn = func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
@@ -133,9 +138,28 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
 
+	// ADR(external-name): check for conflict condition from a previous failed Create()
+	// Only block if the spec hasn't changed since the conflict (same Generation)
+	lastAsyncOp := cr.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation))
+	if lastAsyncOp.Status == corev1.ConditionFalse &&
+		strings.Contains(lastAsyncOp.Message, "Conflict") &&
+		lastAsyncOp.ObservedGeneration == cr.Generation {
+		return managed.ExternalObservation{ResourceExists: false},
+			errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
+	}
+
+	// ADR(external-name): validate external-name is a UUID if set
+	externalName := meta.GetExternalName(cr)
+	if externalName != "" && externalName != cr.Name {
+		if !isValidUUID(externalName) {
+			return managed.ExternalObservation{},
+				errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one")
+		}
+	}
+
 	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
+		return managed.ExternalObservation{}, err
 	}
 
 	//Check for failed async operations ONCE, before the switch
@@ -341,4 +365,8 @@ func (e *external) calculateDiff(cr *v1alpha1.ServiceInstance) string {
 	}
 
 	return diff
+}
+
+func isValidUUID(s string) bool {
+	return uuidRegex.MatchString(strings.ToLower(s))
 }
