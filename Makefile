@@ -60,7 +60,8 @@ IMAGES = provider-btp
 -include build/makelib/imagelight.mk
 
 export UUT_CONFIG = $(BUILD_REGISTRY)/provider-btp-$(ARCH):latest
-export UUT_IMAGES = {"crossplane/provider-btp":"$(UUT_CONFIG)"}
+export UUT_XPKG = $(BUILD_REGISTRY)/provider-btp-xpkg:latest
+export UUT_IMAGES = {"crossplane/provider-btp":"$(UUT_XPKG)"}
 testFilter ?= .*
 
 # local-deploy builds the provider image, sideloads the xpkg into a local kind
@@ -383,12 +384,18 @@ build-upgrade-test-images:
 	@if [ "$(UPGRADE_TEST_FROM_TAG)" == "local" ] || [ "$(UPGRADE_TEST_TO_TAG)" == "local" ]; then \
 		$(INFO) "Building local images (UPGRADE_TEST_FROM_TAG or UPGRADE_TEST_TO_TAG is \"local\")"; \
 		$(MAKE) build; \
-		$(OK) "Built local images: $(UUT_CONFIG)"; \
+		$(MAKE) xpkg.build.provider-btp; \
+		$(INFO) "Loading xpkg into docker as $(UUT_XPKG)"; \
+		XPKG_FILE=$(XPKG_OUTPUT_DIR)/$(PLATFORM)/provider-btp-$(VERSION).xpkg && \
+		XPKG_SHA=$$(docker load -i $$XPKG_FILE | sed -n 's/.*ID: //p') && \
+		docker tag $$XPKG_SHA $(UUT_XPKG); \
+		$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"; \
 	fi
 
 .PHONY: upgrade-test
 upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
+	@$(KIND) delete cluster --name=$(KIND_CLUSTER_NAME) 2>/dev/null || true
 	@go test -tags=upgrade ./test/upgrade -v -short -count=1 -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee upgrade-test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" upgrade-test-output.log
@@ -400,6 +407,7 @@ upgrade-test: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upg
 .PHONY: upgrade-test-debug
 upgrade-test-debug: $(KIND) check-upgrade-test-vars build-upgrade-test-images pull-upgrade-test-version-crs generate-upgrade-test-crs
 	@$(INFO) Running upgrade tests
+	@$(KIND) delete cluster --name=$(KIND_CLUSTER_NAME) 2>/dev/null || true
 	@cd test/upgrade && dlv test --listen=:2345 --headless=true --api-version=2 --build-flags="-tags=upgrade" -- -test.v -test.short -test.count=1 -test.timeout 120m -test.run '^$(testFilter)$$' 2>&1 | tee upgrade-test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" upgrade-test-output.log
