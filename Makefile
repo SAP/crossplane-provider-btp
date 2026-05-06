@@ -289,7 +289,7 @@ test-e2e: $(KIND) $(HELM3) build generate-test-crs
 #run single test-e2e-long test with <make e2e testFilter=functionNameOfTest>
 test-e2e-long: local-deploy $(HELM3) generate-test-crs
 	@$(INFO) running integration tests
-	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
+	@UUT_CONFIG=$(BUILD_REGISTRY)/provider-btp:$(VERSION) go test -v $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
