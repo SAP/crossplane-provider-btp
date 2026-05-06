@@ -14,30 +14,33 @@ import (
 	"time"
 )
 
+// Subaccount contains the data of a single subaccount
+type Subaccount struct {
+	Guid                          string           `json:"guid"`
+	TechnicalName                 string           `json:"technicalName"`
+	DisplayName                   string           `json:"displayName"`
+	GlobalAccountGUID             string           `json:"globalAccountGUID"`
+	ParentGUID                    string           `json:"parentGUID"`
+	ParentType                    string           `json:"parentType"`
+	Region                        string           `json:"region"`
+	Subdomain                     string           `json:"subdomain"`
+	BetaEnabled                   bool             `json:"betaEnabled"`
+	UsedForProduction             string           `json:"usedForProduction"`
+	Description                   string           `json:"description"`
+	State                         string           `json:"state"`
+	StateMessage                  string           `json:"stateMessage"`
+	ContentAutomationState        interface{}      `json:"contentAutomationState"`
+	ContentAutomationStateDetails interface{}      `json:"contentAutomationStateDetails"`
+	CreatedDate                   int64            `json:"createdDate"`
+	CreatedBy                     string           `json:"createdBy"`
+	ModifiedDate                  int64            `json:"modifiedDate"`
+	CustomProperties              CustomProperties `json:"customProperties,omitempty"`
+	Labels                        Labels           `json:"labels,omitempty"`
+}
+
 // Subaccounts contains a array of value filled with subaccounts
 type Subaccounts struct {
-	Value []struct {
-		Guid                          string           `json:"guid"`
-		TechnicalName                 string           `json:"technicalName"`
-		DisplayName                   string           `json:"displayName"`
-		GlobalAccountGUID             string           `json:"globalAccountGUID"`
-		ParentGUID                    string           `json:"parentGUID"`
-		ParentType                    string           `json:"parentType"`
-		Region                        string           `json:"region"`
-		Subdomain                     string           `json:"subdomain"`
-		BetaEnabled                   bool             `json:"betaEnabled"`
-		UsedForProduction             string           `json:"usedForProduction"`
-		Description                   string           `json:"description"`
-		State                         string           `json:"state"`
-		StateMessage                  string           `json:"stateMessage"`
-		ContentAutomationState        interface{}      `json:"contentAutomationState"`
-		ContentAutomationStateDetails interface{}      `json:"contentAutomationStateDetails"`
-		CreatedDate                   int64            `json:"createdDate"`
-		CreatedBy                     string           `json:"createdBy"`
-		ModifiedDate                  int64            `json:"modifiedDate"`
-		CustomProperties              CustomProperties `json:"customProperties,omitempty"`
-		Labels                        Labels           `json:"labels,omitempty"`
-	} `json:"value"`
+	Value []Subaccount `json:"value"`
 }
 
 // Labels contains the labels of a subaccount/directory
@@ -318,6 +321,16 @@ func GetSubaccounts(uaaAuth *UaaAuth, cisBinding CisBinding) (*Subaccounts, erro
 	} else {
 		return nil, fmt.Errorf("request failed with status code: %d\n", resp.StatusCode)
 	}
+
+	// Filter out subaccounts that are already pending deletion
+	var filtered []Subaccount
+	for _, sa := range subaccounts.Value {
+		if sa.StateMessage != "Subaccount is pending deletion" {
+			filtered = append(filtered, sa)
+		}
+	}
+	subaccounts.Value = filtered
+
 	return &subaccounts, nil
 }
 
