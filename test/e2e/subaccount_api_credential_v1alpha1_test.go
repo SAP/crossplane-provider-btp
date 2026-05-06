@@ -113,11 +113,17 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 				sac := &v1alpha1.SubaccountApiCredential{
 					ObjectMeta: metav1.ObjectMeta{Name: orphanSacName, Namespace: cfg.Namespace()},
 				}
-				waitForResource(sac, cfg, t, wait.WithTimeout(time.Minute*7))
+				// Use a longer timeout: subaccount provisioning in BTP can take 4-6 minutes,
+				// followed by SAC creation (~2 minutes). 15 minutes provides sufficient headroom.
+				waitForResource(sac, cfg, t, wait.WithTimeout(time.Minute*15))
 
 				// Read back to get the external name (credential name, not a GUID — ADR exception)
 				MustGetResource(t, cfg, orphanSacName, nil, sac)
 				externalName := xpmeta.GetExternalName(sac)
+				if externalName == "" {
+					t.Fatal("SAC did not become ready in time — external name not set, cannot proceed with import test")
+					return ctx
+				}
 				ctx = context.WithValue(ctx, importFeatureContextKey, externalName)
 				// Also store the subaccount ref so the import CR can find the credential
 				ctx = context.WithValue(ctx, "sacSubaccountRef", sac.Spec.ForProvider.SubaccountRef)
