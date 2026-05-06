@@ -17,8 +17,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	ujresource "github.com/crossplane/upjet/pkg/resource"
 
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	ujresource "github.com/crossplane/upjet/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -26,7 +24,6 @@ import (
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/di"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
-	corev1 "k8s.io/api/core/v1"
 )
 
 const (
