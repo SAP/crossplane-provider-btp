@@ -105,7 +105,7 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 - How to find:
 
   - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Client Name]
-  - CLI: btp list security/app --subaccount <subaccount-id> → `name`
+  - CLI: `btp list security/app --subaccount <subaccount-id>` → `name`
 
 ### Subscription
 

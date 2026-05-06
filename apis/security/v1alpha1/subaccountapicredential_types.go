@@ -6,5 +6,5 @@ package v1alpha1
 //   - Format: Credential Name (string)
 //   - How to find:
 //     - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Client Name]
-//     - CLI: btp list security/app --subaccount <subaccount-id> → `name`
+//     - CLI: `btp list security/app --subaccount <subaccount-id>` → `name`
 //
