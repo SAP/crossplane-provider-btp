@@ -1,0 +1,11 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: destination-entitlement-si-extn
+  namespace: default
+spec:
+  forProvider:
+    serviceName: destination
+    servicePlanName: lite
+    subaccountRef:
+      name: upgrade-test-extn-si-sa

@@ -64,6 +64,12 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
   - CLI: Use BTP ClI: `btp list accounts/environment-instance`
 
+### KymaEnvironmentBinding
+
+- Follows Standard: no - This resource does not support external-name based importing.
+Instead of importing, create a new KymaEnvironmentBinding resource.
+- Format: Not applicable
+
 ### RoleCollection
 
 - Follows Standard: no (uses name as identifier, not a GUID)
@@ -73,6 +79,16 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
   - CLI: btp get security/role-collection `"<name>"` → `name`
 
+### ServiceInstance
+
+- Follows Standard: no
+- Format: ServiceInstance GUID (UUID format)
+- Note: spec.ForProvider.SubaccountRef, spec.ForProvider.SubaccountSelector, or spec.ForProvider.SubaccountID must be set for adoption to work
+- How to find:
+
+  - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
+  - CLI: btp list services/instance --subaccount `<subaccount-guid>` (field: id)
+
 ### Subaccount
 
 - Follows Standard: yes
@@ -81,3 +97,12 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 
   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
   - CLI: btp list accounts/subaccount (field: guid)
+
+### Subscription
+
+- Follows Standard: yes
+- Format: `<appName>/<planName>`
+- How to find:
+
+  - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → [Select Subscription] → Application Technical Name and Plan
+  - CLI: `btp list accounts/subscription` fields `app name` and `plan name`

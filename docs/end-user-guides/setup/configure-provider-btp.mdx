@@ -30,7 +30,7 @@ To orchestrate your global account, you need one instance of the SAP Cloud Manag
 
 For more information on the SAP Cloud Management service, see [Account Administration Using APIs of the SAP Cloud Management Service](https://help.sap.com/docs/btp/sap-business-technology-platform/account-administration-using-apis-of-sap-cloud-management-service?locale=en-US&version=LATEST).
 
-For more information on service instances and bindings, see [Service Instances](https://help.sap.com/docs/service-manager/sap-service-manager/service-instances?locale=en-US&version=LATEST) and [Service Bindings](https://help.sap.com/docs/service-manager/sap-service-manager/service-bindings?locale=en-US&version=LATEST). 
+For more information on service instances and bindings, see [Service Instances](https://help.sap.com/docs/service-manager/sap-service-manager/service-instances?locale=en-US&version=LATEST) and [Service Bindings](https://help.sap.com/docs/service-manager/sap-service-manager/service-bindings?locale=en-US&version=LATEST).
 
 For more information on the BTP platform, see [Basic Platform Concepts](https://help.sap.com/docs/btp/sap-business-technology-platform/btp-basic-platform-concepts?locale=en-US&version=LATEST).
 
@@ -44,7 +44,7 @@ To learn how to set up the SAP Cloud Management service, choose your preferred t
     :::note Install the btp CLI
 
     If you haven't installed the BTP Command Line Interface (btp CLI) yet, follow the guide from the SAP Developer Center: [Get Started with the SAP BTP Command Line Interface (btp CLI)](https://developers.sap.com/tutorials/cp-sapcp-getstarted.html).
-    
+
     :::
 
 		To create a subaccount containing an instance and binding of the Cloud Management service, complete the following steps:
@@ -74,10 +74,10 @@ To learn how to set up the SAP Cloud Management service, choose your preferred t
 					```shell title="Run in Terminal" {1}
 						btp list accounts/available-region --global-account <global-account-subdomain>
 					```
-					
+
         </details>
 
-    3. Copy the subaccount ID to the clipboard. 
+    3. Copy the subaccount ID to the clipboard.
 
     4. Create an SAP Cloud Management service entitlement, instance, and binding by running the commands below.
 
@@ -95,7 +95,7 @@ To learn how to set up the SAP Cloud Management service, choose your preferred t
 
         Replace `<subaccount-id>` with the ID of your newly created subaccount.
 
-    4. From the output of the previous commands, copy the binding credentials to your clipboard. You'll need the credentials to create a Kubernetes secret. 
+    4. From the output of the previous commands, copy the binding credentials to your clipboard. You'll need the credentials to create a Kubernetes secret.
   </TabItem>
   <TabItem value="btp-cockpit" label="Using the SAP BTP cockpit">
 
@@ -105,7 +105,7 @@ To learn how to set up the SAP Cloud Management service, choose your preferred t
 
         - On the top right, choose **Create** > **Subaccount**.
         - Enter the required information and choose **Create**.
-        
+
             ![Create Subaccount in BTP Cockpit](/img/btp-create-subaccount.png)
 
     3. Add an entitlement for the SAP Cloud Management service:
@@ -151,7 +151,7 @@ To learn how to set up the SAP Cloud Management service, choose your preferred t
             ![View Binding for Cloud Management Service in BTP Cockpit](/img/btp-view-cis-binding.png)
 
         - Choose **View** > **Copy JSON**.
-        You'll need the binding credentials to create a Kubernetes secret. 
+        You'll need the binding credentials to create a Kubernetes secret.
 
     <details>
     <summary>Do you miss the central service plan?</summary>
@@ -293,7 +293,7 @@ You can create a `Secret` using the technical user (P-user) credentials.
     ```
 
     Replace the following:
-    
+
     - `<technical-user-email>`: The email address of the technical user
     - `<technical-user-username>`: The username of the technical user
     - `<technical-user-password>`: The password of the technical user
@@ -354,4 +354,4 @@ To learn more about the BTP provider or to extend its functionality, go to [the 
 
 ## ⁉ FAQs
 
-No FAQs yet. Got a question? [Reach out to us](/docs/support/contact) and help us build this section.
+No FAQs yet. Got a question? Reach out to us and help us build this section.

@@ -3,6 +3,7 @@ package tfclient
 import (
 	"context"
 	"testing"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
@@ -12,6 +13,7 @@ import (
 	"github.com/crossplane/upjet/pkg/resource/fake"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -440,6 +442,64 @@ func TestQueryAsyncData(t *testing.T) {
 				},
 			},
 		},
+		"DataAvailableWithObservationFields": {
+			reason: "All observation fields are extracted from the Terraform resource",
+			args: args{
+				cr: terraformedCrWithObservation("test-external-name", "test-id", []xpv1.Condition{
+					xpv1.Available(),
+					ujresource.AsyncOperationFinishedCondition(),
+				}, map[string]any{
+					"dashboard_url": "https://dashboard.example.com",
+					"created_date":  "2023-01-15T10:30:00Z",
+					"last_modified": "2023-01-16T10:30:00Z",
+					"state":         "succeeded",
+					"ready":         true,
+					"usable":        true,
+					"platform_id":   "test-platform",
+				}),
+			},
+			want: want{
+				data: &ObservationData{
+					Conditions: []xpv1.Condition{
+						xpv1.Available(),
+						ujresource.AsyncOperationFinishedCondition(),
+					},
+					ExternalName: "test-external-name",
+					ID:           "test-id",
+					DashboardURL: "https://dashboard.example.com",
+					CreatedDate:  func() *metav1.Time { t := metav1.NewTime(time.Date(2023, 1, 15, 10, 30, 0, 0, time.UTC)); return &t }(),
+					LastModified: func() *metav1.Time { t := metav1.NewTime(time.Date(2023, 1, 16, 10, 30, 0, 0, time.UTC)); return &t }(),
+					State:        "succeeded",
+					Ready:        func() *bool { b := true; return &b }(),
+					Usable:       func() *bool { b := true; return &b }(),
+					PlatformID:   "test-platform",
+				},
+			},
+		},
+		"DataAvailableWithISO8601Timezone": {
+			reason: "Dates with ISO8601 timezone offset (no colon) are parsed correctly",
+			args: args{
+				cr: terraformedCrWithObservation("test-external-name", "test-id", []xpv1.Condition{
+					xpv1.Available(),
+					ujresource.AsyncOperationFinishedCondition(),
+				}, map[string]any{
+					"created_date":  "2023-01-15T10:30:00+0200",
+					"last_modified": "2023-01-16T10:30:00+0200",
+				}),
+			},
+			want: want{
+				data: &ObservationData{
+					Conditions: []xpv1.Condition{
+						xpv1.Available(),
+						ujresource.AsyncOperationFinishedCondition(),
+					},
+					ExternalName: "test-external-name",
+					ID:           "test-id",
+					CreatedDate:  func() *metav1.Time { t := metav1.NewTime(time.Date(2023, 1, 15, 8, 30, 0, 0, time.UTC)); return &t }(),
+					LastModified: func() *metav1.Time { t := metav1.NewTime(time.Date(2023, 1, 16, 8, 30, 0, 0, time.UTC)); return &t }(),
+				},
+			},
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -539,6 +599,11 @@ func (t *TfControllerMock) Update(ctx context.Context, mg resource.Managed) (man
 
 // terraformedCrWithData is a helper function to create a terraformed resource with the given data
 func terraformedCrWithData(externalName, id string, conditions []xpv1.Condition) *fake.Terraformed {
+	return terraformedCrWithObservation(externalName, id, conditions, nil)
+}
+
+// terraformedCrWithObservation is a helper function to create a terraformed resource with observation data
+func terraformedCrWithObservation(externalName, id string, conditions []xpv1.Condition, observation map[string]any) *fake.Terraformed {
 	cr := &fake.Terraformed{}
 	cr.ID = id
 
@@ -546,5 +611,8 @@ func terraformedCrWithData(externalName, id string, conditions []xpv1.Condition)
 		cr.SetConditions(condition)
 	}
 	meta.SetExternalName(cr, externalName)
+	if observation != nil {
+		_ = cr.SetObservation(observation)
+	}
 	return cr
 }

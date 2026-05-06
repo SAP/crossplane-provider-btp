@@ -53,13 +53,9 @@ jobs:
         run: make vendor vendor.check
 
       - name: Build Images
-        run: make build VERSION=${{ steps.version.outputs.version }}
-        env:
-          # We're using docker buildx, which doesn't actually load the images it
-          # builds by default. Specifying --load does so.
-          BUILD_ARGS: "--load"
-          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
-          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
+        run: |
+          make build PLATFORM=linux_amd64 VERSION=${{ steps.version.outputs.version }}
+          make build PLATFORM=linux_arm64 VERSION=${{ steps.version.outputs.version }}
 
       - name: Login to Container Registry
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
@@ -69,10 +65,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish Artifacts to DockerHub
-        run: make publish VERSION=${{ steps.version.outputs.version }}
+        run: |
+          make xpkg.build PLATFORM=linux_amd64 VERSION=${{ steps.version.outputs.version }}
+          make xpkg.build PLATFORM=linux_arm64 VERSION=${{ steps.version.outputs.version }}
+          make xpkg.release.publish VERSION=${{ steps.version.outputs.version }}
         env:
-          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
-          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
+          XPKG_REG_ORGS: ${{ vars.REGISTRY_URL }}/crossplane
 
       - name: Build Exporter Binaries
         run: |

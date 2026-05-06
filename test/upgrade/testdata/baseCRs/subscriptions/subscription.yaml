@@ -2,12 +2,12 @@ apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: Subscription
 metadata:
   namespace: default
-  name: sub-import-test
-  annotations:
-    crossplane.io/external-name: auditlog-viewer/free
+  name: upgrade-test-extn-subscription
 spec:
   forProvider:
     appName: auditlog-viewer
     planName: free
+    parameters:
+      key1: value1
   cloudManagementRef:
-    name: e2e-sub-import-cis-local
+    name: cis-local-upgrade-subscription

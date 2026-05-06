@@ -80,7 +80,14 @@ type SubscriptionStatus struct {
 
 // A Subscription encodes a subscription of a subaccount to a service
 // It requires a references CloudManagement instance of plan type "local" to authenticate and map to subaccount.
-// To import a subscription use the pattern <app name>/<plan name> as externalName annotation
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: `<appName>/<planName>`
+//   - How to find:
+//   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → [Select Subscription] → Application Technical Name and Plan
+//   - CLI: `btp list accounts/subscription` fields `app name` and `plan name`
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

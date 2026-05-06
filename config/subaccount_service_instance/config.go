@@ -27,5 +27,7 @@ func Configure(p *config.Provider) {
 		// we only use this resource internally, so there is no harm in avoiding usage of secrets here it makes the setup a lot easier
 		r.TerraformResource.Schema["parameters"].Sensitive = false
 
+		// ADR: disable external-name initialization
+		r.ExternalName.DisableNameInitializer = true
 	})
 }

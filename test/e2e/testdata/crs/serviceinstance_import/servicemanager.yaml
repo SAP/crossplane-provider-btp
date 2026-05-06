@@ -1,0 +1,12 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceManager
+metadata:
+  name: e2e-sm-serviceinstance
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: e2e-sm-serviceinstance
+    namespace: default
+  forProvider:
+    subaccountRef:
+      name: e2e-test-serviceinstance

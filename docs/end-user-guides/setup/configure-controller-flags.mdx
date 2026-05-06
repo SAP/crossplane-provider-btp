@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Advanced: Configure Controller Flags
 
-The BTP provider exposes a set of controller flags that let you tune reconciliation behavior — for example, how aggressively the provider retries failed operations or how often it checks for drift. 
+The BTP provider exposes a set of controller flags that let you tune reconciliation behavior — for example, how aggressively the provider retries failed operations or how often it checks for drift.
 These flags are passed as arguments to the provider's container process and can be configured via a [`DeploymentRuntimeConfig`](https://docs.crossplane.io/latest/packages/providers/#runtime-configuration).
 
 ## Available Flags
@@ -69,8 +69,11 @@ The following example configures a slower poll interval and a more conservative 
 
 2. This `DeploymentRuntimeConfig` needs to be referenced by the provider's `Provider` resource.
 
-> [!WARNING]  
-> Depending on your setup, the `Provider` resource may already exist and be managed by your platform or tooling — do not modify it in that case. This applies, for example, when using [Open Control Plane (OCPL)](https://github.com/openmcp-project/), where the `Provider` resource is typically managed for you.
+:::warning
+
+Depending on your setup, the `Provider` resource may already exist and be managed by your platform or tooling — do not modify it in that case. This applies, for example, when using [Open Control Plane (OCPL)](https://github.com/openmcp-project/), where the `Provider` resource is typically managed for you.
+
+:::
 
 ```yaml title="provider-btp.yaml"
 apiVersion: pkg.crossplane.io/v1

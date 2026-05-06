@@ -103,7 +103,7 @@ func NewImportTester[T resource.Managed](baseResource T, baseName string, o ...I
 }
 
 func (it *ImportTester[T]) GetPrefixedName() string {
-	return NewID(it.BaseName, envvar.GetOrDefault(UUT_BUILD_ID_KEY, "0000"))
+	return "id-" + NewID(it.BaseName, envvar.GetOrDefault(UUT_BUILD_ID_KEY, "0000"))
 }
 
 func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilder {

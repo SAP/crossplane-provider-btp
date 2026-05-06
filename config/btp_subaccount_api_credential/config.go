@@ -9,18 +9,19 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/upjet/pkg/config"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	accountsv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
-	errTrackRUsage   = "cannot track ResourceUsage"
-	errTypeAssertion = "managed resource is not of type SubaccountApiCredential"
+	errTrackRUsage         = "cannot track ResourceUsage"
+	errTypeAssertion       = "managed resource is not of type SubaccountApiCredential"
+	errMissingClientSecret = "cannot read client_secret from source, please delete external resource and re-create Crossplane resource"
 )
 
 // Configure configures individual resources by adding custom ResourceConfigurators.
@@ -86,7 +87,7 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 	}
 
 	// Manually define reference tracking for relevant fields
-	if cr.Spec.ForProvider.SubaccountID != nil {
+	if cr.Spec.ForProvider.SubaccountID != nil && cr.Spec.ForProvider.SubaccountRef != nil {
 
 		// Use a custom reference tracker to track the subaccount reference
 		err := referenceTracker.CreateTrackingReference(ctx, cr, *cr.Spec.ForProvider.SubaccountRef, accountsv1alpha1.SubaccountGroupVersionKind)
@@ -101,6 +102,30 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 		referenceTracker.SetConditions(ctx, mg)
 		if blocked := referenceTracker.DeleteShouldBeBlocked(mg); blocked {
 			return errors.New(providerv1alpha1.ErrResourceInUse)
+		}
+	}
+
+	// According to the Terraform BTP provider docs, client_secret is only generated
+	// "if the certificate is omitted". Certificate-based credentials never have a
+	// client_secret, so this check must be skipped for them to avoid false positives.
+	// See: https://registry.terraform.io/providers/SAP/btp/latest/docs/resources/subaccount_api_credential
+	if cr.Spec.ForProvider.CertificatePassed == nil {
+		secretRef := cr.GetWriteConnectionSecretToReference()
+		if secretRef != nil && secretRef.Name != "" {
+			secret := &corev1.Secret{}
+			err := d.Kube.Get(ctx, client.ObjectKey{
+				Name:      secretRef.Name,
+				Namespace: secretRef.Namespace,
+			}, secret)
+			if err == nil {
+				_, hasClientID := secret.Data["attribute.client_id"]
+				_, hasTokenURL := secret.Data["attribute.token_url"]
+				_, hasAPIURL := secret.Data["attribute.api_url"]
+				_, hasClientSecret := secret.Data["attribute.client_secret"]
+				if hasClientID && hasTokenURL && hasAPIURL && !hasClientSecret {
+					return errors.New(errMissingClientSecret)
+				}
+			}
 		}
 	}
 	return nil

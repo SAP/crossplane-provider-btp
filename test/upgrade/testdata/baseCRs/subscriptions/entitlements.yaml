@@ -1,0 +1,25 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: cis-local-entitlement-upgrade-subscription
+  namespace: default
+spec:
+  forProvider:
+    serviceName: cis
+    servicePlanName: local
+    enable: true
+    subaccountRef:
+      name: upgrade-test-subscription-sa
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: auditlog-viewer-entitlement-upgrade-subscription
+  namespace: default
+spec:
+  forProvider:
+    serviceName: auditlog-viewer
+    servicePlanName: free
+    enable: true
+    subaccountRef:
+      name: upgrade-test-subscription-sa

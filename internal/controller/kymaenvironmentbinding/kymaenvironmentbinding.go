@@ -9,9 +9,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/pkg/errors"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -21,6 +19,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	kymabinding "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironmentbinding"
+	"github.com/sap/crossplane-provider-btp/internal/reconcilerutil"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -74,40 +73,6 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-// updateStatusWithRetry attempts to update the status with exponential backoff retry logic.
-// On conflict errors it re-fetches the object and re-applies the mutate function before retrying.
-// The mutate function is expected to modify the provided KymaEnvironmentBinding's status based on its current state.
-func (c *external) updateStatusWithRetry(ctx context.Context, cr *v1alpha1.KymaEnvironmentBinding, maxRetries int, mutate func(*v1alpha1.KymaEnvironmentBinding)) error {
-	var lastErr error
-
-	for i := 0; i < maxRetries; i++ {
-		if i > 0 {
-			select {
-			case <-time.After(time.Duration(100*(1<<uint(i-1))) * time.Millisecond):
-			case <-ctx.Done():
-				return errors.Wrap(ctx.Err(), errStatusUpdate)
-			}
-
-			// Re-fetch to resolve resource version conflicts before retrying
-			if err := c.kube.Get(ctx, types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr); err != nil {
-				return errors.Wrap(err, "re-fetch before status retry failed")
-			}
-		}
-
-		mutate(cr)
-
-		lastErr = c.kube.Status().Update(ctx, cr)
-		if lastErr == nil {
-			return nil
-		}
-		if !kerrors.IsConflict(lastErr) {
-			return errors.Wrap(lastErr, errStatusUpdate)
-		}
-	}
-
-	return errors.Wrap(lastErr, "status update failed after retries")
-}
-
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironmentBinding)
 	if !ok {
@@ -123,10 +88,19 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateBindings)
 	}
 	var validBindings bool
-	if err := c.updateStatusWithRetry(ctx, cr, 3, func(cr *v1alpha1.KymaEnvironmentBinding) {
-		validBindings, cr.Status.AtProvider.Bindings = c.validateBindings(cr)
+	var expiredBindings []v1alpha1.Binding
+	if err := reconcilerutil.UpdateStatusWithRetry(ctx, c.kube, cr, 3, func(cr *v1alpha1.KymaEnvironmentBinding) error {
+		validBindings, cr.Status.AtProvider.Bindings, expiredBindings = c.validateBindings(cr)
+		return nil
 	}); err != nil {
 		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, "while updating status during observe")))
+	}
+
+	// Delete expired bindings from BTP API to prevent orphaned resources
+	if len(expiredBindings) > 0 {
+		if err := c.client.DeleteInstances(ctx, expiredBindings, cr.Spec.KymaEnvironmentId); err != nil {
+			c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, "while deleting expired bindings. This binding will be orphanedd in the external system")))
+		}
 	}
 	if !validBindings {
 		return managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: true}, nil
@@ -165,15 +139,17 @@ func (c *external) updateBindingsFromService(ctx context.Context, cr *v1alpha1.K
 	return nil
 }
 
-// validateBindings checks if bindings in status are still active (did not reach rotation deadline) or not yet expired (reached time to live)
-func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, []v1alpha1.Binding) {
+// validateBindings checks if bindings in status are still active (did not reach rotation deadline) or not yet expired (reached time to live).
+// Returns: hasActiveBinding, validBindings (non-expired), expiredBindings (TTL-expired, to be deleted from BTP API).
+func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, []v1alpha1.Binding, []v1alpha1.Binding) {
 	bindings := cr.Status.AtProvider.Bindings
 	if bindings == nil {
-		return false, nil
+		return false, nil, nil
 	}
 
 	hasActiveBinding := false
 	validBindings := []v1alpha1.Binding{}
+	expiredBindings := []v1alpha1.Binding{}
 	now := time.Now()
 
 	// First pass: deactivate bindings that need rotation or are expired
@@ -195,14 +171,16 @@ func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, 
 		}
 	}
 
-	// Second pass: keep non-expired bindings (active or inactive)
+	// Second pass: separate non-expired from expired bindings
 	for _, b := range bindings {
 		if !ttlIsExpired(&b, now) {
 			validBindings = append(validBindings, b)
+		} else {
+			expiredBindings = append(expiredBindings, b)
 		}
 	}
 
-	return hasActiveBinding, validBindings
+	return hasActiveBinding, validBindings, expiredBindings
 }
 
 func reachedRotationDeadline(now time.Time, b *v1alpha1.Binding, cr *v1alpha1.KymaEnvironmentBinding) bool {
@@ -258,8 +236,9 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	// Try to update status with retry, re-applying the new binding on conflict re-fetch
-	statusErr := c.updateStatusWithRetry(ctx, cr, 5, func(cr *v1alpha1.KymaEnvironmentBinding) {
+	statusErr := reconcilerutil.UpdateStatusWithRetry(ctx, c.kube, cr, 5, func(cr *v1alpha1.KymaEnvironmentBinding) error {
 		cr.Status.AtProvider.Bindings = appendIfNotExists(cr.Status.AtProvider.Bindings, newBinding)
+		return nil
 	})
 	if statusErr != nil {
 		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(statusErr, "while updating status during creation - rolling back binding (binding will be deleted again)")))

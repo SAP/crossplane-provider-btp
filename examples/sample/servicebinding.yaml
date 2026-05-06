@@ -17,3 +17,23 @@ spec:
   writeConnectionSecretToRef:
     name: destination-binding
     namespace: default
+---
+# ServiceBinding with SAP Kubernetes service binding format
+# The secret will include metadata properties (type, label, plan, tags, instance_name, instance_guid)
+# and a .metadata descriptor following the SAP Kubernetes Service Binding specification.
+# This enables consumption by SAP libraries (@sap/xsenv, CAP, Cloud SDK).
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceBinding
+metadata:
+  name: destination-binding-sap-format
+spec:
+  forProvider:
+    name: destination-binding-sap-format
+    serviceInstanceRef:
+      name: destination-instance
+    subaccountRef:
+      name: sa-serviceinstance
+  secretFormat: sap-kubernetes
+  writeConnectionSecretToRef:
+    name: destination-binding-sap-format
+    namespace: default

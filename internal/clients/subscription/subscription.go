@@ -110,9 +110,14 @@ func (s *SubscriptionApiHandler) DeleteSubscription(ctx context.Context, externa
 		return fmt.Errorf("invalid external name %s: %w", externalName, err)
 	}
 
-	if _, err := s.client.SubscriptionOperationsForAppConsumersAPI.
+	raw, err := s.client.SubscriptionOperationsForAppConsumersAPI.
 		DeleteSubscriptionAsync(ctx, appName).
-		Execute(); err != nil {
+		Execute()
+	if err != nil {
+		// Handle 404 as success - resource was already deleted externally
+		if raw != nil && (raw.StatusCode == 404 || raw.StatusCode == 429) {
+			return nil
+		}
 		return specifyAPIError(err)
 	}
 	return nil
@@ -191,7 +196,7 @@ func (s *SubscriptionTypeMapper) ConvertToCreatePayload(cr *v1alpha1.Subscriptio
 	}
 }
 
-func (s *SubscriptionTypeMapper) ConvertToClientParams(cr *v1alpha1.Subscription) map[string]interface{} {
+func (s *SubscriptionTypeMapper) ConvertToClientParams(cr *v1alpha1.Subscription) map[string]any {
 	subscriptionParams, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.SubscriptionParameters.DeepCopy().Raw)
 	if err != nil {
 		return nil
@@ -216,6 +221,11 @@ func splitExternalName(externalName string) (string, string, error) {
 		return "", "", errors.New("incorrect format, should be <appName>/<planName>")
 	}
 	return fragments[0], fragments[1], nil
+}
+
+// FormExternalName creates an external-name from appName and planName (exported for controller use)
+func FormExternalName(appName string, planName string) string {
+	return formExternalName(appName, planName)
 }
 
 // formExternalName combines appName and planName into a single string of the form <appName>/<planName>
