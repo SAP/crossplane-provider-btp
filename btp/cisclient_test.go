@@ -102,22 +102,9 @@ func Test_authenticationParams(t *testing.T) {
 					CISCredential: &CISCredential{
 						GrantType: "user_token",
 						Uaa: struct {
-							Apiurl          string `json:"apiurl"`
-							Clientid        string `json:"clientid"`
-							Clientsecret    string `json:"clientsecret"`
-							CredentialType  string `json:"credential-type"`
-							Identityzone    string `json:"identityzone"`
-							Identityzoneid  string `json:"identityzoneid"`
-							Sburl           string `json:"sburl"`
-							Subaccountid    string `json:"subaccountid"`
-							Tenantid        string `json:"tenantid"`
-							Tenantmode      string `json:"tenantmode"`
-							Uaadomain       string `json:"uaadomain"`
-							Url             string `json:"url"`
-							Verificationkey string `json:"verificationkey"`
-							Xsappname       string `json:"xsappname"`
-							Xsmasterappname string `json:"xsmasterappname"`
-							Zoneid          string `json:"zoneid"`
+							Clientid     string `json:"clientid"`
+							Clientsecret string `json:"clientsecret"`
+							Url          string `json:"url"`
 						}{
 							Clientid: "myclientid",
 						},
@@ -135,22 +122,9 @@ func Test_authenticationParams(t *testing.T) {
 					CISCredential: &CISCredential{
 						GrantType: "client_credentials",
 						Uaa: struct {
-							Apiurl          string `json:"apiurl"`
-							Clientid        string `json:"clientid"`
-							Clientsecret    string `json:"clientsecret"`
-							CredentialType  string `json:"credential-type"`
-							Identityzone    string `json:"identityzone"`
-							Identityzoneid  string `json:"identityzoneid"`
-							Sburl           string `json:"sburl"`
-							Subaccountid    string `json:"subaccountid"`
-							Tenantid        string `json:"tenantid"`
-							Tenantmode      string `json:"tenantmode"`
-							Uaadomain       string `json:"uaadomain"`
-							Url             string `json:"url"`
-							Verificationkey string `json:"verificationkey"`
-							Xsappname       string `json:"xsappname"`
-							Xsmasterappname string `json:"xsmasterappname"`
-							Zoneid          string `json:"zoneid"`
+							Clientid     string `json:"clientid"`
+							Clientsecret string `json:"clientsecret"`
+							Url          string `json:"url"`
 						}{
 							Clientid:     "myclientid",
 							Clientsecret: "myclientsecret",
@@ -170,22 +144,9 @@ func Test_authenticationParams(t *testing.T) {
 					CISCredential: &CISCredential{
 						GrantType: "user_token",
 						Uaa: struct {
-							Apiurl          string `json:"apiurl"`
-							Clientid        string `json:"clientid"`
-							Clientsecret    string `json:"clientsecret"`
-							CredentialType  string `json:"credential-type"`
-							Identityzone    string `json:"identityzone"`
-							Identityzoneid  string `json:"identityzoneid"`
-							Sburl           string `json:"sburl"`
-							Subaccountid    string `json:"subaccountid"`
-							Tenantid        string `json:"tenantid"`
-							Tenantmode      string `json:"tenantmode"`
-							Uaadomain       string `json:"uaadomain"`
-							Url             string `json:"url"`
-							Verificationkey string `json:"verificationkey"`
-							Xsappname       string `json:"xsappname"`
-							Xsmasterappname string `json:"xsmasterappname"`
-							Zoneid          string `json:"zoneid"`
+							Clientid     string `json:"clientid"`
+							Clientsecret string `json:"clientsecret"`
+							Url          string `json:"url"`
 						}{
 							Clientid: "",
 						},
