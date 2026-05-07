@@ -9,17 +9,54 @@ These flags are passed as arguments to the provider's container process and can 
 
 ## Available Flags
 
+### Reconciliation throughput
+
 | Flag | Default | Description |
-|---|---|---|
-| `--sync` / `-s` | `1h` | How often **all** resources are re-checked for drift from the desired state (full sync interval). |
-| `--poll` | `1m` | How often **individual** resources are checked for drift from the desired state. |
-| `--max-reconcile-rate` | `3` | Global maximum number of resources reconciled concurrently (parallel reconcile goroutines) |
-| `--backoff-base` | `1s` | Base duration for exponential backoff when a reconcile fails. The wait time after the first failure. |
-| `--backoff-max` | `60s` | Maximum duration for exponential backoff. The wait time will never exceed this value, regardless of how many failures have occurred. |
-| `--leader-election` / `-l` | `false` | Enable leader election for the controller manager. Used to ensure only one instance of the controller is active at a time while allowing multiple replicas to run simultaneously for failover. Can also be set via the `LEADER_ELECTION` environment variable. |
+|------|---------|-------------|
+| `--max-reconcile-rate` | `3` | How many reconciles per second are allowed globally across all controllers. Technically: all controllers share one token bucket that refills at this rate with a burst of 10x. |
+| `--max-concurrent-reconciles` | `3` | How many reconciles can run in parallel per controller. Technically: number of worker goroutines dequeuing from the controller-runtime work queue per controller. |
+
+### Polling
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--poll` | `1m` | How often a successfully-reconciled resource is re-checked for drift from the desired state. Technically: requeue delay after any successful reconcile (both when up-to-date and after successful updates).|
+| `--poll-jitter` | `0` (disabled) | Random spread added to poll interval to avoid all resources polling at the same instant. Technically: random duration between -jitter and +jitter added to poll interval on each requeue. |
+| `--sync` / `-s` | `1h` | How often all watched resources are re-listed from the API server to correct missed watch events. Technically: controller-runtime cache SyncPeriod; triggers a full re-list per resource type, with 10% jitter between controllers. |
+
+### Error handling
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--backoff-base` | `1s` | Initial wait time before retrying a failed reconcile. Technically: base duration for per-item exponential backoff (baseDelay * 2^numFailures) in the controller-runtime work queue. |
+| `--backoff-max` | `60s` | Maximum wait time between retries of a failing reconcile. Technically: cap for the exponential backoff rate limiter. |
+| `--reconcile-timeout` | `3m` | Maximum time a single reconcile may take before being canceled. Technically: deadline for the externalCtx passed to external API calls; a separate parent context with +30s grace period remains active for K8s status updates after expiry. |
+
+### Kubernetes API client
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--kube-client-qps` | `15` | How many requests per second the provider may send to the Kubernetes API. Technically: token refill rate for the client-go REST client rate limiter (applies to all API calls from this provider). |
+| `--kube-client-burst` | 2x `kube-client-qps` | Maximum burst of requests allowed to the Kubernetes API above the steady QPS. Defaults to 2x `--kube-client-qps` if not explicitly set. Technically: bucket size for the client-go REST client rate limiter. |
+
+### Leader election
+
+These flags control the leader election mechanism for high-availability deployments. Only one replica reconciles at a time; others stand by to take over.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--leader-election` / `-l` | `false` | Enable leader election for the controller manager. Can also be set via the `LEADER_ELECTION` environment variable. |
+| `--leader-election-lease-duration` | `60s` | How long standby replicas wait before taking over leadership. Technically: Kubernetes Lease duration; other candidates wait this long before force-acquiring. |
+| `--leader-election-renew-deadline` | `50s` | How long the active leader tries to renew before giving up. Technically: deadline for the leader to refresh the Lease; on expiry the leader steps down and cancels in-flight reconciles. |
+| `--leader-election-retry-period` | `10s` | How often leader election actions (renew or acquire) are attempted. Technically: interval between LeaderElector client tries; applies to both the leader refreshing its lease and standbys attempting to acquire. |
+
+### Other
+
+| Flag | Default | Description |
+|------|---------|-------------|
 | `--debug` / `-d` | `false` | Run with debug logging. |
 
-### Exponential Backoff Details
+## Exponential Backoff Details
 
 The `--backoff-base` and `--backoff-max` flags control how the provider handles transient errors. When a reconciliation fails, the provider waits before retrying using an exponential backoff strategy:
 
@@ -41,7 +78,7 @@ Crossplane manages the provider's `Deployment` directly. To pass custom argument
 
 ### Example
 
-The following example configures a slower poll interval and a more conservative backoff strategy, which is useful when the provider manages a large number of resources or when the BTP API enforces strict rate limits.
+The following example configures higher throughput with jitter-based spread, which is useful when the provider manages a large number of resources.
 
 1. Create and apply `DeploymentRuntimeConfig`:
 
@@ -60,11 +97,14 @@ The following example configures a slower poll interval and a more conservative 
               containers:
                 - name: package-runtime
                   args:
-                    - --sync=2h
-                    - --poll=5m
-                    - --max-reconcile-rate=5
+                    - --max-reconcile-rate=10
+                    - --max-concurrent-reconciles=5
+                    - --poll=2m
+                    - --poll-jitter=10s
+                    - --kube-client-qps=50
                     - --backoff-base=5s
                     - --backoff-max=90s
+                    - --leader-election
     ```
 
 2. This `DeploymentRuntimeConfig` needs to be referenced by the provider's `Provider` resource.

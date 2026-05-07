@@ -25,6 +25,8 @@ type CrossplaneOptions struct {
 
 	BackoffBase time.Duration
 	BackoffMax  time.Duration
+	PollJitter  time.Duration
+	Timeout     time.Duration
 }
 
 // ForControllerRuntime returns default controller-runtime options. Its basically just an alias.
@@ -51,6 +53,7 @@ type UpjetOptions struct {
 
 	BackoffBase time.Duration
 	BackoffMax  time.Duration
+	Timeout     time.Duration
 }
 
 // ForControllerRuntime returns default controller-runtime options. Its basically just an alias.

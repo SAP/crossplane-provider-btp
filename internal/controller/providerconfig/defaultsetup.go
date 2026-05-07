@@ -1,6 +1,8 @@
 package providerconfig
 
 import (
+	"time"
+
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
@@ -43,6 +45,8 @@ func DefaultSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions, object cli
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 		managed.WithPollInterval(o.PollInterval),
+		managed.WithTimeout(o.Timeout),
+		pollJitterOption(o.PollJitter),
 		connectionPublishers(mgr, o),
 		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
 	)
@@ -75,7 +79,9 @@ func DefaultSetupWithoutDefaultInitializer(mgr ctrl.Manager, o internalopts.Cros
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 		managed.WithPollInterval(o.PollInterval),
+		managed.WithTimeout(o.Timeout),
 		managed.WithInitializers(), // No default initializer
+		pollJitterOption(o.PollJitter),
 		connectionPublishers(mgr, o),
 		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
 	)
@@ -102,4 +108,11 @@ func enableBetaManagementPolicies(enable bool) managed.ReconcilerOption {
 			managed.WithManagementPolicies()(r)
 		}
 	}
+}
+
+func pollJitterOption(jitter time.Duration) managed.ReconcilerOption {
+	if jitter > 0 {
+		return managed.WithPollJitterHook(jitter)
+	}
+	return func(_ *managed.Reconciler) {}
 }
