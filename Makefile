@@ -60,34 +60,17 @@ IMAGES = provider-btp
 -include build/makelib/imagelight.mk
 
 export UUT_CONFIG = $(BUILD_REGISTRY)/provider-btp-$(ARCH):latest
-export UUT_IMAGES = {"crossplane/provider-btp":"$(UUT_CONFIG)"}
+export UUT_XPKG = $(BUILD_REGISTRY)/provider-btp-xpkg:latest
+export UUT_IMAGES = {"crossplane/provider-btp":"$(UUT_XPKG)"}
 testFilter ?= .*
 
-# local-deploy builds the provider image, sideloads the xpkg into a local kind
-# cluster via local.xpkg.mk, and waits for the provider to become healthy.
-# E2E_REUSE_CLUSTER/E2E_CLUSTER_NAME tell xp-testing to reuse this cluster
-# instead of creating a new one and trying to install the provider itself.
-KIND_CLUSTER_NAME ?= local-dev
-CROSSPLANE_VERSION ?= 1.20.1
-TEST_REUSE_CLUSTER ?= 0
-export E2E_REUSE_CLUSTER = $(KIND_CLUSTER_NAME)
-export E2E_CLUSTER_NAME = $(KIND_CLUSTER_NAME)
--include build/makelib/local.xpkg.mk
--include build/makelib/controlplane.mk
-
-.PHONY: local-deploy
-local-deploy: build xpkg.build.provider-btp local-deploy-reuse-check controlplane.up local.xpkg.deploy.provider.provider-btp
-	@$(INFO) waiting for provider to become healthy
-	@$(KUBECTL) wait provider.pkg provider-btp --for condition=Healthy --timeout 5m
-	@$(KUBECTL) -n crossplane-system wait --for=condition=Available deployment --all --timeout=5m
-	@$(OK) provider is healthy
-
-.PHONY: local-deploy-reuse-check
-local-deploy-reuse-check:
-ifeq ($(TEST_REUSE_CLUSTER),0)
-	@$(INFO) deleting any existing kind cluster named $(KIND_CLUSTER_NAME)
-	@$(KIND) delete cluster --name=$(KIND_CLUSTER_NAME) 2>/dev/null || true
-endif
+.PHONY: local-build
+local-build: build xpkg.build.provider-btp
+	$(INFO) "Loading xpkg into docker as $(UUT_XPKG)"; \
+	XPKG_FILE=$(XPKG_OUTPUT_DIR)/$(PLATFORM)/provider-btp-$(VERSION).xpkg && \
+	XPKG_SHA=$$(docker load -i $$XPKG_FILE | sed -n 's/.*ID: //p') && \
+	docker tag $$XPKG_SHA $(UUT_XPKG); \
+	$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"; \
 
 # ====================================================================================
 # Setup XPKG
@@ -280,17 +263,10 @@ test.run: go.test.unit
 # e2e tests
 e2e.run: test-acceptance
 
-test-e2e: $(KIND) $(HELM3) build generate-test-crs
-	@$(INFO) running e2e tests
-	@$(INFO) Skipping long running tests
-	@UUT_CONFIG=$(BUILD_REGISTRY)/provider-btp:$(VERSION) go test $(PROJECT_REPO)/test/... -tags=e2e -short -count=1 -timeout 30m
-	@$(OK) e2e tests passed
-
 #run single test-e2e-long test with <make e2e testFilter=functionNameOfTest>
-test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
+test-e2e-long: local-build $(KIND) $(HELM3) generate-test-crs
 	@$(INFO) running integration tests
-	@echo UUT_CONFIG=$$UUT_CONFIG
-	go test -v  $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
+	go test -v $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
@@ -301,8 +277,8 @@ test-e2e-long: $(KIND) $(HELM3) build generate-test-crs
 
 #run single e2e test with <make e2e testFilter=functionNameOfTest>
 .PHONY: test-acceptance
-test-acceptance: local-deploy $(HELM3) generate-test-crs
-	@$(INFO) running integration tests
+test-acceptance: local-build $(KIND) $(HELM3) generate-test-crs
+	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
 	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
@@ -313,13 +289,12 @@ test-acceptance: local-deploy $(HELM3) generate-test-crs
      esac
 
 .PHONY: test-acceptance-debug
-test-acceptance-debug: $(KIND) $(HELM3) build generate-test-crs
-	@$(INFO) running integration tests
+test-acceptance-debug: local-build $(KIND) $(HELM3) generate-test-crs
+	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
-	@echo UUT_CONFIG=$$UUT_CONFIG
 	go test -gcflags="all=-N -l" -c -v  $(PROJECT_REPO)/test/e2e/ -tags=e2e -o ./test/e2e/test-acceptance-debug.test -timeout 30m
 	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
-	@$(OK) integration tests passed
+	@$(OK) end-to-end tests passed
 
 .PHONY: generate-test-crs
 generate-test-crs:
@@ -383,8 +358,8 @@ pull-upgrade-test-version-crs:
 build-upgrade-test-images:
 	@if [ "$(UPGRADE_TEST_FROM_TAG)" == "local" ] || [ "$(UPGRADE_TEST_TO_TAG)" == "local" ]; then \
 		$(INFO) "Building local images (UPGRADE_TEST_FROM_TAG or UPGRADE_TEST_TO_TAG is \"local\")"; \
-		$(MAKE) build; \
-		$(OK) "Built local images: $(UUT_CONFIG)"; \
+		$(MAKE) local-build; \
+		$(OK) "Built local images for upgrade tests"; \
 	fi
 
 .PHONY: upgrade-test
