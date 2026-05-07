@@ -95,8 +95,7 @@ func SetupClusterWithCrossplane(namespace string) {
 			ControllerImage: &uutController,
 		},
 		CrossplaneSetup: setup.CrossplaneSetup{
-			Version:  "1.20.1",
-			Registry: setup.DockerRegistry,
+			Version: "2.1.3",
 		},
 		DeploymentRuntimeConfig: &deploymentRuntimeConfig,
 	}

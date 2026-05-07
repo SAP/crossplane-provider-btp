@@ -70,11 +70,11 @@ testFilter ?= .*
 
 .PHONY: local-build
 local-build: build xpkg.build.provider-btp
-	$(INFO) "Loading xpkg into docker as $(UUT_XPKG)"; \
-	XPKG_FILE=$(XPKG_OUTPUT_DIR)/$(PLATFORM)/provider-btp-$(VERSION).xpkg && \
+	$(INFO) "Loading xpkg into docker as $(UUT_XPKG)"
+	@XPKG_FILE=$(XPKG_OUTPUT_DIR)/$(PLATFORM)/provider-btp-$(VERSION).xpkg && \
 	XPKG_SHA=$$(docker load -i $$XPKG_FILE | sed -n 's/.*ID: //p') && \
-	docker tag $$XPKG_SHA $(UUT_XPKG); \
-	$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"; \
+	docker tag $$XPKG_SHA $(UUT_XPKG);
+	$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"
 
 # ====================================================================================
 # Setup XPKG
