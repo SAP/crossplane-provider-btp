@@ -180,40 +180,60 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
-	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, *pollJitter, *reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies, enableExternalSecretStores, namespace, terraformVersion, providerSource, providerVersion)
-	setupNativeControllers(mgr, log, maxReconcileRate, maxConcurrentReconciles, pollInterval, pollJitter, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies, enableExternalSecretStores, namespace)
+	common := commonSetupParams{
+		MaxReconcileRate:           *maxReconcileRate,
+		PollInterval:               *pollInterval,
+		PollJitter:                 *pollJitter,
+		ReconcileTimeout:           *reconcileTimeout,
+		BackoffBase:                *backoffBase,
+		BackoffMax:                 *backoffMax,
+		EnableManagementPolicies:   *enableManagementPolicies,
+		EnableExternalSecretStores: *enableExternalSecretStores,
+		Namespace:                  *namespace,
+	}
+
+	setupTerraformControllers(mgr, log, terraformSetupParams{
+		commonSetupParams: common,
+		TerraformVersion:  *terraformVersion,
+		ProviderSource:    *providerSource,
+		ProviderVersion:   *providerVersion,
+	})
+	setupNativeControllers(mgr, log, nativeSetupParams{
+		commonSetupParams:       common,
+		MaxConcurrentReconciles: *maxConcurrentReconciles,
+	})
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
 
-func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, pollJitter time.Duration, reconcileTimeout time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string, terraformVersion *string, providerSource *string, providerVersion *string) {
+func setupTerraformControllers(mgr manager.Manager, log logging.Logger, p terraformSetupParams) {
 	o := internalopts.UpjetOptions{
 		Options: tjcontroller.Options{
 			Options: controller.Options{
 				Logger:                  log,
-				GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
-				PollInterval:            pollInterval,
+				GlobalRateLimiter:       ratelimiter.NewGlobal(p.MaxReconcileRate),
+				PollInterval:            p.PollInterval,
 				MaxConcurrentReconciles: 1,
 				Features:                &feature.Flags{},
 			},
 			Provider:   config.GetProvider(),
-			PollJitter: pollJitter,
+			PollJitter: p.PollJitter,
 			// use the following WorkspaceStoreOption to enable the shared gRPC mode
 			// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
 			WorkspaceStore: terraform.NewWorkspaceStore(log),
-			SetupFn:        tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
+			SetupFn:        tfclient.TerraformSetupBuilder(p.TerraformVersion, p.ProviderSource, p.ProviderVersion),
 		},
-		BackoffBase: *backoffBase,
-		BackoffMax:  *backoffMax,
-		Timeout:     reconcileTimeout,
+		BackoffBase: p.BackoffBase,
+		BackoffMax:  p.BackoffMax,
+		Timeout:     p.ReconcileTimeout,
 	}
 
-	if *enableManagementPolicies {
+	if p.EnableManagementPolicies {
 		o.Features.Enable(features.EnableBetaManagementPolicies)
 		log.Info("Beta feature enabled", "flag", features.EnableBetaManagementPolicies)
 	}
 
-	if *enableExternalSecretStores {
+	if p.EnableExternalSecretStores {
 		o.Features.Enable(features.EnableAlphaExternalSecretStores)
 		log.Info("Alpha feature enabled", "flag", features.EnableAlphaExternalSecretStores)
 
@@ -229,7 +249,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 							// NOTE(turkenh): We only set required spec and expect optional
 							// ones to properly be initialized with CRD level default values.
 							SecretStoreConfig: xpv1.SecretStoreConfig{
-								DefaultScope: *namespace,
+								DefaultScope: p.Namespace,
 							},
 						},
 					},
@@ -240,27 +260,28 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
-func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, maxConcurrentReconciles *int, pollInterval *time.Duration, pollJitter *time.Duration, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string) {
+
+func setupNativeControllers(mgr manager.Manager, log logging.Logger, p nativeSetupParams) {
 	co := internalopts.CrossplaneOptions{
 		Options: controller.Options{
 			Logger:                  log,
-			MaxConcurrentReconciles: *maxConcurrentReconciles,
-			PollInterval:            *pollInterval,
-			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
+			MaxConcurrentReconciles: p.MaxConcurrentReconciles,
+			PollInterval:            p.PollInterval,
+			GlobalRateLimiter:       ratelimiter.NewGlobal(p.MaxReconcileRate),
 			Features:                &feature.Flags{},
 		},
-		BackoffBase: *backoffBase,
-		BackoffMax:  *backoffMax,
-		PollJitter:  *pollJitter,
-		Timeout:     *reconcileTimeout,
+		BackoffBase: p.BackoffBase,
+		BackoffMax:  p.BackoffMax,
+		PollJitter:  p.PollJitter,
+		Timeout:     p.ReconcileTimeout,
 	}
 
-	if *enableManagementPolicies {
+	if p.EnableManagementPolicies {
 		co.Features.Enable(features.EnableBetaManagementPolicies)
 		log.Info("Beta feature enabled", "flag", features.EnableBetaManagementPolicies)
 	}
 
-	if *enableExternalSecretStores {
+	if p.EnableExternalSecretStores {
 		co.Features.Enable(features.EnableAlphaExternalSecretStores)
 		log.Info("Alpha feature enabled", "flag", features.EnableAlphaExternalSecretStores)
 
@@ -276,7 +297,7 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 							// NOTE(turkenh): We only set required spec and expect optional
 							// ones to properly be initialized with CRD level default values.
 							SecretStoreConfig: xpv1.SecretStoreConfig{
-								DefaultScope: *namespace,
+								DefaultScope: p.Namespace,
 							},
 						},
 					},
@@ -285,4 +306,28 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 		)
 	}
 	kingpin.FatalIfError(template.CustomSetup(mgr, co), "Cannot setup controllers")
+}
+
+type commonSetupParams struct {
+	MaxReconcileRate           int
+	PollInterval               time.Duration
+	PollJitter                 time.Duration
+	ReconcileTimeout           time.Duration
+	BackoffBase                time.Duration
+	BackoffMax                 time.Duration
+	EnableManagementPolicies   bool
+	EnableExternalSecretStores bool
+	Namespace                  string
+}
+
+type terraformSetupParams struct {
+	commonSetupParams
+	TerraformVersion string
+	ProviderSource   string
+	ProviderVersion  string
+}
+
+type nativeSetupParams struct {
+	commonSetupParams
+	MaxConcurrentReconciles int
 }
