@@ -3,6 +3,7 @@ package btp
 import (
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -280,5 +281,127 @@ func TestCloudFoundryOrgByLabel(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+func TestValidateCISCredential(t *testing.T) {
+	validCredential := func() *CISCredential {
+		return &CISCredential{
+			GrantType: "client_credentials",
+			Uaa: struct {
+				Clientid     string `json:"clientid"`
+				Clientsecret string `json:"clientsecret"`
+				Url          string `json:"url"`
+			}{
+				Clientid:     "my-client-id",
+				Clientsecret: "my-client-secret",
+				Url:          "https://my-tenant.authentication.eu10.hana.ondemand.com",
+			},
+			Endpoints: struct {
+				AccountsServiceUrl     string `json:"accounts_service_url"`
+				EntitlementsServiceUrl string `json:"entitlements_service_url"`
+				ProvisioningServiceUrl string `json:"provisioning_service_url"`
+				SaasRegistryServiceUrl string `json:"saas_registry_service_url"`
+			}{
+				AccountsServiceUrl:     "https://accounts-service.eu10.hana.ondemand.com",
+				EntitlementsServiceUrl: "https://entitlements-service.eu10.hana.ondemand.com",
+				ProvisioningServiceUrl: "https://provisioning-service.cfapps.eu10.hana.ondemand.com",
+				SaasRegistryServiceUrl: "https://saas-manager.cfapps.eu10.hana.ondemand.com",
+			},
+		}
+	}
+
+	tests := []struct {
+		name    string
+		mutate  func(*CISCredential)
+		useNil  bool
+		wantErr bool
+		wantMsg string
+		wantMsg2 string
+	}{
+		{
+			name:    "valid credential - all required fields present",
+			mutate:  func(c *CISCredential) {},
+			wantErr: false,
+		},
+		{
+			name:    "missing uaa.clientid",
+			mutate:  func(c *CISCredential) { c.Uaa.Clientid = "" },
+			wantErr: true,
+			wantMsg: "uaa.clientid",
+		},
+		{
+			name:    "missing uaa.clientsecret",
+			mutate:  func(c *CISCredential) { c.Uaa.Clientsecret = "" },
+			wantErr: true,
+			wantMsg: "uaa.clientsecret",
+		},
+		{
+			name:    "missing uaa.url",
+			mutate:  func(c *CISCredential) { c.Uaa.Url = "" },
+			wantErr: true,
+			wantMsg: "uaa.url",
+		},
+		{
+			name:    "missing endpoints.accounts_service_url",
+			mutate:  func(c *CISCredential) { c.Endpoints.AccountsServiceUrl = "" },
+			wantErr: true,
+			wantMsg: "endpoints.accounts_service_url",
+		},
+		{
+			name:    "missing endpoints.entitlements_service_url",
+			mutate:  func(c *CISCredential) { c.Endpoints.EntitlementsServiceUrl = "" },
+			wantErr: true,
+			wantMsg: "endpoints.entitlements_service_url",
+		},
+		{
+			name:    "missing endpoints.provisioning_service_url",
+			mutate:  func(c *CISCredential) { c.Endpoints.ProvisioningServiceUrl = "" },
+			wantErr: true,
+			wantMsg: "endpoints.provisioning_service_url",
+		},
+		{
+			name:     "multiple missing fields reported together",
+			mutate:   func(c *CISCredential) { c.Uaa.Clientid = ""; c.Uaa.Url = "" },
+			wantErr:  true,
+			wantMsg:  "uaa.clientid",
+			wantMsg2: "uaa.url",
+		},
+		{
+			name:    "completely empty credential",
+			mutate:  func(c *CISCredential) { *c = CISCredential{} },
+			wantErr: true,
+			wantMsg: "uaa.clientid",
+		},
+		{
+			name:    "nil credential",
+			useNil:  true,
+			mutate:  func(c *CISCredential) {},
+			wantErr: true,
+			wantMsg: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cred *CISCredential
+			if tt.useNil {
+				cred = nil
+			} else {
+				cred = validCredential()
+				tt.mutate(cred)
+			}
+			err := validateCISCredential(cred)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateCISCredential() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.wantMsg != "" && !strings.Contains(err.Error(), tt.wantMsg) {
+				t.Errorf("validateCISCredential() error %q does not contain %q", err.Error(), tt.wantMsg)
+			}
+			if tt.wantErr && tt.wantMsg2 != "" && !strings.Contains(err.Error(), tt.wantMsg2) {
+				t.Errorf("validateCISCredential() error %q does not contain %q", err.Error(), tt.wantMsg2)
+			}
+		})
 	}
 }
