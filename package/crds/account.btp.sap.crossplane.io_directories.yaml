@@ -41,8 +41,8 @@ spec:
             - Follows Standard: yes
             - Format: Directory GUID (UUID format)
             - How to find:
-              - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
-              - CLI: btp list accounts/directory (field: guid)
+            - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
+            - CLI: btp list accounts/directory (field: guid)
         properties:
           apiVersion:
             description: |-

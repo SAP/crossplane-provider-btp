@@ -41,8 +41,8 @@ spec:
             - Follows Standard: no (uses name as identifier, not a GUID)
             - Format: Role Collection Name (string)
             - How to find:
-              - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
-              - CLI: btp get security/role-collection `"<name>"` → `name`
+            - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
+            - CLI: btp get security/role-collection `"<name>"` → `name`
         properties:
           apiVersion:
             description: |-
