@@ -203,13 +203,13 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 
 				// Wait for the resource to become Available. BTP stores service key credentials
 				// and returns them on every read, so the connection secret will contain a valid
-				// client_secret after import.
+				// client_secret after import. Terraform needs ~3-5 min to init and read from BTP.
 				c := conditions.New(cfg.Client().Resources())
 				err := wait.For(c.ResourceMatch(importSac, func(object k8sobj.Object) bool {
 					cr := object.(*v1alpha1.SubaccountApiCredential)
 					cond := cr.GetCondition(xpv1.TypeReady)
 					return cond.Status == corev1.ConditionTrue
-				}), wait.WithTimeout(time.Minute*5))
+				}), wait.WithTimeout(time.Minute*8))
 
 				if err != nil {
 					t.Errorf("Import CR did not become Available within timeout: %v", err)
