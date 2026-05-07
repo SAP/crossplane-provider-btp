@@ -1,8 +1,8 @@
 package v1alpha1
 
 import (
-	"github.com/crossplane/crossplane-runtime/pkg/reference"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reference"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 )
 
 // KymaEnvironmentBindingSecret extracts the Reference of some Kyma credentials to a secret name

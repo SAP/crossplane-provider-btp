@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	crossplane_meta "github.com/crossplane/crossplane-runtime/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	crossplane_meta "github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/internal"
 	saas_client "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-saas-provisioning-api-go/pkg"

@@ -14,5 +14,5 @@ find "${REPO_ROOT}" -name "zz_controller.go" -print0 | xargs -0 perl -i -0777 -p
 
 perl -i -0777 -pe \
   's/controller\.Options/internalopts.UpjetOptions/g;
-   s/"github\.com\/crossplane\/upjet\/pkg\/controller"/internalopts "github.com\/sap\/crossplane-provider-btp\/internal\/controller\/options"/g;' \
+   s/"github\.com\/crossplane\/upjet\/v2\/pkg\/controller"/internalopts "github.com\/sap\/crossplane-provider-btp\/internal\/controller\/options"/g;' \
   "${REPO_ROOT}/internal/controller/zz_setup.go"

@@ -1,9 +1,8 @@
 package kymaenvironmentbinding
 
 import (
-	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -17,7 +16,7 @@ import (
 // Setup adds a controller that reconciles KymaEnvironment managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	name := managed.ControllerName(v1alpha1.KymaEnvironmentBindingKind)
-	return providerconfig.DefaultSetupWithoutDefaultInitializer(mgr, o, &v1alpha1.KymaEnvironmentBinding{}, v1alpha1.KymaEnvironmentBindingKind, v1alpha1.KymaEnvironmentBindingGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
+	return providerconfig.DefaultSetupWithoutDefaultInitializer(mgr, o, &v1alpha1.KymaEnvironmentBinding{}, v1alpha1.KymaEnvironmentBindingKind, v1alpha1.KymaEnvironmentBindingGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 		return &connector{
 			kube:            kube,
 			usage:           usage,

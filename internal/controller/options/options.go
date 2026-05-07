@@ -4,8 +4,8 @@ package options
 import (
 	"time"
 
-	xpcontroller "github.com/crossplane/crossplane-runtime/pkg/controller"
-	tjcontroller "github.com/crossplane/upjet/pkg/controller"
+	xpcontroller "github.com/crossplane/crossplane-runtime/v2/pkg/controller"
+	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
 	"k8s.io/client-go/util/workqueue"
 	crcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"

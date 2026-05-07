@@ -46,3 +46,21 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	}
 	return nil
 }
+
+// SetupGated creates all controllers with the supplied logger and adds them to
+// the supplied manager gated.
+func SetupGated(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
+	for _, setup := range []func(ctrl.Manager, internalopts.UpjetOptions) error{
+		directoryentitlement.SetupGated,
+		subaccountservicebroker.SetupGated,
+		providerconfig.SetupGated,
+		globalaccounttrustconfiguration.SetupGated,
+		subaccountapicredential.SetupGated,
+		subaccounttrustconfiguration.SetupGated,
+	} {
+		if err := setup(mgr, o); err != nil {
+			return err
+		}
+	}
+	return nil
+}

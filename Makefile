@@ -24,6 +24,10 @@ PLATFORMS ?= linux_amd64
 VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || echo "v0.0.0-$$(git rev-parse HEAD)")
 $(info VERSION is $(VERSION))
 
+# Override to be Crossplane v2 compatible
+ROOT_DIR := $(shell pwd)
+export BUILD_REGISTRY := index.docker.io/build-$(shell echo $(HOSTNAME)-$(ROOT_DIR) | sha256sum | cut -c1-8)
+
 -include build/makelib/common.mk
 
 # Setup Output
