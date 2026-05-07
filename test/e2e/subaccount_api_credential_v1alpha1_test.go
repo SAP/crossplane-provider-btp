@@ -109,19 +109,38 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 				r, _ := kres.New(cfg.Client().RESTConfig())
 				_ = meta.AddToScheme(r.GetScheme())
 
-				// Create the credential via crossplane using its own subaccount (no conflict with Standalone test)
+				// Apply only the subaccount first. The SAC is created programmatically
+				// after the subaccount is Ready so that the SubaccountRef resolves
+				// immediately on the first reconcile, avoiding exponential backoff.
 				resources.ImportResources(ctx, t, cfg, orphanManifestDir)
 
-				// Wait for the subaccount to be ready before the SAC can resolve its reference.
+				// Wait for the subaccount to be ready before creating the SAC.
 				// BTP subaccount provisioning can take up to 10+ minutes.
 				waitForResource(&accountv1alpha1.Subaccount{
 					ObjectMeta: metav1.ObjectMeta{Name: "sac-orphan-subaccount", Namespace: cfg.Namespace()},
 				}, cfg, t, wait.WithTimeout(time.Minute*12))
 
+				// Create the SAC only after the subaccount is Ready, so the
+				// subaccountRef resolves on the very first reconcile.
+				readOnly := false
 				sac := &v1alpha1.SubaccountApiCredential{
 					ObjectMeta: metav1.ObjectMeta{Name: orphanSacName, Namespace: cfg.Namespace()},
+					Spec: v1alpha1.SubaccountApiCredentialSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							WriteConnectionSecretToReference: &xpv1.SecretReference{
+								Name:      "xsuaa-creds-sac-orphan-import",
+								Namespace: cfg.Namespace(),
+							},
+						},
+						ForProvider: v1alpha1.SubaccountApiCredentialParameters{
+							ReadOnly:      &readOnly,
+							SubaccountRef: &xpv1.Reference{Name: "sac-orphan-subaccount"},
+						},
+					},
 				}
-				// Wait for the SAC itself — subaccountRef is now resolved so Terraform can start.
+				if err := cfg.Client().Resources().Create(ctx, sac); err != nil {
+					t.Fatalf("Failed to create orphan SAC: %v", err)
+				}
 				waitForResource(sac, cfg, t, wait.WithTimeout(time.Minute*8))
 
 				// Read back to get the external name (credential name, not a GUID — ADR exception)
