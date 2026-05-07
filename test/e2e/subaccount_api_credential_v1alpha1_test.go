@@ -11,6 +11,7 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
+	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -110,12 +111,18 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 
 				// Create the credential via crossplane using its own subaccount (no conflict with Standalone test)
 				resources.ImportResources(ctx, t, cfg, orphanManifestDir)
+
+				// Wait for the subaccount to be ready before the SAC can resolve its reference.
+				// BTP subaccount provisioning can take up to 10+ minutes.
+				waitForResource(&accountv1alpha1.Subaccount{
+					ObjectMeta: metav1.ObjectMeta{Name: "sac-orphan-subaccount", Namespace: cfg.Namespace()},
+				}, cfg, t, wait.WithTimeout(time.Minute*12))
+
 				sac := &v1alpha1.SubaccountApiCredential{
 					ObjectMeta: metav1.ObjectMeta{Name: orphanSacName, Namespace: cfg.Namespace()},
 				}
-				// Use a longer timeout: subaccount provisioning in BTP can take 4-6 minutes,
-				// followed by SAC creation (~2 minutes). 15 minutes provides sufficient headroom.
-				waitForResource(sac, cfg, t, wait.WithTimeout(time.Minute*15))
+				// Wait for the SAC itself — subaccountRef is now resolved so Terraform can start.
+				waitForResource(sac, cfg, t, wait.WithTimeout(time.Minute*8))
 
 				// Read back to get the external name (credential name, not a GUID — ADR exception)
 				MustGetResource(t, cfg, orphanSacName, nil, sac)
