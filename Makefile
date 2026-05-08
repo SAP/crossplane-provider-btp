@@ -46,7 +46,7 @@ GO111MODULE = on
 
 # Override the GO_LINT_ARGS from golang.mk to use updated golangci-lint parameters
 # this can potentially be removed when we update to a newer version of the build
-GO_LINT_ARGS = --output.checkstyle.path=$(GO_LINT_OUTPUT)/checkstyle.xml
+GO_LINT_ARGS = --output.checkstyle.path=$(GO_LINT_OUTPUT)/checkstyle.xml --output.text.path=stdout
 
 # kind-related versions
 KIND_VERSION ?= v0.23.0

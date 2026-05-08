@@ -65,7 +65,8 @@ type CISCredential struct {
 
 func validateCISCredential(c *CISCredential) error {
 	if c == nil {
-		return fmt.Errorf(errCISBindingCredentialIsNil)
+		return errors.New(errCISBindingCredentialIsNil)
+
 	}
 	var missing []string
 	if c.Uaa.Clientid == "" {
