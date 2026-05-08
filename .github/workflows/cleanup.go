@@ -601,6 +601,10 @@ func deleteTrustConfigurations(trustConfigurationsList []TrustConfiguration) err
 		cmd.Stderr = &out
 		err := cmd.Run()
 		if err != nil {
+			if strings.Contains(out.String(), "not found") {
+				fmt.Printf("skipped (already gone): %s\n", trustConfiguration.Name)
+				continue
+			}
 			return fmt.Errorf("failed deleting security/trust with name %s: command execution failed: %s, output: %s", trustConfiguration.Name, err, out.String())
 		}
 		fmt.Printf("deleted: %s\n", trustConfiguration.Name)
