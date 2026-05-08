@@ -19,6 +19,8 @@ import (
 const (
 	errCouldNotParseCISSecret      = "CIS Secret seems malformed"
 	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
+	errCISBindingCredentialIsNil        = "CIS binding credential is nil"
+	errCISBindingMissingRequiredFields  = "CIS binding is missing required fields: %s"
 )
 
 type InstanceParameters = map[string]interface{}
@@ -63,7 +65,7 @@ type CISCredential struct {
 
 func validateCISCredential(c *CISCredential) error {
 	if c == nil {
-		return fmt.Errorf("CIS binding credential is nil")
+		return fmt.Errorf(errCISBindingCredentialIsNil)
 	}
 	var missing []string
 	if c.Uaa.Clientid == "" {
@@ -85,7 +87,7 @@ func validateCISCredential(c *CISCredential) error {
 		missing = append(missing, "endpoints.provisioning_service_url")
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("CIS binding is missing required fields: %s", strings.Join(missing, ", "))
+		return fmt.Errorf(errCISBindingMissingRequiredFields, strings.Join(missing, ", "))
 	}
 	return nil
 }
