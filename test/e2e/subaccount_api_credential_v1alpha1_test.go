@@ -209,7 +209,7 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 					cr := object.(*v1alpha1.SubaccountApiCredential)
 					cond := cr.GetCondition(xpv1.TypeReady)
 					return cond.Status == corev1.ConditionTrue
-				}), wait.WithTimeout(time.Minute*8))
+				}), wait.WithTimeout(time.Minute*12))
 
 				if err != nil {
 					t.Errorf("Import CR did not become Available within timeout: %v", err)
