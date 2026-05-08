@@ -16,14 +16,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sobj "sigs.k8s.io/e2e-framework/klient/k8s"
-	kres "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 
 	meta "github.com/sap/crossplane-provider-btp/apis"
 
 	"sigs.k8s.io/e2e-framework/klient/wait"
-	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 )
@@ -93,42 +90,50 @@ func assertApiCredentialSecret(t *testing.T, ctx context.Context, cfg *envconf.C
 	}
 }
 
-// TestSubaccountApiCredentialOrphanImport verifies that importing an orphaned
-// SubaccountApiCredential by its external name (credential name) works correctly.
-// BTP stores service key credentials and returns them on every read, so the connection
-// secret will contain a valid client_secret after import.
+// TestSubaccountApiCredentialOrphanImport verifies External-Name ADR compliance for
+// SubaccountApiCredential: when an explicit external-name annotation is set, Crossplane
+// uses it as the BTP credential's name (via SetIdentifierArgumentFn), and after the
+// credential is provisioned the annotation round-trips correctly (via GetExternalNameFn).
+// The connection secret must also contain a valid client_secret.
+//
+// Note: the BTP Terraform provider does not implement ImportState for this resource type,
+// so the "orphan and re-import" pattern used by other resources is not applicable here.
+// Instead, this test validates the forward direction: explicit external-name → BTP name.
+//
 // See: https://github.com/SAP/crossplane-provider-btp/issues/553
 func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 	var orphanManifestDir = "testdata/crs/SubaccountApiCredentialOrphanImport"
-	var orphanSacName = "sac-orphan-import"
-	importName := NewID("sac-orphan-reimport", BUILD_ID)
+	credentialName := NewID("sac-cred", BUILD_ID)
+	sacName := NewID("sac-import", BUILD_ID)
 
-	orphanImportFeature := features.New("SubaccountApiCredential Orphan Import Has Valid Client Secret").
+	orphanImportFeature := features.New("SubaccountApiCredential External Name ADR Compliance").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				r, _ := kres.New(cfg.Client().RESTConfig())
+				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = meta.AddToScheme(r.GetScheme())
 
-				// Apply only the subaccount first. The SAC is created programmatically
-				// after the subaccount is Ready so that the SubaccountRef resolves
-				// immediately on the first reconcile, avoiding exponential backoff.
+				// Apply the subaccount. The SAC is created programmatically in the Assess
+				// step after the subaccount is Ready to avoid exponential back-off on
+				// reference resolution.
 				resources.ImportResources(ctx, t, cfg, orphanManifestDir)
 
-				// Wait for the subaccount to be ready before creating the SAC.
-				// BTP subaccount provisioning can take up to 10+ minutes.
 				waitForResource(&accountv1alpha1.Subaccount{
 					ObjectMeta: metav1.ObjectMeta{Name: "sac-orphan-subaccount", Namespace: cfg.Namespace()},
 				}, cfg, t, wait.WithTimeout(time.Minute*12))
 
-				// Create the SAC only after the subaccount is Ready, so the
-				// subaccountRef resolves on the very first reconcile.
+				return ctx
+			},
+		).
+		Assess(
+			"SAC with explicit external name creates BTP credential with that name and a valid client_secret",
+			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				readOnly := false
 				sac := &v1alpha1.SubaccountApiCredential{
-					ObjectMeta: metav1.ObjectMeta{Name: orphanSacName, Namespace: cfg.Namespace()},
+					ObjectMeta: metav1.ObjectMeta{Name: sacName, Namespace: cfg.Namespace()},
 					Spec: v1alpha1.SubaccountApiCredentialSpec{
 						ResourceSpec: xpv1.ResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{
-								Name:      "xsuaa-creds-sac-orphan-import",
+								Name:      sacName + "-secret",
 								Namespace: cfg.Namespace(),
 							},
 						},
@@ -138,97 +143,33 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 						},
 					},
 				}
+				// Set the explicit external name. SetIdentifierArgumentFn will pass this
+				// as the Terraform `name` argument, so the BTP credential gets this exact name.
+				xpmeta.SetExternalName(sac, credentialName)
+
 				if err := cfg.Client().Resources().Create(ctx, sac); err != nil {
-					t.Fatalf("Failed to create orphan SAC: %v", err)
+					t.Fatalf("Failed to create SAC: %v", err)
 				}
 				waitForResource(sac, cfg, t, wait.WithTimeout(time.Minute*8))
 
-				// Read back to get the external name (credential name, not a GUID — ADR exception)
-				MustGetResource(t, cfg, orphanSacName, nil, sac)
-				externalName := xpmeta.GetExternalName(sac)
-				if externalName == "" {
-					t.Fatal("SAC did not become ready in time — external name not set, cannot proceed with import test")
-					return ctx
-				}
-				ctx = context.WithValue(ctx, importFeatureContextKey, externalName)
-				// Also store the subaccount ref so the import CR can find the credential
-				ctx = context.WithValue(ctx, "sacSubaccountRef", sac.Spec.ForProvider.SubaccountRef)
-
-				// Orphan: set management policy to not-delete so BTP resource survives CR deletion
-				sac.Spec.ManagementPolicies = []xpv1.ManagementAction{
-					xpv1.ManagementActionObserve,
-					xpv1.ManagementActionCreate,
-					xpv1.ManagementActionUpdate,
-					xpv1.ManagementActionLateInitialize,
-				}
-				if err := cfg.Client().Resources().Update(ctx, sac); err != nil {
-					t.Fatalf("Failed to update management policy: %v", err)
-				}
-				AwaitResourceDeletionOrFail(ctx, t, cfg, sac, wait.WithTimeout(time.Minute*5))
-
-				return ctx
-			},
-		).
-		Assess(
-			"Import of orphaned credential results in a valid client_secret in connection secret",
-			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				externalName := ctx.Value(importFeatureContextKey).(string)
-				subaccountRef, _ := ctx.Value("sacSubaccountRef").(*xpv1.Reference)
-
-				// Re-create the CR with the credential name as external-name to trigger import
-				readOnly := false
-				importSac := &v1alpha1.SubaccountApiCredential{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      importName,
-						Namespace: cfg.Namespace(),
-					},
-					Spec: v1alpha1.SubaccountApiCredentialSpec{
-						ForProvider: v1alpha1.SubaccountApiCredentialParameters{
-							ReadOnly:      &readOnly,
-							SubaccountRef: subaccountRef,
-						},
-						ResourceSpec: xpv1.ResourceSpec{
-							WriteConnectionSecretToReference: &xpv1.SecretReference{
-								Name:      importName + "-secret",
-								Namespace: cfg.Namespace(),
-							},
-						},
-					},
-				}
-				xpmeta.SetExternalName(importSac, externalName)
-
-				if err := cfg.Client().Resources().Create(ctx, importSac); err != nil {
-					t.Fatalf("Failed to create import CR: %v", err)
-				}
-
-				// Wait for the resource to become Available. BTP stores service key credentials
-				// and returns them on every read, so the connection secret will contain a valid
-				// client_secret after import. Terraform needs ~3-5 min to init and read from BTP.
-				c := conditions.New(cfg.Client().Resources())
-				err := wait.For(c.ResourceMatch(importSac, func(object k8sobj.Object) bool {
-					cr := object.(*v1alpha1.SubaccountApiCredential)
-					cond := cr.GetCondition(xpv1.TypeReady)
-					return cond.Status == corev1.ConditionTrue
-				}), wait.WithTimeout(time.Minute*12))
-
-				if err != nil {
-					t.Errorf("Import CR did not become Available within timeout: %v", err)
-					return ctx
+				// ADR compliance: after provisioning, GetExternalNameFn reads `name` from
+				// the Terraform state and writes it back to the annotation. Verify the
+				// round-trip is correct.
+				MustGetResource(t, cfg, sacName, nil, sac)
+				if got := xpmeta.GetExternalName(sac); got != credentialName {
+					t.Errorf("External name ADR compliance: expected %q, got %q", credentialName, got)
 				}
 
 				// Verify the connection secret contains a valid client_secret.
-				// BTP stores service key credentials server-side and returns them on read,
-				// so an imported credential has a fully usable client_secret.
-				assertApiCredentialSecret(t, ctx, cfg, importSac)
+				assertApiCredentialSecret(t, ctx, cfg, sac)
+
+				// Full deletion — BTP credential is also removed.
+				AwaitResourceDeletionOrFail(ctx, t, cfg, sac, wait.WithTimeout(time.Minute*5))
 
 				return ctx
 			},
 		).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			importSac := &v1alpha1.SubaccountApiCredential{}
-			if err := cfg.Client().Resources().Get(ctx, importName, cfg.Namespace(), importSac); err == nil {
-				AwaitResourceDeletionOrFail(ctx, t, cfg, importSac, wait.WithTimeout(time.Minute*5))
-			}
 			DeleteResourcesIgnoreMissing(ctx, t, cfg, orphanManifestDir, wait.WithTimeout(time.Minute*5))
 			return ctx
 		},
