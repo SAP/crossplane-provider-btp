@@ -7,6 +7,8 @@ go 1.25.6
 // - google.golang.org/genproto/googleapis/api (newer, split module)
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7
 
+replace github.com/crossplane/upjet => ../../open-source-stephan/upjet
+
 require (
 	dario.cat/mergo v1.0.2
 	github.com/SAP/xp-clifford v0.0.0-20260320095944-ad159065df3c
