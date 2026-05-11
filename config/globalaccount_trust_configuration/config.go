@@ -9,5 +9,7 @@ func Configure(p *config.Provider) {
 	p.AddResourceConfigurator("btp_globalaccount_trust_configuration", func(r *config.Resource) {
 		r.ShortGroup = "security"
 		r.Kind = "GlobalaccountTrustConfiguration"
+
+		r.UseAsync = false
 	})
 }
