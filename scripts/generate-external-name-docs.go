@@ -247,7 +247,7 @@ func generateDocumentation(configs []ResourceConfig) string {
 		if i > 0 {
 			sb.WriteString("\n")
 		}
-		sb.WriteString(fmt.Sprintf("### %s\n\n", config.Name))
+		fmt.Fprintf(&sb, "### %s\n\n", config.Name)
 		sb.WriteString(config.Content)
 		sb.WriteString("\n")
 	}
