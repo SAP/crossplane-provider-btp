@@ -17,5 +17,6 @@ func Configure(p *config.Provider) {
 			SelectorFieldName: "SubaccountSelector",
 		}
 
+		r.UseAsync = false
 	})
 }
