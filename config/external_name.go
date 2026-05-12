@@ -11,6 +11,7 @@ import "github.com/crossplane/upjet/v2/pkg/config"
 var CLIReconciledExternalNameConfigs = map[string]config.ExternalName{
 	"btp_subaccount_service_instance": config.IdentifierFromProvider,
 	"btp_subaccount_service_binding":  config.IdentifierFromProvider,
+	"btp_directory_entitlement":       config.IdentifierFromProvider,
 }
 
 // TerraformPluginFrameworkReconciledExternalNameConfigs contains all external name configurations for this
@@ -18,7 +19,6 @@ var CLIReconciledExternalNameConfigs = map[string]config.ExternalName{
 var TerraformPluginFrameworkReconciledExternalNameConfigs = map[string]config.ExternalName{
 	"btp_subaccount_trust_configuration":    config.IdentifierFromProvider,
 	"btp_globalaccount_trust_configuration": config.IdentifierFromProvider,
-	"btp_directory_entitlement":             config.IdentifierFromProvider,
 	"btp_subaccount_service_broker":         config.IdentifierFromProvider,
 	"btp_subaccount_api_credential":         config.IdentifierFromProvider,
 }
