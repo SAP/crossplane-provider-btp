@@ -103,7 +103,10 @@ func assertApiCredentialSecret(t *testing.T, ctx context.Context, cfg *envconf.C
 // See: https://github.com/SAP/crossplane-provider-btp/issues/553
 func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 	var orphanManifestDir = "testdata/crs/SubaccountApiCredentialOrphanImport"
-	sacName := NewID("sac-adr", BUILD_ID)
+	// Prefix "sac-adr-" ensures the BTP credential name starts with a letter.
+	// The SAC is created in Setup (not Assess) so the controller picks it up
+	// reliably while Crossplane is already actively reconciling resources.
+	sacName := "sac-adr-" + BUILD_ID
 
 	orphanImportFeature := features.New("SubaccountApiCredential External Name ADR Compliance").
 		Setup(
@@ -111,21 +114,20 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = meta.AddToScheme(r.GetScheme())
 
-				// Apply the subaccount. The SAC is created programmatically in the Assess
-				// step after the subaccount is Ready to avoid exponential back-off on
-				// reference resolution.
+				// Apply the subaccount first. The SAC is created programmatically after
+				// the subaccount is Ready to avoid exponential back-off on SubaccountRef
+				// resolution.
 				resources.ImportResources(ctx, t, cfg, orphanManifestDir)
 
 				waitForResource(&accountv1alpha1.Subaccount{
 					ObjectMeta: metav1.ObjectMeta{Name: "sac-orphan-subaccount", Namespace: cfg.Namespace()},
 				}, cfg, t, wait.WithTimeout(time.Minute*12))
 
-				return ctx
-			},
-		).
-		Assess(
-			"SAC external-name annotation reflects BTP credential name after provisioning (ADR compliance)",
-			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				// Create the SAC in Setup so the controller picks it up while Crossplane
+				// is already actively reconciling. Do NOT set the external-name annotation
+				// before creation — that would trigger Upjet's terraform-import path, which
+				// always fails because the BTP Terraform provider does not implement
+				// ImportState for btp_subaccount_api_credential.
 				readOnly := false
 				sac := &v1alpha1.SubaccountApiCredential{
 					ObjectMeta: metav1.ObjectMeta{Name: sacName, Namespace: cfg.Namespace()},
@@ -142,19 +144,22 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 						},
 					},
 				}
-				// Do NOT set external-name before creation. Setting it would trigger Upjet's
-				// terraform-import path, which always fails because the BTP Terraform provider
-				// does not implement ImportState for this resource type. The external-name is
-				// set by the provider after successful creation via GetExternalNameFn.
-
 				if err := cfg.Client().Resources().Create(ctx, sac); err != nil {
 					t.Fatalf("Failed to create SAC: %v", err)
 				}
 				waitForResource(sac, cfg, t, wait.WithTimeout(time.Minute*8))
 
+				return ctx
+			},
+		).
+		Assess(
+			"SAC external-name annotation reflects BTP credential name after provisioning (ADR compliance)",
+			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				sac := &v1alpha1.SubaccountApiCredential{}
+				MustGetResource(t, cfg, sacName, nil, sac)
+
 				// ADR compliance: after provisioning, GetExternalNameFn reads `name` from
 				// the Terraform state and writes it back to the annotation.
-				MustGetResource(t, cfg, sacName, nil, sac)
 				if externalName := xpmeta.GetExternalName(sac); externalName == "" {
 					t.Error("External name ADR compliance: annotation is empty after provisioning — GetExternalNameFn did not run")
 				}
@@ -162,13 +167,14 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 				// Verify the connection secret contains a valid client_secret.
 				assertApiCredentialSecret(t, ctx, cfg, sac)
 
-				// Full deletion — BTP credential is also removed.
-				AwaitResourceDeletionOrFail(ctx, t, cfg, sac, wait.WithTimeout(time.Minute*5))
-
 				return ctx
 			},
 		).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+			sac := &v1alpha1.SubaccountApiCredential{}
+			if err := cfg.Client().Resources().Get(ctx, sacName, cfg.Namespace(), sac); err == nil {
+				AwaitResourceDeletionOrFail(ctx, t, cfg, sac, wait.WithTimeout(time.Minute*5))
+			}
 			DeleteResourcesIgnoreMissing(ctx, t, cfg, orphanManifestDir, wait.WithTimeout(time.Minute*5))
 			return ctx
 		},
