@@ -18,6 +18,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 
+	"regexp"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -44,6 +46,8 @@ const (
 	errConnectClient   = "while connecting to service"
 	errDeleteInstance  = "cannot delete serviceinstance"
 )
+
+var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Dependency Injection
 var newClientCreatorFn = func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
@@ -135,33 +139,36 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
 
-	// ADR(external-name): Check if there's a conflict error from previous Create attempt
-	// AND external-name is not set (meaning user didn't intend to adopt).
-	// ObservedGeneration is set by saveCallback — if the spec changed since the conflict
-	// (cr.Generation > lastAsyncCond.ObservedGeneration), we allow a new Create() attempt since it is a new version/generation.
-	if meta.GetExternalName(cr) == "" {
-		lastAsyncCond := cr.GetCondition(ujresource.TypeLastAsyncOperation)
-		if lastAsyncCond.Message != "" &&
-			strings.Contains(lastAsyncCond.Message, "Conflict") &&
-			lastAsyncCond.ObservedGeneration == cr.Generation {
-			// ADR(external-name): Resource already exists but user hasn't set external-name
-			// Return ResourceExists: false to stay in error loop
-			// This forces user to set external-name to adopt the resource
-			return managed.ExternalObservation{
-				ResourceExists: false,
-			}, errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
-		}
+	// ADR(external-name): check for conflict condition from a previous failed Create()
+	// Only block if the spec hasn't changed since the conflict (same Generation)
+	lastAsyncOp := cr.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation))
+	if lastAsyncOp.Status == corev1.ConditionFalse &&
+		strings.Contains(lastAsyncOp.Message, "Conflict") &&
+		lastAsyncOp.ObservedGeneration == cr.Generation {
+		return managed.ExternalObservation{ResourceExists: false},
+			errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
 	}
 
-	if meta.GetExternalName(cr) != "" {
-		if !internal.IsValidUUID(meta.GetExternalName(cr)) {
-			return managed.ExternalObservation{}, errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one")
+	// ADR(external-name): validate external-name is a UUID if set
+	externalName := meta.GetExternalName(cr)
+	if externalName != "" && externalName != cr.Name {
+		if !isValidUUID(externalName) {
+			return managed.ExternalObservation{},
+				errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one")
 		}
 	}
 
 	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
+		return managed.ExternalObservation{}, err
+	}
+
+	//Check for failed async operations ONCE, before the switch
+	if e.checkAsyncOperationFailure(cr) {
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: false,
+		}, nil
 	}
 
 	switch status {
@@ -187,6 +194,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			Diff:              diff,
 		}, nil
 	case tfClient.UpToDate:
+
 		data := e.tfClient.QueryAsyncData(ctx)
 
 		if data != nil {
@@ -200,6 +208,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 				cr.SetConditions(xpv1.Available())
 			}
 		}
+
 		return managed.ExternalObservation{
 			ResourceExists:    true,
 			ResourceUpToDate:  true,
@@ -289,6 +298,22 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 	return nil
 }
 
+// checkAsyncOperationFailure checks if there's a failed async operation and sets appropriate conditions
+func (e *external) checkAsyncOperationFailure(cr *v1alpha1.ServiceInstance) bool {
+	lastAsyncOp := cr.GetCondition(xpv1.ConditionType("LastAsyncOperation"))
+	if lastAsyncOp.Status == corev1.ConditionFalse && lastAsyncOp.Reason == "ApplyFailure" {
+		return true
+	}
+
+	// Also check AsyncOperation as fallback
+	asyncOp := cr.GetCondition(ujresource.TypeAsyncOperation)
+	if asyncOp.Status == corev1.ConditionFalse && asyncOp.Reason == "ApplyFailure" {
+		return true
+	}
+
+	return false
+}
+
 func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
 	policies := cr.GetManagementPolicies()
 	return len(policies) == 1 && policies[0] == xpv1.ManagementActionObserve
@@ -341,4 +366,8 @@ func (e *external) calculateDiff(cr *v1alpha1.ServiceInstance) string {
 	}
 
 	return diff
+}
+
+func isValidUUID(s string) bool {
+	return uuidRegex.MatchString(strings.ToLower(s))
 }
