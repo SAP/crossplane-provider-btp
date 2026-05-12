@@ -16,5 +16,7 @@ func Configure(p *config.Provider) {
 			RefFieldName:      "DirectoryRef",
 			SelectorFieldName: "DirectorySelector",
 		}
+
+		r.UseAsync = false
 	})
 }
