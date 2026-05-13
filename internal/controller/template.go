@@ -3,17 +3,15 @@ package controller
 import (
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
+	clusteraccount "github.com/sap/crossplane-provider-btp/internal/controller/cluster/account"
 	"github.com/sap/crossplane-provider-btp/internal/controller/kymamodule"
 	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/cloudmanagement"
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/directory"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/entitlement"
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/globalaccount"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/resourceusage"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicemanager"
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/subaccount"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/cloudfoundry"
 
@@ -29,8 +27,7 @@ import (
 // the supplied manager.
 func CustomSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	for _, setup := range []func(ctrl.Manager, internalopts.CrossplaneOptions) error{
-		globalaccount.Setup,
-		subaccount.Setup,
+		clusteraccount.Setup,
 		cloudfoundry.Setup,
 		kyma.Setup,
 		entitlement.Setup,
@@ -39,7 +36,6 @@ func CustomSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 		resourceusage.Setup,
 		certbasedoidclogin.Setup,
 		kubeconfiggenerator.Setup,
-		directory.Setup,
 		subscription.Setup,
 		rolecollectionassignment.Setup,
 		rolecollection.Setup,
