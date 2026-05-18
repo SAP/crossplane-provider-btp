@@ -139,14 +139,20 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
 
-	// ADR(external-name): check for conflict condition from a previous failed Create()
-	// Only block if the spec hasn't changed since the conflict (same Generation)
-	lastAsyncOp := cr.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation))
-	if lastAsyncOp.Status == corev1.ConditionFalse &&
-		strings.Contains(lastAsyncOp.Message, "Conflict") &&
-		lastAsyncOp.ObservedGeneration == cr.Generation {
-		return managed.ExternalObservation{ResourceExists: false},
-			errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
+	// ADR(external-name): Check if there's a conflict error from previous Create attempt
+	// AND external-name is not set (meaning user didn't intend to adopt).
+	// ObservedGeneration is set by saveCallback — if the spec changed since the conflict
+	// (cr.Generation > lastAsyncCond.ObservedGeneration), we allow a new Create() attempt since it is a new version/generation.
+	// TODO: test if this is still valid with no-fork
+	if meta.GetExternalName(cr) == "" {
+		lastAsyncCond := cr.GetCondition(ujresource.TypeLastAsyncOperation)
+		if lastAsyncCond.Message != "" &&
+			strings.Contains(lastAsyncCond.Message, "Conflict") &&
+			lastAsyncCond.ObservedGeneration == cr.Generation {
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
+		}
 	}
 
 	// ADR(external-name): validate external-name is a UUID if set

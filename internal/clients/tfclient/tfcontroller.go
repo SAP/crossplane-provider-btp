@@ -11,6 +11,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -115,7 +116,7 @@ type TfProxyController[UPJETTED ujresource.Terraformed] struct {
 // QueryUpdatedData returns the relevant status data once the async creation is done
 func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *ObservationData {
 	// only query the async data if the operation is finished
-	if t.tfResource.GetCondition(ujresource.TypeAsyncOperation).Reason == ujresource.ReasonFinished {
+	if t.tfResource.GetCondition(ujresource.TypeLastAsyncOperation).Status == corev1.ConditionTrue {
 		sid := &ObservationData{}
 		sid.ID = t.tfResource.GetID()
 		sid.ExternalName = meta.GetExternalName(t.tfResource)
