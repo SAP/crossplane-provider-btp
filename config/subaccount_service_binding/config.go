@@ -20,6 +20,6 @@ func Configure(p *config.Provider) {
 			return externalName, nil
 		}
 		// note: can be overwritten during initialization
-		r.UseAsync = true
+		//r.UseAsync = true
 	})
 }

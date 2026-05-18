@@ -75,8 +75,7 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	// register webhooks for the kind v1alpha1.DirectoryEntitlement
 	// if they're enabled.
 	if o.StartWebhooks {
-		if err := ctrl.NewWebhookManagedBy(mgr).
-			For(&v1alpha1.DirectoryEntitlement{}).
+		if err := ctrl.NewWebhookManagedBy(mgr, &v1alpha1.DirectoryEntitlement{}).
 			Complete(); err != nil {
 			return errors.Wrap(err, "cannot register webhook for the kind v1alpha1.DirectoryEntitlement")
 		}
