@@ -1,0 +1,49 @@
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: KymaEnvironment
+metadata:
+  name: upgrade-test-kyma-module-env
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: kyma-module-upgrade-test
+    namespace: default
+  forProvider:
+    planName: azure
+    name: "$BUILD_ID-kyma-module-upgrade-test-env"
+    parameters:
+      region: westeurope
+      administrators:
+        - $TECHNICAL_USER_EMAIL
+  subaccountRef:
+    name: upgrade-test-kyma-module-sa
+  cloudManagementRef:
+    name: cis-local-kyma-module-upgrade
+---
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: KymaEnvironmentBinding
+metadata:
+  name: upgrade-test-kyma-module-binding
+  namespace: default
+spec:
+  kymaEnvironmentRef:
+    name: upgrade-test-kyma-module-env
+  writeConnectionSecretToRef:
+    name: upgrade-test-kyma-module-binding
+    namespace: default
+  cloudManagementRef:
+    name: cis-local-kyma-module-upgrade
+  forProvider:
+    rotationInterval: 3m
+    ttl: 10m
+---
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: KymaModule
+metadata:
+  name: upgrade-test-kyma-module
+  namespace: default
+spec:
+  kymaEnvironmentBindingRef:
+    name: upgrade-test-kyma-module-binding
+  forProvider:
+    name: cloud-manager
+    channel: regular

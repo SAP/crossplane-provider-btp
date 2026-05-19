@@ -70,6 +70,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 Instead of importing, create a new KymaEnvironmentBinding resource.
 - Format: Not applicable
 
+### KymaModule
+
+- Follows Standard: yes
+- Format: Kyma module name (e.g. "keda", "serverless")
+- How to find:
+
+  - UI: Kyma Dashboard → Modules → [Module Name]
+  - CLI: `kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'`
+
 ### RoleCollection
 
 - Follows Standard: no (uses name as identifier, not a GUID)

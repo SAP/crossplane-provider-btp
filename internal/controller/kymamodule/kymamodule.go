@@ -90,6 +90,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaModule)
 	}
 
+	// Per ADR: if external-name is not set, resource does not exist yet
+	externalName := meta.GetExternalName(cr)
+	if externalName == "" {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
+
 	// Get the reference for the kyma environment binding
 	if cr.Spec.KymaEnvironmentBindingRef == nil {
 		cr.SetConditions(xpv1.Unavailable().WithMessage(
@@ -129,7 +135,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	res, err := c.client.ObserveModule(ctx, cr)
+	res, err := c.client.ObserveModule(ctx, externalName)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
 	}
@@ -140,6 +146,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
+	cr.Status.AtProvider = *res
 	cr.Status.SetConditions(xpv1.Available())
 
 	return managed.ExternalObservation{
@@ -186,9 +193,9 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, nil
 	}
 
-	// Delete the module from Kyma cluster
+	// Delete the module from Kyma cluster using external-name as the identifier
 	if c.client != nil {
-		err := c.client.DeleteModule(ctx, cr.Spec.ForProvider.Name)
+		err := c.client.DeleteModule(ctx, meta.GetExternalName(cr))
 		if err != nil {
 			return managed.ExternalDelete{}, errors.Wrap(err, errDeleteModule)
 		}
