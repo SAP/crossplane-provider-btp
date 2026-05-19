@@ -2,7 +2,9 @@ package btp
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/go-openapi/runtime"
@@ -17,6 +19,8 @@ import (
 const (
 	errCouldNotParseCISSecret      = "CIS Secret seems malformed"
 	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
+	errCISBindingCredentialIsNil        = "CIS binding credential is nil"
+	errCISBindingMissingRequiredFields  = "CIS binding is missing required fields: %s"
 )
 
 type InstanceParameters = map[string]interface{}
@@ -46,36 +50,47 @@ type UserCredential struct {
 
 type CISCredential struct {
 	Endpoints struct {
-		AccountsServiceUrl          string `json:"accounts_service_url"`
-		CloudAutomationUrl          string `json:"cloud_automation_url"`
-		EntitlementsServiceUrl      string `json:"entitlements_service_url"`
-		EventsServiceUrl            string `json:"events_service_url"`
-		ExternalProviderRegistryUrl string `json:"external_provider_registry_url"`
-		MetadataServiceUrl          string `json:"metadata_service_url"`
-		OrderProcessingUrl          string `json:"order_processing_url"`
-		ProvisioningServiceUrl      string `json:"provisioning_service_url"`
-		SaasRegistryServiceUrl      string `json:"saas_registry_service_url"`
+		AccountsServiceUrl     string `json:"accounts_service_url"`
+		EntitlementsServiceUrl string `json:"entitlements_service_url"`
+		ProvisioningServiceUrl string `json:"provisioning_service_url"`
+		SaasRegistryServiceUrl string `json:"saas_registry_service_url"`
 	} `json:"endpoints"`
-	GrantType       string `json:"grant_type"`
-	SapCloudService string `json:"sap.cloud.service"`
-	Uaa             struct {
-		Apiurl          string `json:"apiurl"`
-		Clientid        string `json:"clientid"`
-		Clientsecret    string `json:"clientsecret"`
-		CredentialType  string `json:"credential-type"`
-		Identityzone    string `json:"identityzone"`
-		Identityzoneid  string `json:"identityzoneid"`
-		Sburl           string `json:"sburl"`
-		Subaccountid    string `json:"subaccountid"`
-		Tenantid        string `json:"tenantid"`
-		Tenantmode      string `json:"tenantmode"`
-		Uaadomain       string `json:"uaadomain"`
-		Url             string `json:"url"`
-		Verificationkey string `json:"verificationkey"`
-		Xsappname       string `json:"xsappname"`
-		Xsmasterappname string `json:"xsmasterappname"`
-		Zoneid          string `json:"zoneid"`
+	GrantType string `json:"grant_type"`
+	Uaa       struct {
+		Clientid     string `json:"clientid"`
+		Clientsecret string `json:"clientsecret"`
+		Url          string `json:"url"`
 	} `json:"uaa"`
+}
+
+func validateCISCredential(c *CISCredential) error {
+	if c == nil {
+		return errors.New(errCISBindingCredentialIsNil)
+
+	}
+	var missing []string
+	if c.Uaa.Clientid == "" {
+		missing = append(missing, "uaa.clientid")
+	}
+	if c.Uaa.Clientsecret == "" {
+		missing = append(missing, "uaa.clientsecret")
+	}
+	if c.Uaa.Url == "" {
+		missing = append(missing, "uaa.url")
+	}
+	if c.Endpoints.AccountsServiceUrl == "" {
+		missing = append(missing, "endpoints.accounts_service_url")
+	}
+	if c.Endpoints.EntitlementsServiceUrl == "" {
+		missing = append(missing, "endpoints.entitlements_service_url")
+	}
+	if c.Endpoints.ProvisioningServiceUrl == "" {
+		missing = append(missing, "endpoints.provisioning_service_url")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf(errCISBindingMissingRequiredFields, strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 const (
@@ -214,6 +229,10 @@ func ServiceClientFromSecret(cisSecret []byte, userSecret []byte) (Client, error
 	var cisCredential CISCredential
 	if err := json.Unmarshal(cisSecret, &cisCredential); err != nil {
 		return Client{}, errors.Wrap(err, errCouldNotParseCISSecret)
+	}
+
+	if err := validateCISCredential(&cisCredential); err != nil {
+		return Client{}, err
 	}
 
 	var userCredential UserCredential

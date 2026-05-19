@@ -19,9 +19,9 @@ func CloudFoundryEnvironmentType() EnvironmentType {
 }
 
 type CloudFoundryOrg struct {
-	Id          string `json:"Org Id,"`
-	Name        string `json:"Org Name,"`
-	ApiEndpoint string `json:"API Endpoint,"`
+	Id          string `json:"Org Id"`
+	Name        string `json:"Org Name"`
+	ApiEndpoint string `json:"API Endpoint"`
 }
 
 // CreateCloudFoundryEnvironment creates a Cloud Foundry environment instance with the given parameters. It returns the instance ID of the created environment.
