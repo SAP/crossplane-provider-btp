@@ -83,6 +83,9 @@ The provider comes with a set of end-to-end tests that can be run locally. To ru
 make test-acceptance
 ```
 
+> [!NOTE]  
+> Make sure to set required environment variables before starting the e2e tests with real valid credentials!
+
 This will spin up a specific kind cluster which runs the provider as docker container in it. The e2e tests will run kubectl commands against that cluster to test the provider's functionality.
 
 If you want to run a single E2E Test locally simply set the `testFilter` variable like this:
