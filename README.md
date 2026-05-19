@@ -84,7 +84,7 @@ make test-acceptance
 ```
 
 > [!NOTE]  
-> Make sure to set required environment variables before starting the e2e tests wit real valid credentials!
+> Make sure to set required environment variables before starting the e2e tests with real valid credentials!
 
 This will spin up a specific kind cluster which runs the provider as docker container in it. The e2e tests will run kubectl commands against that cluster to test the provider's functionality.
 
