@@ -111,6 +111,11 @@ spec:
                       (String) The display name of the trust configuration.
                       The display name of the trust configuration.
                     type: string
+                  origin:
+                    description: |-
+                      (String) The origin of the identity provider.
+                      The origin of the identity provider.
+                    type: string
                   status:
                     description: |-
                       (String) Determines whether the identity provider is currently 'active' or 'inactive'.
@@ -245,6 +250,11 @@ spec:
                     description: |-
                       (String) The display name of the trust configuration.
                       The display name of the trust configuration.
+                    type: string
+                  origin:
+                    description: |-
+                      (String) The origin of the identity provider.
+                      The origin of the identity provider.
                     type: string
                   status:
                     description: |-
