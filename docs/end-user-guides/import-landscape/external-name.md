@@ -107,6 +107,15 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Client Name]
   - CLI: `btp list security/app --subaccount <subaccount-id>` → `name`
 
+### SubaccountTrustConfiguration
+
+- Follows Standard: no (uses origin key as identifier, not a GUID)
+- Format: origin key (string, e.g. "sap.custom")
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Security → Trust Configurations → [Origin column]
+  - CLI: `btp list security/trust --subaccount <subaccount-id>` → `originKey`
+
 ### Subscription
 
 - Follows Standard: yes
