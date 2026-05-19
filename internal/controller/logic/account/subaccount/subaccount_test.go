@@ -7,7 +7,6 @@ import (
 	"testing"
 	"unsafe"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
@@ -203,12 +202,6 @@ func withExternalName(name string) saModifier {
 func withStatus(obs base.BaseSubaccountObservation) saModifier {
 	return func(cr *base.BaseSubaccount) {
 		cr.Status.AtProvider = obs
-	}
-}
-
-func withConditions(c ...xpv1.Condition) saModifier {
-	return func(cr *base.BaseSubaccount) {
-		cr.Status.Conditions = c
 	}
 }
 

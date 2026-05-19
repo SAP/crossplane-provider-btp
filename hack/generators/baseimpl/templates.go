@@ -53,12 +53,6 @@ var controllerTemplate = mustParseTemplate("controller", "controller.go.tmpl")
 // setupTemplate generates the setup.go file that registers all controllers.
 var setupTemplate = mustParseTemplate("setup", "setup.go.tmpl")
 
-// utilsLegacyTrackerTemplate generates the utils/legacy_tracker.go for cluster scope.
-var utilsLegacyTrackerTemplate = mustParseTemplate("utilsLegacyTracker", "utils_legacy_tracker.go.tmpl")
-
-// utilsModernTrackerTemplate generates the utils/utils.go for namespaced scope.
-var utilsModernTrackerTemplate = mustParseTemplate("utilsModernTracker", "utils_modern_tracker.go.tmpl")
-
 // docTemplate generates the doc.go file.
 var docTemplate = mustParseTemplate("doc", "doc.go.tmpl")
 

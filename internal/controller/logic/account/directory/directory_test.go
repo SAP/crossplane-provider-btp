@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
@@ -144,12 +143,6 @@ func withExternalName(name string) dirModifier {
 func withStatus(obs base.BaseDirectoryObservation) dirModifier {
 	return func(cr *base.BaseDirectory) {
 		cr.Status.AtProvider = obs
-	}
-}
-
-func withConditions(c ...xpv1.Condition) dirModifier {
-	return func(cr *base.BaseDirectory) {
-		cr.Status.Conditions = c
 	}
 }
 
