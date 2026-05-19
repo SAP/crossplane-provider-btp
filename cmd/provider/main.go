@@ -47,24 +47,71 @@ func main() {
 
 		syncInterval = app.Flag(
 			"sync",
-			"How often all resources will be double-checked for drift from the desired state.",
+			"How often all watched resources are re-listed from the API server to correct missed events. "+
+				"Technically: controller-runtime cache SyncPeriod; triggers a full re-list per resource type, with 10% jitter between controllers.",
 		).Short('s').Default("1h").Duration()
 		pollInterval = app.Flag(
 			"poll",
-			"How often individual resources will be checked for drift from the desired state",
+			"How often a successfully-reconciled resource is re-checked for drift from the desired state. "+
+				"Technically: requeue delay after any successful reconcile (both when up-to-date and after successful updates), since no watch events exist for external resources.",
 		).Default("1m").Duration()
+		pollJitter = app.Flag(
+			"poll-jitter",
+			"Random spread added to poll interval to avoid all resources polling at the same instant. "+
+				"Technically: random duration between -jitter and +jitter added to poll interval on each requeue. 0 disables jitter.",
+		).Default("0").Duration()
 		maxReconcileRate = app.Flag(
 			"max-reconcile-rate",
-			"The global maximum rate per second at which resources may checked for drift from the desired state.",
+			"How many reconciles per second are allowed globally across all controllers. "+
+				"Technically: token-bucket rate limiter shared by all controllers; refills at this rate with a burst of 10x.",
 		).Default("3").Int()
+		maxConcurrentReconciles = app.Flag(
+			"max-concurrent-reconciles",
+			"How many reconciles can run in parallel per controller. "+
+				"Technically: number of worker goroutines dequeuing from the controller-runtime work queue per controller.",
+		).Default("3").Int()
+		kubeClientQPS = app.Flag(
+			"kube-client-qps",
+			"How many requests per second the provider may send to the Kubernetes API. "+
+				"Recommended: 5x the max-reconcile-rate, since one reconcile typically makes ~5 API calls. "+
+				"Technically: token refill rate for the client-go REST client rate limiter (applies to all API calls from this provider).",
+		).Default("15").Int()
+		kubeClientBurst = app.Flag(
+			"kube-client-burst",
+			"Maximum burst of requests allowed to the Kubernetes API above the steady QPS. "+
+				"Recommended: 2x kube-client-qps. Defaults to 2x kube-client-qps if not explicitly set. "+
+				"Technically: bucket size for the client-go REST client rate limiter.",
+		).Int()
+		reconcileTimeout = app.Flag(
+			"reconcile-timeout",
+			"Maximum time a single reconcile may take before being canceled. "+
+				"Technically: deadline for the externalCtx passed to external API calls; a separate parent context with +30s grace period remains active for K8s status updates after expiry.",
+		).Default("3m").Duration()
 		backoffBase = app.Flag(
 			"backoff-base",
-			"Base duration for exponential backoff for reconciling resources in error cases. Default is 1s",
+			"Initial wait time before retrying a failed reconcile. "+
+				"Technically: base duration for per-item exponential backoff (baseDelay * 2^numFailures) in the controller-runtime work queue.",
 		).Default("1s").Duration()
 		backoffMax = app.Flag(
 			"backoff-max",
-			"Maximum duration for exponential backoff for reconciling resources in error cases. Default is 60s",
+			"Maximum wait time between retries of a failing reconcile. "+
+				"Technically: cap for the exponential backoff rate limiter.",
 		).Default("60s").Duration()
+		leaderElectionLeaseDuration = app.Flag(
+			"leader-election-lease-duration",
+			"How long standby replicas wait before taking over leadership. "+
+				"Technically: Kubernetes Lease duration; other candidates wait this long before force-acquiring.",
+		).Default("60s").Duration()
+		leaderElectionRenewDeadline = app.Flag(
+			"leader-election-renew-deadline",
+			"How long the active leader tries to renew before giving up. "+
+				"Technically: deadline for the leader to refresh the Lease; on expiry the leader steps down and cancels in-flight reconciles.",
+		).Default("50s").Duration()
+		leaderElectionRetryPeriod = app.Flag(
+			"leader-election-retry-period",
+			"How often leader election actions (renew or acquire) are attempted. "+
+				"Technically: interval between LeaderElector client tries; applies to both the leader refreshing its lease and standbys attempting to acquire.",
+		).Default("10s").Duration()
 
 		namespace = app.Flag(
 			"namespace",
@@ -92,6 +139,11 @@ func main() {
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 
+	// Default burst to 2x QPS if not explicitly set
+	if *kubeClientBurst == 0 {
+		*kubeClientBurst = *kubeClientQPS * 2
+	}
+
 	zl := zap.New(zap.UseDevMode(*debug))
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	ctrl.SetLogger(zl)
@@ -105,59 +157,83 @@ func main() {
 	envErr := os.Setenv("BTP_APPEND_USER_AGENT", fmt.Sprintf("crossplane/%s", version.ProviderVersion))
 	kingpin.FatalIfError(envErr, "Cannot set environment variable BTP_APPEND_USER_AGENT")
 
-	mgr, err := ctrl.NewManager(
-		ratelimiter.LimitRESTConfig(cfg, *maxReconcileRate), ctrl.Options{
-			Cache: cache.Options{SyncPeriod: syncInterval},
+	cfg.QPS = float32(*kubeClientQPS)
+	cfg.Burst = *kubeClientBurst
 
-			// controller-runtime uses both ConfigMaps and Leases for leader
-			// election by default. Leases expire after 15 seconds, with a
-			// 10 second renewal deadline. We've observed leader loss due to
-			// renewal deadlines being exceeded when under high load - i.e.
-			// hundreds of reconciles per second and ~200rps to the API
-			// server. Switching to Leases only and longer leases appears to
-			// alleviate this.
-			LeaderElection:             *leaderElection,
-			LeaderElectionID:           "crossplane-leader-election-crossplane-provider-btp",
-			LeaderElectionResourceLock: resourcelock.LeasesResourceLock,
-			LeaseDuration:              func() *time.Duration { d := 60 * time.Second; return &d }(),
-			RenewDeadline:              func() *time.Duration { d := 50 * time.Second; return &d }(),
-		},
-	)
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Cache: cache.Options{SyncPeriod: syncInterval},
+
+		// controller-runtime uses both ConfigMaps and Leases for leader
+		// election by default. Leases expire after 15 seconds, with a
+		// 10 second renewal deadline. We've observed leader loss due to
+		// renewal deadlines being exceeded when under high load - i.e.
+		// hundreds of reconciles per second and ~200rps to the API
+		// server. Switching to Leases only and longer leases appears to
+		// alleviate this.
+		LeaderElection:             *leaderElection,
+		LeaderElectionID:           "crossplane-leader-election-crossplane-provider-btp",
+		LeaderElectionResourceLock: resourcelock.LeasesResourceLock,
+		LeaseDuration:              leaderElectionLeaseDuration,
+		RenewDeadline:              leaderElectionRenewDeadline,
+		RetryPeriod:                leaderElectionRetryPeriod,
+	})
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
-	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, backoffBase, backoffMax, enableManagementPolicies, enableExternalSecretStores, namespace, terraformVersion, providerSource, providerVersion)
-	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, backoffBase, backoffMax, enableManagementPolicies, enableExternalSecretStores, namespace)
+	common := commonSetupParams{
+		MaxReconcileRate:           *maxReconcileRate,
+		PollInterval:               *pollInterval,
+		PollJitter:                 *pollJitter,
+		ReconcileTimeout:           *reconcileTimeout,
+		BackoffBase:                *backoffBase,
+		BackoffMax:                 *backoffMax,
+		EnableManagementPolicies:   *enableManagementPolicies,
+		EnableExternalSecretStores: *enableExternalSecretStores,
+		Namespace:                  *namespace,
+	}
+
+	setupTerraformControllers(mgr, log, terraformSetupParams{
+		commonSetupParams: common,
+		TerraformVersion:  *terraformVersion,
+		ProviderSource:    *providerSource,
+		ProviderVersion:   *providerVersion,
+	})
+	setupNativeControllers(mgr, log, nativeSetupParams{
+		commonSetupParams:       common,
+		MaxConcurrentReconciles: *maxConcurrentReconciles,
+	})
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
 
-func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string, terraformVersion *string, providerSource *string, providerVersion *string) {
+func setupTerraformControllers(mgr manager.Manager, log logging.Logger, p terraformSetupParams) {
 	o := internalopts.UpjetOptions{
 		Options: tjcontroller.Options{
 			Options: controller.Options{
 				Logger:                  log,
-				GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
-				PollInterval:            pollInterval,
+				GlobalRateLimiter:       ratelimiter.NewGlobal(p.MaxReconcileRate),
+				PollInterval:            p.PollInterval,
 				MaxConcurrentReconciles: 1,
 				Features:                &feature.Flags{},
 			},
-			Provider: config.GetProvider(),
+			Provider:   config.GetProvider(),
+			PollJitter: p.PollJitter,
 			// use the following WorkspaceStoreOption to enable the shared gRPC mode
 			// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
 			WorkspaceStore: terraform.NewWorkspaceStore(log),
-			SetupFn:        tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
+			SetupFn:        tfclient.TerraformSetupBuilder(p.TerraformVersion, p.ProviderSource, p.ProviderVersion),
 		},
-		BackoffBase: *backoffBase,
-		BackoffMax:  *backoffMax,
+		BackoffBase: p.BackoffBase,
+		BackoffMax:  p.BackoffMax,
+		Timeout:     p.ReconcileTimeout,
 	}
 
-	if *enableManagementPolicies {
+	if p.EnableManagementPolicies {
 		o.Features.Enable(features.EnableBetaManagementPolicies)
 		log.Info("Beta feature enabled", "flag", features.EnableBetaManagementPolicies)
 	}
 
-	if *enableExternalSecretStores {
+	if p.EnableExternalSecretStores {
 		o.Features.Enable(features.EnableAlphaExternalSecretStores)
 		log.Info("Alpha feature enabled", "flag", features.EnableAlphaExternalSecretStores)
 
@@ -173,7 +249,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 							// NOTE(turkenh): We only set required spec and expect optional
 							// ones to properly be initialized with CRD level default values.
 							SecretStoreConfig: xpv1.SecretStoreConfig{
-								DefaultScope: *namespace,
+								DefaultScope: p.Namespace,
 							},
 						},
 					},
@@ -184,25 +260,28 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
-func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool, enableExternalSecretStores *bool, namespace *string) {
+
+func setupNativeControllers(mgr manager.Manager, log logging.Logger, p nativeSetupParams) {
 	co := internalopts.CrossplaneOptions{
 		Options: controller.Options{
 			Logger:                  log,
-			MaxConcurrentReconciles: *maxReconcileRate,
-			PollInterval:            *pollInterval,
-			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
+			MaxConcurrentReconciles: p.MaxConcurrentReconciles,
+			PollInterval:            p.PollInterval,
+			GlobalRateLimiter:       ratelimiter.NewGlobal(p.MaxReconcileRate),
 			Features:                &feature.Flags{},
 		},
-		BackoffBase: *backoffBase,
-		BackoffMax:  *backoffMax,
+		BackoffBase: p.BackoffBase,
+		BackoffMax:  p.BackoffMax,
+		PollJitter:  p.PollJitter,
+		Timeout:     p.ReconcileTimeout,
 	}
 
-	if *enableManagementPolicies {
+	if p.EnableManagementPolicies {
 		co.Features.Enable(features.EnableBetaManagementPolicies)
 		log.Info("Beta feature enabled", "flag", features.EnableBetaManagementPolicies)
 	}
 
-	if *enableExternalSecretStores {
+	if p.EnableExternalSecretStores {
 		co.Features.Enable(features.EnableAlphaExternalSecretStores)
 		log.Info("Alpha feature enabled", "flag", features.EnableAlphaExternalSecretStores)
 
@@ -218,7 +297,7 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 							// NOTE(turkenh): We only set required spec and expect optional
 							// ones to properly be initialized with CRD level default values.
 							SecretStoreConfig: xpv1.SecretStoreConfig{
-								DefaultScope: *namespace,
+								DefaultScope: p.Namespace,
 							},
 						},
 					},
@@ -227,4 +306,28 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 		)
 	}
 	kingpin.FatalIfError(template.CustomSetup(mgr, co), "Cannot setup controllers")
+}
+
+type commonSetupParams struct {
+	MaxReconcileRate           int
+	PollInterval               time.Duration
+	PollJitter                 time.Duration
+	ReconcileTimeout           time.Duration
+	BackoffBase                time.Duration
+	BackoffMax                 time.Duration
+	EnableManagementPolicies   bool
+	EnableExternalSecretStores bool
+	Namespace                  string
+}
+
+type terraformSetupParams struct {
+	commonSetupParams
+	TerraformVersion string
+	ProviderSource   string
+	ProviderVersion  string
+}
+
+type nativeSetupParams struct {
+	commonSetupParams
+	MaxConcurrentReconciles int
 }
