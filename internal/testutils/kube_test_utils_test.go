@@ -6,7 +6,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 	v1alpha12 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"

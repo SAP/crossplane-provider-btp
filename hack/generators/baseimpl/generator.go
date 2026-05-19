@@ -1,19 +1,3 @@
-/*
-Copyright 2025 The Crossplane Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package main
 
 import (
@@ -135,8 +119,18 @@ func (g *Generator) generateForGroup(gc GroupConfig) error {
 		return nil
 	}
 
+	exportedStructs, err := parser.ParseExportedStructs()
+	if err != nil {
+		return fmt.Errorf("failed to parse exported structs in %s: %w", gc.BasePkg, err)
+	}
+
+	exportedVars, err := parser.ParseExportedVarsAndConsts()
+	if err != nil {
+		return fmt.Errorf("failed to parse exported vars in %s: %w", gc.BasePkg, err)
+	}
+
 	for _, scope := range []string{ScopeCluster, ScopeNamespaced} {
-		if err := g.generateForScope(gc, baseTypes, scope); err != nil {
+		if err := g.generateForScope(gc, baseTypes, exportedStructs, exportedVars, scope); err != nil {
 			return err
 		}
 	}
@@ -145,23 +139,34 @@ func (g *Generator) generateForGroup(gc GroupConfig) error {
 }
 
 // generateForScope generates all files for a single scope within a group.
-func (g *Generator) generateForScope(gc GroupConfig, baseTypes []BaseType, scope string) error {
+func (g *Generator) generateForScope(gc GroupConfig, baseTypes []BaseType, exportedStructs []string, exportedVars []ExportedVar, scope string) error {
+	// Clean stale generated files before writing new ones.
+	pkgPath := gc.GetPackagePath(scope)
+	apisParentDir := filepath.Dir(pkgPath)
+	ctrlBasePath := gc.GetControllerPackagePath(scope)
+	for _, dir := range []string{pkgPath, apisParentDir, ctrlBasePath} {
+		if err := cleanGeneratedFiles(dir); err != nil {
+			return fmt.Errorf("failed to clean generated files in %s: %w", dir, err)
+		}
+	}
+	// Also clean per-resource controller subdirectories.
+	for _, bt := range baseTypes {
+		ctrlPkgPath := filepath.Join(ctrlBasePath, strings.ToLower(bt.ResourceName))
+		if err := cleanGeneratedFiles(ctrlPkgPath); err != nil {
+			return fmt.Errorf("failed to clean generated files in %s: %w", ctrlPkgPath, err)
+		}
+	}
+
 	generators := []struct {
 		name string
 		fn   func() error
 	}{
 		{"API package files", func() error { return g.generateAPIPackageFiles(gc, scope) }},
 		{"types", func() error { return g.generateScopedTypes(gc, baseTypes, scope) }},
+		{"type aliases", func() error { return g.generateTypeAliases(gc, exportedStructs, exportedVars, scope) }},
 		{"baseimpl", func() error { return g.generateBaseImpl(gc, baseTypes, scope) }},
 		{"controllers", func() error { return g.generateControllers(gc, baseTypes, scope) }},
 		{"setup", func() error { return g.generateSetup(gc, baseTypes, scope) }},
-	}
-
-	if !g.SkipProviderConfig {
-		generators = append(generators, struct {
-			name string
-			fn   func() error
-		}{"providerconfig controller", func() error { return g.generateProviderConfigController(gc, scope) }})
 	}
 
 	for _, gen := range generators {
@@ -176,7 +181,6 @@ func (g *Generator) generateForScope(gc GroupConfig, baseTypes []BaseType, scope
 // generateAPIPackageFiles generates all API package infrastructure files.
 func (g *Generator) generateAPIPackageFiles(gc GroupConfig, scope string) error {
 	pkgPath := gc.GetPackagePath(scope)
-	isCluster := scope == ScopeCluster
 
 	if err := os.MkdirAll(pkgPath, 0750); err != nil {
 		return fmt.Errorf("failed to create API directory %s: %w", pkgPath, err)
@@ -185,27 +189,13 @@ func (g *Generator) generateAPIPackageFiles(gc GroupConfig, scope string) error 
 	groupName := gc.GetGroupName(scope)
 
 	files := []templateFile{
-		{docTemplate, nil, filepath.Join(pkgPath, "zz_generated.doc.go")},
-		{groupVersionInfoTemplate, GroupVersionTemplateData{GroupName: groupName, ProviderName: g.ProviderName}, filepath.Join(pkgPath, "zz_generated.groupversion_info.go")},
-	}
-
-	if !g.SkipProviderConfig {
-		pcData := ProviderConfigTemplateData{
-			Scope:        scope,
-			IsCluster:    isCluster,
-			ModulePath:   g.ModulePath,
-			GroupDir:     gc.Name,
-			ProviderName: g.ProviderName,
-		}
-		files = append(files,
-			templateFile{providerConfigTypesTemplate, pcData, filepath.Join(pkgPath, "zz_generated.providerconfig_types.go")},
-			templateFile{providerConfigUsageTypesTemplate, pcData, filepath.Join(pkgPath, "zz_generated.providerconfigusage_types.go")},
-		)
+		{docTemplate, nil, filepath.Join(pkgPath, GeneratedFilePrefix+"doc.go")},
+		{groupVersionInfoTemplate, GroupVersionTemplateData{GroupName: groupName, ProviderName: g.ProviderName}, filepath.Join(pkgPath, GeneratedFilePrefix+"groupversion_info.go")},
 	}
 
 	apisParentDir := filepath.Dir(pkgPath) // e.g., apis/cluster/account
 	files = append(files,
-		templateFile{apisPackageTemplate, APIsPackageTemplateData{Scope: scope, ModulePath: g.ModulePath, GroupDir: gc.Name}, filepath.Join(apisParentDir, fmt.Sprintf("zz_generated.%s.go", gc.Name))},
+		templateFile{apisPackageTemplate, APIsPackageTemplateData{Scope: scope, ModulePath: g.ModulePath, GroupDir: gc.Name}, filepath.Join(apisParentDir, GeneratedFilePrefix+gc.Name+".go")},
 	)
 
 	return generateFiles(files)
@@ -238,8 +228,12 @@ func (g *Generator) generateScopedTypes(gc GroupConfig, baseTypes []BaseType, sc
 	pkgPath := gc.GetPackagePath(scope)
 
 	for _, bt := range baseTypes {
+		scopedBt := bt
+		if scope != ScopeCluster {
+			scopedBt.ParameterFields = deriveNamespacedReferenceGroups(bt.ParameterFields)
+		}
 		data := ScopedTemplateData{
-			BaseType:      bt,
+			BaseType:      scopedBt,
 			Scope:         scope,
 			IsCluster:     scope == ScopeCluster,
 			ModulePath:    g.ModulePath,
@@ -252,7 +246,7 @@ func (g *Generator) generateScopedTypes(gc GroupConfig, baseTypes []BaseType, sc
 			return fmt.Errorf("failed to execute template for %s: %w", bt.ResourceName, err)
 		}
 
-		filename := filepath.Join(pkgPath, fmt.Sprintf("zz_generated.%s.go", strings.ToLower(bt.ResourceName)))
+		filename := filepath.Join(pkgPath, GeneratedFilePrefix+strings.ToLower(bt.ResourceName)+"_types.go")
 		if err := writeFile(filename, content); err != nil {
 			return err
 		}
@@ -260,6 +254,21 @@ func (g *Generator) generateScopedTypes(gc GroupConfig, baseTypes []BaseType, sc
 	}
 
 	return nil
+}
+
+// deriveNamespacedReferenceGroups returns a copy of fields with ReferenceGroup
+// converted from cluster group to namespaced group (e.g., "account.btp.sap.crossplane.io" → "account.btp.sap.m.crossplane.io").
+// This is correct because namespaced output uses *xpv1.NamespacedReference, which always
+// points to namespaced-scoped resources in the derived group.
+func deriveNamespacedReferenceGroups(fields []ParameterField) []ParameterField {
+	out := make([]ParameterField, len(fields))
+	copy(out, fields)
+	for i := range out {
+		if out[i].IsReferenceValue && out[i].ReferenceGroup != "" {
+			out[i].ReferenceGroup = DeriveNamespacedGroup(out[i].ReferenceGroup)
+		}
+	}
+	return out
 }
 
 // generateBaseImpl generates the interface implementation file.
@@ -276,7 +285,35 @@ func (g *Generator) generateBaseImpl(gc GroupConfig, baseTypes []BaseType, scope
 		return fmt.Errorf("failed to execute baseimpl template: %w", err)
 	}
 
-	filename := filepath.Join(pkgPath, "zz_generated.baseimpl.go")
+	filename := filepath.Join(pkgPath, GeneratedFilePrefix+"baseimpl.go")
+	if err := writeFile(filename, content); err != nil {
+		return err
+	}
+	log.Printf("Generated %s", filename)
+
+	return nil
+}
+
+// generateTypeAliases generates a file with type aliases for exported base structs.
+func (g *Generator) generateTypeAliases(gc GroupConfig, exportedStructs []string, exportedVars []ExportedVar, scope string) error {
+	if len(exportedStructs) == 0 && len(exportedVars) == 0 {
+		return nil
+	}
+
+	pkgPath := gc.GetPackagePath(scope)
+
+	data := TypesTemplateData{
+		BasePkgImport: g.GetBasePkgImport(gc),
+		TypeNames:     exportedStructs,
+		Vars:          exportedVars,
+	}
+
+	content, err := executeTemplate(typesTemplate, data)
+	if err != nil {
+		return fmt.Errorf("failed to execute types template: %w", err)
+	}
+
+	filename := filepath.Join(pkgPath, GeneratedFilePrefix+"types.go")
 	if err := writeFile(filename, content); err != nil {
 		return err
 	}
@@ -302,6 +339,7 @@ func (g *Generator) generateControllers(gc GroupConfig, baseTypes []BaseType, sc
 			ModulePath:    g.ModulePath,
 			BasePkgImport: g.GetBasePkgImport(gc),
 			GroupDir:      gc.Name,
+			LogicCtrlDir:  g.LogicCtrlDir,
 		}
 
 		content, err := executeTemplate(controllerTemplate, data)
@@ -309,7 +347,7 @@ func (g *Generator) generateControllers(gc GroupConfig, baseTypes []BaseType, sc
 			return fmt.Errorf("failed to execute controller template for %s: %w", bt.ResourceName, err)
 		}
 
-		filename := filepath.Join(ctrlPkgPath, fmt.Sprintf("zz_generated.%s.go", strings.ToLower(bt.ResourceName)))
+		filename := filepath.Join(ctrlPkgPath, GeneratedFilePrefix+strings.ToLower(bt.ResourceName)+".go")
 		if err := writeFile(filename, content); err != nil {
 			return err
 		}
@@ -328,11 +366,10 @@ func (g *Generator) generateSetup(gc GroupConfig, baseTypes []BaseType, scope st
 	}
 
 	data := SetupTemplateData{
-		BaseTypes:          baseTypes,
-		Scope:              scope,
-		ModulePath:         g.ModulePath,
-		GroupDir:           gc.Name,
-		SkipProviderConfig: g.SkipProviderConfig,
+		BaseTypes:  baseTypes,
+		Scope:      scope,
+		ModulePath: g.ModulePath,
+		GroupDir:   gc.Name,
 	}
 
 	content, err := executeTemplate(setupTemplate, data)
@@ -340,7 +377,7 @@ func (g *Generator) generateSetup(gc GroupConfig, baseTypes []BaseType, scope st
 		return fmt.Errorf("failed to execute setup template: %w", err)
 	}
 
-	filename := filepath.Join(ctrlBasePath, "zz_generated.setup.go")
+	filename := filepath.Join(ctrlBasePath, GeneratedFilePrefix+"setup.go")
 	if err := writeFile(filename, content); err != nil {
 		return err
 	}
@@ -349,64 +386,28 @@ func (g *Generator) generateSetup(gc GroupConfig, baseTypes []BaseType, scope st
 	return nil
 }
 
-// generateUtils generates the utils package for the scope.
-func (g *Generator) generateUtils(gc GroupConfig, scope string) error {
-	ctrlBasePath := gc.GetControllerPackagePath(scope)
-	utilsPath := filepath.Join(ctrlBasePath, "utils")
-
-	if err := os.MkdirAll(utilsPath, 0750); err != nil {
-		return fmt.Errorf("failed to create utils directory %s: %w", utilsPath, err)
-	}
-
-	var tmpl *template.Template
-	if scope == ScopeCluster {
-		tmpl = utilsLegacyTrackerTemplate
-	} else {
-		tmpl = utilsModernTrackerTemplate
-	}
-
-	content, err := executeTemplate(tmpl, nil)
+// cleanGeneratedFiles removes all files with the GeneratedFilePrefix from the given directory.
+// It is a no-op if the directory does not exist.
+func cleanGeneratedFiles(dir string) error {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("failed to execute utils template: %w", err)
-	}
-
-	filename := filepath.Join(utilsPath, "zz_generated.utils.go")
-	if err := writeFile(filename, content); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
-	log.Printf("Generated %s", filename)
-
-	return nil
-}
-
-// generateProviderConfigController generates the providerconfig controller for the scope.
-func (g *Generator) generateProviderConfigController(gc GroupConfig, scope string) error {
-	ctrlBasePath := gc.GetControllerPackagePath(scope)
-	pcPath := filepath.Join(ctrlBasePath, "providerconfig")
-
-	if err := os.MkdirAll(pcPath, 0750); err != nil {
-		return fmt.Errorf("failed to create providerconfig directory %s: %w", pcPath, err)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if strings.HasPrefix(entry.Name(), GeneratedFilePrefix) {
+			path := filepath.Join(dir, entry.Name())
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf("failed to remove stale file %s: %w", path, err)
+			}
+			log.Printf("Cleaned stale file: %s", path)
+		}
 	}
-
-	data := ProviderConfigTemplateData{
-		Scope:        scope,
-		IsCluster:    scope == ScopeCluster,
-		ModulePath:   g.ModulePath,
-		GroupDir:     gc.Name,
-		ProviderName: g.ProviderName,
-	}
-
-	content, err := executeTemplate(providerConfigTemplate, data)
-	if err != nil {
-		return fmt.Errorf("failed to execute providerconfig template: %w", err)
-	}
-
-	filename := filepath.Join(pcPath, "zz_generated.providerconfig.go")
-	if err := writeFile(filename, content); err != nil {
-		return err
-	}
-	log.Printf("Generated %s", filename)
-
 	return nil
 }
 

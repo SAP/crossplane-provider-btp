@@ -5,17 +5,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RoleReference describes a role that belongs to a role collection.
 type RoleReference struct {
 	// RoleTemplateAppId The name of the referenced template app id
 	RoleTemplateAppId string `json:"roleTemplateAppId"`
-	// RoleTemplateName The name of the referenced role template
+	// RemoteRoleTemplateAppId The name of the referenced remote template
 	RoleTemplateName string `json:"roleTemplateName"`
-	// Name The name of the referenced role
+	// Name The name of the referenced role template
 	Name string `json:"name"`
 }
 
-// BaseRoleCollectionParameters are the configurable fields of a RoleCollection.
+// RoleCollectionParameters are the configurable fields of a RoleCollection
 type BaseRoleCollectionParameters struct {
 	// Name of the role collection
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name can't be updated once set"
@@ -26,7 +25,7 @@ type BaseRoleCollectionParameters struct {
 	RoleReferences []RoleReference `json:"roles"`
 }
 
-// BaseRoleCollectionObservation are the observable fields of a RoleCollection.
+// RoleCollectionObservation are the observable fields of a RoleCollection.
 type BaseRoleCollectionObservation struct {
 	// Name of the role collection as saved in external system
 	// +kubebuilder:validation:Optional
@@ -41,6 +40,8 @@ type BaseRoleCollectionObservation struct {
 // BaseRoleCollectionSpec defines the desired state of a RoleCollection.
 type BaseRoleCollectionSpec struct {
 	ForProvider BaseRoleCollectionParameters `json:"forProvider"`
+
+	XSUAACredentialsReference `json:",inline"`
 }
 
 // BaseRoleCollectionStatus represents the observed state of a RoleCollection.
@@ -50,11 +51,17 @@ type BaseRoleCollectionStatus struct {
 }
 
 // BaseRoleCollection is the base resource definition for RoleCollection.
+// A RoleCollection aggregates roles into a single entity to assign it to users / groups
+//
+// External-Name Configuration:
+//   - Follows Standard: no (uses name as identifier, not a GUID)
+//   - Format: Role Collection Name (string)
+//   - How to find:
+//   - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
+//   - CLI: btp get security/role-collection `"<name>"` → `name`
 // +codegen:generate:scoped
-// +kubebuilder:skip
 // +kubebuilder:object:generate=false
 type BaseRoleCollection struct {
-	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              BaseRoleCollectionSpec   `json:"spec"`
 	Status            BaseRoleCollectionStatus `json:"status,omitempty"`

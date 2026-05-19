@@ -5,7 +5,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BaseSubaccountParameters are the configurable fields of a Subaccount.
+// SubaccountParameters are the configurable fields of a Subaccount.
 type BaseSubaccountParameters struct {
 	// enable beta services and applications?
 	// +optional
@@ -21,16 +21,18 @@ type BaseSubaccountParameters struct {
 	// +kubebuilder:validation:MinLength=1
 	DisplayName string `json:"displayName"`
 
-	// Labels, up to 10 user-defined labels to assign as key-value pairs to the subaccount.
+	// Labels, up to 10 user-defined labels to assign as key-value pairs to the subaccount. Each label has a name (key) that you specify, and to which you can assign up to 10 corresponding values or leave empty.
+	// Keys and values are each limited to 63 characters.
 	// +optional
 	Labels map[string][]string `json:"labels,omitempty"`
 
 	// Region
+	// Change requires recreation
 	// +kubebuilder:validation:MinLength=1
 	Region string `json:"region"`
 
-	// Admins for the subaccount (service account user already included)
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="subaccountAdmins can't be updated once set"
 	SubaccountAdmins []string `json:"subaccountAdmins"`
 
 	// Subdomain
@@ -43,14 +45,14 @@ type BaseSubaccountParameters struct {
 	// +kubebuilder:default:=UNSET
 	UsedForProduction string `json:"usedForProduction,omitempty"`
 
-	// GlobalAccountGuid is the GUID of the global account
+	// +optional
 	GlobalAccountGuid string `json:"globalAccountGuid,omitempty"`
 
-	// DirectoryGuid is the GUID of the parent directory (empty = direct under global account)
+	// +optional
 	DirectoryGuid string `json:"directoryGuid,omitempty"`
 }
 
-// BaseSubaccountObservation are the observable fields of a Subaccount.
+// SubaccountObservation are the observable fields of a Subaccount.
 type BaseSubaccountObservation struct {
 	// Subaccount ID
 	// +optional
@@ -73,14 +75,16 @@ type BaseSubaccountObservation struct {
 	// Display name
 	DisplayName *string `json:"displayName,omitempty"`
 
-	// Labels
+	// Labels, up to 10 user-defined labels to assign as key-value pairs to the subaccount. Each label has a name (key) that you specify, and to which you can assign up to 10 corresponding values or leave empty.
+	// Keys and values are each limited to 63 characters.
 	// +optional
 	Labels *map[string][]string `json:"labels,omitempty"`
 
 	// Region
+	// Change requires recreation
 	Region *string `json:"region,omitempty"`
 
-	// Admins for the subaccount
+	// Admins for the subaccount (service account user already included)
 	SubaccountAdmins *[]string `json:"subaccountAdmins,omitempty"`
 
 	// Subdomain
@@ -108,25 +112,43 @@ type BaseSubaccountStatus struct {
 }
 
 // BaseSubaccount is the base resource definition for Subaccount.
+// A Subaccount is a managed resource that represents a subaccount in the SAP Business Technology Platform.
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: Subaccount GUID (UUID format)
+//   - How to find:
+//   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
+//   - CLI: btp list accounts/subaccount (field: guid)
+//
 // +codegen:generate:scoped
-// +kubebuilder:skip
+// +codegen:categories=sap
 // +kubebuilder:object:generate=false
 type BaseSubaccount struct {
-	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              BaseSubaccountSpec   `json:"spec"`
 	Status            BaseSubaccountStatus `json:"status,omitempty"`
 }
 
 // SubaccountReferences defines reference configuration for code generation.
-// TODO: Activate by adding + prefix to codegen:references marker once the baseimpl
-// generator supports generating ResolveReferences (angryjet cannot handle promoted fields).
-// codegen:references
+// +codegen:references
 // +kubebuilder:object:generate=false
 type SubaccountReferences struct {
-	// codegen:reference:target=GlobalAccount,field=Spec.ForProvider.GlobalAccountGuid,refName=GlobalAccountRef,selectorName=GlobalAccountSelector
+	// +codegen:reference:target=GlobalAccount
+	// +codegen:reference:group=account.btp.sap.crossplane.io
+	// +codegen:reference:apiversion=v1alpha1
+	// +codegen:reference:field=Spec.ForProvider.GlobalAccountGuid
+	// +codegen:reference:refName=GlobalAccountRef
+	// +codegen:reference:selectorName=GlobalAccountSelector
+	// +codegen:reference:refDescription=GlobalAccountRef is deprecated, please use globalAccount field in the ProviderConfig spec instead and leave this field empty.
 	GlobalAccountRef bool
 
-	// codegen:reference:target=Directory,field=Spec.ForProvider.DirectoryGuid,refName=DirectoryRef,selectorName=DirectorySelector
+	// +codegen:reference:target=Directory
+	// +codegen:reference:group=account.btp.sap.crossplane.io
+	// +codegen:reference:apiversion=v1alpha1
+	// +codegen:reference:field=Spec.ForProvider.DirectoryGuid
+	// +codegen:reference:refName=DirectoryRef
+	// +codegen:reference:selectorName=DirectorySelector
+	// +codegen:reference:refDescription=DirectoryRef allows grouping subaccounts into directories. If unset subaccount will be placed in globalaccount directly\nPlease note: The provider supports moving subaccounts between directories if you supply `resolve: Always` as a policy in this ref
 	DirectoryRef bool
 }

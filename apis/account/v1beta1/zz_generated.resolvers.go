@@ -23,6 +23,7 @@ import (
 	reference "github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	errors "github.com/pkg/errors"
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	v1alpha11 "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -40,8 +41,8 @@ func (mg *CloudManagement) ResolveReferences(ctx context.Context, c client.Reade
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &v1alpha1.SubaccountList{},
-			Managed: &v1alpha1.Subaccount{},
+			List:    &v1alpha11.SubaccountList{},
+			Managed: &v1alpha11.Subaccount{},
 		},
 	})
 	if err != nil {
@@ -101,8 +102,8 @@ func (mg *ServiceManager) ResolveReferences(ctx context.Context, c client.Reader
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &v1alpha1.SubaccountList{},
-			Managed: &v1alpha1.Subaccount{},
+			List:    &v1alpha11.SubaccountList{},
+			Managed: &v1alpha11.Subaccount{},
 		},
 	})
 	if err != nil {

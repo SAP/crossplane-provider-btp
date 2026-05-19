@@ -33,7 +33,7 @@ type Client struct {
 }
 
 // Connect creates a Client from a BTP client.
-func Connect(btpClient *btp.Client) Client {
+func Connect(btpClient *btp.Client, _ client.Client) Client {
 	return Client{btp: *btpClient}
 }
 
@@ -213,7 +213,7 @@ func needsUpdate(cr *base.BaseSubaccount) bool {
 	if !reflect.DeepEqual(&spec.BetaEnabled, status.BetaEnabled) {
 		return true
 	}
-	if directoryParentChanged(spec, status) {
+	if directoryParentChanged(cr.Spec.ForProvider.DirectoryGuid, status) {
 		return true
 	}
 	return false
@@ -264,10 +264,9 @@ func createBTPSubaccount(c Client, ctx context.Context, cr *base.BaseSubaccount)
 }
 
 func updateBTPSubaccount(c Client, ctx context.Context, cr *base.BaseSubaccount) error {
-	spec := &cr.Spec.ForProvider
 	status := &cr.Status.AtProvider
 
-	if directoryParentChanged(spec, status) {
+	if directoryParentChanged(cr.Spec.ForProvider.DirectoryGuid, status) {
 		return moveSubaccountAPI(c, ctx, cr)
 	}
 	return updateSubaccountAPI(c, ctx, cr)
@@ -323,12 +322,13 @@ func addOperatorLabel(cr *base.BaseSubaccount) map[string][]string {
 	return labels
 }
 
-func directoryParentChanged(spec *base.BaseSubaccountParameters, status *base.BaseSubaccountObservation) bool {
-	if spec.DirectoryGuid == "" {
+func directoryParentChanged(directoryGuid string, status *base.BaseSubaccountObservation) bool {
+	if directoryGuid == "" {
 		return !reflect.DeepEqual(status.ParentGuid, status.GlobalAccountGUID)
 	}
-	return !reflect.DeepEqual(status.ParentGuid, &spec.DirectoryGuid)
+	return !reflect.DeepEqual(status.ParentGuid, &directoryGuid)
 }
+
 func changedLabels(specLabels map[string][]string, statusLabels *map[string][]string) bool {
 	if statusLabels == nil {
 		return len(specLabels) != 0

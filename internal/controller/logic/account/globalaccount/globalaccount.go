@@ -26,7 +26,7 @@ type Client struct {
 }
 
 // Connect creates a Client from a BTP client.
-func Connect(btpClient *btp.Client) Client {
+func Connect(btpClient *btp.Client, _ client.Client) Client {
 	return Client{btp: *btpClient}
 }
 

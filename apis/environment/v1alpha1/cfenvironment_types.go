@@ -75,7 +75,7 @@ type CfEnvironmentSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 	ForProvider       CfEnvironmentParameters `json:"forProvider"`
 
-	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1.Subaccount
 	// +crossplane:generate:reference:refFieldName=SubaccountRef
 	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
 	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()

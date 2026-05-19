@@ -1,19 +1,3 @@
-/*
-Copyright 2025 The Crossplane Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package main
 
 import (
@@ -29,6 +13,7 @@ var templateFS embed.FS
 var templateFuncs = template.FuncMap{
 	"toLower":    strings.ToLower,
 	"lowerFirst": lowerFirst,
+	"splitLines": splitLines,
 }
 
 // lowerFirst lowercases the first character of a string.
@@ -37,6 +22,11 @@ func lowerFirst(s string) string {
 		return s
 	}
 	return strings.ToLower(s[:1]) + s[1:]
+}
+
+// splitLines splits a string on newlines, returning a slice.
+func splitLines(s string) []string {
+	return strings.Split(s, "\n")
 }
 
 // mustParseTemplate parses a template from the embedded filesystem.
@@ -75,14 +65,8 @@ var docTemplate = mustParseTemplate("doc", "doc.go.tmpl")
 // groupVersionInfoTemplate generates the groupversion_info.go file.
 var groupVersionInfoTemplate = mustParseTemplate("groupVersionInfo", "groupversion_info.go.tmpl")
 
-// providerConfigTypesTemplate generates the providerconfig_types.go file.
-var providerConfigTypesTemplate = mustParseTemplate("providerConfigTypes", "providerconfig_types.go.tmpl")
-
-// providerConfigUsageTypesTemplate generates the providerconfigusage_types.go file.
-var providerConfigUsageTypesTemplate = mustParseTemplate("providerConfigUsageTypes", "providerconfigusage_types.go.tmpl")
-
 // apisPackageTemplate generates the top-level apis/{scope}/aicore.go file.
 var apisPackageTemplate = mustParseTemplate("apisPackage", "apis_package.go.tmpl")
 
-// providerConfigTemplate generates the providerconfig controller.
-var providerConfigTemplate = mustParseTemplate("providerconfig", "providerconfig.go.tmpl")
+// typesTemplate generates type aliases for exported base structs.
+var typesTemplate = mustParseTemplate("types", "types.go.tmpl")

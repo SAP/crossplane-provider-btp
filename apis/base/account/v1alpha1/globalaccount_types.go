@@ -5,11 +5,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BaseGlobalAccountParameters are the configurable fields of a GlobalAccount.
+// GlobalAccountParameters are the configurable fields of a GlobalAccount.
 type BaseGlobalAccountParameters struct {
 }
 
-// BaseGlobalAccountObservation are the observable fields of a GlobalAccount.
+// GlobalAccountObservation are the observable fields of a GlobalAccount.
 type BaseGlobalAccountObservation struct {
 	// BTP Global Account GUID
 	// +optional
@@ -28,11 +28,13 @@ type BaseGlobalAccountStatus struct {
 }
 
 // BaseGlobalAccount is the base resource definition for GlobalAccount.
+// A GlobalAccount is an example API type.
+//
 // +codegen:generate:scoped
-// +kubebuilder:skip
+// +codegen:categories=sap
+// +codegen:deprecatedversion:warning="Use globalaccount reference in providerconfig instead"
 // +kubebuilder:object:generate=false
 type BaseGlobalAccount struct {
-	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              BaseGlobalAccountSpec   `json:"spec"`
 	Status            BaseGlobalAccountStatus `json:"status,omitempty"`

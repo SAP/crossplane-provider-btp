@@ -115,7 +115,16 @@ func extractConfigurations() ([]ResourceConfig, error) {
 			return err
 		}
 
-		if info.IsDir() || !strings.HasSuffix(path, "_types.go") {
+		if info.IsDir() {
+			// Skip generated/internal directories to avoid duplicates
+			base := filepath.Base(path)
+			if base == "base" || base == "namespaced" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if !strings.HasSuffix(path, "_types.go") {
 			return nil
 		}
 

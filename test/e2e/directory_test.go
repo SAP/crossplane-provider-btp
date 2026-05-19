@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/features"
 
 	meta "github.com/sap/crossplane-provider-btp/apis"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 )
 
@@ -90,9 +90,8 @@ func TestDirectory(t *testing.T) {
 
 func newMutateDirFunc(directoryNameE2e string) func(obj k8s.Object) error {
 	mutateDirResource := func(obj k8s.Object) error {
-		if mg, ok := any(obj).(meta.ManagedTested); ok {
-			newId := directoryNameE2e
-			mg.SetExternalID(newId)
+		if mg, ok := any(obj).(*v1alpha1.Directory); ok {
+			mg.Spec.ForProvider.DisplayName = &directoryNameE2e
 		}
 		return nil
 	}

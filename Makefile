@@ -315,7 +315,7 @@ generate-test-crs:
 .PHONY: generate-baseimpl
 generate-baseimpl:
 	@$(INFO) Generating baseimpl scoped types and controllers
-	@$(GO) run ./hack/generators/baseimpl/... --module=github.com/sap/crossplane-provider-btp --provider-name=btp --skip-providerconfig
+	@$(GO) run ./hack/generators/baseimpl/... --module=github.com/sap/crossplane-provider-btp --provider-name=btp
 	@$(OK) Baseimpl generation completed
 
 # Generate external-name documentation from *_types.go files

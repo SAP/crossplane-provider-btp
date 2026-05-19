@@ -17,8 +17,9 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/features"
 
 	"github.com/sap/crossplane-provider-btp/apis"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+	legacyv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+	"github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 )
 
 var (
@@ -34,7 +35,7 @@ func TestServiceManagerCreationFlow(t *testing.T) {
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
-				sm := v1beta1.ServiceManager{
+				sm := legacyv1beta1.ServiceManager{
 					ObjectMeta: metav1.ObjectMeta{Name: smCreateName, Namespace: cfg.Namespace()},
 				}
 				waitForResource(&sm, cfg, t, wait.WithTimeout(7*time.Minute))
@@ -43,10 +44,10 @@ func TestServiceManagerCreationFlow(t *testing.T) {
 		).
 		Assess(
 			"Check ServiceManager Resources are fully created", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				sm := &v1beta1.ServiceManager{}
+				sm := &legacyv1beta1.ServiceManager{}
 				MustGetResource(t, cfg, smCreateName, nil, sm)
 				// Status bound?
-				if sm.Status.AtProvider.Status != v1alpha1.ServiceManagerBound {
+				if sm.Status.AtProvider.Status != legacyv1beta1.ServiceManagerBound {
 					t.Error("Binding status not set as expected")
 				}
 
@@ -57,7 +58,7 @@ func TestServiceManagerCreationFlow(t *testing.T) {
 		).Assess(
 		"Properly delete all resources", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			// k8s resource cleaned up?
-			sm := &v1beta1.ServiceManager{}
+			sm := &legacyv1beta1.ServiceManager{}
 			MustGetResource(t, cfg, smCreateName, nil, sm)
 
 			AwaitResourceDeletionOrFail(ctx, t, cfg, sm, wait.WithTimeout(time.Minute*5))
@@ -88,12 +89,12 @@ func TestServiceManagerImport(t *testing.T) {
 				}, cfg, t, wait.WithTimeout(15*time.Minute))
 
 				// This will create the external resource but not delete it when we remove the k8s resource
-				sm := &v1beta1.ServiceManager{
+				sm := &legacyv1beta1.ServiceManager{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      smImportName + "-create",
 						Namespace: cfg.Namespace(),
 					},
-					Spec: v1beta1.ServiceManagerSpec{
+					Spec: legacyv1beta1.ServiceManagerSpec{
 						ResourceSpec: xpv1.ResourceSpec{
 							ManagementPolicies: []xpv1.ManagementAction{
 								xpv1.ManagementActionObserve,

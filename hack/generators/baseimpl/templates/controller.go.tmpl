@@ -16,7 +16,7 @@ import (
 	"{{ .ModulePath }}/btp"
 	internalopts "{{ .ModulePath }}/internal/controller/options"
 	"{{ .ModulePath }}/internal/controller/providerconfig"
-	logic "{{ .ModulePath }}/internal/controller/logic/{{ .GroupDir }}/{{ toLower .ResourceName }}"
+	logic "{{ .ModulePath }}/{{ .LogicCtrlDir }}/{{ .GroupDir }}/{{ toLower .ResourceName }}"
 	"{{ .ModulePath }}/internal/tracking"
 )
 
@@ -62,7 +62,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errConnect{{ .ResourceName }})
 	}
 
-	svcClient := logic.Connect(btpClient)
+	svcClient := logic.Connect(btpClient, c.kube)
 
 	return &external{
 		kube:            c.kube,
