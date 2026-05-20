@@ -4,16 +4,19 @@ import (
 	"strings"
 )
 
-// GroupConfig holds the discovered configuration for a single API group.
+// GroupConfig holds the discovered configuration for a single (API group, version) pair.
+// Each GroupConfig represents one base package directory: apis/base/<group>/<version>/.
+// Multiple GroupConfigs can share the same Name (one per version of the group).
 type GroupConfig struct {
 	Name                string // directory name, e.g., "account"
+	Version             string // version directory name, e.g., "v1alpha1"
 	ClusterGroupName    string // e.g., "account.btp.sap.crossplane.io"
 	NamespacedGroupName string // e.g., "account.btp.sap.m.crossplane.io"
 	BasePkg             string // e.g., "apis/base/account/v1alpha1"
 	ClusterPkg          string // e.g., "apis/cluster/account/v1alpha1"
 	NamespacedPkg       string // e.g., "apis/namespaced/account/v1alpha1"
-	ClusterCtrlPkg      string // e.g., "internal/controller/cluster/account"
-	NamespacedCtrlPkg   string // e.g., "internal/controller/namespaced/account"
+	ClusterCtrlPkg      string // e.g., "internal/controller/cluster/account" (version-agnostic)
+	NamespacedCtrlPkg   string // e.g., "internal/controller/namespaced/account" (version-agnostic)
 }
 
 // Generator generates scope-specific types from base type definitions.
@@ -121,6 +124,7 @@ type ScopedTemplateData struct {
 	BaseType
 	Scope         string
 	IsCluster     bool
+	Version       string // e.g., "v1alpha1"
 	ModulePath    string
 	BasePkgImport string
 	ProviderName  string
@@ -129,6 +133,7 @@ type ScopedTemplateData struct {
 // BaseImplTemplateData holds data passed to base implementation templates.
 type BaseImplTemplateData struct {
 	BaseTypes     []BaseType
+	Version       string // e.g., "v1alpha1"
 	ModulePath    string
 	BasePkgImport string
 	IsCluster     bool
@@ -142,6 +147,7 @@ type ControllerTemplateData struct {
 	BaseType
 	Scope         string
 	IsCluster     bool
+	Version       string // e.g., "v1alpha1"
 	ModulePath    string
 	BasePkgImport string
 	GroupDir      string // e.g., "account"
@@ -149,6 +155,7 @@ type ControllerTemplateData struct {
 }
 
 // SetupTemplateData holds data passed to setup.go templates.
+// BaseTypes is the union of all base types across every version of the group.
 type SetupTemplateData struct {
 	BaseTypes  []BaseType
 	Scope      string
@@ -159,14 +166,22 @@ type SetupTemplateData struct {
 // GroupVersionTemplateData holds data passed to groupversion_info templates.
 type GroupVersionTemplateData struct {
 	GroupName    string
+	Version      string // e.g., "v1alpha1"
 	ProviderName string
 }
 
-// APIsPackageTemplateData holds data passed to apis package templates.
+// DocTemplateData holds data passed to the doc.go template.
+type DocTemplateData struct {
+	Version string // e.g., "v1alpha1"
+}
+
+// APIsPackageTemplateData holds data passed to the per-group apis package template.
+// Versions lists every version of the group whose SchemeBuilder must be registered.
 type APIsPackageTemplateData struct {
 	Scope      string
 	ModulePath string
-	GroupDir   string // e.g., "account"
+	GroupDir   string   // e.g., "account"
+	Versions   []string // e.g., ["v1alpha1", "v1beta1"], sorted
 }
 
 // ExportedVar represents an exported var or const from the base package.
@@ -177,6 +192,7 @@ type ExportedVar struct {
 
 // TypesTemplateData holds data passed to the types alias template.
 type TypesTemplateData struct {
+	Version       string // e.g., "v1alpha1"
 	BasePkgImport string
 	TypeNames     []string
 	Vars          []ExportedVar

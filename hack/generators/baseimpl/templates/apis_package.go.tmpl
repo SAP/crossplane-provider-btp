@@ -6,13 +6,15 @@ package apis
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
-	v1alpha1 "{{ .ModulePath }}/apis/{{ .Scope }}/{{ .GroupDir }}/v1alpha1"
-)
+{{ range .Versions }}	{{ . }} "{{ $.ModulePath }}/apis/{{ $.Scope }}/{{ $.GroupDir }}/{{ . }}"
+{{ end }})
 
 func init() {
 	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
 	AddToSchemes = append(AddToSchemes,
-		v1alpha1.SchemeBuilder.AddToScheme,
+{{- range .Versions }}
+		{{ . }}.SchemeBuilder.AddToScheme,
+{{- end }}
 	)
 }
 

@@ -11,7 +11,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apisv1alpha1 "{{ .ModulePath }}/apis/{{ .Scope }}/{{ .GroupDir }}/v1alpha1"
+	apis{{ .Version }} "{{ .ModulePath }}/apis/{{ .Scope }}/{{ .GroupDir }}/{{ .Version }}"
 	providerv1alpha1 "{{ .ModulePath }}/apis/v1alpha1"
 	"{{ .ModulePath }}/btp"
 	internalopts "{{ .ModulePath }}/internal/controller/options"
@@ -29,9 +29,9 @@ const (
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	return providerconfig.DefaultSetupWithoutDefaultInitializer(
 		mgr, o,
-		&apisv1alpha1.{{ .ResourceName }}{},
-		apisv1alpha1.{{ .ResourceName }}GroupKind,
-		apisv1alpha1.{{ .ResourceName }}GroupVersionKind,
+		&apis{{ .Version }}.{{ .ResourceName }}{},
+		apis{{ .Version }}.{{ .ResourceName }}GroupKind,
+		apis{{ .Version }}.{{ .ResourceName }}GroupVersionKind,
 		func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 			return &connector{
 				kube:            kube,
@@ -51,7 +51,7 @@ type connector struct {
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*apisv1alpha1.{{ .ResourceName }})
+	cr, ok := mg.(*apis{{ .Version }}.{{ .ResourceName }})
 	if !ok {
 		return nil, errors.New(errNot{{ .ResourceName }})
 	}
@@ -78,7 +78,7 @@ type external struct {
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*apisv1alpha1.{{ .ResourceName }})
+	cr, ok := mg.(*apis{{ .Version }}.{{ .ResourceName }})
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNot{{ .ResourceName }})
 	}
@@ -102,7 +102,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*apisv1alpha1.{{ .ResourceName }})
+	cr, ok := mg.(*apis{{ .Version }}.{{ .ResourceName }})
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNot{{ .ResourceName }})
 	}
@@ -121,7 +121,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*apisv1alpha1.{{ .ResourceName }})
+	cr, ok := mg.(*apis{{ .Version }}.{{ .ResourceName }})
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNot{{ .ResourceName }})
 	}
@@ -139,7 +139,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
-	cr, ok := mg.(*apisv1alpha1.{{ .ResourceName }})
+	cr, ok := mg.(*apis{{ .Version }}.{{ .ResourceName }})
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNot{{ .ResourceName }})
 	}
