@@ -11,9 +11,10 @@ var templateFS embed.FS
 
 // templateFuncs contains functions available in templates.
 var templateFuncs = template.FuncMap{
-	"toLower":    strings.ToLower,
-	"lowerFirst": lowerFirst,
-	"splitLines": splitLines,
+	"toLower":        strings.ToLower,
+	"lowerFirst":     lowerFirst,
+	"splitLines":     splitLines,
+	"unqualifyEmbed": unqualifyEmbed,
 }
 
 // lowerFirst lowercases the first character of a string.
@@ -27,6 +28,19 @@ func lowerFirst(s string) string {
 // splitLines splits a string on newlines, returning a slice.
 func splitLines(s string) []string {
 	return strings.Split(s, "\n")
+}
+
+// unqualifyEmbed strips a leading package selector and pointer from an embedded field's
+// type expression, returning the bare identifier used as the field name in Go.
+//
+// Examples: "xpv1.CommonCredentialSelectors" -> "CommonCredentialSelectors";
+// "*base.APICredentials" -> "APICredentials"; "Foo" -> "Foo".
+func unqualifyEmbed(typeExpr string) string {
+	s := strings.TrimPrefix(typeExpr, "*")
+	if idx := strings.LastIndex(s, "."); idx >= 0 {
+		return s[idx+1:]
+	}
+	return s
 }
 
 // mustParseTemplate parses a template from the embedded filesystem.

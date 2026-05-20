@@ -12,8 +12,14 @@ func (r *RoleCollection) ToBase() *base.BaseRoleCollection {
 	b := &base.BaseRoleCollection{
 		ObjectMeta: r.ObjectMeta,
 		Spec: base.BaseRoleCollectionSpec{
-			ForProvider:               r.Spec.ForProvider,
-			XSUAACredentialsReference: r.Spec.XSUAACredentialsReference,
+			ForProvider: r.Spec.ForProvider,
+			XSUAACredentialsReference: base.XSUAACredentialsReference{
+				APICredentials:                         r.Spec.XSUAACredentialsReference.APICredentials,
+				SubaccountApiCredentialSelector:        r.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
+				SubaccountApiCredentialRef:             r.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
+				SubaccountApiCredentialSecret:          r.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret,
+				SubaccountApiCredentialSecretNamespace: r.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace,
+			},
 		},
 		Status: base.BaseRoleCollectionStatus{
 			AtProvider: r.Status.AtProvider,
@@ -28,7 +34,13 @@ func (r *RoleCollection) ToBase() *base.BaseRoleCollection {
 func (r *RoleCollection) FromBase(b *base.BaseRoleCollection) {
 	r.ObjectMeta = b.ObjectMeta
 	r.Spec.ForProvider = b.Spec.ForProvider
-	r.Spec.XSUAACredentialsReference = b.Spec.XSUAACredentialsReference
+	r.Spec.XSUAACredentialsReference = XSUAACredentialsReference{
+		APICredentials:                         b.Spec.XSUAACredentialsReference.APICredentials,
+		SubaccountApiCredentialSelector:        b.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
+		SubaccountApiCredentialRef:             b.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
+		SubaccountApiCredentialSecret:          b.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret,
+		SubaccountApiCredentialSecretNamespace: b.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace,
+	}
 	r.Status.AtProvider = b.Status.AtProvider
 	r.Status.Conditions = b.Status.Conditions
 }

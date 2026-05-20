@@ -202,10 +202,13 @@ spec:
                 - name
                 type: object
               subaccountApiCredentialRef:
-                description: A Reference to a named object.
+                description: A NamespacedReference to a named object.
                 properties:
                   name:
                     description: Name of the referenced object.
+                    type: string
+                  namespace:
+                    description: Namespace of the referenced object
                     type: string
                   policy:
                     description: Policies for referencing.
@@ -240,7 +243,7 @@ spec:
               subaccountApiCredentialSecretNamespace:
                 type: string
               subaccountApiCredentialSelector:
-                description: A Selector selects an object.
+                description: NamespacedSelector selects a namespaced object.
                 properties:
                   matchControllerRef:
                     description: |-
@@ -253,6 +256,9 @@ spec:
                     description: MatchLabels ensures an object with matching labels
                       is selected.
                     type: object
+                  namespace:
+                    description: Namespace for the selector
+                    type: string
                   policy:
                     description: Policies for selection.
                     properties:
