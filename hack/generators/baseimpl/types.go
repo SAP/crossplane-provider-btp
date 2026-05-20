@@ -35,6 +35,13 @@ type SpecField struct {
 	TypeName string // type name, e.g., "XSUAACredentialsReference"
 	JSONTag  string // raw struct tag string, e.g., `json:",inline"`
 	Embedded bool   // true if anonymous embed
+
+	// Refs is the list of reference fields whose value/ref/selector live inside the struct named TypeName.
+	// When non-empty, the scoped types generator emits a LOCAL copy of TypeName in the scoped package
+	// (with angryjet `+crossplane:generate:reference:*` markers) instead of embedding the base type.
+	// Fields then describes ALL fields of the local struct so the template can render them faithfully.
+	Refs   []Reference
+	Fields []ParameterField
 }
 
 // AccessName returns the Go expression to access this field (type name for embeds, field name otherwise).
@@ -63,11 +70,13 @@ type BaseType struct {
 
 // Reference represents a reference field configuration.
 type Reference struct {
-	TargetType     string // e.g., "Directory"
+	TargetType     string // e.g., "Directory" or fully-qualified "github.com/.../v1alpha1.SubaccountApiCredential"
 	Group          string // e.g., "account.btp.sap.crossplane.io" (required, used for tracking struct tags)
 	ApiVersion     string // e.g., "v1alpha1" (required, used for tracking struct tags)
-	FieldPath      string // e.g., "Spec.ForProvider.DirectoryGuid"
-	FieldName      string // e.g., "DirectoryGuid" (extracted from FieldPath)
+	FieldPath      string // e.g., "Spec.ForProvider.DirectoryGuid" or "Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret"
+	FieldName      string // e.g., "DirectoryGuid" (extracted from FieldPath; last path segment)
+	SpecFieldName  string // empty if reference lives in ForProvider; otherwise the embedded SpecField type name (e.g., "XSUAACredentialsReference")
+	Extractor      string // optional fully-qualified extractor expression, e.g. "github.com/.../v1alpha1.SubaccountApiCredentialSecret()". Empty means default ExternalName().
 	RefName        string // e.g., "DirectoryRef" (override for ref field name, defaults to FieldName + "Ref")
 	SelectorName   string // e.g., "DirectorySelector" (override for selector field name, defaults to FieldName + "Selector")
 	RefDescription string // Optional description for the Ref field (overrides the default from xpv1.Reference)
@@ -88,13 +97,23 @@ type ParameterField struct {
 	Tag                 string   // raw struct tag, e.g., `json:"displayName"`
 	Comments            []string // doc comment lines (without // prefix)
 	IsReferenceValue    bool     // true if this field is a reference value (matches a Reference.FieldName)
-	ReferenceTarget     string   // e.g., "GlobalAccount" (only set if IsReferenceValue)
+	ReferenceTarget     string   // e.g., "GlobalAccount" or fully-qualified path (only set if IsReferenceValue)
 	ReferenceGroup      string   // e.g., "account.btp.sap.crossplane.io" (only set if IsReferenceValue)
 	ReferenceApiVersion string   // e.g., "v1alpha1" (only set if IsReferenceValue)
 	RefName             string   // e.g., "GlobalAccountRef" (only set if IsReferenceValue)
 	SelectorName        string   // e.g., "GlobalAccountSelector" (only set if IsReferenceValue)
 	RefDescription      string   // e.g., "DirectoryRef allows..." (only set if IsReferenceValue)
 	ImmutableRef        bool     // If true, emit XValidation on Ref field (only set if IsReferenceValue)
+	Extractor           string   // optional fully-qualified extractor expression (only set if IsReferenceValue)
+
+	// Embedded indicates this is an anonymous (embedded) field on a sub-struct (e.g. xpv1.CommonCredentialSelectors).
+	// When true, the template emits the type name only (no field name) with the JSON tag.
+	Embedded bool
+	// IsRefField indicates this field is the *Ref pointer (xpv1.Reference) — used so the template can
+	// emit it without the +crossplane:generate:reference markers but with the reference-* struct tags.
+	IsRefField bool
+	// IsSelectorField indicates this field is the *Selector pointer (xpv1.Selector).
+	IsSelectorField bool
 }
 
 // ScopedTemplateData holds data passed to scoped type templates.
@@ -112,6 +131,10 @@ type BaseImplTemplateData struct {
 	BaseTypes     []BaseType
 	ModulePath    string
 	BasePkgImport string
+	IsCluster     bool
+	// NeedsRefConverters is true when at least one BaseType has a SpecField with Refs,
+	// in which case the namespaced base_impl template emits ref/selector conversion helpers.
+	NeedsRefConverters bool
 }
 
 // ControllerTemplateData holds data passed to controller templates.

@@ -163,7 +163,7 @@ func (g *Generator) generateForScope(gc GroupConfig, baseTypes []BaseType, expor
 	}{
 		{"API package files", func() error { return g.generateAPIPackageFiles(gc, scope) }},
 		{"types", func() error { return g.generateScopedTypes(gc, baseTypes, scope) }},
-		{"type aliases", func() error { return g.generateTypeAliases(gc, exportedStructs, exportedVars, scope) }},
+		{"type aliases", func() error { return g.generateTypeAliases(gc, filterShadowedStructs(exportedStructs, baseTypes), exportedVars, scope) }},
 		{"baseimpl", func() error { return g.generateBaseImpl(gc, baseTypes, scope) }},
 		{"controllers", func() error { return g.generateControllers(gc, baseTypes, scope) }},
 		{"setup", func() error { return g.generateSetup(gc, baseTypes, scope) }},
@@ -275,9 +275,11 @@ func deriveNamespacedReferenceGroups(fields []ParameterField) []ParameterField {
 func (g *Generator) generateBaseImpl(gc GroupConfig, baseTypes []BaseType, scope string) error {
 	pkgPath := gc.GetPackagePath(scope)
 	data := BaseImplTemplateData{
-		BaseTypes:     baseTypes,
-		ModulePath:    g.ModulePath,
-		BasePkgImport: g.GetBasePkgImport(gc),
+		BaseTypes:          baseTypes,
+		ModulePath:         g.ModulePath,
+		BasePkgImport:      g.GetBasePkgImport(gc),
+		IsCluster:          scope == ScopeCluster,
+		NeedsRefConverters: anySpecFieldHasRefs(baseTypes),
 	}
 
 	content, err := executeTemplate(baseImplTemplate, data)
@@ -439,4 +441,43 @@ func writeFile(filename string, content []byte) error {
 		return fmt.Errorf("failed to write %s: %w", filename, err)
 	}
 	return nil
+}
+
+// filterShadowedStructs returns the exported base struct names with any names that the
+// scoped types template will emit as local copies removed. Without this filter the
+// re-export `type X = base.X` collides with the locally-declared `type X struct { ... }`.
+func filterShadowedStructs(names []string, baseTypes []BaseType) []string {
+	shadowed := make(map[string]struct{})
+	for _, bt := range baseTypes {
+		for _, sf := range bt.SpecFields {
+			if len(sf.Refs) > 0 {
+				shadowed[sf.TypeName] = struct{}{}
+			}
+		}
+	}
+	if len(shadowed) == 0 {
+		return names
+	}
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		if _, skip := shadowed[n]; skip {
+			continue
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
+// anySpecFieldHasRefs reports whether any BaseType has a SpecField with reference
+// markers (i.e. a sidecar entry pointed at it). Drives whether the namespaced base_impl
+// template emits the *xpv1.Reference / *xpv1.NamespacedReference conversion helpers.
+func anySpecFieldHasRefs(baseTypes []BaseType) bool {
+	for _, bt := range baseTypes {
+		for _, sf := range bt.SpecFields {
+			if len(sf.Refs) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }

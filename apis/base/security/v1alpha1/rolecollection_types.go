@@ -41,6 +41,7 @@ type BaseRoleCollectionObservation struct {
 type BaseRoleCollectionSpec struct {
 	ForProvider BaseRoleCollectionParameters `json:"forProvider"`
 
+	// +codegen:references
 	XSUAACredentialsReference `json:",inline"`
 }
 

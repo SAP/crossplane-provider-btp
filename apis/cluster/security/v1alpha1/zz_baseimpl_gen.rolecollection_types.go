@@ -19,11 +19,38 @@ type RoleCollectionParameters = base.BaseRoleCollectionParameters
 // RoleCollectionObservation are the observable fields of a RoleCollection.
 type RoleCollectionObservation = base.BaseRoleCollectionObservation
 
+// XSUAACredentialsReference is a local copy of the base XSUAACredentialsReference struct, with angryjet
+// reference markers attached so a ResolveReferences method is generated for the scoped
+// resource. JSON tags match the base type exactly so the CRD shape is unchanged.
+//
+// The Ref field's `reference-{group,kind,apiversion}:` struct tag is inherited verbatim
+// from the base type's tag (see Tag below) — the target is identified there. If the
+// reference target ever changes, update the base type's tag rather than this template.
+type XSUAACredentialsReference struct {
+	// xsuaa api credentials used to manage the assignment
+	// +kubebuilder:validation:Optional
+	APICredentials base.APICredentials `json:"apiCredentials"`
+	// +kubebuilder:validation:Optional
+	SubaccountApiCredentialSelector *xpv1.Selector `json:"subaccountApiCredentialSelector,omitempty"`
+	// +kubebuilder:validation:Optional
+	SubaccountApiCredentialRef *xpv1.Reference `json:"subaccountApiCredentialRef,omitempty" reference-group:"security.btp.sap.crossplane.io" reference-kind:"SubaccountApiCredential" reference-apiversion:"v1alpha1"`
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredential
+	// +crossplane:generate:reference:refFieldName=SubaccountApiCredentialRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountApiCredentialSelector
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredentialSecret()
+	SubaccountApiCredentialSecret string `json:"subaccountApiCredentialSecret,omitempty"`
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredential
+	// +crossplane:generate:reference:refFieldName=SubaccountApiCredentialRef
+	// +crossplane:generate:reference:selectorFieldName=SubaccountApiCredentialSelector
+	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/security/v1alpha1.SubaccountApiCredentialSecretNamespace()
+	SubaccountApiCredentialSecretNamespace string `json:"subaccountApiCredentialSecretNamespace,omitempty"`
+}
+
 // A RoleCollectionSpec defines the desired state of a RoleCollection.
 type RoleCollectionSpec struct {
-	xpv1.ResourceSpec              `json:",inline"`
-	ForProvider                    RoleCollectionParameters `json:"forProvider"`
-	base.XSUAACredentialsReference `json:",inline"`
+	xpv1.ResourceSpec         `json:",inline"`
+	ForProvider               RoleCollectionParameters `json:"forProvider"`
+	XSUAACredentialsReference `json:",inline"`
 }
 
 // A RoleCollectionStatus represents the observed state of a RoleCollection.

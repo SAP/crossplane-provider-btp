@@ -6,5 +6,4 @@ import base "github.com/sap/crossplane-provider-btp/apis/base/security/v1alpha1"
 
 // Re-exported base types for consumer convenience.
 type RoleReference = base.RoleReference
-type XSUAACredentialsReference = base.XSUAACredentialsReference
 type APICredentials = base.APICredentials

@@ -11,6 +11,7 @@ const (
 	MarkerGenerateScoped    = "+codegen:generate:scoped"
 	MarkerReferences        = "+codegen:references"
 	MarkerReference         = "+codegen:reference:"
+	MarkerAngryjetReference = "+crossplane:generate:reference:"
 	MarkerMethod            = "+codegen:method:"
 	MarkerCategories        = "+codegen:categories="
 	MarkerDeprecatedVersion = "+codegen:deprecatedversion:warning="

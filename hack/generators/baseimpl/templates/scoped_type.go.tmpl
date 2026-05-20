@@ -73,6 +73,65 @@ type {{ .ResourceName }}Parameters = base.{{ .ParametersType }}
 // {{ .ResourceName }}Observation are the observable fields of a {{ .ResourceName }}.
 type {{ .ResourceName }}Observation = base.{{ .ObservationType }}
 
+{{- range .SpecFields }}
+{{- if .Refs }}
+
+// {{ .TypeName }} is a local copy of the base {{ .TypeName }} struct, with angryjet
+// reference markers attached so a ResolveReferences method is generated for the scoped
+// resource. JSON tags match the base type exactly so the CRD shape is unchanged.
+//
+// The Ref field's `reference-{group,kind,apiversion}:` struct tag is inherited verbatim
+// from the base type's tag (see Tag below) — the target is identified there. If the
+// reference target ever changes, update the base type's tag rather than this template.
+type {{ .TypeName }} struct {
+{{- range .Fields }}
+{{- if .Embedded }}
+
+	{{ .TypeExpr }} {{ .Tag }}
+{{- else if .IsReferenceValue }}
+
+{{- range .Comments }}
+	// {{ . }}
+{{- end }}
+	// +crossplane:generate:reference:type={{ .ReferenceTarget }}
+	// +crossplane:generate:reference:refFieldName={{ .RefName }}
+	// +crossplane:generate:reference:selectorFieldName={{ .SelectorName }}
+{{- if .Extractor }}
+	// +crossplane:generate:reference:extractor={{ .Extractor }}
+{{- end }}
+	{{ .Name }} {{ .TypeExpr }} {{ .Tag }}
+{{- else if .IsRefField }}
+
+{{- range .Comments }}
+	// {{ . }}
+{{- end }}
+{{- if $.IsCluster }}
+	{{ .Name }} *xpv1.Reference {{ .Tag }}
+{{- else }}
+	{{ .Name }} *xpv1.NamespacedReference {{ .Tag }}
+{{- end }}
+{{- else if .IsSelectorField }}
+
+{{- range .Comments }}
+	// {{ . }}
+{{- end }}
+{{- if $.IsCluster }}
+	{{ .Name }} *xpv1.Selector {{ .Tag }}
+{{- else }}
+	{{ .Name }} *xpv1.NamespacedSelector {{ .Tag }}
+{{- end }}
+{{- else }}
+
+{{- range .Comments }}
+	// {{ . }}
+{{- end }}
+	{{ .Name }} {{ .TypeExpr }} {{ .Tag }}
+{{- end }}
+{{- end }}
+}
+{{- end }}
+{{- end }}
+
 // A {{ .ResourceName }}Spec defines the desired state of a {{ .ResourceName }}.
 type {{ .ResourceName }}Spec struct {
 {{- if .IsCluster }}
@@ -86,10 +145,18 @@ type {{ .ResourceName }}Spec struct {
 	ForProvider       {{ .ResourceName }}Parameters `json:"forProvider"`
 {{- end }}
 {{- range .SpecFields }}
+{{- if .Refs }}
+{{- if .Embedded }}
+	{{ .TypeName }} {{ .JSONTag }}
+{{- else }}
+	{{ .Name }} {{ .TypeName }} {{ .JSONTag }}
+{{- end }}
+{{- else }}
 {{- if .Embedded }}
 	base.{{ .TypeName }} {{ .JSONTag }}
 {{- else }}
 	{{ .Name }} base.{{ .TypeName }} {{ .JSONTag }}
+{{- end }}
 {{- end }}
 {{- end }}
 }
