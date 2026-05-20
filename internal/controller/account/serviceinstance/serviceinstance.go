@@ -12,11 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	ujresource "github.com/crossplane/upjet/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 
 	"regexp"
 
@@ -25,6 +25,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/di"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
@@ -86,7 +87,7 @@ var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube clie
 
 type connector struct {
 	kube  client.Client
-	usage resource.Tracker
+	usage providerconfig.LegacyTracker
 
 	clientConnector             tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance]
 	newServicePlanInitializerFn func() Initializer

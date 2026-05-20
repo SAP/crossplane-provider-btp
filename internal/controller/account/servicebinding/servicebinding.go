@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -18,6 +18,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/reconcilerutil"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
@@ -77,7 +78,7 @@ var newSBKeyRotatorFn = func(bindingDeleter servicebindingclient.BindingDeleter)
 
 type connector struct {
 	kube              kubeclient.Client
-	usage             resource.Tracker
+	usage             providerconfig.LegacyTracker
 	resourcetracker   tracking.ReferenceResolverTracker
 	clientFactory     ServiceBindingClientFactory
 	newSBKeyRotatorFn func(servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator

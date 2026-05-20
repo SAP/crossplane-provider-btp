@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -16,8 +16,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 )
 
 const (
@@ -38,7 +38,7 @@ var newDirHandlerFn = func(client *btp.Client, cr *v1alpha1.Directory) directory
 
 type connector struct {
 	kube         client.Client
-	usage        resource.Tracker
+	usage        providerconfig.LegacyTracker
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
 
 	newDirHandlerFn func(client *btp.Client, cr *v1alpha1.Directory) directory.DirectoryClientI

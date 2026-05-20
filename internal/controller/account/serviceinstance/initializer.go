@@ -3,7 +3,7 @@ package serviceinstance
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"

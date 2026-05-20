@@ -3,18 +3,19 @@ package rolecollectionassignment
 import (
 	"context"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/btp"
 	rolecollectiongroupassignment "github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollectiongroupassignment"
 	"github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollectionuserassignment"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 )
@@ -65,7 +66,7 @@ type RoleAssigner interface {
 // is called.
 type connector struct {
 	kube               client.Client
-	usage              resource.Tracker
+	usage              providerconfig.LegacyTracker
 	newUserAssignerFn  func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error)
 	newGroupAssignerFn func(binding *v1alpha1.XsuaaBinding) (RoleAssigner, error)
 	resourcetracker    tracking.ReferenceResolverTracker
@@ -77,7 +78,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotRoleCollectionAssignment)
 	}
 
-	if err := c.usage.Track(ctx, mg); err != nil {
+	if err := c.usage.Track(ctx, mg.(resource.LegacyManaged)); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 

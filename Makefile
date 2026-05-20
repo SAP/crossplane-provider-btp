@@ -24,6 +24,10 @@ PLATFORMS ?= linux_amd64
 VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || echo "v0.0.0-$$(git rev-parse HEAD)")
 $(info VERSION is $(VERSION))
 
+# Override to be Crossplane v2 compatible
+ROOT_DIR := $(shell pwd)
+export BUILD_REGISTRY := index.docker.io/build-$(shell echo $(HOSTNAME)-$(ROOT_DIR) | sha256sum | cut -c1-8)
+
 -include build/makelib/common.mk
 
 # Setup Output
@@ -67,11 +71,11 @@ testFilter ?= .*
 
 .PHONY: local-build
 local-build: build xpkg.build.provider-btp
-	$(INFO) "Loading xpkg into docker as $(UUT_XPKG)"; \
-	XPKG_FILE=$(XPKG_OUTPUT_DIR)/$(PLATFORM)/provider-btp-$(VERSION).xpkg && \
+	$(INFO) "Loading xpkg into docker as $(UUT_XPKG)"
+	@XPKG_FILE=$(XPKG_OUTPUT_DIR)/$(PLATFORM)/provider-btp-$(VERSION).xpkg && \
 	XPKG_SHA=$$(docker load -i $$XPKG_FILE | sed -n 's/.*ID: //p') && \
-	docker tag $$XPKG_SHA $(UUT_XPKG); \
-	$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"; \
+	docker tag $$XPKG_SHA $(UUT_XPKG);
+	$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"
 
 # ====================================================================================
 # Setup XPKG

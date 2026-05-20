@@ -4,13 +4,14 @@ import (
 	"context"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -379,7 +380,7 @@ func TestConnect(t *testing.T) {
 
 	type args struct {
 		cr                 *v1alpha1.RoleCollectionAssignment
-		track              resource.Tracker
+		track              providerconfig.LegacyTracker
 		resourcetracker    tracking.ReferenceResolverTracker
 		kube               client.Client
 		newUserAssignerFn  func(_ *v1alpha1.XsuaaBinding) (RoleAssigner, error)
@@ -707,7 +708,7 @@ func withGroup(groupname string) RoleCollectionModifier {
 	}
 }
 
-func newTracker(err error) resource.Tracker {
+func newTracker(err error) providerconfig.LegacyTracker {
 	return &tracker{err: err}
 }
 
@@ -724,7 +725,7 @@ type tracker struct {
 	err error
 }
 
-func (t *tracker) Track(ctx context.Context, mg resource.Managed) error {
+func (t *tracker) Track(ctx context.Context, mg resource.LegacyManaged) error {
 	return t.err
 }
 

@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	v1 "k8s.io/api/core/v1"
