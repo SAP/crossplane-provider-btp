@@ -20,8 +20,7 @@ package v1alpha1
 
 import (
 	"context"
-
-	reference "github.com/crossplane/crossplane-runtime/pkg/reference"
+	reference "github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	errors "github.com/pkg/errors"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -36,6 +35,7 @@ func (mg *CloudManagement) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.SubaccountGuid,
 		Extract:      SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
@@ -52,6 +52,7 @@ func (mg *CloudManagement) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecret,
 		Extract:      ServiceManagerSecret(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
 		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
 		To: reference.To{
@@ -68,6 +69,7 @@ func (mg *CloudManagement) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecretNamespace,
 		Extract:      ServiceManagerSecretNamespace(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
 		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
 		To: reference.To{
@@ -94,6 +96,7 @@ func (mg *Directory) ResolveReferences(ctx context.Context, c client.Reader) err
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.DirectoryGuid,
 		Extract:      DirectoryUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.DirectoryRef,
 		Selector:     mg.Spec.ForProvider.DirectorySelector,
 		To: reference.To{
@@ -120,6 +123,7 @@ func (mg *DirectoryEntitlement) ResolveReferences(ctx context.Context, c client.
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.DirectoryID),
 		Extract:      DirectoryUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.DirectoryRef,
 		Selector:     mg.Spec.ForProvider.DirectorySelector,
 		To: reference.To{
@@ -136,6 +140,7 @@ func (mg *DirectoryEntitlement) ResolveReferences(ctx context.Context, c client.
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.DirectoryID),
 		Extract:      DirectoryUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.InitProvider.DirectoryRef,
 		Selector:     mg.Spec.InitProvider.DirectorySelector,
 		To: reference.To{
@@ -162,6 +167,7 @@ func (mg *Entitlement) ResolveReferences(ctx context.Context, c client.Reader) e
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.SubaccountGuid,
 		Extract:      SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
@@ -188,6 +194,7 @@ func (mg *ServiceBinding) ResolveReferences(ctx context.Context, c client.Reader
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountID),
 		Extract:      SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
@@ -204,6 +211,7 @@ func (mg *ServiceBinding) ResolveReferences(ctx context.Context, c client.Reader
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.ServiceInstanceID),
 		Extract:      ServiceInstanceUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.ServiceInstanceRef,
 		Selector:     mg.Spec.ForProvider.ServiceInstanceSelector,
 		To: reference.To{
@@ -230,6 +238,7 @@ func (mg *ServiceInstance) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecret,
 		Extract:      ServiceManagerSecret(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
 		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
 		To: reference.To{
@@ -246,6 +255,7 @@ func (mg *ServiceInstance) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecretNamespace,
 		Extract:      ServiceManagerSecretNamespace(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
 		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
 		To: reference.To{
@@ -262,6 +272,7 @@ func (mg *ServiceInstance) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountID),
 		Extract:      SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
@@ -288,6 +299,7 @@ func (mg *ServiceManager) ResolveReferences(ctx context.Context, c client.Reader
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.SubaccountGuid,
 		Extract:      SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
@@ -314,6 +326,7 @@ func (mg *Subaccount) ResolveReferences(ctx context.Context, c client.Reader) er
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.GlobalAccountGuid,
 		Extract:      GlobalAccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.GlobalAccountRef,
 		Selector:     mg.Spec.ForProvider.GlobalAccountSelector,
 		To: reference.To{
@@ -330,6 +343,7 @@ func (mg *Subaccount) ResolveReferences(ctx context.Context, c client.Reader) er
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.DirectoryGuid,
 		Extract:      DirectoryUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.DirectoryRef,
 		Selector:     mg.Spec.ForProvider.DirectorySelector,
 		To: reference.To{
@@ -356,6 +370,7 @@ func (mg *SubaccountServiceBroker) ResolveReferences(ctx context.Context, c clie
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountID),
 		Extract:      reference.ExternalName(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
@@ -372,6 +387,7 @@ func (mg *SubaccountServiceBroker) ResolveReferences(ctx context.Context, c clie
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.SubaccountID),
 		Extract:      reference.ExternalName(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.InitProvider.SubaccountRef,
 		Selector:     mg.Spec.InitProvider.SubaccountSelector,
 		To: reference.To{
@@ -398,6 +414,7 @@ func (mg *Subscription) ResolveReferences(ctx context.Context, c client.Reader) 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSecret,
 		Extract:      CloudManagementSecret(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
@@ -414,6 +431,7 @@ func (mg *Subscription) ResolveReferences(ctx context.Context, c client.Reader) 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSecretNamespace,
 		Extract:      CloudManagementSecretNamespace(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
