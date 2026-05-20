@@ -205,7 +205,7 @@ func TestObserve(t *testing.T) {
 			defer restore()
 
 			c := testClient()
-			got, err := Observe(c, context.Background(), tc.args.cr)
+			got, err := Observe(c, context.Background(), nil, tc.args.cr)
 			expectedErrorBehaviour(t, tc.want.err, err)
 			if diff := cmp.Diff(tc.want.CalledIdentifier, tc.args.client.CalledIdentifier); diff != "" {
 				t.Errorf("\n%s\nObserve(...): -want, +CalledIdentifier:\n", diff)
@@ -302,7 +302,7 @@ func TestCreate(t *testing.T) {
 			defer restore()
 
 			c := testClient()
-			got, err := Create(c, context.Background(), tc.args.cr)
+			got, err := Create(c, context.Background(), nil, tc.args.cr)
 
 			expectedErrorBehaviour(t, tc.want.err, err)
 			if diff := cmp.Diff(tc.want.o, got); diff != "" {
@@ -369,7 +369,7 @@ func TestUpdate(t *testing.T) {
 			defer restore()
 
 			c := testClient()
-			got, err := Update(c, context.Background(), tc.args.cr)
+			got, err := Update(c, context.Background(), nil, tc.args.cr)
 
 			expectedErrorBehaviour(t, tc.want.err, err)
 			if diff := cmp.Diff(tc.want.CalledIdentifier, tc.args.client.CalledIdentifier); diff != "" {
@@ -458,7 +458,7 @@ func TestDelete(t *testing.T) {
 			defer restore()
 
 			c := testClient()
-			_, err := Delete(c, context.Background(), tc.args.cr)
+			_, err := Delete(c, context.Background(), nil, tc.args.cr)
 			if diff := cmp.Diff(tc.want.CalledIdentifier, tc.args.client.CalledIdentifier); diff != "" {
 				t.Errorf("\n%s\nDelete(...): -want, +CalledIdentifier:\n", diff)
 			}
@@ -600,7 +600,7 @@ func TestConnect(t *testing.T) {
 			}
 
 			c := Client{kube: tc.args.kube}
-			_, err := Observe(c, context.Background(), tc.args.cr)
+			_, err := Observe(c, context.Background(), nil, tc.args.cr)
 			expectedErrorBehaviour(t, tc.want.err, err)
 		})
 	}

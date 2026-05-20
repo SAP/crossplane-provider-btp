@@ -8,11 +8,15 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	base "github.com/sap/crossplane-provider-btp/apis/base/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/internal/controller/logic"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
@@ -20,14 +24,27 @@ const (
 	errEmptyGUID        = "BTP Global Account GUID is empty"
 )
 
+// Options is the per-Setup configuration for the GlobalAccount controller.
+type Options = logic.Options
+
 // Client defines the interface for global account operations.
 type Client struct {
-	btp btp.Client
+	btp     btp.Client
+	tracker tracking.ReferenceResolverTracker
 }
 
-// Connect creates a Client from a BTP client.
-func Connect(btpClient *btp.Client, _ client.Client) Client {
-	return Client{btp: *btpClient}
+// Setup wires up the GlobalAccount controller via the shared logic.Setup helper.
+func Setup(mgr ctrl.Manager, o Options, obj client.Object, kind string, gvk schema.GroupVersionKind, mk logic.MakeExternal) error {
+	return logic.Setup(mgr, o, obj, kind, gvk, mk)
+}
+
+// Connect builds a *btp.Client for the supplied managed resource.
+func Connect(ctx context.Context, mg resource.Managed, kube client.Client) (Client, error) {
+	btpClient, tracker, err := logic.BuildBTPClient(ctx, mg, kube)
+	if err != nil {
+		return Client{}, err
+	}
+	return Client{btp: *btpClient, tracker: tracker}, nil
 }
 
 // MigrateExternalName is a no-op for GlobalAccount (no legacy format migration needed).
@@ -36,7 +53,11 @@ func MigrateExternalName(_ Client, _ context.Context, _ resource.Managed, _ *bas
 }
 
 // Observe checks the external state of a global account.
-func Observe(c Client, ctx context.Context, cr *base.BaseGlobalAccount) (managed.ExternalObservation, error) {
+func Observe(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseGlobalAccount) (managed.ExternalObservation, error) {
+	if c.tracker != nil {
+		c.tracker.SetConditions(ctx, mg)
+	}
+
 	if meta.WasDeleted(cr) {
 		if cr.Status.GetCondition(providerv1alpha1.UseCondition).Reason == providerv1alpha1.InUseReason {
 			return managed.ExternalObservation{ResourceExists: true}, nil
@@ -64,17 +85,24 @@ func Observe(c Client, ctx context.Context, cr *base.BaseGlobalAccount) (managed
 }
 
 // Create is a no-op for GlobalAccount.
-func Create(_ Client, _ context.Context, _ *base.BaseGlobalAccount) (managed.ExternalCreation, error) {
+func Create(_ Client, _ context.Context, _ resource.Managed, _ *base.BaseGlobalAccount) (managed.ExternalCreation, error) {
 	return managed.ExternalCreation{}, nil
 }
 
 // Update is a no-op for GlobalAccount.
-func Update(_ Client, _ context.Context, _ *base.BaseGlobalAccount) (managed.ExternalUpdate, error) {
+func Update(_ Client, _ context.Context, _ resource.Managed, _ *base.BaseGlobalAccount) (managed.ExternalUpdate, error) {
 	return managed.ExternalUpdate{}, nil
 }
 
 // Delete handles deletion of a GlobalAccount.
-func Delete(_ Client, _ context.Context, cr *base.BaseGlobalAccount) (managed.ExternalDelete, error) {
+func Delete(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseGlobalAccount) (managed.ExternalDelete, error) {
+	if c.tracker != nil {
+		c.tracker.SetConditions(ctx, mg)
+		if c.tracker.DeleteShouldBeBlocked(mg) {
+			return managed.ExternalDelete{}, logic.DeleteBlockedError()
+		}
+	}
+
 	cr.Status.SetConditions(xpv1.Deleting())
 	return managed.ExternalDelete{}, nil
 }

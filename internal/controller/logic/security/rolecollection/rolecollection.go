@@ -8,12 +8,15 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	base "github.com/sap/crossplane-provider-btp/apis/base/security/v1alpha1"
 	legacyv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/btp"
 	service "github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollection"
+	"github.com/sap/crossplane-provider-btp/internal/controller/logic"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
@@ -26,6 +29,9 @@ const (
 )
 
 var errInvalidSecret = errors.New("api credential secret invalid")
+
+// Options is the per-Setup configuration for the RoleCollection controller.
+type Options = logic.Options
 
 // RoleCollectionMaintainer defines the contract for XSUAA role collection operations.
 type RoleCollectionMaintainer interface {
@@ -44,14 +50,26 @@ var configureRoleCollectionMaintainerFn = func(ctx context.Context, binding *leg
 	return service.NewXsuaaRoleCollectionMaintainer(ctx, binding.ClientId, binding.ClientSecret, binding.TokenURL, binding.ApiUrl), nil
 }
 
-// Client holds the kube client for XSUAA credential resolution.
+// Client holds the kube client for XSUAA credential resolution and the tracker for
+// SetConditions / DeleteShouldBeBlocked.
 type Client struct {
-	kube client.Client
+	kube    client.Client
+	tracker tracking.ReferenceResolverTracker
 }
 
-// Connect creates a Client from a BTP client and kube client.
-func Connect(_ *btp.Client, kube client.Client) Client {
-	return Client{kube: kube}
+// Setup wires up the RoleCollection controller via the shared logic.Setup helper.
+func Setup(mgr ctrl.Manager, o Options, obj client.Object, kind string, gvk schema.GroupVersionKind, mk logic.MakeExternal) error {
+	return logic.Setup(mgr, o, obj, kind, gvk, mk)
+}
+
+// Connect returns a Client carrying the kube client and a fresh tracker. RoleCollection
+// reads XSUAA credentials directly from a secret resolved via the API credential
+// reference, so no btp.Client construction is needed here.
+func Connect(_ context.Context, _ resource.Managed, kube client.Client) (Client, error) {
+	return Client{
+		kube:    kube,
+		tracker: tracking.NewDefaultReferenceResolverTracker(kube),
+	}, nil
 }
 
 // MigrateExternalName is a no-op for RoleCollection (uses name as identifier, not a GUID).
@@ -60,7 +78,11 @@ func MigrateExternalName(_ Client, _ context.Context, _ resource.Managed, _ *bas
 }
 
 // Observe checks the external state of a role collection.
-func Observe(c Client, ctx context.Context, cr *base.BaseRoleCollection) (managed.ExternalObservation, error) {
+func Observe(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseRoleCollection) (managed.ExternalObservation, error) {
+	if c.tracker != nil {
+		c.tracker.SetConditions(ctx, mg)
+	}
+
 	externalName := meta.GetExternalName(cr)
 	if externalName == "" {
 		return managed.ExternalObservation{ResourceExists: false}, nil
@@ -99,7 +121,7 @@ func Observe(c Client, ctx context.Context, cr *base.BaseRoleCollection) (manage
 }
 
 // Create provisions a new role collection.
-func Create(c Client, ctx context.Context, cr *base.BaseRoleCollection) (managed.ExternalCreation, error) {
+func Create(c Client, ctx context.Context, _ resource.Managed, cr *base.BaseRoleCollection) (managed.ExternalCreation, error) {
 	cr.Status.SetConditions(xpv1.Creating())
 
 	maintainer, err := createMaintainer(c, ctx, cr)
@@ -120,7 +142,7 @@ func Create(c Client, ctx context.Context, cr *base.BaseRoleCollection) (managed
 }
 
 // Update modifies an existing role collection.
-func Update(c Client, ctx context.Context, cr *base.BaseRoleCollection) (managed.ExternalUpdate, error) {
+func Update(c Client, ctx context.Context, _ resource.Managed, cr *base.BaseRoleCollection) (managed.ExternalUpdate, error) {
 	maintainer, err := createMaintainer(c, ctx, cr)
 	if err != nil {
 		return managed.ExternalUpdate{}, err
@@ -136,7 +158,14 @@ func Update(c Client, ctx context.Context, cr *base.BaseRoleCollection) (managed
 }
 
 // Delete removes a role collection.
-func Delete(c Client, ctx context.Context, cr *base.BaseRoleCollection) (managed.ExternalDelete, error) {
+func Delete(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseRoleCollection) (managed.ExternalDelete, error) {
+	if c.tracker != nil {
+		c.tracker.SetConditions(ctx, mg)
+		if c.tracker.DeleteShouldBeBlocked(mg) {
+			return managed.ExternalDelete{}, logic.DeleteBlockedError()
+		}
+	}
+
 	cr.Status.SetConditions(xpv1.Deleting())
 
 	maintainer, err := createMaintainer(c, ctx, cr)
@@ -172,9 +201,9 @@ func toLegacyCredentialsRef(ref *base.XSUAACredentialsReference) *legacyv1alpha1
 			Source:                    ref.APICredentials.Source,
 			CommonCredentialSelectors: ref.APICredentials.CommonCredentialSelectors,
 		},
-		SubaccountApiCredentialSelector:          ref.SubaccountApiCredentialSelector,
-		SubaccountApiCredentialRef:               ref.SubaccountApiCredentialRef,
-		SubaccountApiCredentialSecret:            ref.SubaccountApiCredentialSecret,
-		SubaccountApiCredentialSecretNamespace:    ref.SubaccountApiCredentialSecretNamespace,
+		SubaccountApiCredentialSelector:        ref.SubaccountApiCredentialSelector,
+		SubaccountApiCredentialRef:             ref.SubaccountApiCredentialRef,
+		SubaccountApiCredentialSecret:          ref.SubaccountApiCredentialSecret,
+		SubaccountApiCredentialSecretNamespace: ref.SubaccountApiCredentialSecretNamespace,
 	}
 }

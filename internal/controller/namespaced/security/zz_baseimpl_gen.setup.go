@@ -4,14 +4,18 @@ package security
 
 import (
 	"github.com/sap/crossplane-provider-btp/internal/controller/namespaced/security/rolecollection"
-	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// Setup creates all controllers with the supplied logger and adds them to
-// the supplied manager.
-func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
-	for _, setup := range []func(ctrl.Manager, internalopts.CrossplaneOptions) error{
+// Options is the per-Setup configuration. Aliased to the first base type's logic
+// Options — every resource in this group is expected to share the same project-level
+// options type.
+type Options = rolecollection.Options
+
+// Setup creates all controllers for this group's resources and adds them to the
+// supplied manager.
+func Setup(mgr ctrl.Manager, o Options) error {
+	for _, setup := range []func(ctrl.Manager, Options) error{
 		rolecollection.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {

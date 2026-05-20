@@ -12,69 +12,48 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/namespaced/account/v1alpha1"
-	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/btp"
 	logic "github.com/sap/crossplane-provider-btp/internal/controller/logic/account/globalaccount"
-	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
-	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
-	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
-	errNotGlobalAccount     = "managed resource is not a GlobalAccount custom resource"
-	errConnectGlobalAccount = "cannot connect to provider"
+	errNotGlobalAccount = "managed resource is not a GlobalAccount custom resource"
 )
 
+// Options is the per-Setup configuration; re-exported from the logic package so the
+// per-group setup file can alias it without importing logic directly.
+type Options = logic.Options
+
 // Setup adds a controller that reconciles GlobalAccount managed resources.
-func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
-	return providerconfig.DefaultSetupWithoutDefaultInitializer(
-		mgr, o,
+func Setup(mgr ctrl.Manager, o Options) error {
+	return logic.Setup(mgr, o,
 		&apisv1alpha1.GlobalAccount{},
 		apisv1alpha1.GlobalAccountGroupKind,
 		apisv1alpha1.GlobalAccountGroupVersionKind,
-		func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
-			return &connector{
-				kube:            kube,
-				usage:           usage,
-				newServiceFn:    btp.NewBTPClient,
-				resourcetracker: resourcetracker,
-			}
-		},
+		makeExternal,
 	)
 }
 
-type connector struct {
-	kube            client.Client
-	usage           providerconfig.LegacyTracker
-	resourcetracker tracking.ReferenceResolverTracker
-	newServiceFn    func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
-}
-
-func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
+func makeExternal(ctx context.Context, mg resource.Managed, kube client.Client) (managed.ExternalClient, error) {
 	cr, ok := mg.(*apisv1alpha1.GlobalAccount)
 	if !ok {
 		return nil, errors.New(errNotGlobalAccount)
 	}
 	_ = cr
 
-	btpClient, err := providerconfig.CreateClient(ctx, mg, c.kube, c.usage, c.newServiceFn, c.resourcetracker)
+	svc, err := logic.Connect(ctx, mg, kube)
 	if err != nil {
-		return nil, errors.Wrap(err, errConnectGlobalAccount)
+		return nil, err
 	}
 
-	svcClient := logic.Connect(btpClient, c.kube)
-
 	return &external{
-		kube:            c.kube,
-		client:          svcClient,
-		resourcetracker: c.resourcetracker,
+		kube:   kube,
+		client: svc,
 	}, nil
 }
 
 type external struct {
-	kube            client.Client
-	client          logic.Client
-	resourcetracker tracking.ReferenceResolverTracker
+	kube   client.Client
+	client logic.Client
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -83,15 +62,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotGlobalAccount)
 	}
 
-	c.resourcetracker.SetConditions(ctx, cr)
-
 	baseCR := cr.ToBase()
 
 	if err := logic.MigrateExternalName(c.client, ctx, mg, baseCR, c.kube); err != nil {
 		return managed.ExternalObservation{}, err
 	}
 
-	obs, err := logic.Observe(c.client, ctx, baseCR)
+	obs, err := logic.Observe(c.client, ctx, mg, baseCR)
 	if err != nil {
 		return obs, err
 	}
@@ -109,7 +86,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	baseCR := cr.ToBase()
 
-	result, err := logic.Create(c.client, ctx, baseCR)
+	result, err := logic.Create(c.client, ctx, mg, baseCR)
 	if err != nil {
 		return result, err
 	}
@@ -128,7 +105,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	baseCR := cr.ToBase()
 
-	result, err := logic.Update(c.client, ctx, baseCR)
+	result, err := logic.Update(c.client, ctx, mg, baseCR)
 	if err != nil {
 		return result, err
 	}
@@ -144,14 +121,9 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotGlobalAccount)
 	}
 
-	c.resourcetracker.SetConditions(ctx, cr)
-	if blocked := c.resourcetracker.DeleteShouldBeBlocked(mg); blocked {
-		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
-	}
-
 	baseCR := cr.ToBase()
 
-	result, err := logic.Delete(c.client, ctx, baseCR)
+	result, err := logic.Delete(c.client, ctx, mg, baseCR)
 	if err != nil {
 		return result, err
 	}

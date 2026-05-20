@@ -2,479 +2,351 @@
 
 ## Overview
 
-The **baseimpl generator** is a code generation tool that produces scope-specific Kubernetes API types and controllers from a single set of base type definitions. It enables you to define your resource schemas once in `apis/base/v1alpha1/` and automatically generates both **cluster-scoped** and **namespaced** variants with complete Crossplane controller implementations.
+The **baseimpl generator** at `hack/generators/baseimpl/` produces scope-specific Kubernetes API types and controllers from a single set of base type definitions. You define a resource schema once under `apis/base/<group>/<version>/` and the generator emits a **cluster-scoped** variant under `apis/cluster/<group>/<version>/` and a **namespaced** variant under `apis/namespaced/<group>/<version>/`, plus controllers that delegate to a shared logic package.
 
-This eliminates the need to manually maintain duplicated code across scopes and ensures that business logic remains in a single, testable location.
+### Key benefits
 
-### Key Benefits
+- **Single source of truth.** Field definitions live in one place.
+- **Two scopes from one definition** — cluster-scoped (`<group>.example.crossplane.io`) and namespaced (`<group>.example.m.crossplane.io`).
+- **Generated controllers** that delegate to your logic functions.
+- **Cross-resource references** with scope-aware resolution (cluster `*xpv1.Reference` vs. namespaced `*xpv1.NamespacedReference`).
+- **Multi-version groups.** A single group can host base types at any number of versions side-by-side; both versions register at runtime.
+- **Provider-agnostic.** The generated controllers and API types reference only Crossplane runtime types and the project's logic package — no provider-specific imports leak in. To use this generator in another Crossplane provider, write the per-resource logic packages following the contract in [Adding a new resource](#adding-a-new-resource); no changes to the templates or the generator itself are required.
 
-- **Single source of truth** for resource field definitions
-- **Two scopes from one definition** — cluster-scoped (`aicore.crossplane.io`) and namespaced (`aicore.m.crossplane.io`)
-- **Generated controllers** that delegate to shared logic functions
-- **Cross-resource references** with automatic scope-aware resolution
-- **Type-safe conversions** between scoped types and base types via `ToBase()`/`FromBase()`
-
-## Quick Start
-
-### Running the Generator
+### Invocation
 
 ```bash
-make generate-baseimpl
+make generate-baseimpl   # baseimpl generator
+make generate            # controller-gen + angryjet (deepcopy, resolvers, CRD YAMLs)
 ```
 
-After running the generator, you can run:
-
-```bash
-make generate
-```
-
-This will run the kubebuilder code generators to produce deepcopy methods and CRD YAMLs based on the generated API types.
+Run `make generate-baseimpl` first, then `make generate`. The second pass picks up the newly emitted types.
 
 ---
 
-## Defining Base Types
+## Onboarding a new provider
 
-### Resource Type Definition
+Lifting the generator into a new Crossplane provider is a one-time, mostly-mechanical exercise. See [docs/onboarding.md](docs/onboarding.md) for the step-by-step walkthrough (prerequisites, CLI flags, directory layout, the project-shared helper pattern, what you do and do *not* have to write).
 
-Define your base types in `apis/base/v1alpha1/` with the `+codegen:generate:scoped` marker:
-
-Make sure to add the `+kubebuilder:skip` and `+kubebuilder:object:generate=false` markers to prevent CRD and deepcopy generation for the base types, as they are not meant to be used directly.
-
-```go
-// BaseConfigurationParameters are the configurable fields of a Configuration.
-type BaseConfigurationParameters struct {
-    // Name of the configuration
-    // +kubebuilder:validation:Required
-    Name string `json:"name"`
-
-    // ScenarioID is the ID of the scenario
-    // +kubebuilder:validation:Required
-    ScenarioID string `json:"scenarioId"`
-}
-
-// BaseConfigurationObservation are the observable fields of a Configuration.
-type BaseConfigurationObservation struct {
-    // ID is the configuration ID assigned by AI Core
-    ID string `json:"id,omitempty"`
-}
-
-// BaseConfigurationSpec defines the desired state of a Configuration.
-type BaseConfigurationSpec struct {
-    ForProvider BaseConfigurationParameters `json:"forProvider"`
-}
-
-// BaseConfigurationStatus represents the observed state of a Configuration.
-type BaseConfigurationStatus struct {
-    AtProvider BaseConfigurationObservation `json:"atProvider,omitempty"`
-}
-
-// BaseConfiguration is the base resource definition.
-// +codegen:generate:scoped
-// +kubebuilder:skip
-// +kubebuilder:object:generate=false
-type BaseConfiguration struct {
-    metav1.TypeMeta   `json:",inline"`
-    metav1.ObjectMeta `json:"metadata,omitempty"`
-    Spec              BaseConfigurationSpec   `json:"spec"`
-    Status            BaseConfigurationStatus `json:"status,omitempty"`
-}
-```
-
-### Naming Convention
-
-The generator derives the resource name by stripping the `Base` prefix:
-
-| Base Type Name | Generated Resource Name | Generated File |
-|---|---|---|
-| `BaseConfiguration` | `Configuration` | `zz_generated.configuration.go` |
-| `BaseDeployment` | `Deployment` | `zz_generated.deployment.go` |
-
-The following companion types are expected to exist:
-
-| Convention | Example |
-|---|---|
-| `Base<Resource>Parameters` | `BaseConfigurationParameters` |
-| `Base<Resource>Observation` | `BaseConfigurationObservation` |
-| `Base<Resource>Spec` | `BaseConfigurationSpec` |
-| `Base<Resource>Status` | `BaseConfigurationStatus` |
-
-### Required Markers
-
-| Marker | Where | Purpose |
-|--------|-------|---------|
-| `+codegen:generate:scoped` | On the `Base<Resource>` struct | Triggers generation of scoped variants |
-| `+kubebuilder:skip` | On the `Base<Resource>` struct | Prevents CRD generation for the base type |
-| `+kubebuilder:object:generate=false` | On the `Base<Resource>` struct | Prevents deepcopy generation for the base type |
+For migrating an individual existing legacy controller into the generator's split layout, see [docs/migration-checklist.md](docs/migration-checklist.md).
 
 ---
 
-## Cross-Resource References
+## Directory layout
 
-References allow one resource to refer to another by Kubernetes name, which gets resolved to the external name (e.g., an AI Core configuration ID). The generator creates scope-appropriate reference fields.
+```
+apis/
+├── base/<group>/<version>/<resource>_types.go  ← source of truth (you write this)
+│   apis/base/<group>/<version>/doc.go          ← +groupName= marker
+├── cluster/<group>/<version>/                  ← generated
+│   apis/cluster/<group>/zz_baseimpl_gen.<group>.go        ← per-group aggregator
+└── namespaced/<group>/<version>/               ← generated
+    apis/namespaced/<group>/zz_baseimpl_gen.<group>.go     ← per-group aggregator
 
-### Defining References
-
-Create a `<Resource>References` struct with the `+codegen:references` marker:
-
-```go
-// DeploymentReferences defines reference configuration for code generation.
-// +codegen:references
-// +kubebuilder:object:generate=false
-type DeploymentReferences struct {
-    // +codegen:reference:target=Configuration,field=Spec.ForProvider.Configuration
-    ConfigurationRef bool
-}
+internal/controller/
+├── logic/<group>/<resource>/                   ← shared business logic (you write this)
+├── cluster/<group>/<resource>/                 ← generated controller
+│   internal/controller/cluster/<group>/zz_baseimpl_gen.setup.go    ← per-group setup
+└── namespaced/<group>/<resource>/              ← generated controller
+    internal/controller/namespaced/<group>/zz_baseimpl_gen.setup.go ← per-group setup
 ```
 
-The `+codegen:reference` marker has two parameters:
-- **`target=<Resource>`** — The resource type being referenced (e.g., `Configuration`)
-- **`field=<FieldPath>`** — The field path on the *base spec* where the resolved value should be stored (e.g., `Spec.ForProvider.Configuration`)
+Controller directories are **version-agnostic** — the same `<resource>` directory holds the controller regardless of which version of the base type drove generation.
 
-### What Gets Generated
-
-For each reference, the generator creates three fields in the scoped `Parameters` struct:
-
-**Cluster-scoped** (using standard Crossplane v1 references):
-```go
-Configuration         string          `json:"configuration,omitempty"`
-ConfigurationRef      *xpv1.Reference `json:"configurationRef,omitempty"`
-ConfigurationSelector *xpv1.Selector  `json:"configurationSelector,omitempty"`
-```
-
-**Namespaced** (using Crossplane v2 namespaced references):
-```go
-Configuration         string                    `json:"configuration,omitempty"`
-ConfigurationRef      *xpv1.NamespacedReference `json:"configurationRef,omitempty"`
-ConfigurationSelector *xpv1.NamespacedSelector  `json:"configurationSelector,omitempty"`
-```
-
-### How Reference Resolution Works
-
-The reference resolution flow has several moving parts:
-
-1. **User specifies** a `configurationRef` (or `configurationSelector`) in their Deployment YAML
-2. **Crossplane's angryjet** generates `ResolveReferences()` methods (in `zz_generated.resolvers.go`) that resolve the reference to the external name of the target resource
-3. **The resolved value** is stored in the `Configuration` field (the plain string field)
-4. **`ToBase()` copies** the resolved value into `BaseDeploymentSpec.Configuration`
-5. **The logic layer** reads `cr.Spec.Configuration` to get the resolved AI Core configuration ID
-
-### The `BaseSpec` Extra Field Pattern
-
-For references, the base spec needs a non-serialized field to carry the resolved value:
-
-```go
-type BaseDeploymentSpec struct {
-    ForProvider   BaseDeploymentParameters `json:"forProvider"`
-    // Configuration is resolved from the reference — not serialized.
-    Configuration string `json:"-"`
-}
-```
-
-The `json:"-"` tag ensures this field is not part of the CRD schema. It exists solely as a transport mechanism between `ToBase()`/`FromBase()` and the logic layer.
+All generated files are prefixed `zz_baseimpl_gen.` and are overwritten on every generator run; never edit them by hand.
 
 ---
 
-## Adding a New Resource
+## Defining a base type
 
-Follow these steps to add a new resource type (e.g., `Artifact`):
+A base type lives in `apis/base/<group>/<version>/<resource>_types.go`. Each version directory needs its own `doc.go`:
 
-### Step 1: Define Base Types
+```go
+// apis/base/example/v1alpha1/doc.go
+// +kubebuilder:object:generate=true
+// +groupName=example.crossplane.io
+package v1alpha1
+```
 
-Create `apis/base/v1alpha1/artifact_types.go`:
+The base type itself follows the convention `Base<Resource>` with companion `Base<Resource>{Parameters,Observation,Spec,Status}` types:
 
 ```go
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+    xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
-type BaseArtifactParameters struct {
-    Name       string `json:"name"`
-    ScenarioID string `json:"scenarioId"`
+type BaseResourceParameters struct {
+    DisplayName string `json:"displayName"`
 }
 
-type BaseArtifactObservation struct {
+type BaseResourceObservation struct {
     ID string `json:"id,omitempty"`
 }
 
-type BaseArtifactSpec struct {
-    ForProvider BaseArtifactParameters `json:"forProvider"`
+type BaseResourceSpec struct {
+    ForProvider BaseResourceParameters `json:"forProvider"`
 }
 
-type BaseArtifactStatus struct {
-    AtProvider BaseArtifactObservation `json:"atProvider,omitempty"`
+type BaseResourceStatus struct {
+    xpv1.ConditionedStatus `json:",inline"`
+    AtProvider             BaseResourceObservation `json:"atProvider,omitempty"`
 }
 
+// BaseResource is the base resource definition for Resource.
 // +codegen:generate:scoped
-// +kubebuilder:skip
 // +kubebuilder:object:generate=false
-type BaseArtifact struct {
-    metav1.TypeMeta   `json:",inline"`
+type BaseResource struct {
     metav1.ObjectMeta `json:"metadata,omitempty"`
-    Spec              BaseArtifactSpec   `json:"spec"`
-    Status            BaseArtifactStatus `json:"status,omitempty"`
+    Spec              BaseResourceSpec   `json:"spec"`
+    Status            BaseResourceStatus `json:"status,omitempty"`
 }
 ```
 
-### Step 2: Create the API Client
+The generator strips the `Base` prefix to derive the resource name (`BaseResource` → `Resource`). Files are emitted as `zz_baseimpl_gen.<lower-resource>_types.go`.
 
-Create `internal/client/artifact/artifact.go` implementing the external API calls (Get, Create, Update, Delete).
+---
 
-### Step 3: Create the Logic Layer
+## Marker reference
 
-Create `internal/controller/logic/artifact/artifact.go` with these functions:
+### Resource-level markers (on `Base<Resource>`)
+
+| Marker | Required | Effect |
+|---|---|---|
+| `+codegen:generate:scoped` | yes | Triggers scoped-type generation. Without it the type is ignored. |
+| `+kubebuilder:object:generate=false` | yes | Prevents controller-gen from producing deepcopy methods on the base type — only the scoped variants need them. |
+| `+codegen:categories=<list>` | no | Sets the `categories=` value in the scoped CRD's `+kubebuilder:resource:` marker. Defaults to the configured provider name. |
+| `+codegen:deprecatedversion:warning="<msg>"` | no | Emits `+kubebuilder:deprecatedversion:warning=` on the scoped CRD. |
+
+Free-form doc lines on the `Base<Resource>` struct (anything that is not a `+marker` line and not the boilerplate `BaseX is the base resource definition for X.` line) are copied verbatim above the generated scoped type.
+
+### Reference markers
+
+There are two ways to declare cross-resource references. Both produce the same generated output; the choice depends on whether the field already has angryjet markers in the base package.
+
+**1. Sidecar `<Resource>References` struct** — for references whose resolved value lands on a `BaseXxxParameters` field that has no markers of its own. Each field of the sidecar struct represents one reference:
+
+| Marker (above a sidecar struct field) | Required | Purpose |
+|---|---|---|
+| `+codegen:reference:target=<Target>` | yes | The target resource type (bare name, e.g. `OtherResource`, or fully-qualified `github.com/.../v1alpha1.Foo`). |
+| `+codegen:reference:group=<group>` | yes | API group of the target (used for tracker tags). |
+| `+codegen:reference:apiversion=<version>` | yes | API version of the target. |
+| `+codegen:reference:field=Spec.ForProvider.<Field>` | yes | Path to the value field on the base spec that receives the resolved external name. |
+| `+codegen:reference:refName=<Name>` | no | Override for the `Ref` field name. Defaults to `<Field>Ref`. |
+| `+codegen:reference:selectorName=<Name>` | no | Override for the `Selector` field name. Defaults to `<Field>Selector`. |
+| `+codegen:reference:extractor=<expr>` | no | Fully-qualified extractor expression. Defaults to angryjet's `ExternalName()`. |
+| `+codegen:reference:refDescription=<text>` | no | Free-form doc comment for the generated `Ref` field. Use `\n` for line breaks. |
+| `+codegen:reference:immutableRef=true` | no | Emits an `XValidation` rule that prevents the ref name from changing once set. |
+
+The sidecar struct must itself carry `+codegen:references` and `+kubebuilder:object:generate=false`. Its name must be `<Resource>References` (e.g. `ResourceReferences`).
 
 ```go
-package artifact
-
-func Connect(data []byte, resourceGroup string) (client.Client, error) { ... }
-func Observe(c client.Client, ctx context.Context, cr *base.BaseArtifact) (managed.ExternalObservation, xpv1.Condition, error) { ... }
-func Create(c client.Client, ctx context.Context, cr *base.BaseArtifact) (managed.ExternalCreation, xpv1.Condition, error) { ... }
-func Update(c client.Client, ctx context.Context, cr *base.BaseArtifact) (managed.ExternalUpdate, error) { ... }
-func Delete(c client.Client, ctx context.Context, cr *base.BaseArtifact) (managed.ExternalDelete, xpv1.Condition, error) { ... }
+// ResourceReferences declares references for code generation.
+// +codegen:references
+// +kubebuilder:object:generate=false
+type ResourceReferences struct {
+    // +codegen:reference:target=OtherResource
+    // +codegen:reference:group=example.crossplane.io
+    // +codegen:reference:apiversion=v1alpha1
+    // +codegen:reference:field=Spec.ForProvider.OtherResourceID
+    // +codegen:reference:immutableRef=true
+    OtherResourceRef bool
+}
 ```
 
-### Step 4: Run the Generator
+**2. `+codegen:references` on an embedded spec field** — for references whose value field already has angryjet `+crossplane:generate:reference:*` markers in the base package. The generator discovers everything from those markers and from the existing `reference-group:` / `reference-apiversion:` struct tags on the matching `Ref` pointer, so no further authored input is needed:
+
+```go
+type BaseResourceSpec struct {
+    ForProvider BaseResourceParameters `json:"forProvider"`
+
+    // +codegen:references
+    SharedCredentialsReference `json:",inline"`
+}
+```
+
+When this marker is on a field, the generator walks the embedded type, harvests every `+crossplane:generate:reference:type=` / `refFieldName=` / `selectorFieldName=` / `extractor=` marker, reads `reference-group:` / `reference-apiversion:` from the matching `Ref` field's struct tag, and emits a local copy of the embedded struct in each scoped package with the markers angryjet needs.
+
+The marker in this position takes no parameters; the embedded type's own annotations supply everything.
+
+### Custom-method markers
+
+| Marker | Where | Purpose |
+|---|---|---|
+| `+codegen:method:field=<FieldPath>` | On a method declaration in a `Managed<Resource>` interface | Generates an accessor method that returns a value extracted from the given field path on the scoped type. The base resource definition exposes the method through the generated `Managed<Resource>` interface. |
+
+This marker is supported by the parser but not currently used in this codebase.
+
+---
+
+## What gets generated
+
+For each `Base<Resource>` in `apis/base/<group>/<version>/`:
+
+| File | Path | Contents |
+|---|---|---|
+| Scoped type | `apis/<scope>/<group>/<version>/zz_baseimpl_gen.<resource>_types.go` | The `<Resource>` Go type, its Spec, Status, list type, kind metadata, and `init()` registering with the scheme. |
+| Conversion | `apis/<scope>/<group>/<version>/zz_baseimpl_gen.baseimpl.go` | `ToBase()` / `FromBase()` between scoped and base types; also the `Managed<Resource>` interface implementation. |
+| Type aliases | `apis/<scope>/<group>/<version>/zz_baseimpl_gen.types.go` | Re-exports of exported base structs and consts/vars (so consumers can import from the scoped package without touching `base/`). |
+| Doc | `apis/<scope>/<group>/<version>/zz_baseimpl_gen.doc.go` | Trivial `package <version>` shim. |
+| Group/version info | `apis/<scope>/<group>/<version>/zz_baseimpl_gen.groupversion_info.go` | `+groupName=`, `+versionName=`, and the `SchemeBuilder`. |
+| Controller | `internal/controller/<scope>/<group>/<resource>/zz_baseimpl_gen.<resource>.go` | Full Crossplane controller that calls `logic.{Connect,Observe,Create,Update,Delete}`. |
+
+### Per-group aggregators
+
+These are emitted once per `(group, scope)`, covering every version of the group:
+
+| File | Path | Contents |
+|---|---|---|
+| Scheme registration | `apis/<scope>/<group>/zz_baseimpl_gen.<group>.go` | `package apis` with `init()` that adds every version's `SchemeBuilder.AddToScheme` to `AddToSchemes`. |
+| Setup | `internal/controller/<scope>/<group>/zz_baseimpl_gen.setup.go` | `Setup(mgr, opts)` calling each resource's `Setup` across all versions. |
+
+---
+
+## Multi-version groups
+
+A group can have base types at any number of versions side-by-side. To add a new version (for example `v1beta1`) to an existing group:
+
+1. Create `apis/base/<group>/v1beta1/doc.go` with the same `+groupName=` value used in `v1alpha1`.
+2. Drop your `Base<Resource>` files into `apis/base/<group>/v1beta1/`.
+3. Run `make generate-baseimpl`.
+
+The aggregator at `apis/<scope>/<group>/zz_baseimpl_gen.<group>.go` will register both `v1alpha1` and `v1beta1` `SchemeBuilder`s, and the controller setup file will wire up resources from both versions.
+
+**Collision rule.** Because controller directories are version-agnostic (`internal/controller/<scope>/<group>/<resource>/`), defining the same `Base<Resource>` in two version directories of the same group would silently overwrite the controller. The generator detects this and fails with an error pointing at both source paths.
+
+---
+
+## Adding a new resource
+
+### 1. Define the base type
+
+Create `apis/base/<group>/<version>/<resource>_types.go` following the conventions in *Defining a base type*. If the version directory is new, also create `doc.go`.
+
+### 2. Implement the logic layer
+
+Create `internal/controller/logic/<group>/<resource>/<resource>.go` with these exact signatures (the generated controller calls them by name):
+
+```go
+package <resource>
+
+import (
+    "context"
+
+    "github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+    "github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+    "k8s.io/apimachinery/pkg/runtime/schema"
+    ctrl "sigs.k8s.io/controller-runtime"
+    "sigs.k8s.io/controller-runtime/pkg/client"
+
+    base "<module>/apis/base/<group>/<version>"
+)
+
+// Options is the per-Setup configuration. Aliasing to a project-shared type lets the
+// generated Setup/group-setup signatures stay uniform across resources.
+type Options = <project>.Options
+
+// Client carries everything Observe/Create/Update/Delete need: the API client, kube,
+// any tracker the project wants to apply on the managed resource, etc.
+type Client struct { /* … */ }
+
+// Setup wires up this resource's controller. Typically delegates to a project-shared
+// helper that constructs the reconciler with the project's preferred providerconfig
+// and tracker setup.
+func Setup(mgr ctrl.Manager, o Options, obj client.Object, kind string, gvk schema.GroupVersionKind, mk MakeExternal) error
+
+// Connect builds the per-call Client for one managed resource.
+func Connect(ctx context.Context, mg resource.Managed, kube client.Client) (Client, error)
+
+// CRUD methods. Each takes mg so the project's tracker (carried in Client) can act
+// on the managed resource (SetConditions, DeleteShouldBeBlocked, …).
+func Observe(c Client, ctx context.Context, mg resource.Managed, cr *base.Base<R>) (managed.ExternalObservation, error)
+func Create(c Client, ctx context.Context, mg resource.Managed, cr *base.Base<R>)  (managed.ExternalCreation, error)
+func Update(c Client, ctx context.Context, mg resource.Managed, cr *base.Base<R>)  (managed.ExternalUpdate, error)
+func Delete(c Client, ctx context.Context, mg resource.Managed, cr *base.Base<R>)  (managed.ExternalDelete, error)
+
+// MigrateExternalName runs at the start of Observe. Most resources can return nil.
+func MigrateExternalName(c Client, ctx context.Context, mg resource.Managed, cr *base.Base<R>, kube client.Client) error
+
+// MakeExternal is the constructor signature Setup forwards to the project helper.
+type MakeExternal func(ctx context.Context, mg resource.Managed, kube client.Client) (managed.ExternalClient, error)
+```
+
+The logic package owns *all* provider-specific plumbing: API client construction, ProviderConfig resolution, reference trackers, deletion-block sentinels. The generated controller imports nothing project-internal beyond this logic package and the scoped API types. The same logic implementation drives both cluster and namespaced scopes because it only sees `*base.Base<Resource>` plus a generic `resource.Managed`.
+
+In practice every project will have a small shared helper (this repo: `internal/controller/logic/setup.go`) that wraps providerconfig + tracker boilerplate so each per-resource `Setup`, `Connect`, etc. is one or two lines. That helper is not part of the generator's contract — projects choose the path and naming.
+
+#### `mg` and `LegacyManaged`
+
+Both cluster-scoped and namespaced CRs satisfy `resource.Managed` from `crossplane-runtime/v2/pkg/resource`, so the `mg` parameter works under either scope. Cluster-scoped CRs additionally satisfy `resource.LegacyManaged`; namespaced ones do not. Project helpers that need `LegacyManaged` (e.g. for the legacy ProviderConfig usage tracker) should type-switch:
+
+```go
+if legacy, ok := mg.(resource.LegacyManaged); ok {
+    legacyTracker.Track(ctx, legacy)
+}
+```
+
+### 3. Set the external name in `Create`
+
+```go
+meta.SetExternalName(cr, resp.Id)
+```
+
+The generated controller copies annotations back to the scoped CR with `cr.SetAnnotations(baseCR.GetAnnotations())`, which propagates the external name.
+
+### 4. Run the generators
 
 ```bash
 make generate-baseimpl
-```
-
-### Step 5: Generate Deepcopy and CRDs
-
-```bash
 make generate
 ```
 
-### Step 6: Add References (Optional)
+### 5. Add references (optional)
 
-If your resource references another resource, add a references struct in the same `_types.go` file:
-
-```go
-// ArtifactReferences defines reference configuration.
-// +codegen:references
-// +kubebuilder:object:generate=false
-type ArtifactReferences struct {
-    // +codegen:reference:target=Scenario,field=Spec.ForProvider.ScenarioID
-    ScenarioRef bool
-}
-```
-
-And add the corresponding transport field to the base spec:
-
-```go
-type BaseArtifactSpec struct {
-    ForProvider BaseArtifactParameters `json:"forProvider"`
-    ScenarioID  string                `json:"-"` // resolved from reference
-}
-```
+Pick the matching flavour from *Reference markers*. If your resource references a target through a plain string field on `BaseXxxParameters`, use the sidecar struct. If your resource embeds an existing reference-bearing struct (with angryjet markers already in place), put `+codegen:references` on the embed field and skip the sidecar.
 
 ---
 
-## Generated Files Reference
+## Scope differences
 
-For each base type, the generator creates:
-
-### API Files (per scope)
-
-| File | Description |
-|------|-------------|
-| `apis/{scope}/v1alpha1/zz_generated.{resource}.go` | Scoped type with Crossplane embedding |
-| `apis/{scope}/v1alpha1/zz_generated.baseimpl.go` | `ToBase()`/`FromBase()` conversion methods |
-| `apis/{scope}/v1alpha1/zz_generated.doc.go` | Package documentation |
-| `apis/{scope}/v1alpha1/zz_generated.groupversion_info.go` | API group registration |
-| `apis/{scope}/v1alpha1/zz_generated.providerconfig_types.go` | ProviderConfig type |
-| `apis/{scope}/v1alpha1/zz_generated.providerconfigusage_types.go` | ProviderConfigUsage type |
-| `apis/{scope}/zz_generated.aicore.go` | Top-level package with scheme registration |
-
-### Controller Files (per scope)
-
-| File | Description |
-|------|-------------|
-| `internal/controller/{scope}/{resource}/zz_generated.{resource}.go` | Full controller implementation |
-| `internal/controller/{scope}/zz_generated.setup.go` | Controller registration for all resources |
-| `internal/controller/{scope}/utils/zz_generated.utils.go` | ProviderConfig usage tracker utilities |
-| `internal/controller/{scope}/providerconfig/zz_generated.providerconfig.go` | ProviderConfig controller |
-
-### Files You Must NOT Edit
-
-All `zz_generated.*` files are overwritten on every generator run. Never manually edit them.
-
-### Files You Must Maintain
-
-| File | Description |
-|------|-------------|
-| `apis/base/v1alpha1/*_types.go` | Base type definitions with markers |
-| `internal/controller/logic/{resource}/*.go` | Shared business logic |
-| `internal/client/{resource}/*.go` | External API client implementations |
-
----
-
-## Scope Differences
-
-| Feature | Cluster (`aicore.crossplane.io`) | Namespaced (`aicore.m.crossplane.io`) |
-|---------|----------------------------------|---------------------------------------|
+| Feature | Cluster | Namespaced |
+|---|---|---|
+| Group name | `<group>.example.crossplane.io` | `<group>.example.m.crossplane.io` |
 | Spec embedding | `xpv1.ResourceSpec` | `xpv2.ManagedResourceSpec` |
 | Status embedding | `xpv1.ResourceStatus` | `xpv1.ResourceStatus` |
 | Reference type | `*xpv1.Reference` | `*xpv1.NamespacedReference` |
 | Selector type | `*xpv1.Selector` | `*xpv1.NamespacedSelector` |
-| Connector | `WithExternalConnector` | `WithTypedExternalConnector` |
-| PC usage tracking | `LegacyProviderConfigUsageTracker` | Not needed (built into v2) |
-| ProviderConfig lookup | By name only | By name + namespace |
-| Kubebuilder scope | `scope=Cluster` | `scope=Namespaced` |
+| `+kubebuilder:resource:scope` | `Cluster` | `Namespaced` |
+| Resource group on resolved refs | `<group>.example.crossplane.io` | `<group>.example.m.crossplane.io` |
+
+Resolved cross-resource references in the namespaced output point at namespaced versions of their targets — the generator rewrites the group automatically.
 
 ---
 
-## Logic Layer Contract
+## Troubleshooting
 
-The generator expects the logic layer (`internal/controller/logic/{resource}/`) to export these exact function signatures:
+**Generator output doesn't include my new type.** Check that the type starts with `Base`, that `+codegen:generate:scoped` is in its doc comment block, and that the version directory has a `doc.go` with `+groupName=`. Without that doc.go, the version is silently skipped.
 
-```go
-// Connect creates an API client from credentials.
-func Connect(data []byte, resourceGroup string) (<client-type>, error)
+**`group X: resource Y defined in multiple versions` error.** A `Base<Y>` exists in two version directories of the same group. Pick one. (Same resource name in two *different* groups is fine.)
 
-// Observe checks the external resource state.
-func Observe(client <client-type>, ctx context.Context, cr *base.Base<Resource>) (managed.ExternalObservation, xpv1.Condition, error)
+**Reference resolves to empty string.** Normal during simultaneous apply; Crossplane retries until the target has an external name.
 
-// Create creates the external resource.
-func Create(client <client-type>, ctx context.Context, cr *base.Base<Resource>) (managed.ExternalCreation, xpv1.Condition, error)
+**`angryjet doesn't generate ResolveReferences` for a migrated cluster type.** angryjet doesn't follow imports across packages, so a base type that hides reference-bearing fields behind an embed (a struct in another package whose fields already carry `+crossplane:generate:reference:*` markers) needs the embed-marker variant of `+codegen:references` so the generator emits a local copy with the markers angryjet expects.
 
-// Update updates the external resource.
-func Update(client <client-type>, ctx context.Context, cr *base.Base<Resource>) (managed.ExternalUpdate, error)
+**CRD validation error: unknown field.** Re-run both `make generate-baseimpl` and `make generate`. The first regenerates the Go types; the second regenerates the CRD YAMLs and resolvers from those types.
 
-// Delete deletes the external resource.
-func Delete(client <client-type>, ctx context.Context, cr *base.Base<Resource>) (managed.ExternalDelete, xpv1.Condition, error)
-```
-
-**Important**: The logic layer works exclusively with `*base.Base<Resource>` types. It never imports or references the scoped types. This is what enables the same logic to work for both cluster and namespaced scopes.
-
-### Setting the External Name
-
-In your `Create` function, set the external name on the base resource:
-
-```go
-func Create(client Client, ctx context.Context, cr *base.BaseConfiguration) (managed.ExternalCreation, xpv1.Condition, error) {
-    resp, err := client.Create(ctx, req)
-    if err != nil {
-        return managed.ExternalCreation{}, xpv1.Condition{}, err
-    }
-
-    // Set external name — this is critical for reference resolution
-    meta.SetExternalName(cr, resp.Id)
-
-    return managed.ExternalCreation{}, xpv1.Creating(), nil
-}
-```
-
-The generated controller then copies annotations back: `cr.SetAnnotations(baseCR.GetAnnotations())`.
-
----
-
-## Common Issues and Troubleshooting
-
-### "Reference resolves to empty string"
-
-**Cause**: The referenced resource hasn't been created yet, or hasn't had its external name set.
-
-**Expected behavior**: This is normal when resources are applied simultaneously. Crossplane will retry until the reference resolves. The Deployment will remain in a "pending" state until the Configuration has an external name.
-
-### "Generator output doesn't include my new type"
-
-**Checklist**:
-1. Does your base type have the `+codegen:generate:scoped` marker?
-2. Does the type name start with `Base` (e.g., `BaseArtifact`)?
-3. Is the marker directly above the struct (in the doc comment block)?
-4. Did you run `make generate-baseimpl`?
-
-### "Compilation error: missing ToBase/FromBase method"
-
-**Cause**: The `zz_generated.baseimpl.go` file is out of date.
-
-**Fix**: Re-run `make generate-baseimpl`.
-
-### "CRD validation error: unknown field"
-
-**Cause**: CRDs were not regenerated after adding new fields.
-
-**Fix**: Regenerate CRDs after modifying base types:
-```bash
-make generate-baseimpl
-make generate
-```
-
-### "Reference field not appearing in CRD"
-
-**Cause**: Missing or incorrect `+codegen:references` marker.
-
-**Checklist**:
-1. The references struct name must be `<Resource>References` (e.g., `DeploymentReferences`)
-2. The struct must have the `+codegen:references` marker
-3. Each field must have `+codegen:reference:target=X,field=Y` in its doc comment
-4. The `field` path must point to a valid field on the base spec
-
-### "deepcopy generation fails for base types"
-
-**Cause**: Missing `+kubebuilder:object:generate=false` marker on base types.
-
-**Fix**: Ensure all `Base<Resource>` structs have:
-```go
-// +kubebuilder:object:generate=false
-```
-
-### "angryjet doesn't generate resolvers"
-
-**Cause**: The `+crossplane:generate:reference:type=<Target>` comment marker is missing from the generated scoped type.
-
-**Fix**: This marker is included in the scoped type template. Re-run `make generate-baseimpl` and then `go generate ./apis/...`.
+**Compilation error: missing `ToBase`/`FromBase`.** `zz_baseimpl_gen.baseimpl.go` is out of date. Re-run `make generate-baseimpl`.
 
 ---
 
 ## FAQ
 
-### Q: Can I add custom fields to the scoped types?
+**Can I add fields to the generated scoped types?** No. Add them to the base type under `apis/base/<group>/<version>/`; both scoped variants pick them up automatically.
 
-**A**: No. All `zz_generated.*` files are overwritten on every generator run. Add fields to the base types in `apis/base/v1alpha1/` instead, and they will appear in both scoped variants.
+**Can I have a resource with multiple references?** Yes — either add multiple fields to the sidecar `<Resource>References` struct, or put `+codegen:references` on multiple embedded fields in the spec.
 
-### Q: Can I have a resource with references to multiple other resources?
+**How do I change the API group name?** Edit the `+groupName=` marker in the version directory's `doc.go`. The namespaced group name is derived automatically by inserting `m.` before `crossplane.io` (e.g. `example.crossplane.io` → `example.m.crossplane.io`).
 
-**A**: Yes. Add multiple fields to the references struct:
-
-```go
-// +codegen:references
-// +kubebuilder:object:generate=false
-type DeploymentReferences struct {
-    // +codegen:reference:target=Configuration,field=Spec.ForProvider.Configuration
-    ConfigurationRef bool
-
-    // +codegen:reference:target=Scenario,field=Spec.ForProvider.ScenarioID
-    ScenarioRef bool
-}
-```
-
-Each will generate its own `Ref`/`Selector` field pair.
-
-### Q: How do I test my logic layer?
-
-**A**: The logic layer works with base types only, so you can test it without any Kubernetes dependencies:
-
-```go
-func TestCreate(t *testing.T) {
-    cr := &base.BaseConfiguration{
-        Spec: base.BaseConfigurationSpec{
-            ForProvider: base.BaseConfigurationParameters{
-                Name: "test",
-            },
-        },
-    }
-    mockClient := &MockClient{}
-    result, condition, err := Create(mockClient, context.Background(), cr)
-    // Assert...
-}
-```
-
-### Q: How do I change the API group name?
-
-**A**: The group names are defined as constants `GroupNameCluster` and `GroupNameNamespaced` in `constants.go`. Update those constants and re-run the generator.
-
-### Q: Why are there two different ProviderConfig tracker approaches?
-
-**A**: Cluster-scoped resources use the legacy Crossplane v1 `ProviderConfigUsageTracker` pattern, while namespaced resources use Crossplane v2's built-in tracking. This is handled automatically by the generator.
+**Can I test the logic layer without Kubernetes?** Yes. The logic layer takes `*base.Base<Resource>` directly; build one in-memory and call its functions with a mock client.

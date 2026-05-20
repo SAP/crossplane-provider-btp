@@ -13,13 +13,16 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	base "github.com/sap/crossplane-provider-btp/apis/base/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/controller/logic"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
@@ -27,14 +30,27 @@ const (
 	subaccountStateOk       = "OK"
 )
 
+// Options is the per-Setup configuration for the Subaccount controller.
+type Options = logic.Options
+
 // Client defines the interface for subaccount operations.
 type Client struct {
-	btp btp.Client
+	btp     btp.Client
+	tracker tracking.ReferenceResolverTracker
 }
 
-// Connect creates a Client from a BTP client.
-func Connect(btpClient *btp.Client, _ client.Client) Client {
-	return Client{btp: *btpClient}
+// Setup wires up the Subaccount controller via the shared logic.Setup helper.
+func Setup(mgr ctrl.Manager, o Options, obj client.Object, kind string, gvk schema.GroupVersionKind, mk logic.MakeExternal) error {
+	return logic.Setup(mgr, o, obj, kind, gvk, mk)
+}
+
+// Connect builds a *btp.Client for the supplied managed resource.
+func Connect(ctx context.Context, mg resource.Managed, kube client.Client) (Client, error) {
+	btpClient, tracker, err := logic.BuildBTPClient(ctx, mg, kube)
+	if err != nil {
+		return Client{}, err
+	}
+	return Client{btp: *btpClient, tracker: tracker}, nil
 }
 
 // MigrateExternalName migrates legacy external-name format (resource name) to GUID.
@@ -65,7 +81,11 @@ func MigrateExternalName(c Client, ctx context.Context, mg resource.Managed, bas
 }
 
 // Observe checks the external state of a subaccount.
-func Observe(c Client, ctx context.Context, cr *base.BaseSubaccount) (managed.ExternalObservation, error) {
+func Observe(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseSubaccount) (managed.ExternalObservation, error) {
+	if c.tracker != nil {
+		c.tracker.SetConditions(ctx, mg)
+	}
+
 	if meta.GetExternalName(cr) == "" {
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
@@ -100,7 +120,7 @@ func Observe(c Client, ctx context.Context, cr *base.BaseSubaccount) (managed.Ex
 }
 
 // Create provisions a new subaccount.
-func Create(c Client, ctx context.Context, cr *base.BaseSubaccount) (managed.ExternalCreation, error) {
+func Create(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseSubaccount) (managed.ExternalCreation, error) {
 	if cr.Status.AtProvider.Status != nil && *cr.Status.AtProvider.Status == "STARTED" {
 		return managed.ExternalCreation{}, nil
 	}
@@ -114,7 +134,7 @@ func Create(c Client, ctx context.Context, cr *base.BaseSubaccount) (managed.Ext
 }
 
 // Update modifies an existing subaccount.
-func Update(c Client, ctx context.Context, cr *base.BaseSubaccount) (managed.ExternalUpdate, error) {
+func Update(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseSubaccount) (managed.ExternalUpdate, error) {
 	if cr.Status.AtProvider.Status != nil && *cr.Status.AtProvider.Status == "CREATING" {
 		return managed.ExternalUpdate{}, nil
 	}
@@ -127,7 +147,14 @@ func Update(c Client, ctx context.Context, cr *base.BaseSubaccount) (managed.Ext
 }
 
 // Delete removes a subaccount.
-func Delete(c Client, ctx context.Context, cr *base.BaseSubaccount) (managed.ExternalDelete, error) {
+func Delete(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseSubaccount) (managed.ExternalDelete, error) {
+	if c.tracker != nil {
+		c.tracker.SetConditions(ctx, mg)
+		if c.tracker.DeleteShouldBeBlocked(mg) {
+			return managed.ExternalDelete{}, logic.DeleteBlockedError()
+		}
+	}
+
 	if cr.Status.AtProvider.Status != nil && *cr.Status.AtProvider.Status == subaccountStateDeleting {
 		return managed.ExternalDelete{}, nil
 	}

@@ -775,7 +775,7 @@ func TestObserve(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, err := Observe(tc.args.client, context.Background(), tc.args.cr)
+			got, err := Observe(tc.args.client, context.Background(), nil, tc.args.cr)
 			if contained := testutils.ContainsError(err, tc.want.err); !contained {
 				t.Errorf("\n%s\nObserve(...): error \"%v\" not part of \"%v\"", tc.reason, err, tc.want.err)
 			}
@@ -891,7 +891,7 @@ func TestCreate(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, err := Create(tc.args.client, context.Background(), tc.args.cr)
+			got, err := Create(tc.args.client, context.Background(), nil, tc.args.cr)
 			if contained := testutils.ContainsError(err, tc.want.err); !contained {
 				t.Errorf("\n%s\nCreate(...): error \"%v\" not part of \"%v\"", tc.reason, err, tc.want.err)
 			}
@@ -1006,7 +1006,7 @@ func TestDelete(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := Delete(tc.args.client, context.Background(), tc.args.cr)
+			_, err := Delete(tc.args.client, context.Background(), nil, tc.args.cr)
 			if contained := testutils.ContainsError(err, tc.want.err); !contained {
 				t.Errorf("\n%s\nDelete(...): error \"%v\" not part of \"%v\"", tc.reason, err, tc.want.err)
 			}
@@ -1197,7 +1197,7 @@ func TestUpdate(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, err := Update(tc.args.client, context.Background(), tc.args.cr)
+			got, err := Update(tc.args.client, context.Background(), nil, tc.args.cr)
 			if contained := testutils.ContainsError(err, tc.want.err); !contained {
 				t.Errorf("\n%s\nUpdate(...): error \"%v\" not part of \"%v\"", tc.reason, err, tc.want.err)
 			}

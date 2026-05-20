@@ -11,6 +11,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/google/uuid"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -19,17 +20,35 @@ import (
 	base "github.com/sap/crossplane-provider-btp/apis/base/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/controller/logic"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
+
+// Options is the per-Setup configuration; aliased to the shared logic.Options so the
+// generated controller can refer to it as logic.Options uniformly across resources.
+type Options = logic.Options
 
 // Client defines the interface for directory operations.
 type Client struct {
-	btp btp.Client
+	btp     btp.Client
+	tracker tracking.ReferenceResolverTracker
 }
 
-// Connect creates a Client from a BTP client.
-func Connect(btpClient *btp.Client, _ client.Client) Client {
-	return Client{btp: *btpClient}
+// Setup wires up the Directory controller via the shared logic.Setup helper.
+func Setup(mgr ctrl.Manager, o Options, obj client.Object, kind string, gvk schema.GroupVersionKind, mk logic.MakeExternal) error {
+	return logic.Setup(mgr, o, obj, kind, gvk, mk)
+}
+
+// Connect builds a *btp.Client for the supplied managed resource and wraps it for
+// per-call use by the generated controller. Returns the tracker alongside so the
+// returned Client can SetConditions / DeleteShouldBeBlocked from Observe and Delete.
+func Connect(ctx context.Context, mg resource.Managed, kube client.Client) (Client, error) {
+	btpClient, tracker, err := logic.BuildBTPClient(ctx, mg, kube)
+	if err != nil {
+		return Client{}, err
+	}
+	return Client{btp: *btpClient, tracker: tracker}, nil
 }
 
 // MigrateExternalName is a no-op for Directory (no legacy format migration needed).
@@ -38,7 +57,11 @@ func MigrateExternalName(_ Client, _ context.Context, _ resource.Managed, _ *bas
 }
 
 // Observe checks the external state of a directory.
-func Observe(c Client, ctx context.Context, cr *base.BaseDirectory) (managed.ExternalObservation, error) {
+func Observe(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseDirectory) (managed.ExternalObservation, error) {
+	if c.tracker != nil {
+		c.tracker.SetConditions(ctx, mg)
+	}
+
 	if meta.GetExternalName(cr) == "" {
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
@@ -86,7 +109,7 @@ func Observe(c Client, ctx context.Context, cr *base.BaseDirectory) (managed.Ext
 }
 
 // Create provisions a new directory.
-func Create(c Client, ctx context.Context, cr *base.BaseDirectory) (managed.ExternalCreation, error) {
+func Create(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseDirectory) (managed.ExternalCreation, error) {
 	cr.Status.SetConditions(xpv1.Creating())
 
 	var displayName string
@@ -124,7 +147,7 @@ func Create(c Client, ctx context.Context, cr *base.BaseDirectory) (managed.Exte
 }
 
 // Update modifies an existing directory.
-func Update(c Client, ctx context.Context, cr *base.BaseDirectory) (managed.ExternalUpdate, error) {
+func Update(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseDirectory) (managed.ExternalUpdate, error) {
 	extID := meta.GetExternalName(cr)
 	if extID == "" {
 		return managed.ExternalUpdate{}, errors.New("can not request API without GUID")
@@ -159,7 +182,14 @@ func Update(c Client, ctx context.Context, cr *base.BaseDirectory) (managed.Exte
 }
 
 // Delete removes a directory.
-func Delete(c Client, ctx context.Context, cr *base.BaseDirectory) (managed.ExternalDelete, error) {
+func Delete(c Client, ctx context.Context, mg resource.Managed, cr *base.BaseDirectory) (managed.ExternalDelete, error) {
+	if c.tracker != nil {
+		c.tracker.SetConditions(ctx, mg)
+		if c.tracker.DeleteShouldBeBlocked(mg) {
+			return managed.ExternalDelete{}, logic.DeleteBlockedError()
+		}
+	}
+
 	if cr.Status.AtProvider.EntityState != nil && *cr.Status.AtProvider.EntityState == "DELETING" {
 		return managed.ExternalDelete{}, nil
 	}
