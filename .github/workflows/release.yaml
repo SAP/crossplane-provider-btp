@@ -135,3 +135,6 @@ jobs:
         env:
           # GitHub sets the GITHUB_TOKEN secret automatically.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Index CRD documentation
+        run: curl -sL "https://doc.crds.dev/github.com/SAP/crossplane-provider-btp@${{ github.event.inputs.nextVersion }}"

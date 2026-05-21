@@ -3,7 +3,7 @@ package rolecollection
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 

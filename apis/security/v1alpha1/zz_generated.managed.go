@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha1
 
-import xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+import xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 
 // GetCondition of this GlobalaccountTrustConfiguration.
 func (mg *GlobalaccountTrustConfiguration) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
@@ -38,11 +38,6 @@ func (mg *GlobalaccountTrustConfiguration) GetManagementPolicies() xpv1.Manageme
 // GetProviderConfigReference of this GlobalaccountTrustConfiguration.
 func (mg *GlobalaccountTrustConfiguration) GetProviderConfigReference() *xpv1.Reference {
 	return mg.Spec.ProviderConfigReference
-}
-
-// GetPublishConnectionDetailsTo of this GlobalaccountTrustConfiguration.
-func (mg *GlobalaccountTrustConfiguration) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
-	return mg.Spec.PublishConnectionDetailsTo
 }
 
 // GetWriteConnectionSecretToReference of this GlobalaccountTrustConfiguration.
@@ -70,11 +65,6 @@ func (mg *GlobalaccountTrustConfiguration) SetProviderConfigReference(r *xpv1.Re
 	mg.Spec.ProviderConfigReference = r
 }
 
-// SetPublishConnectionDetailsTo of this GlobalaccountTrustConfiguration.
-func (mg *GlobalaccountTrustConfiguration) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetailsTo) {
-	mg.Spec.PublishConnectionDetailsTo = r
-}
-
 // SetWriteConnectionSecretToReference of this GlobalaccountTrustConfiguration.
 func (mg *GlobalaccountTrustConfiguration) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
@@ -98,11 +88,6 @@ func (mg *RoleCollection) GetManagementPolicies() xpv1.ManagementPolicies {
 // GetProviderConfigReference of this RoleCollection.
 func (mg *RoleCollection) GetProviderConfigReference() *xpv1.Reference {
 	return mg.Spec.ProviderConfigReference
-}
-
-// GetPublishConnectionDetailsTo of this RoleCollection.
-func (mg *RoleCollection) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
-	return mg.Spec.PublishConnectionDetailsTo
 }
 
 // GetWriteConnectionSecretToReference of this RoleCollection.
@@ -130,11 +115,6 @@ func (mg *RoleCollection) SetProviderConfigReference(r *xpv1.Reference) {
 	mg.Spec.ProviderConfigReference = r
 }
 
-// SetPublishConnectionDetailsTo of this RoleCollection.
-func (mg *RoleCollection) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetailsTo) {
-	mg.Spec.PublishConnectionDetailsTo = r
-}
-
 // SetWriteConnectionSecretToReference of this RoleCollection.
 func (mg *RoleCollection) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
@@ -158,11 +138,6 @@ func (mg *RoleCollectionAssignment) GetManagementPolicies() xpv1.ManagementPolic
 // GetProviderConfigReference of this RoleCollectionAssignment.
 func (mg *RoleCollectionAssignment) GetProviderConfigReference() *xpv1.Reference {
 	return mg.Spec.ProviderConfigReference
-}
-
-// GetPublishConnectionDetailsTo of this RoleCollectionAssignment.
-func (mg *RoleCollectionAssignment) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
-	return mg.Spec.PublishConnectionDetailsTo
 }
 
 // GetWriteConnectionSecretToReference of this RoleCollectionAssignment.
@@ -190,11 +165,6 @@ func (mg *RoleCollectionAssignment) SetProviderConfigReference(r *xpv1.Reference
 	mg.Spec.ProviderConfigReference = r
 }
 
-// SetPublishConnectionDetailsTo of this RoleCollectionAssignment.
-func (mg *RoleCollectionAssignment) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetailsTo) {
-	mg.Spec.PublishConnectionDetailsTo = r
-}
-
 // SetWriteConnectionSecretToReference of this RoleCollectionAssignment.
 func (mg *RoleCollectionAssignment) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
@@ -218,11 +188,6 @@ func (mg *SubaccountApiCredential) GetManagementPolicies() xpv1.ManagementPolici
 // GetProviderConfigReference of this SubaccountApiCredential.
 func (mg *SubaccountApiCredential) GetProviderConfigReference() *xpv1.Reference {
 	return mg.Spec.ProviderConfigReference
-}
-
-// GetPublishConnectionDetailsTo of this SubaccountApiCredential.
-func (mg *SubaccountApiCredential) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
-	return mg.Spec.PublishConnectionDetailsTo
 }
 
 // GetWriteConnectionSecretToReference of this SubaccountApiCredential.
@@ -250,11 +215,6 @@ func (mg *SubaccountApiCredential) SetProviderConfigReference(r *xpv1.Reference)
 	mg.Spec.ProviderConfigReference = r
 }
 
-// SetPublishConnectionDetailsTo of this SubaccountApiCredential.
-func (mg *SubaccountApiCredential) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetailsTo) {
-	mg.Spec.PublishConnectionDetailsTo = r
-}
-
 // SetWriteConnectionSecretToReference of this SubaccountApiCredential.
 func (mg *SubaccountApiCredential) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
@@ -280,11 +240,6 @@ func (mg *SubaccountTrustConfiguration) GetProviderConfigReference() *xpv1.Refer
 	return mg.Spec.ProviderConfigReference
 }
 
-// GetPublishConnectionDetailsTo of this SubaccountTrustConfiguration.
-func (mg *SubaccountTrustConfiguration) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
-	return mg.Spec.PublishConnectionDetailsTo
-}
-
 // GetWriteConnectionSecretToReference of this SubaccountTrustConfiguration.
 func (mg *SubaccountTrustConfiguration) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
 	return mg.Spec.WriteConnectionSecretToReference
@@ -308,11 +263,6 @@ func (mg *SubaccountTrustConfiguration) SetManagementPolicies(r xpv1.ManagementP
 // SetProviderConfigReference of this SubaccountTrustConfiguration.
 func (mg *SubaccountTrustConfiguration) SetProviderConfigReference(r *xpv1.Reference) {
 	mg.Spec.ProviderConfigReference = r
-}
-
-// SetPublishConnectionDetailsTo of this SubaccountTrustConfiguration.
-func (mg *SubaccountTrustConfiguration) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetailsTo) {
-	mg.Spec.PublishConnectionDetailsTo = r
 }
 
 // SetWriteConnectionSecretToReference of this SubaccountTrustConfiguration.

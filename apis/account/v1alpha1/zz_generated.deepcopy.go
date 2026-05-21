@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -2425,7 +2425,7 @@ func (in *SubaccountServiceBrokerInitParameters) DeepCopyInto(out *SubaccountSer
 		*out = new(string)
 		**out = **in
 	}
-	out.PasswordSecretRef = in.PasswordSecretRef
+	in.PasswordSecretRef.DeepCopyInto(&out.PasswordSecretRef)
 	if in.SubaccountID != nil {
 		in, out := &in.SubaccountID, &out.SubaccountID
 		*out = new(string)
@@ -2568,7 +2568,7 @@ func (in *SubaccountServiceBrokerParameters) DeepCopyInto(out *SubaccountService
 		*out = new(string)
 		**out = **in
 	}
-	out.PasswordSecretRef = in.PasswordSecretRef
+	in.PasswordSecretRef.DeepCopyInto(&out.PasswordSecretRef)
 	if in.SubaccountID != nil {
 		in, out := &in.SubaccountID, &out.SubaccountID
 		*out = new(string)

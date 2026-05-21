@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -133,6 +133,12 @@ func (m *MockTracker) SetConditions(ctx context.Context, mg resource.Managed) {}
 
 func (m *MockTracker) DeleteShouldBeBlocked(mg resource.Managed) bool {
 	return m.deleteBlocked
+}
+
+type noOpLegacyTracker struct{}
+
+func (n *noOpLegacyTracker) Track(ctx context.Context, mg resource.LegacyManaged) error {
+	return nil
 }
 
 func (m *MockTracker) ResolveSource(ctx context.Context, ru providerv1alpha1.ResourceUsage) (*metav1.PartialObjectMetadata, error) {
@@ -327,7 +333,7 @@ func TestConnect(t *testing.T) {
 
 			c := connector{
 				kube:              &test.MockClient{},
-				usage:             resource.TrackerFn(func(ctx context.Context, mg resource.Managed) error { return nil }),
+				usage:             &noOpLegacyTracker{},
 				resourcetracker:   tracker,
 				clientFactory:     mockFactory,
 				newSBKeyRotatorFn: newSBKeyRotatorFn,
@@ -885,7 +891,7 @@ func TestObserve(t *testing.T) {
 						"instance_name": []byte("my-instance"),
 						"instance_guid": []byte("instance-guid-123"),
 						"tags":          []byte("[]"),
-						".metadata":     mustMarshalJSON(secretMetadata{
+						".metadata": mustMarshalJSON(secretMetadata{
 							MetaDataProperties: []secretMetadataProperty{
 								{Name: "instance_name", Format: "text"},
 								{Name: "instance_guid", Format: "text"},
