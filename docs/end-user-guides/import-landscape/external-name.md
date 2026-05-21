@@ -114,7 +114,7 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 - How to find:
 
   - UI: BTP Cockpit → Subaccount → Security → Trust Configurations → [Origin column]
-  - CLI: `btp list security/trust --subaccount <subaccount-id>` → `originKey`
+  - CLI: `btp list security/trust --subaccount <subaccount-id>` → `Origin Key`
 
 ### Subscription
 
