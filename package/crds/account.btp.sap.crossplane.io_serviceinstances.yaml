@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: serviceinstances.account.btp.sap.crossplane.io
 spec:
   group: account.btp.sap.crossplane.io
@@ -389,6 +389,15 @@ spec:
                     type: string
                   id:
                     type: string
+                  labels:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: |-
+                      (Map of Set of String) The set of words or phrases assigned to the service instance.
+                      The set of words or phrases assigned to the service instance.
+                    type: object
                   lastModified:
                     description: The date and time when the resource was last modified.
                     format: date-time
@@ -399,9 +408,24 @@ spec:
                   ready:
                     description: Shows whether the service instance is ready.
                     type: boolean
+                  serviceOfferingName:
+                    description: |-
+                      (String) The name of the service offering of the plan.
+                      The name of the service offering of the plan.
+                    type: string
                   serviceplanId:
                     description: The ID of the service plan as resolved by the ServiceManager
                     type: string
+                  serviceplanName:
+                    description: |-
+                      (String) The name of the service plan.
+                      The name of the service plan.
+                    type: string
+                  shared:
+                    description: |-
+                      (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+                      The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+                    type: boolean
                   state:
                     description: The current state of the service instance.
                     type: string

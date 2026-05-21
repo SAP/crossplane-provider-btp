@@ -64,7 +64,9 @@ type ObservationData struct {
 	State        string       `json:"state,omitempty"`
 	Ready        *bool        `json:"ready,omitempty"`
 	Usable       *bool        `json:"usable,omitempty"`
-	PlatformID   string       `json:"platformId,omitempty"`
+	PlatformID          string `json:"platformId,omitempty"`
+	ServiceOfferingName string `json:"serviceOfferingName,omitempty"`
+	ServiceplanName     string `json:"serviceplanName,omitempty"`
 }
 
 // TfMapper is a generic interface to map a native resource to an upjet resource that will be used for applying to terraform
@@ -154,6 +156,12 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 			}
 			if platformID, ok := obs["platform_id"].(string); ok {
 				sid.PlatformID = platformID
+			}
+			if serviceOfferingName, ok := obs["service_offering_name"].(string); ok {
+				sid.ServiceOfferingName = serviceOfferingName
+			}
+			if serviceplanName, ok := obs["serviceplan_name"].(string); ok {
+				sid.ServiceplanName = serviceplanName
 			}
 		}
 
