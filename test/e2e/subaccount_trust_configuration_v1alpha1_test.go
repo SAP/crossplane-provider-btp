@@ -57,12 +57,8 @@ func Test_SubaccountTrustConfiguration_v1alpha1(t *testing.T) {
 	testenv.Test(t, fB.Feature())
 }
 
-// TestSubaccountTrustConfigurationImportFlow tests the import flow for SubaccountTrustConfiguration
-// according to the External Name Handling ADR.
-//
-// SubaccountTrustConfiguration is an ADR exception: the external-name is the trust configuration's
-// origin key (e.g. "sap.custom"), not a GUID. Import IS supported because the origin key can be
-// retrieved from the BTP API and used to re-adopt an existing trust configuration.
+// TestSubaccountTrustConfigurationImportFlow tests the import flow for SubaccountTrustConfiguration.
+// ADR(external-name): uses origin key (e.g. "sap.custom") as identifier, not a GUID.
 func TestSubaccountTrustConfigurationImportFlow(t *testing.T) {
 	const importK8sResName = "trust-config-import-test"
 

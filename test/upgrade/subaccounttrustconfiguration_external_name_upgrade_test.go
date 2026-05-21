@@ -20,17 +20,8 @@ var (
 	}
 )
 
-// Test_SubaccountTrustConfiguration_External_Name verifies that the SubaccountTrustConfiguration
-// external-name is correctly preserved during provider upgrades.
-//
-// SubaccountTrustConfiguration is an ADR exception: the SAP BTP Terraform provider uses the
-// origin key (e.g. "sap.custom") as the resource identifier, not a GUID. The external-name
-// should equal the origin key and must not change during a provider upgrade.
-//
-// This test ensures that:
-// 1. The external-name exists before upgrade and equals the origin key
-// 2. After upgrade, the external-name is unchanged
-// 3. The resource remains healthy after upgrade
+// Test_SubaccountTrustConfiguration_External_Name verifies that the external-name is preserved during upgrades.
+// ADR(external-name): uses origin key (e.g. "sap.custom") as identifier, not a GUID.
 func Test_SubaccountTrustConfiguration_External_Name(t *testing.T) {
 	const trustName = "upgrade-test-extn-trust"
 
@@ -84,9 +75,7 @@ func Test_SubaccountTrustConfiguration_External_Name(t *testing.T) {
 					t.Fatal("Could not retrieve pre-upgrade external name from context")
 				}
 
-				// The external-name must be unchanged: SubaccountTrustConfiguration uses the
-				// origin key as its Terraform resource identifier (ADR exception).
-				// No migration to UUID format should occur.
+				// ADR(external-name): origin key must not be migrated to UUID format during upgrade.
 				if externalName != preUpgradeExternalName {
 					t.Fatalf(
 						"External name changed during upgrade: before=%q, after=%q (expected no change)",
