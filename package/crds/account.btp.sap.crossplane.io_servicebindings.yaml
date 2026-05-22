@@ -367,6 +367,14 @@ spec:
                 - ""
                 - sap-kubernetes
                 type: string
+              secretKey:
+                description: |-
+                  SecretKey controls how credentials are stored in the connection secret.
+                  When set, all credential properties are bundled into a single JSON key with this name
+                  instead of being flattened into individual top-level keys.
+                  Combined with secretFormat "sap-kubernetes", the .metadata descriptor marks this key
+                  with "container: true" per the SAP Kubernetes Service Binding specification.
+                type: string
               writeConnectionSecretToRef:
                 description: |-
                   WriteConnectionSecretToReference specifies the namespace and name of a
