@@ -10,10 +10,13 @@ import (
 )
 
 const (
-	InstanceStateOk       = "OK"
-	InstanceStateCreating = "CREATING"
-	InstanceStateDeleting = "DELETING"
-	InstanceStateUpdating = "UPDATING"
+	InstanceStateOk             = "OK"
+	InstanceStateCreating       = "CREATING"
+	InstanceStateDeleting       = "DELETING"
+	InstanceStateUpdating       = "UPDATING"
+	InstanceStateCreationFailed = "CREATION_FAILED"
+	InstanceStateDeletionFailed = "DELETION_FAILED"
+	InstanceStateUpdateFailed   = "UPDATE_FAILED"
 )
 
 const (
