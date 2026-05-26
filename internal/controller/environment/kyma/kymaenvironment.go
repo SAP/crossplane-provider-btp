@@ -14,6 +14,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,6 +76,27 @@ type external struct {
 	record     event.Recorder
 }
 
+var creationFailureStates = []string{
+	v1alpha1.InstanceStateCreationFailed,
+}
+
+func environmentBeingDeleted(cr *v1alpha1.KymaEnvironment) bool {
+	readyCondition := cr.GetCondition(xpv1.TypeReady)
+	return readyCondition.Status == corev1.ConditionFalse && readyCondition.Reason == xpv1.ReasonDeleting
+}
+
+func (c *external) shouldRecreateOnFailure(cr *v1alpha1.KymaEnvironment, state *string) bool {
+	if !cr.Spec.RecreateOnCreationFailure || state == nil {
+		return false
+	}
+	for _, s := range creationFailureStates {
+		if *state == s {
+			return true
+		}
+	}
+	return false
+}
+
 // Disconnect is a no-op for the external client to close its connection.
 // Since we dont need this, we only have it to fullfil the interface.
 func (c *external) Disconnect(ctx context.Context) error {
@@ -127,6 +149,18 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	lastModified := cr.Status.AtProvider.ModifiedDate
 	cr.Status.AtProvider = kymaenv.GenerateObservation(instance)
+
+	if c.shouldRecreateOnFailure(cr, cr.Status.AtProvider.State) {
+		var err error
+		if !environmentBeingDeleted(cr) {
+			_, err = c.Delete(ctx, mg)
+		}
+		return managed.ExternalObservation{
+			ResourceExists:    true,
+			ResourceUpToDate:  true,
+			ConnectionDetails: managed.ConnectionDetails{},
+		}, err
+	}
 
 	if cr.Status.AtProvider.State == nil {
 		cr.Status.SetConditions(xpv1.Unavailable())
