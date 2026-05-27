@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 )
 
 func TestDetectFormat(t *testing.T) {
@@ -134,7 +136,7 @@ func TestEnrichConnectionDetails(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			result, err := enrichConnectionDetails(tc.inputCreds, tc.instanceName, tc.instanceGUID, tc.offeringName, tc.planName)
+			result, err := enrichConnectionDetails(tc.inputCreds, tc.instanceName, tc.instanceGUID, tc.offeringName, tc.planName, nil)
 
 			if tc.wantErr {
 				if err == nil {
@@ -165,6 +167,7 @@ func TestEnrichConnectionDetails_MetadataValues(t *testing.T) {
 		"guid-123",
 		"destination",
 		"lite",
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -200,6 +203,7 @@ func TestEnrichConnectionDetails_MetadataDescriptor(t *testing.T) {
 		"guid-123",
 		"xsuaa",
 		"application",
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -231,6 +235,50 @@ func TestEnrichConnectionDetails_MetadataDescriptor(t *testing.T) {
 	}
 }
 
+func TestEnrichConnectionDetails_WithSecretKey(t *testing.T) {
+	secretKey := "credentials"
+	result, err := enrichConnectionDetails(
+		map[string][]byte{
+			"credentials": []byte(`{"clientid":"x","url":"https://api.example.com"}`),
+		},
+		"my-instance",
+		"guid-123",
+		"destination",
+		"lite",
+		&secretKey,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Metadata keys should be present
+	if string(result["type"]) != "destination" {
+		t.Errorf("expected type 'destination', got %q", string(result["type"]))
+	}
+	if string(result["plan"]) != "lite" {
+		t.Errorf("expected plan 'lite', got %q", string(result["plan"]))
+	}
+
+	// .metadata should have container: true for the secretKey
+	var md secretMetadata
+	if err := json.Unmarshal(result[".metadata"], &md); err != nil {
+		t.Fatalf("failed to unmarshal .metadata: %v", err)
+	}
+
+	if len(md.CredentialProperties) != 1 {
+		t.Fatalf("expected 1 credential property, got %d", len(md.CredentialProperties))
+	}
+	if md.CredentialProperties[0].Name != "credentials" {
+		t.Errorf("expected credential name 'credentials', got %q", md.CredentialProperties[0].Name)
+	}
+	if md.CredentialProperties[0].Format != "json" {
+		t.Errorf("expected format 'json', got %q", md.CredentialProperties[0].Format)
+	}
+	if !md.CredentialProperties[0].Container {
+		t.Error("expected container: true")
+	}
+}
+
 func TestEnrichConnectionDetails_ReservedKeyOverwrite(t *testing.T) {
 	result, err := enrichConnectionDetails(
 		map[string][]byte{
@@ -240,6 +288,7 @@ func TestEnrichConnectionDetails_ReservedKeyOverwrite(t *testing.T) {
 		"guid-123",
 		"xsuaa",
 		"application",
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -247,5 +296,199 @@ func TestEnrichConnectionDetails_ReservedKeyOverwrite(t *testing.T) {
 
 	if string(result["type"]) != "xsuaa" {
 		t.Errorf("expected type to be overwritten to 'xsuaa', got %q", string(result["type"]))
+	}
+}
+
+func TestBundleCredentials(t *testing.T) {
+	cases := map[string]struct {
+		secretKey string
+		details   map[string][]byte
+		wantKey   string
+		wantErr   bool
+	}{
+		"SingleJSONObject": {
+			secretKey: "credentials",
+			details: map[string][]byte{
+				"attribute.credentials": []byte(`{"clientid":"x","clientsecret":"y","url":"https://api.example.com"}`),
+			},
+			wantKey: "credentials",
+		},
+		"MultipleKeys": {
+			secretKey: "credentials",
+			details: map[string][]byte{
+				"url":      []byte("https://api.example.com"),
+				"clientid": []byte("admin"),
+			},
+			wantKey: "credentials",
+		},
+		"EmptyDetails": {
+			secretKey: "credentials",
+			details:   map[string][]byte{},
+			wantKey:   "credentials",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			result, err := bundleCredentials(tc.secretKey, tc.details)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := result[tc.wantKey]; !ok {
+				t.Errorf("expected key %q in result", tc.wantKey)
+			}
+			if len(result) != 1 {
+				t.Errorf("expected exactly 1 key, got %d", len(result))
+			}
+			// Value should be valid JSON
+			if !json.Valid(result[tc.wantKey]) {
+				t.Errorf("value is not valid JSON: %s", string(result[tc.wantKey]))
+			}
+		})
+	}
+}
+
+func TestBundleCredentials_SingleJSONPreserved(t *testing.T) {
+	input := `{"clientid":"x","clientsecret":"y","uaa":{"url":"https://auth"}}`
+	result, err := bundleCredentials("credentials", map[string][]byte{
+		"attribute.credentials": []byte(input),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(result["credentials"]) != input {
+		t.Errorf("expected original JSON preserved, got %s", string(result["credentials"]))
+	}
+}
+
+func TestAssembleCredentialJSON(t *testing.T) {
+	cases := map[string]struct {
+		details map[string][]byte
+		check   func(t *testing.T, result []byte)
+	}{
+		"Empty": {
+			details: map[string][]byte{},
+			check: func(t *testing.T, result []byte) {
+				if string(result) != "{}" {
+					t.Errorf("expected '{}', got %q", string(result))
+				}
+			},
+		},
+		"SingleJSONPassthrough": {
+			details: map[string][]byte{
+				"creds": []byte(`{"a":"b"}`),
+			},
+			check: func(t *testing.T, result []byte) {
+				if string(result) != `{"a":"b"}` {
+					t.Errorf("expected passthrough, got %q", string(result))
+				}
+			},
+		},
+		"MultipleKeysAssembled": {
+			details: map[string][]byte{
+				"url":  []byte("https://api.example.com"),
+				"user": []byte("admin"),
+			},
+			check: func(t *testing.T, result []byte) {
+				var obj map[string]interface{}
+				if err := json.Unmarshal(result, &obj); err != nil {
+					t.Fatalf("invalid JSON: %v", err)
+				}
+				if obj["url"] != "https://api.example.com" {
+					t.Errorf("url mismatch: %v", obj["url"])
+				}
+				if obj["user"] != "admin" {
+					t.Errorf("user mismatch: %v", obj["user"])
+				}
+			},
+		},
+		"JSONValuePreservedAsObject": {
+			details: map[string][]byte{
+				"url": []byte("https://api.example.com"),
+				"uaa": []byte(`{"clientid":"x"}`),
+			},
+			check: func(t *testing.T, result []byte) {
+				var obj map[string]json.RawMessage
+				if err := json.Unmarshal(result, &obj); err != nil {
+					t.Fatalf("invalid JSON: %v", err)
+				}
+				var uaa map[string]interface{}
+				if err := json.Unmarshal(obj["uaa"], &uaa); err != nil {
+					t.Fatalf("uaa not a JSON object: %v", err)
+				}
+				if uaa["clientid"] != "x" {
+					t.Errorf("uaa.clientid mismatch: %v", uaa["clientid"])
+				}
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			result, err := assembleCredentialJSON(tc.details)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			tc.check(t, result)
+		})
+	}
+}
+
+func TestProcessConnectionDetails(t *testing.T) {
+	secretKey := "credentials"
+
+	cases := map[string]struct {
+		cr      *v1alpha1.ServiceBinding
+		details map[string][]byte
+		check   func(t *testing.T, result map[string][]byte)
+	}{
+		"NoSecretKey_Flattens": {
+			cr: &v1alpha1.ServiceBinding{},
+			details: map[string][]byte{
+				"attribute.credentials": []byte(`{"clientid":"x","url":"https://api"}`),
+			},
+			check: func(t *testing.T, result map[string][]byte) {
+				if _, ok := result["clientid"]; !ok {
+					t.Error("expected flattened key 'clientid'")
+				}
+				if _, ok := result["url"]; !ok {
+					t.Error("expected flattened key 'url'")
+				}
+			},
+		},
+		"WithSecretKey_Bundles": {
+			cr: &v1alpha1.ServiceBinding{
+				Spec: v1alpha1.ServiceBindingSpec{
+					SecretKey: &secretKey,
+				},
+			},
+			details: map[string][]byte{
+				"attribute.credentials": []byte(`{"clientid":"x","url":"https://api"}`),
+			},
+			check: func(t *testing.T, result map[string][]byte) {
+				if len(result) != 1 {
+					t.Errorf("expected 1 key, got %d: %v", len(result), result)
+				}
+				if _, ok := result["credentials"]; !ok {
+					t.Error("expected key 'credentials'")
+				}
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			result, err := processConnectionDetails(tc.cr, tc.details)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			tc.check(t, result)
+		})
 	}
 }

@@ -22,6 +22,7 @@ const (
 	errTrackRUsage         = "cannot track ResourceUsage"
 	errTypeAssertion       = "managed resource is not of type SubaccountApiCredential"
 	errMissingClientSecret = "cannot read client_secret from source, please delete external resource and re-create Crossplane resource"
+	errUpdateExternalName  = "cannot update external-name annotation"
 )
 
 // Configure configures individual resources by adding custom ResourceConfigurators.
@@ -60,11 +61,65 @@ func Configure(p *config.Provider) {
 
 		// Add pre-delete hook using InitializerFns for finalizer management
 		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
+			return &NameAsExternalName{Kube: kube}
+		})
+		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
 			return &DeletionProtectionInitializer{Kube: kube}
 		})
 	})
 
 	p.ConfigureResources()
+}
+
+// NameAsExternalName propagates forProvider.name to the external-name annotation.
+// When the name changes, the connection secret is deleted so that
+// DeletionProtectionInitializer does not block with stale data.
+type NameAsExternalName struct {
+	Kube client.Client
+}
+
+func (n *NameAsExternalName) Initialize(ctx context.Context, mg resource.Managed) error {
+	cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
+	if !ok {
+		return errors.New(errTypeAssertion)
+	}
+
+	if meta.WasDeleted(mg) {
+		return nil
+	}
+
+	if cr.Spec.ForProvider.Name == nil || *cr.Spec.ForProvider.Name == "" {
+		return nil
+	}
+
+	desiredName := *cr.Spec.ForProvider.Name
+	if meta.GetExternalName(cr) == desiredName {
+		return nil
+	}
+
+	if err := n.deleteConnectionSecret(ctx, cr); err != nil {
+		return err
+	}
+
+	meta.SetExternalName(cr, desiredName)
+	return errors.Wrap(n.Kube.Update(ctx, cr), errUpdateExternalName)
+}
+
+func (n *NameAsExternalName) deleteConnectionSecret(ctx context.Context, cr *securityv1alpha1.SubaccountApiCredential) error {
+	secretRef := cr.GetWriteConnectionSecretToReference()
+	if secretRef == nil || secretRef.Name == "" {
+		return nil
+	}
+
+	secret := &corev1.Secret{}
+	if err := n.Kube.Get(ctx, client.ObjectKey{
+		Name:      secretRef.Name,
+		Namespace: secretRef.Namespace,
+	}, secret); err != nil {
+		return resource.IgnoreNotFound(err)
+	}
+
+	return resource.IgnoreNotFound(n.Kube.Delete(ctx, secret))
 }
 
 // DeletionProtectionInitializer implements the managed.Initializer interface
