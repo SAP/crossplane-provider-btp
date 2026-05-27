@@ -109,9 +109,8 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 
 ### SubaccountTrustConfiguration
 
-- Follows Standard: no (uses origin key as identifier, not a GUID)
-- Format: origin key (string, e.g. "sap.custom")
-- Note: spec.forProvider.subaccountRef, spec.forProvider.subaccountSelector, or spec.forProvider.subaccountId must be set for adoption to work
+- Follows Standard: no (compound key, not a single GUID)
+- Format: <subaccount-id>,<origin> (e.g. "abc-123-def-456,sap.custom")
 - How to find:
 
   - UI: BTP Cockpit → Subaccount → Security → Trust Configurations → [Origin column]
