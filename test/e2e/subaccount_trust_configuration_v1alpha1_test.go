@@ -58,7 +58,7 @@ func Test_SubaccountTrustConfiguration_v1alpha1(t *testing.T) {
 }
 
 // TestSubaccountTrustConfigurationImportFlow tests the import flow for SubaccountTrustConfiguration.
-// ADR(external-name): uses compound key "<subaccount-id>,<origin>" (e.g. "abc-123,sap.custom") as identifier.
+// ADR(external-name): uses compound key "<subaccount-id>/<origin>" (e.g. "abc-123/sap.custom") as identifier.
 func TestSubaccountTrustConfigurationImportFlow(t *testing.T) {
 	const importK8sResName = "trust-config-import-test"
 

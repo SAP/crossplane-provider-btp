@@ -21,7 +21,7 @@ var (
 )
 
 // Test_SubaccountTrustConfiguration_External_Name verifies that the external-name is preserved during upgrades.
-// ADR(external-name): uses compound key "<subaccount-id>,<origin>" (e.g. "abc-123,sap.custom") as identifier.
+// ADR(external-name): uses compound key "<subaccount-id>/<origin>" (e.g. "abc-123/sap.custom") as identifier.
 func Test_SubaccountTrustConfiguration_External_Name(t *testing.T) {
 	const trustName = "upgrade-test-extn-trust"
 
@@ -75,7 +75,7 @@ func Test_SubaccountTrustConfiguration_External_Name(t *testing.T) {
 					t.Fatal("Could not retrieve pre-upgrade external name from context")
 				}
 
-				// ADR(external-name): compound key "<subaccount-id>,<origin>" must be preserved during upgrade — must not be migrated to UUID format.
+				// ADR(external-name): compound key "<subaccount-id>/<origin>" must be preserved during upgrade — must not be migrated to UUID format.
 				if externalName != preUpgradeExternalName {
 					t.Fatalf(
 						"External name changed during upgrade: before=%q, after=%q (expected no change)",

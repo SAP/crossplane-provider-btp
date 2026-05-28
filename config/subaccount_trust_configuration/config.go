@@ -30,8 +30,8 @@ func Configure(p *config.Provider) {
 			SelectorFieldName: "SubaccountSelector",
 		}
 
-		// ADR(external-name): reconstruct compound key "subaccount_id,origin" from TF state after
-		// Create/Observe so Upjet does not overwrite the annotation with just the origin string.
+		// ADR(external-name): reconstruct compound key "subaccount_id/origin" (ADR delimiter: "/") from
+		// TF state after Create/Observe so Upjet does not overwrite the annotation with just the origin string.
 		// Both fields are present in the TF state returned by the BTP provider.
 		r.ExternalName.GetExternalNameFn = func(tfstate map[string]any) (string, error) {
 			subaccountID, _ := tfstate["subaccount_id"].(string)
@@ -42,12 +42,17 @@ func Configure(p *config.Provider) {
 			if origin == "" {
 				return "", errors.New("cannot reconstruct external-name: origin missing from tfstate")
 			}
-			return fmt.Sprintf("%s,%s", subaccountID, origin), nil
+			return fmt.Sprintf("%s/%s", subaccountID, origin), nil
 		}
 
-		// ADR(external-name): external-name is already the TF import ID format "subaccount_id,origin".
+		// ADR(external-name): translate ADR compound key "subaccount_id/origin" to TF import ID
+		// format "subaccount_id,origin" required by the BTP Terraform provider's ImportState function.
 		r.ExternalName.GetIDFn = func(_ context.Context, externalName string, _ map[string]any, _ map[string]any) (string, error) {
-			return externalName, nil
+			parts := strings.SplitN(externalName, "/", 2)
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				return externalName, nil
+			}
+			return fmt.Sprintf("%s,%s", parts[0], parts[1]), nil
 		}
 
 		// ADR(external-name): seeds status.atProvider.origin from the external-name annotation
@@ -59,7 +64,7 @@ func Configure(p *config.Provider) {
 }
 
 // OriginInitializer copies the origin portion of the compound external-name annotation
-// ("subaccount_id,origin") into status.atProvider.origin when the annotation is set
+// ("subaccount_id/origin") into status.atProvider.origin when the annotation is set
 // but the observation field is still empty.
 type OriginInitializer struct {
 	Kube client.Client
@@ -76,8 +81,8 @@ func (o *OriginInitializer) Initialize(ctx context.Context, mg resource.Managed)
 		return nil
 	}
 
-	// Parse compound key "<subaccount-id>,<origin>"
-	parts := strings.SplitN(externalName, ",", 2)
+	// Parse compound key "<subaccount-id>/<origin>" (ADR delimiter: "/")
+	parts := strings.SplitN(externalName, "/", 2)
 	if len(parts) != 2 || parts[1] == "" {
 		// Not yet in compound format (e.g. during initial Create before first Observe), skip.
 		return nil
