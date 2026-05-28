@@ -25,6 +25,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	kyma "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/kyma/fake"
+	"github.com/sap/crossplane-provider-btp/internal/testutils"
 )
 
 // Unlike many Kubernetes projects Crossplane does not use third party testing
@@ -609,7 +610,7 @@ func TestRecreateOnCreationFailure(t *testing.T) {
 		httpClient: http.DefaultClient,
 		kube:       test.NewMockClient(),
 		record:     event.NewNopRecorder(),
-		tracker:    &fake.MockTracker{},
+		tracker:    testutils.NewResourceTrackerMock(),
 	}
 
 	cr := environment(
