@@ -58,7 +58,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gettext
 
       - name: Run long e2e test
-        timeout-minutes: 180
+        timeout-minutes: 240
         run: |
           if [ -n "${{ github.event.inputs.testFilter }}" ]; then
             make test-e2e-long testFilter=${{ github.event.inputs.testFilter }};
