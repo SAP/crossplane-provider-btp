@@ -3,8 +3,7 @@ package servicemanager
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -26,8 +25,8 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 		apisv1beta1.ServiceManagerKind,
 		apisv1beta1.ServiceManagerGroupVersionKind,
 		func(kube client.Client,
-			usage resource.Tracker,
-			resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
+			usage providerconfig.LegacyTracker,
+			resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 			return &connector{
 				kube:            kube,
 				newServiceFn:    btp.NewBTPClient,

@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -133,6 +133,12 @@ func (m *MockTracker) SetConditions(ctx context.Context, mg resource.Managed) {}
 
 func (m *MockTracker) DeleteShouldBeBlocked(mg resource.Managed) bool {
 	return m.deleteBlocked
+}
+
+type noOpLegacyTracker struct{}
+
+func (n *noOpLegacyTracker) Track(ctx context.Context, mg resource.LegacyManaged) error {
+	return nil
 }
 
 func (m *MockTracker) ResolveSource(ctx context.Context, ru providerv1alpha1.ResourceUsage) (*metav1.PartialObjectMetadata, error) {
@@ -327,7 +333,7 @@ func TestConnect(t *testing.T) {
 
 			c := connector{
 				kube:              &test.MockClient{},
-				usage:             resource.TrackerFn(func(ctx context.Context, mg resource.Managed) error { return nil }),
+				usage:             &noOpLegacyTracker{},
 				resourcetracker:   tracker,
 				clientFactory:     mockFactory,
 				newSBKeyRotatorFn: newSBKeyRotatorFn,
@@ -885,7 +891,7 @@ func TestObserve(t *testing.T) {
 						"instance_name": []byte("my-instance"),
 						"instance_guid": []byte("instance-guid-123"),
 						"tags":          []byte("[]"),
-						".metadata":     mustMarshalJSON(secretMetadata{
+						".metadata": mustMarshalJSON(secretMetadata{
 							MetaDataProperties: []secretMetadataProperty{
 								{Name: "instance_name", Format: "text"},
 								{Name: "instance_guid", Format: "text"},
@@ -996,6 +1002,132 @@ func TestObserve(t *testing.T) {
 					withMetadata("test-external-name", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
+					},
+				),
+			},
+		},
+		"SAPFormatWithSecretKey": {
+			reason: "should bundle credentials under secretKey and mark container:true in .metadata",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						observation: managed.ExternalObservation{
+							ResourceExists:   true,
+							ResourceUpToDate: false,
+							ConnectionDetails: managed.ConnectionDetails{
+								"attribute.credentials": []byte(`{"clientid":"x","clientsecret":"y","url":"https://api.example.com"}`),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: false,
+				},
+				tracker: &MockTracker{},
+				kube: &test.MockClient{
+					MockGet: func(_ context.Context, key kubeclient.ObjectKey, obj kubeclient.Object) error {
+						if si, ok := obj.(*v1alpha1.ServiceInstance); ok {
+							si.Spec.ForProvider.Name = "my-instance"
+							si.Spec.ForProvider.OfferingName = "destination"
+							si.Spec.ForProvider.PlanName = "lite"
+							si.Status.AtProvider.ID = "instance-guid-123"
+							return nil
+						}
+						return errors.New("unexpected Get call")
+					},
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.SecretFormat = "sap-kubernetes"
+						sk := "credentials"
+						cr.Spec.SecretKey = &sk
+						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
+					},
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+					ConnectionDetails: managed.ConnectionDetails{
+						"credentials":   []byte(`{"clientid":"x","clientsecret":"y","url":"https://api.example.com"}`),
+						"type":          []byte("destination"),
+						"label":         []byte("destination"),
+						"plan":          []byte("lite"),
+						"instance_name": []byte("my-instance"),
+						"instance_guid": []byte("instance-guid-123"),
+						"tags":          []byte("[]"),
+						".metadata": mustMarshalJSON(secretMetadata{
+							MetaDataProperties: []secretMetadataProperty{
+								{Name: "instance_name", Format: "text"},
+								{Name: "instance_guid", Format: "text"},
+								{Name: "plan", Format: "text"},
+								{Name: "label", Format: "text"},
+								{Name: "type", Format: "text"},
+								{Name: "tags", Format: "json"},
+							},
+							CredentialProperties: []secretMetadataProperty{
+								{Name: "credentials", Format: "json", Container: true},
+							},
+						}),
+					},
+				},
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.SecretFormat = "sap-kubernetes"
+						sk := "credentials"
+						cr.Spec.SecretKey = &sk
+						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
+					},
+				),
+			},
+		},
+		"SecretKeyWithoutSAPFormat": {
+			reason: "should bundle credentials under secretKey without metadata when no secretFormat",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						observation: managed.ExternalObservation{
+							ResourceExists:   true,
+							ResourceUpToDate: false,
+							ConnectionDetails: managed.ConnectionDetails{
+								"attribute.credentials": []byte(`{"clientid":"x","url":"https://api"}`),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{
+					hasExpiredKeysResult: false,
+				},
+				tracker: &MockTracker{},
+				kube:    &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						sk := "credentials"
+						cr.Spec.SecretKey = &sk
+					},
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+					ConnectionDetails: managed.ConnectionDetails{
+						"credentials": []byte(`{"clientid":"x","url":"https://api"}`),
+					},
+				},
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						sk := "credentials"
+						cr.Spec.SecretKey = &sk
 					},
 				),
 			},

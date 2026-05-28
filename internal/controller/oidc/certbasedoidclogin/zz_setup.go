@@ -1,8 +1,7 @@
 package certbasedoidclogin
 
 import (
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -14,7 +13,7 @@ import (
 
 // Setup adds a controller that reconciles GlobalAccount managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
-	return providerconfig.DefaultSetup(mgr, o, &oidcapisv1alpha1.CertBasedOIDCLogin{}, oidcapisv1alpha1.CertBasedOIDCLoginGroupKind, oidcapisv1alpha1.CertBasedOIDCLoginGroupVersionKind, func(kube client.Client, usage resource.Tracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
+	return providerconfig.DefaultSetup(mgr, o, &oidcapisv1alpha1.CertBasedOIDCLogin{}, oidcapisv1alpha1.CertBasedOIDCLoginGroupKind, oidcapisv1alpha1.CertBasedOIDCLoginGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 		return &connector{
 			kube:         kube,
 			usage:        usage,

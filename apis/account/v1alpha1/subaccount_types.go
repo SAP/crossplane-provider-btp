@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 // SubaccountParameters are the configurable fields of a Subaccount.
@@ -146,8 +146,8 @@ type SubaccountStatus struct {
 //   - Follows Standard: yes
 //   - Format: Subaccount GUID (UUID format)
 //   - How to find:
-//     - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
-//     - CLI: btp list accounts/subaccount (field: guid)
+//   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
+//   - CLI: btp list accounts/subaccount (field: guid)
 //
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
