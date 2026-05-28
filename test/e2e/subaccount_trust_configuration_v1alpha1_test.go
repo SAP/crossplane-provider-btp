@@ -9,13 +9,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
+)
+
+const (
+	IDP_URL_ENV_KEY = "IDP_URL"
 )
 
 func Test_SubaccountTrustConfiguration_v1alpha1(t *testing.T) {
@@ -49,4 +55,35 @@ func Test_SubaccountTrustConfiguration_v1alpha1(t *testing.T) {
 	fB.Teardown(resource.Teardown)
 
 	testenv.Test(t, fB.Feature())
+}
+
+// TestSubaccountTrustConfigurationImportFlow tests the import flow for SubaccountTrustConfiguration.
+// ADR(external-name): uses compound key "<subaccount-id>/<origin>" (e.g. "abc-123/sap.custom") as identifier.
+func TestSubaccountTrustConfigurationImportFlow(t *testing.T) {
+	const importK8sResName = "trust-config-import-test"
+
+	idpURL := envvar.GetOrPanic(IDP_URL_ENV_KEY)
+
+	importTester := NewImportTester(
+		&v1alpha1.SubaccountTrustConfiguration{
+			Spec: v1alpha1.SubaccountTrustConfigurationSpec{
+				ForProvider: v1alpha1.SubaccountTrustConfigurationParameters{
+					IdentityProvider: &idpURL,
+					SubaccountRef: &xpv1.Reference{
+						Name: "sub-trust-import-test",
+					},
+				},
+			},
+		},
+		importK8sResName,
+		WithWaitCreateTimeout[*v1alpha1.SubaccountTrustConfiguration](wait.WithTimeout(5*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.SubaccountTrustConfiguration](wait.WithTimeout(3*time.Minute)),
+		WithDependentResourceDirectory[*v1alpha1.SubaccountTrustConfiguration]("./testdata/crs/SubaccountTrustConfigurationImport"),
+		WithWaitDependentResourceTimeout[*v1alpha1.SubaccountTrustConfiguration](wait.WithTimeout(15*time.Minute)),
+	)
+
+	testenv.Test(
+		t,
+		importTester.BuildTestFeature("SubaccountTrustConfiguration Import Flow").Feature(),
+	)
 }
