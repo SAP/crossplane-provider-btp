@@ -151,6 +151,11 @@ func (p *Parser) collectBaseTypes(file *ast.File, references map[string][]Refere
 
 			bt := NewBaseType(typeSpec.Name.Name)
 			bt.DocComment = p.extractDocComment(genDecl)
+			// Strip "Base" prefix from doc comments so generated types don't
+			// reference the internal base type name (e.g. "BaseMyType" → "MyType").
+			for i, line := range bt.DocComment {
+				bt.DocComment[i] = strings.ReplaceAll(line, bt.Name, bt.ResourceName)
+			}
 			bt.Categories = p.extractCategories(genDecl)
 			bt.DeprecatedWarning = p.extractDeprecatedWarning(genDecl)
 			if refs, ok := references[bt.ResourceName]; ok {

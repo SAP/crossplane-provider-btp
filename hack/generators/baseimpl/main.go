@@ -16,6 +16,7 @@ func main() {
 		namespacedCtrlDir = flag.String("namespaced-ctrl-dir", "internal/controller/namespaced", "Namespaced controller output root directory")
 		modulePath        = flag.String("module", "github.com/sap/crossplane-provider-btp", "Go module path")
 		providerName      = flag.String("provider-name", "btp", "Provider name used in kubebuilder categories")
+		groupSuffix       = flag.String("group-suffix", "crossplane.io", "Domain suffix in group names before which '.m.' is inserted to derive the namespaced group")
 	)
 	flag.Parse()
 
@@ -31,6 +32,7 @@ func main() {
 		NamespacedCtrlDir: *namespacedCtrlDir,
 		ModulePath:        *modulePath,
 		ProviderName:      *providerName,
+		GroupSuffix:       *groupSuffix,
 	}
 
 	if err := gen.Generate(); err != nil {

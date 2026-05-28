@@ -29,6 +29,7 @@ type Generator struct {
 	NamespacedCtrlDir string // e.g., "internal/controller/namespaced"
 	ModulePath        string
 	ProviderName      string
+	GroupSuffix       string // e.g., "crossplane.io" or "orchestrate.cloud.sap" — the domain suffix before which ".m." is inserted
 	Groups            []GroupConfig
 }
 
@@ -238,10 +239,14 @@ func (gen *Generator) GetBasePkgImport(gc GroupConfig) string {
 	return gen.ModulePath + "/" + gc.BasePkg
 }
 
-// DeriveNamespacedGroup derives the namespaced group name from a cluster group name.
-// e.g., "account.btp.sap.crossplane.io" → "account.btp.sap.m.crossplane.io"
-func DeriveNamespacedGroup(clusterGroup string) string {
-	const suffix = "crossplane.io"
+// DeriveNamespacedGroup derives the namespaced group name from a cluster group name
+// by inserting ".m." before the given suffix.
+// e.g., with suffix "crossplane.io": "account.btp.sap.crossplane.io" → "account.btp.sap.m.crossplane.io"
+// e.g., with suffix "orchestrate.cloud.sap": "sample.template.orchestrate.cloud.sap" → "sample.template.m.orchestrate.cloud.sap"
+func DeriveNamespacedGroup(clusterGroup, suffix string) string {
+	if suffix == "" {
+		suffix = "crossplane.io"
+	}
 	if idx := strings.LastIndex(clusterGroup, suffix); idx > 0 {
 		return clusterGroup[:idx] + NamespacedGroupInfix + suffix
 	}

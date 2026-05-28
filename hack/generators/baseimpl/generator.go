@@ -150,7 +150,7 @@ func (g *Generator) discoverGroups() ([]GroupConfig, error) {
 				Name:                groupDir,
 				Version:             version,
 				ClusterGroupName:    clusterGroupName,
-				NamespacedGroupName: DeriveNamespacedGroup(clusterGroupName),
+				NamespacedGroupName: DeriveNamespacedGroup(clusterGroupName, g.GroupSuffix),
 				BasePkg:             basePkg,
 				ClusterPkg:          filepath.Join(g.ClusterDir, groupDir, version),
 				NamespacedPkg:       filepath.Join(g.NamespacedDir, groupDir, version),
@@ -304,7 +304,7 @@ func (g *Generator) generateScopedTypes(gc GroupConfig, baseTypes []BaseType, sc
 	for _, bt := range baseTypes {
 		scopedBt := bt
 		if scope != ScopeCluster {
-			scopedBt.ParameterFields = deriveNamespacedReferenceGroups(bt.ParameterFields)
+			scopedBt.ParameterFields = g.deriveNamespacedReferenceGroups(bt.ParameterFields)
 		}
 		data := ScopedTemplateData{
 			BaseType:      scopedBt,
@@ -335,12 +335,12 @@ func (g *Generator) generateScopedTypes(gc GroupConfig, baseTypes []BaseType, sc
 // converted from cluster group to namespaced group (e.g., "account.btp.sap.crossplane.io" → "account.btp.sap.m.crossplane.io").
 // This is correct because namespaced output uses *xpv1.NamespacedReference, which always
 // points to namespaced-scoped resources in the derived group.
-func deriveNamespacedReferenceGroups(fields []ParameterField) []ParameterField {
+func (g *Generator) deriveNamespacedReferenceGroups(fields []ParameterField) []ParameterField {
 	out := make([]ParameterField, len(fields))
 	copy(out, fields)
 	for i := range out {
 		if out[i].IsReferenceValue && out[i].ReferenceGroup != "" {
-			out[i].ReferenceGroup = DeriveNamespacedGroup(out[i].ReferenceGroup)
+			out[i].ReferenceGroup = DeriveNamespacedGroup(out[i].ReferenceGroup, g.GroupSuffix)
 		}
 	}
 	return out
