@@ -103,6 +103,36 @@ Please note that when running multiple times you might want to delete the kind c
 kind delete cluster --name=<cluster-name>
 ```
 
+#### Running E2E Tests From an IDE or with `go test`
+
+The `make` targets above handle building, packaging and templating automatically. If you instead invoke `go test` directly (e.g. via the VS Code test runner), you need to do this yourself:
+
+1. Build and load the provider image into Docker:
+
+   ```bash
+   make local-build
+   ```
+
+   Re-run this whenever provider code changes.
+
+2. Template the test CRs (substitutes env vars into files under `test/e2e/testdata/crs` in place — do not commit these changes):
+
+   ```bash
+   make generate-test-crs
+   ```
+
+   `envsubst` reads from the shell environment, so make sure your e2e env vars are exported in the shell where you run this target.
+
+3. Set `UUT_IMAGES` in your test env file (e.g. VS Code's `go.testEnvFile`) to the fully qualified image name produced by `make local-build`. Crossplane v2 rejects names without a registry prefix:
+
+   ```
+   UUT_IMAGES={"crossplane/provider-btp":"index.docker.io/build-<hash>/provider-btp-xpkg:latest"}
+   ```
+
+   The `<hash>` part of `BUILD_REGISTRY` depends on your hostname and repo path. Print it with `make common.buildvars | grep BUILD_REGISTRY` after `make local-build`.
+
+   Also set the other required env variables mentioned in Required Configuration below.
+
 #### Required Configuration
 
 In order for the tests to perform successfully some configuration need to be present as environment variables:
