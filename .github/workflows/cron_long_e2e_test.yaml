@@ -56,7 +56,7 @@ jobs:
           echo "BUILD_ID=${{github.run_number}}-${{github.run_attempt}}" >> $GITHUB_ENV
 
       - name: Run long e2e test
-        timeout-minutes: 240
+        timeout-minutes: 180
         run: |
           if [ -n "${{ github.event.inputs.testFilter }}" ]; then
             make test-e2e-long testFilter=${{ github.event.inputs.testFilter }};
