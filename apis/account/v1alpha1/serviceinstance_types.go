@@ -21,6 +21,21 @@ type ServiceInstanceParameters struct {
 	// Name of the service plan of that offering
 	PlanName string `json:"planName,omitempty"`
 
+	// The data center to use when resolving the service plan.
+	// Required when the same service offering exists in multiple data centers
+	// (e.g., SAP HANA Cloud). The value corresponds to the data_center field
+	// in the Service Manager API (e.g., "cf-eu10", "cf-us10").
+	// Mutually exclusive with servicePlanID.
+	// +kubebuilder:validation:Optional
+	DataCenter string `json:"dataCenter,omitempty"`
+
+	// The ID of the service plan (UUID). When set, plan resolution via
+	// offeringName/planName is skipped entirely. Use this as an escape hatch
+	// when name-based resolution is ambiguous or you already have the plan ID.
+	// Mutually exclusive with offeringName, planName, and dataCenter.
+	// +kubebuilder:validation:Optional
+	ServicePlanID string `json:"servicePlanID,omitempty"`
+
 	// Whether the service instance is shared or not
 	// +kubebuilder:validation:Optional
 	Shared *bool `json:"shared,omitempty"`
