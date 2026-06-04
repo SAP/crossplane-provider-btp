@@ -100,7 +100,7 @@ jobs:
         uses: azure/setup-helm@v4
         with:
           version: v3.14.0
-          
+
       - name: Install BTP CLI
       #hardcoded version
         run: |
@@ -115,6 +115,15 @@ jobs:
 
       - name: Install gettext for envsubst
         run: sudo apt-get update && sudo apt-get install -y gettext
+      
+      - name: Install Crossplane CLI
+        run: |
+          CROSSPLANE_CLI_VERSION=v2.0.2
+          TOOLS_DIR=.cache/tools/linux_x86_64
+          mkdir -p $TOOLS_DIR
+          curl -fsSLo $TOOLS_DIR/crossplane-cli-${CROSSPLANE_CLI_VERSION} \
+            https://github.com/crossplane/crossplane/releases/download/${CROSSPLANE_CLI_VERSION}/crossplane_linux_amd64
+          chmod +x $TOOLS_DIR/crossplane-cli-${CROSSPLANE_CLI_VERSION}
 
       - name: Run e2e test
         timeout-minutes: 120
