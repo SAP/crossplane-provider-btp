@@ -97,13 +97,10 @@ jobs:
       - run: go version
 
       - name: Install Helm
-        run: |
-          curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-          sudo apt-get install apt-transport-https --yes
-          echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-          sudo apt-get update
-          sudo apt-get install -y helm
-
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+          
       - name: Install BTP CLI
       #hardcoded version
         run: |
