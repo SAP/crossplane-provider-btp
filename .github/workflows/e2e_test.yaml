@@ -124,7 +124,7 @@ jobs:
           TOOLS_DIR=.cache/tools/linux_x86_64
           mkdir -p $TOOLS_DIR
           curl -fsSLo $TOOLS_DIR/crossplane-cli-${CROSSPLANE_CLI_VERSION} \
-            -H "Authorization: token ${{secrets.GITHUB_TOKEN}}" \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
             https://github.com/crossplane/crossplane/releases/download/${CROSSPLANE_CLI_VERSION}/crossplane_linux_amd64
           chmod +x $TOOLS_DIR/crossplane-cli-${CROSSPLANE_CLI_VERSION}
 
