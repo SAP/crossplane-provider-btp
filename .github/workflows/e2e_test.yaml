@@ -24,27 +24,6 @@ on:
         default: 'pr-e2e-approval'
         required: false
         type: string
-    secrets:
-      CLI_SERVER_URL:
-        description: contains the CLI server URL
-        required: true
-      GLOBAL_ACCOUNT:
-        description: contains the subdomain of the global account
-        required: true
-      IDP_URL:
-        description: contains the URL of an IDP that can be connected to the global account
-        required: true
-      SECOND_DIRECTORY_ADMIN_EMAIL:
-        description: contains a second email (different from the technical user's email) for the directory
-        required: true
-      CIS_CENTRAL_BINDING:
-        description: contents from the service binding of a `cis-central` service
-        required: true
-      BTP_TECHNICAL_USER:
-        required: true
-      TECHNICAL_USER_EMAIL:
-        description: contains the email of the BTP_TECHNICAL_USER
-        required: true
 
 permissions:
   contents: read
@@ -66,19 +45,20 @@ jobs:
         with:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
-          
+
       - name: Set matrix with test names
         id: set-matrix
         run: |
           echo "test-names=$(grep -rh --include='**_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/e2e | sed 's/func //;s/(t \*testing.T)//' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
 
       - name: Print test names
-        run: | 
+        run: |
           echo "Test names: ${{ steps.set-matrix.outputs.test-names }}"
 
   e2e-test:
     runs-on: ubuntu-latest
     needs: prepare-matrix #required to depend on prepare-matrix to be able to use its outputs and its environment manual approval
+    environment: ${{ inputs.environment }}
     strategy:
       fail-fast: false
       matrix:
@@ -97,15 +77,12 @@ jobs:
       - run: go version
 
       - name: Install Helm
-        run: |
-          curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-          sudo apt-get install apt-transport-https --yes
-          echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-          sudo apt-get update
-          sudo apt-get install -y helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
 
       - name: Install BTP CLI
-      #hardcoded version
+        #hardcoded version
         run: |
           curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
           tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
@@ -118,6 +95,19 @@ jobs:
 
       - name: Install gettext for envsubst
         run: sudo apt-get update && sudo apt-get install -y gettext
+
+      - name: Install Crossplane CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          CROSSPLANE_CLI_VERSION=v2.0.2
+          TOOLS_DIR=.cache/tools/linux_x86_64
+          mkdir -p $TOOLS_DIR
+          curl -fsSLo $TOOLS_DIR/crossplane-cli-${CROSSPLANE_CLI_VERSION} \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            https://github.com/crossplane/crossplane/releases/download/${CROSSPLANE_CLI_VERSION}/crossplane_linux_amd64
+          chmod +x $TOOLS_DIR/crossplane-cli-${CROSSPLANE_CLI_VERSION}
 
       - name: Run e2e test
         timeout-minutes: 120
@@ -136,6 +126,7 @@ jobs:
   cleanup-e2e:
     runs-on: ubuntu-latest
     needs: [prepare-matrix, e2e-test]
+    environment: pr-e2e-no-approval
     if: always() && needs.prepare-matrix.result == 'success'  # only run if prepare-matrix was successful (requires manual approval) and then always run after e2e-test
     steps:
       - name: checkout repo
