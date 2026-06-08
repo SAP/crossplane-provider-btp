@@ -97,8 +97,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gettext
 
       - name: Install Crossplane CLI
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
           CROSSPLANE_CLI_VERSION=v2.0.2
