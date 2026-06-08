@@ -103,7 +103,7 @@ jobs:
           TOOLS_DIR=.cache/tools/linux_x86_64
           mkdir -p $TOOLS_DIR
           curl -fsSLo $TOOLS_DIR/crossplane-cli-${CROSSPLANE_CLI_VERSION} \
-          https://releases.crossplane.io/stable/${CROSSPLANE_CLI_VERSION}/bin/linux_amd64/crank
+            https://releases.crossplane.io/stable/${CROSSPLANE_CLI_VERSION}/bin/linux_amd64/crank
           chmod +x $TOOLS_DIR/crossplane-cli-${CROSSPLANE_CLI_VERSION}
 
       - name: Run e2e test
