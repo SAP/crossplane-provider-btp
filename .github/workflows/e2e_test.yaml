@@ -100,6 +100,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e
           CROSSPLANE_CLI_VERSION=v2.0.2
           TOOLS_DIR=.cache/tools/linux_x86_64
           mkdir -p $TOOLS_DIR
