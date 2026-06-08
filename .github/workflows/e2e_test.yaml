@@ -24,27 +24,6 @@ on:
         default: 'pr-e2e-approval'
         required: false
         type: string
-    secrets:
-      CLI_SERVER_URL:
-        description: contains the CLI server URL
-        required: true
-      GLOBAL_ACCOUNT:
-        description: contains the subdomain of the global account
-        required: true
-      IDP_URL:
-        description: contains the URL of an IDP that can be connected to the global account
-        required: true
-      SECOND_DIRECTORY_ADMIN_EMAIL:
-        description: contains a second email (different from the technical user's email) for the directory
-        required: true
-      CIS_CENTRAL_BINDING:
-        description: contents from the service binding of a `cis-central` service
-        required: true
-      BTP_TECHNICAL_USER:
-        required: true
-      TECHNICAL_USER_EMAIL:
-        description: contains the email of the BTP_TECHNICAL_USER
-        required: true
 
 permissions:
   contents: read
@@ -79,6 +58,7 @@ jobs:
   e2e-test:
     runs-on: ubuntu-latest
     needs: prepare-matrix #required to depend on prepare-matrix to be able to use its outputs and its environment manual approval
+    environment: ${{ inputs.environment }}
     strategy:
       fail-fast: false
       matrix:
@@ -145,6 +125,7 @@ jobs:
   cleanup-e2e:
     runs-on: ubuntu-latest
     needs: [prepare-matrix, e2e-test]
+    environment: pr-e2e-no-approval
     if: always() && needs.prepare-matrix.result == 'success'  # only run if prepare-matrix was successful (requires manual approval) and then always run after e2e-test
     steps:
       - name: checkout repo
