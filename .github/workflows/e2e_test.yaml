@@ -47,14 +47,14 @@ jobs:
         with:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
-          
+
       - name: Set matrix with test names
         id: set-matrix
         run: |
           echo "test-names=$(grep -rh --include='**_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/e2e | sed 's/func //;s/(t \*testing.T)//' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
 
       - name: Print test names
-        run: | 
+        run: |
           echo "Test names: ${{ steps.set-matrix.outputs.test-names }}"
 
   # Build image + xpkg + CLI tools once; the matrix consumes them as artifacts.
@@ -179,9 +179,11 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: v3.14.0
 
       - name: Install BTP CLI
-      #hardcoded version
+        #hardcoded version
         run: |
           curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
           tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
@@ -194,6 +196,16 @@ jobs:
 
       - name: Install gettext for envsubst
         run: sudo apt-get update && sudo apt-get install -y gettext
+
+      - name: Install Crossplane CLI
+        run: |
+          set -e
+          CROSSPLANE_CLI_VERSION=v2.0.2
+          TOOLS_DIR=.cache/tools/linux_x86_64
+          mkdir -p $TOOLS_DIR
+          curl -fsSLo $TOOLS_DIR/crossplane-cli-${CROSSPLANE_CLI_VERSION} \
+            https://releases.crossplane.io/stable/${CROSSPLANE_CLI_VERSION}/bin/linux_amd64/crank
+          chmod +x $TOOLS_DIR/crossplane-cli-${CROSSPLANE_CLI_VERSION}
 
       - name: Run e2e test
         timeout-minutes: 120
