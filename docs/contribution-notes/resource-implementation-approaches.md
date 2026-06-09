@@ -43,18 +43,25 @@ The controller is auto-generated from a Terraform provider schema. No hand-writt
 
 The CR schema and the controller are both generated from the Terraform resource schema. This means field names and behaviour closely mirror what the Terraform provider exposes. This approach allows to offload any "real" implementation into the underlying terraform provider. Its generally easy to consume from the crossplane side but does only allow for very little customization in behaviour. 
 
-
 In case of our Crossplane BTP Provider here we are using the official [BTP Terraform Provider](https://registry.terraform.io/providers/SAP/btp/latest/docs) for those cases. 
-
 
 Setting up a resource using upjet is quite straight-forward and usually just requires some minimal configuration in the `config` folder of the repository. The generation tools integrated in the provider will take care of autogenerating and wiring types and controller based on those configurations together with the schema data of the provider. 
 
-You can find a tutorial a more comprehensive tutorial under: 
+You can find a more comprehensive tutorial under: 
 https://github.com/crossplane/upjet/blob/main/docs/README.md
 
+### Regular vs. no-fork controllers
+
+Upjet supports two modes for invoking Terraform operations, and the generated controller code differs accordingly:
+
+- **Regular (forked):** Each reconciliation schedules a Terraform CLI process in a managed workspace on disk. The controller writes HCL, forks a `terraform` subprocess, and waits for it to finish. This is the older and more resource-intensive mode — it requires a Terraform binary at runtime and carries the overhead of process startup for every operation. The controller is implemented in [`pkg/controller/external.go`](https://github.com/crossplane/upjet/blob/main/pkg/controller/external.go) in upjet.
+
+- **No-fork:** The Terraform provider's Go functions are called directly in-process — no subprocess, no workspace on disk, no Terraform binary required. This is generally the superior approach: it is faster, uses less memory, avoids file system overhead, and makes the provider easier to deploy. The connector is implemented in [`pkg/controller/external_tfpluginfw.go`](https://github.com/crossplane/upjet/blob/main/pkg/controller/external_tfpluginfw.go) (for Plugin Framework-based providers, which the btp provider uses).
+
+> **Note:** The resources in this provider currently still use the regular (forked) mode. Progress on no-fork migration is captured in this [epic](https://github.com/SAP/crossplane-provider-btp/issues/207)
 
 
-### Resources using this approach
+### Resources using the upjet approach
 
 | Resource | Terraform resource backing |
 |---|---|
