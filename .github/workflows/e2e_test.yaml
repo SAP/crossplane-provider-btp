@@ -33,8 +33,8 @@ env:
   # hardcoded BTP CLI version
   btp_cli_version: 2.90.2
   GO_VERSION: '1.25'
-  E2E_BUILD_REGISTRY: e2e
-  E2E_PROVIDER_IMAGE: e2e/provider-btp-amd64
+  E2E_BUILD_REGISTRY: index.docker.io/e2e
+  E2E_PROVIDER_IMAGE: index.docker.io/e2e/provider-btp-amd64
 
 jobs:
   prepare-matrix:
