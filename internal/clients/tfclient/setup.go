@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
-	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
+	ujconfig "github.com/crossplane/upjet/v2/pkg/config"
+	ujcontroller "github.com/crossplane/upjet/v2/pkg/controller"
 	"github.com/crossplane/upjet/v2/pkg/controller/handler"
 	"github.com/crossplane/upjet/v2/pkg/terraform"
 	"github.com/pkg/errors"
@@ -99,6 +101,8 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 			return ps, errors.Wrap(err, errCouldNotParseUserCredential)
 		}
 
+		ps.FrameworkProvider = config.GetProvider().TerraformPluginFrameworkProvider
+
 		ps.Configuration = map[string]any{
 			"username":       userCredential.Username,
 			"password":       userCredential.Password,
@@ -153,6 +157,8 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 			return ps, errors.Wrap(err, errCouldNotParseUserCredential)
 		}
 
+		ps.FrameworkProvider = config.GetProvider().TerraformPluginFrameworkProvider
+
 		ps.Configuration = map[string]any{
 			"username":       userCredential.Username,
 			"password":       userCredential.Password,
@@ -170,12 +176,11 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 }
 
 // NewInternalTfConnector creates a new internal Terraform connector, it does not have a callback handler, since those won't be managed by the controller manager
-func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) *tjcontroller.Connector {
+func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider ujcontroller.CallbackProvider) managed.ExternalConnecter {
 	tfVersion := TF_VERSION_CALLBACK()
 	zl := zap.New(zap.UseDevMode(tfVersion.DebugLogs))
 	setupFn := TerraformSetupBuilderNoTracking(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion)
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
-	ws := terraform.NewWorkspaceStore(log)
 	provider := config.GetProvider()
 	eventHandler := handler.NewEventHandler(handler.WithLogger(log.WithValues("gvk", gvk)))
 
@@ -183,14 +188,32 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	res := provider.Resources[resourceName]
 	res.UseAsync = useAsync
 
-	connector := tjcontroller.NewConnector(client, ws, setupFn,
-		res,
-		tjcontroller.WithLogger(log),
-		tjcontroller.WithConnectorEventHandler(eventHandler),
-		tjcontroller.WithCallbackProvider(callbackProvider),
-	)
+	if useAsync {
+		return AsyncTfPluginFWConnector(client, log, setupFn, res, eventHandler, callbackProvider)
+	}
+	return tfPluginFWConnector(client, setupFn, res, log)
+}
 
-	return connector
+func tfPluginFWConnector(client client.Client, setupFn terraform.SetupFn, res *ujconfig.Resource, log logging.Logger) managed.ExternalConnecter {
+	return ujcontroller.NewTerraformPluginFrameworkConnector(
+		client,
+		setupFn,
+		res,
+		ujcontroller.NewOperationStore(log),
+		ujcontroller.WithTerraformPluginFrameworkLogger(log),
+	)
+}
+
+func AsyncTfPluginFWConnector(client client.Client, log logging.Logger, setupFn terraform.SetupFn, res *ujconfig.Resource, eventHandler *handler.EventHandler, callbackProvider ujcontroller.CallbackProvider) managed.ExternalConnecter {
+	return ujcontroller.NewTerraformPluginFrameworkAsyncConnector(
+		client,
+		ujcontroller.NewOperationStore(log),
+		setupFn,
+		res,
+		ujcontroller.WithTerraformPluginFrameworkAsyncLogger(log),
+		ujcontroller.WithTerraformPluginFrameworkAsyncConnectorEventHandler(eventHandler),
+		ujcontroller.WithTerraformPluginFrameworkAsyncCallbackProvider(callbackProvider),
+	)
 }
 
 type TfEnvVersion struct {

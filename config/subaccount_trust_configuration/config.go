@@ -60,6 +60,8 @@ func Configure(p *config.Provider) {
 		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
 			return &OriginInitializer{Kube: kube}
 		})
+
+		r.UseAsync = false
 	})
 }
 
