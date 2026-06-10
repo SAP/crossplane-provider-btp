@@ -1,3 +1,5 @@
+# Runs e2e tests, potentially requiring approval based on the `environment` input.
+#
 # Enviroment variables/secrets that are needed
 # CLI_SERVER_URL contains the CLI server URL
 # GLOBAL_ACCOUNT contains the subdomain of the global account
@@ -11,7 +13,6 @@
 name: E2E Test
 
 on:
-  workflow_dispatch:
   workflow_call:
     inputs:
       checkout-ref:
@@ -38,7 +39,7 @@ env:
 jobs:
   prepare-matrix:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ inputs.environment }}  # approval here for the entire workflow, later jobs use no approval environment
     outputs:
       test-names: ${{ steps.set-matrix.outputs.test-names }}
     steps:
@@ -131,7 +132,7 @@ jobs:
   e2e-test:
     runs-on: ubuntu-latest
     needs: [prepare-matrix, build] # build provides the prebuilt image/xpkg/tools artifacts
-    environment: ${{ inputs.environment }}
+    environment: pr-e2e-no-approval  # approval is on the preceding prepare-matrix job
     strategy:
       fail-fast: false
       matrix:
