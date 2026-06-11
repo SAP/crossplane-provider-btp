@@ -41,7 +41,7 @@ type DirectoryEntitlementInitParameters struct {
 
 	// (String) The ID of the directory.
 	// The ID of the directory.
-	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Directory
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1.Directory
 	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.DirectoryUuid()
 	// +crossplane:generate:reference:refFieldName=DirectoryRef
 	// +crossplane:generate:reference:selectorFieldName=DirectorySelector
@@ -147,7 +147,7 @@ type DirectoryEntitlementParameters struct {
 
 	// (String) The ID of the directory.
 	// The ID of the directory.
-	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Directory
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1.Directory
 	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.DirectoryUuid()
 	// +crossplane:generate:reference:refFieldName=DirectoryRef
 	// +crossplane:generate:reference:selectorFieldName=DirectorySelector

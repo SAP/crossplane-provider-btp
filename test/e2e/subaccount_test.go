@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/features"
 
 	meta "github.com/sap/crossplane-provider-btp/apis"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 )
 
 var (
@@ -174,13 +174,12 @@ func mutateSubAccResource() func(obj k8s.Object) error {
 	mutateResource := func(obj k8s.Object) error {
 
 		if mg, ok := any(obj).(*v1alpha1.Subaccount); ok {
-			newId := subaccountNameE2e
-			mg.SetExternalID(newId)
+			mg.Spec.ForProvider.DisplayName = subaccountNameE2e
+			mg.Spec.ForProvider.Subdomain = subaccountNameE2e
 		}
 
 		if mg, ok := any(obj).(*v1alpha1.Directory); ok {
-			newId := subaccountDirectoryNameE2e
-			mg.SetExternalID(newId)
+			mg.Spec.ForProvider.DisplayName = &subaccountDirectoryNameE2e
 		}
 
 		return nil

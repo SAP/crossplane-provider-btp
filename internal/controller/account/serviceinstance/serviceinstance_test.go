@@ -753,7 +753,7 @@ func TestCreate(t *testing.T) {
 				client: &TfProxyMock{},
 			},
 			args: args{
-				mg: &v1alpha1.Subaccount{},
+				mg: &v1alpha1.Entitlement{},
 			},
 			want: want{
 				err: errors.New(errNotServiceInstance),

@@ -11,7 +11,7 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	xpmeta "github.com/crossplane/crossplane-runtime/v2/pkg/meta"
-	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"

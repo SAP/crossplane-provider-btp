@@ -1,27 +1,28 @@
 package controller
 
 import (
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding"
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
-	"github.com/sap/crossplane-provider-btp/internal/controller/kymamodule"
-	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
+
+	// Cluster-scoped controllers
+	clusteraccount "github.com/sap/crossplane-provider-btp/internal/controller/cluster/account"
+	clustersecurity "github.com/sap/crossplane-provider-btp/internal/controller/cluster/security"
+
+	// Legacy non-scoped controllers
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/cloudmanagement"
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/directory"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/entitlement"
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/globalaccount"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/resourceusage"
+	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicebinding"
+	"github.com/sap/crossplane-provider-btp/internal/controller/account/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicemanager"
-	"github.com/sap/crossplane-provider-btp/internal/controller/account/subaccount"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/cloudfoundry"
-
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/kyma"
 	"github.com/sap/crossplane-provider-btp/internal/controller/kymaenvironmentbinding"
+	"github.com/sap/crossplane-provider-btp/internal/controller/kymamodule"
 	"github.com/sap/crossplane-provider-btp/internal/controller/oidc/certbasedoidclogin"
 	"github.com/sap/crossplane-provider-btp/internal/controller/oidc/kubeconfiggenerator"
-	"github.com/sap/crossplane-provider-btp/internal/controller/security/rolecollection"
 	"github.com/sap/crossplane-provider-btp/internal/controller/security/rolecollectionassignment"
 )
 
@@ -29,8 +30,8 @@ import (
 // the supplied manager.
 func CustomSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	for _, setup := range []func(ctrl.Manager, internalopts.CrossplaneOptions) error{
-		globalaccount.Setup,
-		subaccount.Setup,
+		clusteraccount.Setup,
+		clustersecurity.Setup,
 		cloudfoundry.Setup,
 		kyma.Setup,
 		entitlement.Setup,
@@ -39,10 +40,8 @@ func CustomSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 		resourceusage.Setup,
 		certbasedoidclogin.Setup,
 		kubeconfiggenerator.Setup,
-		directory.Setup,
 		subscription.Setup,
 		rolecollectionassignment.Setup,
-		rolecollection.Setup,
 		serviceinstance.Setup,
 		servicebinding.Setup,
 		kymaenvironmentbinding.Setup,

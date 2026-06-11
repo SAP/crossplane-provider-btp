@@ -11,7 +11,7 @@ func Configure(p *config.Provider) {
 		r.Kind = "DirectoryEntitlement"
 
 		r.References["directory_id"] = config.Reference{
-			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Directory",
+			Type:              "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1.Directory",
 			Extractor:         "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.DirectoryUuid()",
 			RefFieldName:      "DirectoryRef",
 			SelectorFieldName: "DirectorySelector",

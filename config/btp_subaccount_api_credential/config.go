@@ -12,7 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	accountsv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	clusteraccount "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -53,7 +53,7 @@ func Configure(p *config.Provider) {
 		}
 
 		r.References["subaccount_id"] = config.Reference{
-			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
+			Type:              "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1.Subaccount",
 			Extractor:         "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()",
 			RefFieldName:      "SubaccountRef",
 			SelectorFieldName: "SubaccountSelector",
@@ -145,7 +145,7 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 	if cr.Spec.ForProvider.SubaccountID != nil && cr.Spec.ForProvider.SubaccountRef != nil {
 
 		// Use a custom reference tracker to track the subaccount reference
-		err := referenceTracker.CreateTrackingReference(ctx, cr, *cr.Spec.ForProvider.SubaccountRef, accountsv1alpha1.SubaccountGroupVersionKind)
+		err := referenceTracker.CreateTrackingReference(ctx, cr, *cr.Spec.ForProvider.SubaccountRef, clusteraccount.SubaccountGroupVersionKind)
 
 		if err != nil {
 			return errors.Wrap(err, errTrackRUsage)

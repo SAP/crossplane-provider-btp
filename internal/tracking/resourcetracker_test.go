@@ -18,7 +18,8 @@ import (
 	fake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/sap/crossplane-provider-btp/apis"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
+	legacyv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 
@@ -88,10 +89,10 @@ func Test_findReferences(t *testing.T) {
 		{
 			name: "With ManagedResource",
 			args: args{
-				res: &v1alpha1.ServiceManager{
-					Spec: v1alpha1.ServiceManagerSpec{
+				res: &legacyv1alpha1.ServiceManager{
+					Spec: legacyv1alpha1.ServiceManagerSpec{
 						ResourceSpec: xpv1.ResourceSpec{},
-						ForProvider: v1alpha1.ServiceManagerParameters{
+						ForProvider: legacyv1alpha1.ServiceManagerParameters{
 							SubaccountRef: &xpv1.Reference{
 								Name: "asd",
 							},
@@ -308,6 +309,10 @@ func buildFakeClient(initialObjects []kclient.Object, t *testing.T) (kclient.Wit
 	}
 	scheme := runtime.NewScheme()
 	err := apis.AddToScheme(scheme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = v1alpha1.SchemeBuilder.AddToScheme(scheme)
 	if err != nil {
 		t.Fatal(err)
 	}
