@@ -102,7 +102,10 @@ func CreateClient(
 		return nil, saErr
 	}
 
-	svc, err := newServiceFn(CISSecretData, ServiceAccountSecretData)
+	pcName := mg.GetProviderConfigReference().Name
+	svc, err := DefaultClientCache.GetOrCreate(pcName, CISSecretData, ServiceAccountSecretData, func() (*btp.Client, error) {
+		return newServiceFn(CISSecretData, ServiceAccountSecretData)
+	})
 	return svc, errors.Wrap(err, errNewClient)
 }
 
