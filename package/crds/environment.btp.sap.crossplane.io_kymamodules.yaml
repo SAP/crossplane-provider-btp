@@ -95,6 +95,8 @@ spec:
                 - name
                 type: object
               kymaEnvironmentBindingId:
+                description: 'Deprecated: KymaEnvironmentBindingId is no longer used.
+                  The active binding is read from the referenced secret instead.'
                 type: string
               kymaEnvironmentBindingRef:
                 description: A Reference to a named object.
