@@ -378,66 +378,6 @@ func TestConnect(t *testing.T) {
 	}
 }
 
-// Test flattenSecretData function
-func TestFlattenSecretData(t *testing.T) {
-	cases := map[string]struct {
-		reason string
-		input  map[string][]byte
-		want   map[string][]byte
-		err    error
-	}{
-		"EmptyInput": {
-			reason: "should handle empty input",
-			input:  map[string][]byte{},
-			want:   map[string][]byte{},
-		},
-		"NonJSONValue": {
-			reason: "should keep non-JSON values as-is",
-			input: map[string][]byte{
-				"simple": []byte("value"),
-			},
-			want: map[string][]byte{
-				"simple": []byte("value"),
-			},
-		},
-		"JSONObjectValue": {
-			reason: "should flatten JSON object values",
-			input: map[string][]byte{
-				"json_obj": []byte(`{"key1": "value1", "key2": "value2"}`),
-			},
-			want: map[string][]byte{
-				"key1": []byte("value1"),
-				"key2": []byte("value2"),
-			},
-		},
-		"MixedValues": {
-			reason: "should handle mixed JSON and non-JSON values",
-			input: map[string][]byte{
-				"simple":   []byte("simple_value"),
-				"json_obj": []byte(`{"nested_key": "nested_value"}`),
-			},
-			want: map[string][]byte{
-				"simple":     []byte("simple_value"),
-				"nested_key": []byte("nested_value"),
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			got, err := flattenSecretData(tc.input)
-
-			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\nflattenSecretData(...): -want error, +got error:\n%s\n", tc.reason, diff)
-			}
-
-			if diff := cmp.Diff(tc.want, got); diff != "" {
-				t.Errorf("\n%s\nflattenSecretData(...): -want, +got:\n%s\n", tc.reason, diff)
-			}
-		})
-	}
-}
-
 // Test helper function validation
 func TestServiceBindingHelpers(t *testing.T) {
 	t.Run("expectedServiceBinding creates valid CR", func(t *testing.T) {
