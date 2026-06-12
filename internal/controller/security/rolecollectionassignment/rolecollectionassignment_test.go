@@ -24,9 +24,12 @@ var (
 )
 
 func TestObserve(t *testing.T) {
+	const legacyName = "legacy-rca"
+
 	type args struct {
 		cr     *v1alpha1.RoleCollectionAssignment
 		client *RoleAssignerMock
+		kube   client.Client
 	}
 
 	type want struct {
@@ -40,7 +43,7 @@ func TestObserve(t *testing.T) {
 		args args
 		want want
 	}{
-		"NoExternalName": {
+		"empty external-name triggers create": {
 			args: args{
 				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer")),
 				client: &RoleAssignerMock{},
@@ -50,6 +53,48 @@ func TestObserve(t *testing.T) {
 				o: managed.ExternalObservation{
 					ResourceExists: false,
 				},
+			},
+		},
+		"legacy sentinel, role exists, migrates to compound key": {
+			args: args{
+				cr:     cr(withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName(legacyName)),
+				client: &RoleAssignerMock{hasRole: true},
+				kube:   &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			},
+			want: want{
+				cr: cr(WithConditions(xpv1.Available()), withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  true,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				CalledIdentifier: "someUser",
+			},
+		},
+		"legacy sentinel, role missing": {
+			args: args{
+				cr:     cr(withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName(legacyName)),
+				client: &RoleAssignerMock{hasRole: false},
+			},
+			want: want{
+				cr: cr(withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName(legacyName)),
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				CalledIdentifier: "someUser",
+			},
+		},
+		"legacy sentinel kube update fails": {
+			args: args{
+				cr:     cr(withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName(legacyName)),
+				client: &RoleAssignerMock{hasRole: true},
+				kube:   &test.MockClient{MockUpdate: test.NewMockUpdateFn(apiError)},
+			},
+			want: want{
+				cr:               cr(withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
+				o:                managed.ExternalObservation{},
+				err:              apiError,
+				CalledIdentifier: "someUser",
 			},
 		},
 		"InvalidExternalName": {
@@ -149,7 +194,7 @@ func TestObserve(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client}
+			e := external{client: tc.args.client, kube: tc.args.kube}
 			got, err := e.Observe(context.Background(), tc.args.cr)
 			assertCalledIdentifier(t, "e.Observe", tc.want.CalledIdentifier, tc.args.client.CalledIdentifier)
 			expectedErrorBehaviour(t, tc.want.err, err)
@@ -746,6 +791,12 @@ func withCredsUpjet() RoleCollectionModifier {
 func withUser(username string) RoleCollectionModifier {
 	return func(assignment *v1alpha1.RoleCollectionAssignment) {
 		assignment.Spec.ForProvider.UserName = username
+	}
+}
+
+func withName(name string) RoleCollectionModifier {
+	return func(assignment *v1alpha1.RoleCollectionAssignment) {
+		assignment.Name = name
 	}
 }
 

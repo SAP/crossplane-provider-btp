@@ -33,8 +33,9 @@ const (
 	errAssignRole   = "cannot assign role"
 	errRevokeRole   = "cannot revoke role"
 
-	errParseExternalName = "cannot parse external-name"
-	errNewClient         = "cannot create new Service"
+	errParseExternalName  = "cannot parse external-name"
+	errUpdateExternalName = "cannot update external-name to compound key"
+	errNewClient          = "cannot create new Service"
 )
 
 var (
@@ -99,11 +100,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errNewClient)
 	}
 
-	return &external{client: svc}, nil
+	return &external{client: svc, kube: c.kube}, nil
 }
 
 type external struct {
 	client RoleAssigner
+	kube   client.Client
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -119,10 +121,28 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	externalName := meta.GetExternalName(cr)
+
+	// Empty annotation means a fresh resource (the default initializer is
+	// suppressed via DefaultSetupWithoutDefaultInitializer). Trigger Create;
+	// if the assignment already exists, AssignRole returns a conflict and we
+	// stay in an error loop until the user sets the compound external-name.
+	// ADR(external-name): Definition #1 — empty annotation expresses "create
+	// new", not "adopt existing".
 	if externalName == "" {
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 
+	// Legacy sentinel: pre-ADR controller wrote `cr.Name` via the default
+	// initializer. ADR(external-name): Observe step 1 backwards-compat branch.
+	if externalName == cr.Name {
+		return c.observeLegacy(ctx, cr)
+	}
+
+	return c.observeCurrent(ctx, cr, externalName)
+}
+
+// observeCurrent handles a populated, ADR-compliant compound external-name.
+func (c *external) observeCurrent(ctx context.Context, cr *v1alpha1.RoleCollectionAssignment, externalName string) (managed.ExternalObservation, error) {
 	origin, name, roleCollection, err := ParseExternalName(externalName)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errParseExternalName)
@@ -137,7 +157,31 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	cr.Status.SetConditions(xpv1.Available())
+	return managed.ExternalObservation{
+		ResourceExists:    true,
+		ResourceUpToDate:  true,
+		ConnectionDetails: managed.ConnectionDetails{},
+	}, nil
+}
 
+// observeLegacy handles the pre-ADR `externalName == cr.Name` sentinel: query
+// XSUAA using the spec values; on hit, rewrite the annotation to the compound
+// key; on miss, signal Create.
+func (c *external) observeLegacy(ctx context.Context, cr *v1alpha1.RoleCollectionAssignment) (managed.ExternalObservation, error) {
+	hasRole, err := c.client.HasRole(ctx, cr.Spec.ForProvider.Origin, IdentifierName(cr), cr.Spec.ForProvider.RoleCollectionName)
+	if err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errRetrieveRole)
+	}
+	if !hasRole {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
+
+	meta.SetExternalName(cr, BuildExternalName(cr))
+	if err := c.kube.Update(ctx, cr); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateExternalName)
+	}
+
+	cr.Status.SetConditions(xpv1.Available())
 	return managed.ExternalObservation{
 		ResourceExists:    true,
 		ResourceUpToDate:  true,
