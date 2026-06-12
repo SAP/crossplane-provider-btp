@@ -1,4 +1,4 @@
-# Behavior sketch — RoleCollectionAssignment ADR compliance
+# Implementation sketch — RoleCollectionAssignment ADR compliance
 
 ## Decisions made (review before implementing)
 
@@ -98,3 +98,73 @@ These cover everything once the annotation holds a valid compound key — either
 - **Unit** (`rolecollectionassignment_test.go`): rewrite `TestObserve` — empty (false), legacy sentinel + found (auto-migrates and adopts), legacy sentinel + missing (false), valid key + found, valid key + 404, invalid format (errors), drift case (Diff populated). Rewrite `TestCreate` — success sets compound key, error leaves annotation empty. Replace `TestUpdate` with a no-op success. Extend `TestDelete` — valid key path, 404 swallowed, legacy sentinel parse error, garbage parse error, empty annotation parse error.
 - **E2E import** (`test/e2e/rolecollectionassignment_test.go`, new): user-only flow via `ImportTester`. Pre-create the user assignment in XSUAA, apply MR with the compound external-name, assert Ready + correct status. Group path covered only by unit tests.
 - **Upgrade** (`test/upgrade/rolecollectionassignment_external_name_upgrade_test.go`, new): baseCR with `externalName == cr.Name`, run controller, assert annotation transitions to compound key and resource stays Ready.
+
+## Implementation slices
+
+The work is split into four slices. Each slice is independently mergeable in terms of code (build + unit tests pass at every boundary), but **only slice 2 onwards is release-safe** — slice 1 alone would break existing clusters because legacy-sentinel annotations would start failing to parse. Slice 1 is therefore a local-testing milestone, not a release point.
+
+A note on `zz_setup.go`: despite the `zz_` prefix, controller-wiring `zz_setup.go` files in this repo are hand-written (generated files use the `zz_generated_*.go` pattern). The eight already-migrated peer resources show the exact one-line edit. No codegen step.
+
+### Slice 1 — Greenfield compound key (local-testing milestone)
+
+**Goal:** prove the new compound-key path works through the whole stack — CRD → controller → XSUAA client → annotation roundtrip — for fresh resources only. Enables manual end-to-end testing against a real XSUAA before adding migration complexity.
+
+**In scope:**
+- `zz_setup.go`: `DefaultSetup` → `DefaultSetupWithoutDefaultInitializer` (one-line change at line 16).
+- New helpers `BuildExternalName(cr) string` and `ParseExternalName(s) (origin, name, rc string, err error)`, with their own unit tests. Place alongside the controller (e.g. `rolecollectionassignment.go` or a new `external_name.go` in the same package — match peer convention).
+- **Observe** (subset): steps 1, 2, 4 (parse → on error return error), 5 (HasRole → false ⇒ `ResourceExists: false`), 7 (Available). **Skip step 3 (legacy sentinel) and step 6 (drift detection).**
+- **Create**: full ADR version — set compound key on success only; do not set on error.
+- **Update**: replace `errNotImplemented` with no-op success (`return managed.ExternalUpdate{}, nil`).
+- **Delete** (subset): parse → `RevokeRole` → 404-swallow → success. **No legacy-sentinel branch.** Parse failure (including empty) returns error.
+- Unit tests covering only the paths above. Rewrite `TestObserve`, `TestCreate`, `TestUpdate`, `TestDelete` accordingly. Drop the legacy-sentinel and drift cases for now — they belong to slices 2 and 3.
+- Manual smoke test against a real XSUAA: apply a fresh MR, observe annotation written as compound key, delete it, observe revoke.
+
+**Explicitly out of scope (must remain not-yet-implemented at end of slice):**
+- Legacy sentinel branch in Observe (covers U1, U2, U5).
+- Legacy sentinel branch in Delete.
+- Drift detection, `Diff` field, event recorder (covers P4).
+- Upgrade test, E2E test, doc comment block.
+
+**Acceptance:** unit tests green, build green, manual P1 path verified end-to-end against XSUAA. **Do not merge to main without slice 2.**
+
+### Slice 2 — Legacy migration (first release-safe point)
+
+**Goal:** make the controller safe to roll out to existing clusters that already hold `externalName == cr.Name` annotations.
+
+**In scope:**
+- **Observe step 3**: legacy-sentinel branch. Build expected key from spec, `HasRole` lookup, on hit rewrite annotation via `kube.Update` and fall through; on miss return `ResourceExists: false` so Create runs.
+- **Delete legacy-sentinel branch**: per decision #8, return parse error and rely on the next reconcile to complete the rewrite. (If review flips decision #8 to "rebuild from spec," fold that change in here.)
+- Unit tests for U1, U2, U5 paths.
+- Upgrade test `test/upgrade/rolecollectionassignment_external_name_upgrade_test.go`: baseCR with `externalName == cr.Name`, assert transition to compound key with resource staying Ready. Mirror `subaccount_external_name_upgrade_test.go` structure.
+
+**Acceptance:** all of slice 1 + legacy upgrade test green. **Releasable.** Existing clusters can adopt this build without manual annotation surgery.
+
+### Slice 3 — Drift reporting
+
+**Goal:** strict ADR §Observe step 6 — surface mismatch between annotation and spec to the user instead of silently ignoring it.
+
+**In scope:**
+- Add `Diff string` field to `RoleCollectionAssignmentObservation` in `apis/security/v1alpha1/rolecollectionassignment_types.go`. Regenerate deepcopy.
+- Wire event recorder into the connector if not already present (check `kymaenvironment.go:152-310` for the precedent).
+- **Observe step 6**: on parsed-vs-spec mismatch, populate `cr.Status.AtProvider.Diff`, emit `event.Warning("DriftDetected", diff)`, set `ExternalObservation.Diff`. Still return `ResourceUpToDate: true` because spec is immutable.
+- Unit test for P4 (mismatched-spec import → Diff populated, event emitted).
+
+**Acceptance:** drift surfaces in `kubectl describe` and events. Releasable.
+
+### Slice 4 — Import E2E + docs
+
+**Goal:** lock in the import-by-external-name path with a real-cluster test, and document the external-name format on the type.
+
+**In scope:**
+- Add the standard `External-Name Configuration:` doc-comment block above `RoleCollectionAssignment` in `rolecollectionassignment_types.go`. Mirror peer resources' wording: Follows Standard: no — compound key; format: `origin/user-or-group/roleCollection`; navigation via UI + `btp` CLI.
+- E2E test `test/e2e/rolecollectionassignment_test.go`: user-only flow via `ImportTester` (group flow remains unit-tested only, per decision #4). Pre-create the user assignment in XSUAA, apply MR with compound external-name, assert Ready + correct status.
+- Update any user-facing docs / examples to show the compound external-name format.
+
+**Acceptance:** E2E green in CI, docs reflect the new format.
+
+### Why this ordering
+
+- **Slice 1 first** because the helper + Create/Observe-happy-path is the foundation everything else rewrites; doing it standalone keeps the diff small and reviewable.
+- **Slice 2 before any release** because shipping slice 1 alone would break legacy clusters — the legacy sentinel would start hitting the parse-error path.
+- **Slice 3 after slice 2** because drift is informational only (spec is immutable, `ResourceUpToDate: true` either way) — pure addition, doesn't gate correctness.
+- **Slice 4 last** because E2E + docs depend on everything else being stable; it's the "lock it down" slice.
