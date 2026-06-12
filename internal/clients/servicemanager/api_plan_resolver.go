@@ -24,7 +24,7 @@ const ErrMissingXsappname = "Xsappname (xsappname) is missing"
 
 // PlanIdResolver used as its own resolval implementation downstream
 type PlanIdResolver interface {
-	PlanIDByName(ctx context.Context, offeringName string, servicePlanName string) (string, error)
+	PlanIDByName(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error)
 }
 
 // NewCredsFromOperatorSecret creates a new BindingCredentials from a secret data
@@ -119,14 +119,18 @@ func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*S
 	}, nil
 }
 
-func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, planName string) (string, error) {
-	offeringQuery := fmt.Sprintf("catalog_name eq '%s'", offeringName)
+func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, planName, dataCenter string) (string, error) {
+	offeringQuery := fmt.Sprintf("catalog_name eq '%s' and data_center eq '%s'", offeringName, dataCenter)
+
 	execute, _, err := sm.GetServiceOfferings(ctx).FieldQuery(offeringQuery).Execute()
 	if err != nil {
 		return "", err
 	}
 	if len(execute.Items) == 0 {
-		return "", errors.Errorf("API returned no service plan for offering %s", offeringName)
+		if dataCenter != "" {
+			return "", errors.Errorf("no service offering '%s' found in data center '%s'", offeringName, dataCenter)
+		}
+		return "", errors.Errorf("no service offering found for '%s'", offeringName)
 	}
 
 	planQuery := fmt.Sprintf("catalog_name eq '%s' and service_offering_id eq '%s'", planName, *execute.Items[0].Id)
