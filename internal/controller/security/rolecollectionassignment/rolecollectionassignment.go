@@ -5,6 +5,7 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/btp"
 	rolecollectiongroupassignment "github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollectiongroupassignment"
@@ -32,8 +33,8 @@ const (
 	errAssignRole   = "cannot assign role"
 	errRevokeRole   = "cannot revoke role"
 
-	errNotImplemented = "not implemented"
-	errNewClient      = "cannot create new Service"
+	errParseExternalName = "cannot parse external-name"
+	errNewClient         = "cannot create new Service"
 )
 
 var (
@@ -117,15 +118,22 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotRoleCollectionAssignment)
 	}
 
-	hasRole, err := c.client.HasRole(ctx, cr.Spec.ForProvider.Origin, IdentifierName(cr), cr.Spec.ForProvider.RoleCollectionName)
+	externalName := meta.GetExternalName(cr)
+	if externalName == "" {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
 
+	origin, name, roleCollection, err := ParseExternalName(externalName)
+	if err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errParseExternalName)
+	}
+
+	hasRole, err := c.client.HasRole(ctx, origin, name, roleCollection)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errRetrieveRole)
 	}
 	if !hasRole {
-		return managed.ExternalObservation{
-			ResourceExists: false,
-		}, nil
+		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 
 	cr.Status.SetConditions(xpv1.Available())
@@ -150,13 +158,16 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errAssignRole)
 	}
 
+	meta.SetExternalName(cr, BuildExternalName(cr))
+
 	return managed.ExternalCreation{
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	return managed.ExternalUpdate{}, errors.New(errNotImplemented)
+	// All spec fields are immutable via XValidation, so Update has no work to do.
+	return managed.ExternalUpdate{}, nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
@@ -166,8 +177,13 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	cr.Status.SetConditions(xpv1.Deleting())
-	err := c.client.RevokeRole(ctx, cr.Spec.ForProvider.Origin, IdentifierName(cr), cr.Spec.ForProvider.RoleCollectionName)
+
+	origin, name, roleCollection, err := ParseExternalName(meta.GetExternalName(cr))
 	if err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errParseExternalName)
+	}
+
+	if err := c.client.RevokeRole(ctx, origin, name, roleCollection); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errRevokeRole)
 	}
 
