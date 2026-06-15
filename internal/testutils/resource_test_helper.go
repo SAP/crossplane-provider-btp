@@ -3,7 +3,7 @@ package testutils
 import (
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 	v1alpha12 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

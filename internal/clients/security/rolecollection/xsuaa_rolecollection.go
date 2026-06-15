@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"reflect"
 
-	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
+	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/cluster/security/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	xsuaa "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-xsuaa-service-api-go/pkg"
 	"golang.org/x/oauth2/clientcredentials"

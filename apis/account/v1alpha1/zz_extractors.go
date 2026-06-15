@@ -3,24 +3,24 @@ package v1alpha1
 import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	clusterv1alpha1 "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 )
 
 // GlobalAccountUuid Global Account UUID extractor function
 func GlobalAccountUuid() reference.ExtractValueFn {
 	return func(mg resource.Managed) string {
-		sg, ok := mg.(*GlobalAccount)
+		sg, ok := mg.(*clusterv1alpha1.GlobalAccount)
 		if !ok {
 			return ""
 		}
 		return sg.Status.AtProvider.Guid
-
 	}
 }
 
 // DirectoryUuid Directory Account UUID extractor function
 func DirectoryUuid() reference.ExtractValueFn {
 	return func(mg resource.Managed) string {
-		d, ok := mg.(*Directory)
+		d, ok := mg.(*clusterv1alpha1.Directory)
 		if !ok {
 			return ""
 		}
@@ -28,14 +28,13 @@ func DirectoryUuid() reference.ExtractValueFn {
 			return ""
 		}
 		return *d.Status.AtProvider.Guid
-
 	}
 }
 
-// SubaccountUuid Global Account UUID extractor function
+// SubaccountUuid Subaccount UUID extractor function
 func SubaccountUuid() reference.ExtractValueFn {
 	return func(mg resource.Managed) string {
-		sg, ok := mg.(*Subaccount)
+		sg, ok := mg.(*clusterv1alpha1.Subaccount)
 		if !ok {
 			return ""
 		}

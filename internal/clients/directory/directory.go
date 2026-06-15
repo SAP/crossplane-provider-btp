@@ -9,7 +9,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/google/uuid"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"

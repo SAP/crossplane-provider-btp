@@ -24,10 +24,10 @@ limitations under the License.
 //go:generate rm -rf ../package/crds
 
 // Remove generated files
-//go:generate bash -c "find . -iname 'zz_generated' ! -iname 'zz_generated.managed*.go' -delete"
-//go:generate bash -c "find . -type d -empty -delete"
-//go:generate bash -c "find ../internal/controller -iname 'zz_generated*' -delete"
-//go:generate bash -c "find ../internal/controller -type d -empty -delete"
+//go:generate bash -c "find . -not -path './cluster/*' -not -path './namespaced/*' -not -path './base/*' -iname 'zz_generated' ! -iname 'zz_generated.managed*.go' -delete"
+//go:generate bash -c "find . -not -path './cluster/*' -not -path './namespaced/*' -not -path './base/*' -type d -empty -delete"
+//go:generate bash -c "find ../internal/controller -not -path '../internal/controller/cluster/*' -not -path '../internal/controller/namespaced/*' -iname 'zz_generated*' -delete"
+//go:generate bash -c "find ../internal/controller -not -path '../internal/controller/cluster/*' -not -path '../internal/controller/namespaced/*' -type d -empty -delete"
 //go:generate rm -rf ../examples-generated
 
 // Generate documentation from Terraform docs.

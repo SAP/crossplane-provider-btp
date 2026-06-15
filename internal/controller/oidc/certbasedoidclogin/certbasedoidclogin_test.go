@@ -147,7 +147,7 @@ func TestObserve(t *testing.T) {
 						IssuedAt:  testingTime(time.Hour * -1),
 						ExpiresAt: testingTime(time.Minute - 1),
 						RotationNotBefore: testingTimeWith(
-							time.Now().Add(time.Minute-1),
+							testutils.Now().Add(time.Minute-1),
 							((time.Minute*20)+(time.Second*20))*-1),
 						RotationStrategy: internal.Ptr(v1alpha1.RotationStrategyDynamic),
 						RotationDuration: testingDuration((time.Minute * 20) + (time.Second * 20)),

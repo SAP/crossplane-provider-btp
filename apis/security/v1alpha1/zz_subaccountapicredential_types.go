@@ -41,7 +41,7 @@ type SubaccountApiCredentialInitParameters struct {
 
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
-	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1.Subaccount
 	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()
 	// +crossplane:generate:reference:refFieldName=SubaccountRef
 	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
@@ -108,7 +108,7 @@ type SubaccountApiCredentialParameters struct {
 
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
-	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
+	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1.Subaccount
 	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()
 	// +crossplane:generate:reference:refFieldName=SubaccountRef
 	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector

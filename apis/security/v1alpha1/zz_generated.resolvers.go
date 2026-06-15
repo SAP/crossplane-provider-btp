@@ -23,52 +23,9 @@ import (
 	reference "github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	errors "github.com/pkg/errors"
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	v1alpha11 "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-// ResolveReferences of this RoleCollection.
-func (mg *RoleCollection) ResolveReferences(ctx context.Context, c client.Reader) error {
-	r := reference.NewAPIResolver(c, mg)
-
-	var rsp reference.ResolutionResponse
-	var err error
-
-	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret,
-		Extract:      SubaccountApiCredentialSecret(),
-		Namespace:    mg.GetNamespace(),
-		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
-		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
-		To: reference.To{
-			List:    &SubaccountApiCredentialList{},
-			Managed: &SubaccountApiCredential{},
-		},
-	})
-	if err != nil {
-		return errors.Wrap(err, "mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret")
-	}
-	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret = rsp.ResolvedValue
-	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef = rsp.ResolvedReference
-
-	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace,
-		Extract:      SubaccountApiCredentialSecretNamespace(),
-		Namespace:    mg.GetNamespace(),
-		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
-		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
-		To: reference.To{
-			List:    &SubaccountApiCredentialList{},
-			Managed: &SubaccountApiCredential{},
-		},
-	})
-	if err != nil {
-		return errors.Wrap(err, "mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace")
-	}
-	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace = rsp.ResolvedValue
-	mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef = rsp.ResolvedReference
-
-	return nil
-}
 
 // ResolveReferences of this RoleCollectionAssignment.
 func (mg *RoleCollectionAssignment) ResolveReferences(ctx context.Context, c client.Reader) error {
@@ -128,8 +85,8 @@ func (mg *SubaccountApiCredential) ResolveReferences(ctx context.Context, c clie
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &v1alpha1.SubaccountList{},
-			Managed: &v1alpha1.Subaccount{},
+			List:    &v1alpha11.SubaccountList{},
+			Managed: &v1alpha11.Subaccount{},
 		},
 	})
 	if err != nil {
@@ -145,8 +102,8 @@ func (mg *SubaccountApiCredential) ResolveReferences(ctx context.Context, c clie
 		Reference:    mg.Spec.InitProvider.SubaccountRef,
 		Selector:     mg.Spec.InitProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &v1alpha1.SubaccountList{},
-			Managed: &v1alpha1.Subaccount{},
+			List:    &v1alpha11.SubaccountList{},
+			Managed: &v1alpha11.Subaccount{},
 		},
 	})
 	if err != nil {
@@ -172,8 +129,8 @@ func (mg *SubaccountTrustConfiguration) ResolveReferences(ctx context.Context, c
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &v1alpha1.SubaccountList{},
-			Managed: &v1alpha1.Subaccount{},
+			List:    &v1alpha11.SubaccountList{},
+			Managed: &v1alpha11.Subaccount{},
 		},
 	})
 	if err != nil {
@@ -189,8 +146,8 @@ func (mg *SubaccountTrustConfiguration) ResolveReferences(ctx context.Context, c
 		Reference:    mg.Spec.InitProvider.SubaccountRef,
 		Selector:     mg.Spec.InitProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &v1alpha1.SubaccountList{},
-			Managed: &v1alpha1.Subaccount{},
+			List:    &v1alpha11.SubaccountList{},
+			Managed: &v1alpha11.Subaccount{},
 		},
 	})
 	if err != nil {

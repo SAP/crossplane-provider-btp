@@ -22,6 +22,7 @@ import (
 	"context"
 	reference "github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	errors "github.com/pkg/errors"
+	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/cluster/account/v1alpha1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -39,8 +40,8 @@ func (mg *CloudManagement) ResolveReferences(ctx context.Context, c client.Reade
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &SubaccountList{},
-			Managed: &Subaccount{},
+			List:    &v1alpha1.SubaccountList{},
+			Managed: &v1alpha1.Subaccount{},
 		},
 	})
 	if err != nil {
@@ -86,33 +87,6 @@ func (mg *CloudManagement) ResolveReferences(ctx context.Context, c client.Reade
 	return nil
 }
 
-// ResolveReferences of this Directory.
-func (mg *Directory) ResolveReferences(ctx context.Context, c client.Reader) error {
-	r := reference.NewAPIResolver(c, mg)
-
-	var rsp reference.ResolutionResponse
-	var err error
-
-	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.ForProvider.DirectoryGuid,
-		Extract:      DirectoryUuid(),
-		Namespace:    mg.GetNamespace(),
-		Reference:    mg.Spec.ForProvider.DirectoryRef,
-		Selector:     mg.Spec.ForProvider.DirectorySelector,
-		To: reference.To{
-			List:    &DirectoryList{},
-			Managed: &Directory{},
-		},
-	})
-	if err != nil {
-		return errors.Wrap(err, "mg.Spec.ForProvider.DirectoryGuid")
-	}
-	mg.Spec.ForProvider.DirectoryGuid = rsp.ResolvedValue
-	mg.Spec.ForProvider.DirectoryRef = rsp.ResolvedReference
-
-	return nil
-}
-
 // ResolveReferences of this DirectoryEntitlement.
 func (mg *DirectoryEntitlement) ResolveReferences(ctx context.Context, c client.Reader) error {
 	r := reference.NewAPIResolver(c, mg)
@@ -127,8 +101,8 @@ func (mg *DirectoryEntitlement) ResolveReferences(ctx context.Context, c client.
 		Reference:    mg.Spec.ForProvider.DirectoryRef,
 		Selector:     mg.Spec.ForProvider.DirectorySelector,
 		To: reference.To{
-			List:    &DirectoryList{},
-			Managed: &Directory{},
+			List:    &v1alpha1.DirectoryList{},
+			Managed: &v1alpha1.Directory{},
 		},
 	})
 	if err != nil {
@@ -144,8 +118,8 @@ func (mg *DirectoryEntitlement) ResolveReferences(ctx context.Context, c client.
 		Reference:    mg.Spec.InitProvider.DirectoryRef,
 		Selector:     mg.Spec.InitProvider.DirectorySelector,
 		To: reference.To{
-			List:    &DirectoryList{},
-			Managed: &Directory{},
+			List:    &v1alpha1.DirectoryList{},
+			Managed: &v1alpha1.Directory{},
 		},
 	})
 	if err != nil {
@@ -171,8 +145,8 @@ func (mg *Entitlement) ResolveReferences(ctx context.Context, c client.Reader) e
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &SubaccountList{},
-			Managed: &Subaccount{},
+			List:    &v1alpha1.SubaccountList{},
+			Managed: &v1alpha1.Subaccount{},
 		},
 	})
 	if err != nil {
@@ -198,8 +172,8 @@ func (mg *ServiceBinding) ResolveReferences(ctx context.Context, c client.Reader
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &SubaccountList{},
-			Managed: &Subaccount{},
+			List:    &v1alpha1.SubaccountList{},
+			Managed: &v1alpha1.Subaccount{},
 		},
 	})
 	if err != nil {
@@ -276,8 +250,8 @@ func (mg *ServiceInstance) ResolveReferences(ctx context.Context, c client.Reade
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &SubaccountList{},
-			Managed: &Subaccount{},
+			List:    &v1alpha1.SubaccountList{},
+			Managed: &v1alpha1.Subaccount{},
 		},
 	})
 	if err != nil {
@@ -303,8 +277,8 @@ func (mg *ServiceManager) ResolveReferences(ctx context.Context, c client.Reader
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &SubaccountList{},
-			Managed: &Subaccount{},
+			List:    &v1alpha1.SubaccountList{},
+			Managed: &v1alpha1.Subaccount{},
 		},
 	})
 	if err != nil {
@@ -312,50 +286,6 @@ func (mg *ServiceManager) ResolveReferences(ctx context.Context, c client.Reader
 	}
 	mg.Spec.ForProvider.SubaccountGuid = rsp.ResolvedValue
 	mg.Spec.ForProvider.SubaccountRef = rsp.ResolvedReference
-
-	return nil
-}
-
-// ResolveReferences of this Subaccount.
-func (mg *Subaccount) ResolveReferences(ctx context.Context, c client.Reader) error {
-	r := reference.NewAPIResolver(c, mg)
-
-	var rsp reference.ResolutionResponse
-	var err error
-
-	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.ForProvider.GlobalAccountGuid,
-		Extract:      GlobalAccountUuid(),
-		Namespace:    mg.GetNamespace(),
-		Reference:    mg.Spec.ForProvider.GlobalAccountRef,
-		Selector:     mg.Spec.ForProvider.GlobalAccountSelector,
-		To: reference.To{
-			List:    &GlobalAccountList{},
-			Managed: &GlobalAccount{},
-		},
-	})
-	if err != nil {
-		return errors.Wrap(err, "mg.Spec.ForProvider.GlobalAccountGuid")
-	}
-	mg.Spec.ForProvider.GlobalAccountGuid = rsp.ResolvedValue
-	mg.Spec.ForProvider.GlobalAccountRef = rsp.ResolvedReference
-
-	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.ForProvider.DirectoryGuid,
-		Extract:      DirectoryUuid(),
-		Namespace:    mg.GetNamespace(),
-		Reference:    mg.Spec.ForProvider.DirectoryRef,
-		Selector:     mg.Spec.ForProvider.DirectorySelector,
-		To: reference.To{
-			List:    &DirectoryList{},
-			Managed: &Directory{},
-		},
-	})
-	if err != nil {
-		return errors.Wrap(err, "mg.Spec.ForProvider.DirectoryGuid")
-	}
-	mg.Spec.ForProvider.DirectoryGuid = rsp.ResolvedValue
-	mg.Spec.ForProvider.DirectoryRef = rsp.ResolvedReference
 
 	return nil
 }
@@ -374,8 +304,8 @@ func (mg *SubaccountServiceBroker) ResolveReferences(ctx context.Context, c clie
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &SubaccountList{},
-			Managed: &Subaccount{},
+			List:    &v1alpha1.SubaccountList{},
+			Managed: &v1alpha1.Subaccount{},
 		},
 	})
 	if err != nil {
@@ -391,8 +321,8 @@ func (mg *SubaccountServiceBroker) ResolveReferences(ctx context.Context, c clie
 		Reference:    mg.Spec.InitProvider.SubaccountRef,
 		Selector:     mg.Spec.InitProvider.SubaccountSelector,
 		To: reference.To{
-			List:    &SubaccountList{},
-			Managed: &Subaccount{},
+			List:    &v1alpha1.SubaccountList{},
+			Managed: &v1alpha1.Subaccount{},
 		},
 	})
 	if err != nil {

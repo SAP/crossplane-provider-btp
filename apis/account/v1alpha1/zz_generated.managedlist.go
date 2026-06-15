@@ -38,26 +38,8 @@ func (l *DirectoryEntitlementList) GetItems() []resource.Managed {
 	return items
 }
 
-// GetItems of this DirectoryList.
-func (l *DirectoryList) GetItems() []resource.Managed {
-	items := make([]resource.Managed, len(l.Items))
-	for i := range l.Items {
-		items[i] = &l.Items[i]
-	}
-	return items
-}
-
 // GetItems of this EntitlementList.
 func (l *EntitlementList) GetItems() []resource.Managed {
-	items := make([]resource.Managed, len(l.Items))
-	for i := range l.Items {
-		items[i] = &l.Items[i]
-	}
-	return items
-}
-
-// GetItems of this GlobalAccountList.
-func (l *GlobalAccountList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]
@@ -85,15 +67,6 @@ func (l *ServiceInstanceList) GetItems() []resource.Managed {
 
 // GetItems of this ServiceManagerList.
 func (l *ServiceManagerList) GetItems() []resource.Managed {
-	items := make([]resource.Managed, len(l.Items))
-	for i := range l.Items {
-		items[i] = &l.Items[i]
-	}
-	return items
-}
-
-// GetItems of this SubaccountList.
-func (l *SubaccountList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]

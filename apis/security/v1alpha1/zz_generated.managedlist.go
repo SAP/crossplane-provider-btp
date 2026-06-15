@@ -38,15 +38,6 @@ func (l *RoleCollectionAssignmentList) GetItems() []resource.Managed {
 	return items
 }
 
-// GetItems of this RoleCollectionList.
-func (l *RoleCollectionList) GetItems() []resource.Managed {
-	items := make([]resource.Managed, len(l.Items))
-	for i := range l.Items {
-		items[i] = &l.Items[i]
-	}
-	return items
-}
-
 // GetItems of this SubaccountApiCredentialList.
 func (l *SubaccountApiCredentialList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
