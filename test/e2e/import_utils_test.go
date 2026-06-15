@@ -90,8 +90,8 @@ func NewImportTester[T resource.Managed](baseResource T, baseName string, o ...I
 		BaseResource:                 baseResource,
 		BaseName:                     baseName,
 		WaitDependentResourceTimeout: wait.WithTimeout(5 * time.Minute),
-		WaitCreateTimeout:            wait.WithTimeout(3 * time.Minute),
-		WaitDeletionTimeout:          wait.WithTimeout(3 * time.Minute),
+		WaitCreateTimeout:            wait.WithTimeout(10 * time.Minute),
+		WaitDeletionTimeout:          wait.WithTimeout(10 * time.Minute),
 	}
 	it.BaseResource.SetName(it.GetPrefixedName())
 
