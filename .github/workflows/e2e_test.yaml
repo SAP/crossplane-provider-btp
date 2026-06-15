@@ -36,6 +36,10 @@ env:
   E2E_BUILD_REGISTRY: index.docker.io/e2e
   E2E_PROVIDER_IMAGE: index.docker.io/e2e/provider-btp-amd64
   CROSSPLANE_CLI_VERSION: v2.0.2
+  CROSSPLANE_CHART_VERSION: '2.1.3'
+  # SHA256 of crossplane-2.1.3.tgz from upstream charts.crossplane.io/stable
+  # index.yaml's `digest:` field. Update on every Crossplane version bump.
+  CROSSPLANE_CHART_SHA256: '1059cc4b87167ba7e1b837a8e6bd787691bc9f84c5a29a7e91dbd0122086c682'
 
 jobs:
   prepare-matrix:
@@ -83,9 +87,6 @@ jobs:
         with:
           version: v3.14.0
 
-      - name: Set Crossplane chart version
-        run: echo "CROSSPLANE_CHART_VERSION=2.1.3" >> $GITHUB_ENV
-
       - name: Restore Crossplane chart cache
         id: crossplane-chart-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -115,6 +116,25 @@ jobs:
             --version "${CROSSPLANE_CHART_VERSION}" \
             --destination .cache/charts
           ls -la .cache/charts
+
+      # Defense-in-depth against artifact poisoning (CodeQL alert #64). The `build`
+      # job's `helm pull` step is workflow-mutable; a malicious PR could rewrite
+      # it to upload a poisoned chart for matrix legs to install. Pinning the
+      # expected SHA256 (sourced from upstream charts.crossplane.io/stable
+      # index.yaml's `digest:` field) means a poisoned tarball fails the build
+      # before reaching matrix legs. Update the constant on every Crossplane
+      # version bump.
+      - name: Verify Crossplane chart integrity
+        run: |
+          set -euo pipefail
+          cd .cache/charts
+          EXPECTED="${CROSSPLANE_CHART_SHA256}"
+          ACTUAL="$(sha256sum "crossplane-${CROSSPLANE_CHART_VERSION}.tgz" | awk '{print $1}')"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Crossplane chart SHA256 mismatch: expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+          echo "Crossplane chart SHA256 verified: $ACTUAL"
 
       - name: Save Crossplane chart cache
         if: success() && steps.crossplane-chart-cache.outputs.cache-hit != 'true'
