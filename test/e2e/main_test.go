@@ -33,14 +33,22 @@ var (
 
 const (
 	// crossplaneChartPathEnv names the env var that points at a local
-	// Crossplane chart tarball (e.g. /path/to/crossplane-2.1.3.tgz). CI
-	// populates this from a workflow artifact built once per run; local
-	// developers can `helm pull crossplane --repo
-	// https://charts.crossplane.io/stable --version <ver> -d /tmp` and
-	// export the resulting path. This bypasses the
-	// `helm repo add https://charts.crossplane.io/stable` flow that has
-	// been throwing intermittent 403 Forbidden errors. See
-	// docs/development/flakiness-analysis.md (Pattern A).
+	// Crossplane chart tarball (e.g. /path/to/crossplane-2.1.3.tgz). When
+	// set, the test installs from the local file (avoiding the per-test
+	// `helm repo add charts.crossplane.io/stable` network call which has
+	// been throwing intermittent 403 Forbidden errors; see
+	// docs/development/flakiness-analysis.md, Pattern A). When unset, the
+	// test falls back to xp-testing's bundled helm-repo install
+	// (xpenvfuncs.InstallCrossplane).
+	//
+	// The fallback is required because this PR's workflow uses
+	// `pull_request_target`, which means GitHub runs the workflow file
+	// from the BASE branch (main), not from the PR head — so the
+	// chart-tarball export step doesn't run on this PR's own CI. Once the
+	// PR merges and main's `Resolve Crossplane chart path` step in
+	// `e2e_test.yaml` exports the env var, every matrix leg automatically
+	// switches to the chart-tarball path. The fallback also lets local
+	// developers run e2e tests without pre-staging the chart.
 	crossplaneChartPathEnv = "CROSSPLANE_CHART_PATH"
 	// crossplaneVersion is the Crossplane chart version. Must match the
 	// version that was pulled into the tarball at CROSSPLANE_CHART_PATH.
@@ -117,7 +125,8 @@ func SetupClusterWithCrossplane(namespace string) {
 	// Replicate the slice of setup.ClusterSetup.Configure that we need, swapping
 	// xp-testing's bundled InstallCrossplane (which goes through
 	// `helm repo add https://charts.crossplane.io/stable`) for an install from
-	// a chart reference passed via CROSSPLANE_CHART_PATH.
+	// a chart reference passed via CROSSPLANE_CHART_PATH when available, and
+	// falling back to the bundled helm-repo install when it's not.
 	//
 	// xp-testing v1.9.2's setup.ClusterSetup.Configure pinned to the helm-repo
 	// install path with no opt-out. PR crossplane-contrib/xp-testing#134 adds a
@@ -126,11 +135,24 @@ func SetupClusterWithCrossplane(namespace string) {
 	// Replicating inline keeps the dep tree intact.
 	clusterName := resolveClusterName()
 	reuseCluster := envvar.CheckEnvVarExists(reuseClusterEnv)
-	// Only required when we will actually install Crossplane (fresh cluster).
-	// On reuse runs the cluster already has Crossplane wired up.
-	var chartRef string
+	// Resolve the install func to use on a fresh cluster. On reuse runs the
+	// cluster already has Crossplane wired up, so we skip both paths via the
+	// xpenvfuncs.Conditional below.
+	var installCrossplaneFunc env.Func
 	if !reuseCluster {
-		chartRef = envvar.GetOrPanic(crossplaneChartPathEnv)
+		if chartRef := os.Getenv(crossplaneChartPathEnv); chartRef != "" {
+			installCrossplaneFunc = testutil.InstallCrossplaneFromChart(clusterName, chartRef, crossplaneVersion)
+		} else {
+			// Fallback: xp-testing's bundled helm-repo install. Used (a) on
+			// this PR's own CI before the chart-tarball workflow lands on
+			// main (pull_request_target runs base-branch workflows, so the
+			// PR's chart-export step doesn't run), and (b) for local dev
+			// when the chart isn't pre-staged.
+			installCrossplaneFunc = xpenvfuncs.InstallCrossplane(
+				clusterName,
+				xpenvfuncs.Version(crossplaneVersion),
+			)
+		}
 	}
 
 	testenv.Setup(
@@ -146,7 +168,7 @@ func SetupClusterWithCrossplane(namespace string) {
 		// reuseCluster on => skip and trust the previous run wired things up.
 		xpenvfuncs.Conditional(
 			xpenvfuncs.Compose(
-				testutil.InstallCrossplaneFromChart(clusterName, chartRef, crossplaneVersion),
+				installCrossplaneFunc,
 				xpenvfuncs.InstallCrossplaneProvider(
 					clusterName, xpenvfuncs.InstallCrossplaneProviderOptions{
 						Name:                    "btp-account",

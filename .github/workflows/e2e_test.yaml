@@ -25,6 +25,18 @@ on:
         default: 'pr-e2e-approval'
         required: false
         type: string
+  workflow_dispatch:
+    inputs:
+      checkout-ref:
+        description: 'the ref for the repo checkout step (defaults to the dispatched ref when empty)'
+        default: ''
+        required: false
+        type: string
+      environment:
+        description: 'the environment to run in'
+        default: 'pr-e2e-approval'
+        required: false
+        type: string
 
 permissions:
   contents: read
