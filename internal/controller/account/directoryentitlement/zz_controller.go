@@ -53,11 +53,8 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	name := managed.ControllerName(v1alpha1.DirectoryEntitlement_GroupVersionKind.String())
 	var initializers managed.InitializerChain
 	eventHandler := handler.NewEventHandler(handler.WithLogger(o.Logger.WithValues("gvk", v1alpha1.DirectoryEntitlement_GroupVersionKind)))
-	ac := tjcontroller.NewAPICallbacks(mgr, xpresource.ManagedKind(v1alpha1.DirectoryEntitlement_GroupVersionKind), tjcontroller.WithEventHandler(eventHandler))
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnecter(tjcontroller.NewConnector(mgr.GetClient(), o.WorkspaceStore, o.SetupFn, o.Provider.Resources["btp_directory_entitlement"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler),
-			tjcontroller.WithCallbackProvider(ac),
-		)),
+		managed.WithExternalConnecter(tjcontroller.NewConnector(mgr.GetClient(), o.WorkspaceStore, o.SetupFn, o.Provider.Resources["btp_directory_entitlement"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler))),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 		managed.WithFinalizer(terraform.NewWorkspaceFinalizer(o.WorkspaceStore, xpresource.NewAPIFinalizer(mgr.GetClient(), managed.FinalizerName))),
@@ -78,8 +75,7 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	// register webhooks for the kind v1alpha1.DirectoryEntitlement
 	// if they're enabled.
 	if o.StartWebhooks {
-		if err := ctrl.NewWebhookManagedBy(mgr).
-			For(&v1alpha1.DirectoryEntitlement{}).
+		if err := ctrl.NewWebhookManagedBy(mgr, &v1alpha1.DirectoryEntitlement{}).
 			Complete(); err != nil {
 			return errors.Wrap(err, "cannot register webhook for the kind v1alpha1.DirectoryEntitlement")
 		}

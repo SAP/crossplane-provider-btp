@@ -62,6 +62,15 @@ func (s *ServiceInstanceMapper) TfResource(ctx context.Context, si *v1alpha1.Ser
 	if si.Status.AtProvider.ServiceplanID != "" {
 		sInstance.Spec.ForProvider.ServiceplanID = &si.Status.AtProvider.ServiceplanID
 	}
+	// since terraform calculates diffs based on spec, which usually is set during lateinitialize
+	// we need to set those names, because otherwise there will be a drift,
+	// which requires replacement of the cloud resource (which would fail)
+	if si.Status.AtProvider.ServiceOfferingName != nil {
+		sInstance.Spec.ForProvider.ServiceOfferingName = si.Status.AtProvider.ServiceOfferingName
+	}
+	if si.Status.AtProvider.ServiceplanName != nil {
+		sInstance.Spec.ForProvider.ServiceplanName = si.Status.AtProvider.ServiceplanName
+	}
 
 	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
 	condition := si.GetCondition(xpv1.TypeReady)

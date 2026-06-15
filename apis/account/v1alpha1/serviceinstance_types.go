@@ -93,6 +93,22 @@ type ServiceInstanceObservation struct {
 
 	// The platform ID of the service instance.
 	PlatformID string `json:"platformId,omitempty"`
+
+	// (String) The name of the service offering of the plan.
+	// The name of the service offering of the plan.
+	ServiceOfferingName *string `json:"serviceOfferingName,omitempty" tf:"service_offering_name,omitempty"`
+
+	// (String) The name of the service plan.
+	// The name of the service plan.
+	ServiceplanName *string `json:"serviceplanName,omitempty" tf:"serviceplan_name,omitempty"`
+
+	// (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+	// The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
+	Shared *bool `json:"shared,omitempty" tf:"shared,omitempty"`
+
+	// (Map of Set of String) The set of words or phrases assigned to the service instance.
+	// The set of words or phrases assigned to the service instance.
+	Labels map[string][]*string `json:"labels,omitempty" tf:"labels,omitempty"`
 }
 
 // A ServiceInstanceSpec defines the desired state of a ServiceInstance.

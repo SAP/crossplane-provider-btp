@@ -29,7 +29,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
 	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
 	"github.com/crossplane/upjet/v2/pkg/controller/handler"
-	"github.com/crossplane/upjet/v2/pkg/terraform"
+	"github.com/crossplane/upjet/v2/pkg/metrics"
 	"github.com/pkg/errors"
 	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -53,14 +53,15 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	name := managed.ControllerName(v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind.String())
 	var initializers managed.InitializerChain
 	eventHandler := handler.NewEventHandler(handler.WithLogger(o.Logger.WithValues("gvk", v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind)))
-	ac := tjcontroller.NewAPICallbacks(mgr, xpresource.ManagedKind(v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind), tjcontroller.WithEventHandler(eventHandler))
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnecter(tjcontroller.NewConnector(mgr.GetClient(), o.WorkspaceStore, o.SetupFn, o.Provider.Resources["btp_globalaccount_trust_configuration"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler),
-			tjcontroller.WithCallbackProvider(ac),
-		)),
+		managed.WithExternalConnecter(
+			tjcontroller.NewTerraformPluginFrameworkConnector(mgr.GetClient(), o.SetupFn, o.Provider.Resources["btp_globalaccount_trust_configuration"], o.OperationTrackerStore,
+				tjcontroller.WithTerraformPluginFrameworkLogger(o.Logger),
+				tjcontroller.WithTerraformPluginFrameworkMetricRecorder(metrics.NewMetricRecorder(v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind, mgr, o.PollInterval)),
+				tjcontroller.WithTerraformPluginFrameworkManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)))),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
-		managed.WithFinalizer(terraform.NewWorkspaceFinalizer(o.WorkspaceStore, xpresource.NewAPIFinalizer(mgr.GetClient(), managed.FinalizerName))),
+		managed.WithFinalizer(tjcontroller.NewOperationTrackerFinalizer(o.OperationTrackerStore, xpresource.NewAPIFinalizer(mgr.GetClient(), managed.FinalizerName))),
 		managed.WithTimeout(3 * time.Minute),
 		managed.WithInitializers(initializers),
 		managed.WithPollInterval(o.PollInterval),
@@ -78,8 +79,7 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	// register webhooks for the kind v1alpha1.GlobalaccountTrustConfiguration
 	// if they're enabled.
 	if o.StartWebhooks {
-		if err := ctrl.NewWebhookManagedBy(mgr).
-			For(&v1alpha1.GlobalaccountTrustConfiguration{}).
+		if err := ctrl.NewWebhookManagedBy(mgr, &v1alpha1.GlobalaccountTrustConfiguration{}).
 			Complete(); err != nil {
 			return errors.Wrap(err, "cannot register webhook for the kind v1alpha1.GlobalaccountTrustConfiguration")
 		}

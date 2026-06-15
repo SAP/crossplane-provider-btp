@@ -82,7 +82,7 @@ func main() {
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	ctrl.SetLogger(zl)
 	btp.SetLogger(log)
-	btp.SetDebug(*debug)
+	btp.Debug = *debug
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
@@ -131,8 +131,9 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 			Provider: config.GetProvider(),
 			// use the following WorkspaceStoreOption to enable the shared gRPC mode
 			// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
-			WorkspaceStore: terraform.NewWorkspaceStore(log),
-			SetupFn:        tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
+			WorkspaceStore:        terraform.NewWorkspaceStore(log),
+			SetupFn:               tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
+			OperationTrackerStore: tjcontroller.NewOperationStore(log),
 		},
 		BackoffBase: *backoffBase,
 		BackoffMax:  *backoffMax,

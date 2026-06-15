@@ -139,14 +139,20 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
 
-	// ADR(external-name): check for conflict condition from a previous failed Create()
-	// Only block if the spec hasn't changed since the conflict (same Generation)
-	lastAsyncOp := cr.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation))
-	if lastAsyncOp.Status == corev1.ConditionFalse &&
-		strings.Contains(lastAsyncOp.Message, "Conflict") &&
-		lastAsyncOp.ObservedGeneration == cr.Generation {
-		return managed.ExternalObservation{ResourceExists: false},
-			errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
+	// ADR(external-name): Check if there's a conflict error from previous Create attempt
+	// AND external-name is not set (meaning user didn't intend to adopt).
+	// ObservedGeneration is set by saveCallback — if the spec changed since the conflict
+	// (cr.Generation > lastAsyncCond.ObservedGeneration), we allow a new Create() attempt since it is a new version/generation.
+	// TODO: test if this is still valid with no-fork
+	if meta.GetExternalName(cr) == "" {
+		lastAsyncCond := cr.GetCondition(ujresource.TypeLastAsyncOperation)
+		if lastAsyncCond.Message != "" &&
+			strings.Contains(lastAsyncCond.Message, "Conflict") &&
+			lastAsyncCond.ObservedGeneration == cr.Generation {
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
+		}
 	}
 
 	// ADR(external-name): validate external-name is a UUID if set
@@ -295,6 +301,8 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 	cr.Status.AtProvider.Ready = sid.Ready
 	cr.Status.AtProvider.Usable = sid.Usable
 	cr.Status.AtProvider.PlatformID = sid.PlatformID
+	cr.Status.AtProvider.ServiceOfferingName = internal.Ptr(sid.ServiceOfferingName)
+	cr.Status.AtProvider.ServiceplanName = internal.Ptr(sid.ServiceplanName)
 	return nil
 }
 
@@ -319,8 +327,9 @@ func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
 	return len(policies) == 1 && policies[0] == xpv1.ManagementActionObserve
 }
 
-// calculateDiff compares the desired state (spec) with the observed state from the API
+// calculateDiff compares the desired state (spec) with the observed state from the API (based on the upjetted resource)
 // Returns a human-readable diff string following the ADR(external-name) requirement for drift reporting
+// Please be aware that this is not precisly the same as the Terraform planResponse diff which includes more considerations like fields not set by the user
 func (e *external) calculateDiff(cr *v1alpha1.ServiceInstance) string {
 	// Get the Terraform resource to access both desired and observed state
 	tfResource := e.tfClient.GetTfResource()
@@ -336,22 +345,16 @@ func (e *external) calculateDiff(cr *v1alpha1.ServiceInstance) string {
 
 	// Build desired state from Spec.ForProvider (what user wants)
 	desired := map[string]any{
-		"name":           upjettedSI.Spec.ForProvider.Name,
-		"subaccount_id":  upjettedSI.Spec.ForProvider.SubaccountID,
-		"shared":         upjettedSI.Spec.ForProvider.Shared,
-		"parameters":     upjettedSI.Spec.ForProvider.Parameters,
-		"serviceplan_id": upjettedSI.Spec.ForProvider.ServiceplanID,
-		"labels":         upjettedSI.Spec.ForProvider.Labels,
+		"name":       upjettedSI.Spec.ForProvider.Name,
+		"shared":     upjettedSI.Spec.ForProvider.Shared,
+		"parameters": upjettedSI.Spec.ForProvider.Parameters,
 	}
 
 	// Build observed state from Status.AtProvider (what API returned)
 	observed := map[string]any{
-		"name":           upjettedSI.Status.AtProvider.Name,
-		"subaccount_id":  upjettedSI.Status.AtProvider.SubaccountID,
-		"shared":         upjettedSI.Status.AtProvider.Shared,
-		"parameters":     upjettedSI.Status.AtProvider.Parameters,
-		"serviceplan_id": upjettedSI.Status.AtProvider.ServiceplanID,
-		"labels":         upjettedSI.Status.AtProvider.Labels,
+		"name":       upjettedSI.Status.AtProvider.Name,
+		"shared":     upjettedSI.Status.AtProvider.Shared,
+		"parameters": upjettedSI.Status.AtProvider.Parameters,
 	}
 
 	// Compare all fields between desired and observed state
