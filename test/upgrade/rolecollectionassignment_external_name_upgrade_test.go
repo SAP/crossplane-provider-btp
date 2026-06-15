@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	rcaFromCustomTag             = "v1.3.0"
+	rcaFromCustomTag             = "v1.9.0"
 	rcaToCustomTag               = "local"
 	rcaCustomResourceDirectories = []string{
 		"./testdata/customCRs/subaccountExternalName",
