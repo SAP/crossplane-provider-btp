@@ -8,9 +8,8 @@ import (
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
-	"github.com/crossplane-contrib/xp-testing/pkg/images"
-	"github.com/crossplane-contrib/xp-testing/pkg/setup"
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
+	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
 	testutil "github.com/sap/crossplane-provider-btp/test"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +29,33 @@ var (
 	SECONDARY_DIRC_ADMIN_ENV_KEY = "SECOND_DIRECTORY_ADMIN_EMAIL"
 
 	UUT_BUILD_ID_KEY = "BUILD_ID"
+)
+
+const (
+	// crossplaneChartPathEnv names the env var that points at a local
+	// Crossplane chart tarball (e.g. /path/to/crossplane-2.1.3.tgz). CI
+	// populates this from a workflow artifact built once per run; local
+	// developers can `helm pull crossplane --repo
+	// https://charts.crossplane.io/stable --version <ver> -d /tmp` and
+	// export the resulting path. This bypasses the
+	// `helm repo add https://charts.crossplane.io/stable` flow that has
+	// been throwing intermittent 403 Forbidden errors. See
+	// docs/development/flakiness-analysis.md (Pattern A).
+	crossplaneChartPathEnv = "CROSSPLANE_CHART_PATH"
+	// crossplaneVersion is the Crossplane chart version. Must match the
+	// version that was pulled into the tarball at CROSSPLANE_CHART_PATH.
+	crossplaneVersion = "2.1.3"
+
+	// reuseClusterEnv mirrors xp-testing's E2E_REUSE_CLUSTER semantics: when
+	// set, the cluster, Crossplane, and provider are reused across runs and
+	// the cluster is not destroyed at teardown.
+	reuseClusterEnv = "E2E_REUSE_CLUSTER"
+	// clusterNameEnv mirrors xp-testing's E2E_CLUSTER_NAME: when set, it
+	// overrides the generated cluster name.
+	clusterNameEnv = "E2E_CLUSTER_NAME"
+	// defaultClusterPrefix matches xp-testing's defaultPrefix used for the
+	// reused-cluster name.
+	defaultClusterPrefix = "e2e"
 )
 
 var (
@@ -88,21 +114,50 @@ func SetupClusterWithCrossplane(namespace string) {
 		},
 	}
 
-	cfg := setup.ClusterSetup{
-		ProviderName: "btp-account",
-		Images: images.ProviderImages{
-			Package:         uutConfig,
-			ControllerImage: &uutController,
-		},
-		CrossplaneSetup: setup.CrossplaneSetup{
-			Version: "2.1.3",
-		},
-		DeploymentRuntimeConfig: &deploymentRuntimeConfig,
+	// Replicate the slice of setup.ClusterSetup.Configure that we need, swapping
+	// xp-testing's bundled InstallCrossplane (which goes through
+	// `helm repo add https://charts.crossplane.io/stable`) for an install from
+	// a chart reference passed via CROSSPLANE_CHART_PATH.
+	//
+	// xp-testing v1.9.2's setup.ClusterSetup.Configure pinned to the helm-repo
+	// install path with no opt-out. PR crossplane-contrib/xp-testing#134 adds a
+	// ChartRef field, but it sits on xp-testing main which has bumped k8s deps
+	// to v0.36 incompatibly with this repo's crossplane-runtime/v2 v2.2.0-rc.0.
+	// Replicating inline keeps the dep tree intact.
+	clusterName := resolveClusterName()
+	reuseCluster := envvar.CheckEnvVarExists(reuseClusterEnv)
+	// Only required when we will actually install Crossplane (fresh cluster).
+	// On reuse runs the cluster already has Crossplane wired up.
+	var chartRef string
+	if !reuseCluster {
+		chartRef = envvar.GetOrPanic(crossplaneChartPathEnv)
 	}
 
-	cfg.Configure(testenv, &kind.Cluster{})
-
 	testenv.Setup(
+		xpenvfuncs.ValidateTestSetup(xpenvfuncs.ValidateTestSetupOptions{
+			CrossplaneVersion: crossplaneVersion,
+		}),
+		envfuncs.CreateCluster(&kind.Cluster{}, clusterName),
+		// Conditional matches Configure's behavior: when reusing an existing
+		// cluster we skip the install steps. We always install on a fresh
+		// cluster (firstSetup=true) and skip when reusing. We do not have a
+		// cheap way to detect "cluster exists" without the gexe shell out
+		// xp-testing uses, so we approximate: reuseCluster off => install,
+		// reuseCluster on => skip and trust the previous run wired things up.
+		xpenvfuncs.Conditional(
+			xpenvfuncs.Compose(
+				testutil.InstallCrossplaneFromChart(clusterName, chartRef, crossplaneVersion),
+				xpenvfuncs.InstallCrossplaneProvider(
+					clusterName, xpenvfuncs.InstallCrossplaneProviderOptions{
+						Name:                    "btp-account",
+						Package:                 uutConfig,
+						ControllerImage:         &uutController,
+						DeploymentRuntimeConfig: &deploymentRuntimeConfig,
+					}),
+			), !reuseCluster),
+		xpenvfuncs.ApplyProviderConfigFromDir("./provider"),
+		xpenvfuncs.LoadSchemas(),
+		xpenvfuncs.AwaitCRDsEstablished,
 		envfuncs.CreateNamespace(namespace),
 		func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 			cfg.WithNamespace(namespace)
@@ -112,4 +167,21 @@ func SetupClusterWithCrossplane(namespace string) {
 		testutil.ApplySecretInCrossplaneNamespace(SERVICE_USER_SECRET_NAME, userSecretData),
 		testutil.CreateProviderConfigEnvFn(namespace, globalAccount, cliServerUrl, CIS_SECRET_NAME, SERVICE_USER_SECRET_NAME),
 	)
+
+	testenv.Finish(
+		xpenvfuncs.DumpLogs(clusterName, "post-tests"),
+		xpenvfuncs.Conditional(envfuncs.DestroyCluster(clusterName), !reuseCluster),
+	)
+}
+
+// resolveClusterName mirrors xp-testing's setup.clusterName logic so that the
+// E2E_CLUSTER_NAME / E2E_REUSE_CLUSTER environment variables continue to work.
+func resolveClusterName() string {
+	if envvar.CheckEnvVarExists(clusterNameEnv) {
+		return os.Getenv(clusterNameEnv)
+	}
+	if envvar.CheckEnvVarExists(reuseClusterEnv) {
+		return defaultClusterPrefix
+	}
+	return envconf.RandomName(defaultClusterPrefix, 10)
 }

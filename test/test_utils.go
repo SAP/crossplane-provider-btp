@@ -19,6 +19,7 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
 	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/pkg/errors"
 	metaApi "github.com/sap/crossplane-provider-btp/apis"
 	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/vladimirvivien/gexe"
@@ -37,7 +38,9 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
 	"sigs.k8s.io/e2e-framework/pkg/features"
+	"sigs.k8s.io/e2e-framework/third_party/helm"
 )
 
 const (
@@ -59,6 +62,41 @@ func SetupLogging(verbosity int) {
 	logging.EnableVerboseLogging(&verbosity)
 	zl := zap.New(zap.UseDevMode(true))
 	ctrl.SetLogger(zl)
+}
+
+// InstallCrossplaneFromChart returns an env.Func that installs Crossplane
+// from a caller-supplied chart reference, bypassing the
+// `helm repo add https://charts.crossplane.io/stable` flow that has been
+// throwing intermittent 403 Forbidden errors. See
+// docs/development/flakiness-analysis.md (Pattern A) for context.
+//
+// chartRef is anything `helm.WithChart` accepts: a local tarball path
+// (e.g. /path/to/crossplane-2.1.3.tgz), an OCI URL
+// (e.g. oci://example.com/crossplane), or a `repo/name` reference (legacy).
+// version is the chart version tag.
+func InstallCrossplaneFromChart(clusterName, chartRef, version string) env.Func {
+	return xpenvfuncs.Compose(
+		envfuncs.CreateNamespace(xpenvfuncs.CrossplaneNamespace),
+		func(ctx context.Context, _ *envconf.Config) (context.Context, error) {
+			cluster, ok := envfuncs.GetClusterFromContext(ctx, clusterName)
+			if !ok {
+				return ctx, fmt.Errorf("install crossplane from chart: cluster %q missing from context", clusterName)
+			}
+			mgr := helm.New(cluster.GetKubeconfig())
+			err := mgr.RunInstall(
+				helm.WithName("crossplane"),
+				helm.WithNamespace(xpenvfuncs.CrossplaneNamespace),
+				helm.WithChart(chartRef),
+				helm.WithVersion(version),
+				helm.WithTimeout("10m"),
+				helm.WithWait(),
+			)
+			if err != nil {
+				return ctx, errors.Wrap(err, "install crossplane from chart: helm install failed")
+			}
+			return ctx, nil
+		},
+	)
 }
 
 func ApplySecretInCrossplaneNamespace(name string, data map[string]string) env.Func {
