@@ -59,7 +59,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gettext
 
       - name: Run long e2e test
-        timeout-minutes: 180
+        # Must be > Go -timeout in `make test-e2e-long` (currently 240m) to allow t.Cleanup to run.
+        # See docs/development/flakiness-pr-plans.md PR-3.
+        timeout-minutes: 260
         run: |
           if [ -n "${{ github.event.inputs.testFilter }}" ]; then
             make test-e2e-long testFilter=${{ github.event.inputs.testFilter }};
