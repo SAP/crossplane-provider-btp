@@ -70,13 +70,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y helm
 
+      - name: Cache BTP CLI binary
+        id: cache-btp-cli
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: /tmp/btp-cli/btp
+          key: btp-cli-${{ env.btp_cli_version }}-${{ runner.os }}
+
       - name: Install BTP CLI
         #hardcoded version
         run: |
-          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
-          cd linux-amd64
-          mv btp /usr/local/bin
+          if [ ! -f /tmp/btp-cli/btp ]; then
+            mkdir -p /tmp/btp-cli
+            curl -LJO --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --max-time 300 \
+              https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz \
+              --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+            tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+            mv linux-amd64/btp /tmp/btp-cli/btp
+          fi
+          sudo cp /tmp/btp-cli/btp /usr/local/bin/btp
+          sudo chmod +x /usr/local/bin/btp
 
       - name: Set BUILD_ID
         run: |
