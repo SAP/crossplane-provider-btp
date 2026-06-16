@@ -26,8 +26,7 @@ const (
 	errTrackPCUsage                = "cannot track ProviderConfig usage"
 	errTrackRCUsage                = "cannot track ResourceUsage"
 
-	errGetSecret  = "api credential secret not found"
-	errReadSecret = "api credential secret is malformed"
+	errGetSecret = "api credential secret not found"
 
 	errRetrieveRole = "cannot retrieve api data"
 	errAssignRole   = "cannot assign role"
