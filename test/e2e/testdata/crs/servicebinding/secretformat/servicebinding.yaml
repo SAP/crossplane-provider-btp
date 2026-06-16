@@ -1,0 +1,17 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceBinding
+metadata:
+  name: e2e-destination-binding-fmt
+  namespace: default
+spec:
+  forProvider:
+    name: e2e-destination-binding-fmt
+    serviceInstanceRef:
+      name: e2e-destination-instance-fmt
+    subaccountRef:
+      name: e2e-test-servicebinding-fmt
+  secretFormat: sap-kubernetes
+  secretKey: credentials
+  writeConnectionSecretToRef:
+    name: e2e-destination-binding-fmt
+    namespace: default
