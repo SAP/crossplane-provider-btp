@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	errExtractSecretKey = "secret not found"
+	errExtractSecretKey = "no secret found"
 )
 
 func Default[T any](object *T, defaultValue T) T {
