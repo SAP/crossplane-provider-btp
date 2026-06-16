@@ -64,13 +64,13 @@ func ParseExternalName(s string) (origin, name, roleCollection string, err error
 func externalNameSpecMismatch(cr *v1alpha1.RoleCollectionAssignment, parsedOrigin, parsedName, parsedRoleCollection string) string {
 	var mismatches []string
 	if parsedOrigin != cr.Spec.ForProvider.Origin {
-		mismatches = append(mismatches, fmt.Sprintf("origin (annotation=%q, spec=%q)", parsedOrigin, cr.Spec.ForProvider.Origin))
+		mismatches = append(mismatches, fmt.Sprintf("origin mismatch (annotation=%q, spec=%q)", parsedOrigin, cr.Spec.ForProvider.Origin))
 	}
 	if parsedName != IdentifierName(cr) {
-		mismatches = append(mismatches, fmt.Sprintf("userOrGroup (annotation=%q, spec=%q)", parsedName, IdentifierName(cr)))
+		mismatches = append(mismatches, fmt.Sprintf("userOrGroup mismatch (annotation=%q, spec=%q)", parsedName, IdentifierName(cr)))
 	}
 	if parsedRoleCollection != cr.Spec.ForProvider.RoleCollectionName {
-		mismatches = append(mismatches, fmt.Sprintf("roleCollectionName (annotation=%q, spec=%q)", parsedRoleCollection, cr.Spec.ForProvider.RoleCollectionName))
+		mismatches = append(mismatches, fmt.Sprintf("roleCollectionName mismatch (annotation=%q, spec=%q)", parsedRoleCollection, cr.Spec.ForProvider.RoleCollectionName))
 	}
 	return strings.Join(mismatches, "; ")
 }
