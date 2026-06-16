@@ -47,6 +47,17 @@ type RoleCollectionAssignmentStatus struct {
 // +kubebuilder:object:root=true
 
 // A RoleCollectionAssignment assigns a role collection to a user or group
+//
+// External-Name Configuration:
+//   - Resource: RoleCollectionAssignment
+//   - Follows Standard: no [compound key, no GUID available; user/group type derived from the mutually-exclusive spec fields userName/groupName]
+//   - Format: `<origin>/<userOrGroupName>/<roleCollectionName>` (e.g. "sap.default/jane.doe@example.com/Subaccount Administrator")
+//   - How to find:
+//     -- UI:
+//     --- User/Group To Role Collections: BTP Cockpit → Subaccount → Security → Users → [Select entry] → Role Collections
+//     --- Role Collections: BTP Cockpit → Subaccount → Security → Role Collections
+//     -- CLI: `btp --format json get security/role-collection <role collection name> --subaccount <subaccount-id> --show-user-assignments`
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
