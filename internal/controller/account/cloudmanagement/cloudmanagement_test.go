@@ -601,6 +601,7 @@ func TestUpdate(t *testing.T) {
 				tracker:  test2.NoOpReferenceResolverTracker{},
 				tfClient: tc.args.tfClient,
 			}
+			// call update
 			_, err := uua.Update(context.TODO(), NewCloudManagement("test", WithExternalName("someID/anotherID")))
 			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Update(): -want error, +got error:\n%s\n", diff)
