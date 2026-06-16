@@ -108,6 +108,50 @@ func TestObserve(t *testing.T) {
 				err: ErrInvalidExternalName,
 			},
 		},
+		"ExternalNameSpecMismatch_Origin": {
+			args: args{
+				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("ldap/someUser/Subaccount Viewer")),
+				client: &RoleAssignerMock{},
+			},
+			want: want{
+				cr:  cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("ldap/someUser/Subaccount Viewer")),
+				o:   managed.ExternalObservation{},
+				err: ErrExternalNameSpecMismatch,
+			},
+		},
+		"ExternalNameSpecMismatch_User": {
+			args: args{
+				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/otherUser/Subaccount Viewer")),
+				client: &RoleAssignerMock{},
+			},
+			want: want{
+				cr:  cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/otherUser/Subaccount Viewer")),
+				o:   managed.ExternalObservation{},
+				err: ErrExternalNameSpecMismatch,
+			},
+		},
+		"ExternalNameSpecMismatch_RoleCollection": {
+			args: args{
+				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Administrator")),
+				client: &RoleAssignerMock{},
+			},
+			want: want{
+				cr:  cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Administrator")),
+				o:   managed.ExternalObservation{},
+				err: ErrExternalNameSpecMismatch,
+			},
+		},
+		"ExternalNameSpecMismatch_GroupVsUser": {
+			args: args{
+				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someGroup/Subaccount Viewer")),
+				client: &RoleAssignerMock{},
+			},
+			want: want{
+				cr:  cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someGroup/Subaccount Viewer")),
+				o:   managed.ExternalObservation{},
+				err: ErrExternalNameSpecMismatch,
+			},
+		},
 		"LookupError": {
 			args: args{
 				cr: cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),

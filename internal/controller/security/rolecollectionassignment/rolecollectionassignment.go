@@ -39,7 +39,8 @@ const (
 )
 
 var (
-	errInvalidSecret = errors.New("api credential secret invalid")
+	errInvalidSecret            = errors.New("api credential secret invalid")
+	ErrExternalNameSpecMismatch = errors.New("external-name does not match spec")
 )
 
 var _ RoleAssigner = &rolecollectionuserassignment.XsusaaUserRoleAssigner{}
@@ -146,6 +147,16 @@ func (c *external) observeCurrent(ctx context.Context, cr *v1alpha1.RoleCollecti
 	origin, name, roleCollection, err := ParseExternalName(externalName)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errParseExternalName)
+	}
+
+	// All four spec fields are immutable via XValidation, so the only way the
+	// parsed external-name can disagree with the spec is at import time when
+	// the user typed inconsistent values. Reject loudly: refuse to take
+	// ownership until the manifest is consistent with the resource being
+	// adopted. The user must fix either the annotation or the spec — there is
+	// nothing the controller can reconcile on its own.
+	if mismatch := externalNameSpecMismatch(cr, origin, name, roleCollection); mismatch != "" {
+		return managed.ExternalObservation{}, errors.Wrap(ErrExternalNameSpecMismatch, mismatch)
 	}
 
 	hasRole, err := c.client.HasRole(ctx, origin, name, roleCollection)

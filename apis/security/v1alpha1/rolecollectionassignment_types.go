@@ -52,6 +52,7 @@ type RoleCollectionAssignmentStatus struct {
 //   - Resource: RoleCollectionAssignment
 //   - Follows Standard: no - uses compound key as resource has no GUID available; user/group type derived from the mutually-exclusive spec fields userName/groupName
 //   - Format: `<origin>/<userOrGroupName>/<roleCollectionName>` (e.g. "sap.default/jane.doe@example.com/Subaccount Administrator")
+//   - Note: `spec.ForProvider` must match external name; mismatches will prompt an error
 //   - How to find (BTP Cockpit):
 //   - RoleCollections: Role Collections: BTP Cockpit → Subaccount → Security → Role Collections
 //   - User Assignments: BTP Cockpit → Subaccount → Security → Users → [Select entry] → Role Collections
