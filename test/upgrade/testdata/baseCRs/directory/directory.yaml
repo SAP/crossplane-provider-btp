@@ -1,0 +1,39 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Directory
+metadata:
+  namespace: default
+  name: upgrade-test-parent-directory
+spec:
+  forProvider:
+    description: "$BUILD_ID-created by upgrade tests (parent)"
+    directoryAdmins:
+      - "$SECOND_DIRECTORY_ADMIN_EMAIL"
+      - "$TECHNICAL_USER_EMAIL"
+    directoryFeatures:
+      - "DEFAULT"
+    displayName: $BUILD_ID-upgrade-test-parent-directory
+    labels:
+      custom_label: ["custom_value"]
+      another_label: ["onevalue", "twovalue"]
+      BUILD_ID: ["$BUILD_ID"]
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Directory
+metadata:
+  namespace: default
+  name: upgrade-test-child-directory
+spec:
+  forProvider:
+    directoryRef:
+      name: upgrade-test-parent-directory
+    description: "$BUILD_ID-created by upgrade tests (child)"
+    directoryAdmins:
+      - "$SECOND_DIRECTORY_ADMIN_EMAIL"
+      - "$TECHNICAL_USER_EMAIL"
+    directoryFeatures:
+      - "DEFAULT"
+    displayName: $BUILD_ID-upgrade-test-child-directory
+    labels:
+      custom_label: ["custom_value"]
+      another_label: ["onevalue", "twovalue"]
+      BUILD_ID: ["$BUILD_ID"]

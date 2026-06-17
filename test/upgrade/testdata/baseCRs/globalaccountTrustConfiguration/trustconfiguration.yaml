@@ -1,0 +1,10 @@
+apiVersion: security.btp.sap.crossplane.io/v1alpha1
+kind: GlobalaccountTrustConfiguration
+metadata:
+  name: upgrade-test-global-trustconfiguration
+  namespace: default
+spec:
+  forProvider:
+    name: $BUILD_ID-upgrade-test-global-trust
+    description: "upgrade-testing-of-global-trust"
+    identityProvider: "$IDP_URL"
