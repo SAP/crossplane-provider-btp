@@ -30,7 +30,8 @@ If you have a question always feel free to reach out on our official crossplane 
 
 :rocket: [**#provider-sap-btp**](https://crossplane.slack.com/archives/C07UZ3UJY7Q).
 
-💬 Also we are hosting an open community call and hope to see you there! Find more details [here](https://sap.github.io/crossplane-provider-docs/docs/contribution/understand-providers/).
+💬 Also we are hosting an open community call and hope to see you there! 
+👉 Find more details [here](https://github.com/SAP/crossplane-provider-btp/discussions/515). 👈
 
 For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 
