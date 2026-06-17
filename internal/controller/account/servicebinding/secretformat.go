@@ -10,6 +10,7 @@ import (
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 )
 
 const (
@@ -163,7 +164,7 @@ func processConnectionDetails(cr *v1alpha1.ServiceBinding, details map[string][]
 	if cr.Spec.SecretKey != nil {
 		return bundleCredentials(*cr.Spec.SecretKey, details)
 	}
-	return flattenSecretData(details)
+	return internal.FlattenConnectionDetails(details)
 }
 
 func fetchServiceInstance(ctx context.Context, kube kubeclient.Client, refName string) (*v1alpha1.ServiceInstance, error) {
