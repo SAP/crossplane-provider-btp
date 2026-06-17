@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 
 var (
@@ -209,6 +211,22 @@ func assertServiceManagerSecret(t *testing.T, ctx context.Context, cfg *envconf.
 	// secret contains correct structure
 	if _, ok := secret.Data["tokenurl"]; !ok {
 		t.Error("Secret not in proper format")
+	}
+	// raw credentials blob preserved under __raw
+	rawBlob, ok := secret.Data[providerv1alpha1.RawBindingKey]
+	if !ok || len(rawBlob) == 0 {
+		t.Errorf("Secret missing %q key with raw credentials blob", providerv1alpha1.RawBindingKey)
+		return
+	}
+	var rawCreds map[string]any
+	if err := json.Unmarshal(rawBlob, &rawCreds); err != nil {
+		t.Errorf("Secret %q value is not valid JSON: %v", providerv1alpha1.RawBindingKey, err)
+		return
+	}
+	for _, key := range []string{"clientid", "clientsecret", "sm_url", "url", "xsappname"} {
+		if _, ok := rawCreds[key]; !ok {
+			t.Errorf("Secret %q blob missing field %q", providerv1alpha1.RawBindingKey, key)
+		}
 	}
 }
 

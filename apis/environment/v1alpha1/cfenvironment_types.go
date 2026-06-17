@@ -20,7 +20,6 @@ const (
 	ResourceAPIEndpoint = "apiEndpoint"
 	ResourceOrgId       = "orgId"
 	ResourceOrgName     = "orgName"
-	ResourceRaw         = "__raw"
 )
 
 // User identifies a user by username and origin
