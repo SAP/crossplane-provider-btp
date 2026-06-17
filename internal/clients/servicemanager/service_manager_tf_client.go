@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 
 	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -284,5 +285,6 @@ func mapTfConnectionDetails(conDetails map[string][]byte) (managed.ConnectionDet
 		apisv1beta1.ResourceCredentialsXsuaaUrl:          []byte(internal.Val(creds.Url)),
 		apisv1beta1.ResourceCredentialsXsappname:         []byte(internal.Val(creds.Xsappname)),
 		apisv1beta1.ResourceCredentialsXsuaaUrlSufix:     []byte("/oauth/token"),
+		providerv1alpha1.RawBindingKey:                   bindingAsBytes,
 	}, nil
 }
