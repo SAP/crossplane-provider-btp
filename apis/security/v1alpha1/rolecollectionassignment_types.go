@@ -53,12 +53,11 @@ type RoleCollectionAssignmentStatus struct {
 //   - Follows Standard: no - uses compound key as resource has no GUID available; user/group type derived from the mutually-exclusive spec fields userName/groupName
 //   - Format: `<origin>/<userOrGroupName>/<roleCollectionName>` (e.g. "sap.default/jane.doe@example.com/Subaccount Administrator")
 //   - Note: `spec.ForProvider` must match external name; mismatches will prompt an error
-//   - How to find (BTP Cockpit):
-//   - RoleCollections: Role Collections: BTP Cockpit → Subaccount → Security → Role Collections
-//   - User Assignments: BTP Cockpit → Subaccount → Security → Users → [Select entry] → Role Collections
-//   - How to find (CLI):
-//   - RoleCollections: `btp --format json list security/role-collection --subaccount <subaccount-id>` → field `name`
-//   - User Assignments: `btp --format json get security/role-collection <role-collection-name> --subaccount <subaccount-id> --show-user-assignments` → fields `origin`, `username`
+//   - How to find:
+//   - UI (RoleCollections): BTP Cockpit → Subaccount → Security → Role Collections
+//   - UI (User Assignments): BTP Cockpit → Subaccount → Security → Users → [Select entry] → Role Collections
+//   - CLI (RoleCollections): `btp --format json list security/role-collection --subaccount <subaccount-id>` (field: `name`)
+//   - CLI (User Assignments): `btp --format json get security/role-collection <role-collection-name> --subaccount <subaccount-id> --show-user-assignments` (fields: `origin`, `username`)
 //
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
