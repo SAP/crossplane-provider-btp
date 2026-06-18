@@ -23,12 +23,7 @@ func Configure(p *config.Provider) {
 		r.ShortGroup = "security"
 		r.Kind = "SubaccountTrustConfiguration"
 
-		// Workaround for inconsistent description on create, see #724.
-		// TODO: remove when terraform-provider-btp is bumped to >= 1.23.1 (#521).
-		r.TerraformConfigurationInjector = func(jsonMap, tfMap map[string]any) error {
-			delete(tfMap, "description")
-			return nil
-		}
+		applyDescriptionInconsistencyWorkaround(r)
 
 		r.References["subaccount_id"] = config.Reference{
 			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
@@ -68,6 +63,28 @@ func Configure(p *config.Provider) {
 			return &OriginInitializer{Kube: kube}
 		})
 	})
+}
+
+// applyDescriptionInconsistencyWorkaround works around an upstream bug in
+// terraform-provider-btp (see #724, fixed upstream in v1.23.1) that causes
+// SubaccountTrustConfiguration creation to fail with "Provider produced
+// inconsistent result after apply" when spec.forProvider.description is set.
+//
+// Strips `description` from the params map so terraform sees a nil value;
+// combined with Optional+Computed in the schema, the BTP-computed value is
+// accepted without a consistency violation. Also overrides the field's
+// ArgumentDocs to surface the limitation on the user-facing CR field.
+//
+// TODO: remove when terraform-provider-btp is bumped to >= 1.23.1 (#521).
+func applyDescriptionInconsistencyWorkaround(r *config.Resource) {
+	r.TerraformConfigurationInjector = func(jsonMap, tfMap map[string]any) error {
+		delete(tfMap, "description")
+		return nil
+	}
+	if r.MetaResource != nil && r.MetaResource.ArgumentDocs != nil {
+		r.MetaResource.ArgumentDocs["description"] = "(String) Description of the trust configuration. " +
+			"NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default."
+	}
 }
 
 // OriginInitializer copies the origin portion of the compound external-name annotation
