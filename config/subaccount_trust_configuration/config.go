@@ -23,6 +23,13 @@ func Configure(p *config.Provider) {
 		r.ShortGroup = "security"
 		r.Kind = "SubaccountTrustConfiguration"
 
+		// Workaround for inconsistent description on create, see #724.
+		// TODO: remove when terraform-provider-btp is bumped to >= 1.23.1 (#521).
+		r.TerraformConfigurationInjector = func(jsonMap, tfMap map[string]any) error {
+			delete(tfMap, "description")
+			return nil
+		}
+
 		r.References["subaccount_id"] = config.Reference{
 			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
 			Extractor:         "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.SubaccountUuid()",
