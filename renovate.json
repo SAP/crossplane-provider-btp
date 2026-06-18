@@ -20,6 +20,16 @@
       "datasourceTemplate": "terraform-provider",
       "versioningTemplate": "hashicorp",
       "depNameTemplate": "SAP/btp"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^\\.github/workflows/e2e_test\\.yaml$"],
+      "matchStrings": [
+        "# renovate: datasource=helm depName=crossplane registryUrl=https://charts\\.crossplane\\.io/stable\\s*\\n\\s*CROSSPLANE_CHART_VERSION:\\s*['\"]?(?<currentValue>[^'\"\\s]+)['\"]?(?:\\s*\\n[^\\n]*)*?\\s*\\n\\s*CROSSPLANE_CHART_SHA256:\\s*['\"]?(?<currentDigest>[a-f0-9]{64})['\"]?"
+      ],
+      "datasourceTemplate": "helm",
+      "depNameTemplate": "crossplane",
+      "registryUrlTemplate": "https://charts.crossplane.io/stable"
     }
   ]
 }
