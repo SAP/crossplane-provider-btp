@@ -70,21 +70,39 @@ func Configure(p *config.Provider) {
 // SubaccountTrustConfiguration creation to fail with "Provider produced
 // inconsistent result after apply" when spec.forProvider.description is set.
 //
-// Strips `description` from the params map so terraform sees a nil value;
-// combined with Optional+Computed in the schema, the BTP-computed value is
-// accepted without a consistency violation. Also overrides the field's
+// Registers an Initializer that nils spec.forProvider.description (and the
+// initProvider counterpart) in-process on every reconcile, before upjet
+// serializes the spec into main.tf.json. Terraform therefore plans against a
+// nil description; combined with Optional+Computed in the schema, the
+// BTP-computed value is accepted without a consistency violation. The change
+// is not persisted to the API server, so the user's spec value remains intact
+// and the workaround is transparent on removal. Also overrides the field's
 // ArgumentDocs to surface the limitation on the user-facing CR field.
 //
 // TODO: remove when terraform-provider-btp is bumped to >= 1.23.1 (#521).
 func applyDescriptionInconsistencyWorkaround(r *config.Resource) {
-	r.TerraformConfigurationInjector = func(jsonMap, tfMap map[string]any) error {
-		delete(tfMap, "description")
-		return nil
-	}
+	r.InitializerFns = append(r.InitializerFns, func(_ client.Client) managed.Initializer {
+		return &descriptionStripper{}
+	})
 	if r.MetaResource != nil && r.MetaResource.ArgumentDocs != nil {
 		r.MetaResource.ArgumentDocs["description"] = "(String) Description of the trust configuration. " +
 			"NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default."
 	}
+}
+
+// descriptionStripper is the Initializer registered by
+// applyDescriptionInconsistencyWorkaround. See that function's godoc for
+// rationale and removal conditions.
+type descriptionStripper struct{}
+
+func (descriptionStripper) Initialize(_ context.Context, mg resource.Managed) error {
+	cr, ok := mg.(*securityv1alpha1.SubaccountTrustConfiguration)
+	if !ok {
+		return errors.New(errTypeAssertion)
+	}
+	cr.Spec.ForProvider.Description = nil
+	cr.Spec.InitProvider.Description = nil
+	return nil
 }
 
 // OriginInitializer copies the origin portion of the compound external-name annotation
