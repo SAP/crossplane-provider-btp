@@ -1,4 +1,4 @@
-//go:build e2e
+//go:build e2e || e2e_long
 
 package e2e
 
