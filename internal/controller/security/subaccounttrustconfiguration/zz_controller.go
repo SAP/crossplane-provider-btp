@@ -32,8 +32,8 @@ import (
 	"github.com/crossplane/upjet/pkg/controller/handler"
 	"github.com/crossplane/upjet/pkg/terraform"
 	"github.com/pkg/errors"
-	ctrl "sigs.k8s.io/controller-runtime"
 	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	features "github.com/sap/crossplane-provider-btp/internal/features"
@@ -43,6 +43,9 @@ import (
 func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	name := managed.ControllerName(v1alpha1.SubaccountTrustConfiguration_GroupVersionKind.String())
 	var initializers managed.InitializerChain
+	for _, i := range o.Provider.Resources["btp_subaccount_trust_configuration"].InitializerFns {
+		initializers = append(initializers, i(mgr.GetClient()))
+	}
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 	if o.SecretStoreConfigGVK != nil {
 		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), *o.SecretStoreConfigGVK, connection.WithTLSConfig(o.ESSOptions.TLSConfig)))
