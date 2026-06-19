@@ -97,6 +97,20 @@ make test-acceptance testFilter=<functionNameOfTest>
 > [!WARNING]
 > Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
 
+#### Long-Running Tests
+
+Some tests (e.g. Kyma environment, service binding rotation) are excluded from `make test-acceptance` because they can take 10 minutes or more. These tests carry the `e2e_long` build tag and must be run explicitly:
+
+```bash
+make test-e2e-long testFilter=<functionNameOfTest>
+```
+
+To run the full long-running suite, omit the filter:
+
+```bash
+make test-e2e-long
+```
+
 Please note that when running multiple times you might want to delete the kind cluster again to avoid conflicts:
 
 ```bash
