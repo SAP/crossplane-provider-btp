@@ -1632,8 +1632,8 @@ func TestDelete(t *testing.T) {
 				err: nil, // 404 should not be treated as error
 			},
 		},
-		"DeleteAPI409SoftHandled": {
-			reason: "409 Conflict on delete (in-progress or blocked by children) is soft-handled: log and return nil so the controller polls Observe on the next reconcile",
+		"DeleteAPI409SurfacesError": {
+			reason: "409 Conflict on delete (in-progress or blocked by children) is wrapped via specifyAPIError so the BTP message lands in the resource's Synced condition",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName(SAMPLE_GUID),
@@ -1653,7 +1653,7 @@ func TestDelete(t *testing.T) {
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
 			},
 			want: want{
-				err: nil,
+				err: errors.New("deletion of subaccount failed"),
 			},
 		},
 		"DeleteAPI5xxWrappedWithSpecifyAPIError": {

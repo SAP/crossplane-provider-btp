@@ -3,7 +3,6 @@ package subaccount
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -340,44 +339,11 @@ func deleteBTPSubaccount(
 		return nil
 	}
 
-	if raw != nil && raw.StatusCode == 409 {
-		// 409 Conflict: delete already in progress, or blocked by child resources
-		// (entitlements, subscriptions, environments, trust configs). Return nil so
-		// the controller polls Observe on the next reconcile instead of retrying
-		// DELETE — repeated DELETEs amplify the conflict and pollute the error log.
-		// The BTP-side state will eventually become DELETING, at which point the
-		// guard in Delete() short-circuits, and Observe will detect the final
-		// 404 (deleted).
-		ctrl.Log.Info("subaccount delete returned 409 Conflict (in-progress or blocked by children), waiting for next reconcile",
-			"subaccountId", subaccountId, "body", string(readBodySafe(err, raw)))
-		return nil
-	}
-
 	if err != nil {
 		return errors.Wrap(specifyAPIError(err), "deletion of subaccount failed")
 	}
 
 	return nil
-}
-
-// readBodySafe extracts the response body for diagnostic logging. It prefers the
-// already-read body on a *accountclient.GenericOpenAPIError (the OpenAPI client
-// drains raw.Body into err.Body() before returning). As a fallback, it reads at
-// most 1 KiB from raw.Body so a buggy server response can't blow the log.
-func readBodySafe(err error, raw *http.Response) []byte {
-	if genericErr, ok := err.(*accountclient.GenericOpenAPIError); ok {
-		if body := genericErr.Body(); len(body) > 0 {
-			return body
-		}
-	}
-	if raw == nil || raw.Body == nil {
-		return nil
-	}
-	body, readErr := io.ReadAll(io.LimitReader(raw.Body, 1024))
-	if readErr != nil {
-		return nil
-	}
-	return body
 }
 
 func (c *external) updateBTPSubaccount(
