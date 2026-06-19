@@ -44,6 +44,7 @@ jobs:
       - run-make-reviewable-and-check-diff
       with:
         environment: pr-e2e-no-approval
+      secrets: inherit
       permissions:
         contents: read
 
