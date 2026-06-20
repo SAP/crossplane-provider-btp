@@ -2,7 +2,9 @@ package servicemanager
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/sap/crossplane-provider-btp/internal"
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 )
 
@@ -80,24 +82,24 @@ func (t ServiceManagerInstanceProxyClient) resolveServicePlan(ctx context.Contex
 func (t ServiceManagerInstanceProxyClient) describeAdminBinding(ctx context.Context, subaccountGuid string) (*BindingCredentials, error) {
 	response, raw, err := t.GetServiceManagementBinding(ctx, subaccountGuid).Execute()
 
-	if raw.StatusCode == 404 {
+	if raw != nil && raw.StatusCode == 404 {
 		return nil, nil
 	}
 
-	return mapBindingCredentialTypes(response), err
+	return mapBindingCredentialTypes(response), specifyAPIError(err)
 }
 
 func (t ServiceManagerInstanceProxyClient) createAdminBinding(ctx context.Context, subaccountGuid string) (*BindingCredentials, error) {
 	result, _, err := t.CreateServiceManagementBinding(ctx, subaccountGuid).Execute()
 	if err != nil {
-		return nil, err
+		return nil, specifyAPIError(err)
 	}
-	return mapBindingCredentialTypes(result), err
+	return mapBindingCredentialTypes(result), nil
 }
 
 func (t ServiceManagerInstanceProxyClient) deleteAdminBinding(ctx context.Context, subaccountGuid string) error {
 	_, err := t.DeleteServiceManagementBindingOfSubaccount(ctx, subaccountGuid).Execute()
-	return err
+	return specifyAPIError(err)
 }
 
 // mapBindingCredentialTypes is a helper function to convert ServiceManagerBindingResponseObject to BindingCredentials by mapping each value individually
@@ -112,4 +114,17 @@ func mapBindingCredentialTypes(in *accountsserviceclient.ServiceManagerBindingRe
 	out.SmUrl = in.SmUrl
 	out.Xsappname = in.Xsappname
 	return out
+}
+
+// specifyAPIError surfaces the BTP accounts-service error body when present.
+func specifyAPIError(err error) error {
+	if genericErr, ok := err.(*accountsserviceclient.GenericOpenAPIError); ok {
+		if accountError, ok := genericErr.Model().(accountsserviceclient.ApiExceptionResponseObject); ok {
+			return fmt.Errorf("API Error: %v, Code %v", internal.Val(accountError.Error.Message), internal.Val(accountError.Error.Code))
+		}
+		if genericErr.Body() != nil {
+			return fmt.Errorf("API Error: %s", string(genericErr.Body()))
+		}
+	}
+	return err
 }
