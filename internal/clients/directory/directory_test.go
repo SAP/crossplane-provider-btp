@@ -3,9 +3,7 @@ package directory
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
-	"unsafe"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
@@ -715,7 +713,7 @@ func TestDeleteDirectory(t *testing.T) {
 		"DeleteAPI409SurfacesError": {
 			reason: "409 Conflict on delete is wrapped via specifyAPIError so the BTP message lands in the resource's Synced condition",
 			args: args{
-				mockClient: MockDirClient{DeleteErr: create409Error()},
+				mockClient: MockDirClient{DeleteErr: testutils.NewAccountAPIError(409, "directory has child resources", "409 Conflict")},
 				cr: testutils.NewDirectory("unittest-client",
 					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
 			},
@@ -875,32 +873,4 @@ func TestDirectoryPayload(t *testing.T) {
 			}
 		})
 	}
-}
-
-// create409Error builds a GenericOpenAPIError carrying an
-// ApiExceptionResponseObject with code 409, mimicking the BTP API's
-// "conflict" response so specifyAPIError can extract the body.
-func create409Error() error {
-	apiExceptionError := accountclient.NewApiExceptionResponseObjectError()
-	apiExceptionError.SetCode(409)
-	apiExceptionError.SetMessage("directory has child resources")
-
-	apiException := accountclient.NewApiExceptionResponseObject(*apiExceptionError)
-
-	err := &accountclient.GenericOpenAPIError{}
-	errValue := reflect.ValueOf(err).Elem()
-
-	modelField := errValue.FieldByName("model")
-	if modelField.IsValid() {
-		reflect.NewAt(modelField.Type(), unsafe.Pointer(modelField.UnsafeAddr())).
-			Elem().Set(reflect.ValueOf(*apiException))
-	}
-
-	errorField := errValue.FieldByName("error")
-	if errorField.IsValid() {
-		reflect.NewAt(errorField.Type(), unsafe.Pointer(errorField.UnsafeAddr())).
-			Elem().SetString("409 Conflict")
-	}
-
-	return err
 }
