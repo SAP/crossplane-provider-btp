@@ -158,7 +158,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 func specifyAPIError(err error) error {
 	if genericErr, ok := err.(*accountclient.GenericOpenAPIError); ok {
 		if accountError, ok := genericErr.Model().(accountclient.ApiExceptionResponseObject); ok {
-			return errors.New(fmt.Sprintf("API Error: %v, Code %v", internal.Val(accountError.Error.Message), internal.Val(accountError.Error.Code)))
+			return fmt.Errorf("API Error: %v, Code %v", internal.Val(accountError.Error.Message), internal.Val(accountError.Error.Code))
 		}
 		if genericErr.Body() != nil {
 			return fmt.Errorf("API Error: %s", string(genericErr.Body()))
