@@ -9,18 +9,13 @@ import (
 	xsuaa "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-xsuaa-service-api-go/pkg"
 )
 
-// newGenericErr builds a *xsuaa.GenericOpenAPIError with the given body and model
-// using reflect/unsafe because the fields are unexported.
-func newGenericErr(body []byte, model any) *xsuaa.GenericOpenAPIError {
+// newGenericErr builds a *xsuaa.GenericOpenAPIError with the given body
+// using reflect/unsafe because the field is unexported.
+func newGenericErr(body []byte) *xsuaa.GenericOpenAPIError {
 	e := &xsuaa.GenericOpenAPIError{}
-	v := reflect.ValueOf(e).Elem()
 	if body != nil {
-		f := v.FieldByName("body")
+		f := reflect.ValueOf(e).Elem().FieldByName("body")
 		reflect.NewAt(f.Type(), unsafe.Pointer(f.UnsafeAddr())).Elem().Set(reflect.ValueOf(body))
-	}
-	if model != nil {
-		f := v.FieldByName("model")
-		reflect.NewAt(f.Type(), unsafe.Pointer(f.UnsafeAddr())).Elem().Set(reflect.ValueOf(model))
 	}
 	return e
 }
@@ -33,9 +28,8 @@ func TestSpecifyAPIError(t *testing.T) {
 	}{
 		"non-generic passes through": {in: plain, wantMsg: "boom"},
 		"nil passes through":         {in: nil, wantMsg: ""},
-		"with model":                 {in: newGenericErr(nil, map[string]any{"error": "bad"}), wantMsg: "API Error: map[error:bad]"},
-		"with body only":             {in: newGenericErr([]byte(`{"error":"bad"}`), nil), wantMsg: `API Error: {"error":"bad"}`},
-		"empty generic returns self": {in: newGenericErr(nil, nil), wantMsg: ""},
+		"with body":                  {in: newGenericErr([]byte(`{"error":"bad"}`)), wantMsg: `API Error: {"error":"bad"}`},
+		"empty generic returns self": {in: newGenericErr(nil), wantMsg: ""},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
