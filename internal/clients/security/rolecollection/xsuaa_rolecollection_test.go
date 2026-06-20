@@ -2,16 +2,15 @@ package rolecollection
 
 import (
 	"context"
-	"reflect"
 	"strings"
 	"testing"
-	"unsafe"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	xsuaa "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-xsuaa-service-api-go/pkg"
+	"github.com/sap/crossplane-provider-btp/internal/testutils"
 )
 
 var apiRoleCollection = xsuaa.RoleCollection{
@@ -580,13 +579,8 @@ func crSpec(collectionName string) v1alpha1.RoleCollectionParameters {
 // TestGenerateObservation_SurfacesErrorBody verifies that an XSUAA
 // GenericOpenAPIError carrying a response body is unwrapped via SpecifyAPIError.
 func TestGenerateObservation_SurfacesErrorBody(t *testing.T) {
-	body := []byte(`{"error":"insufficient_scope"}`)
-	gErr := &xsuaa.GenericOpenAPIError{}
-	bodyField := reflect.ValueOf(gErr).Elem().FieldByName("body")
-	reflect.NewAt(bodyField.Type(), unsafe.Pointer(bodyField.UnsafeAddr())).Elem().Set(reflect.ValueOf(body))
-
 	assigner := &XsuaaRoleCollectionMaintainer{
-		apiClient: &roleCollectionApiFake{BodyErr: gErr},
+		apiClient: &roleCollectionApiFake{BodyErr: testutils.NewXsuaaAPIError([]byte(`{"error":"insufficient_scope"}`))},
 	}
 	_, err := assigner.GenerateObservation(context.Background(), "test")
 	if err == nil || !strings.Contains(err.Error(), "insufficient_scope") {

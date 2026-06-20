@@ -2,23 +2,10 @@ package security
 
 import (
 	"errors"
-	"reflect"
 	"testing"
-	"unsafe"
 
-	xsuaa "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-xsuaa-service-api-go/pkg"
+	"github.com/sap/crossplane-provider-btp/internal/testutils"
 )
-
-// newGenericErr builds a *xsuaa.GenericOpenAPIError with the given body
-// using reflect/unsafe because the field is unexported.
-func newGenericErr(body []byte) *xsuaa.GenericOpenAPIError {
-	e := &xsuaa.GenericOpenAPIError{}
-	if body != nil {
-		f := reflect.ValueOf(e).Elem().FieldByName("body")
-		reflect.NewAt(f.Type(), unsafe.Pointer(f.UnsafeAddr())).Elem().Set(reflect.ValueOf(body))
-	}
-	return e
-}
 
 func TestSpecifyAPIError(t *testing.T) {
 	plain := errors.New("boom")
@@ -28,8 +15,8 @@ func TestSpecifyAPIError(t *testing.T) {
 	}{
 		"non-generic passes through": {in: plain, wantMsg: "boom"},
 		"nil passes through":         {in: nil, wantMsg: ""},
-		"with body":                  {in: newGenericErr([]byte(`{"error":"bad"}`)), wantMsg: `API Error: {"error":"bad"}`},
-		"empty generic returns self": {in: newGenericErr(nil), wantMsg: ""},
+		"with body":                  {in: testutils.NewXsuaaAPIError([]byte(`{"error":"bad"}`)), wantMsg: `API Error: {"error":"bad"}`},
+		"empty generic returns self": {in: testutils.NewXsuaaAPIError(nil), wantMsg: ""},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {

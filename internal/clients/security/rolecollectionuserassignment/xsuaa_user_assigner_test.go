@@ -2,14 +2,13 @@ package rolecollectionuserassignment
 
 import (
 	"context"
-	"reflect"
 	"strings"
 	"testing"
-	"unsafe"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	xsuaa "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-xsuaa-service-api-go/pkg"
+	"github.com/sap/crossplane-provider-btp/internal/testutils"
 )
 
 func TestContainsRole(t *testing.T) {
@@ -194,13 +193,8 @@ func TestRevokeRole(t *testing.T) {
 // TestAssignRole_SurfacesErrorBody verifies that an XSUAA GenericOpenAPIError
 // carrying a response body is unwrapped via SpecifyAPIError.
 func TestAssignRole_SurfacesErrorBody(t *testing.T) {
-	body := []byte(`{"error":"insufficient_scope"}`)
-	gErr := &xsuaa.GenericOpenAPIError{}
-	bodyField := reflect.ValueOf(gErr).Elem().FieldByName("body")
-	reflect.NewAt(bodyField.Type(), unsafe.Pointer(bodyField.UnsafeAddr())).Elem().Set(reflect.ValueOf(body))
-
 	assigner := &XsusaaUserRoleAssigner{
-		userApi: userApiFake{BodyErr: gErr},
+		userApi: userApiFake{BodyErr: testutils.NewXsuaaAPIError([]byte(`{"error":"insufficient_scope"}`))},
 	}
 	err := assigner.AssignRole(context.Background(), "origin", "user", "rc")
 	if err == nil || !strings.Contains(err.Error(), "insufficient_scope") {
