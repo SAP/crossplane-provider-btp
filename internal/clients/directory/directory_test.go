@@ -3,7 +3,9 @@ package directory
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
@@ -710,6 +712,17 @@ func TestDeleteDirectory(t *testing.T) {
 				err: errors.New("InternalServerError"),
 			},
 		},
+		"DeleteAPI409SurfacesError": {
+			reason: "409 Conflict on delete is wrapped via specifyAPIError so the BTP message lands in the resource's Synced condition",
+			args: args{
+				mockClient: MockDirClient{DeleteErr: create409Error()},
+				cr: testutils.NewDirectory("unittest-client",
+					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
+			},
+			want: want{
+				err: errors.New("API Error"),
+			},
+		},
 		"Success": {
 			reason: "With successful API call we expect to succeed the operation",
 			args: args{
@@ -738,8 +751,8 @@ func TestDeleteDirectory(t *testing.T) {
 			client := NewDirectoryClient(&btpClient, tc.args.cr)
 			err := client.DeleteDirectory(context.Background())
 
-			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\ne.DeleteDirectory(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			if contained := testutils.ContainsError(err, tc.want.err); !contained {
+				t.Errorf("\n%s\ne.DeleteDirectory(...): error \"%v\" not part of \"%v\"", tc.reason, err, tc.want.err)
 			}
 		})
 	}
@@ -862,4 +875,32 @@ func TestDirectoryPayload(t *testing.T) {
 			}
 		})
 	}
+}
+
+// create409Error builds a GenericOpenAPIError carrying an
+// ApiExceptionResponseObject with code 409, mimicking the BTP API's
+// "conflict" response so specifyAPIError can extract the body.
+func create409Error() error {
+	apiExceptionError := accountclient.NewApiExceptionResponseObjectError()
+	apiExceptionError.SetCode(409)
+	apiExceptionError.SetMessage("directory has child resources")
+
+	apiException := accountclient.NewApiExceptionResponseObject(*apiExceptionError)
+
+	err := &accountclient.GenericOpenAPIError{}
+	errValue := reflect.ValueOf(err).Elem()
+
+	modelField := errValue.FieldByName("model")
+	if modelField.IsValid() {
+		reflect.NewAt(modelField.Type(), unsafe.Pointer(modelField.UnsafeAddr())).
+			Elem().Set(reflect.ValueOf(*apiException))
+	}
+
+	errorField := errValue.FieldByName("error")
+	if errorField.IsValid() {
+		reflect.NewAt(errorField.Type(), unsafe.Pointer(errorField.UnsafeAddr())).
+			Elem().SetString("409 Conflict")
+	}
+
+	return err
 }

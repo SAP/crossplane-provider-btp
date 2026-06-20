@@ -58,7 +58,7 @@ func (d *DirectoryClient) UpdateDirectory(ctx context.Context) (*v1alpha1.Direct
 		Execute()
 
 	if err != nil {
-		return d.cr, err
+		return d.cr, specifyAPIError(err)
 	}
 
 	_, _, err = d.btpClient.AccountsServiceClient.DirectoryOperationsAPI.
@@ -66,7 +66,7 @@ func (d *DirectoryClient) UpdateDirectory(ctx context.Context) (*v1alpha1.Direct
 		UpdateDirectoryTypeRequestPayload(d.toUpdateFeaturesApiPayload()).
 		Execute()
 
-	return d.cr, err
+	return d.cr, specifyAPIError(err)
 }
 
 func (d *DirectoryClient) DeleteDirectory(ctx context.Context) error {
@@ -82,7 +82,7 @@ func (d *DirectoryClient) DeleteDirectory(ctx context.Context) error {
 		return errors.New(errDirectoryNotFound)
 	}
 
-	return err
+	return specifyAPIError(err)
 }
 
 func (d *DirectoryClient) NeedsCreation(ctx context.Context) (bool, error) {
