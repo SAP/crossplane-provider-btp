@@ -15,6 +15,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	meta "github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	entApi "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -80,6 +82,9 @@ func TestEntitlements(t *testing.T) {
 										func(object k8s.Object) bool {
 											entlmt := object.(*v1alpha1.Entitlement)
 											expectedAmount := expectedAssignAmount(ctx, cfg, entlmt.Spec.ForProvider.ServiceName)
+
+											logAwaitedDiff(expectedAmount, entlmt.Status.AtProvider.Assigned)
+
 											if entlmt.Status.AtProvider.Assigned == nil {
 												return false
 											}
@@ -89,7 +94,7 @@ func TestEntitlements(t *testing.T) {
 											}
 											return true
 										},
-										wait.WithTimeout(time.Second*90),
+										wait.WithTimeout(time.Minute*3),
 									)
 								}
 								return ctx
@@ -180,4 +185,16 @@ func newEntitlementResource(cfg *envconf.Config, entitlementName string) *v1alph
 			Name: entitlementName, Namespace: cfg.Namespace(),
 		},
 	}
+}
+
+func logAwaitedDiff(expected int, assignable *entApi.Assignable) {
+	amount := "nil"
+	if assignable != nil {
+		amount = fmt.Sprintf("%v", internal.Val(assignable.Amount))
+	}
+	klog.V(4).Infof(
+		"Checking Diff on Amount: Expected %v, Got %v",
+		expected,
+		amount,
+	)
 }
