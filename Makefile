@@ -285,7 +285,7 @@ e2e.run: test-acceptance
 #run single test-e2e-long test with <make e2e testFilter=functionNameOfTest>
 test-e2e-long: local-build $(KIND) $(HELM3) generate-test-crs
 	@$(INFO) running integration tests
-	go test -v $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
+	go test -v $(PROJECT_REPO)/test/e2e -tags=e2e_long -count=1 -test.v -run '^$(testFilter)$$' -timeout 150m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
@@ -303,7 +303,7 @@ ACCEPTANCE_DEPLOY ?= local-build
 test-acceptance: $(ACCEPTANCE_DEPLOY) $(KIND) generate-test-crs
 	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
-	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
+	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
@@ -316,7 +316,7 @@ test-acceptance-debug: local-build $(KIND) $(HELM3) generate-test-crs
 	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
 	go test -gcflags="all=-N -l" -c -v  $(PROJECT_REPO)/test/e2e/ -tags=e2e -o ./test/e2e/test-acceptance-debug.test -timeout 30m
-	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
+	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
 	@$(OK) end-to-end tests passed
 
 .PHONY: generate-test-crs
