@@ -88,7 +88,7 @@ spec:
                     type: boolean
                   description:
                     description: |-
-                      (String) Description of the trust configuration.
+                      (String) Description of the trust configuration. NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default.
                       Description of the trust configuration.
                     type: string
                   domain:
@@ -223,7 +223,7 @@ spec:
                     type: boolean
                   description:
                     description: |-
-                      (String) Description of the trust configuration.
+                      (String) Description of the trust configuration. NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default.
                       Description of the trust configuration.
                     type: string
                   domain:
@@ -523,7 +523,7 @@ spec:
                     type: boolean
                   description:
                     description: |-
-                      (String) Description of the trust configuration.
+                      (String) Description of the trust configuration. NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default.
                       Description of the trust configuration.
                     type: string
                   domain:
