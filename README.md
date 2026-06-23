@@ -95,8 +95,8 @@ If you want to run a single E2E Test locally simply set the `testFilter` variabl
 make test-acceptance testFilter=<functionNameOfTest>
 ````
 
-> [!WARNING]
-> Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
+> [!NOTE]
+> The e2e fixtures under `test/e2e/testdata/crs/` are templates that reference environment variables (`$BUILD_ID`, `$TECHNICAL_USER_EMAIL`, …). `make test-acceptance` renders them into `test/e2e/testdata/crs.rendered/` (gitignored) before each run — the committed templates are not modified. Override the source and output directories with `TEST_CRS_TEMPLATES_PATH` and `TEST_CRS_GENERATED_PATH` if needed.
 
 #### Long-Running Tests
 

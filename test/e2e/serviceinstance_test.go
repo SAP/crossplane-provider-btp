@@ -30,7 +30,7 @@ func TestServiceInstance_CreationFlow(t *testing.T) {
 	crudFeatureSuite := features.New("ServiceInstance Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/serviceinstance")
+				resources.ImportResources(ctx, t, cfg, crsPath("serviceinstance"))
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
@@ -89,7 +89,7 @@ func TestServiceInstanceImportFlow(t *testing.T) {
 		WithWaitDependentResourceTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(15*time.Minute)),
 		WithWaitCreateTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(20*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(20*time.Minute)),
-		WithDependentResourceDirectory[*v1alpha1.ServiceInstance]("testdata/crs/serviceinstance_import"),
+		WithDependentResourceDirectory[*v1alpha1.ServiceInstance](crsPath("serviceinstance_import")),
 	)
 
 	importFeature := importTester.BuildTestFeature("BTP ServiceInstance Import Flow").Feature()

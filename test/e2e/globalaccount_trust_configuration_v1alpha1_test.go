@@ -21,7 +21,7 @@ func Test_TrustConfiguration_v1alpha1(t *testing.T) {
 
 	resource := resources.ResourceTestConfig{
 		Kind:              "GlobalaccountTrustConfiguration",
-		ResourceDirectory: "testdata/crs/GlobalaccountTrustConfiguration",
+		ResourceDirectory: crsPath("GlobalaccountTrustConfiguration"),
 	}
 
 	fB := features.New(resource.Kind)
