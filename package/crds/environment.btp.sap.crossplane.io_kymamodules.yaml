@@ -95,6 +95,8 @@ spec:
                 - name
                 type: object
               kymaEnvironmentBindingId:
+                description: 'Deprecated: This id is not required anymore, will be
+                  ignored'
                 type: string
               kymaEnvironmentBindingRef:
                 description: A Reference to a named object.
