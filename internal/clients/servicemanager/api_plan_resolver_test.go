@@ -260,6 +260,76 @@ func TestPlanIDByName_OfferingQuery(t *testing.T) {
 	}
 }
 
+func TestPlanIDByName_MultipleOfferings(t *testing.T) {
+	// Regression test: when the same catalog_name exists in multiple
+	// data centers (e.g. cloud-logging, hana-cloud) and dataCenter is
+	// not provided, the offering query returns multiple items. The
+	// resolver must not pin the plan lookup to an arbitrary first
+	// offering — if the plan exists only under a later offering, it
+	// must still be found. Otherwise the resolver flakes with
+	// "no service plan found" depending on SM API ordering.
+	tests := []struct {
+		name      string
+		offerings []servicemanager.ServiceOfferingResponseObject
+		plansByID map[string][]servicemanager.ServicePlanResponseObject
+		wantErr   bool
+		wantID    string
+	}{
+		{
+			name: "plan only under second offering is still found",
+			offerings: []servicemanager.ServiceOfferingResponseObject{
+				{Name: internal.Ptr("cloud-logging"), Id: internal.Ptr("offering-eu10")},
+				{Name: internal.Ptr("cloud-logging"), Id: internal.Ptr("offering-us10")},
+			},
+			plansByID: map[string][]servicemanager.ServicePlanResponseObject{
+				"offering-eu10": {},
+				"offering-us10": {{Name: internal.Ptr("standard"), Id: internal.Ptr("plan-us10")}},
+			},
+			wantID: "plan-us10",
+		},
+		{
+			name: "plan exists in none of the offerings returns error mentioning data centers",
+			offerings: []servicemanager.ServiceOfferingResponseObject{
+				{Name: internal.Ptr("cloud-logging"), Id: internal.Ptr("offering-eu10")},
+				{Name: internal.Ptr("cloud-logging"), Id: internal.Ptr("offering-us10")},
+			},
+			plansByID: map[string][]servicemanager.ServicePlanResponseObject{
+				"offering-eu10": {},
+				"offering-us10": {},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			smClient := &ServiceManagerClient{
+				OfferingServiceFake{
+					listOfferingsMockFn: func() (*servicemanager.ServiceOfferingResponseList, *http.Response, error) {
+						return &servicemanager.ServiceOfferingResponseList{Items: tc.offerings}, nil, nil
+					},
+				},
+				PlansServiceFake{
+					listPlansByQueryMockFn: func(fieldQuery string) (*servicemanager.ServicePlanResponseList, *http.Response, error) {
+						for id, plans := range tc.plansByID {
+							if fieldQuery == "catalog_name eq 'standard' and service_offering_id eq '"+id+"'" {
+								return &servicemanager.ServicePlanResponseList{Items: plans}, nil, nil
+							}
+						}
+						return &servicemanager.ServicePlanResponseList{}, nil, nil
+					},
+				},
+			}
+			planID, err := smClient.PlanIDByName(context.TODO(), "cloud-logging", "standard", "")
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantID, planID)
+		})
+	}
+}
+
 func TestNewCredsFromOperatorSecret(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -382,7 +452,8 @@ func (f OfferingServiceFake) GetServiceOfferingsExecute(r servicemanager.ApiGetS
 var _ servicemanager.ServicePlansAPI = &PlansServiceFake{}
 
 type PlansServiceFake struct {
-	listPlansMockFn func() (*servicemanager.ServicePlanResponseList, *http.Response, error)
+	listPlansMockFn        func() (*servicemanager.ServicePlanResponseList, *http.Response, error)
+	listPlansByQueryMockFn func(fieldQuery string) (*servicemanager.ServicePlanResponseList, *http.Response, error)
 }
 
 func (p PlansServiceFake) GetServicePlansByServiceId(ctx context.Context, servicePlanID string) servicemanager.ApiGetServicePlansByServiceIdRequest {
@@ -398,5 +469,14 @@ func (p PlansServiceFake) GetAllServicePlans(ctx context.Context) servicemanager
 }
 
 func (p PlansServiceFake) GetAllServicePlansExecute(r servicemanager.ApiGetAllServicePlansRequest) (*servicemanager.ServicePlanResponseList, *http.Response, error) {
+	if p.listPlansByQueryMockFn != nil {
+		rv := reflect.ValueOf(&r).Elem().FieldByName("fieldQuery")
+		rv = reflect.NewAt(rv.Type(), unsafe.Pointer(rv.UnsafeAddr())).Elem()
+		var fq string
+		if ptr := rv.Interface().(*string); ptr != nil {
+			fq = *ptr
+		}
+		return p.listPlansByQueryMockFn(fq)
+	}
 	return p.listPlansMockFn()
 }
