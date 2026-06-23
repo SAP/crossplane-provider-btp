@@ -133,10 +133,6 @@ func createK8sResources(ctx context.Context, t *testing.T, cfg *envconf.Config, 
 	}
 }
 
-func NewID(oldId string, buildId string) string {
-	return buildId + "-" + oldId
-}
-
 // TestDirectoryImport tests importing an existing Directory resource using external-name annotation
 // Uses ImportTester utility to follow the standard import test pattern
 func TestDirectoryImport(t *testing.T) {
