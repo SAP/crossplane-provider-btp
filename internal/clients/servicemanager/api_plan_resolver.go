@@ -120,7 +120,10 @@ func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*S
 }
 
 func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, planName, dataCenter string) (string, error) {
-	offeringQuery := fmt.Sprintf("catalog_name eq '%s' and data_center eq '%s'", offeringName, dataCenter)
+	offeringQuery := fmt.Sprintf("catalog_name eq '%s'", offeringName)
+	if dataCenter != "" {
+		offeringQuery = fmt.Sprintf("%s and data_center eq '%s'", offeringQuery, dataCenter)
+	}
 
 	execute, _, err := sm.GetServiceOfferings(ctx).FieldQuery(offeringQuery).Execute()
 	if err != nil {
