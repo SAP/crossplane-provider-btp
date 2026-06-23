@@ -1,5 +1,4 @@
-//go:build e2e
-// +build e2e
+//go:build e2e_long
 
 package e2e
 
@@ -24,10 +23,6 @@ import (
 )
 
 func TestKymaEnvironment(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping kyma in short mode")
-		return
-	}
 	var manifestDir = "testdata/crs/kyma_env"
 	crudFeature := features.New("BTP Kyma Environment Controller").
 		Setup(
@@ -66,11 +61,6 @@ func TestKymaEnvironment(t *testing.T) {
 }
 
 func TestKymaEnvironmentImportFlow(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping kyma import in short mode")
-		return
-	}
-
 	kymaImportName := "e2e-kyma-import-test"
 
 	importTester := NewImportTester(
