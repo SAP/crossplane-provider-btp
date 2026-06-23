@@ -38,9 +38,8 @@ type KymaModuleParameters struct {
 type KymaModuleSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 	ForProvider       KymaModuleParameters `json:"forProvider"`
-	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1.KymaEnvironmentBinding
-	// +crossplane:generate:reference:refFieldName=KymaEnvironmentBindingRef
-	// +crossplane:generate:reference:selectorFieldName=KymaEnvironmentBindingSelector
+	// Deprecated: This id is not required anymore, will be ignored
+	// +kubebuilder:validation:Optional
 	KymaEnvironmentBindingId string `json:"kymaEnvironmentBindingId,omitempty"`
 	// +kubebuilder:validation:Optional
 	KymaEnvironmentBindingSelector *xpv1.Selector `json:"kymaEnvironmentBindingSelector,omitempty"`
