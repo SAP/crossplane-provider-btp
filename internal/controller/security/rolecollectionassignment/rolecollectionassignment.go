@@ -138,11 +138,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return c.observeLegacy(ctx, cr)
 	}
 
-	return c.observeCurrent(ctx, cr, externalName)
-}
-
-// observeCurrent handles a populated, ADR-compliant compound external-name.
-func (c *external) observeCurrent(ctx context.Context, cr *v1alpha1.RoleCollectionAssignment, externalName string) (managed.ExternalObservation, error) {
 	origin, name, roleCollection, err := ParseExternalName(externalName)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errParseExternalName)
