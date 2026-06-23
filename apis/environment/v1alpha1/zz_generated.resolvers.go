@@ -268,23 +268,6 @@ func (mg *KymaModule) ResolveReferences(ctx context.Context, c client.Reader) er
 	var err error
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.KymaEnvironmentBindingId,
-		Extract:      reference.ExternalName(),
-		Namespace:    mg.GetNamespace(),
-		Reference:    mg.Spec.KymaEnvironmentBindingRef,
-		Selector:     mg.Spec.KymaEnvironmentBindingSelector,
-		To: reference.To{
-			List:    &KymaEnvironmentBindingList{},
-			Managed: &KymaEnvironmentBinding{},
-		},
-	})
-	if err != nil {
-		return errors.Wrap(err, "mg.Spec.KymaEnvironmentBindingId")
-	}
-	mg.Spec.KymaEnvironmentBindingId = rsp.ResolvedValue
-	mg.Spec.KymaEnvironmentBindingRef = rsp.ResolvedReference
-
-	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.KymaEnvironmentBindingSecret,
 		Extract:      KymaEnvironmentBindingSecret(),
 		Namespace:    mg.GetNamespace(),

@@ -1,5 +1,4 @@
-//go:build e2e
-// +build e2e
+//go:build e2e || e2e_long
 
 package e2e
 
@@ -28,6 +27,10 @@ type mockList struct {
 	client.ObjectList
 
 	Items []k8s.Object
+}
+
+func NewID(oldId string, buildId string) string {
+	return buildId + "-" + oldId
 }
 
 func waitForResource(res k8s.Object, cfg *envconf.Config, t *testing.T, opts ...wait.Option) {
