@@ -29,22 +29,16 @@ func SetDebug(debugFlag bool) {
 	debug = debugFlag
 }
 
-// NewBackgroundContextWithDebugPrintHTTPClient creates a new context with a HTTP client that logs the request and response in the RoundTrip.
+// NewBackgroundContextWithDebugPrintHTTPClient returns a context carrying an
+// HTTP client that always counts calls (CountingRoundTripper) and, when debug
+// is on, also logs request/response (RoundTripDebugger).
 func NewBackgroundContextWithDebugPrintHTTPClient(opts ...Option) context.Context {
-	if debug {
-		return context.WithValue(context.Background(), oauth2.HTTPClient, DebugPrintHTTPClient(opts...))
-	} else {
-		return context.Background()
-	}
+	return context.WithValue(context.Background(), oauth2.HTTPClient, DebugPrintHTTPClient(opts...))
 }
 
-// AddDebugPrintHTTPClientToContext adds a HTTP client that logs the request and response in the RoundTrip to the context with the oauth2.HTTPClient key.
+// AddDebugPrintHTTPClientToContext puts the counting+debug HTTP client into ctx.
 func AddDebugPrintHTTPClientToContext(ctx context.Context, opts ...Option) context.Context {
-	if debug {
-		return context.WithValue(ctx, oauth2.HTTPClient, DebugPrintHTTPClient(opts...))
-	} else {
-		return ctx
-	}
+	return context.WithValue(ctx, oauth2.HTTPClient, DebugPrintHTTPClient(opts...))
 }
 
 type Option func(*debugHttpClient)
@@ -61,8 +55,9 @@ func WithHttpClient(client *http.Client) Option {
 	}
 }
 
-// DebugPrintHTTPClient returns a new http.Client that logs the request and response in the RoundTrip.
-// The debug client uses the default http.Client if no client is set with the WithHttpClient option, otherwise the set client is used and the Transport RoundTripper wrapped.
+// DebugPrintHTTPClient returns an http.Client whose Transport is always
+// wrapped by CountingRoundTripper, and additionally by RoundTripDebugger when
+// debug is on. Counting is cheap (one atomic add per call).
 func DebugPrintHTTPClient(opts ...Option) *http.Client {
 	debugClient := &debugHttpClient{
 		client: &http.Client{},
@@ -72,15 +67,15 @@ func DebugPrintHTTPClient(opts ...Option) *http.Client {
 		applyOpt(debugClient)
 	}
 
-	//Set Own RoundTripper Interceptor with RoundTripper from client in case it is set
-
-	if debugClient.client.Transport == nil {
-		// If no Transport is set, we wrap the default transport in our RoundTripDebugger.
-		debugClient.client.Transport = &RoundTripDebugger{base: http.DefaultTransport}
-	} else {
-		// otherwise, we wrap the existing Transport in our RoundTripDebugger.
-		debugClient.client.Transport = &RoundTripDebugger{base: debugClient.client.Transport}
+	base := debugClient.client.Transport
+	if base == nil {
+		base = http.DefaultTransport
 	}
+	base = &CountingRoundTripper{Base: base}
+	if debug {
+		base = &RoundTripDebugger{base: base}
+	}
+	debugClient.client.Transport = base
 
 	return debugClient.client
 }

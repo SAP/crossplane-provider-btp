@@ -1,14 +1,20 @@
 package btp
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
@@ -103,14 +109,46 @@ const (
 )
 
 func NewServiceClientWithCisCredential(credential *Credentials) Client {
+	// Cache the fully-built Client per credential hash so the oauth2 token
+	// cache survives across reconciles. Without this, the providerconfig
+	// connector would rebuild all 3 sub-clients + 3 token sources on every
+	// reconcile, producing ~1.7 token POSTs per Observe.
+	key := credentialCacheKey(credential)
+	if cached, ok := clientCache.Load(key); ok {
+		return cached.(Client)
+	}
 
 	authentication := authenticationParams(credential)
-
 	config := createConfig(credential, tokenURL, authentication)
-
 	client := createClient(credential, config)
 
-	return client
+	actual, _ := clientCache.LoadOrStore(key, client)
+	return actual.(Client)
+}
+
+// clientCache: process-wide btp.Client cache keyed by credential hash.
+// Credential rotation produces a new key automatically; old entries leak
+// until process restart. Add a TTL/LRU if rotation churn becomes an issue.
+var clientCache sync.Map
+
+func credentialCacheKey(c *Credentials) string {
+	h := sha256.New()
+	if c.CISCredential != nil {
+		fmt.Fprintln(h, c.CISCredential.Uaa.Clientid)
+		fmt.Fprintln(h, c.CISCredential.Uaa.Clientsecret)
+		fmt.Fprintln(h, c.CISCredential.Uaa.Url)
+		fmt.Fprintln(h, c.CISCredential.Endpoints.AccountsServiceUrl)
+		fmt.Fprintln(h, c.CISCredential.Endpoints.EntitlementsServiceUrl)
+		fmt.Fprintln(h, c.CISCredential.Endpoints.ProvisioningServiceUrl)
+		fmt.Fprintln(h, c.CISCredential.GrantType)
+	}
+	if c.UserCredential != nil {
+		fmt.Fprintln(h, c.UserCredential.Email)
+		fmt.Fprintln(h, c.UserCredential.Username)
+		fmt.Fprintln(h, c.UserCredential.Password)
+		fmt.Fprintln(h, c.UserCredential.Idp)
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func authenticationParams(credential *Credentials) url.Values {
@@ -143,18 +181,40 @@ func hasClientCredentials(credential *Credentials) bool {
 }
 
 func createClient(credential *Credentials, config *clientcredentials.Config) Client {
+	// One shared oauth2 *http.Client across all 3 sub-clients so the token
+	// cache is shared. Without this, each createXxxServiceClient builds its
+	// own *http.Client → 3 independent token caches → extra token POSTs per
+	// Observe.
+	sharedHTTPClient := sharedOAuthClient(config)
 	client := Client{
-		AccountsServiceClient:     createAccountsServiceClient(credential, config),
-		EntitlementsServiceClient: createEntitlementsServiceClient(credential, config),
-		ProvisioningServiceClient: createProvisioningServiceClient(credential, config),
+		AccountsServiceClient:     createAccountsServiceClient(credential, sharedHTTPClient),
+		EntitlementsServiceClient: createEntitlementsServiceClient(credential, sharedHTTPClient),
+		ProvisioningServiceClient: createProvisioningServiceClient(credential, sharedHTTPClient),
 		AuthInfo:                  GetBasicAuth(credential),
 		Credential:                credential,
 	}
 	return client
 }
 
+// sharedOAuthClient builds a single *http.Client that wraps our counting+debug
+// transport with the oauth2 transport using a reused token source. Sharing
+// this client across the 3 sub-clients collapses 3 token caches into 1.
+func sharedOAuthClient(config *clientcredentials.Config) *http.Client {
+	baseHTTPClient := DebugPrintHTTPClient() // counting + (optional) debug-print
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, baseHTTPClient)
+	// config.TokenSource already wraps in oauth2.ReuseTokenSource internally;
+	// the explicit wrap below is defensive and a no-op if already reused.
+	ts := oauth2.ReuseTokenSource(nil, config.TokenSource(ctx))
+	return &http.Client{
+		Transport: &oauth2.Transport{
+			Source: ts,
+			Base:   baseHTTPClient.Transport,
+		},
+	}
+}
+
 func createProvisioningServiceClient(
-	credential *Credentials, config *clientcredentials.Config,
+	credential *Credentials, sharedHTTPClient *http.Client,
 ) provisioningclient.EnvironmentsAPI {
 	provisioningServiceUrl, err := url.Parse(credential.CISCredential.Endpoints.ProvisioningServiceUrl)
 	if err != nil {
@@ -163,7 +223,7 @@ func createProvisioningServiceClient(
 
 	c := provisioningclient.NewConfiguration()
 
-	c.HTTPClient = config.Client(NewBackgroundContextWithDebugPrintHTTPClient())
+	c.HTTPClient = sharedHTTPClient
 	c.Servers = []provisioningclient.ServerConfiguration{{URL: provisioningServiceUrl.String()}}
 
 	client := provisioningclient.NewAPIClient(c)
@@ -183,7 +243,7 @@ func createConfig(credential *Credentials, tokenURL string, endPointParams url.V
 }
 
 func createEntitlementsServiceClient(
-	cisCredential *Credentials, config *clientcredentials.Config,
+	cisCredential *Credentials, sharedHTTPClient *http.Client,
 ) *entitlementsserviceclient.ManageAssignedEntitlementsAPIService {
 	entitlementsServiceUrl, err := url.Parse(cisCredential.CISCredential.Endpoints.EntitlementsServiceUrl)
 	if err != nil {
@@ -192,7 +252,7 @@ func createEntitlementsServiceClient(
 
 	c := entitlementsserviceclient.NewConfiguration()
 
-	c.HTTPClient = config.Client(NewBackgroundContextWithDebugPrintHTTPClient())
+	c.HTTPClient = sharedHTTPClient
 	c.Servers = []entitlementsserviceclient.ServerConfiguration{{URL: entitlementsServiceUrl.String()}}
 
 	client := entitlementsserviceclient.NewAPIClient(c)
@@ -201,7 +261,7 @@ func createEntitlementsServiceClient(
 }
 
 func createAccountsServiceClient(
-	cisCredential *Credentials, config *clientcredentials.Config,
+	cisCredential *Credentials, sharedHTTPClient *http.Client,
 ) *accountsserviceclient.APIClient {
 	accountServiceUrl, err := url.Parse(cisCredential.CISCredential.Endpoints.AccountsServiceUrl)
 	if err != nil {
@@ -210,7 +270,7 @@ func createAccountsServiceClient(
 
 	c := accountsserviceclient.NewConfiguration()
 
-	c.HTTPClient = config.Client(NewBackgroundContextWithDebugPrintHTTPClient())
+	c.HTTPClient = sharedHTTPClient
 	c.Servers = []accountsserviceclient.ServerConfiguration{{URL: accountServiceUrl.String()}}
 
 	client := accountsserviceclient.NewAPIClient(c)
