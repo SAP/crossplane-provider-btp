@@ -86,20 +86,20 @@ func (t ServiceManagerInstanceProxyClient) describeAdminBinding(ctx context.Cont
 		return nil, nil
 	}
 
-	return mapBindingCredentialTypes(response), specifyAPIError(err)
+	return mapBindingCredentialTypes(response), specifyAccountsAPIError(err)
 }
 
 func (t ServiceManagerInstanceProxyClient) createAdminBinding(ctx context.Context, subaccountGuid string) (*BindingCredentials, error) {
 	result, _, err := t.CreateServiceManagementBinding(ctx, subaccountGuid).Execute()
 	if err != nil {
-		return nil, specifyAPIError(err)
+		return nil, specifyAccountsAPIError(err)
 	}
 	return mapBindingCredentialTypes(result), nil
 }
 
 func (t ServiceManagerInstanceProxyClient) deleteAdminBinding(ctx context.Context, subaccountGuid string) error {
 	_, err := t.DeleteServiceManagementBindingOfSubaccount(ctx, subaccountGuid).Execute()
-	return specifyAPIError(err)
+	return specifyAccountsAPIError(err)
 }
 
 // mapBindingCredentialTypes is a helper function to convert ServiceManagerBindingResponseObject to BindingCredentials by mapping each value individually
@@ -116,8 +116,8 @@ func mapBindingCredentialTypes(in *accountsserviceclient.ServiceManagerBindingRe
 	return out
 }
 
-// specifyAPIError surfaces the BTP accounts-service error body when present.
-func specifyAPIError(err error) error {
+// specifyAccountsAPIError surfaces the BTP accounts-service error body when present.
+func specifyAccountsAPIError(err error) error {
 	if genericErr, ok := err.(*accountsserviceclient.GenericOpenAPIError); ok {
 		if accountError, ok := genericErr.Model().(accountsserviceclient.ApiExceptionResponseObject); ok {
 			return fmt.Errorf("API Error: %v, Code %v", internal.Val(accountError.Error.Message), internal.Val(accountError.Error.Code))

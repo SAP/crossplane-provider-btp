@@ -183,7 +183,7 @@ func (p *PlanIdResolverFake) PlanIDByName(ctx context.Context, offeringName, pla
 }
 
 // TestCreateAdminBindingSurfacesAPIBody asserts that createAdminBinding routes
-// transport errors through specifyAPIError so the BTP API body is surfaced
+// transport errors through specifyAccountsAPIError so the BTP API body is surfaced
 // instead of the opaque "<status> <reason>" string.
 func TestCreateAdminBindingSurfacesAPIBody(t *testing.T) {
 	accountService := &SubaccountServiceFake{
@@ -211,7 +211,7 @@ func TestCreateAdminBindingSurfacesAPIBody(t *testing.T) {
 }
 
 // create500Error builds a *saops.GenericOpenAPIError carrying an
-// ApiExceptionResponseObject so we can assert specifyAPIError surfaces the
+// ApiExceptionResponseObject so we can assert specifyAccountsAPIError surfaces the
 // structured body. Mirrors subaccount_test.go's helper.
 func create500Error() error {
 	apiExceptionError := saops.NewApiExceptionResponseObjectError()
