@@ -4,6 +4,7 @@ package upgrade
 
 import (
 	"context"
+	"regexp"
 	"testing"
 
 	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -46,6 +47,9 @@ func Test_DirectoryEntitlement_External_Name(t *testing.T) {
 				}
 				if externalName == "" {
 					t.Fatal("External name annotation is empty before upgrade")
+				}
+				if matched, _ := regexp.MatchString(`^[^/]+/[^/]+/[^/]+$`, externalName); !matched {
+					t.Fatalf("External name %q does not match expected format <directory-id>/<service-name>/<plan-name> before upgrade", externalName)
 				}
 
 				klog.V(4).Infof("Pre-upgrade DirectoryEntitlement external name: %s", externalName)
