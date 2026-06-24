@@ -203,18 +203,16 @@ func createClient(credential *Credentials, config *clientcredentials.Config) Cli
 	return client
 }
 
-// sharedOAuthClient builds a single *http.Client that wraps our counting+debug
-// transport with the oauth2 transport using a reused token source. Sharing
-// this client across the 3 sub-clients collapses 3 token caches into 1.
+// sharedOAuthClient builds a single *http.Client backed by the debug-aware
+// HTTP transport and the oauth2 transport with a reused token source.
+// Sharing this client across the 3 sub-clients collapses 3 token caches into 1.
 func sharedOAuthClient(config *clientcredentials.Config) *http.Client {
-	baseHTTPClient := DebugPrintHTTPClient() // counting + (optional) debug-print
+	baseHTTPClient := DebugPrintHTTPClient()
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, baseHTTPClient)
-	// config.TokenSource already wraps in oauth2.ReuseTokenSource internally;
-	// the explicit wrap below is defensive and a no-op if already reused.
-	ts := oauth2.ReuseTokenSource(nil, config.TokenSource(ctx))
+	// config.TokenSource already wraps in oauth2.ReuseTokenSource internally.
 	return &http.Client{
 		Transport: &oauth2.Transport{
-			Source: ts,
+			Source: config.TokenSource(ctx),
 			Base:   baseHTTPClient.Transport,
 		},
 	}

@@ -31,25 +31,21 @@ func NewEntitlementsClient(btp btp.Client) *EntitlementsClient {
 
 }
 
-// ponytail: package-level singleflight + short-TTL cache for
-// GetDirectoryAssignments responses. Keyed by (subaccountGUID, serviceName)
-// since that's the filter we pass to BTP. Singleflight dedupes concurrent
-// sibling reconciles; the TTL absorbs the back-to-back fan-out across all
-// CRs hitting the same (subaccount, service) within a single poll tick.
+// Package-level singleflight + short-TTL cache for GetDirectoryAssignments
+// responses. Keyed by (subaccountGUID, serviceName, planName). Singleflight
+// dedupes concurrent sibling reconciles; the TTL absorbs the back-to-back
+// fan-out across all CRs hitting the same key within a single poll tick.
 // Writes invalidate their own key so post-write reads see fresh state.
 var (
-	describeGroup  singleflight.Group
-	describeCache  sync.Map // string → *describeEntry
-	describeCacheT = 30 * time.Second
+	describeGroup singleflight.Group
+	describeCache sync.Map // string → *describeEntry
 )
+
+const describeCacheT = 30 * time.Second
 
 type describeEntry struct {
 	val *entclient.EntitledAndAssignedServicesResponseObject
 	at  time.Time
-}
-
-func describeKey(subaccountGUID, serviceName string) string {
-	return subaccountGUID + "|" + serviceName
 }
 
 func describeCacheGet(key string) *entclient.EntitledAndAssignedServicesResponseObject {
@@ -65,12 +61,6 @@ func describeCacheGet(key string) *entclient.EntitledAndAssignedServicesResponse
 	return e.val
 }
 
-func describeCachePut(key string, val *entclient.EntitledAndAssignedServicesResponseObject) {
-	describeCache.Store(key, &describeEntry{val: val, at: time.Now()})
-}
-
-func describeCacheInvalidate(key string) { describeCache.Delete(key) }
-
 func (c EntitlementsClient) DescribeInstance(
 	ctx context.Context,
 	cr *v1alpha1.Entitlement,
@@ -79,7 +69,7 @@ func (c EntitlementsClient) DescribeInstance(
 	subaccountGUID := cr.Spec.ForProvider.SubaccountGuid
 	serviceName := cr.Spec.ForProvider.ServiceName
 	planName := cr.Spec.ForProvider.ServicePlanName
-	key := describeKey(subaccountGUID, serviceName) + "|" + planName
+	key := subaccountGUID + "|" + serviceName + "|" + planName
 
 	response, err := c.fetchAssignments(ctx, key, subaccountGUID, serviceName, planName)
 	if err != nil {
@@ -116,9 +106,6 @@ func (c EntitlementsClient) DescribeInstance(
 // BOTH entitledServices and assignedServices server-side, dropping response
 // payload ~50-100× vs assignedServiceName alone.
 func (c EntitlementsClient) fetchAssignments(ctx context.Context, key, subaccountGUID, serviceName, planName string) (*entclient.EntitledAndAssignedServicesResponseObject, error) {
-	if cached := describeCacheGet(key); cached != nil {
-		return cached, nil
-	}
 	v, err, _ := describeGroup.Do(key, func() (any, error) {
 		if cached := describeCacheGet(key); cached != nil {
 			return cached, nil
@@ -132,7 +119,7 @@ func (c EntitlementsClient) fetchAssignments(ctx context.Context, key, subaccoun
 		if err != nil {
 			return nil, err
 		}
-		describeCachePut(key, resp)
+		describeCache.Store(key, &describeEntry{val: resp, at: time.Now()})
 		return resp, nil
 	})
 	if err != nil {
@@ -207,9 +194,9 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 		return specifyAPIError(err, errors.Wrapf(err, errFailedSetEntitlements, serviceName, planName))
 	}
 
-	// ponytail: invalidate the singleflight TTL cache so the next Observe
-	// reads fresh state instead of pre-write data.
-	describeCacheInvalidate(describeKey(cr.Spec.ForProvider.SubaccountGuid, serviceName) + "|" + planName)
+	// Invalidate the singleflight TTL cache so the next Observe reads
+	// fresh state instead of pre-write data.
+	describeCache.Delete(cr.Spec.ForProvider.SubaccountGuid + "|" + serviceName + "|" + planName)
 
 	return nil
 }
