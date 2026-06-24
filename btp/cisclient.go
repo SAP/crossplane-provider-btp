@@ -2,8 +2,6 @@ package btp
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -131,24 +129,33 @@ func NewServiceClientWithCisCredential(credential *Credentials) Client {
 // until process restart. Add a TTL/LRU if rotation churn becomes an issue.
 var clientCache sync.Map
 
+// credentialCacheKey builds a stable string key from the credential bundle.
+// We need ALL credential fields to differentiate cache entries (including the
+// secret, so that a credential rotation produces a new entry), but we do not
+// need cryptographic hashing — this is an in-process map key, not a password
+// verifier. NUL separator can't appear in any of the input strings.
 func credentialCacheKey(c *Credentials) string {
-	h := sha256.New()
+	var parts []string
 	if c.CISCredential != nil {
-		fmt.Fprintln(h, c.CISCredential.Uaa.Clientid)
-		fmt.Fprintln(h, c.CISCredential.Uaa.Clientsecret)
-		fmt.Fprintln(h, c.CISCredential.Uaa.Url)
-		fmt.Fprintln(h, c.CISCredential.Endpoints.AccountsServiceUrl)
-		fmt.Fprintln(h, c.CISCredential.Endpoints.EntitlementsServiceUrl)
-		fmt.Fprintln(h, c.CISCredential.Endpoints.ProvisioningServiceUrl)
-		fmt.Fprintln(h, c.CISCredential.GrantType)
+		parts = append(parts,
+			c.CISCredential.Uaa.Clientid,
+			c.CISCredential.Uaa.Clientsecret,
+			c.CISCredential.Uaa.Url,
+			c.CISCredential.Endpoints.AccountsServiceUrl,
+			c.CISCredential.Endpoints.EntitlementsServiceUrl,
+			c.CISCredential.Endpoints.ProvisioningServiceUrl,
+			c.CISCredential.GrantType,
+		)
 	}
 	if c.UserCredential != nil {
-		fmt.Fprintln(h, c.UserCredential.Email)
-		fmt.Fprintln(h, c.UserCredential.Username)
-		fmt.Fprintln(h, c.UserCredential.Password)
-		fmt.Fprintln(h, c.UserCredential.Idp)
+		parts = append(parts,
+			c.UserCredential.Email,
+			c.UserCredential.Username,
+			c.UserCredential.Password,
+			c.UserCredential.Idp,
+		)
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	return strings.Join(parts, "\x00")
 }
 
 func authenticationParams(credential *Credentials) url.Values {
