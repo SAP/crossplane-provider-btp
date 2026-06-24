@@ -54,6 +54,7 @@ jobs:
   custom-upgrade-test:
     runs-on: ubuntu-latest
     needs: prepare-matrix
+    environment: pr-e2e-no-approval
     strategy:
       fail-fast: false
       matrix:
@@ -113,6 +114,7 @@ jobs:
 
   cleanup-custom-upgrade-test:
     runs-on: ubuntu-latest
+    environment: pr-e2e-no-approval
     needs: [prepare-matrix, custom-upgrade-test]
     if: always() && needs.prepare-matrix.result == 'success'
     steps:
