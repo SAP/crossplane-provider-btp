@@ -28,6 +28,10 @@ type SubaccountParameters struct {
 	// Labels, up to 10 user-defined labels to assign as key-value pairs to the subaccount. Each label has a name (key) that you specify, and to which you can assign up to 10 corresponding values or leave empty.
 	// Keys and values are each limited to 63 characters.
 	// +optional
+	// +kubebuilder:validation:MaxProperties=10
+	// +kubebuilder:validation:XValidation:rule="self.all(k, size(k) <= 63)",message="label keys must be at most 63 characters"
+	// +kubebuilder:validation:XValidation:rule="self.all(k, size(self[k]) <= 10)",message="each label may have at most 10 values"
+	// +kubebuilder:validation:XValidation:rule="self.all(k, self[k].all(v, size(v) <= 63))",message="label values must be at most 63 characters"
 	Labels map[string][]string `json:"labels,omitempty"`
 
 	// Region
