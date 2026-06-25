@@ -28,10 +28,10 @@ import (
 	xpresource "github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
 	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
+	tfclient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/crossplane/upjet/v2/pkg/controller/handler"
 	"github.com/crossplane/upjet/v2/pkg/terraform"
 	"github.com/pkg/errors"
-	tfclient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	ctrl "sigs.k8s.io/controller-runtime"
 
