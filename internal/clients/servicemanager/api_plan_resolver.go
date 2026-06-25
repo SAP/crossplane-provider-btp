@@ -124,7 +124,7 @@ func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, 
 
 	execute, _, err := sm.GetServiceOfferings(ctx).FieldQuery(offeringQuery).Execute()
 	if err != nil {
-		return "", err
+		return "", specifyAPIError(err)
 	}
 	if len(execute.Items) == 0 {
 		if dataCenter != "" {
@@ -136,7 +136,7 @@ func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, 
 	planQuery := fmt.Sprintf("catalog_name eq '%s' and service_offering_id eq '%s'", planName, *execute.Items[0].Id)
 	object, _, err := sm.GetAllServicePlans(ctx).FieldQuery(planQuery).Execute()
 	if err != nil {
-		return "", err
+		return "", specifyAPIError(err)
 	}
 
 	if len(object.Items) == 0 {
