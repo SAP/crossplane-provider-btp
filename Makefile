@@ -150,13 +150,13 @@ $(TERRAFORM_PROVIDER_SCHEMA): $(TERRAFORM)
 	@$(OK) generating provider schema for $(TERRAFORM_PROVIDER_SOURCE) $(TERRAFORM_PROVIDER_VERSION)
 
 $(TERRAFORM):
-	@$(INFO) installing opentofu $(TERRAFORM_VERSION) (as `terraform`) $(HOSTOS)-$(HOSTARCH)
+	@$(INFO) installing opentofu $(TERRAFORM_VERSION) as terraform $(HOSTOS)-$(HOSTARCH)
 	@mkdir -p $(TOOLS_HOST_DIR)/tmp-terraform
 	@curl -fsSL https://github.com/opentofu/opentofu/releases/download/v$(TERRAFORM_VERSION)/tofu_$(TERRAFORM_VERSION)_$(SAFEHOST_PLATFORM).zip -o $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip
 	@unzip $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip -d $(TOOLS_HOST_DIR)/tmp-terraform
 	@mv $(TOOLS_HOST_DIR)/tmp-terraform/tofu $(TERRAFORM)
 	@rm -fr $(TOOLS_HOST_DIR)/tmp-terraform
-	@$(OK) installing opentofu $(TERRAFORM_VERSION) (as `terraform`) $(HOSTOS)-$(HOSTARCH)
+	@$(OK) installing opentofu $(TERRAFORM_VERSION) as terraform $(HOSTOS)-$(HOSTARCH)
 pull-docs:
 	@$(INFO) pull-docs called
 	@if [ ! -d "$(WORK_DIR)/$(TERRAFORM_PROVIDER_SOURCE)" ]; then \
