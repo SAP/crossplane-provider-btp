@@ -9,7 +9,6 @@ on:
 
 env:
   GO_VERSION: '1.25'
-  GO_IMPORT_VERSION: 'v0.16.1'
 
 jobs:
   reviewable-checkdiff:
@@ -17,17 +16,15 @@ jobs:
     steps:
     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       with:
-        submodules: true 
+        submodules: true
 
     - name: Set up Go
       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version: ${{ env.GO_VERSION }}
 
-    - name: Install goimports
-      run: |
-        cd /tmp
-        go install golang.org/x/tools/cmd/goimports@${{ env.GO_IMPORT_VERSION }}
+    - name: Install Go tools
+      run: go install tool
 
     - name: Make Reviewable
       run: make reviewable
