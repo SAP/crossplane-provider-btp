@@ -10,7 +10,7 @@ spec:
     parameters:
       region: westeurope
       administrators:
-        - dl_673f35f54ffd090136dc821c@global.corp.sap
+        - $TECHNICAL_USER_EMAIL
   subaccountRef:
     name: kyma-test-subaccount
   cloudManagementRef:
