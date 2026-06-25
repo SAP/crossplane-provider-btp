@@ -35,7 +35,7 @@ type SubaccountTrustConfigurationInitParameters struct {
 	// Determines that end users can choose the trust configuration for login. If not set, the trust configuration can remain active, however only application users that explicitly specify the origin key can use if for login.
 	AvailableForUserLogon *bool `json:"availableForUserLogon,omitempty" tf:"available_for_user_logon,omitempty"`
 
-	// (String) Description of the trust configuration. NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default.
+	// (String) Description of the trust configuration.
 	// Description of the trust configuration.
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
 
@@ -90,7 +90,7 @@ type SubaccountTrustConfigurationObservation struct {
 	// Determines that end users can choose the trust configuration for login. If not set, the trust configuration can remain active, however only application users that explicitly specify the origin key can use if for login.
 	AvailableForUserLogon *bool `json:"availableForUserLogon,omitempty" tf:"available_for_user_logon,omitempty"`
 
-	// (String) Description of the trust configuration. NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default.
+	// (String) Description of the trust configuration.
 	// Description of the trust configuration.
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
 
@@ -150,7 +150,7 @@ type SubaccountTrustConfigurationParameters struct {
 	// +kubebuilder:validation:Optional
 	AvailableForUserLogon *bool `json:"availableForUserLogon,omitempty" tf:"available_for_user_logon,omitempty"`
 
-	// (String) Description of the trust configuration. NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default.
+	// (String) Description of the trust configuration.
 	// Description of the trust configuration.
 	// +kubebuilder:validation:Optional
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
