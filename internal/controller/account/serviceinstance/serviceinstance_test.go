@@ -108,6 +108,32 @@ func TestConnect_ResourceTracking(t *testing.T) {
 				trackCalled: true,
 			},
 		},
+		"SkipTrackingWhenDeleted": {
+			// Regression: an MR being deleted whose upstream reference has
+			// already been removed used to fail Connect() with a "not found"
+			// from Track(), which prevented Delete() from ever running and
+			// left the BTP-side instance and the finalizer in place forever.
+			reason: "should skip Track when the MR is being deleted, even if Track would error",
+			fields: fields{
+				creator:         &TfProxyClientCreatorMock{},
+				initializer:     &InitializerMock{},
+				resourcetracker: testutils.NewResourceTrackerMockWithError(errTracking),
+			},
+			args: args{
+				mg: func() *v1alpha1.ServiceInstance {
+					now := metav1.Now()
+					return &v1alpha1.ServiceInstance{
+						ObjectMeta: metav1.ObjectMeta{
+							DeletionTimestamp: &now,
+						},
+					}
+				}(),
+			},
+			want: want{
+				err:         nil,
+				trackCalled: false,
+			},
+		},
 	}
 
 	for name, tc := range cases {

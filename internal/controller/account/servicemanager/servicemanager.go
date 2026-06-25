@@ -52,8 +52,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if !ok {
 		return nil, errors.New(errNotServiceManager)
 	}
-	if err := c.resourcetracker.Track(ctx, mg); err != nil {
-		return nil, errors.Wrap(err, errTrack)
+	// Skip ResourceUsage tracking when the MR is being deleted: Track() walks
+	// references and Gets each upstream MR; if any was deleted out from under
+	// us, that Get returns NotFound and Connect would abort before Delete()
+	// runs, leaving the BTP-side instance and the finalizer in place forever.
+	if !meta.WasDeleted(mg) {
+		if err := c.resourcetracker.Track(ctx, mg); err != nil {
+			return nil, errors.Wrap(err, errTrack)
+		}
 	}
 
 	if err := c.InitializeServicePlanId(ctx, cr); err != nil {
