@@ -79,6 +79,18 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
   - CLI: btp get security/role-collection `"<name>"` → `name`
 
+### RoleCollectionAssignment
+
+- Follows Standard: no - uses compound key as resource has no GUID available; user/group type derived from the mutually-exclusive spec fields userName/groupName
+- Format: `<origin>/<userOrGroupName>/<roleCollectionName>` (e.g. "sap.default/jane.doe@example.com/Subaccount Administrator")
+- Note: `spec.ForProvider` must match external name; mismatches will prompt an error
+- How to find:
+
+  - UI (RoleCollections): BTP Cockpit → Subaccount → Security → Role Collections
+  - UI (User Assignments): BTP Cockpit → Subaccount → Security → Users → [Select entry] → Role Collections
+  - CLI (RoleCollections): `btp --format json list security/role-collection --subaccount <subaccount-id>` (field: `name`)
+  - CLI (User Assignments): `btp --format json get security/role-collection <role-collection-name> --subaccount <subaccount-id> --show-user-assignments` (fields: `origin`, `username`)
+
 ### ServiceInstance
 
 - Follows Standard: no
