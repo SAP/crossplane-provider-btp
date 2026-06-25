@@ -249,6 +249,11 @@ spec:
                 required:
                 - name
                 type: object
+              recreateOnCreationFailure:
+                description: |-
+                  RecreateOnCreationFailure indicates whether the environment should be
+                  automatically deleted and recreated when it enters CREATION_FAILED state.
+                type: boolean
               subaccountGuid:
                 type: string
               subaccountRef:
