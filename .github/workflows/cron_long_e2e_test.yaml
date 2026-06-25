@@ -59,7 +59,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gettext
 
       - name: Run long e2e test
-        timeout-minutes: 180
+        # Must exceed Go -timeout in `make test-e2e-long` (currently 240m) so
+        # t.Cleanup gets to run before the runner SIGKILLs the job.
+        timeout-minutes: 260
         run: |
           if [ -n "${{ github.event.inputs.testFilter }}" ]; then
             make test-e2e-long testFilter=${{ github.event.inputs.testFilter }};
