@@ -185,7 +185,10 @@ generate.init: install-tools clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
 # Options.WorkspaceStore must stay *terraform.WorkspaceStore (NewWorkspaceFinalizer
 # needs the concrete type). Idempotent. Remove when no-fork (PR #680 / issue
 # #207) lands. See cmd/zz-inject-identity/main.go.
-generate.done:
+generate.done: inject-identity-into-zz-controllers
+
+.PHONY: inject-identity-into-zz-controllers
+inject-identity-into-zz-controllers:
 	@$(INFO) patching zz_controller.go files with identity injector wrap
 	@$(GO) run ./cmd/zz-inject-identity
 	@$(OK) patching zz_controller.go files with identity injector wrap
