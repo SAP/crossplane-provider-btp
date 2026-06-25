@@ -13,7 +13,7 @@ import (
 
 // Setup adds a controller that reconciles GlobalAccount managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
-	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.RoleCollectionAssignment{}, v1alpha1.RoleCollectionAssignmentGroupKind, v1alpha1.RoleCollectionAssignmentGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
+	return providerconfig.DefaultSetupWithoutDefaultInitializer(mgr, o, &v1alpha1.RoleCollectionAssignment{}, v1alpha1.RoleCollectionAssignmentGroupKind, v1alpha1.RoleCollectionAssignmentGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 		return &connector{
 			kube:               kube,
 			usage:              usage,

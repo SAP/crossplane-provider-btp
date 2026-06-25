@@ -2,8 +2,10 @@ package subaccount
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"unsafe"
 
@@ -1630,6 +1632,51 @@ func TestDelete(t *testing.T) {
 				err: nil, // 404 should not be treated as error
 			},
 		},
+		"DeleteAPI409SurfacesError": {
+			reason: "409 Conflict on delete (in-progress or blocked by children) is wrapped via specifyAPIError so the BTP message lands in the resource's Synced condition",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{}, &http.Response{
+							StatusCode: 409,
+							Body:       io.NopCloser(strings.NewReader(`{"error":{"code":409,"message":"subaccount has child resources"}}`)),
+						}, create409Error()
+					},
+				},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				err: errors.New("deletion of subaccount failed"),
+			},
+		},
+		"DeleteAPI5xxWrappedWithSpecifyAPIError": {
+			reason: "5xx errors must produce a wrapped error containing 'API Error:' prefix from specifyAPIError when the error is a GenericOpenAPIError",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{}, &http.Response{StatusCode: 500}, create500Error()
+					},
+				},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				err: errors.New("API Error"),
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -1982,6 +2029,36 @@ func create409Error() error {
 	if errorField.IsValid() {
 		reflect.NewAt(errorField.Type(), unsafe.Pointer(errorField.UnsafeAddr())).
 			Elem().SetString("409 Conflict")
+	}
+
+	return err
+}
+
+// create500Error creates a GenericOpenAPIError with a 500 status code
+// that wraps an ApiExceptionResponseObject with code 500. This mimics
+// the actual API behavior for "internal server error" responses, used
+// to assert that specifyAPIError surfaces the API body in the wrapped
+// error message.
+func create500Error() error {
+	apiExceptionError := accountclient.NewApiExceptionResponseObjectError()
+	apiExceptionError.SetCode(500)
+	apiExceptionError.SetMessage("internal server error")
+
+	apiException := accountclient.NewApiExceptionResponseObject(*apiExceptionError)
+
+	err := &accountclient.GenericOpenAPIError{}
+	errValue := reflect.ValueOf(err).Elem()
+
+	modelField := errValue.FieldByName("model")
+	if modelField.IsValid() {
+		reflect.NewAt(modelField.Type(), unsafe.Pointer(modelField.UnsafeAddr())).
+			Elem().Set(reflect.ValueOf(*apiException))
+	}
+
+	errorField := errValue.FieldByName("error")
+	if errorField.IsValid() {
+		reflect.NewAt(errorField.Type(), unsafe.Pointer(errorField.UnsafeAddr())).
+			Elem().SetString("500 Internal Server Error")
 	}
 
 	return err
