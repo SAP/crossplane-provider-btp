@@ -131,16 +131,6 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 			Provider: config.GetProvider(),
 			// use the following WorkspaceStoreOption to enable the shared gRPC mode
 			// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
-			// NOTE(issue #521): identity-injection for template-generated upjet
-			// controllers (DirectoryEntitlement, SubaccountTrustConfiguration, …)
-			// is NOT applied here. Options.WorkspaceStore is typed
-			// *terraform.WorkspaceStore (concrete) — we cannot substitute our
-			// Store wrapper, and NewWorkspaceFinalizer also needs the concrete
-			// pointer. Resources whose lifecycle goes through this store still
-			// hit "Missing Resource Identity After Read" on refresh. Covered for
-			// the ServiceManager path via NewInternalTfConnector in
-			// internal/clients/tfclient/setup.go. Removed entirely when no-fork
-			// (PR #680 / issue #207) lands.
 			WorkspaceStore: terraform.NewWorkspaceStore(log),
 			SetupFn:        tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
 		},
