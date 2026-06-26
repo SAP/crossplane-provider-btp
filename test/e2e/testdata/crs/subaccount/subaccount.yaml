@@ -11,5 +11,7 @@ spec:
     labels:
       safe-to-delete: [ "yes" ]
       BUILD_ID: [ "$BUILD_ID" ]
+      environment: [ "e2e", "transient" ]
+      owner: []
     subaccountAdmins:
       - $TECHNICAL_USER_EMAIL

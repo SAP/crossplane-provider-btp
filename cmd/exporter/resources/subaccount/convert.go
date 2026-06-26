@@ -99,7 +99,11 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 
 	// Labels
 	if len(sa.Labels) > 0 {
-		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Labels = sa.Labels
+		labels := make(map[string]v1alpha1.SubaccountLabelValueList, len(sa.Labels))
+		for k, v := range sa.Labels {
+			labels[k] = v
+		}
+		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Labels = labels
 	}
 
 	// BetaEnabled
