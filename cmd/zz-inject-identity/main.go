@@ -12,13 +12,15 @@
 // upjet code generator runs, this tool rewrites only the NewConnector argument
 // per generated file to wrap it in our identity-injecting Store.
 //
-// Hook this into `generate.done` in the Makefile so it runs every time
-// `make generate` regenerates the zz_*.go files.
+// Hooked in via a //go:generate directive in apis/generate.go so it runs
+// every time `make generate` (i.e. `go generate ./apis/...`) regenerates the
+// zz_*.go files, right after the upjet generator and before controller-gen.
 //
 // Idempotent: re-running on already-patched files is a no-op.
 //
 // Removal: when no-fork (PR #680 / issue #207) lands, delete this command,
-// the Makefile hook, and the tfclient.NewIdentityInjectingStore wrapper.
+// the apis/generate.go directive, and the tfclient.NewIdentityInjectingStore
+// wrapper.
 package main
 
 import (

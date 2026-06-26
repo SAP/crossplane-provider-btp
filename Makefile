@@ -179,20 +179,6 @@ install-tools:
 
 generate.init: install-tools clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
 
-# Patch upjet-generated zz_controller.go files to wrap o.WorkspaceStore in
-# tfclient.NewIdentityInjectingStore at the NewConnector call site. Workaround
-# for issue #521 — upjet's controller template has no public override hook, and
-# Options.WorkspaceStore must stay *terraform.WorkspaceStore (NewWorkspaceFinalizer
-# needs the concrete type). Idempotent. Remove when no-fork (PR #680 / issue
-# #207) lands. See cmd/zz-inject-identity/main.go.
-generate.done: inject-identity-into-zz-controllers
-
-.PHONY: inject-identity-into-zz-controllers
-inject-identity-into-zz-controllers:
-	@$(INFO) patching zz_controller.go files with identity injector wrap
-	@$(GO) run ./cmd/zz-inject-identity
-	@$(OK) patching zz_controller.go files with identity injector wrap
-
 .PHONY: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs terraform.buildvars
 
 # Update the submodules, such as the common build scripts.
