@@ -15,7 +15,6 @@ var (
 	sacFromCustomTag             = "v1.3.0"
 	sacToCustomTag               = "local"
 	sacCustomResourceDirectories = []string{
-		"./testdata/customCRs/subaccountExternalName",
 		"./testdata/customCRs/subaccountApiCredentialExternalName",
 	}
 )
@@ -31,7 +30,7 @@ var (
 // 2. After upgrade, the external-name is unchanged
 // 3. The resource remains healthy after upgrade
 func Test_SubaccountApiCredential_External_Name(t *testing.T) {
-	const sacName = "upgrade-test-extn-sac"
+	const sacName = "upgrade-test-extn-sa-api-credential"
 
 	upgradeTest := NewCustomUpgradeTest("subaccount-api-credential-external-name-test").
 		FromVersion(sacFromCustomTag).
