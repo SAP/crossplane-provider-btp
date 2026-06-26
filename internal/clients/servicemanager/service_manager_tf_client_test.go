@@ -4,15 +4,16 @@ import (
 	"context"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -308,6 +309,7 @@ func TestObserveResources(t *testing.T) {
 							v1beta1.ResourceCredentialsXsuaaUrl:          []byte("https://subdomain.authentication.eu12.hana.ondemand.com"),
 							v1beta1.ResourceCredentialsXsappname:         []byte("someAppName"),
 							v1beta1.ResourceCredentialsXsuaaUrlSufix:     []byte("/oauth/token"),
+							providerv1alpha1.RawBindingKey:               []byte(`{"clientid":"someClientID","clientsecret":"someSecret","sm_url":"https://service-manager.cfapps.eu12.hana.ondemand.com","url":"https://subdomain.authentication.eu12.hana.ondemand.com","xsappname":"someAppName"}`),
 						},
 					},
 					InstanceID: "someID",
@@ -395,6 +397,7 @@ func TestObserveResources(t *testing.T) {
 							v1beta1.ResourceCredentialsXsuaaUrl:          []byte("https://subdomain.authentication.eu12.hana.ondemand.com"),
 							v1beta1.ResourceCredentialsXsappname:         []byte("someAppName"),
 							v1beta1.ResourceCredentialsXsuaaUrlSufix:     []byte("/oauth/token"),
+							providerv1alpha1.RawBindingKey:               []byte(`{"clientid":"someClientID","clientsecret":"someSecret","sm_url":"https://service-manager.cfapps.eu12.hana.ondemand.com","url":"https://subdomain.authentication.eu12.hana.ondemand.com","xsappname":"someAppName"}`),
 						}},
 					InstanceID: "someID",
 					BindingID:  "anotherID",

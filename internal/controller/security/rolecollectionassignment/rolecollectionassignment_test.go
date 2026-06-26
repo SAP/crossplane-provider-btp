@@ -4,13 +4,15 @@ import (
 	"context"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -18,14 +20,16 @@ import (
 )
 
 var (
-	apiError          = errors.New("apiError")
-	notImplementedErr = errors.New(errNotImplemented)
+	apiError = errors.New("apiError")
 )
 
 func TestObserve(t *testing.T) {
+	const legacyName = "legacy-rca"
+
 	type args struct {
 		cr     *v1alpha1.RoleCollectionAssignment
 		client *RoleAssignerMock
+		kube   client.Client
 	}
 
 	type want struct {
@@ -39,29 +43,139 @@ func TestObserve(t *testing.T) {
 		args args
 		want want
 	}{
+		"empty external-name triggers create": {
+			args: args{
+				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer")),
+				client: &RoleAssignerMock{},
+			},
+			want: want{
+				cr: cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer")),
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+			},
+		},
+		"legacy sentinel, role exists, migrates to compound key": {
+			args: args{
+				cr:     cr(withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName(legacyName)),
+				client: &RoleAssignerMock{hasRole: true},
+				kube:   &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			},
+			want: want{
+				cr: cr(WithConditions(xpv1.Available()), withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  true,
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+				CalledIdentifier: "someUser",
+			},
+		},
+		"legacy sentinel, role missing": {
+			args: args{
+				cr:     cr(withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName(legacyName)),
+				client: &RoleAssignerMock{hasRole: false},
+			},
+			want: want{
+				cr: cr(withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName(legacyName)),
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				CalledIdentifier: "someUser",
+			},
+		},
+		"legacy sentinel kube update fails": {
+			args: args{
+				cr:     cr(withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName(legacyName)),
+				client: &RoleAssignerMock{hasRole: true},
+				kube:   &test.MockClient{MockUpdate: test.NewMockUpdateFn(apiError)},
+			},
+			want: want{
+				cr:               cr(withName(legacyName), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
+				o:                managed.ExternalObservation{},
+				err:              apiError,
+				CalledIdentifier: "someUser",
+			},
+		},
+		"InvalidExternalName": {
+			args: args{
+				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("garbage")),
+				client: &RoleAssignerMock{},
+			},
+			want: want{
+				cr:  cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("garbage")),
+				o:   managed.ExternalObservation{},
+				err: ErrInvalidExternalName,
+			},
+		},
+		"ExternalNameSpecMismatch_Origin": {
+			args: args{
+				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("ldap/someUser/Subaccount Viewer")),
+				client: &RoleAssignerMock{},
+			},
+			want: want{
+				cr:  cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("ldap/someUser/Subaccount Viewer")),
+				o:   managed.ExternalObservation{},
+				err: ErrExternalNameSpecMismatch,
+			},
+		},
+		"ExternalNameSpecMismatch_User": {
+			args: args{
+				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/otherUser/Subaccount Viewer")),
+				client: &RoleAssignerMock{},
+			},
+			want: want{
+				cr:  cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/otherUser/Subaccount Viewer")),
+				o:   managed.ExternalObservation{},
+				err: ErrExternalNameSpecMismatch,
+			},
+		},
+		"ExternalNameSpecMismatch_RoleCollection": {
+			args: args{
+				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Administrator")),
+				client: &RoleAssignerMock{},
+			},
+			want: want{
+				cr:  cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Administrator")),
+				o:   managed.ExternalObservation{},
+				err: ErrExternalNameSpecMismatch,
+			},
+		},
+		"ExternalNameSpecMismatch_GroupVsUser": {
+			args: args{
+				cr:     cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someGroup/Subaccount Viewer")),
+				client: &RoleAssignerMock{},
+			},
+			want: want{
+				cr:  cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someGroup/Subaccount Viewer")),
+				o:   managed.ExternalObservation{},
+				err: ErrExternalNameSpecMismatch,
+			},
+		},
 		"LookupError": {
 			args: args{
-				cr: cr(),
+				cr: cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
 				client: &RoleAssignerMock{
 					err: apiError,
 				},
 			},
 			want: want{
-				cr:  cr(),
-				o:   managed.ExternalObservation{},
-				err: apiError,
+				cr:               cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
+				o:                managed.ExternalObservation{},
+				err:              apiError,
+				CalledIdentifier: "someUser",
 			},
 		},
 		"user needs creation": {
 			args: args{
-				cr: cr(withUser("someUser")),
+				cr: cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
 				client: &RoleAssignerMock{
 					hasRole: false,
 					err:     nil,
 				},
 			},
 			want: want{
-				cr: cr(withUser("someUser")),
+				cr: cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
 				o: managed.ExternalObservation{
 					ResourceExists: false,
 				},
@@ -70,14 +184,14 @@ func TestObserve(t *testing.T) {
 		},
 		"group needs creation": {
 			args: args{
-				cr: cr(withGroup("someGroup")),
+				cr: cr(withGroup("someGroup"), withOrigin("sap.default"), withRoleCollection("Subaccount Administrator"), withExternalName("sap.default/someGroup/Subaccount Administrator")),
 				client: &RoleAssignerMock{
 					hasRole: false,
 					err:     nil,
 				},
 			},
 			want: want{
-				cr: cr(withGroup("someGroup")),
+				cr: cr(withGroup("someGroup"), withOrigin("sap.default"), withRoleCollection("Subaccount Administrator"), withExternalName("sap.default/someGroup/Subaccount Administrator")),
 				o: managed.ExternalObservation{
 					ResourceExists: false,
 				},
@@ -86,14 +200,14 @@ func TestObserve(t *testing.T) {
 		},
 		"group available": {
 			args: args{
-				cr: cr(withGroup("someGroup")),
+				cr: cr(withGroup("someGroup"), withOrigin("sap.default"), withRoleCollection("Subaccount Administrator"), withExternalName("sap.default/someGroup/Subaccount Administrator")),
 				client: &RoleAssignerMock{
 					hasRole: true,
 					err:     nil,
 				},
 			},
 			want: want{
-				cr: cr(WithConditions(xpv1.Available()), withGroup("someGroup")),
+				cr: cr(WithConditions(xpv1.Available()), withGroup("someGroup"), withOrigin("sap.default"), withRoleCollection("Subaccount Administrator"), withExternalName("sap.default/someGroup/Subaccount Administrator")),
 				o: managed.ExternalObservation{
 					ResourceExists:    true,
 					ResourceUpToDate:  true,
@@ -104,14 +218,14 @@ func TestObserve(t *testing.T) {
 		},
 		"user available": {
 			args: args{
-				cr: cr(withUser("someUser")),
+				cr: cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
 				client: &RoleAssignerMock{
 					hasRole: true,
 					err:     nil,
 				},
 			},
 			want: want{
-				cr: cr(WithConditions(xpv1.Available()), withUser("someUser")),
+				cr: cr(WithConditions(xpv1.Available()), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
 				o: managed.ExternalObservation{
 					ResourceExists:    true,
 					ResourceUpToDate:  true,
@@ -124,11 +238,9 @@ func TestObserve(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client}
+			e := external{client: tc.args.client, kube: tc.args.kube}
 			got, err := e.Observe(context.Background(), tc.args.cr)
-			if diff := cmp.Diff(&tc.want.CalledIdentifier, tc.args.client.CalledIdentifier); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want, +CalledIdentifier:\n", diff)
-			}
+			assertCalledIdentifier(t, "e.Observe", tc.want.CalledIdentifier, tc.args.client.CalledIdentifier)
 			expectedErrorBehaviour(t, tc.want.err, err)
 			if diff := cmp.Diff(tc.want.o, got); diff != "" {
 				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n", diff)
@@ -159,13 +271,13 @@ func TestCreate(t *testing.T) {
 	}{
 		"ApiError UserAssigner": {
 			args: args{
-				cr: cr(withCredsCustom(), withUser("someUser")),
+				cr: cr(withCredsCustom(), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer")),
 				client: &RoleAssignerMock{
 					err: apiError,
 				},
 			},
 			want: want{
-				cr:               cr(WithConditions(xpv1.Creating()), withCredsCustom(), withUser("someUser")),
+				cr:               cr(WithConditions(xpv1.Creating()), withCredsCustom(), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer")),
 				o:                managed.ExternalCreation{},
 				err:              apiError,
 				CalledIdentifier: "someUser",
@@ -173,13 +285,13 @@ func TestCreate(t *testing.T) {
 		},
 		"ApiError GroupAssigner": {
 			args: args{
-				cr: cr(withGroup("someGroup"), withCredsCustom()),
+				cr: cr(withGroup("someGroup"), withCredsCustom(), withOrigin("sap.default"), withRoleCollection("Subaccount Administrator")),
 				client: &RoleAssignerMock{
 					err: apiError,
 				},
 			},
 			want: want{
-				cr:               cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCredsCustom()),
+				cr:               cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCredsCustom(), withOrigin("sap.default"), withRoleCollection("Subaccount Administrator")),
 				o:                managed.ExternalCreation{},
 				err:              apiError,
 				CalledIdentifier: "someGroup",
@@ -187,14 +299,14 @@ func TestCreate(t *testing.T) {
 		},
 		"Successful UserAssigner": {
 			args: args{
-				cr: cr(withUser("someUser"), withCredsCustom()),
+				cr: cr(withUser("someUser"), withCredsCustom(), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer")),
 				client: &RoleAssignerMock{
 					hasRole: true,
 					err:     nil,
 				},
 			},
 			want: want{
-				cr: cr(WithConditions(xpv1.Creating()), withUser("someUser"), withCredsCustom()),
+				cr: cr(WithConditions(xpv1.Creating()), withUser("someUser"), withCredsCustom(), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
 				o: managed.ExternalCreation{
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
@@ -203,14 +315,14 @@ func TestCreate(t *testing.T) {
 		},
 		"Successful GroupAssigner": {
 			args: args{
-				cr: cr(withGroup("someGroup"), withCredsCustom()),
+				cr: cr(withGroup("someGroup"), withCredsCustom(), withOrigin("sap.default"), withRoleCollection("Subaccount Administrator")),
 				client: &RoleAssignerMock{
 					hasRole: true,
 					err:     nil,
 				},
 			},
 			want: want{
-				cr: cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCredsCustom()),
+				cr: cr(WithConditions(xpv1.Creating()), withGroup("someGroup"), withCredsCustom(), withOrigin("sap.default"), withRoleCollection("Subaccount Administrator"), withExternalName("sap.default/someGroup/Subaccount Administrator")),
 				o: managed.ExternalCreation{
 					ConnectionDetails: managed.ConnectionDetails{},
 				},
@@ -224,9 +336,7 @@ func TestCreate(t *testing.T) {
 			e := external{client: tc.args.client}
 			got, err := e.Create(context.Background(), tc.args.cr)
 
-			if diff := cmp.Diff(&tc.want.CalledIdentifier, tc.args.client.CalledIdentifier); diff != "" {
-				t.Errorf("\n%s\ne.Create(...): -want, +CalledIdentifier:\n", diff)
-			}
+			assertCalledIdentifier(t, "e.Create", tc.want.CalledIdentifier, tc.args.client.CalledIdentifier)
 			expectedErrorBehaviour(t, tc.want.err, err)
 			if diff := cmp.Diff(tc.want.o, got); diff != "" {
 				t.Errorf("\n%s\ne.Create(...): -want, +got:\n", diff)
@@ -252,15 +362,15 @@ func TestUpdate(t *testing.T) {
 		args args
 		want want
 	}{
-		// we always expect an error
-		"NotImplemented": {
+		// All spec fields are immutable via XValidation, so Update is a no-op success.
+		"Success": {
 			args: args{
 				cr: cr(),
 			},
 			want: want{
 				cr:  cr(),
 				o:   managed.ExternalUpdate{},
-				err: notImplementedErr,
+				err: nil,
 			},
 		},
 	}
@@ -298,39 +408,52 @@ func TestDelete(t *testing.T) {
 		args args
 		want want
 	}{
+		"InvalidExternalName": {
+			args: args{
+				cr: cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer")),
+				client: &RoleAssignerMock{
+					err: nil,
+				},
+			},
+			want: want{
+				cr:  cr(WithConditions(xpv1.Deleting()), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer")),
+				err: ErrInvalidExternalName,
+			},
+		},
 		"ApiError": {
 			args: args{
-				cr: cr(),
+				cr: cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
 				client: &RoleAssignerMock{
 					err: apiError,
 				},
 			},
 			want: want{
-				cr:  cr(WithConditions(xpv1.Deleting())),
-				err: apiError,
+				cr:               cr(WithConditions(xpv1.Deleting()), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
+				err:              apiError,
+				CalledIdentifier: "someUser",
 			},
 		},
 		"Successful UserAssigner": {
 			args: args{
-				cr: cr(withUser("someUser")),
+				cr: cr(withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
 				client: &RoleAssignerMock{
 					err: nil,
 				},
 			},
 			want: want{
-				cr:               cr(WithConditions(xpv1.Deleting()), withUser("someUser")),
+				cr:               cr(WithConditions(xpv1.Deleting()), withUser("someUser"), withOrigin("sap.default"), withRoleCollection("Subaccount Viewer"), withExternalName("sap.default/someUser/Subaccount Viewer")),
 				CalledIdentifier: "someUser",
 			},
 		},
 		"Successful GroupAssigner": {
 			args: args{
-				cr: cr(withGroup("someGroup")),
+				cr: cr(withGroup("someGroup"), withOrigin("sap.default"), withRoleCollection("Subaccount Administrator"), withExternalName("sap.default/someGroup/Subaccount Administrator")),
 				client: &RoleAssignerMock{
 					err: nil,
 				},
 			},
 			want: want{
-				cr:               cr(WithConditions(xpv1.Deleting()), withGroup("someGroup")),
+				cr:               cr(WithConditions(xpv1.Deleting()), withGroup("someGroup"), withOrigin("sap.default"), withRoleCollection("Subaccount Administrator"), withExternalName("sap.default/someGroup/Subaccount Administrator")),
 				CalledIdentifier: "someGroup",
 			},
 		},
@@ -340,9 +463,7 @@ func TestDelete(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := external{client: tc.args.client}
 			_, err := e.Delete(context.Background(), tc.args.cr)
-			if diff := cmp.Diff(&tc.want.CalledIdentifier, tc.args.client.CalledIdentifier); diff != "" {
-				t.Errorf("\n%s\ne.Delete(...): -want, +CalledIdentifier:\n", diff)
-			}
+			assertCalledIdentifier(t, "e.Delete", tc.want.CalledIdentifier, tc.args.client.CalledIdentifier)
 			expectedErrorBehaviour(t, tc.want.err, err)
 			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
 				t.Errorf("\ne.Create(): expected cr after operation -want, +got:\n%s\n", diff)
@@ -379,7 +500,7 @@ func TestConnect(t *testing.T) {
 
 	type args struct {
 		cr                 *v1alpha1.RoleCollectionAssignment
-		track              resource.Tracker
+		track              providerconfig.LegacyTracker
 		resourcetracker    tracking.ReferenceResolverTracker
 		kube               client.Client
 		newUserAssignerFn  func(_ *v1alpha1.XsuaaBinding) (RoleAssigner, error)
@@ -654,6 +775,26 @@ func expectedErrorBehaviour(t *testing.T, expectedErr error, gotErr error) {
 
 }
 
+// assertCalledIdentifier checks the mock's recorded identifier. An empty want
+// means "the client must not have been called" (mock leaves CalledIdentifier
+// nil in that case).
+func assertCalledIdentifier(t *testing.T, op, want string, got *string) {
+	t.Helper()
+	if want == "" {
+		if got != nil {
+			t.Errorf("%s(...): expected client not to be called, got identifier %q", op, *got)
+		}
+		return
+	}
+	if got == nil {
+		t.Errorf("%s(...): expected client called with %q, got no call", op, want)
+		return
+	}
+	if diff := cmp.Diff(want, *got); diff != "" {
+		t.Errorf("\n%s\n%s(...): -want, +CalledIdentifier:\n", diff, op)
+	}
+}
+
 func cr(m ...RoleCollectionModifier) *v1alpha1.RoleCollectionAssignment {
 	cr := &v1alpha1.RoleCollectionAssignment{
 		Spec:   v1alpha1.RoleCollectionAssignmentSpec{ForProvider: v1alpha1.RoleCollectionAssignmentParameters{}},
@@ -693,21 +834,41 @@ func withCredsUpjet() RoleCollectionModifier {
 
 func withUser(username string) RoleCollectionModifier {
 	return func(assignment *v1alpha1.RoleCollectionAssignment) {
-		assignment.Spec.ForProvider = v1alpha1.RoleCollectionAssignmentParameters{
-			UserName: username,
-		}
+		assignment.Spec.ForProvider.UserName = username
+	}
+}
+
+func withName(name string) RoleCollectionModifier {
+	return func(assignment *v1alpha1.RoleCollectionAssignment) {
+		assignment.Name = name
 	}
 }
 
 func withGroup(groupname string) RoleCollectionModifier {
 	return func(assignment *v1alpha1.RoleCollectionAssignment) {
-		assignment.Spec.ForProvider = v1alpha1.RoleCollectionAssignmentParameters{
-			GroupName: groupname,
-		}
+		assignment.Spec.ForProvider.GroupName = groupname
 	}
 }
 
-func newTracker(err error) resource.Tracker {
+func withOrigin(origin string) RoleCollectionModifier {
+	return func(assignment *v1alpha1.RoleCollectionAssignment) {
+		assignment.Spec.ForProvider.Origin = origin
+	}
+}
+
+func withRoleCollection(rc string) RoleCollectionModifier {
+	return func(assignment *v1alpha1.RoleCollectionAssignment) {
+		assignment.Spec.ForProvider.RoleCollectionName = rc
+	}
+}
+
+func withExternalName(name string) RoleCollectionModifier {
+	return func(assignment *v1alpha1.RoleCollectionAssignment) {
+		meta.SetExternalName(assignment, name)
+	}
+}
+
+func newTracker(err error) providerconfig.LegacyTracker {
 	return &tracker{err: err}
 }
 
@@ -724,7 +885,7 @@ type tracker struct {
 	err error
 }
 
-func (t *tracker) Track(ctx context.Context, mg resource.Managed) error {
+func (t *tracker) Track(ctx context.Context, mg resource.LegacyManaged) error {
 	return t.err
 }
 

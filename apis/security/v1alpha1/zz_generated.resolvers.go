@@ -20,8 +20,7 @@ package v1alpha1
 
 import (
 	"context"
-
-	reference "github.com/crossplane/crossplane-runtime/pkg/reference"
+	reference "github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	errors "github.com/pkg/errors"
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,6 +36,7 @@ func (mg *RoleCollection) ResolveReferences(ctx context.Context, c client.Reader
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret,
 		Extract:      SubaccountApiCredentialSecret(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
 		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
 		To: reference.To{
@@ -53,6 +53,7 @@ func (mg *RoleCollection) ResolveReferences(ctx context.Context, c client.Reader
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace,
 		Extract:      SubaccountApiCredentialSecretNamespace(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
 		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
 		To: reference.To{
@@ -79,6 +80,7 @@ func (mg *RoleCollectionAssignment) ResolveReferences(ctx context.Context, c cli
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecret,
 		Extract:      SubaccountApiCredentialSecret(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
 		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
 		To: reference.To{
@@ -95,6 +97,7 @@ func (mg *RoleCollectionAssignment) ResolveReferences(ctx context.Context, c cli
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSecretNamespace,
 		Extract:      SubaccountApiCredentialSecretNamespace(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialRef,
 		Selector:     mg.Spec.XSUAACredentialsReference.SubaccountApiCredentialSelector,
 		To: reference.To{
@@ -121,6 +124,7 @@ func (mg *SubaccountApiCredential) ResolveReferences(ctx context.Context, c clie
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountID),
 		Extract:      v1alpha1.SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
@@ -137,6 +141,7 @@ func (mg *SubaccountApiCredential) ResolveReferences(ctx context.Context, c clie
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.SubaccountID),
 		Extract:      v1alpha1.SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.InitProvider.SubaccountRef,
 		Selector:     mg.Spec.InitProvider.SubaccountSelector,
 		To: reference.To{
@@ -163,6 +168,7 @@ func (mg *SubaccountTrustConfiguration) ResolveReferences(ctx context.Context, c
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountID),
 		Extract:      v1alpha1.SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
@@ -179,6 +185,7 @@ func (mg *SubaccountTrustConfiguration) ResolveReferences(ctx context.Context, c
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.SubaccountID),
 		Extract:      v1alpha1.SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.InitProvider.SubaccountRef,
 		Selector:     mg.Spec.InitProvider.SubaccountSelector,
 		To: reference.To{

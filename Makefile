@@ -24,6 +24,10 @@ PLATFORMS ?= linux_amd64
 VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || echo "v0.0.0-$$(git rev-parse HEAD)")
 $(info VERSION is $(VERSION))
 
+# Override to be Crossplane v2 compatible
+ROOT_DIR := $(shell pwd)
+export BUILD_REGISTRY := index.docker.io/build-$(shell echo $(HOSTNAME)-$(ROOT_DIR) | sha256sum | cut -c1-8)
+
 -include build/makelib/common.mk
 
 # Setup Output
@@ -31,7 +35,7 @@ $(info VERSION is $(VERSION))
 
 # Setup Versions
 GO_REQUIRED_VERSION=1.25
-GOLANGCILINT_VERSION ?= 2.8.0
+GOLANGCILINT_VERSION ?= 2.12.2
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
@@ -42,11 +46,12 @@ GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.ProviderVersion=$(VERSION)
 
 GO_SUBDIRS += cmd internal apis
 GO111MODULE = on
+GOTOOLCHAIN = local
 -include build/makelib/golang.mk
 
 # Override the GO_LINT_ARGS from golang.mk to use updated golangci-lint parameters
 # this can potentially be removed when we update to a newer version of the build
-GO_LINT_ARGS = --output.checkstyle.path=$(GO_LINT_OUTPUT)/checkstyle.xml
+GO_LINT_ARGS = --output.checkstyle.path=$(GO_LINT_OUTPUT)/checkstyle.xml --output.text.path=stdout
 
 # kind-related versions
 KIND_VERSION ?= v0.23.0
@@ -66,11 +71,19 @@ testFilter ?= .*
 
 .PHONY: local-build
 local-build: build xpkg.build.provider-btp
-	$(INFO) "Loading xpkg into docker as $(UUT_XPKG)"; \
-	XPKG_FILE=$(XPKG_OUTPUT_DIR)/$(PLATFORM)/provider-btp-$(VERSION).xpkg && \
+	$(INFO) "Loading xpkg into docker as $(UUT_XPKG)"
+	@XPKG_FILE=$(XPKG_OUTPUT_DIR)/$(PLATFORM)/provider-btp-$(VERSION).xpkg && \
 	XPKG_SHA=$$(docker load -i $$XPKG_FILE | sed -n 's/.*ID: //p') && \
-	docker tag $$XPKG_SHA $(UUT_XPKG); \
-	$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"; \
+	docker tag $$XPKG_SHA $(UUT_XPKG);
+	$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"
+
+.PHONY: local-deploy-prebuilt
+local-deploy-prebuilt:
+	$(INFO) "Loading prebuilt xpkg into docker as $(UUT_XPKG)"
+	@XPKG_FILE=$$(find $(XPKG_OUTPUT_DIR)/$(PLATFORM) -name "*.xpkg" | head -1) && \
+	XPKG_SHA=$$(docker load -i $$XPKG_FILE | sed -n 's/.*ID: //p') && \
+	docker tag $$XPKG_SHA $(UUT_XPKG)
+	$(OK) "Prebuilt xpkg loaded as $(UUT_XPKG)"
 
 # ====================================================================================
 # Setup XPKG
@@ -152,7 +165,13 @@ clean-work:
 	@$(INFO) cleaning work directory
 	@rm -rf .work
 
-generate.init: clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
+.PHONY: install-tools
+install-tools:
+	@$(INFO) installing Go tools from go.mod
+	@$(GO) install tool
+	@$(OK) installing Go tools from go.mod
+
+generate.init: install-tools clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
 
 .PHONY: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs terraform.buildvars
 
@@ -266,7 +285,7 @@ e2e.run: test-acceptance
 #run single test-e2e-long test with <make e2e testFilter=functionNameOfTest>
 test-e2e-long: local-build $(KIND) $(HELM3) generate-test-crs
 	@$(INFO) running integration tests
-	go test -v $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
+	go test -v $(PROJECT_REPO)/test/e2e -tags=e2e_long -count=1 -test.v -run '^$(testFilter)$$' -timeout 150m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
@@ -276,11 +295,15 @@ test-e2e-long: local-build $(KIND) $(HELM3) generate-test-crs
      esac
 
 #run single e2e test with <make e2e testFilter=functionNameOfTest>
+# Deploy mechanism for test-acceptance. Default rebuilds locally (local dev);
+# CI overrides to local-deploy-prebuilt to consume artifacts from the build job.
+ACCEPTANCE_DEPLOY ?= local-build
+
 .PHONY: test-acceptance
-test-acceptance: local-build $(KIND) $(HELM3) generate-test-crs
+test-acceptance: $(ACCEPTANCE_DEPLOY) $(KIND) generate-test-crs
 	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
-	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
+	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
@@ -293,7 +316,7 @@ test-acceptance-debug: local-build $(KIND) $(HELM3) generate-test-crs
 	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
 	go test -gcflags="all=-N -l" -c -v  $(PROJECT_REPO)/test/e2e/ -tags=e2e -o ./test/e2e/test-acceptance-debug.test -timeout 30m
-	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
+	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
 	@$(OK) end-to-end tests passed
 
 .PHONY: generate-test-crs
@@ -402,3 +425,44 @@ upgrade-test-clean: upgrade-test-restore-crs
 	@$(INFO) Cleaning BTP artifacts
 	@$(GO) run .github/workflows/cleanup.go
 	@$(OK) BTP artifacts cleaned
+
+# ====================================================================================
+# E2E Test Environment Setup
+# ====================================================================================
+
+# Interactively ask for the file paths containing each required e2e configuration value
+# and write them into a .env file. Each variable's value is read from the specified file
+# so that secrets never need to be typed on the command line.
+.PHONY: e2e-tests-create-dot-env-from-files
+e2e-tests-create-dot-env-from-files:
+	@echo "This target creates a .env file for e2e tests by reading each required"
+	@echo "configuration value from a file you specify."
+	@echo "See https://github.com/SAP/crossplane-provider-btp#required-configuration"
+	@echo ""
+	@> .env
+	@for entry in \
+		"BTP_TECHNICAL_USER:JSON file with BTP technical user credentials (email/username/password)" \
+		"CIS_CENTRAL_BINDING:JSON file with the cis-central service binding data" \
+		"CLI_SERVER_URL:File containing the BTP CLI server URL (e.g. https://cli.btp.cloud.sap/)" \
+		"GLOBAL_ACCOUNT:File containing the global account subdomain" \
+		"IDP_URL:File containing the IDP URL connectable to the global account" \
+		"SECOND_DIRECTORY_ADMIN_EMAIL:File containing a second admin email (different from technical user)" \
+		"TECHNICAL_USER_EMAIL:File containing the email address of the BTP technical user" \
+	; do \
+		varname=$${entry%%:*}; \
+		description=$${entry#*:}; \
+		printf "%s\n  (%s)\n  Path: " "$$varname" "$$description" >&2; \
+		read -r filepath; \
+		if [ -z "$$filepath" ]; then \
+			echo "⚠️  Skipping $$varname (no path provided)" >&2; \
+			continue; \
+		fi; \
+		if [ ! -f "$$filepath" ]; then \
+			echo "❌ Error: file not found: $$filepath" >&2; exit 1; \
+		fi; \
+		value=$$(cat "$$filepath"); \
+		printf '%s=%s\n' "$$varname" "$$value" >> .env; \
+		echo "✅ $$varname written" >&2; \
+	done
+	@echo ""
+	@$(OK) .env file created

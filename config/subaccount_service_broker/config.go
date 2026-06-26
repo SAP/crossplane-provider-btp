@@ -3,7 +3,7 @@ package subaccountservicebroker
 import (
 	"context"
 
-	"github.com/crossplane/upjet/pkg/config"
+	"github.com/crossplane/upjet/v2/pkg/config"
 )
 
 // Configure configures individual resources by adding custom ResourceConfigurators.
@@ -23,7 +23,7 @@ func Configure(p *config.Provider) {
 
 		r.References["subaccount_id"] = config.Reference{
 			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
-			Extractor:         "github.com/crossplane/crossplane-runtime/pkg/reference.ExternalName()",
+			Extractor:         "github.com/crossplane/crossplane-runtime/v2/pkg/reference.ExternalName()",
 			RefFieldName:      "SubaccountRef",
 			SelectorFieldName: "SubaccountSelector",
 		}

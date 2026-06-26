@@ -6,21 +6,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 const (
-	InstanceStateOk       = "OK"
-	InstanceStateCreating = "CREATING"
-	InstanceStateDeleting = "DELETING"
-	InstanceStateUpdating = "UPDATING"
+	InstanceStateOk             = "OK"
+	InstanceStateCreating       = "CREATING"
+	InstanceStateDeleting       = "DELETING"
+	InstanceStateUpdating       = "UPDATING"
+	InstanceStateCreationFailed = "CREATION_FAILED"
+	InstanceStateDeletionFailed = "DELETION_FAILED"
+	InstanceStateUpdateFailed   = "UPDATE_FAILED"
 )
 
 const (
 	ResourceAPIEndpoint = "apiEndpoint"
 	ResourceOrgId       = "orgId"
 	ResourceOrgName     = "orgName"
-	ResourceRaw         = "__raw"
 )
 
 // User identifies a user by username and origin

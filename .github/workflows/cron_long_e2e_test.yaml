@@ -20,6 +20,7 @@ env:
 jobs:
   e2e-test:
     runs-on: ubuntu-latest
+    environment: pr-e2e-no-approval
     env:
       # hardcoded BTP CLI version
       btp_cli_version: 2.90.2
@@ -53,9 +54,6 @@ jobs:
       - name: Set BUILD_ID
         run: |
           echo "BUILD_ID=${{github.run_number}}-${{github.run_attempt}}" >> $GITHUB_ENV
-
-      - name: Install gettext for envsubst
-        run: sudo apt-get update && sudo apt-get install -y gettext
 
       - name: Run long e2e test
         timeout-minutes: 180

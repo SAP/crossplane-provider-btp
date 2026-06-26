@@ -1,5 +1,4 @@
-//go:build e2e
-// +build e2e
+//go:build e2e_long
 
 package e2e
 
@@ -10,7 +9,7 @@ import (
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
@@ -24,10 +23,6 @@ import (
 )
 
 func TestKymaEnvironment(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping kyma in short mode")
-		return
-	}
 	var manifestDir = "testdata/crs/kyma_env"
 	crudFeature := features.New("BTP Kyma Environment Controller").
 		Setup(
@@ -66,11 +61,6 @@ func TestKymaEnvironment(t *testing.T) {
 }
 
 func TestKymaEnvironmentImportFlow(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping kyma import in short mode")
-		return
-	}
-
 	kymaImportName := "e2e-kyma-import-test"
 
 	importTester := NewImportTester(

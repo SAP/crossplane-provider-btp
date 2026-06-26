@@ -9,18 +9,19 @@ import (
 	"reflect"
 	"strconv"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/event"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/internal"
 
@@ -28,6 +29,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	kymaenv "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -55,7 +57,7 @@ const (
 // is called.
 type connector struct {
 	kube            client.Client
-	usage           resource.Tracker
+	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
 
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
@@ -72,6 +74,27 @@ type external struct {
 	httpClient *http.Client
 	log        logr.Logger
 	record     event.Recorder
+}
+
+var creationFailureStates = []string{
+	v1alpha1.InstanceStateCreationFailed,
+}
+
+func environmentBeingDeleted(cr *v1alpha1.KymaEnvironment) bool {
+	readyCondition := cr.GetCondition(xpv1.TypeReady)
+	return readyCondition.Status == corev1.ConditionFalse && readyCondition.Reason == xpv1.ReasonDeleting
+}
+
+func (c *external) shouldRecreateOnFailure(cr *v1alpha1.KymaEnvironment, state *string) bool {
+	if !cr.Spec.RecreateOnCreationFailure || state == nil {
+		return false
+	}
+	for _, s := range creationFailureStates {
+		if *state == s {
+			return true
+		}
+	}
+	return false
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -126,6 +149,18 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	lastModified := cr.Status.AtProvider.ModifiedDate
 	cr.Status.AtProvider = kymaenv.GenerateObservation(instance)
+
+	if c.shouldRecreateOnFailure(cr, cr.Status.AtProvider.State) {
+		var err error
+		if !environmentBeingDeleted(cr) {
+			_, err = c.Delete(ctx, mg)
+		}
+		return managed.ExternalObservation{
+			ResourceExists:    true,
+			ResourceUpToDate:  true,
+			ConnectionDetails: managed.ConnectionDetails{},
+		}, err
+	}
 
 	if cr.Status.AtProvider.State == nil {
 		cr.Status.SetConditions(xpv1.Unavailable())

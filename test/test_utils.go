@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -18,7 +19,8 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/pkg/errors"
 	metaApi "github.com/sap/crossplane-provider-btp/apis"
 	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/vladimirvivien/gexe"
@@ -37,7 +39,9 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
 	"sigs.k8s.io/e2e-framework/pkg/features"
+	"sigs.k8s.io/e2e-framework/third_party/helm"
 )
 
 const (
@@ -59,6 +63,133 @@ func SetupLogging(verbosity int) {
 	logging.EnableVerboseLogging(&verbosity)
 	zl := zap.New(zap.UseDevMode(true))
 	ctrl.SetLogger(zl)
+}
+
+// crossplaneCacheMount is the host-path directory on the kind control-plane
+// container that backs the package-cache PVC. This must match the path
+// xp-testing's InstallCrossplaneProvider docker-cps the xpkg into:
+// /cache/xpkg/<name>.gz in xp-testing v1.9.2 (xpenvfuncs.go:326-327). The
+// Crossplane helm chart mounts the PVC at /cache in the pod, so a host
+// hostPath of /cache/xpkg surfaces files at /cache/<name>.gz inside the pod —
+// which is where Crossplane's package manager looks.
+const crossplaneCacheMount = "/cache/xpkg"
+
+// crossplaneCacheVolumeTemplate is the PV+PVC manifest pair that backs the
+// helm chart's `--set packageCache.pvc=<name>` reference. Format args:
+//  1. PV name
+//  2. PV hostPath
+//  3. PVC name
+//  4. PVC volumeName
+const crossplaneCacheVolumeTemplate = `apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: %s
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 5Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "%s"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: %s
+  namespace: crossplane-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeName: %s
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 1Mi
+`
+
+// setupCrossplanePackageCache prepares the Crossplane package-cache on the
+// given kind cluster's control-plane node:
+//  1. `docker exec <cluster>-control-plane mkdir -m 777 -p /cache` to create
+//     the host-path directory the PV binds to.
+//  2. Applies a PV (hostPath: /cache) + PVC (in crossplane-system) named
+//     cacheName, which the helm chart references via
+//     `--set packageCache.pvc=<cacheName>`.
+//
+// Inline replicates xp-testing v1.9.2's unexported helper of the same name
+// (pkg/xpenvfuncs/xpenvfuncs.go). When that helper becomes exportable
+// upstream (see crossplane-contrib/xp-testing#134 and follow-ups), this
+// implementation can be removed in favor of the upstream entry point.
+func setupCrossplanePackageCache(clusterName, cacheName string) env.Func {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		controlPlane := clusterName + "-control-plane"
+
+		// Step 1: ensure the host-path dir exists on the kind container.
+		cmd := exec.CommandContext(ctx, "docker", "exec", controlPlane,
+			"mkdir", "-m", "777", "-p", crossplaneCacheMount)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return ctx, errors.Wrapf(err, "setupCrossplanePackageCache: docker exec mkdir on %s failed: %s", controlPlane, string(out))
+		}
+
+		// Step 2: apply PV + PVC.
+		manifest := fmt.Sprintf(crossplaneCacheVolumeTemplate,
+			cacheName,            // PV name
+			crossplaneCacheMount, // PV hostPath
+			cacheName,            // PVC name
+			cacheName,            // PVC volumeName
+		)
+
+		r, err := res.New(cfg.Client().RESTConfig())
+		if err != nil {
+			return ctx, errors.Wrap(err, "setupCrossplanePackageCache: resources.New failed")
+		}
+		if err := decoder.DecodeEach(ctx, strings.NewReader(manifest),
+			decoder.CreateHandler(r),
+		); err != nil {
+			return ctx, errors.Wrap(err, "setupCrossplanePackageCache: apply PV/PVC failed")
+		}
+		return ctx, nil
+	}
+}
+
+// InstallCrossplaneFromChart returns an env.Func that installs Crossplane
+// from a caller-supplied chart reference, bypassing the
+// `helm repo add https://charts.crossplane.io/stable` flow that has been
+// throwing intermittent 403 Forbidden errors. See
+// docs/development/flakiness-analysis.md (Pattern A) for context.
+//
+// chartRef is anything `helm.WithChart` accepts: a local tarball path
+// (e.g. /path/to/crossplane-2.1.3.tgz), an OCI URL
+// (e.g. oci://example.com/crossplane), or a `repo/name` reference (legacy).
+// version is the chart version tag.
+func InstallCrossplaneFromChart(clusterName, chartRef, version string) env.Func {
+	const cacheName = "package-cache"
+	return xpenvfuncs.Compose(
+		envfuncs.CreateNamespace(xpenvfuncs.CrossplaneNamespace),
+		setupCrossplanePackageCache(clusterName, cacheName),
+		func(ctx context.Context, _ *envconf.Config) (context.Context, error) {
+			cluster, ok := envfuncs.GetClusterFromContext(ctx, clusterName)
+			if !ok {
+				return ctx, fmt.Errorf("install crossplane from chart: cluster %q missing from context", clusterName)
+			}
+			mgr := helm.New(cluster.GetKubeconfig())
+			err := mgr.RunInstall(
+				helm.WithName("crossplane"),
+				helm.WithNamespace(xpenvfuncs.CrossplaneNamespace),
+				helm.WithChart(chartRef),
+				helm.WithVersion(version),
+				helm.WithArgs("--set", fmt.Sprintf("packageCache.pvc=%s", cacheName)),
+				helm.WithTimeout("10m"),
+				helm.WithWait(),
+			)
+			if err != nil {
+				return ctx, errors.Wrap(err, "install crossplane from chart: helm install failed")
+			}
+			return ctx, nil
+		},
+	)
 }
 
 func ApplySecretInCrossplaneNamespace(name string, data map[string]string) env.Func {

@@ -37,3 +37,24 @@ spec:
   writeConnectionSecretToRef:
     name: destination-binding-sap-format
     namespace: default
+---
+# ServiceBinding with secretKey: all credentials bundled into a single JSON key.
+# Combined with secretFormat, the secret also includes SAP metadata and .metadata
+# marks the credential key with "container: true" per the SAP specification.
+# This format is required by components like Connectivity Proxy and Transparent Proxy.
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceBinding
+metadata:
+  name: connectivity-binding
+spec:
+  forProvider:
+    name: connectivity-binding
+    serviceInstanceRef:
+      name: connectivity-instance
+    subaccountRef:
+      name: sa-serviceinstance
+  secretFormat: sap-kubernetes
+  secretKey: credentials
+  writeConnectionSecretToRef:
+    name: connectivity-binding-cred
+    namespace: default

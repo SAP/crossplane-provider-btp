@@ -1,5 +1,4 @@
-//go:build e2e
-// +build e2e
+//go:build e2e || e2e_long
 
 package e2e
 
@@ -9,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/test"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +27,10 @@ type mockList struct {
 	client.ObjectList
 
 	Items []k8s.Object
+}
+
+func NewID(oldId string, buildId string) string {
+	return buildId + "-" + oldId
 }
 
 func waitForResource(res k8s.Object, cfg *envconf.Config, t *testing.T, opts ...wait.Option) {

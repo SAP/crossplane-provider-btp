@@ -79,6 +79,18 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
   - CLI: btp get security/role-collection `"<name>"` → `name`
 
+### RoleCollectionAssignment
+
+- Follows Standard: no - uses compound key as resource has no GUID available; user/group type derived from the mutually-exclusive spec fields userName/groupName
+- Format: `<origin>/<userOrGroupName>/<roleCollectionName>` (e.g. "sap.default/jane.doe@example.com/Subaccount Administrator")
+- Note: `spec.ForProvider` must match external name; mismatches will prompt an error
+- How to find:
+
+  - UI (RoleCollections): BTP Cockpit → Subaccount → Security → Role Collections
+  - UI (User Assignments): BTP Cockpit → Subaccount → Security → Users → [Select entry] → Role Collections
+  - CLI (RoleCollections): `btp --format json list security/role-collection --subaccount <subaccount-id>` (field: `name`)
+  - CLI (User Assignments): `btp --format json get security/role-collection <role-collection-name> --subaccount <subaccount-id> --show-user-assignments` (fields: `origin`, `username`)
+
 ### ServiceInstance
 
 - Follows Standard: no
@@ -97,6 +109,24 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 
   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
   - CLI: btp list accounts/subaccount (field: guid)
+
+### SubaccountApiCredential
+
+- Follows Standard: no (uses credential name as identifier, not a GUID)
+- Format: Credential Name (string)
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Client Name]
+  - CLI: `btp list security/app --subaccount <subaccount-id>` → `name`
+
+### SubaccountTrustConfiguration
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format:`<subaccount-id>/<origin>` (e.g. "abc-123-def-456/sap.custom")
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Security → Trust Configurations → [Origin column]
+  - CLI: `btp list security/trust --subaccount <subaccount-id>` → `Origin Key`
 
 ### Subscription
 

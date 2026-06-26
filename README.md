@@ -30,7 +30,8 @@ If you have a question always feel free to reach out on our official crossplane 
 
 :rocket: [**#provider-sap-btp**](https://crossplane.slack.com/archives/C07UZ3UJY7Q).
 
-💬 Also we are hosting an open community call and hope to see you there! Find more details [here](https://sap.github.io/crossplane-provider-docs/docs/contribution/understand-providers/).
+💬 Also we are hosting an open community call and hope to see you there! 
+👉 Find more details [here](https://github.com/SAP/crossplane-provider-btp/discussions/515). 👈
 
 For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 
@@ -83,6 +84,9 @@ The provider comes with a set of end-to-end tests that can be run locally. To ru
 make test-acceptance
 ```
 
+> [!NOTE]  
+> Make sure to set required environment variables before starting the e2e tests with real valid credentials!
+
 This will spin up a specific kind cluster which runs the provider as docker container in it. The e2e tests will run kubectl commands against that cluster to test the provider's functionality.
 
 If you want to run a single E2E Test locally simply set the `testFilter` variable like this:
@@ -93,6 +97,20 @@ make test-acceptance testFilter=<functionNameOfTest>
 
 > [!WARNING]
 > Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
+
+#### Long-Running Tests
+
+Some tests (e.g. Kyma environment, service binding rotation) are excluded from `make test-acceptance` because they can take 10 minutes or more. These tests carry the `e2e_long` build tag and must be run explicitly:
+
+```bash
+make test-e2e-long testFilter=<functionNameOfTest>
+```
+
+To run the full long-running suite, omit the filter:
+
+```bash
+make test-e2e-long
+```
 
 Please note that when running multiple times you might want to delete the kind cluster again to avoid conflicts:
 
@@ -207,7 +225,7 @@ The default is `0`.
 
 ### Upgrade Tests
 
-The provider also comes with upgrade tests that can be run locally. These upgrade tests ensure that resources created with an older version of the provider can be properly handled by the current version. Find more detailed information in the [upgrade test docs](/docs/development/upgrade-tests.md).
+The provider also comes with upgrade tests that can be run locally. These upgrade tests ensure that resources created with an older version of the provider can be properly handled by the current version. Find more detailed information in the [upgrade test docs](/docs/contribution-notes/upgrade-tests.md).
 
 To run the upgrade tests, you can use the following command:
 

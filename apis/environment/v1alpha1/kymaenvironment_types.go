@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 const (
@@ -46,6 +46,11 @@ type KymaEnvironmentObservation struct {
 type KymaEnvironmentSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 	ForProvider       KymaEnvironmentParameters `json:"forProvider"`
+
+	// RecreateOnCreationFailure indicates whether the environment should be
+	// automatically deleted and recreated when it enters CREATION_FAILED state.
+	// +kubebuilder:validation:Optional
+	RecreateOnCreationFailure bool `json:"recreateOnCreationFailure,omitempty"`
 	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
 	// +crossplane:generate:reference:refFieldName=SubaccountRef
 	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
