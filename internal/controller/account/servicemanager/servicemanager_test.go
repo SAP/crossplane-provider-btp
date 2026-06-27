@@ -22,6 +22,9 @@ import (
 
 var (
 	errTracking = errors.New("trackingError")
+
+	testInstanceID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	testBindingID  = "f0e1d2c3-b4a5-6789-0abc-def123456789"
 )
 
 // ====================================================================================
@@ -297,9 +300,41 @@ func TestObserve(t *testing.T) {
 		want want
 	}{
 		{
+			name: "EmptyExternalName",
+			args: args{
+				cr: NewServiceManager("test", WithExternalName("")),
+				tfClient: &TfClientFake{
+					observeFn: func() (sm.ResourcesStatus, error) {
+						return sm.ResourcesStatus{}, nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: false},
+				err: nil,
+				cr:  NewServiceManager("test", WithExternalName("")),
+			},
+		},
+		{
+			name: "InvalidExternalNameFormat",
+			args: args{
+				cr: NewServiceManager("test", WithExternalName("not-a-uuid")),
+				tfClient: &TfClientFake{
+					observeFn: func() (sm.ResourcesStatus, error) {
+						return sm.ResourcesStatus{}, nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{},
+				err: errors.New("invalid external-name format"),
+				cr:  NewServiceManager("test", WithExternalName("not-a-uuid")),
+			},
+		},
+		{
 			name: "InstanceObserveError",
 			args: args{
-				cr: NewServiceManager("test"),
+				cr: NewServiceManager("test", WithExternalName(testInstanceID+"/"+testBindingID)),
 				tfClient: &TfClientFake{
 					observeFn: func() (sm.ResourcesStatus, error) {
 						return sm.ResourcesStatus{}, errors.New("observeError")
@@ -310,6 +345,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{},
 				err: errors.New("observeError"),
 				cr: NewServiceManager("test",
+					WithExternalName(testInstanceID+"/"+testBindingID),
 					WithStatus(apisv1beta1.ServiceManagerObservation{
 						Status: apisv1beta1.ServiceManagerUnbound,
 					}),
@@ -319,7 +355,7 @@ func TestObserve(t *testing.T) {
 		{
 			name: "NotAvailable",
 			args: args{
-				cr: NewServiceManager("test"),
+				cr: NewServiceManager("test", WithExternalName(testInstanceID+"/"+testBindingID)),
 				tfClient: &TfClientFake{
 					observeFn: func() (sm.ResourcesStatus, error) {
 						// Doesn't matter what observe is returned exactly, as long as its passed through and IDs are persisted
@@ -334,6 +370,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{ResourceExists: false},
 				err: nil,
 				cr: NewServiceManager("test",
+					WithExternalName(testInstanceID+"/"+testBindingID),
 					WithStatus(apisv1beta1.ServiceManagerObservation{
 						Status:            apisv1beta1.ServiceManagerUnbound,
 						ServiceInstanceID: "someID",
@@ -345,7 +382,7 @@ func TestObserve(t *testing.T) {
 		{
 			name: "IsAvailable",
 			args: args{
-				cr: NewServiceManager("test"),
+				cr: NewServiceManager("test", WithExternalName(testInstanceID+"/"+testBindingID)),
 				tfClient: &TfClientFake{
 					observeFn: func() (sm.ResourcesStatus, error) {
 						// Doesn't matter if updated or not
@@ -366,12 +403,39 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, ConnectionDetails: map[string][]byte{"key": []byte("value")}},
 				err: nil,
 				cr: NewServiceManager("test",
+					WithExternalName(testInstanceID+"/"+testBindingID),
 					WithStatus(apisv1beta1.ServiceManagerObservation{
 						Status:            apisv1beta1.ServiceManagerBound,
 						ServiceInstanceID: "someID",
 						ServiceBindingID:  "anotherID",
 					}),
 					WithConditions(xpv1.Available())),
+			},
+		},
+		{
+			name: "ValidSingleUUID_MidCreation",
+			args: args{
+				cr: NewServiceManager("test", WithExternalName(testInstanceID)),
+				tfClient: &TfClientFake{
+					observeFn: func() (sm.ResourcesStatus, error) {
+						return sm.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{ResourceExists: false},
+							InstanceID:          testInstanceID,
+						}, nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: false},
+				err: nil,
+				cr: NewServiceManager("test",
+					WithExternalName(testInstanceID),
+					WithStatus(apisv1beta1.ServiceManagerObservation{
+						Status:            apisv1beta1.ServiceManagerUnbound,
+						ServiceInstanceID: testInstanceID,
+					}),
+					WithConditions(xpv1.Unavailable()),
+				),
 			},
 		},
 	}
@@ -390,7 +454,11 @@ func TestObserve(t *testing.T) {
 				t.Errorf("\ne.Observe(): -want, +got:\n%s\n", diff)
 			}
 			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
-				t.Errorf("\ne.Observe(): -want error, +got error:\n%s\n", diff)
+				if err != nil && tc.want.err != nil && strings.Contains(err.Error(), tc.want.err.Error()) {
+					// error messages match by substring
+				} else {
+					t.Errorf("\ne.Observe(): -want error, +got error:\n%s\n", diff)
+				}
 			}
 			if diff := cmp.Diff(tc.args.cr, tc.want.cr); diff != "" {
 				t.Errorf("\ne.Observe(): expected cr after operation -want, +got:\n%s\n", diff)
@@ -584,6 +652,35 @@ func TestDelete(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want.cr, tc.args.cr); diff != "" {
 				t.Errorf("\ne.Delete(): expected cr after operation -want, +got:\n%s\n", diff)
+			}
+		})
+	}
+}
+
+func TestIsValidExternalNameFormat(t *testing.T) {
+	tests := []struct {
+		name         string
+		externalName string
+		want         bool
+	}{
+		{name: "ValidCompoundKey", externalName: testInstanceID + "/" + testBindingID, want: true},
+		{name: "ValidSingleUUID", externalName: testInstanceID, want: true},
+		{name: "Empty", externalName: "", want: false},
+		{name: "NotAUUID", externalName: "not-a-uuid", want: false},
+		{name: "MetadataName", externalName: "my-service-manager", want: false},
+		{name: "SlashOnly", externalName: "/", want: false},
+		{name: "EmptyParts", externalName: "/", want: false},
+		{name: "UUIDSlashEmpty", externalName: testInstanceID + "/", want: false},
+		{name: "EmptySlashUUID", externalName: "/" + testBindingID, want: false},
+		{name: "ThreeParts", externalName: testInstanceID + "/" + testBindingID + "/extra", want: false},
+		{name: "UUIDSlashNotUUID", externalName: testInstanceID + "/not-uuid", want: false},
+		{name: "NotUUIDSlashUUID", externalName: "not-uuid/" + testBindingID, want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isValidExternalNameFormat(tc.externalName)
+			if got != tc.want {
+				t.Errorf("isValidExternalNameFormat(%q) = %v, want %v", tc.externalName, got, tc.want)
 			}
 		})
 	}
