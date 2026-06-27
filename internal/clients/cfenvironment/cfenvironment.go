@@ -162,6 +162,10 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 	}
 
 	for _, managerEmail := range cr.Spec.ForProvider.Managers {
+		if managerEmail == adminServiceAccountEmail {
+			// Skip adding the admin service account email as org manager since it's added by default during creation
+			continue
+		}
 		if err := cloudFoundryClient.addManager(ctx, managerEmail, defaultOrigin); err != nil {
 			return "", errors.Wrap(err, instanceCreateFailed)
 		}
