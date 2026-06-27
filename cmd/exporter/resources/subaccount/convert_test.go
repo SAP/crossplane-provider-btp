@@ -112,7 +112,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							Description:       description,
 							UsedForProduction: usedForProd,
 							BetaEnabled:       true,
-							Labels:            map[string][]string{"env": {"dev"}, "team": {"platform"}},
+							Labels:            map[string]v1alpha1.SubaccountLabelValueList{"env": {"dev"}, "team": {"platform"}},
 						},
 					},
 				}),
