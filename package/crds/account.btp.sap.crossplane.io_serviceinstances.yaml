@@ -97,6 +97,11 @@ spec:
                   offeringName:
                     description: Name of the service offering
                     type: string
+                  operationTimeout:
+                    description: |-
+                      Timeout for create, update, and delete operations, e.g. "60m".
+                      Applied to all three operations. If unset, the terraform-provider-btp default applies.
+                    type: string
                   parameterSecretRefs:
                     description: Parameters stored in secret, will be merged with
                       spec parameters

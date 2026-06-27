@@ -12,7 +12,7 @@ func Configure(p *config.Provider) {
 		r.ShortGroup = "account"
 		r.Kind = "SubaccountServiceInstance"
 
-		r.ExternalName.OmittedFields = []string{"timeouts"}
+		r.ExternalName.OmittedFields = []string{}
 		r.ExternalName.GetIDFn = func(_ context.Context, externalName string, _ map[string]any, _ map[string]any) (string, error) {
 			// When using "" as ID the API endpoint call will fail, so we need to use anything else that
 			// won't yield a result

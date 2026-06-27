@@ -50,6 +50,9 @@ type SubaccountServiceInstanceInitParameters struct {
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
 	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
+
+	// (Attributes) (see below for nested schema)
+	Timeouts *TimeoutsInitParameters `json:"timeouts,omitempty" tf:"timeouts,omitempty"`
 }
 
 type SubaccountServiceInstanceObservation struct {
@@ -112,6 +115,9 @@ type SubaccountServiceInstanceObservation struct {
 	// The ID of the subaccount.
 	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
 
+	// (Attributes) (see below for nested schema)
+	Timeouts *TimeoutsObservation `json:"timeouts,omitempty" tf:"timeouts,omitempty"`
+
 	// (Boolean) Shows whether the resource can be used.
 	// Shows whether the resource can be used.
 	Usable *bool `json:"usable,omitempty" tf:"usable,omitempty"`
@@ -148,6 +154,58 @@ type SubaccountServiceInstanceParameters struct {
 	// The ID of the subaccount.
 	// +kubebuilder:validation:Optional
 	SubaccountID *string `json:"subaccountId,omitempty" tf:"subaccount_id,omitempty"`
+
+	// (Attributes) (see below for nested schema)
+	// +kubebuilder:validation:Optional
+	Timeouts *TimeoutsParameters `json:"timeouts,omitempty" tf:"timeouts,omitempty"`
+}
+
+type TimeoutsInitParameters struct {
+
+	// (String) Timeout for creating the service instance.
+	// Timeout for creating the service instance.
+	Create *string `json:"create,omitempty" tf:"create,omitempty"`
+
+	// (String) Timeout for deleting the service instance.
+	// Timeout for deleting the service instance.
+	Delete *string `json:"delete,omitempty" tf:"delete,omitempty"`
+
+	// (String) Timeout for updating the service instance.
+	// Timeout for updating the service instance.
+	Update *string `json:"update,omitempty" tf:"update,omitempty"`
+}
+
+type TimeoutsObservation struct {
+
+	// (String) Timeout for creating the service instance.
+	// Timeout for creating the service instance.
+	Create *string `json:"create,omitempty" tf:"create,omitempty"`
+
+	// (String) Timeout for deleting the service instance.
+	// Timeout for deleting the service instance.
+	Delete *string `json:"delete,omitempty" tf:"delete,omitempty"`
+
+	// (String) Timeout for updating the service instance.
+	// Timeout for updating the service instance.
+	Update *string `json:"update,omitempty" tf:"update,omitempty"`
+}
+
+type TimeoutsParameters struct {
+
+	// (String) Timeout for creating the service instance.
+	// Timeout for creating the service instance.
+	// +kubebuilder:validation:Optional
+	Create *string `json:"create,omitempty" tf:"create,omitempty"`
+
+	// (String) Timeout for deleting the service instance.
+	// Timeout for deleting the service instance.
+	// +kubebuilder:validation:Optional
+	Delete *string `json:"delete,omitempty" tf:"delete,omitempty"`
+
+	// (String) Timeout for updating the service instance.
+	// Timeout for updating the service instance.
+	// +kubebuilder:validation:Optional
+	Update *string `json:"update,omitempty" tf:"update,omitempty"`
 }
 
 // SubaccountServiceInstanceSpec defines the desired state of SubaccountServiceInstance
