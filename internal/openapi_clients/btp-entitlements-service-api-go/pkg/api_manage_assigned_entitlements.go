@@ -1,7 +1,7 @@
 /*
 Entitlements Service
 
-The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.   NOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -123,7 +123,7 @@ func (a *ManageAssignedEntitlementsAPIService) CreateOrUpdateEntitlementsExecute
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -134,7 +134,7 @@ func (a *ManageAssignedEntitlementsAPIService) CreateOrUpdateEntitlementsExecute
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -145,7 +145,7 @@ func (a *ManageAssignedEntitlementsAPIService) CreateOrUpdateEntitlementsExecute
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -178,6 +178,8 @@ type ApiGetDirectoryAssignmentsRequest struct {
 	acceptLanguage *string
 	entitledServicesOnly *bool
 	assignedServiceName *string
+	serviceName *string
+	planName *string
 }
 
 // The ID of the directory for which to show the entitlements and quota assignments.
@@ -213,6 +215,18 @@ func (r ApiGetDirectoryAssignmentsRequest) EntitledServicesOnly(entitledServices
 // A specific service for which to return subaccount quota assignments in the global account or directory. If not specified, then all services in the global account or directory are returned.
 func (r ApiGetDirectoryAssignmentsRequest) AssignedServiceName(assignedServiceName string) ApiGetDirectoryAssignmentsRequest {
 	r.assignedServiceName = &assignedServiceName
+	return r
+}
+
+// A specific service for which to return subaccount quota entitlements and assignments in the global account. this parameter comes with conjunction with planName. If not specified, then all services in the global account are returned.
+func (r ApiGetDirectoryAssignmentsRequest) ServiceName(serviceName string) ApiGetDirectoryAssignmentsRequest {
+	r.serviceName = &serviceName
+	return r
+}
+
+// A specific service for which to return subaccount quota entitlements and assignments in the global account. this parameter comes with conjunction with serviceName. If not specified, then all services in the global account are returned.
+func (r ApiGetDirectoryAssignmentsRequest) PlanName(planName string) ApiGetDirectoryAssignmentsRequest {
+	r.planName = &planName
 	return r
 }
 
@@ -269,6 +283,7 @@ func (a *ManageAssignedEntitlementsAPIService) GetDirectoryAssignmentsExecute(r 
 		parameterAddToHeaderOrQuery(localVarQueryParams, "includeAutoManagedPlans", r.includeAutoManagedPlans, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeAutoManagedPlans", defaultValue, "form", "")
 		r.includeAutoManagedPlans = &defaultValue
 	}
 	if r.entitledServicesOnly != nil {
@@ -276,6 +291,12 @@ func (a *ManageAssignedEntitlementsAPIService) GetDirectoryAssignmentsExecute(r 
 	}
 	if r.assignedServiceName != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "assignedServiceName", r.assignedServiceName, "form", "")
+	}
+	if r.serviceName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "serviceName", r.serviceName, "form", "")
+	}
+	if r.planName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "planName", r.planName, "form", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -320,7 +341,7 @@ func (a *ManageAssignedEntitlementsAPIService) GetDirectoryAssignmentsExecute(r 
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -331,7 +352,7 @@ func (a *ManageAssignedEntitlementsAPIService) GetDirectoryAssignmentsExecute(r 
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -363,6 +384,8 @@ type ApiGetGlobalAccountAssignmentsRequest struct {
 	includeAutoManagedPlans *bool
 	entitledServicesOnly *bool
 	assignedServiceName *string
+	serviceName *string
+	planName *string
 }
 
 // Use the parameter to specify for which subaccount to view assigned entitlements. If left empty, the API returns the entitlements for the global account and all its subaccounts.
@@ -392,6 +415,18 @@ func (r ApiGetGlobalAccountAssignmentsRequest) EntitledServicesOnly(entitledServ
 // A specific service for which to return subaccount quota assignments in the global account. If not specified, then all services in the global account are returned.
 func (r ApiGetGlobalAccountAssignmentsRequest) AssignedServiceName(assignedServiceName string) ApiGetGlobalAccountAssignmentsRequest {
 	r.assignedServiceName = &assignedServiceName
+	return r
+}
+
+// A specific service for which to return subaccount quota entitlements and assignments in the global account. this parameter comes with conjunction with planName. If not specified, then all services in the global account are returned.
+func (r ApiGetGlobalAccountAssignmentsRequest) ServiceName(serviceName string) ApiGetGlobalAccountAssignmentsRequest {
+	r.serviceName = &serviceName
+	return r
+}
+
+// A specific service for which to return subaccount quota entitlements and assignments in the global account. this parameter comes with conjunction with serviceName. If not specified, then all services in the global account are returned.
+func (r ApiGetGlobalAccountAssignmentsRequest) PlanName(planName string) ApiGetGlobalAccountAssignmentsRequest {
+	r.planName = &planName
 	return r
 }
 
@@ -442,6 +477,7 @@ func (a *ManageAssignedEntitlementsAPIService) GetGlobalAccountAssignmentsExecut
 		parameterAddToHeaderOrQuery(localVarQueryParams, "includeAutoManagedPlans", r.includeAutoManagedPlans, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeAutoManagedPlans", defaultValue, "form", "")
 		r.includeAutoManagedPlans = &defaultValue
 	}
 	if r.entitledServicesOnly != nil {
@@ -449,6 +485,12 @@ func (a *ManageAssignedEntitlementsAPIService) GetGlobalAccountAssignmentsExecut
 	}
 	if r.assignedServiceName != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "assignedServiceName", r.assignedServiceName, "form", "")
+	}
+	if r.serviceName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "serviceName", r.serviceName, "form", "")
+	}
+	if r.planName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "planName", r.planName, "form", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -493,7 +535,7 @@ func (a *ManageAssignedEntitlementsAPIService) GetGlobalAccountAssignmentsExecut
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -504,7 +546,7 @@ func (a *ManageAssignedEntitlementsAPIService) GetGlobalAccountAssignmentsExecut
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -624,7 +666,7 @@ func (a *ManageAssignedEntitlementsAPIService) SetServicePlansExecute(r ApiSetSe
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -635,18 +677,7 @@ func (a *ManageAssignedEntitlementsAPIService) SetServicePlansExecute(r ApiSetSe
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -657,6 +688,17 @@ func (a *ManageAssignedEntitlementsAPIService) SetServicePlansExecute(r ApiSetSe
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
+			var v ErrorResponse
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v ApiExceptionResponseObject
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -781,7 +823,7 @@ func (a *ManageAssignedEntitlementsAPIService) UpdateEntitlementsExecute(r ApiUp
 			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 400 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -792,7 +834,7 @@ func (a *ManageAssignedEntitlementsAPIService) UpdateEntitlementsExecute(r ApiUp
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -803,7 +845,7 @@ func (a *ManageAssignedEntitlementsAPIService) UpdateEntitlementsExecute(r ApiUp
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
-			var v ApiExceptionResponseObject
+			var v ErrorResponse
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
