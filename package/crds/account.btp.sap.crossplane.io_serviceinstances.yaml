@@ -91,6 +91,15 @@ spec:
                       in the Service Manager API (e.g., "cf-eu10", "cf-us10").
                       Mutually exclusive with servicePlanID.
                     type: string
+                  labels:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: |-
+                      Arbitrary labels to attach to the service instance in BTP Service Manager.
+                      Each key maps to a list of string values. Labels are propagated to the SM API on create and update.
+                    type: object
                   name:
                     description: Name of the service instance in btp, required
                     type: string
