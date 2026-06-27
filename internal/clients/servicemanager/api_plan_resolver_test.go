@@ -3,7 +3,9 @@ package servicemanager
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -190,7 +192,7 @@ func TestPlanIDByName(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			smClient := &ServiceManagerClient{
-				OfferingServiceFake{tc.args.listOfferingsMockFn},
+				OfferingServiceFake{listOfferingsMockFn: tc.args.listOfferingsMockFn},
 				PlansServiceFake{listPlansMockFn: tc.args.listPlansMockFn},
 			}
 			planID, err := smClient.PlanIDByName(context.TODO(), "Not relevant, since mocked", "Not relevant, since mocked", tc.args.dataCenter)
@@ -202,6 +204,128 @@ func TestPlanIDByName(t *testing.T) {
 				t.Errorf("Unexpected returned PlanID; Expected: %s, Returned: %s", tc.wantID, planID)
 			}
 
+		})
+	}
+}
+
+func TestPlanIDByName_OfferingQuery(t *testing.T) {
+	// Regression test for #687: PlanIDByName used to always include
+	// `data_center eq ''` in the field query when dataCenter was empty,
+	// which made the SM API return no offerings and caused downstream
+	// ServiceInstance reconciles to fail.
+	tests := []struct {
+		name       string
+		dataCenter string
+		wantQuery  string
+	}{
+		{
+			name:       "without dataCenter omits data_center clause",
+			dataCenter: "",
+			wantQuery:  "catalog_name eq 'someOffering'",
+		},
+		{
+			name:       "with dataCenter appends data_center clause",
+			dataCenter: "cf-eu10",
+			wantQuery:  "catalog_name eq 'someOffering' and data_center eq 'cf-eu10'",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var captured string
+			smClient := &ServiceManagerClient{
+				OfferingServiceFake{
+					listOfferingsMockFn: func() (*servicemanager.ServiceOfferingResponseList, *http.Response, error) {
+						return &servicemanager.ServiceOfferingResponseList{
+							Items: []servicemanager.ServiceOfferingResponseObject{
+								{Name: internal.Ptr("someOffering"), Id: internal.Ptr("someID")},
+							},
+						}, nil, nil
+					},
+					capturedFieldQuery: &captured,
+				},
+				PlansServiceFake{
+					listPlansMockFn: func() (*servicemanager.ServicePlanResponseList, *http.Response, error) {
+						return &servicemanager.ServicePlanResponseList{
+							Items: []servicemanager.ServicePlanResponseObject{
+								{Name: internal.Ptr("somePlan"), Id: internal.Ptr("somePlanID")},
+							},
+						}, nil, nil
+					},
+				},
+			}
+			_, err := smClient.PlanIDByName(context.TODO(), "someOffering", "somePlan", tc.dataCenter)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantQuery, captured)
+		})
+	}
+}
+
+func TestPlanIDByName_MultipleOfferings(t *testing.T) {
+	// Regression test: when the same catalog_name exists in multiple
+	// data centers (e.g. cloud-logging, hana-cloud) and dataCenter is
+	// not provided, the offering query returns multiple items. The
+	// resolver must not pin the plan lookup to an arbitrary first
+	// offering — if the plan exists only under a later offering, it
+	// must still be found. Otherwise the resolver flakes with
+	// "no service plan found" depending on SM API ordering.
+	tests := []struct {
+		name      string
+		offerings []servicemanager.ServiceOfferingResponseObject
+		plansByID map[string][]servicemanager.ServicePlanResponseObject
+		wantErr   bool
+		wantID    string
+	}{
+		{
+			name: "plan only under second offering is still found",
+			offerings: []servicemanager.ServiceOfferingResponseObject{
+				{Name: internal.Ptr("cloud-logging"), Id: internal.Ptr("offering-eu10")},
+				{Name: internal.Ptr("cloud-logging"), Id: internal.Ptr("offering-us10")},
+			},
+			plansByID: map[string][]servicemanager.ServicePlanResponseObject{
+				"offering-eu10": {},
+				"offering-us10": {{Name: internal.Ptr("standard"), Id: internal.Ptr("plan-us10")}},
+			},
+			wantID: "plan-us10",
+		},
+		{
+			name: "plan exists in none of the offerings returns error mentioning data centers",
+			offerings: []servicemanager.ServiceOfferingResponseObject{
+				{Name: internal.Ptr("cloud-logging"), Id: internal.Ptr("offering-eu10")},
+				{Name: internal.Ptr("cloud-logging"), Id: internal.Ptr("offering-us10")},
+			},
+			plansByID: map[string][]servicemanager.ServicePlanResponseObject{
+				"offering-eu10": {},
+				"offering-us10": {},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			smClient := &ServiceManagerClient{
+				OfferingServiceFake{
+					listOfferingsMockFn: func() (*servicemanager.ServiceOfferingResponseList, *http.Response, error) {
+						return &servicemanager.ServiceOfferingResponseList{Items: tc.offerings}, nil, nil
+					},
+				},
+				PlansServiceFake{
+					listPlansByQueryMockFn: func(fieldQuery string) (*servicemanager.ServicePlanResponseList, *http.Response, error) {
+						for id, plans := range tc.plansByID {
+							if fieldQuery == "catalog_name eq 'standard' and service_offering_id eq '"+id+"'" {
+								return &servicemanager.ServicePlanResponseList{Items: plans}, nil, nil
+							}
+						}
+						return &servicemanager.ServicePlanResponseList{}, nil, nil
+					},
+				},
+			}
+			planID, err := smClient.PlanIDByName(context.TODO(), "cloud-logging", "standard", "")
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantID, planID)
 		})
 	}
 }
@@ -297,6 +421,7 @@ var _ servicemanager.ServiceOfferingsAPI = &OfferingServiceFake{}
 
 type OfferingServiceFake struct {
 	listOfferingsMockFn func() (*servicemanager.ServiceOfferingResponseList, *http.Response, error)
+	capturedFieldQuery  *string
 }
 
 func (f OfferingServiceFake) GetServiceOfferingById(ctx context.Context, serviceOfferingID string) servicemanager.ApiGetServiceOfferingByIdRequest {
@@ -312,13 +437,23 @@ func (f OfferingServiceFake) GetServiceOfferings(ctx context.Context) serviceman
 }
 
 func (f OfferingServiceFake) GetServiceOfferingsExecute(r servicemanager.ApiGetServiceOfferingsRequest) (*servicemanager.ServiceOfferingResponseList, *http.Response, error) {
+	if f.capturedFieldQuery != nil {
+		// fieldQuery is an unexported *string on the request struct; read it via reflect+unsafe
+		// so the test can assert on the exact query string generated by PlanIDByName.
+		rv := reflect.ValueOf(&r).Elem().FieldByName("fieldQuery")
+		rv = reflect.NewAt(rv.Type(), unsafe.Pointer(rv.UnsafeAddr())).Elem()
+		if p := rv.Interface().(*string); p != nil {
+			*f.capturedFieldQuery = *p
+		}
+	}
 	return f.listOfferingsMockFn()
 }
 
 var _ servicemanager.ServicePlansAPI = &PlansServiceFake{}
 
 type PlansServiceFake struct {
-	listPlansMockFn func() (*servicemanager.ServicePlanResponseList, *http.Response, error)
+	listPlansMockFn        func() (*servicemanager.ServicePlanResponseList, *http.Response, error)
+	listPlansByQueryMockFn func(fieldQuery string) (*servicemanager.ServicePlanResponseList, *http.Response, error)
 }
 
 func (p PlansServiceFake) GetServicePlansByServiceId(ctx context.Context, servicePlanID string) servicemanager.ApiGetServicePlansByServiceIdRequest {
@@ -334,5 +469,14 @@ func (p PlansServiceFake) GetAllServicePlans(ctx context.Context) servicemanager
 }
 
 func (p PlansServiceFake) GetAllServicePlansExecute(r servicemanager.ApiGetAllServicePlansRequest) (*servicemanager.ServicePlanResponseList, *http.Response, error) {
+	if p.listPlansByQueryMockFn != nil {
+		rv := reflect.ValueOf(&r).Elem().FieldByName("fieldQuery")
+		rv = reflect.NewAt(rv.Type(), unsafe.Pointer(rv.UnsafeAddr())).Elem()
+		var fq string
+		if ptr := rv.Interface().(*string); ptr != nil {
+			fq = *ptr
+		}
+		return p.listPlansByQueryMockFn(fq)
+	}
 	return p.listPlansMockFn()
 }
