@@ -7,6 +7,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/clients/security"
 	xsuaa "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-xsuaa-service-api-go/pkg"
 	"golang.org/x/oauth2/clientcredentials"
 )
@@ -44,7 +45,7 @@ func (x *XsuaaRoleCollectionMaintainer) GenerateObservation(ctx context.Context,
 		if h != nil && h.StatusCode == 404 {
 			return v1alpha1.RoleCollectionObservation{}, nil
 		}
-		return v1alpha1.RoleCollectionObservation{}, err
+		return v1alpha1.RoleCollectionObservation{}, security.SpecifyAPIError(err)
 	}
 
 	return mapObservation(roleCollection), nil
@@ -63,7 +64,7 @@ func (x *XsuaaRoleCollectionMaintainer) NeedsUpdate(params v1alpha1.RoleCollecti
 func (x *XsuaaRoleCollectionMaintainer) Create(ctx context.Context, params v1alpha1.RoleCollectionParameters) (string, error) {
 	execute, _, err := x.apiClient.CreateRoleCollection(ctx).RoleCollection(mapApiPayload(params)).Execute()
 	if err != nil {
-		return "", err
+		return "", security.SpecifyAPIError(err)
 	}
 	return execute.Name, nil
 }
@@ -97,7 +98,7 @@ func (x *XsuaaRoleCollectionMaintainer) Delete(ctx context.Context, roleCollecti
 	if h != nil && h.StatusCode == 404 {
 		return nil
 	}
-	return err
+	return security.SpecifyAPIError(err)
 }
 
 // UpdateDescription updates the description of a role collection using the xsuaa api
@@ -105,19 +106,19 @@ func (x *XsuaaRoleCollectionMaintainer) UpdateDescription(ctx context.Context, r
 	_, _, err := x.apiClient.ChangeRoleCollectionDescription(ctx, roleCollectionName).
 		RoleCollectionDescription(xsuaa.RoleCollectionDescription{Description: description}).
 		Execute()
-	return err
+	return security.SpecifyAPIError(err)
 }
 
 // AddRolesToRoleCollection adds roles to a role collection using the xsuaa api
 func (x *XsuaaRoleCollectionMaintainer) AddRolesToRoleCollection(ctx context.Context, roleCollectionName string, roles []xsuaa.RoleReference) error {
 	_, _, err := x.apiClient.AddRolesToRoleCollection(ctx, roleCollectionName).RoleReference(roles).Execute()
-	return err
+	return security.SpecifyAPIError(err)
 }
 
 // DeleteRolesFromRoleCollection deletes roles from a role collection using the xsuaa api
 func (x *XsuaaRoleCollectionMaintainer) DeleteRolesFromRoleCollection(ctx context.Context, roleCollectionName string, roles []xsuaa.RoleReference) error {
 	_, _, err := x.apiClient.DeleteRolesFromRoleCollection(ctx, roleCollectionName).RoleReference(roles).Execute()
-	return err
+	return security.SpecifyAPIError(err)
 }
 
 // roleDiff returns the list of roles to be added and removed from the existing role collection
