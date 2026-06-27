@@ -864,7 +864,7 @@ func TestObserve(t *testing.T) {
 						Subdomain:         "sub1",
 						Region:            "eu12",
 						DisplayName:       "unittest-sa",
-						Labels:            map[string][]string{"somekey": {"somevalue"}},
+						Labels:            map[string]v1alpha1.SubaccountLabelValueList{"somekey": {"somevalue"}},
 						UsedForProduction: "",
 						BetaEnabled:       false,
 					}), WithProviderConfig(xpv1.Reference{
@@ -1801,7 +1801,7 @@ func TestUpdate(t *testing.T) {
 					WithData(v1alpha1.SubaccountParameters{
 						DirectoryGuid: "234",
 						DirectoryRef:  &xpv1.Reference{Name: "dir-1"},
-						Labels:        map[string][]string{"somekey": {"somevalue"}},
+						Labels:        map[string]v1alpha1.SubaccountLabelValueList{"somekey": {"somevalue"}},
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
 						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
@@ -1816,7 +1816,7 @@ func TestUpdate(t *testing.T) {
 					WithData(v1alpha1.SubaccountParameters{
 						DirectoryGuid: "234",
 						DirectoryRef:  &xpv1.Reference{Name: "dir-1"},
-						Labels:        map[string][]string{"somekey": {"somevalue"}},
+						Labels:        map[string]v1alpha1.SubaccountLabelValueList{"somekey": {"somevalue"}},
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
 						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
