@@ -192,6 +192,8 @@ func TestPlanIDByName(t *testing.T) {
 			smClient := &ServiceManagerClient{
 				OfferingServiceFake{tc.args.listOfferingsMockFn},
 				PlansServiceFake{listPlansMockFn: tc.args.listPlansMockFn},
+				nil, // ServiceInstancesAPI -- not used by these tests
+				nil, // ServiceBindingsAPI   -- not used by these tests
 			}
 			planID, err := smClient.PlanIDByName(context.TODO(), "Not relevant, since mocked", "Not relevant, since mocked", tc.args.dataCenter)
 

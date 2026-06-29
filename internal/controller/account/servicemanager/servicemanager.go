@@ -36,6 +36,14 @@ type ServiceManagerPlanIdInitializer interface {
 	ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string) (string, error)
 }
 
+// smResourceLookup looks up the BTP-side IDs of the managed-service-manager
+// service instance + its binding in a given subaccount, by name, via direct
+// SAP Service Manager API calls. Used by Observe() to recover from upjet
+// workspace state loss without re-issuing a Create.
+type smResourceLookup interface {
+	FindManagedSMResources(ctx context.Context, subaccountID, instanceName, bindingName string) (siID, sbID string, err error)
+}
+
 // A connector is expected to produce an ExternalClient when its Connect method
 // is called.
 type connector struct {
@@ -45,6 +53,7 @@ type connector struct {
 
 	newPlanIdInitializerFn func(ctx context.Context, cr *apisv1beta1.ServiceManager) (ServiceManagerPlanIdInitializer, error)
 	newClientInitalizerFn  func() sm.ITfClientInitializer
+	newLookupFn            func(ctx context.Context, cr *apisv1beta1.ServiceManager) (smResourceLookup, error)
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -68,10 +77,20 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errConnect)
 	}
 
+	var lookup smResourceLookup
+	if c.newLookupFn != nil {
+		if l, lookupErr := c.newLookupFn(ctx, cr); lookupErr == nil {
+			lookup = l
+		}
+		// Lookup is best-effort; if we can't build it (auth error, etc.),
+		// fall back to upjet's view.
+	}
+
 	return &external{
 		tracker:  c.resourcetracker,
 		tfClient: tfClient,
 		kube:     c.kube,
+		lookup:   lookup,
 	}, nil
 }
 
@@ -119,6 +138,7 @@ type external struct {
 	tracker tracking.ReferenceResolverTracker
 
 	tfClient sm.ITfClient
+	lookup   smResourceLookup
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -134,6 +154,19 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
+
+	// When upjet's workspace-state-based view says the underlying SI/binding
+	// pair doesn't exist, the workspace might just be empty (per-pod ephemeral
+	// state, wiped on restart). Recover by asking the SAP Service Manager API
+	// directly for the managed-service-manager pair in this subaccount before
+	// trusting NotExists -- otherwise Crossplane would either drop the
+	// finalizer (deletion path, leaking the BTP resources) or re-Create and
+	// hit 409 Conflict (creation path, wedging the CR).
+	if err == nil && !resStatus.ExternalObservation.ResourceExists {
+		if adopted := c.tryRecoverByBTPName(ctx, cr, &resStatus); adopted {
+			// resStatus has been updated with the recovered IDs and ResourceExists=true
+		}
+	}
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
 	if statusErr != nil {
@@ -214,4 +247,48 @@ func formExternalName(serviceInstanceID, serviceBindingID string) string {
 		return serviceInstanceID
 	}
 	return serviceInstanceID + "/" + serviceBindingID
+}
+
+// tryRecoverByBTPName asks the SAP Service Manager API directly for the
+// managed-service-manager service-instance + binding pair under this CR's
+// subaccount. When found, it updates `status` with the discovered IDs and
+// flips ResourceExists=true so the caller can stamp the right external-name
+// instead of dropping the finalizer or re-issuing Create.
+//
+// Returns true when recovery happened. Any error or "not found" returns
+// false; the caller falls through to the existing NotExists semantics.
+func (c *external) tryRecoverByBTPName(ctx context.Context, cr *apisv1beta1.ServiceManager, status *sm.ResourcesStatus) bool {
+	if c.lookup == nil {
+		return false
+	}
+	subaccount := cr.Spec.ForProvider.SubaccountGuid
+	if subaccount == "" {
+		return false
+	}
+	instanceName := cr.Spec.ForProvider.ServiceInstanceName
+	if instanceName == "" {
+		instanceName = apisv1beta1.DefaultServiceInstanceName
+	}
+	bindingName := cr.Spec.ForProvider.ServiceBindingName
+	if bindingName == "" {
+		bindingName = apisv1beta1.DefaultServiceBindingName
+	}
+
+	siID, sbID, err := c.lookup.FindManagedSMResources(ctx, subaccount, instanceName, bindingName)
+	if err != nil || siID == "" {
+		return false
+	}
+
+	// Stamp the recovered external-name onto the public CR so subsequent
+	// reconciles' upjet refresh can import-by-UUID and converge normally.
+	meta.SetExternalName(cr, formExternalName(siID, sbID))
+	if err := c.kube.Update(ctx, cr); err != nil {
+		return false
+	}
+
+	status.ExternalObservation.ResourceExists = true
+	status.ExternalObservation.ResourceUpToDate = true
+	status.InstanceID = siID
+	status.BindingID = sbID
+	return true
 }

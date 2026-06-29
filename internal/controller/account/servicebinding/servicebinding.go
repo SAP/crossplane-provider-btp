@@ -16,6 +16,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
+	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/reconcilerutil"
@@ -145,6 +146,15 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Extract and update data from TF resource if available and up-to-date
 	if !observation.ResourceExists {
+		// Upjet's workspace-state-based view says the binding doesn't exist, but
+		// the workspace is per-pod ephemeral state (emptyDir). After a pod
+		// restart this can mis-report a still-existing BTP binding as gone --
+		// during a deletion that causes the finalizer to be dropped and the BTP
+		// binding to be permanently leaked. Consult the durable source (the SAP
+		// Service Manager API) before trusting NotExists.
+		if adopted, recErr := e.recoverByBTPName(ctx, cr); recErr == nil && adopted {
+			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
+		}
 		return observation, nil
 	}
 
@@ -332,6 +342,70 @@ func (e *external) generateName(cr *v1alpha1.ServiceBinding) string {
 		return servicebindingclient.GenerateRandomName(cr.Spec.ForProvider.Name)
 	}
 	return cr.Spec.ForProvider.Name
+}
+
+// recoverByBTPName tries to recover a missing-from-upjet ServiceBinding by
+// looking it up directly on the SAP Service Manager API by name + parent
+// service instance ID. On success it writes the discovered BTP UUID into the
+// public CR's external-name annotation and returns (true, nil).
+//
+// All error and "not found" cases return (false, nil) so the caller can fall
+// through to reporting NotExists -- the goal is to be additive (recover when
+// possible) without regressing the failure semantics of the existing path.
+func (e *external) recoverByBTPName(ctx context.Context, cr *v1alpha1.ServiceBinding) (bool, error) {
+	// We need both the parent SI's UUID and the binding's BTP-side name.
+	siID := internal.Val(cr.Spec.ForProvider.ServiceInstanceID)
+	if siID == "" {
+		return false, nil
+	}
+	name := cr.Status.AtProvider.Name
+	if name == "" {
+		// Status hasn't been populated yet (rotation case, never observed UpToDate).
+		// For non-rotation bindings the spec name matches the BTP-side name and is
+		// safe to use; for rotation bindings without status we can't reconstruct
+		// the random suffix and must give up.
+		if e.isRotationEnabled(cr) {
+			return false, nil
+		}
+		name = cr.Spec.ForProvider.Name
+		if name == "" {
+			return false, nil
+		}
+	}
+
+	// The SB CR doesn't carry the ServiceManager secret reference directly --
+	// it's only on the parent ServiceInstance CR. Resolve it via the binding's
+	// ServiceInstanceRef.
+	siRef := cr.Spec.ForProvider.ServiceInstanceRef
+	if siRef == nil || siRef.Name == "" {
+		return false, nil
+	}
+	si := &v1alpha1.ServiceInstance{}
+	if err := e.kube.Get(ctx, kubeclient.ObjectKey{Name: siRef.Name}, si); err != nil {
+		return false, nil
+	}
+
+	creds, err := servicemanager.LoadCredsFromSecret(ctx, e.kube,
+		si.Spec.ForProvider.ServiceManagerSecretNamespace,
+		si.Spec.ForProvider.ServiceManagerSecret)
+	if err != nil {
+		return false, nil
+	}
+	smClient, err := servicemanager.NewServiceManagerClient(ctx, creds)
+	if err != nil {
+		return false, nil
+	}
+
+	id, err := smClient.FindServiceBindingIDByName(ctx, siID, name)
+	if err != nil || id == "" {
+		return false, nil
+	}
+
+	meta.SetExternalName(cr, id)
+	if err := e.kube.Update(ctx, cr); err != nil {
+		return false, errors.Wrap(err, "cannot persist recovered external-name")
+	}
+	return true, nil
 }
 
 // updateServiceBindingFromTfResource extracts data from SubaccountServiceBinding and updates the public ServiceBinding CR

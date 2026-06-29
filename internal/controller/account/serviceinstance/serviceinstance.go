@@ -24,6 +24,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
+	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/di"
@@ -173,6 +174,16 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	switch status {
 	case tfClient.NotExisting:
+		// Upjet's workspace-state-based view says the instance doesn't exist, but
+		// the workspace is per-pod ephemeral state. After a pod restart this can
+		// mis-report a still-existing BTP service instance as gone -- during a
+		// deletion that drops the finalizer and leaks the BTP resource; during a
+		// fresh create it triggers a duplicate POST that BTP rejects with 409
+		// Conflict. Consult the durable source (the SAP Service Manager API)
+		// before trusting NotExists.
+		if adopted, recErr := e.recoverByBTPName(ctx, cr); recErr == nil && adopted {
+			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
+		}
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	case tfClient.Drift:
 		// ADR(external-name): Calculate and report diff between desired state and what was observed from the API
@@ -296,6 +307,44 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 	cr.Status.AtProvider.Usable = sid.Usable
 	cr.Status.AtProvider.PlatformID = sid.PlatformID
 	return nil
+}
+
+// recoverByBTPName tries to recover a missing-from-upjet ServiceInstance by
+// looking it up directly on the SAP Service Manager API by name +
+// subaccount_id. On success it writes the discovered BTP UUID into the public
+// CR's external-name annotation and returns (true, nil).
+//
+// All error and "not found" cases return (false, nil) so the caller can fall
+// through to reporting NotExists -- the goal is to be additive (recover when
+// possible) without regressing the failure semantics of the existing path.
+func (e *external) recoverByBTPName(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error) {
+	subID := internal.Val(cr.Spec.ForProvider.SubaccountID)
+	name := cr.Spec.ForProvider.Name
+	if subID == "" || name == "" {
+		return false, nil
+	}
+
+	creds, err := servicemanager.LoadCredsFromSecret(ctx, e.kube,
+		cr.Spec.ForProvider.ServiceManagerSecretNamespace,
+		cr.Spec.ForProvider.ServiceManagerSecret)
+	if err != nil {
+		return false, nil
+	}
+	smClient, err := servicemanager.NewServiceManagerClient(ctx, creds)
+	if err != nil {
+		return false, nil
+	}
+
+	id, err := smClient.FindServiceInstanceIDByName(ctx, subID, name)
+	if err != nil || id == "" {
+		return false, nil
+	}
+
+	meta.SetExternalName(cr, id)
+	if err := e.kube.Update(ctx, cr); err != nil {
+		return false, errors.Wrap(err, "cannot persist recovered external-name")
+	}
+	return true, nil
 }
 
 // checkAsyncOperationFailure checks if there's a failed async operation and sets appropriate conditions

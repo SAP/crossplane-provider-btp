@@ -83,6 +83,8 @@ type BindingCredentials struct {
 type ServiceManagerClient struct {
 	servicemanager.ServiceOfferingsAPI
 	servicemanager.ServicePlansAPI
+	servicemanager.ServiceInstancesAPI
+	servicemanager.ServiceBindingsAPI
 }
 
 func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*ServiceManagerClient, error) {
@@ -116,6 +118,8 @@ func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*S
 	return &ServiceManagerClient{
 		apiClient.ServiceOfferingsAPI,
 		apiClient.ServicePlansAPI,
+		apiClient.ServiceInstancesAPI,
+		apiClient.ServiceBindingsAPI,
 	}, nil
 }
 

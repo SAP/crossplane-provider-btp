@@ -113,3 +113,44 @@ func mapBindingCredentialTypes(in *accountsserviceclient.ServiceManagerBindingRe
 	out.Xsappname = in.Xsappname
 	return out
 }
+
+// FindManagedSMResources looks up the IDs of the managed-service-manager
+// service instance and (optionally) its binding pair under the given
+// subaccount by name, via the SAP Service Manager API. It uses the existing
+// admin binding for that subaccount (without creating a new one) -- if no
+// admin binding exists yet, returns ("", "", nil) so the caller can fall back
+// to the normal Create path.
+//
+// Used by the ServiceManager / CloudManagement controllers to recover from
+// upjet workspace state loss: when upjet reports the underlying SI/binding
+// as not existing despite a prior Create having succeeded on BTP, this
+// returns the real IDs so the controller can adopt them into the public CR's
+// external-name instead of dropping the finalizer (deletion path) or
+// re-creating and hitting 409 Conflict (creation path).
+func (t ServiceManagerInstanceProxyClient) FindManagedSMResources(
+	ctx context.Context, subaccountID, instanceName, bindingName string,
+) (siID string, sbID string, err error) {
+	if subaccountID == "" || instanceName == "" {
+		return "", "", nil
+	}
+	binding, err := t.describeAdminBinding(ctx, subaccountID)
+	if err != nil || binding == nil {
+		return "", "", err
+	}
+	smClient, err := NewServiceManagerClient(ctx, binding)
+	if err != nil {
+		return "", "", err
+	}
+	siID, err = smClient.FindServiceInstanceIDByName(ctx, subaccountID, instanceName)
+	if err != nil || siID == "" {
+		return "", "", err
+	}
+	if bindingName == "" {
+		return siID, "", nil
+	}
+	sbID, err = smClient.FindServiceBindingIDByName(ctx, siID, bindingName)
+	if err != nil {
+		return siID, "", err
+	}
+	return siID, sbID, nil
+}

@@ -182,6 +182,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
 
+	// When upjet's workspace-state-based view says the underlying SI/binding
+	// pair doesn't exist, the workspace might just be empty (per-pod ephemeral
+	// state, wiped on restart). Recover by asking the SAP Service Manager API
+	// directly for the cis-local pair in this subaccount before trusting
+	// NotExists -- otherwise Crossplane would either drop the finalizer
+	// (deletion path, leaking the BTP resources) or re-Create and hit 409
+	// Conflict (creation path, wedging the CR).
+	if err == nil && !resStatus.ExternalObservation.ResourceExists {
+		c.tryRecoverByBTPName(ctx, cr, &resStatus)
+	}
+
 	statusErr := c.setStatus(ctx, resStatus, cr)
 	if statusErr != nil {
 		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
@@ -267,6 +278,62 @@ func formExternalName(serviceInstanceID, serviceBindingID string) string {
 		return serviceInstanceID
 	}
 	return serviceInstanceID + "/" + serviceBindingID
+}
+
+// tryRecoverByBTPName asks the SAP Service Manager API directly for the
+// cis-local service-instance + binding pair under this CR's subaccount.
+// When found, it updates `status` with the discovered IDs and flips
+// ResourceExists=true so the caller can stamp the right external-name
+// instead of dropping the finalizer or re-issuing Create.
+//
+// Returns true when recovery happened. Any error or "not found" returns
+// false; the caller falls through to the existing NotExists semantics.
+func (c *external) tryRecoverByBTPName(ctx context.Context, cr *apisv1beta1.CloudManagement, status *cmclient.ResourcesStatus) bool {
+	subaccount := cr.Spec.ForProvider.SubaccountGuid
+	if subaccount == "" {
+		return false
+	}
+	instanceName := cr.Spec.ForProvider.ServiceInstanceName
+	if instanceName == "" {
+		instanceName = apisv1beta1.DefaultCloudManagementInstanceName
+	}
+	bindingName := cr.Spec.ForProvider.ServiceBindingName
+	if bindingName == "" {
+		bindingName = apisv1beta1.DefaultCloudManagementBindingName
+	}
+
+	creds, err := servicemanager.LoadCredsFromSecret(ctx, c.kube,
+		cr.Spec.ForProvider.ServiceManagerSecretNamespace,
+		cr.Spec.ForProvider.ServiceManagerSecret)
+	if err != nil {
+		return false
+	}
+	smClient, err := servicemanager.NewServiceManagerClient(ctx, creds)
+	if err != nil {
+		return false
+	}
+
+	siID, err := smClient.FindServiceInstanceIDByName(ctx, subaccount, instanceName)
+	if err != nil || siID == "" {
+		return false
+	}
+	sbID, err := smClient.FindServiceBindingIDByName(ctx, siID, bindingName)
+	if err != nil {
+		sbID = ""
+	}
+
+	meta.SetExternalName(cr, formExternalName(siID, sbID))
+	if err := c.kube.Update(ctx, cr); err != nil {
+		return false
+	}
+
+	status.ExternalObservation.ResourceExists = true
+	status.ExternalObservation.ResourceUpToDate = true
+	status.Instance.ID = internal.Ptr(siID)
+	if sbID != "" {
+		status.Binding.ID = internal.Ptr(sbID)
+	}
+	return true
 }
 
 func mapToInstance(src *apisv1alpha1.SubaccountServiceInstanceObservation) *apisv1beta1.Instance {
