@@ -153,7 +153,13 @@ clean-work:
 	@$(INFO) cleaning work directory
 	@rm -rf .work
 
-generate.init: clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
+.PHONY: install-tools
+install-tools:
+	@$(INFO) installing Go tools from go.mod
+	@$(GO) install tool
+	@$(OK) installing Go tools from go.mod
+
+generate.init: install-tools clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
 
 .PHONY: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs terraform.buildvars
 
