@@ -22,6 +22,7 @@ import (
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	kyma "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/kyma/fake"
@@ -566,7 +567,7 @@ func TestObserve(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient(), record: event.NewNopRecorder()}
+			e := external{client: tc.args.client, httpClient: http.DefaultClient, kube: test.NewMockClient(), record: event.NewNopRecorder(), tracker: testutils.NewResourceTrackerMock()}
 			if tc.args.httpClient != nil {
 				e.httpClient = tc.args.httpClient
 			}
@@ -969,3 +970,23 @@ func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 type RoundTripFunc func(req *http.Request) *http.Response
+
+func TestObserveSetsResourceUsageCondition(t *testing.T) {
+	cases := map[string]struct {
+		inUse      bool
+		wantReason xpv1.ConditionReason
+	}{
+		"InUse":    {inUse: true, wantReason: providerv1alpha1.InUseReason},
+		"NotInUse": {inUse: false, wantReason: providerv1alpha1.NotInUseReason},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := environment(withUID("ke-uid")) // no external-name -> Observe returns right after SetConditions
+			e := external{tracker: testutils.NewRealResourceTracker(t, cr, tc.inUse)}
+			_, _ = e.Observe(context.Background(), cr)
+			if got := cr.GetCondition(providerv1alpha1.UseCondition).Reason; got != tc.wantReason {
+				t.Errorf("UseCondition.Reason = %q, want %q", got, tc.wantReason)
+			}
+		})
+	}
+}

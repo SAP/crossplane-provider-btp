@@ -108,6 +108,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotKymaEnvironment)
 	}
+	c.tracker.SetConditions(ctx, cr)
 
 	// Check if external-name is empty first - resource needs creation
 	externalName := meta.GetExternalName(cr)

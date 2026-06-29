@@ -633,6 +633,7 @@ func TestObserve(t *testing.T) {
 				kube: &test.MockClient{
 					MockUpdate: test.NewMockUpdateFn(nil),
 				},
+				tracker: testutils.NewResourceTrackerMock(),
 			}
 
 			got, err := e.Observe(context.Background(), tc.args.mg)
@@ -1296,6 +1297,30 @@ func TestSaveInstanceData(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want, tc.cr); diff != "" {
 				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestObserveSetsResourceUsageCondition(t *testing.T) {
+	cases := map[string]struct {
+		inUse      bool
+		wantReason xpv1.ConditionReason
+	}{
+		"InUse":    {inUse: true, wantReason: providerv1alpha1.InUseReason},
+		"NotInUse": {inUse: false, wantReason: providerv1alpha1.NotInUseReason},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := &v1alpha1.ServiceInstance{ObjectMeta: metav1.ObjectMeta{UID: "si-uid"}}
+			e := external{
+				tfClient: &TfProxyMock{status: tfclient.NotExisting},
+				tracker:  testutils.NewRealResourceTracker(t, cr, tc.inUse),
+			}
+			// SetConditions runs at the top of Observe; the later return value is irrelevant here.
+			_, _ = e.Observe(context.Background(), cr)
+			if got := cr.GetCondition(providerv1alpha1.UseCondition).Reason; got != tc.wantReason {
+				t.Errorf("UseCondition.Reason = %q, want %q", got, tc.wantReason)
 			}
 		})
 	}

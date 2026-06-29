@@ -139,6 +139,8 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
 
+	e.tracker.SetConditions(ctx, cr)
+
 	// ADR(external-name): check for conflict condition from a previous failed Create()
 	// Only block if the spec hasn't changed since the conflict (same Generation)
 	lastAsyncOp := cr.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation))
