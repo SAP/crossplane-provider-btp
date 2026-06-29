@@ -24,6 +24,10 @@ PLATFORMS ?= linux_amd64
 VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || echo "v0.0.0-$$(git rev-parse HEAD)")
 $(info VERSION is $(VERSION))
 
+# Override to be Crossplane v2 compatible
+ROOT_DIR := $(shell pwd)
+export BUILD_REGISTRY := index.docker.io/build-$(shell echo $(HOSTNAME)-$(ROOT_DIR) | sha256sum | cut -c1-8)
+
 -include build/makelib/common.mk
 
 # Setup Output
@@ -67,11 +71,19 @@ testFilter ?= .*
 
 .PHONY: local-build
 local-build: build xpkg.build.provider-btp
-	$(INFO) "Loading xpkg into docker as $(UUT_XPKG)"; \
-	XPKG_FILE=$(XPKG_OUTPUT_DIR)/$(PLATFORM)/provider-btp-$(VERSION).xpkg && \
+	$(INFO) "Loading xpkg into docker as $(UUT_XPKG)"
+	@XPKG_FILE=$(XPKG_OUTPUT_DIR)/$(PLATFORM)/provider-btp-$(VERSION).xpkg && \
 	XPKG_SHA=$$(docker load -i $$XPKG_FILE | sed -n 's/.*ID: //p') && \
-	docker tag $$XPKG_SHA $(UUT_XPKG); \
-	$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"; \
+	docker tag $$XPKG_SHA $(UUT_XPKG);
+	$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"
+
+.PHONY: local-deploy-prebuilt
+local-deploy-prebuilt:
+	$(INFO) "Loading prebuilt xpkg into docker as $(UUT_XPKG)"
+	@XPKG_FILE=$$(find $(XPKG_OUTPUT_DIR)/$(PLATFORM) -name "*.xpkg" | head -1) && \
+	XPKG_SHA=$$(docker load -i $$XPKG_FILE | sed -n 's/.*ID: //p') && \
+	docker tag $$XPKG_SHA $(UUT_XPKG)
+	$(OK) "Prebuilt xpkg loaded as $(UUT_XPKG)"
 
 # ====================================================================================
 # Setup XPKG
@@ -153,7 +165,13 @@ clean-work:
 	@$(INFO) cleaning work directory
 	@rm -rf .work
 
-generate.init: clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
+.PHONY: install-tools
+install-tools:
+	@$(INFO) installing Go tools from go.mod
+	@$(GO) install tool
+	@$(OK) installing Go tools from go.mod
+
+generate.init: install-tools clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
 
 .PHONY: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs terraform.buildvars
 
@@ -277,8 +295,12 @@ test-e2e-long: local-build $(KIND) $(HELM3) generate-test-crs
      esac
 
 #run single e2e test with <make e2e testFilter=functionNameOfTest>
+# Deploy mechanism for test-acceptance. Default rebuilds locally (local dev);
+# CI overrides to local-deploy-prebuilt to consume artifacts from the build job.
+ACCEPTANCE_DEPLOY ?= local-build
+
 .PHONY: test-acceptance
-test-acceptance: local-build $(KIND) $(HELM3) generate-test-crs
+test-acceptance: $(ACCEPTANCE_DEPLOY) $(KIND) generate-test-crs
 	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
 	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
