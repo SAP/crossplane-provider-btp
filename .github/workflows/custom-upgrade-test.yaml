@@ -54,7 +54,7 @@ jobs:
   custom-upgrade-test:
     runs-on: ubuntu-latest
     needs: prepare-matrix
-    environment: pr-e2e-no-approval
+    environment: pr-e2e-approval
     strategy:
       fail-fast: false
       matrix:
@@ -93,9 +93,6 @@ jobs:
         run: |
           echo "BUILD_ID=${{github.run_number}}-${{github.run_attempt}}" >> $GITHUB_ENV
 
-      - name: Install gettext for envsubst
-        run: sudo apt-get update && sudo apt-get install -y gettext
-
       - name: Run custom upgrade test
         timeout-minutes: 120
         run: |
@@ -114,8 +111,8 @@ jobs:
 
   cleanup-custom-upgrade-test:
     runs-on: ubuntu-latest
-    environment: pr-e2e-no-approval
     needs: [prepare-matrix, custom-upgrade-test]
+    environment: pr-e2e-no-approval
     if: always() && needs.prepare-matrix.result == 'success'
     steps:
       - name: checkout repo
