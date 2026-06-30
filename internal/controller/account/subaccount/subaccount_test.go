@@ -4,10 +4,8 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"reflect"
 	"strings"
 	"testing"
-	"unsafe"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
@@ -1297,7 +1295,7 @@ func TestCreate(t *testing.T) {
 				cr: NewSubaccount("unittest-sa"),
 				mockClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{},
-					returnErr:        create409Error(),
+					returnErr:        testutils.NewAccountAPIError(409, "", "409 Conflict"),
 					httpStatusCode:   http.StatusConflict,
 				},
 			},
@@ -1647,7 +1645,7 @@ func TestDelete(t *testing.T) {
 						return &accountclient.SubaccountResponseObject{}, &http.Response{
 							StatusCode: 409,
 							Body:       io.NopCloser(strings.NewReader(`{"error":{"code":409,"message":"subaccount has child resources"}}`)),
-						}, create409Error()
+						}, testutils.NewAccountAPIError(409, "", "409 Conflict")
 					},
 				},
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
@@ -1668,7 +1666,7 @@ func TestDelete(t *testing.T) {
 				mockClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
 					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
-						return &accountclient.SubaccountResponseObject{}, &http.Response{StatusCode: 500}, create500Error()
+						return &accountclient.SubaccountResponseObject{}, &http.Response{StatusCode: 500}, testutils.NewAccountAPIError(500, "internal server error", "500 Internal Server Error")
 					},
 				},
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
@@ -2000,66 +1998,4 @@ func WithExternalName(externalName string) SubaccountModifier {
 	return func(r *v1alpha1.Subaccount) {
 		meta.SetExternalName(r, externalName)
 	}
-}
-
-// create409Error creates a GenericOpenAPIError with a 409 status code
-// that wraps an ApiExceptionResponseObject with code 409.
-// This mimics the actual API behavior for "resource already exists" errors.
-func create409Error() error {
-	// Create the inner error object with code 409
-	apiExceptionError := accountclient.NewApiExceptionResponseObjectError()
-	apiExceptionError.SetCode(409)
-
-	// Create the API exception response that wraps the error
-	apiException := accountclient.NewApiExceptionResponseObject(*apiExceptionError)
-
-	// Create GenericOpenAPIError
-	err := &accountclient.GenericOpenAPIError{}
-	errValue := reflect.ValueOf(err).Elem()
-
-	// Use unsafe to set unexported 'model' field
-	modelField := errValue.FieldByName("model")
-	if modelField.IsValid() {
-		reflect.NewAt(modelField.Type(), unsafe.Pointer(modelField.UnsafeAddr())).
-			Elem().Set(reflect.ValueOf(*apiException))
-	}
-
-	// Use unsafe to set unexported 'error' field
-	errorField := errValue.FieldByName("error")
-	if errorField.IsValid() {
-		reflect.NewAt(errorField.Type(), unsafe.Pointer(errorField.UnsafeAddr())).
-			Elem().SetString("409 Conflict")
-	}
-
-	return err
-}
-
-// create500Error creates a GenericOpenAPIError with a 500 status code
-// that wraps an ApiExceptionResponseObject with code 500. This mimics
-// the actual API behavior for "internal server error" responses, used
-// to assert that specifyAPIError surfaces the API body in the wrapped
-// error message.
-func create500Error() error {
-	apiExceptionError := accountclient.NewApiExceptionResponseObjectError()
-	apiExceptionError.SetCode(500)
-	apiExceptionError.SetMessage("internal server error")
-
-	apiException := accountclient.NewApiExceptionResponseObject(*apiExceptionError)
-
-	err := &accountclient.GenericOpenAPIError{}
-	errValue := reflect.ValueOf(err).Elem()
-
-	modelField := errValue.FieldByName("model")
-	if modelField.IsValid() {
-		reflect.NewAt(modelField.Type(), unsafe.Pointer(modelField.UnsafeAddr())).
-			Elem().Set(reflect.ValueOf(*apiException))
-	}
-
-	errorField := errValue.FieldByName("error")
-	if errorField.IsValid() {
-		reflect.NewAt(errorField.Type(), unsafe.Pointer(errorField.UnsafeAddr())).
-			Elem().SetString("500 Internal Server Error")
-	}
-
-	return err
 }

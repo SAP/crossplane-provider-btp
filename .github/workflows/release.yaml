@@ -44,7 +44,14 @@ jobs:
       - run-make-reviewable-and-check-diff
       with:
         environment: pr-e2e-no-approval
-      secrets: inherit
+      secrets:
+        CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
+        GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
+        IDP_URL: ${{ secrets.IDP_URL }}
+        SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
+        CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
+        BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
+        TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
       permissions:
         contents: read
 
@@ -105,7 +112,7 @@ jobs:
           make build PLATFORM=linux_arm64 VERSION=${{ github.event.inputs.nextVersion }}
 
       - name: Login to Container Registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ vars.REGISTRY_URL }}
           username: ${{ github.actor }}
