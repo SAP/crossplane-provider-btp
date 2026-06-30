@@ -384,7 +384,6 @@ func TestObserve(t *testing.T) {
 						return nil
 					},
 				},
-				tracker: testutils.NewResourceTrackerMock(),
 			}
 			obs, err := uua.Observe(context.TODO(), tc.args.cr)
 			if diff := cmp.Diff(obs, tc.want.obs); diff != "" {
@@ -694,35 +693,4 @@ func (t *TfClientFake) UpdateResources(ctx context.Context, cr *apisv1beta1.Serv
 func (t *TfClientFake) DeleteResources(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
 	t.DeleteCalled = true
 	return t.deleteFn()
-}
-
-func TestObserveSetsResourceUsageCondition(t *testing.T) {
-	cases := map[string]struct {
-		inUse      bool
-		wantReason xpv1.ConditionReason
-	}{
-		"InUse":    {inUse: true, wantReason: providerv1alpha1.InUseReason},
-		"NotInUse": {inUse: false, wantReason: providerv1alpha1.NotInUseReason},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			cr := NewServiceManager("test")
-			cr.SetUID("sm-uid")
-			e := &external{
-				tfClient: &TfClientFake{
-					observeFn: func() (sm.ResourcesStatus, error) {
-						return sm.ResourcesStatus{ExternalObservation: managed.ExternalObservation{ResourceExists: false}}, nil
-					},
-				},
-				kube:    &test.MockClient{MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
-				tracker: testutils.NewRealResourceTracker(t, cr, tc.inUse),
-			}
-			if _, err := e.Observe(context.TODO(), cr); err != nil {
-				t.Fatalf("Observe() error: %v", err)
-			}
-			if got := cr.GetCondition(providerv1alpha1.UseCondition).Reason; got != tc.wantReason {
-				t.Errorf("UseCondition.Reason = %q, want %q", got, tc.wantReason)
-			}
-		})
-	}
 }

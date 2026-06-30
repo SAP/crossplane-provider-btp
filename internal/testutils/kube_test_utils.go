@@ -90,6 +90,7 @@ func (b FakeKubeClientBuilder) Build() test.MockClient {
 		return errors.Errorf("No resource with name %v available", key.Name)
 	}
 	return test.MockClient{
-		MockGet: b.getFn,
+		MockGet:  b.getFn,
+		MockList: test.NewMockListFn(nil),
 	}
 }

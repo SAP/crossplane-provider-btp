@@ -80,8 +80,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaEnvironmentBinding)
 	}
 
-	c.tracker.SetConditions(ctx, cr)
-
 	if cr.GetWriteConnectionSecretToReference() == nil {
 		return managed.ExternalObservation{}, errors.New(errNoSecretsToPublish)
 	}

@@ -10,11 +10,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
-	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	cmclient "github.com/sap/crossplane-provider-btp/internal/clients/cis"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
-	testutils "github.com/sap/crossplane-provider-btp/internal/testutils"
 	test2 "github.com/sap/crossplane-provider-btp/internal/tracking/test"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -409,7 +407,6 @@ func TestObserve(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			uua := &external{
 				tfClient: tc.args.tfClient,
-				tracker:  testutils.NewResourceTrackerMock(),
 				kube: &test.MockClient{
 					MockStatusUpdate: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 						return nil
@@ -694,35 +691,4 @@ type ClientInitializerFake struct {
 
 func (c ClientInitializerFake) ConnectResources(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ITfClient, error) {
 	return c.ConnectResourcesFn(ctx, cr)
-}
-
-func TestObserveSetsResourceUsageCondition(t *testing.T) {
-	cases := map[string]struct {
-		inUse      bool
-		wantReason xpv1.ConditionReason
-	}{
-		"InUse":    {inUse: true, wantReason: providerv1alpha1.InUseReason},
-		"NotInUse": {inUse: false, wantReason: providerv1alpha1.NotInUseReason},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			cr := NewCloudManagement("test")
-			cr.SetUID("cm-uid")
-			uua := &external{
-				tfClient: &TfClientFake{
-					observeFn: func() (cmclient.ResourcesStatus, error) {
-						return cmclient.ResourcesStatus{ExternalObservation: managed.ExternalObservation{ResourceExists: false}}, nil
-					},
-				},
-				kube:    &test.MockClient{MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
-				tracker: testutils.NewRealResourceTracker(t, cr, tc.inUse),
-			}
-			if _, err := uua.Observe(context.TODO(), cr); err != nil {
-				t.Fatalf("Observe() error: %v", err)
-			}
-			if got := cr.GetCondition(providerv1alpha1.UseCondition).Reason; got != tc.wantReason {
-				t.Errorf("UseCondition.Reason = %q, want %q", got, tc.wantReason)
-			}
-		})
-	}
 }

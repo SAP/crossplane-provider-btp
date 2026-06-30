@@ -179,7 +179,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotCloudManagement)
 	}
-	c.tracker.SetConditions(ctx, cr)
 
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
 

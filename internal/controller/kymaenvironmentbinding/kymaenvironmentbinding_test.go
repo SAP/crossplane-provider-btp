@@ -14,10 +14,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
-	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironmentbinding"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
-	testutils "github.com/sap/crossplane-provider-btp/internal/testutils"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -863,7 +861,7 @@ func Test_external_Observe(t *testing.T) {
 				}
 			}
 
-			c := &external{kube: test.NewMockClient(), client: testClient, tracker: testutils.NewResourceTrackerMock()}
+			c := &external{kube: test.NewMockClient(), client: testClient}
 			got, err := c.Observe(tt.args.ctx, tt.args.mg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Observe() error = %v, wantErr %v", err, tt.wantErr)
@@ -1304,24 +1302,3 @@ func (f fakeClient) DeleteInstances(ctx context.Context, bindings []v1alpha1.Bin
 }
 
 var _ kymaenvironmentbinding.Client = &fakeClient{}
-
-func TestObserveSetsResourceUsageCondition(t *testing.T) {
-	cases := map[string]struct {
-		inUse      bool
-		wantReason xpv1.ConditionReason
-	}{
-		"InUse":    {inUse: true, wantReason: providerv1alpha1.InUseReason},
-		"NotInUse": {inUse: false, wantReason: providerv1alpha1.NotInUseReason},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			// No WriteConnectionSecretToReference -> Observe returns right after SetConditions.
-			cr := &v1alpha1.KymaEnvironmentBinding{ObjectMeta: metav1.ObjectMeta{UID: "keb-uid"}}
-			c := &external{tracker: testutils.NewRealResourceTracker(t, cr, tc.inUse)}
-			_, _ = c.Observe(context.Background(), cr)
-			if got := cr.GetCondition(providerv1alpha1.UseCondition).Reason; got != tc.wantReason {
-				t.Errorf("UseCondition.Reason = %q, want %q", got, tc.wantReason)
-			}
-		})
-	}
-}
