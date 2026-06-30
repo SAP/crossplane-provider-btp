@@ -167,7 +167,15 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	zl := zap.New(zap.UseDevMode(tfVersion.DebugLogs))
 	setupFn := TerraformSetupBuilderNoTracking(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion)
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
+	// Identity-injecting Store wraps upjet's WorkspaceStore so that every
+	// Workspace() call patches an `identity` block into the on-disk
+	// terraform.tfstate, satisfying plugin-framework's post-Read identity
+	// check (issue #521). The earlier afero.Fs middleware approach was
+	// inert — upjet's WithFs doesn't propagate to FileProducer, see
+	// identity_injector.go header. Remove the wrap when no-fork (PR #680 /
+	// issue #207) lands.
 	ws := terraform.NewWorkspaceStore(log)
+	store := NewIdentityInjectingStore(ws, log)
 	provider := config.GetProvider()
 	eventHandler := handler.NewEventHandler(handler.WithLogger(log.WithValues("gvk", gvk)))
 
@@ -175,7 +183,7 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	res := provider.Resources[resourceName]
 	res.UseAsync = useAsync
 
-	connector := tjcontroller.NewConnector(client, ws, setupFn,
+	connector := tjcontroller.NewConnector(client, store, setupFn,
 		res,
 		tjcontroller.WithLogger(log),
 		tjcontroller.WithConnectorEventHandler(eventHandler),

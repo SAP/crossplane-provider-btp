@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.5
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: directoryentitlements.account.btp.sap.crossplane.io
 spec:
   group: account.btp.sap.crossplane.io
@@ -184,8 +184,8 @@ spec:
                     type: string
                   planUniqueIdentifier:
                     description: |-
-                      (String) The unique identifier of the service plan.
-                      The unique identifier of the service plan.
+                      (String) The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
+                      The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
                     type: string
                   serviceName:
                     description: |-
@@ -312,8 +312,8 @@ spec:
                     type: string
                   planUniqueIdentifier:
                     description: |-
-                      (String) The unique identifier of the service plan.
-                      The unique identifier of the service plan.
+                      (String) The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
+                      The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
                     type: string
                   serviceName:
                     description: |-
@@ -558,8 +558,8 @@ spec:
                     type: string
                   planUniqueIdentifier:
                     description: |-
-                      (String) The unique identifier of the service plan.
-                      The unique identifier of the service plan.
+                      (String) The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
+                      The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
                     type: string
                   serviceName:
                     description: |-

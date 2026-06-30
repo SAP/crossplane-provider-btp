@@ -35,7 +35,7 @@ type SubaccountTrustConfigurationInitParameters struct {
 	// Determines that end users can choose the trust configuration for login. If not set, the trust configuration can remain active, however only application users that explicitly specify the origin key can use if for login.
 	AvailableForUserLogon *bool `json:"availableForUserLogon,omitempty" tf:"available_for_user_logon,omitempty"`
 
-	// (String) Description of the trust configuration. NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default.
+	// (String) Description of the trust configuration.
 	// Description of the trust configuration.
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
 
@@ -54,6 +54,10 @@ type SubaccountTrustConfigurationInitParameters struct {
 	// (String) The display name of the trust configuration.
 	// The display name of the trust configuration.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
+
+	// (String) The origin of the identity provider.
+	// The origin of the identity provider.
+	Origin *string `json:"origin,omitempty" tf:"origin,omitempty"`
 
 	// (String) Determines whether the identity provider is currently 'active' or 'inactive'.
 	// Determines whether the identity provider is currently 'active' or 'inactive'.
@@ -86,7 +90,7 @@ type SubaccountTrustConfigurationObservation struct {
 	// Determines that end users can choose the trust configuration for login. If not set, the trust configuration can remain active, however only application users that explicitly specify the origin key can use if for login.
 	AvailableForUserLogon *bool `json:"availableForUserLogon,omitempty" tf:"available_for_user_logon,omitempty"`
 
-	// (String) Description of the trust configuration. NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default.
+	// (String) Description of the trust configuration.
 	// Description of the trust configuration.
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
 
@@ -146,7 +150,7 @@ type SubaccountTrustConfigurationParameters struct {
 	// +kubebuilder:validation:Optional
 	AvailableForUserLogon *bool `json:"availableForUserLogon,omitempty" tf:"available_for_user_logon,omitempty"`
 
-	// (String) Description of the trust configuration. NOTE: currently ignored due to an upstream bug (see #724); the BTP backend assigns its own default.
+	// (String) Description of the trust configuration.
 	// Description of the trust configuration.
 	// +kubebuilder:validation:Optional
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
@@ -170,6 +174,11 @@ type SubaccountTrustConfigurationParameters struct {
 	// The display name of the trust configuration.
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
+
+	// (String) The origin of the identity provider.
+	// The origin of the identity provider.
+	// +kubebuilder:validation:Optional
+	Origin *string `json:"origin,omitempty" tf:"origin,omitempty"`
 
 	// (String) Determines whether the identity provider is currently 'active' or 'inactive'.
 	// Determines whether the identity provider is currently 'active' or 'inactive'.
