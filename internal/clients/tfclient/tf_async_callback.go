@@ -5,9 +5,8 @@ import (
 
 	ujresource "github.com/crossplane/upjet/pkg/resource"
 	"github.com/crossplane/upjet/pkg/terraform"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/pkg/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var errUpdateStatusFmt = "cannot update status of the resource %s after an async %s"
