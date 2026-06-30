@@ -27,10 +27,13 @@ import (
 
 // testCRsGeneratedPathEnv names the env var that points at the directory
 // containing rendered (envsubst-processed) e2e fixtures. The Makefile target
-// generate-test-crs renders templates from TEST_CRS_TEMPLATES_PATH into this
-// location; tests then read from here so the committed templates stay
-// untouched on disk. Falls back to the in-tree templates dir when unset, so
-// raw `go test` invocations still work for read-only inspection.
+// generate-test-crs renders templates from TEST_CRS_PATH into
+// TEST_CRS_GENERATED_PATH; that var is exported at the top of the Makefile,
+// so it is already in the test binary's environment when invoked via
+// `make test-acceptance`. Tests read from there so the committed templates
+// stay untouched on disk. Falls back to the in-tree templates dir when
+// unset, so raw `go test` invocations still work for read-only inspection
+// (substitutions won't be applied).
 const testCRsGeneratedPathEnv = "TEST_CRS_GENERATED_PATH"
 
 // crsPath resolves a fixture path relative to the e2e CRs directory.

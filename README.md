@@ -96,7 +96,7 @@ make test-acceptance testFilter=<functionNameOfTest>
 ````
 
 > [!NOTE]
-> The e2e fixtures under `test/e2e/testdata/crs/` are templates that reference environment variables (`$BUILD_ID`, `$TECHNICAL_USER_EMAIL`, …). `make test-acceptance` renders them into `test/e2e/testdata/crs.rendered/` (gitignored) before each run — the committed templates are not modified. Override the source and output directories with `TEST_CRS_TEMPLATES_PATH` and `TEST_CRS_GENERATED_PATH` if needed.
+> The e2e fixtures under `test/e2e/testdata/crs/` are templates that reference environment variables (`$BUILD_ID`, `$TECHNICAL_USER_EMAIL`, …). `make test-acceptance` copies them into `.work/rendered-crs/e2e/` (gitignored), runs `envsubst` on the copies, then runs the tests against the rendered tree — the committed templates are not modified. Override the source and output directories with `TEST_CRS_PATH` and `TEST_CRS_GENERATED_PATH` if needed.
 
 #### Long-Running Tests
 

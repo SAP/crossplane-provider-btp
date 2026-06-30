@@ -23,11 +23,11 @@ export TERRAFORM_DOCS_PATH ?= docs/resources
 # set BUILD_ID if its not running in an action
 BUILD_ID ?= $(shell date +"%H%M%S")
 
-export TEST_CRS_TEMPLATES_PATH ?= test/e2e/testdata/crs
-export TEST_CRS_GENERATED_PATH ?= test/e2e/testdata/crs.rendered
+export TEST_CRS_PATH ?= test/e2e/testdata/crs
+export TEST_CRS_GENERATED_PATH ?= .work/rendered-crs/e2e
 
-export UPGRADE_TEST_CRS_TEMPLATES_PATH ?= test/upgrade/testdata
-export UPGRADE_TEST_CRS_GENERATED_PATH ?= test/upgrade/testdata.rendered
+export UPGRADE_TEST_CRS_PATH ?= test/upgrade/testdata
+export UPGRADE_TEST_CRS_GENERATED_PATH ?= .work/rendered-crs/upgrade
 
 PLATFORMS ?= linux_amd64
 #get version from current git release tag
@@ -331,19 +331,19 @@ test-acceptance-debug: local-build $(KIND) $(HELM3) generate-test-crs
 
 .PHONY: generate-test-crs
 generate-test-crs:
-	@$(INFO) Rendering CRS templates from $(TEST_CRS_TEMPLATES_PATH) into $(TEST_CRS_GENERATED_PATH)
-	@if [ "$(abspath $(TEST_CRS_TEMPLATES_PATH))" = "$(abspath $(TEST_CRS_GENERATED_PATH))" ]; then \
-		echo "❌ TEST_CRS_TEMPLATES_PATH and TEST_CRS_GENERATED_PATH must differ; both point at $(TEST_CRS_TEMPLATES_PATH)"; \
+	@$(INFO) Rendering CRS templates from $(TEST_CRS_PATH) into $(TEST_CRS_GENERATED_PATH)
+	@if [ "$(abspath $(TEST_CRS_PATH))" = "$(abspath $(TEST_CRS_GENERATED_PATH))" ]; then \
+		echo "❌ TEST_CRS_PATH and TEST_CRS_GENERATED_PATH must differ; both point at $(TEST_CRS_PATH)"; \
 		exit 1; \
 	fi
 	@rm -rf "$(TEST_CRS_GENERATED_PATH)"
 	@mkdir -p "$(TEST_CRS_GENERATED_PATH)"
-	@cd "$(TEST_CRS_TEMPLATES_PATH)" && find . -type f -name "*.yaml" -exec sh -c '\
-    	for template; do \
-    		dest="$(abspath $(TEST_CRS_GENERATED_PATH))/$$template"; \
-    		mkdir -p "$$(dirname "$$dest")"; \
-    		envsubst < "$$template" > "$$dest"; \
-    	done' sh {} +
+	@cp -R "$(TEST_CRS_PATH)/." "$(TEST_CRS_GENERATED_PATH)/"
+	@# envsubst with an explicit allowlist — any other $VAR-shaped string in the
+	@# YAML (e.g. unrelated provider-config references) is preserved verbatim.
+	@for template in $$(find "$(TEST_CRS_GENERATED_PATH)" -type f -name "*.yaml"); do \
+		envsubst '$$BUILD_ID $$IDP_URL $$SECOND_DIRECTORY_ADMIN_EMAIL $$TECHNICAL_USER_EMAIL' < $$template > $$template.tmp && mv $$template.tmp $$template; \
+	done
 	@$(OK) CRS rendered
 
 
@@ -363,9 +363,9 @@ docs.generate-external-name:
 UPGRADE_TEST_CRS_TAG ?= $(UPGRADE_TEST_FROM_TAG)
 
 .PHONY: generate-upgrade-test-crs
-# Renders the upgrade-test fixtures from UPGRADE_TEST_CRS_TEMPLATES_PATH
-# into UPGRADE_TEST_CRS_GENERATED_PATH. Templates stay untouched on disk.
-generate-upgrade-test-crs: TEST_CRS_TEMPLATES_PATH := $(UPGRADE_TEST_CRS_TEMPLATES_PATH)
+# Renders the upgrade-test fixtures from UPGRADE_TEST_CRS_PATH into
+# UPGRADE_TEST_CRS_GENERATED_PATH. Templates stay untouched on disk.
+generate-upgrade-test-crs: TEST_CRS_PATH := $(UPGRADE_TEST_CRS_PATH)
 generate-upgrade-test-crs: TEST_CRS_GENERATED_PATH := $(UPGRADE_TEST_CRS_GENERATED_PATH)
 generate-upgrade-test-crs: generate-test-crs
 

@@ -53,9 +53,11 @@ const (
 
 // upgradeCRsGeneratedPathEnv names the env var that points at the rendered
 // upgrade-test fixture tree (envsubst-substituted). `make generate-upgrade-test-crs`
-// renders templates from UPGRADE_TEST_CRS_TEMPLATES_PATH into this directory.
-// Falls back to the in-tree templates dir so raw `go test -tags=upgrade` keeps
-// working for inspection (values won't be substituted in that case).
+// renders templates from UPGRADE_TEST_CRS_PATH into this directory; the var
+// is exported at the top of the Makefile, so it is already in the test
+// binary's environment when invoked via `make upgrade-test`. Falls back to
+// the in-tree templates dir so raw `go test -tags=upgrade` keeps working
+// for inspection (values won't be substituted in that case).
 const upgradeCRsGeneratedPathEnv = "UPGRADE_TEST_CRS_GENERATED_PATH"
 
 // upgradeCRsPath resolves a fixture path relative to the upgrade-test CRs
@@ -75,7 +77,7 @@ func upgradeCRsPath(rel string) string {
 // resourceDirectoryRoot returns the rendered baseCRs directory. Defined as a
 // function (not a const) because the rendered root depends on the
 // UPGRADE_TEST_CRS_GENERATED_PATH env var, which is only set when the test
-// runs under `make generate-upgrade-test-crs`.
+// runs under `make upgrade-test`.
 func resourceDirectoryRoot() string { return upgradeCRsPath("baseCRs") }
 
 var (
