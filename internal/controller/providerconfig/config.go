@@ -48,7 +48,7 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	r := providerconfig.NewReconciler(
 		mgr, of,
 		providerconfig.WithLogger(o.Logger.WithValues("controller", name)),
-		providerconfig.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		providerconfig.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 	)
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -65,6 +65,15 @@ func SetupGated(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	return Setup(mgr, o)
 }
 
+// SetupWebhookWithManager registers the conversion webhook for ProviderConfig.
+func SetupWebhookWithManager(mgr ctrl.Manager) error {
+	if err := ctrl.NewWebhookManagedBy(mgr, &v1alpha1.ProviderConfig{}).
+		Complete(); err != nil {
+		return errors.Wrap(err, "cannot register webhook for the kind v1alpha1.ProviderConfig")
+	}
+	return nil
+}
+
 func CreateClient(
 	ctx context.Context,
 	mg resource.Managed,
@@ -74,7 +83,7 @@ func CreateClient(
 	resourcetracker tracking.ReferenceResolverTracker,
 ) (*btp.Client, error) {
 
-	lm, ok := mg.(resource.LegacyManaged)
+	lm, ok := mg.(LegacyManaged)
 	if !ok {
 		return nil, errors.New("managed resource does not implement LegacyManaged")
 	}
@@ -106,7 +115,7 @@ func CreateClient(
 	return svc, errors.Wrap(err, errNewClient)
 }
 
-func ResolveProviderConfig(ctx context.Context, mg resource.LegacyManaged, kube client.Client) (*v1alpha1.ProviderConfig, error) {
+func ResolveProviderConfig(ctx context.Context, mg LegacyManaged, kube client.Client) (*v1alpha1.ProviderConfig, error) {
 	pc := &v1alpha1.ProviderConfig{}
 	ref := mg.GetProviderConfigReference()
 	if ref == nil {
