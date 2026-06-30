@@ -876,6 +876,11 @@ func (in *SubaccountTrustConfigurationInitParameters) DeepCopyInto(out *Subaccou
 		*out = new(string)
 		**out = **in
 	}
+	if in.Origin != nil {
+		in, out := &in.Origin, &out.Origin
+		*out = new(string)
+		**out = **in
+	}
 	if in.Status != nil {
 		in, out := &in.Status, &out.Status
 		*out = new(string)
@@ -1060,6 +1065,11 @@ func (in *SubaccountTrustConfigurationParameters) DeepCopyInto(out *SubaccountTr
 	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
+		*out = new(string)
+		**out = **in
+	}
+	if in.Origin != nil {
+		in, out := &in.Origin, &out.Origin
 		*out = new(string)
 		**out = **in
 	}
