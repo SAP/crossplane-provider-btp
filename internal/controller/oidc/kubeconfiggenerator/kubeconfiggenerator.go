@@ -49,7 +49,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotKubeConfigGenerator)
 	}
 
-	if err := c.usage.Track(ctx, mg.(resource.LegacyManaged)); err != nil {
+	if err := c.usage.Track(ctx, mg.(providerconfig.LegacyManaged)); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 

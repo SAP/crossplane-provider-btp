@@ -61,7 +61,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotEnvironment)
 	}
 
-	lm := mg.(resource.LegacyManaged)
+	lm := mg.(providerconfig.LegacyManaged)
 
 	pc := &providerv1alpha1.ProviderConfig{}
 	if err := c.kube.Get(ctx, types.NamespacedName{Name: lm.GetProviderConfigReference().Name}, pc); err != nil {

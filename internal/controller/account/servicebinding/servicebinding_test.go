@@ -21,6 +21,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	tracking_test "github.com/sap/crossplane-provider-btp/internal/tracking/test"
 )
@@ -137,7 +138,7 @@ func (m *MockTracker) DeleteShouldBeBlocked(mg resource.Managed) bool {
 
 type noOpLegacyTracker struct{}
 
-func (n *noOpLegacyTracker) Track(ctx context.Context, mg resource.LegacyManaged) error {
+func (n *noOpLegacyTracker) Track(ctx context.Context, mg providerconfig.LegacyManaged) error {
 	return nil
 }
 

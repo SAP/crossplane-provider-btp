@@ -15,6 +15,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironmentbinding"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 )
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -23,7 +24,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotKymaEnvironmentBinding)
 	}
 
-	lm := mg.(resource.LegacyManaged)
+	lm := mg.(providerconfig.LegacyManaged)
 
 	pc := &providerv1alpha1.ProviderConfig{}
 	if err := c.kube.Get(ctx, types.NamespacedName{Name: lm.GetProviderConfigReference().Name}, pc); err != nil {
