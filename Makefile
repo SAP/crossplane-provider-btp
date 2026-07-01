@@ -4,14 +4,20 @@ PROJECT_NAME := crossplane-provider-btp
 PROJECT_REPO := github.com/sap/$(PROJECT_NAME)
 
 # Terraform Related variables
-export TERRAFORM_VERSION ?= 1.3.9
+# OpenTofu (MPL-2.0) is used as the `terraform` CLI to avoid the BSL of
+# Terraform CLI ≥ 1.6. We install the `tofu` binary under the name `terraform`
+# everywhere upjet expects it — upjet's executor hardcodes the binary name
+# "terraform" (workspace.go:413). OpenTofu is a drop-in replacement at the
+# CLI level. Required for the identity-injector workaround (#521): identity
+# forwarding to the provider lands in CLI 1.12+; OpenTofu 1.12+ has it too.
+export TERRAFORM_VERSION ?= 1.12.3
 
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
-export TERRAFORM_PROVIDER_VERSION ?= 1.15.1
+export TERRAFORM_PROVIDER_VERSION ?= 1.23.1
 export TERRAFORM_PROVIDER_DOWNLOAD_NAME ?= terraform-provider-btp
 export TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX ?= https://releases.hashicorp.com/$(TERRAFORM_PROVIDER_DOWNLOAD_NAME)/$(TERRAFORM_PROVIDER_VERSION)
-export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.15.1_x5
+export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.23.1_x5
 export TERRAFORM_DOCS_PATH ?= docs/resources
 
 # set BUILD_ID if its not running in an action
@@ -144,13 +150,13 @@ $(TERRAFORM_PROVIDER_SCHEMA): $(TERRAFORM)
 	@$(OK) generating provider schema for $(TERRAFORM_PROVIDER_SOURCE) $(TERRAFORM_PROVIDER_VERSION)
 
 $(TERRAFORM):
-	@$(INFO) installing terraform $(HOSTOS)-$(HOSTARCH)
+	@$(INFO) installing opentofu $(TERRAFORM_VERSION) as terraform $(HOSTOS)-$(HOSTARCH)
 	@mkdir -p $(TOOLS_HOST_DIR)/tmp-terraform
-	@curl -fsSL https://releases.hashicorp.com/terraform/$(TERRAFORM_VERSION)/terraform_$(TERRAFORM_VERSION)_$(SAFEHOST_PLATFORM).zip -o $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip
+	@curl -fsSL https://github.com/opentofu/opentofu/releases/download/v$(TERRAFORM_VERSION)/tofu_$(TERRAFORM_VERSION)_$(SAFEHOST_PLATFORM).zip -o $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip
 	@unzip $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip -d $(TOOLS_HOST_DIR)/tmp-terraform
-	@mv $(TOOLS_HOST_DIR)/tmp-terraform/terraform $(TERRAFORM)
+	@mv $(TOOLS_HOST_DIR)/tmp-terraform/tofu $(TERRAFORM)
 	@rm -fr $(TOOLS_HOST_DIR)/tmp-terraform
-	@$(OK) installing terraform $(HOSTOS)-$(HOSTARCH)
+	@$(OK) installing opentofu $(TERRAFORM_VERSION) as terraform $(HOSTOS)-$(HOSTARCH)
 pull-docs:
 	@$(INFO) pull-docs called
 	@if [ ! -d "$(WORK_DIR)/$(TERRAFORM_PROVIDER_SOURCE)" ]; then \
@@ -165,7 +171,13 @@ clean-work:
 	@$(INFO) cleaning work directory
 	@rm -rf .work
 
-generate.init: clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
+.PHONY: install-tools
+install-tools:
+	@$(INFO) installing Go tools from go.mod
+	@$(GO) install tool
+	@$(OK) installing Go tools from go.mod
+
+generate.init: install-tools clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
 
 .PHONY: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs terraform.buildvars
 
