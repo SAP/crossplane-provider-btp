@@ -97,7 +97,10 @@ make upgrade-test-clean
 
 #### `make upgrade-test-restore-crs`
 
-Restores only the `test/upgrade/testdata/baseCRs` directory to the git state:
+Restores `test/upgrade/testdata/baseCRs` to the git state. Only needed after
+`make pull-upgrade-test-version-crs` (see below) checked out historical CRs
+and overwrote the working tree — rendering itself never modifies the
+templates (output goes to `.work/rendered-crs/upgrade/`).
 
 ```bash
 make upgrade-test-restore-crs
@@ -116,7 +119,10 @@ make pull-upgrade-test-version-crs
 
 #### `make generate-upgrade-test-crs`
 
-Generates test CRs by substituting environment variables in YAML files:
+Renders the upgrade-test CRs by substituting environment variables into the
+YAML templates. Output is written to `.work/rendered-crs/upgrade/`
+(gitignored); the committed templates under `test/upgrade/testdata/` are not
+modified.
 
 ```bash
 make generate-upgrade-test-crs
@@ -173,12 +179,16 @@ func Test_MyCustomUpgrade(t *testing.T) {
         FromVersion("v1.4.0").
         ToVersion("v1.5.0").
         WithResourceDirectories([]string{
-            "./testdata/customCRs/myResources",
+            upgradeCRsPath("customCRs/myResources"),
         })
 
     testenv.Test(t, upgradeTest.Feature())
 }
 ```
+
+> Resource directories must be resolved via `upgradeCRsPath()` (defined in
+> `test/upgrade/main_test.go`) so tests read from the rendered tree under
+> `UPGRADE_TEST_CRS_GENERATED_PATH` rather than the committed templates.
 
 ### Timeout Configuration
 
