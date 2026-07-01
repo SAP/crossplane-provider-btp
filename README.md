@@ -95,8 +95,8 @@ If you want to run a single E2E Test locally simply set the `testFilter` variabl
 make test-acceptance testFilter=<functionNameOfTest>
 ````
 
-> [!WARNING]
-> Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
+> [!NOTE]
+> The e2e fixtures under `test/e2e/testdata/crs/` are templates that reference environment variables (`$BUILD_ID`, `$TECHNICAL_USER_EMAIL`, …). `make test-acceptance` copies them into `.work/rendered-crs/e2e/` (gitignored), runs `envsubst` on the copies, then runs the tests against the rendered tree — the committed templates are not modified. Override the source and output directories with `TEST_CRS_PATH` and `TEST_CRS_GENERATED_PATH` if needed.
 
 #### Long-Running Tests
 
@@ -233,8 +233,8 @@ To run the upgrade tests, you can use the following command:
 make upgrade-test
 ```
 
-> [!WARNING]  
-> Please be aware that as part of the upgrade tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/upgrade/testdata/baseCRs` after running the command. Make sure to not commit those changes into git.
+> [!NOTE]
+> As part of the upgrade tests, the CRs under `test/upgrade/testdata/` are rendered with the current environment configuration (see below). The committed templates are not modified — rendered output is written to `.work/rendered-crs/upgrade/` (gitignored). Override the source and output directories with `UPGRADE_TEST_CRS_PATH` and `UPGRADE_TEST_CRS_GENERATED_PATH` if needed.
 
 #### Required configuration
 

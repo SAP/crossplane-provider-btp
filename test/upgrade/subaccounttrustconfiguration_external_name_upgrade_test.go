@@ -15,8 +15,8 @@ var (
 	trustFromCustomTag             = "v1.3.0"
 	trustToCustomTag               = "local"
 	trustCustomResourceDirectories = []string{
-		"./testdata/customCRs/subaccountExternalName",
-		"./testdata/customCRs/subaccountTrustConfigurationExternalName",
+		upgradeCRsPath("customCRs/subaccountExternalName"),
+		upgradeCRsPath("customCRs/subaccountTrustConfigurationExternalName"),
 	}
 )
 
