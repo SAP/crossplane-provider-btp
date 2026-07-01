@@ -104,9 +104,16 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if cisBinding == nil {
 		return nil, errors.New(errGetCredentialsSecret)
 	}
-	svc, err := c.newServiceFn(cisBinding, ServiceAccountSecretData)
 
-	return &external{client: env.NewCloudFoundryOrganization(*svc), kube: c.kube}, err
+	pcName := mg.GetProviderConfigReference().Name
+	svc, err := providerconfig.DefaultClientCache.GetOrCreate(pcName, cisBinding, ServiceAccountSecretData, func() (*btp.Client, error) {
+		return c.newServiceFn(cisBinding, ServiceAccountSecretData)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &external{client: env.NewCloudFoundryOrganization(*svc), kube: c.kube}, nil
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an

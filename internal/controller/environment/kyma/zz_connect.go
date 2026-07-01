@@ -13,7 +13,9 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/btp"
 	kymaenv "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 )
 
 // Connect typically produces an ExternalClient by:
@@ -70,7 +72,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if cisBinding == nil {
 		return nil, errors.New(errGetCredentialsSecret)
 	}
-	svc, err := c.newServiceFn(cisBinding, ServiceAccountSecretData)
 
-	return &external{client: kymaenv.NewKymaEnvironments(*svc), log: c.log, record: c.record, kube: c.kube, tracker: c.resourcetracker, httpClient: &http.Client{Timeout: 10 * time.Second}}, err
+	pcName := mg.GetProviderConfigReference().Name
+	svc, err := providerconfig.DefaultClientCache.GetOrCreate(pcName, cisBinding, ServiceAccountSecretData, func() (*btp.Client, error) {
+		return c.newServiceFn(cisBinding, ServiceAccountSecretData)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &external{client: kymaenv.NewKymaEnvironments(*svc), log: c.log, record: c.record, kube: c.kube, tracker: c.resourcetracker, httpClient: &http.Client{Timeout: 10 * time.Second}}, nil
 }
