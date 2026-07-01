@@ -1,0 +1,11 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: DirectoryEntitlement
+metadata:
+  name: upgrade-test-extn-dir-ent
+  namespace: default
+spec:
+  forProvider:
+    serviceName: cis
+    planName: local
+    directoryRef:
+      name: upgrade-test-extn-dir
