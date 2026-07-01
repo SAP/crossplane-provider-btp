@@ -297,6 +297,28 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 		},
+		"OperationTimeout wired to Timeouts on TfResource": {
+			reason: "operationTimeout field should be wired to Timeouts.Create/Update/Delete on the tf resource so upjet writes a timeouts block into main.tf.json",
+			args: args{
+				si: expectedServiceInstance(
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+					withOperationTimeout("60m"),
+				),
+			},
+			want: want{
+				hasErr: false,
+				tfResource: expectedTfSerivceInstance(
+					withTfExternalName("123"),
+					withTfParameters(`{}`),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+					withTfTimeouts("60m"),
+				),
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -444,5 +466,22 @@ func withObservation(obs v1alpha1.ServiceInstanceObservation) func(*v1alpha1.Ser
 func withTfServicePlanID(servicePlanID string) func(*v1alpha1.SubaccountServiceInstance) {
 	return func(cr *v1alpha1.SubaccountServiceInstance) {
 		cr.Spec.ForProvider.ServiceplanID = &servicePlanID
+	}
+}
+
+func withOperationTimeout(timeout string) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Spec.ForProvider.OperationTimeout = &timeout
+	}
+}
+
+func withTfTimeouts(timeout string) func(*v1alpha1.SubaccountServiceInstance) {
+	return func(cr *v1alpha1.SubaccountServiceInstance) {
+		t := timeout
+		cr.Spec.ForProvider.Timeouts = &v1alpha1.TimeoutsParameters{
+			Create: &t,
+			Update: &t,
+			Delete: &t,
+		}
 	}
 }
