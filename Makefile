@@ -24,10 +24,10 @@ export TERRAFORM_DOCS_PATH ?= docs/resources
 BUILD_ID ?= $(shell date +"%H%M%S")
 
 export TEST_CRS_PATH ?= test/e2e/testdata/crs
-export TEST_CRS_GENERATED_PATH ?= .work/rendered-crs/e2e
+export TEST_CRS_GENERATED_PATH ?= $(abspath .work/rendered-crs/e2e)
 
 export UPGRADE_TEST_CRS_PATH ?= test/upgrade/testdata
-export UPGRADE_TEST_CRS_GENERATED_PATH ?= .work/rendered-crs/upgrade
+export UPGRADE_TEST_CRS_GENERATED_PATH ?= $(abspath .work/rendered-crs/upgrade)
 
 PLATFORMS ?= linux_amd64
 #get version from current git release tag
