@@ -27,6 +27,10 @@ type ApiScenario string
 type userApiFake struct {
 	Scenario       ApiScenario
 	RoleCollection string
+
+	// BodyErr, when set, is returned verbatim from AddRoleCollectionExecute
+	// (overriding Scenario). Used to exercise the SpecifyAPIError integration.
+	BodyErr error
 }
 
 func newUserApiFake(scenario ApiScenario, roleCollection string) *userApiFake {
@@ -38,6 +42,9 @@ func (u userApiFake) AddRoleCollection(ctx context.Context, origin string, userN
 }
 
 func (u userApiFake) AddRoleCollectionExecute(r xsuaa.UsercontrollerAPIAddRoleCollectionRequest) (map[string]interface{}, *http.Response, error) {
+	if u.BodyErr != nil {
+		return nil, &http.Response{StatusCode: http.StatusInternalServerError}, u.BodyErr
+	}
 	switch u.Scenario {
 	case UserWithRole, UserWithoutRole, NoUser:
 		return map[string]interface{}{}, &http.Response{StatusCode: http.StatusOK}, nil
