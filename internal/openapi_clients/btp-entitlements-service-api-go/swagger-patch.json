@@ -70,7 +70,7 @@
     }
   },
   {
-    "op": "replace",
+    "op": "add",
     "path": "/components/schemas/ApiExceptionResponseObject",
     "value": {
       "type": "object",
