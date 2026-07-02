@@ -50,6 +50,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
   - CLI: btp list accounts/directory (field: guid)
 
+### GlobalaccountTrustConfiguration
+
+- Follows Standard: no (origin key, not a GUID)
+- Format: Origin key of the identity provider (e.g. "sap.custom")
+- How to find:
+
+  - UI: BTP Cockpit → Global Account → Security → Trust Configurations → [Origin column]
+  - CLI: `btp list security/trust` → `Origin Key`
+
 ### KubeConfigGenerator
 
 - Follows Standard: no - This resource does not support external name as it does not represent an external resource. Instead of using external name for importing, you can just create an instance of this resource.
