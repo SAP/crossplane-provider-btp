@@ -429,11 +429,8 @@ upgrade-test-debug: $(KIND) check-upgrade-test-vars build-upgrade-test-images pu
 	 esac
 
 .PHONY: upgrade-test-restore-crs
-# Restores `test/upgrade/testdata/baseCRs` after `pull-upgrade-test-version-crs`
-# checked out historical CRs from UPGRADE_TEST_CRS_TAG and overwrote the local
-# working tree. Rendering itself never modifies the templates (the renderer
-# writes into UPGRADE_TEST_CRS_GENERATED_PATH), so this target is only needed
-# when `make upgrade-test` was invoked with a non-`local` UPGRADE_TEST_FROM_TAG.
+# Restores `test/upgrade/testdata/baseCRs` to HEAD. This undoes the working-tree
+# overwrite that `pull-upgrade-test-version-crs` performs.
 upgrade-test-restore-crs:
 	@$(INFO) Restoring test/upgrade/testdata/baseCRs
 	@git restore test/upgrade/testdata/baseCRs

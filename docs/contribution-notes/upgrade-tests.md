@@ -97,10 +97,8 @@ make upgrade-test-clean
 
 #### `make upgrade-test-restore-crs`
 
-Restores `test/upgrade/testdata/baseCRs` to the git state. Only needed after
-`make pull-upgrade-test-version-crs` (see below) checked out historical CRs
-and overwrote the working tree — rendering itself never modifies the
-templates (output goes to `.work/rendered-crs/upgrade/`).
+Restores `test/upgrade/testdata/baseCRs` to HEAD. Undoes the working-tree
+overwrite that `make pull-upgrade-test-version-crs` (see below) performs.
 
 ```bash
 make upgrade-test-restore-crs
