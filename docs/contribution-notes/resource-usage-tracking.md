@@ -17,7 +17,7 @@ Crossplane itself does not enforce delete ordering across MRs. Owner references 
 The mechanism rests on three invariants:
 
 1. RU records exist and stay current — `Track()` runs on every downstream reconcile.
-2. The upstream's `ResourceUsage` condition reflects whether anything still references it, so `DeleteShouldBeBlocked` can read it.
+2. The upstream's `ResourceUsage` condition reflects whether anything still references it, so `DeleteShouldBeBlocked` can read it — `Track()` refreshes it on every reconcile.
 3. Nothing bypasses the block — no force-delete, no manual finalizer patch, no `deletionPolicy: Orphan` on an in-use upstream.
 
 ---
@@ -42,11 +42,11 @@ Source: [Crossplane Usage docs](https://docs.crossplane.io/latest/managed-resour
 
 ## Mechanism
 
-### 1. Reference discovery (`internal/tracking/resourcetracker.go:65`)
+### 1. Reference discovery (`internal/tracking/resourcetracker.go:69`)
 
-`Track(ctx, mg)` reflects over the MR using `mitchellh/reflectwalk`, finds every `xpv1.Reference` field carrying all three struct tags `reference-group`, `reference-kind`, `reference-apiversion` (`:154–175`), and emits one `ResolvedReference` per match. Fields without the tag trio are skipped. This is how a new field becomes "tracked" without writing controller code — just tag it.
+`Track(ctx, mg)` reflects over the MR using `mitchellh/reflectwalk`, finds every `xpv1.Reference` field carrying all three struct tags `reference-group`, `reference-kind`, `reference-apiversion` (`:159–181`), and emits one `ResolvedReference` per match. Fields without the tag trio are skipped. This is how a new field becomes "tracked" without writing controller code — just tag it.
 
-Example (`apis/account/v1beta1/cloudmanagement_types.go:33`):
+Example (`apis/account/v1beta1/cloudmanagement_types.go:35`):
 
 ```go
 ServiceManagerRef *xpv1.Reference `json:"serviceManagerRef,omitempty"
@@ -55,7 +55,7 @@ ServiceManagerRef *xpv1.Reference `json:"serviceManagerRef,omitempty"
     reference-apiversion:"v1alpha1"`
 ```
 
-### 2. RU creation (`createTracking`, `:177–224`)
+### 2. RU creation (`createTracking`, `:184–231`)
 
 For each resolved reference:
 
@@ -65,14 +65,14 @@ For each resolved reference:
 4. Labels: `ref.orchestrate.cloud.sap/source-uid` and `…/target-uid` for indexed lookup.
 5. `Apply` with `MustBeControllableBy(target.UID)` and `AllowUpdateIf(specsDiffer)` — idempotent and concurrency-safe between sibling reconciles of the same downstream.
 
-### 3. Condition wiring (`SetConditions`, `:284–287`)
+### 3. Condition wiring (`SetConditions`, `:289–292`)
 
-Each upstream MR calls `tracker.SetConditions(ctx, mg)` to refresh its `ResourceUsage` condition. `hasUsages` lists RUs by `LabelKeySourceUid == mg.UID` and writes:
+`Track()` calls `SetConditions(ctx, mg)` at the end of every reconcile — it runs in each controller's `Connect()`, so every MR that calls `Track()` refreshes its own `ResourceUsage` condition each pass and it stays current in steady state, rather than being stamped only on the first delete attempt. Each `Delete()` also calls `SetConditions` as a redundant refresh right before the block check. `hasUsages` lists RUs by `LabelKeySourceUid == mg.UID` (i.e. RUs where `mg` is the referenced upstream) and writes:
 
 - `True` + reason `ResourceUsagesFound` if any RU exists (`apis/v1alpha1/resourceusage_types.go:76`).
 - `False` + reason `NoResourceUsagesFound` otherwise (`:77`).
 
-### 4. Delete block (`DeleteShouldBeBlocked`, `:303–308`)
+### 4. Delete block (`DeleteShouldBeBlocked`, `:308–313`)
 
 ```go
 func (r *DefaultReferenceResolverTracker) DeleteShouldBeBlocked(mg resource.Managed) bool {
@@ -86,4 +86,4 @@ func (r *DefaultReferenceResolverTracker) DeleteShouldBeBlocked(mg resource.Mana
 
 ### 5. Enforcement surface
 
-The block is implemented entirely by each upstream's `Delete()` returning an error after consulting `DeleteShouldBeBlocked`. There is no admission webhook in this repo; enforcement is cooperative within the provider's own reconcile loop. The contract is "Crossplane calls our `Delete()`, our `Delete()` refuses while RU records still exist."
+The block is implemented by each upstream controller wiring it into its own `Delete()` — returning an error after consulting `DeleteShouldBeBlocked`. There is no admission webhook in this repo; enforcement is cooperative within the provider's own reconcile loop, so it is only as complete as each controller's `Delete()`. The contract is "Crossplane calls our `Delete()`, our `Delete()` refuses while RU records still exist."
