@@ -60,30 +60,12 @@ func describeCacheGet(key string) *entclient.EntitledAndAssignedServicesResponse
 	}
 	e := v.(*describeEntry)
 	if time.Since(e.at) > describeCacheT {
-		describeCache.Delete(key)
+		// Compare-and-delete so a fresh entry stored by a concurrent
+		// writer between our Load and Delete is not wiped.
+		describeCache.CompareAndDelete(key, e)
 		return nil
 	}
 	return e.val
-}
-
-// describeCacheStore stores val under key with issuedAt as its freshness
-// timestamp, unless a newer entry is already cached - this stops a slower
-// ordinary/fresh flight from regressing an already-cached response.
-func describeCacheStore(key string, val *entclient.EntitledAndAssignedServicesResponseObject, issuedAt time.Time) {
-	entry := &describeEntry{val: val, at: issuedAt}
-	for {
-		actual, loaded := describeCache.LoadOrStore(key, entry)
-		if !loaded {
-			return
-		}
-		prev := actual.(*describeEntry)
-		if !issuedAt.After(prev.at) {
-			return
-		}
-		if describeCache.CompareAndSwap(key, actual, entry) {
-			return
-		}
-	}
 }
 
 func (c EntitlementsClient) DescribeInstance(
@@ -176,7 +158,7 @@ func (c EntitlementsClient) fetchAssignments(
 		if err != nil {
 			return nil, err
 		}
-		describeCacheStore(cacheKey, resp, issuedAt)
+		describeCache.Store(cacheKey, &describeEntry{val: resp, at: issuedAt})
 		return resp, nil
 	})
 	if err != nil {
