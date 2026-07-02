@@ -55,10 +55,42 @@ func describeCacheGet(key string) *entclient.EntitledAndAssignedServicesResponse
 	}
 	e := v.(*describeEntry)
 	if time.Since(e.at) > describeCacheT {
-		describeCache.Delete(key)
+		// Compare-and-delete so a fresh entry stored by a concurrent
+		// writer between our Load and Delete is not wiped.
+		describeCache.CompareAndDelete(key, e)
 		return nil
 	}
 	return e.val
+}
+
+// describeSweep removes all expired entries from describeCache. Runs from
+// a single background goroutine (see describeSweeperOnce) so keys that
+// are never re-read do not leak for the lifetime of the process.
+func describeSweep(now time.Time) {
+	describeCache.Range(func(k, v any) bool {
+		e, ok := v.(*describeEntry)
+		if !ok {
+			return true
+		}
+		if now.Sub(e.at) > describeCacheT {
+			describeCache.CompareAndDelete(k, e)
+		}
+		return true
+	})
+}
+
+var describeSweeperOnce sync.Once
+
+func startDescribeSweeper() {
+	describeSweeperOnce.Do(func() {
+		go func() {
+			t := time.NewTicker(describeCacheT)
+			defer t.Stop()
+			for now := range t.C {
+				describeSweep(now)
+			}
+		}()
+	})
 }
 
 func (c EntitlementsClient) DescribeInstance(
@@ -120,6 +152,7 @@ func (c EntitlementsClient) fetchAssignments(ctx context.Context, key, subaccoun
 			return nil, err
 		}
 		describeCache.Store(key, &describeEntry{val: resp, at: time.Now()})
+		startDescribeSweeper()
 		return resp, nil
 	})
 	if err != nil {
