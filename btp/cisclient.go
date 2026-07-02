@@ -14,6 +14,7 @@ import (
 	httptransport "github.com/go-openapi/runtime/client"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
+	"golang.org/x/sync/singleflight"
 
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	entitlementsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
@@ -116,18 +117,36 @@ func NewServiceClientWithCisCredential(credential *Credentials) Client {
 		return cached.(Client)
 	}
 
-	authentication := authenticationParams(credential)
-	config := createConfig(credential, tokenURL, authentication)
-	client := createClient(credential, config)
-
-	actual, _ := clientCache.LoadOrStore(key, client)
-	return actual.(Client)
+	// Under concurrent first-callers with the same credential (e.g. a fresh
+	// process ingesting many CRs at once), plain Load+LoadOrStore lets
+	// every caller run createClient() and then discards all but one. That
+	// wastes oauth2 transport + 3 openapi sub-client allocations per
+	// redundant caller. singleflight collapses them into a single build.
+	v, _, _ := clientBuildGroup.Do(key, func() (any, error) {
+		if cached, ok := clientCache.Load(key); ok {
+			return cached, nil
+		}
+		authentication := authenticationParams(credential)
+		config := createConfig(credential, tokenURL, authentication)
+		client := buildClientFn(credential, config)
+		clientCache.Store(key, client)
+		return client, nil
+	})
+	return v.(Client)
 }
+
+// buildClientFn is the seam that lets tests count how many times a
+// concurrent-first-call batch actually reaches createClient. Production
+// leaves it pointing at createClient.
+var buildClientFn = createClient
 
 // clientCache: process-wide btp.Client cache keyed by credential hash.
 // Credential rotation produces a new key automatically; old entries leak
 // until process restart. Add a TTL/LRU if rotation churn becomes an issue.
-var clientCache sync.Map
+var (
+	clientCache       sync.Map
+	clientBuildGroup  singleflight.Group
+)
 
 // credentialCacheKey builds a stable string key from the credential bundle.
 // We need ALL credential fields to differentiate cache entries (including the
@@ -207,7 +226,7 @@ func createClient(credential *Credentials, config *clientcredentials.Config) Cli
 // HTTP transport and the oauth2 transport with a reused token source.
 // Sharing this client across the 3 sub-clients collapses 3 token caches into 1.
 func sharedOAuthClient(config *clientcredentials.Config) *http.Client {
-	baseHTTPClient := DebugPrintHTTPClient()
+	baseHTTPClient := newBaseHTTPClientFn()
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, baseHTTPClient)
 	// config.TokenSource already wraps in oauth2.ReuseTokenSource internally.
 	return &http.Client{
@@ -217,6 +236,11 @@ func sharedOAuthClient(config *clientcredentials.Config) *http.Client {
 		},
 	}
 }
+
+// newBaseHTTPClientFn is the seam that lets tests inject an instrumented
+// base HTTP client (e.g. an httpcount.RoundTripper) between oauth2 and
+// the network. Production points at DebugPrintHTTPClient.
+var newBaseHTTPClientFn = func() *http.Client { return DebugPrintHTTPClient() }
 
 func createProvisioningServiceClient(
 	credential *Credentials, sharedHTTPClient *http.Client,
