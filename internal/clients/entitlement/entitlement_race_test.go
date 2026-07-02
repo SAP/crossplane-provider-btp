@@ -109,10 +109,11 @@ func TestDescribeCache_UnboundedGrowth(t *testing.T) {
 		)
 	}
 
-	// Fire the sweeper directly — janitor goroutine would tick every
-	// describeCacheT (30s), too long for a test. describeSweep is
-	// exported to the test package to allow deterministic verification.
-	describeSweep(time.Now())
+	// Trigger lazy eviction: describeCacheGet calls CompareAndDelete on
+	// expired entries, replacing the old janitor sweep.
+	for i := range N {
+		describeCacheGet("leak-key-" + strconv.Itoa(i))
+	}
 
 	var count int
 	describeCache.Range(func(k, _ any) bool {

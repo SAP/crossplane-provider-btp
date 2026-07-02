@@ -53,6 +53,26 @@ type describeEntry struct {
 	at  time.Time
 }
 
+// describeCacheStore stores val under key with issuedAt as its freshness
+// timestamp, unless a newer entry is already cached - this stops a slower
+// ordinary/fresh flight from regressing an already-cached response.
+func describeCacheStore(key string, val *entclient.EntitledAndAssignedServicesResponseObject, issuedAt time.Time) {
+	entry := &describeEntry{val: val, at: issuedAt}
+	for {
+		actual, loaded := describeCache.LoadOrStore(key, entry)
+		if !loaded {
+			return
+		}
+		prev := actual.(*describeEntry)
+		if !issuedAt.After(prev.at) {
+			return
+		}
+		if describeCache.CompareAndSwap(key, actual, entry) {
+			return
+		}
+	}
+}
+
 func describeCacheGet(key string) *entclient.EntitledAndAssignedServicesResponseObject {
 	v, ok := describeCache.Load(key)
 	if !ok {
@@ -158,7 +178,7 @@ func (c EntitlementsClient) fetchAssignments(
 		if err != nil {
 			return nil, err
 		}
-		describeCache.Store(cacheKey, &describeEntry{val: resp, at: issuedAt})
+		describeCacheStore(cacheKey, resp, issuedAt)
 		return resp, nil
 	})
 	if err != nil {

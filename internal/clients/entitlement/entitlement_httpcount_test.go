@@ -122,9 +122,11 @@ func TestDescribeInstance_CachedWithinTTL(t *testing.T) {
 	_ = srv
 
 	cr := newTestCR(testService, testPlan, testSubaccount)
+	key, err := NewExternalNameKey(cr)
+	r.NoError(err)
 	const calls = 10
 	for range calls {
-		_, err := client.DescribeInstance(context.Background(), cr)
+		_, err := client.DescribeInstance(context.Background(), key)
 		r.NoError(err)
 	}
 
@@ -148,13 +150,15 @@ func TestDescribeInstance_SingleflightConcurrent(t *testing.T) {
 	client, rt, _ := buildEntitlementsClient(t, assignmentsHandler(&fires, &mu))
 
 	cr := newTestCR(testService, testPlan, testSubaccount)
+	key, err := NewExternalNameKey(cr)
+	r.NoError(err)
 	const workers = 32
 	var wg sync.WaitGroup
 	start := make(chan struct{})
 	for range workers {
 		wg.Go(func() {
 			<-start
-			_, err := client.DescribeInstance(context.Background(), cr)
+			_, err := client.DescribeInstance(context.Background(), key)
 			r.NoError(err)
 		})
 	}
@@ -180,7 +184,9 @@ func TestDescribeInstance_DistinctKeys_NoSharing(t *testing.T) {
 
 	for i := range 5 {
 		cr := newTestCR(testService, testPlan, fmt.Sprintf("sub-%d", i))
-		_, err := client.DescribeInstance(context.Background(), cr)
+		key, err := NewExternalNameKey(cr)
+		r.NoError(err)
+		_, err = client.DescribeInstance(context.Background(), key)
 		r.NoError(err)
 	}
 
@@ -219,24 +225,26 @@ func TestUpdateInstance_InvalidatesDescribeCache(t *testing.T) {
 	client, rt, _ := buildEntitlementsClient(t, handler)
 
 	cr := newTestCR(testService, testPlan, testSubaccount)
+	key, err := NewExternalNameKey(cr)
+	r.NoError(err)
 
 	// First describe → 1 GET.
-	_, err := client.DescribeInstance(context.Background(), cr)
+	_, err = client.DescribeInstance(context.Background(), key)
 	r.NoError(err)
 	r.Equal(uint64(1), rt.CountFor("GET", "/entitlements/v1/assignments"))
 
 	// Second describe within TTL → still 1 GET (cache hit).
-	_, err = client.DescribeInstance(context.Background(), cr)
+	_, err = client.DescribeInstance(context.Background(), key)
 	r.NoError(err)
 	r.Equal(uint64(1), rt.CountFor("GET", "/entitlements/v1/assignments"))
 
 	// PUT SetServicePlans → 1 PUT + invalidates cache key.
-	err = client.UpdateInstance(context.Background(), cr)
+	err = client.UpdateInstance(context.Background(), key, cr)
 	r.NoError(err)
 	r.Equal(uint64(1), rt.CountFor("PUT", "/entitlements/v1/subaccountServicePlans"))
 
 	// Third describe post-write → forced fresh GET.
-	_, err = client.DescribeInstance(context.Background(), cr)
+	_, err = client.DescribeInstance(context.Background(), key)
 	r.NoError(err)
 	r.Equal(uint64(2), rt.CountFor("GET", "/entitlements/v1/assignments"),
 		"UpdateInstance must invalidate the describe cache; expected 2 GETs total after write, got %d",
