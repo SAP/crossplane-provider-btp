@@ -1,4 +1,4 @@
-FROM alpine:3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
+FROM alpine@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
 RUN apk --no-cache add ca-certificates bash
 
 ARG TARGETOS
@@ -20,19 +20,34 @@ ARG CROSSPLANE_PROVIDER_VERSION
 
 ## End of - Provider-dependent configuration
 
-ENV PLUGIN_DIR=/terraform/provider-mirror/registry.terraform.io/${TERRAFORM_PROVIDER_SOURCE}/${TERRAFORM_PROVIDER_VERSION}/${TARGETOS}_${TARGETARCH}
+# OpenTofu (MPL-2.0) normalizes provider source addresses to lowercase and
+# uses `registry.opentofu.org` (not `registry.terraform.io`) as the implicit
+# hostname when `main.tf.json` says e.g. `"source":"SAP/btp"`. It also
+# refuses symlinks inside the mirror tree (only the mirror root may be a
+# symlink). So we lay the mirror down at the path OpenTofu actually searches:
+# `/terraform/provider-mirror/registry.opentofu.org/<lowercase-source>/<ver>/<os>_<arch>`.
+# `TERRAFORM_PROVIDER_SOURCE` stays `SAP/btp` for the rest of the codebase
+# (main.tf.json, host-side schema generation, etc.); only the on-disk plugin
+# path is lowercased.
+ENV PLUGIN_DIR=/terraform/provider-mirror/registry.opentofu.org/sap/btp/${TERRAFORM_PROVIDER_VERSION}/${TARGETOS}_${TARGETARCH}
 ENV TF_CLI_CONFIG_FILE=/terraform/.terraformrc
 ENV TF_FORK=0
 
 RUN mkdir -p ${PLUGIN_DIR}
 
-ADD https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_${TARGETOS}_${TARGETARCH}.zip /tmp
+ADD https://github.com/opentofu/opentofu/releases/download/v${TERRAFORM_VERSION}/tofu_${TERRAFORM_VERSION}_${TARGETOS}_${TARGETARCH}.zip /tmp/opentofu.zip
 ADD https://github.com/SAP/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}/releases/download/v${TERRAFORM_PROVIDER_VERSION}/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}_${TERRAFORM_PROVIDER_VERSION}_${TARGETOS}_${TARGETARCH}.zip /tmp
 COPY terraformrc.hcl ${TF_CLI_CONFIG_FILE}
 
-RUN unzip /tmp/terraform_${TERRAFORM_VERSION}_${TARGETOS}_${TARGETARCH}.zip -d /usr/local/bin \
+# OpenTofu (MPL-2.0) is installed under the name `terraform`. Upjet's executor
+# hardcodes the binary name "terraform" (workspace.go:413); OpenTofu is a
+# drop-in replacement at the CLI level, so we just rename on install.
+# Required for the identity-injector workaround (#521): identity forwarding
+# lands in CLI 1.12+ (Terraform CLI ≥ 1.12 is BSL; OpenTofu 1.12+ is MPL-2.0).
+RUN unzip /tmp/opentofu.zip -d /tmp/opentofu \
+  && mv /tmp/opentofu/tofu /usr/local/bin/terraform \
   && chmod +x /usr/local/bin/terraform \
-  && rm /tmp/terraform_${TERRAFORM_VERSION}_${TARGETOS}_${TARGETARCH}.zip \
+  && rm -rf /tmp/opentofu /tmp/opentofu.zip \
   && unzip /tmp/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}_${TERRAFORM_PROVIDER_VERSION}_${TARGETOS}_${TARGETARCH}.zip -d ${PLUGIN_DIR} \
   && chmod +x ${PLUGIN_DIR}/* \
   && rm /tmp/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}_${TERRAFORM_PROVIDER_VERSION}_${TARGETOS}_${TARGETARCH}.zip \

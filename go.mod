@@ -2,6 +2,8 @@ module github.com/sap/crossplane-provider-btp
 
 go 1.25.9
 
+tool golang.org/x/tools/cmd/goimports
+
 // Module conflict in Go dependencies. The package google.golang.org/genproto/googleapis/api/httpbody exists in two different modules:
 // - google.golang.org/genproto (older version)
 // - google.golang.org/genproto/googleapis/api (newer, split module)
@@ -40,10 +42,10 @@ require (
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/controller-runtime v0.22.0
-	sigs.k8s.io/controller-tools v0.20.0
+	sigs.k8s.io/controller-tools v0.20.1
 	sigs.k8s.io/e2e-framework v0.6.0
 	sigs.k8s.io/yaml v1.6.0
-	software.sslmate.com/src/go-pkcs12 v0.7.0
+	software.sslmate.com/src/go-pkcs12 v0.7.3
 )
 
 require (
@@ -223,6 +225,7 @@ require (
 	golang.org/x/mod v0.34.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/telemetry v0.0.0-20260209163413-e7419c687ee4 // indirect
 	golang.org/x/term v0.40.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/time v0.14.0 // indirect

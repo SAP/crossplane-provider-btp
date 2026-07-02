@@ -144,7 +144,7 @@ func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1beta1
 		return errors.Wrap(err, errGetPlanId)
 	}
 
-	id, err := sm.PlanIDByName(ctx, "cis", "local")
+	id, err := sm.PlanIDByName(ctx, "cis", "local", "")
 	if err != nil {
 		return errors.Wrap(err, errGetPlanId)
 	}

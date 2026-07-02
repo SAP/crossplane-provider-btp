@@ -1,5 +1,4 @@
-//go:build e2e
-// +build e2e
+//go:build e2e_long
 
 package e2e
 
@@ -26,11 +25,6 @@ var (
 
 func TestServiceBinding_RotationLifecycle(t *testing.T) {
 	// When watchting the test, it took around 600s (10 min). So for now only running it if in "long mode"
-	if testing.Short() {
-		t.Skip("skipping rotation tests in short mode - use 'make e2e-long' to run rotation tests")
-		return
-	}
-
 	rotationLifecycleFeature := features.New("ServiceBinding Complete Rotation Lifecycle").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {

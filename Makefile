@@ -4,14 +4,20 @@ PROJECT_NAME := crossplane-provider-btp
 PROJECT_REPO := github.com/sap/$(PROJECT_NAME)
 
 # Terraform Related variables
-export TERRAFORM_VERSION ?= 1.3.9
+# OpenTofu (MPL-2.0) is used as the `terraform` CLI to avoid the BSL of
+# Terraform CLI ≥ 1.6. We install the `tofu` binary under the name `terraform`
+# everywhere upjet expects it — upjet's executor hardcodes the binary name
+# "terraform" (workspace.go:413). OpenTofu is a drop-in replacement at the
+# CLI level. Required for the identity-injector workaround (#521): identity
+# forwarding to the provider lands in CLI 1.12+; OpenTofu 1.12+ has it too.
+export TERRAFORM_VERSION ?= 1.12.3
 
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
-export TERRAFORM_PROVIDER_VERSION ?= 1.15.1
+export TERRAFORM_PROVIDER_VERSION ?= 1.23.1
 export TERRAFORM_PROVIDER_DOWNLOAD_NAME ?= terraform-provider-btp
 export TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX ?= https://releases.hashicorp.com/$(TERRAFORM_PROVIDER_DOWNLOAD_NAME)/$(TERRAFORM_PROVIDER_VERSION)
-export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.15.1_x5
+export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.23.1_x5
 export TERRAFORM_DOCS_PATH ?= docs/resources
 
 # set BUILD_ID if its not running in an action
@@ -77,6 +83,14 @@ local-build: build xpkg.build.provider-btp
 	docker tag $$XPKG_SHA $(UUT_XPKG);
 	$(OK) "Built local images: $(UUT_CONFIG) $(UUT_XPKG)"
 
+.PHONY: local-deploy-prebuilt
+local-deploy-prebuilt:
+	$(INFO) "Loading prebuilt xpkg into docker as $(UUT_XPKG)"
+	@XPKG_FILE=$$(find $(XPKG_OUTPUT_DIR)/$(PLATFORM) -name "*.xpkg" | head -1) && \
+	XPKG_SHA=$$(docker load -i $$XPKG_FILE | sed -n 's/.*ID: //p') && \
+	docker tag $$XPKG_SHA $(UUT_XPKG)
+	$(OK) "Prebuilt xpkg loaded as $(UUT_XPKG)"
+
 # ====================================================================================
 # Setup XPKG
 
@@ -136,13 +150,13 @@ $(TERRAFORM_PROVIDER_SCHEMA): $(TERRAFORM)
 	@$(OK) generating provider schema for $(TERRAFORM_PROVIDER_SOURCE) $(TERRAFORM_PROVIDER_VERSION)
 
 $(TERRAFORM):
-	@$(INFO) installing terraform $(HOSTOS)-$(HOSTARCH)
+	@$(INFO) installing opentofu $(TERRAFORM_VERSION) as terraform $(HOSTOS)-$(HOSTARCH)
 	@mkdir -p $(TOOLS_HOST_DIR)/tmp-terraform
-	@curl -fsSL https://releases.hashicorp.com/terraform/$(TERRAFORM_VERSION)/terraform_$(TERRAFORM_VERSION)_$(SAFEHOST_PLATFORM).zip -o $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip
+	@curl -fsSL https://github.com/opentofu/opentofu/releases/download/v$(TERRAFORM_VERSION)/tofu_$(TERRAFORM_VERSION)_$(SAFEHOST_PLATFORM).zip -o $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip
 	@unzip $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip -d $(TOOLS_HOST_DIR)/tmp-terraform
-	@mv $(TOOLS_HOST_DIR)/tmp-terraform/terraform $(TERRAFORM)
+	@mv $(TOOLS_HOST_DIR)/tmp-terraform/tofu $(TERRAFORM)
 	@rm -fr $(TOOLS_HOST_DIR)/tmp-terraform
-	@$(OK) installing terraform $(HOSTOS)-$(HOSTARCH)
+	@$(OK) installing opentofu $(TERRAFORM_VERSION) as terraform $(HOSTOS)-$(HOSTARCH)
 pull-docs:
 	@$(INFO) pull-docs called
 	@if [ ! -d "$(WORK_DIR)/$(TERRAFORM_PROVIDER_SOURCE)" ]; then \
@@ -157,7 +171,13 @@ clean-work:
 	@$(INFO) cleaning work directory
 	@rm -rf .work
 
-generate.init: clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
+.PHONY: install-tools
+install-tools:
+	@$(INFO) installing Go tools from go.mod
+	@$(GO) install tool
+	@$(OK) installing Go tools from go.mod
+
+generate.init: install-tools clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
 
 .PHONY: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs terraform.buildvars
 
@@ -271,7 +291,7 @@ e2e.run: test-acceptance
 #run single test-e2e-long test with <make e2e testFilter=functionNameOfTest>
 test-e2e-long: local-build $(KIND) $(HELM3) generate-test-crs
 	@$(INFO) running integration tests
-	go test -v $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
+	go test -v $(PROJECT_REPO)/test/e2e -tags=e2e_long -count=1 -test.v -run '^$(testFilter)$$' -timeout 150m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
@@ -281,11 +301,15 @@ test-e2e-long: local-build $(KIND) $(HELM3) generate-test-crs
      esac
 
 #run single e2e test with <make e2e testFilter=functionNameOfTest>
+# Deploy mechanism for test-acceptance. Default rebuilds locally (local dev);
+# CI overrides to local-deploy-prebuilt to consume artifacts from the build job.
+ACCEPTANCE_DEPLOY ?= local-build
+
 .PHONY: test-acceptance
-test-acceptance: local-build $(KIND) $(HELM3) generate-test-crs
+test-acceptance: $(ACCEPTANCE_DEPLOY) $(KIND) generate-test-crs
 	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
-	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
+	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
@@ -298,7 +322,7 @@ test-acceptance-debug: local-build $(KIND) $(HELM3) generate-test-crs
 	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
 	go test -gcflags="all=-N -l" -c -v  $(PROJECT_REPO)/test/e2e/ -tags=e2e -o ./test/e2e/test-acceptance-debug.test -timeout 30m
-	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
+	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
 	@$(OK) end-to-end tests passed
 
 .PHONY: generate-test-crs

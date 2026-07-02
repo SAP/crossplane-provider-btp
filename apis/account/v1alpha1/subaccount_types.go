@@ -9,6 +9,12 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
+// SubaccountLabelValueList is a list of values for one Subaccount label key.
+// Bounded so the CEL value-length rule on Subaccount.spec.forProvider.labels stays inside the API server's per-rule cost budget.
+// +kubebuilder:validation:MaxItems=10
+// +kubebuilder:validation:items:MaxLength=63
+type SubaccountLabelValueList []string
+
 // SubaccountParameters are the configurable fields of a Subaccount.
 type SubaccountParameters struct {
 	// enable beta services and applications?
@@ -27,8 +33,12 @@ type SubaccountParameters struct {
 
 	// Labels, up to 10 user-defined labels to assign as key-value pairs to the subaccount. Each label has a name (key) that you specify, and to which you can assign up to 10 corresponding values or leave empty.
 	// Keys and values are each limited to 63 characters.
+	// Limits sourced from the BTP accounts-service OpenAPI: CreateSubaccountRequestPayload and UpdateSubaccountRequestPayload at https://accounts-service.cfapps.<region>.hana.ondemand.com/v3/api-docs.
+	// Value-array length and value-string length are bounded on the SubaccountLabelValueList type below; key length needs CEL because OpenAPI has no map-key-length marker.
 	// +optional
-	Labels map[string][]string `json:"labels,omitempty"`
+	// +kubebuilder:validation:MaxProperties=10
+	// +kubebuilder:validation:XValidation:rule="self.all(k, size(k) <= 63)",message="label keys must be at most 63 characters"
+	Labels map[string]SubaccountLabelValueList `json:"labels,omitempty"`
 
 	// Region
 	// Change requires recreation
