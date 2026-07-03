@@ -161,7 +161,7 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 		return "", errors.Wrap(err, instanceCreateFailed)
 	}
 
-	for _, managerEmail := range cr.Spec.ForProvider.Managers {
+	for _, managerEmail := range filterOutUser(cr.Spec.ForProvider.Managers, adminServiceAccountEmail) {
 		if err := cloudFoundryClient.addManager(ctx, managerEmail, defaultOrigin); err != nil {
 			return "", errors.Wrap(err, instanceCreateFailed)
 		}
@@ -183,6 +183,16 @@ func FormOrgName(orgName string, subaccountId string, crName string) string {
 		return subaccountId + "-" + crName
 	}
 	return orgName
+}
+
+func filterOutUser(users []string, exclude string) []string {
+	result := make([]string, 0, len(users))
+	for _, u := range users {
+		if u != exclude {
+			result = append(result, u)
+		}
+	}
+	return result
 }
 
 type organizationClient struct {
