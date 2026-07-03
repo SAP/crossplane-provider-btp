@@ -36,6 +36,14 @@ limitations under the License.
 // Run Upjet generator
 //go:generate go run ../cmd/generator/main.go ..
 
+// Patch upjet-generated zz_controller.go files to wrap o.WorkspaceStore in
+// tfclient.NewIdentityInjectingStore at the NewConnector call site. Workaround
+// for issue #521 — upjet's controller template has no public override hook, and
+// Options.WorkspaceStore must stay *terraform.WorkspaceStore (NewWorkspaceFinalizer
+// needs the concrete type). Idempotent. Remove when no-fork (PR #680 / issue
+// #207) lands. See ../cmd/zz-inject-identity/main.go.
+//go:generate go run ../cmd/zz-inject-identity -root ../internal/controller
+
 // Inject custom backoff settings on top of generated controllers
 //go:generate ../hack/helpers/ctrl_inject_backoff.sh
 

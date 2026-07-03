@@ -3,12 +3,15 @@ package entitlement
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	entclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -28,22 +31,52 @@ func NewEntitlementsClient(btp btp.Client) *EntitlementsClient {
 
 }
 
+// Package-level singleflight + short-TTL cache for GetDirectoryAssignments
+// responses. Keyed by (subaccountGUID, serviceName, planName). Singleflight
+// dedupes concurrent sibling reconciles; the TTL absorbs the back-to-back
+// fan-out across all CRs hitting the same key within a single poll tick.
+// Writes invalidate their own key so post-write reads see fresh state.
+var (
+	describeGroup singleflight.Group
+	describeCache sync.Map // string → *describeEntry
+)
+
+const describeCacheT = 30 * time.Second
+
+type describeEntry struct {
+	val *entclient.EntitledAndAssignedServicesResponseObject
+	at  time.Time
+}
+
+func describeCacheGet(key string) *entclient.EntitledAndAssignedServicesResponseObject {
+	v, ok := describeCache.Load(key)
+	if !ok {
+		return nil
+	}
+	e := v.(*describeEntry)
+	if time.Since(e.at) > describeCacheT {
+		describeCache.Delete(key)
+		return nil
+	}
+	return e.val
+}
+
 func (c EntitlementsClient) DescribeInstance(
 	ctx context.Context,
 	cr *v1alpha1.Entitlement,
 ) (*Instance, error) {
 
-	response, _, err := c.btp.EntitlementsServiceClient.
-		GetDirectoryAssignments(ctx).
-		SubaccountGUID(cr.Spec.ForProvider.SubaccountGuid).
-		AssignedServiceName(cr.Spec.ForProvider.ServiceName).
-		Execute()
+	subaccountGUID := cr.Spec.ForProvider.SubaccountGuid
+	serviceName := cr.Spec.ForProvider.ServiceName
+	planName := cr.Spec.ForProvider.ServicePlanName
+	key := subaccountGUID + "|" + serviceName + "|" + planName
+
+	response, err := c.fetchAssignments(ctx, key, subaccountGUID, serviceName, planName)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceName := cr.Spec.ForProvider.ServiceName
-	servicePlanName := cr.Spec.ForProvider.ServicePlanName
+	servicePlanName := planName
 
 	// assignment can be nil, that is a valid response, as acc/dir will anot always have all assignments set
 	assignment, err := c.findAssignedServicePlan(response, cr)
@@ -65,6 +98,34 @@ func (c EntitlementsClient) DescribeInstance(
 		EntitledServicePlan: entitledServicePlan,
 		Assignment:          assignment,
 	}, nil
+}
+
+// fetchAssignments returns the GetDirectoryAssignments response for the given
+// (subaccount, service, plan), reusing a cached value (TTL describeCacheT) and
+// deduping concurrent fetches via singleflight. serviceName+planName narrows
+// BOTH entitledServices and assignedServices server-side, dropping response
+// payload ~50-100× vs assignedServiceName alone.
+func (c EntitlementsClient) fetchAssignments(ctx context.Context, key, subaccountGUID, serviceName, planName string) (*entclient.EntitledAndAssignedServicesResponseObject, error) {
+	v, err, _ := describeGroup.Do(key, func() (any, error) {
+		if cached := describeCacheGet(key); cached != nil {
+			return cached, nil
+		}
+		resp, _, err := c.btp.EntitlementsServiceClient.
+			GetDirectoryAssignments(ctx).
+			SubaccountGUID(subaccountGUID).
+			ServiceName(serviceName).
+			PlanName(planName).
+			Execute()
+		if err != nil {
+			return nil, err
+		}
+		describeCache.Store(key, &describeEntry{val: resp, at: time.Now()})
+		return resp, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(*entclient.EntitledAndAssignedServicesResponseObject), nil
 }
 
 func (c EntitlementsClient) CreateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
@@ -132,6 +193,10 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 	if err != nil {
 		return specifyAPIError(err, errors.Wrapf(err, errFailedSetEntitlements, serviceName, planName))
 	}
+
+	// Invalidate the singleflight TTL cache so the next Observe reads
+	// fresh state instead of pre-write data.
+	describeCache.Delete(cr.Spec.ForProvider.SubaccountGuid + "|" + serviceName + "|" + planName)
 
 	return nil
 }

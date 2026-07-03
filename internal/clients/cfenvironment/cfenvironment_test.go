@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -147,6 +148,48 @@ func TestCloudFoundryOrganization_LegacyFormatHandling(t *testing.T) {
 	actualOrgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	if actualOrgName != expectedOrgName {
 		t.Errorf("OrgName mismatch: got %v, want %v", actualOrgName, expectedOrgName)
+	}
+}
+
+func TestFilterOutUser(t *testing.T) {
+	tests := []struct {
+		name    string
+		users   []string
+		exclude string
+		want    []string
+	}{
+		{
+			name:    "TechUserInList_IsFiltered",
+			users:   []string{"other@example.com", "techuser@example.com", "another@example.com"},
+			exclude: "techuser@example.com",
+			want:    []string{"other@example.com", "another@example.com"},
+		},
+		{
+			name:    "TechUserNotInList_NoChange",
+			users:   []string{"other@example.com", "another@example.com"},
+			exclude: "techuser@example.com",
+			want:    []string{"other@example.com", "another@example.com"},
+		},
+		{
+			name:    "OnlyTechUser_ReturnsEmpty",
+			users:   []string{"techuser@example.com"},
+			exclude: "techuser@example.com",
+			want:    []string{},
+		},
+		{
+			name:    "EmptyList_ReturnsEmpty",
+			users:   []string{},
+			exclude: "techuser@example.com",
+			want:    []string{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := filterOutUser(tt.users, tt.exclude)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("filterOutUser() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

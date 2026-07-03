@@ -1,794 +1,36 @@
 {
-  "components": {
-    "schemas": {
-      "ApiExceptionResponseObject": {
-        "properties": {
-          "error": {
-            "description": "List of assigned entitlements and their specifications.",
-            "properties": {
-              "code": {
-                "description": "the error code.",
-                "type": "number"
-              },
-              "correlationID": {
-                "description": "in case of incident, please report this correlation id.",
-                "type": "string"
-              },
-              "message": {
-                "description": "error message helping to resolve the issue",
-                "type": "string"
-              },
-              "target": {
-                "description": "The susppect.",
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        },
-        "required": [
-          "error"
-        ],
-        "type": "object"
-      },
-      "AssignedServicePlanResponseObject": {
-        "description": "List of service plans associated with the assigned service.",
-        "properties": {
-          "assignmentInfo": {
-            "description": "Assignment detailed information",
-            "items": {
-              "$ref": "#/components/schemas/AssignedServicePlanSubaccountDTO"
-            },
-            "type": "array"
-          },
-          "beta": {
-            "description": "Whether the service plan is a beta feature.",
-            "type": "boolean"
-          },
-          "category": {
-            "description": "The type of service offering. Possible values:\n* <b>PLATFORM:</b> A service required for using a specific platform; for example, Application Runtime is required for the Cloud Foundry platform.\n* <b>SERVICE:</b> A commercial or technical service. that has a numeric quota (amount) when entitled or assigned to a resource. When assigning entitlements of this type, use the 'amount' option instead of 'enable'. See: PUT/entitlements/v1/directories/{directoryGUID}/assignments.\n* <b>ELASTIC_SERVICE:</b> A commercial or technical service that has no numeric quota (amount) when entitled or assigned to a resource. Generally this type of service can be as many times as needed when enabled, but may in some cases be restricted by the service owner. When assigning entitlements of this type, use the 'enable' option instead of 'amount'. See: PUT/entitlements/v1/directories/{directoryGUID}/assignments.\n* <b>ELASTIC_LIMITED:</b> An elastic service that can be enabled for only one subaccount per global account.\n* <b>APPLICATION:</b> A multitenant application to which consumers can subscribe. As opposed to applications defined as a 'QUOTA_BASED_APPLICATION', these applications do not have a numeric quota and are simply enabled or disabled as entitlements per subaccount.\n* <b>QUOTA_BASED_APPLICATION:</b> A multitenant application to which consumers can subscribe. As opposed to applications defined as 'APPLICATION', these applications have an numeric quota that limits consumer usage of the subscribed application per subaccount. When maxAllowedSubaccountQuota is > 0, this is the limit that can be set when assigning the max quota entitlement of the app to any subaccount. If maxAllowedSubaccountQuota is = 0 or null, the max quota that can be entitled to any subaccount is the amount purchased by the customer (the global account quota).\n* <b>ENVIRONMENT:</b> An environment service; for example, Cloud Foundry.",
-            "enum": [
-              "PLATFORM",
-              "SERVICE",
-              "ELASTIC_SERVICE",
-              "ELASTIC_LIMITED",
-              "APPLICATION",
-              "QUOTA_BASED_APPLICATION",
-              "ENVIRONMENT"
-            ],
-            "type": "string"
-          },
-          "displayName": {
-            "description": "The name of the service plan for customer-facing UIs.",
-            "type": "string"
-          },
-          "maxAllowedSubaccountQuota": {
-            "description": "The maximum allowed usage quota per subaccount for multitenant applications and environments that are defined as \"quota-based\". This quota limits the usage of the application and/or environment per subaccount per a given usage metric that is defined within the application or environment by the service provider. If null, the usage limit per subaccount is the maximum free quota in the global account.\nFor example, a value of 1 could: (1) limit the number of subscriptions to a quota-based multitenant application within a global account according to the purchased quota, or (2) restrict the enablement of a single instance of an environment per subaccount.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "name": {
-            "description": "The unique registration name of the service plan.",
-            "type": "string"
-          },
-          "uniqueIdentifier": {
-            "description": "A unique identifier for service plans that can distinguish between the same service plans with different pricing plans.",
-            "type": "string"
-          },
-          "unlimited": {
-            "description": "Is the quota of this service plan entitled to the global account with unlimited usage.",
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "AssignedServicePlanSubaccountDTO": {
-        "description": "Assignment detailed information",
-        "properties": {
-          "amount": {
-            "description": "The quantity of the entitlement that is assigned to the root global account or directory.",
-            "type": "number"
-          },
-          "autoAssign": {
-            "description": "Whether the plan is automatically distributed to the subaccounts that are located in the directory.",
-            "type": "boolean"
-          },
-          "autoAssigned": {
-            "description": "Specifies if the plan was automatically assigned regardless of any action by an admin. This applies to entitlements that are always available to subaccounts and cannot be removed.",
-            "type": "boolean"
-          },
-          "autoDistributeAmount": {
-            "description": "The amount of the entitlement to automatically assign to subaccounts that are added in the future to the entitlement's assigned directory.  \nRequires that autoAssign is set to TRUE, and there is remaining quota for the entitlement. To automatically distribute to subaccounts that are added in the future to the directory, distribute must be set to TRUE.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "createdDate": {
-            "description": "Date the subaccount has been created. Dates and times are in UTC format.",
-            "format": "number",
-            "type": "string"
-          },
-          "entityId": {
-            "description": "The unique ID of the global account or directory to which the entitlement is assigned.",
-            "example": "GUID of GLOBAL_ACCOUNT or SUBACCOUNT",
-            "type": "string"
-          },
-          "entityState": {
-            "description": "The current state of the service plan assignment.\n* <b>STARTED:</b> CRUD operation on an entity has started.\n* <b>PROCESSING:</b> A series of operations related to the entity is in progress.\n* <b>PROCESSING_FAILED:</b> The processing operations failed.\n* <b>OK:</b> The CRUD operation or series of operations completed successfully.",
-            "enum": [
-              "STARTED",
-              "PROCESSING",
-              "PROCESSING_FAILED",
-              "OK"
-            ],
-            "type": "string"
-          },
-          "entityType": {
-            "description": "The type of entity to which the entitlement is assigned.\n* <b>SUBACCOUNT:</b> The entitlement is assigned to a subaccount.\n* <b>GLOBAL_ACCOUNT:</b> The entitlement is assigned to a root global account.\n* <b>DIRECTORY:</b> The entitlement is assigned to a directory.",
-            "enum": [
-              "SUBACCOUNT",
-              "GLOBAL_ACCOUNT",
-              "DIRECTORY"
-            ],
-            "example": "GLOBAL_ACCOUNT or SUBACCOUNT",
-            "type": "string"
-          },
-          "modifiedDate": {
-            "description": "Date the subaccount has been modified. Dates and times are in UTC format.",
-            "format": "number",
-            "type": "string"
-          },
-          "parentAmount": {
-            "type": "number"
-          },
-          "parentId": {
-            "type": "string"
-          },
-          "parentRemainingAmount": {
-            "type": "number"
-          },
-          "parentType": {
-            "enum": [
-              "SUBACCOUNT",
-              "GLOBAL_ACCOUNT",
-              "DIRECTORY"
-            ],
-            "type": "string"
-          },
-          "requestedAmount": {
-            "description": "The requested amount when it is different from the actual amount because the request state is still in process or failed.",
-            "type": "number"
-          },
-          "resources": {
-            "description": "Global account resource details",
-            "items": {
-              "$ref": "#/components/schemas/ExternalResourceRequestPayload"
-            },
-            "type": "array"
-          },
-          "stateMessage": {
-            "description": "Information about the current state.",
-            "type": "string"
-          },
-          "unlimitedAmountAssigned": {
-            "description": "True, if an unlimited quota of this service plan assigned to the directory or subaccount in the global account. False, if the service plan is assigned to the directory or subaccount with a limited numeric quota, even if the service plan has an unlimited usage entitled on the level of the global account.",
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "AssignedServiceResponseObject": {
-        "description": "The list of services that are assigned to subaccounts located under a global account.",
-        "properties": {
-          "applicationCoordinates": {
-            "type": "object"
-          },
-          "businessCategory": {
-            "$ref": "#/components/schemas/BusinessCategoryResponseObject"
-          },
-          "displayName": {
-            "description": "Display name of the service for customer-facing UIs.",
-            "type": "string"
-          },
-          "iconBase64": {
-            "description": "The icon of the service in Base64 format.",
-            "type": "string"
-          },
-          "name": {
-            "description": "The unique registration name of the deployed service as defined by the service provider.",
-            "type": "string"
-          },
-          "ownerType": {
-            "description": "The owner type of the service. Possible values:\n* <b>VENDOR:</b> The owner is a service owner, who is affiliated with the cloud operator, that added the service to the product catalog for general consumption.\n* <b>CUSTOMER:</b> The owner is an SAP customer that added a custom service to the product catalog, and it is available only for consumption within the customer's global account.\n* <b>PARTNER:</b> The owner is an SAP partner that added the service to the product catalog, and it is available only to their customers for consumption.\n",
-            "enum": [
-              "VENDOR",
-              "CUSTOMER",
-              "PARTNER"
-            ],
-            "type": "string"
-          },
-          "servicePlans": {
-            "description": "List of service plans associated with the assigned service.",
-            "items": {
-              "$ref": "#/components/schemas/AssignedServicePlanResponseObject"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "BusinessCategoryResponseObject": {
-        "properties": {
-          "displayName": {
-            "description": "Display name of the business category for customer-facing UIs.",
-            "type": "string"
-          },
-          "id": {
-            "description": "Unique ID of the business category.",
-            "type": "string"
-          }
-        },
-        "title": "BusinessCategoryResponseObject",
-        "type": "object"
-      },
-      "CommercialModelResponseObject": {
-        "description": "The commercial model type assigned to the entitlement.",
-        "properties": {
-          "consumptionBased": {
-            "description": "Whether a customer pays only for services that they actually use (consumption-based) or pays for subscribed services at a fixed cost irrespective of consumption (subscription-based).\n<b>True:</b> Consumption-based commercial model.<b>False:</b> Subscription-based commercial model.",
-            "type": "boolean"
-          },
-          "containedCommercialModels": {
-            "description": "Directly contained commercial models.",
-            "items": {
-              "$ref": "#/components/schemas/CommercialModelResponseObject"
-            },
-            "type": "array"
-          },
-          "description": {
-            "description": "A description of the commercial model",
-            "type": "string"
-          },
-          "displayName": {
-            "description": "A descriptive name of the commercial model for customer-facing UIs.",
-            "type": "string"
-          },
-          "name": {
-            "description": "Technical name of the commercial model.",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "DataCenterResponseCollection": {
-        "properties": {
-          "datacenters": {
-            "description": "Contains information about the available data centers for a specified global account.",
-            "items": {
-              "$ref": "#/components/schemas/DataCenterResponseObject"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "DataCenterResponseObject": {
-        "description": "Contains information about the data centers and regions in the cloud landscape",
-        "properties": {
-          "displayName": {
-            "description": "Descriptive name of the data center for customer-facing UIs.",
-            "type": "string"
-          },
-          "domain": {
-            "description": "The domain of the data center",
-            "type": "string"
-          },
-          "environment": {
-            "description": "The environment that the data center supports. For example: Kubernetes, Cloud Foundry.",
-            "type": "string"
-          },
-          "iaasProvider": {
-            "description": "The infrastructure provider for the data center. Valid values:\n* <b>AWS:</b> Amazon Web Services.\n* <b>GCP:</b> Google Cloud Platform.\n* <b>AZURE:</b> Microsoft Azure.\n* <b>SAP:</b> SAP BTP (Neo).\n* <b>ALI:</b> Alibaba Cloud.\n* <b>IBM:</b> IBM Cloud.",
-            "enum": [
-              "AWS",
-              "GCP",
-              "AZURE",
-              "SAP",
-              "ALI",
-              "IBM"
-            ],
-            "type": "string"
-          },
-          "isMainDataCenter": {
-            "description": "Whether the data center is designated as the primary data center within its region. Note that regions that comprise multiple data centers can have only one main data center defined.",
-            "type": "boolean"
-          },
-          "name": {
-            "description": "Technical name of the data center. Must be unique within the cloud deployment.",
-            "type": "string"
-          },
-          "provisioningServiceUrl": {
-            "description": "Provisioning service URL.",
-            "type": "string"
-          },
-          "region": {
-            "description": "The region in which the data center is located.",
-            "type": "string"
-          },
-          "saasRegistryServiceUrl": {
-            "description": "Saas-Registry service URL.",
-            "type": "string"
-          },
-          "supportsTrial": {
-            "description": "Whether the specified data center supports trial accounts.",
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "DirectoryAssignmentsPatchUpdateRequestPayload": {
-        "properties": {
-          "autoAssign": {
-            "description": "Whether to automatically allocate the plans of entitlements that have a numeric quota with the amount specified in auto-distribute-amount to any new subaccount that is added to the directory in the future. For entitlements without a numeric quota, the plan is assigned to any new subaccount that is added to the directory in the future with the condition that enable=TRUE is set (autoDistributeAmount is not relevant in this case). If distribute=TRUE, the same assignment is also made to all subaccounts currently in the directory. Entitlements are subject to available quota in the directory.",
-            "type": "boolean"
-          },
-          "autoDistributeAmount": {
-            "description": "The quota of the specified plan to automatically allocate to any new subaccount that is created in the future in the directory.\nWhen applying this option, you must set autoAssign=TRUE and/or distribute=TRUE. Applies only to entitlements that have a numeric quota. Entitlements are subject to available quota in the directory.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "distribute": {
-            "description": "Whether to assign the plan with the quota specified in autoDistributeAmount to subaccounts currently located in the specified directory. For entitlements without a numeric quota, such as multitenant apps, the plan is assigned to the subaccounts currently located in the directory (autoDistributeAmount is not relevant in this case). In both cases, autoAssign must be set to TRUE.",
-            "type": "boolean"
-          },
-          "plan": {
-            "description": "The technical name of the entitlement to assign to the directory.",
-            "type": "string"
-          },
-          "planUniqueIdentifier": {
-            "description": "A unique identifier for service plans that can distinguish between the same service plans with different pricing plans.",
-            "type": "string"
-          },
-          "service": {
-            "description": "The technical name of the entitlement (service, application, environment) to assign.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "plan",
-          "service"
-        ],
-        "type": "object"
-      },
-      "DirectoryAssignmentsPatchUpdateRequestPayloadCollection": {
-        "description": "JSON object that contains the specifications of an assignment, such as the name of the assigned plan and whether to distribute the quota and how much to subaccounts that currently exist in the directory and to subaccounts that will be added to the directory in the future.",
-        "properties": {
-          "entitlementUpdates": {
-            "items": {
-              "$ref": "#/components/schemas/DirectoryAssignmentsPatchUpdateRequestPayload"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "entitlementUpdates"
-        ],
-        "type": "object"
-      },
-      "DirectoryAssignmentsRequestPayload": {
-        "properties": {
-          "amount": {
-            "description": "The quantity of the plan to assign to the specified directory. Relevant and mandatory only for plans that have a numeric quota.  Do not set if enable=TRUE is specified.",
-            "type": "number"
-          },
-          "autoAssign": {
-            "description": "Whether to automatically allocate the plans of entitlements that have a numeric quota with the amount specified in auto-distribute-amount to any new subaccount that is added to the directory in the future. For entitlements without a numeric quota, the plan is assigned to any new subaccount that is added to the directory in the future with the condition that enable=TRUE is set (autoDistributeAmount is not relevant in this case). If distribute=TRUE, the same assignment is also made to all subaccounts currently in the directory. Entitlements are subject to available quota in the directory.",
-            "type": "boolean"
-          },
-          "autoDistributeAmount": {
-            "description": "The quota of the specified plan to automatically allocate to any new subaccount that is created in the future in the directory.\nWhen applying this option, you must set autoAssign=TRUE and/or distribute=TRUE. Applies only to entitlements that have a numeric quota. Entitlements are subject to available quota in the directory.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "distribute": {
-            "description": "Whether to assign the plan with the quota specified in autoDistributeAmount to subaccounts currently located in the specified directory. For entitlements without a numeric quota, such as multitenant apps, the plan is assigned to the subaccounts currently located in the directory (autoDistributeAmount is not relevant in this case). In both cases, autoAssign must be set to TRUE.",
-            "type": "boolean"
-          },
-          "enable": {
-            "description": "Whether to allocate the plan to the to the specified directory without quantity restrictions. Relevant and mandatory only for plans that don't have a numeric quota. Do not use if amount is specified.",
-            "type": "boolean"
-          },
-          "plan": {
-            "description": "The technical name of the entitlement to assign to the directory.",
-            "type": "string"
-          },
-          "planUniqueIdentifier": {
-            "description": "A unique identifier for service plans that can distinguish between the same service plans with different pricing plans.",
-            "type": "string"
-          },
-          "service": {
-            "description": "The technical name of the entitlement (service, application, environment) to assign.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "plan",
-          "service"
-        ],
-        "type": "object"
-      },
-      "DirectoryAssignmentsRequestPayloadCollection": {
-        "description": "JSON object that contains the specifications of assignment, such as the name of the assigned plan, the quantity to distribute, and whether to distribute the quota and how much to subaccounts that currently exist in the directory and to subaccounts that will added to the directory in the future.",
-        "properties": {
-          "entitlements": {
-            "items": {
-              "$ref": "#/components/schemas/DirectoryAssignmentsRequestPayload"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "entitlements"
-        ],
-        "type": "object"
-      },
-      "EntitledAndAssignedServicesResponseObject": {
-        "properties": {
-          "assignedServices": {
-            "description": "The list of services that are assigned to subaccounts located under a global account.",
-            "items": {
-              "$ref": "#/components/schemas/AssignedServiceResponseObject"
-            },
-            "type": "array"
-          },
-          "entitledServices": {
-            "description": "Services entitled to global account, its directories and subaccounts.",
-            "items": {
-              "$ref": "#/components/schemas/EntitledServicesResponseObject"
-            },
-            "type": "array",
-            "uniqueItems": true
-          },
-          "fetchErrorFromExternalProviderRegistry": {
-            "description": "Whether the External Provider Registry (XPR) is available.",
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "EntitledServicesResponseObject": {
-        "description": "Services entitled to global account, its directories and subaccounts.",
-        "properties": {
-          "applicationCoordinates": {
-            "type": "object"
-          },
-          "businessCategory": {
-            "$ref": "#/components/schemas/BusinessCategoryResponseObject"
-          },
-          "description": {
-            "description": "Description of the service for customer-facing UIs.",
-            "type": "string"
-          },
-          "displayName": {
-            "description": "Display name of the service for customer-facing UIs.",
-            "type": "string"
-          },
-          "iconBase64": {
-            "description": "The icon of the service in Base64 format.",
-            "type": "string"
-          },
-          "name": {
-            "description": "The unique registration name of the deployed service as defined by the service provider.",
-            "type": "string"
-          },
-          "ownerType": {
-            "description": "The owner type of the service. Possible values:\n* <b>VENDOR:</b> The owner is a service owner, who is affiliated with the cloud operator, that added the service to the product catalog for general consumption.\n* <b>CUSTOMER:</b> The owner is an SAP customer that added a custom service to the product catalog, and it is available only for consumption within the customer's global account.\n* <b>PARTNER:</b> The owner is an SAP partner that added the service to the product catalog, and it is available only to their customers for consumption.\n",
-            "enum": [
-              "VENDOR",
-              "CUSTOMER",
-              "PARTNER"
-            ],
-            "type": "string"
-          },
-          "servicePlans": {
-            "description": "List of service plans associated with the entitled service.",
-            "items": {
-              "$ref": "#/components/schemas/ServicePlanResponseObject"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "EntitlementAmountResponseObject": {
-        "description": "Relevant entitlements for the source that added the product.",
-        "properties": {
-          "amount": {
-            "description": "The quantity of the entitlement that is assigned to the root global account or directory.",
-            "type": "number"
-          },
-          "autoAssign": {
-            "description": "Specifies if a plan associated with this entitlement will be automatically assigned by the system to any new subaccount. For example, free plans that are available to all subaccounts.",
-            "type": "boolean"
-          },
-          "commercialModel": {
-            "$ref": "#/components/schemas/CommercialModelResponseObject"
-          },
-          "entitlementName": {
-            "description": "The technical name of the product.",
-            "type": "string"
-          },
-          "productId": {
-            "description": "The unique ID of the material (product) to which the assigned service plan belongs.",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "ExternalResourceRequestPayload": {
-        "description": "External resources to assign to subaccount",
-        "properties": {
-          "resourceData": {
-            "additionalProperties": {
-              "description": "Any additional data to include.",
-              "type": "object"
-            },
-            "description": "Any additional data to include.",
-            "type": "object"
-          },
-          "resourceName": {
-            "description": "The name of the resource.",
-            "type": "string"
-          },
-          "resourceProvider": {
-            "description": "The name of the provider.",
-            "type": "string"
-          },
-          "resourceTechnicalName": {
-            "description": "The unique name of the resource.",
-            "type": "string"
-          },
-          "resourceType": {
-            "description": "The type of the provider. For example infrastructure-as-a-service (IaaS).",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "JsonNode": {
-        "description": "Error description in JSON format",
-        "type": "object"
-      },
-      "NestingErrorDetailsResponseObject": {
-        "description": "Nesting of error responses",
-        "properties": {
-          "code": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "ServicePlanAssignmentRequestPayload": {
-        "description": "Contains information about the plans to assign to a subaccount.",
-        "properties": {
-          "assignmentInfo": {
-            "description": "List of assigned entitlements and their specifications.",
-            "items": {
-              "$ref": "#/components/schemas/SubaccountServicePlanRequestPayload"
-            },
-            "type": "array"
-          },
-          "serviceName": {
-            "description": "The technical name of the entitlement to assign to a subaccount.",
-            "type": "string"
-          },
-          "servicePlanName": {
-            "description": "The technical name of the entitlement's plan.",
-            "type": "string"
-          },
-          "servicePlanUniqueIdentifier": {
-            "description": "The unique identifier of the entitlement's plan. As obtained in the GET assignments endpoint.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "assignmentInfo",
-          "serviceName",
-          "servicePlanName"
-        ],
-        "type": "object"
-      },
-      "ServicePlanResponseObject": {
-        "description": "List of service plans associated with the entitled service.",
-        "properties": {
-          "amount": {
-            "description": "The assigned quota for maximum allowed consumption of the plan. Relevant for services that have a numeric quota assignment.",
-            "type": "number"
-          },
-          "autoAssign": {
-            "description": "Whether to automatically assign a quota of the entitlement to a subaccount when the subaccount is created in the entitlement's assigned directory.",
-            "type": "boolean"
-          },
-          "autoDistributeAmount": {
-            "description": "The amount of the entitlement to automatically assign to a subaccount when the subaccount is created in the entitlement's assigned directory.\nRequires that autoAssign is set to TRUE, and there is remaining quota for the entitlement. ",
-            "format": "int32",
-            "type": "integer"
-          },
-          "availableForInternal": {
-            "description": "Whether the service plan is available internally to SAP users.",
-            "type": "boolean"
-          },
-          "beta": {
-            "description": "Whether the service plan is a beta feature.",
-            "type": "boolean"
-          },
-          "category": {
-            "description": "The type of service offering. Possible values:\n* <b>PLATFORM:</b> A service required for using a specific platform; for example, Application Runtime is required for the Cloud Foundry platform.\n* <b>SERVICE:</b> A commercial or technical service. that has a numeric quota (amount) when entitled or assigned to a resource. When assigning entitlements of this type, use the 'amount' option instead of 'enable'. See: PUT/entitlements/v1/directories/{directoryGUID}/assignments.\n* <b>ELASTIC_SERVICE:</b> A commercial or technical service that has no numeric quota (amount) when entitled or assigned to a resource. Generally this type of service can be as many times as needed when enabled, but may in some cases be restricted by the service owner. When assigning entitlements of this type, use the 'enable' option instead of 'amount'. See: PUT/entitlements/v1/directories/{directoryGUID}/assignments.\n* <b>ELASTIC_LIMITED:</b> An elastic service that can be enabled for only one subaccount per global account.\n* <b>APPLICATION:</b> A multitenant application to which consumers can subscribe. As opposed to applications defined as a 'QUOTA_BASED_APPLICATION', these applications do not have a numeric quota and are simply enabled or disabled as entitlements per subaccount.\n* <b>QUOTA_BASED_APPLICATION:</b> A multitenant application to which consumers can subscribe. As opposed to applications defined as 'APPLICATION', these applications have an numeric quota that limits consumer usage of the subscribed application per subaccount. When maxAllowedSubaccountQuota is > 0, this is the limit that can be set when assigning the max quota entitlement of the app to any subaccount. If maxAllowedSubaccountQuota is = 0 or null, the max quota that can be entitled to any subaccount is the amount purchased by the customer (the global account quota).\n* <b>ENVIRONMENT:</b> An environment service; for example, Cloud Foundry.",
-            "enum": [
-              "PLATFORM",
-              "SERVICE",
-              "ELASTIC_SERVICE",
-              "ELASTIC_LIMITED",
-              "APPLICATION",
-              "QUOTA_BASED_APPLICATION",
-              "ENVIRONMENT"
-            ],
-            "type": "string"
-          },
-          "dataCenters": {
-            "description": "Contains information about the data centers and regions in the cloud landscape",
-            "items": {
-              "$ref": "#/components/schemas/DataCenterResponseObject"
-            },
-            "type": "array"
-          },
-          "description": {
-            "description": "Description of the service plan for customer-facing UIs.",
-            "type": "string"
-          },
-          "displayName": {
-            "description": "Display name of the service plan for customer-facing UIs.",
-            "type": "string"
-          },
-          "internalQuotaLimit": {
-            "description": "The quota limit that is allowed for this service plan for SAP internal users.\nIf null, the default quota limit is set to 200.\nApplies only when the availableForInternal property is set to TRUE.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "maxAllowedSubaccountQuota": {
-            "description": "The maximum allowed usage quota per subaccount for multitenant applications and environments that are defined as \"quota-based\". This quota limits the usage of the application and/or environment per subaccount per a given usage metric that is defined within the application or environment by the service provider. If null, the usage limit per subaccount is the maximum free quota in the global account.\nFor example, a value of 1 could: (1) limit the number of subscriptions to a quota-based multitenant application within a global account according to the purchased quota, or (2) restrict the enablement of a single instance of an environment per subaccount.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "name": {
-            "description": "The unique registration name of the service plan.",
-            "type": "string"
-          },
-          "providedBy": {
-            "description": "[DEPRECATED] The source that added the service. Possible values:\n* <b>VENDOR:</b> The product has been added by SAP or the cloud operator to the product catalog for general use.\n* <b>GLOBAL_ACCOUNT_OWNER:</b> Custom services that are added by a customer and are available only for that customer’s global account.\n* <b>PARTNER:</b> Service that are added by partners. And only available to its customers.\n\nNote: This property is deprecated. Please use the ownerType attribute on the entitledService level instead.",
-            "enum": [
-              "VENDOR",
-              "GLOBAL_ACCOUNT_OWNER",
-              "PARTNER"
-            ],
-            "type": "string"
-          },
-          "provisioningMethod": {
-            "description": "The method used to provision the service plan.\n* <b>SERVICE_BROKER:</b> Provisioning of Neo or Cloud Foundry quotas done by the service broker.\n* <b>NONE_REQUIRED:</b> Provisioning of Cloud Foundry quotas done by setting amount at provisioning-service.\n* <b>COMMERCIAL_SOLUTION_SCRIPT:</b> Provisioning is done by a script provided by the service owner and run by the Core Commercial Foundation service.\n* <b>GLOBAL_COMMERCIAL_SOLUTION_SCRIPT:</b> Provisioning is done by a script provided by the service owner and run by the Core Commercial Foundation service used for Global Account level.\n* <b>GLOBAL_QUOTA_DOMAIN_DB:</b> Provisioning is done by setting amount at Domain DB, this is relevant for non-ui quotas only.\n* <b>CLOUD_AUTOMATION:</b> Provisioning is done by the cloud automation service. This is relevant only for provisioning that requires external providers that are not within the scope of CIS.\n* <b>SPC:</b> Provisioning is done by Service Provider Cockpit.\n",
-            "enum": [
-              "SERVICE_BROKER",
-              "NONE_REQUIRED",
-              "COMMERCIAL_SOLUTION_SCRIPT",
-              "GLOBAL_COMMERCIAL_SOLUTION_SCRIPT",
-              "GLOBAL_QUOTA_DOMAIN_DB",
-              "CLOUD_AUTOMATION",
-              "SPC"
-            ],
-            "type": "string"
-          },
-          "remainingAmount": {
-            "description": "The remaining amount of the plan that can still be assigned. For plans that don't have a numeric quota, the remaining amount is always the maximum allowed quota.",
-            "type": "number"
-          },
-          "resources": {
-            "description": "Remote service resources provided by non-SAP cloud vendors, and which are offered by this plan.",
-            "items": {
-              "$ref": "#/components/schemas/ExternalResourceRequestPayload"
-            },
-            "type": "array"
-          },
-          "sourceEntitlements": {
-            "description": "Relevant entitlements for the source that added the product.",
-            "items": {
-              "$ref": "#/components/schemas/EntitlementAmountResponseObject"
-            },
-            "type": "array"
-          },
-          "uniqueIdentifier": {
-            "description": "A unique identifier for service plans that can distinguish between the same service plans with different pricing plans.",
-            "type": "string"
-          },
-          "unlimited": {
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "SubaccountServicePlanRequestPayload": {
-        "description": "List of assigned entitlements and their specifications.",
-        "properties": {
-          "amount": {
-            "description": "The quantity of the plan that is assigned to the specified subaccount. Relevant and mandatory only for plans that have a numeric quota. Do not set if enable=TRUE is specified.",
-            "type": "number"
-          },
-          "enable": {
-            "description": "Whether to enable the service plan assignment to the specified subaccount without quantity restrictions. Relevant and mandatory only for plans that do not have a numeric quota. Do not set if amount is specified.",
-            "type": "boolean"
-          },
-          "resources": {
-            "description": "External resources to assign to subaccount",
-            "items": {
-              "$ref": "#/components/schemas/ExternalResourceRequestPayload"
-            },
-            "type": "array"
-          },
-          "subaccountGUID": {
-            "description": "The unique ID of the subaccount to which to assign a service plan.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "subaccountGUID"
-        ],
-        "type": "object"
-      },
-      "SubaccountServicePlansRequestPayloadCollection": {
-        "description": "The details of entitlement's name, plan, amount and subaccount GUIDs to assign to a subaccount. The entitlement can be a service, multitenant application, or environment. Note that some environments, such as Cloud Foundry, are available by default to all subaccounts, and therefore are not displayed as entitlements.",
-        "properties": {
-          "subaccountServicePlans": {
-            "description": "Contains information about the plans to assign to a subaccount.",
-            "items": {
-              "$ref": "#/components/schemas/ServicePlanAssignmentRequestPayload"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "subaccountServicePlans"
-        ],
-        "type": "object"
-      }
-    },
-    "securitySchemes": {
-      "OAuth2": {
-        "flows": {
-          "clientCredentials": {
-            "scopes": {},
-            "tokenUrl": "https://{identityzone}.authentication.eu10.hana.ondemand.com/oauth/token"
-          },
-          "password": {
-            "scopes": {},
-            "tokenUrl": "https://{identityzone}.authentication.eu10.hana.ondemand.com/oauth/token"
-          }
-        },
-        "type": "oauth2"
-      }
-    }
-  },
-  "externalDocs": {
-    "description": "Account Administration Using APIs of the SAP Cloud Management Service",
-    "url": "https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/17b6a171552544a6804f12ea83112a3f.html"
-  },
+  "openapi": "3.0.1",
   "info": {
-    "description": "The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.  \nEntitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.  \nNOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).\n\nSee also:\n* [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html)\n* [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html)\n* [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html)\n* [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)",
+    "description": "The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.  \nEntitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.\n\nSee also:\n* [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html)\n* [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html)\n* [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html)\n* [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)",
     "termsOfService": "http://www.sap.com",
     "title": "Entitlements Service",
     "version": "1.0"
   },
-  "openapi": "3.0.1",
+  "servers": [
+    {
+      "url": "https://entitlements-service.cfapps.eu10.hana.ondemand.com",
+      "description": "Generated server url"
+    }
+  ],
+  "security": [
+    {
+      "OAuth2": []
+    }
+  ],
+  "tags": [
+    {
+      "description": "Manage Assigned Entitlements",
+      "name": "Manage Assigned Entitlements"
+    },
+    {
+      "description": "Job Management",
+      "name": "Job Management"
+    },
+    {
+      "description": "Regions for Global Account",
+      "name": "Regions for Global Account"
+    }
+  ],
   "paths": {
     "/entitlements/v1/assignments": {
       "get": {
@@ -819,8 +61,8 @@
             "name": "includeAutoManagedPlans",
             "required": false,
             "schema": {
-              "default": false,
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             }
           },
           {
@@ -846,6 +88,24 @@
             "description": "A specific service for which to return subaccount quota assignments in the global account or directory. If not specified, then all services in the global account or directory are returned.",
             "in": "query",
             "name": "assignedServiceName",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A specific service for which to return subaccount quota entitlements and assignments in the global account. this parameter comes with conjunction with planName. If not specified, then all services in the global account are returned.",
+            "in": "query",
+            "name": "serviceName",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A specific service for which to return subaccount quota entitlements and assignments in the global account. this parameter comes with conjunction with serviceName. If not specified, then all services in the global account are returned.",
+            "in": "query",
+            "name": "planName",
             "required": false,
             "schema": {
               "type": "string"
@@ -879,7 +139,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -892,8 +152,8 @@
                 "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
                 "example": "167918400000",
                 "schema": {
-                  "format": "long",
-                  "type": "string"
+                  "type": "string",
+                  "format": "long"
                 }
               }
             }
@@ -902,7 +162,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -955,11 +215,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -971,7 +231,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -984,8 +244,8 @@
                 "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
                 "example": "167918400000",
                 "schema": {
-                  "format": "long",
-                  "type": "string"
+                  "type": "string",
+                  "format": "long"
                 }
               }
             }
@@ -994,7 +254,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1045,11 +305,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1061,7 +321,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1074,8 +334,8 @@
                 "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
                 "example": "167918400000",
                 "schema": {
-                  "format": "long",
-                  "type": "string"
+                  "type": "string",
+                  "format": "long"
                 }
               }
             }
@@ -1084,7 +344,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1118,8 +378,8 @@
             "name": "includeSatelliteDataCenters",
             "required": false,
             "schema": {
-              "default": false,
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             }
           },
           {
@@ -1157,7 +417,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1170,8 +430,8 @@
                 "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
                 "example": "167918400000",
                 "schema": {
-                  "format": "long",
-                  "type": "string"
+                  "type": "string",
+                  "format": "long"
                 }
               }
             }
@@ -1180,7 +440,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1223,8 +483,8 @@
             "name": "includeAutoManagedPlans",
             "required": false,
             "schema": {
-              "default": false,
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             }
           },
           {
@@ -1240,6 +500,24 @@
             "description": "A specific service for which to return subaccount quota assignments in the global account. If not specified, then all services in the global account are returned.",
             "in": "query",
             "name": "assignedServiceName",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A specific service for which to return subaccount quota entitlements and assignments in the global account. this parameter comes with conjunction with planName. If not specified, then all services in the global account are returned.",
+            "in": "query",
+            "name": "serviceName",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A specific service for which to return subaccount quota entitlements and assignments in the global account. this parameter comes with conjunction with serviceName. If not specified, then all services in the global account are returned.",
+            "in": "query",
+            "name": "planName",
             "required": false,
             "schema": {
               "type": "string"
@@ -1273,7 +551,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1286,8 +564,8 @@
                 "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
                 "example": "167918400000",
                 "schema": {
-                  "format": "long",
-                  "type": "string"
+                  "type": "string",
+                  "format": "long"
                 }
               }
             }
@@ -1296,7 +574,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1311,7 +589,7 @@
     },
     "/entitlements/v1/subaccountServicePlans": {
       "put": {
-        "description": "Assign or update an entitlement of a service, multitenant application, or environment plan, to a subaccount. Subaccounts can be located either directly under the global account, or under a directory in the global account.When a subaccount is located directly under the global account, total amount of service or application plan it is entitled to consume cannot exceed the entitlement’s quota for the global account. This is also true for the directories that are not enabled to manage their quota as they consume the quota from the global account.<br/>For the directories that are enabled to manage their entitlements, the total amounts assigned to subaccounts cannot exceed the entitlement’s quota for these directories.<br/>Note that some environments, such as Cloud Foundry, are available by default to all subaccounts, and therefore are not displayed as entitlements.<br/><br/>Required scopes: $XSAPPNAME.global-account.entitlement.subaccount.update",
+        "description": "Assign or update an entitlement of a service, multitenant application, or environment plan, to a subaccount. Subaccounts can be located either directly under the global account, or under a directory in the global account.When a subaccount is located directly under the global account, total amount of service or application plan it is entitled to consume cannot exceed the entitlement\u2019s quota for the global account. This is also true for the directories that are not enabled to manage their quota as they consume the quota from the global account.<br/>For the directories that are enabled to manage their entitlements, the total amounts assigned to subaccounts cannot exceed the entitlement\u2019s quota for these directories.<br/>Note that some environments, such as Cloud Foundry, are available by default to all subaccounts, and therefore are not displayed as entitlements.<br/><br/>Required scopes: $XSAPPNAME.global-account.entitlement.subaccount.update",
         "operationId": "setServicePlans",
         "requestBody": {
           "content": {
@@ -1338,11 +616,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Bad Request"
           },
           "401": {
             "description": "Not Authorized"
@@ -1354,11 +632,34 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
             "description": "Not Found"
+          },
+          "429": {
+            "description": "Rate Limit Exceeded",
+            "headers": {
+              "X-Ratelimit-Reset": {
+                "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
+                "example": "167918400000",
+                "schema": {
+                  "type": "string",
+                  "format": "long"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "409": {
             "content": {
@@ -1369,29 +670,6 @@
               }
             },
             "description": "Conflict"
-          },
-          "429": {
-            "description": "Rate Limit Exceeded",
-            "headers": {
-              "X-Ratelimit-Reset": {
-                "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
-                "example": "167918400000",
-                "schema": {
-                  "format": "long",
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
-                }
-              }
-            },
-            "description": "Internal Server Error"
           }
         },
         "summary": "Assign entitlements to subaccounts",
@@ -1420,7 +698,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/JobStatusResponseObject"
                 }
               }
             },
@@ -1430,7 +708,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1446,7 +724,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1459,8 +737,8 @@
                 "description": "The time at which the rate limit will reset, expressed in milliseconds. It indicates the timestamp when the client can make additional requests without exceeding the rate limit.",
                 "example": "167918400000",
                 "schema": {
-                  "format": "long",
-                  "type": "string"
+                  "type": "string",
+                  "format": "long"
                 }
               }
             }
@@ -1469,7 +747,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExceptionResponseObject"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -1483,32 +761,911 @@
       }
     }
   },
-  "security": [
-    {
-      "OAuth2": []
-    }
-  ],
-  "servers": [
-    {
-      "description": "Generated server url",
-      "url": "https://entitlements-service.cfapps.eu10.hana.ondemand.com"
-    }
-  ],
-  "tags": [
-    {
-      "description": "Manage Assigned Entitlements",
-      "name": "Manage Assigned Entitlements"
+  "components": {
+    "schemas": {
+      "AssignedServicePlanResponseObject": {
+        "type": "object",
+        "properties": {
+          "assignmentInfo": {
+            "type": "array",
+            "description": "Assignment detailed information",
+            "items": {
+              "$ref": "#/components/schemas/AssignedServicePlanSubaccountDTO"
+            }
+          },
+          "beta": {
+            "type": "boolean",
+            "description": "Whether the service plan is a beta feature."
+          },
+          "category": {
+            "type": "string",
+            "description": "The type of service offering. Possible values:\n* <b>PLATFORM:</b> A service required for using a specific platform; for example, Application Runtime is required for the Cloud Foundry platform.\n* <b>SERVICE:</b> A commercial or technical service. that has a numeric quota (amount) when entitled or assigned to a resource. When assigning entitlements of this type, use the 'amount' option instead of 'enable'. See: PUT/entitlements/v1/directories/{directoryGUID}/assignments.\n* <b>ELASTIC_SERVICE:</b> A commercial or technical service that has no numeric quota (amount) when entitled or assigned to a resource. Generally this type of service can be as many times as needed when enabled, but may in some cases be restricted by the service owner. When assigning entitlements of this type, use the 'enable' option instead of 'amount'. See: PUT/entitlements/v1/directories/{directoryGUID}/assignments.\n* <b>ELASTIC_LIMITED:</b> An elastic service that can be enabled for only one subaccount per global account.\n* <b>APPLICATION:</b> A multitenant application to which consumers can subscribe. As opposed to applications defined as a 'QUOTA_BASED_APPLICATION', these applications do not have a numeric quota and are simply enabled or disabled as entitlements per subaccount.\n* <b>QUOTA_BASED_APPLICATION:</b> A multitenant application to which consumers can subscribe. As opposed to applications defined as 'APPLICATION', these applications have an numeric quota that limits consumer usage of the subscribed application per subaccount. When maxAllowedSubaccountQuota is > 0, this is the limit that can be set when assigning the max quota entitlement of the app to any subaccount. If maxAllowedSubaccountQuota is = 0 or null, the max quota that can be entitled to any subaccount is the amount purchased by the customer (the global account quota).\n* <b>ENVIRONMENT:</b> An environment service; for example, Cloud Foundry.",
+            "enum": [
+              "PLATFORM",
+              "SERVICE",
+              "ELASTIC_SERVICE",
+              "ELASTIC_LIMITED",
+              "APPLICATION",
+              "QUOTA_BASED_APPLICATION",
+              "ENVIRONMENT"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The name of the service plan for customer-facing UIs."
+          },
+          "maxAllowedSubaccountQuota": {
+            "type": "integer",
+            "description": "The maximum allowed usage quota per subaccount for multitenant applications and environments that are defined as \"quota-based\". This quota limits the usage of the application and/or environment per subaccount per a given usage metric that is defined within the application or environment by the service provider. If null, the usage limit per subaccount is the maximum free quota in the global account.\nFor example, a value of 1 could: (1) limit the number of subscriptions to a quota-based multitenant application within a global account according to the purchased quota, or (2) restrict the enablement of a single instance of an environment per subaccount.",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "description": "The unique registration name of the service plan."
+          },
+          "uniqueIdentifier": {
+            "type": "string",
+            "description": "A unique identifier for service plans that can distinguish between the same service plans with different pricing plans."
+          },
+          "unlimited": {
+            "type": "boolean",
+            "description": "Is the quota of this service plan entitled to the global account with unlimited usage."
+          }
+        },
+        "description": "List of service plans associated with the assigned service."
+      },
+      "AssignedServicePlanSubaccountDTO": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "The quantity of the entitlement that is assigned to the root global account or directory."
+          },
+          "autoAssign": {
+            "type": "boolean",
+            "description": "Whether the plan is automatically distributed to the subaccounts that are located in the directory."
+          },
+          "autoAssigned": {
+            "type": "boolean",
+            "description": "Specifies if the plan was automatically assigned regardless of any action by an admin. This applies to entitlements that are always available to subaccounts and cannot be removed."
+          },
+          "autoDistributeAmount": {
+            "type": "integer",
+            "description": "The amount of the entitlement to automatically assign to subaccounts that are added in the future to the entitlement's assigned directory.  \nRequires that autoAssign is set to TRUE, and there is remaining quota for the entitlement. To automatically distribute to subaccounts that are added in the future to the directory, distribute must be set to TRUE.",
+            "format": "int32"
+          },
+          "createdDate": {
+            "type": "string",
+            "description": "Date the subaccount has been created. Dates and times are in UTC format.",
+            "format": "number"
+          },
+          "entityId": {
+            "type": "string",
+            "description": "The unique ID of the global account or directory to which the entitlement is assigned.",
+            "example": "GUID of GLOBAL_ACCOUNT or SUBACCOUNT"
+          },
+          "entityState": {
+            "type": "string",
+            "description": "The current state of the service plan assignment.\n* <b>STARTED:</b> CRUD operation on an entity has started.\n* <b>PROCESSING:</b> A series of operations related to the entity is in progress.\n* <b>PROCESSING_FAILED:</b> The processing operations failed.\n* <b>OK:</b> The CRUD operation or series of operations completed successfully.",
+            "enum": [
+              "STARTED",
+              "PROCESSING",
+              "PROCESSING_FAILED",
+              "OK"
+            ]
+          },
+          "entityType": {
+            "type": "string",
+            "description": "The type of entity to which the entitlement is assigned.\n* <b>SUBACCOUNT:</b> The entitlement is assigned to a subaccount.\n* <b>GLOBAL_ACCOUNT:</b> The entitlement is assigned to a root global account.\n* <b>DIRECTORY:</b> The entitlement is assigned to a directory.",
+            "example": "GLOBAL_ACCOUNT or SUBACCOUNT",
+            "enum": [
+              "SUBACCOUNT",
+              "GLOBAL_ACCOUNT",
+              "DIRECTORY"
+            ]
+          },
+          "modifiedDate": {
+            "type": "string",
+            "description": "Date the subaccount has been modified. Dates and times are in UTC format.",
+            "format": "number"
+          },
+          "parentAmount": {
+            "type": "number"
+          },
+          "parentId": {
+            "type": "string"
+          },
+          "parentRemainingAmount": {
+            "type": "number"
+          },
+          "parentType": {
+            "type": "string",
+            "enum": [
+              "SUBACCOUNT",
+              "GLOBAL_ACCOUNT",
+              "DIRECTORY"
+            ]
+          },
+          "requestedAmount": {
+            "type": "number",
+            "description": "The requested amount when it is different from the actual amount because the request state is still in process or failed."
+          },
+          "resources": {
+            "type": "array",
+            "description": "Global account resource details",
+            "items": {
+              "$ref": "#/components/schemas/ExternalResourceRequestPayload"
+            }
+          },
+          "stateMessage": {
+            "type": "string",
+            "description": "Information about the current state."
+          },
+          "unlimitedAmountAssigned": {
+            "type": "boolean",
+            "description": "True, if an unlimited quota of this service plan assigned to the directory or subaccount in the global account. False, if the service plan is assigned to the directory or subaccount with a limited numeric quota, even if the service plan has an unlimited usage entitled on the level of the global account."
+          }
+        },
+        "description": "Assignment detailed information"
+      },
+      "AssignedServiceResponseObject": {
+        "type": "object",
+        "properties": {
+          "applicationCoordinates": {
+            "type": "object"
+          },
+          "businessCategory": {
+            "$ref": "#/components/schemas/BusinessCategoryResponseObject"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Display name of the service for customer-facing UIs."
+          },
+          "iconBase64": {
+            "type": "string",
+            "description": "The icon of the service in Base64 format."
+          },
+          "name": {
+            "type": "string",
+            "description": "The unique registration name of the deployed service as defined by the service provider."
+          },
+          "ownerType": {
+            "type": "string",
+            "description": "The owner type of the service. Possible values:\n* <b>VENDOR:</b> The owner is a service owner, who is affiliated with the cloud operator, that added the service to the product catalog for general consumption.\n* <b>CUSTOMER:</b> The owner is an SAP customer that added a custom service to the product catalog, and it is available only for consumption within the customer's global account.\n* <b>PARTNER:</b> The owner is an SAP partner that added the service to the product catalog, and it is available only to their customers for consumption.\n",
+            "enum": [
+              "VENDOR",
+              "CUSTOMER",
+              "PARTNER"
+            ]
+          },
+          "servicePlans": {
+            "type": "array",
+            "description": "List of service plans associated with the assigned service.",
+            "items": {
+              "$ref": "#/components/schemas/AssignedServicePlanResponseObject"
+            }
+          }
+        },
+        "description": "The list of services that are assigned to subaccounts located under a global account."
+      },
+      "CommercialModelResponseObject": {
+        "type": "object",
+        "properties": {
+          "consumptionBased": {
+            "type": "boolean",
+            "description": "Whether a customer pays only for services that they actually use (consumption-based) or pays for subscribed services at a fixed cost irrespective of consumption (subscription-based).\n<b>True:</b> Consumption-based commercial model.<b>False:</b> Subscription-based commercial model."
+          },
+          "containedCommercialModels": {
+            "type": "array",
+            "description": "Directly contained commercial models.",
+            "items": {
+              "$ref": "#/components/schemas/CommercialModelResponseObject"
+            }
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of the commercial model"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "A descriptive name of the commercial model for customer-facing UIs."
+          },
+          "name": {
+            "type": "string",
+            "description": "Technical name of the commercial model."
+          }
+        },
+        "description": "The commercial model type assigned to the entitlement."
+      },
+      "DataCenterResponseCollection": {
+        "type": "object",
+        "properties": {
+          "datacenters": {
+            "type": "array",
+            "description": "Contains information about the available data centers for a specified global account.",
+            "items": {
+              "$ref": "#/components/schemas/DataCenterResponseObject"
+            }
+          }
+        }
+      },
+      "DataCenterResponseObject": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "Descriptive name of the data center for customer-facing UIs."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The domain of the data center"
+          },
+          "environment": {
+            "type": "string",
+            "description": "The environment that the data center supports. For example: Kubernetes, Cloud Foundry."
+          },
+          "iaasProvider": {
+            "type": "string",
+            "description": "The infrastructure provider for the data center. Valid values:\n* <b>AWS:</b> Amazon Web Services.\n* <b>GCP:</b> Google Cloud Platform.\n* <b>AZURE:</b> Microsoft Azure.\n* <b>SAP:</b> SAP BTP (Neo).\n* <b>ALI:</b> Alibaba Cloud.\n* <b>IBM:</b> IBM Cloud. \n* <b>ccee:</b> ccee prestaging. \n* <b>gdch:</b> gdch. \n",
+            "enum": [
+              "AWS",
+              "GCP",
+              "AZURE",
+              "SAP",
+              "ALI",
+              "IBM",
+              "ccee",
+              "gdch"
+            ]
+          },
+          "isMainDataCenter": {
+            "type": "boolean",
+            "description": "Whether the data center is designated as the primary data center within its region. Note that regions that comprise multiple data centers can have only one main data center defined."
+          },
+          "name": {
+            "type": "string",
+            "description": "Technical name of the data center. Must be unique within the cloud deployment."
+          },
+          "provisioningServiceUrl": {
+            "type": "string",
+            "description": "Provisioning service URL."
+          },
+          "region": {
+            "type": "string",
+            "description": "The region in which the data center is located."
+          },
+          "saasRegistryServiceUrl": {
+            "type": "string",
+            "description": "Saas-Registry service URL."
+          },
+          "supportsTrial": {
+            "type": "boolean",
+            "description": "Whether the specified data center supports trial accounts."
+          }
+        },
+        "description": "Contains information about the data centers and regions in the cloud landscape"
+      },
+      "DirectoryAssignmentsPatchUpdateRequestPayload": {
+        "required": [
+          "plan",
+          "service"
+        ],
+        "type": "object",
+        "properties": {
+          "autoAssign": {
+            "type": "boolean",
+            "description": "Whether to automatically allocate the plans of entitlements that have a numeric quota with the amount specified in auto-distribute-amount to any new subaccount that is added to the directory in the future. For entitlements without a numeric quota, the plan is assigned to any new subaccount that is added to the directory in the future with the condition that enable=TRUE is set (autoDistributeAmount is not relevant in this case). If distribute=TRUE, the same assignment is also made to all subaccounts currently in the directory. Entitlements are subject to available quota in the directory."
+          },
+          "autoDistributeAmount": {
+            "type": "integer",
+            "description": "The quota of the specified plan to automatically allocate to any new subaccount that is created in the future in the directory.\nWhen applying this option, you must set autoAssign=TRUE and/or distribute=TRUE. Applies only to entitlements that have a numeric quota. Entitlements are subject to available quota in the directory.",
+            "format": "int32"
+          },
+          "distribute": {
+            "type": "boolean",
+            "description": "Whether to assign the plan with the quota specified in autoDistributeAmount to subaccounts currently located in the specified directory. For entitlements without a numeric quota, such as multitenant apps, the plan is assigned to the subaccounts currently located in the directory (autoDistributeAmount is not relevant in this case). In both cases, autoAssign must be set to TRUE."
+          },
+          "plan": {
+            "type": "string",
+            "description": "The technical name of the entitlement to assign to the directory."
+          },
+          "planUniqueIdentifier": {
+            "type": "string",
+            "description": "A unique identifier for service plans that can distinguish between the same service plans with different pricing plans."
+          },
+          "resources": {
+            "type": "array",
+            "description": "External resources to assign to subaccount",
+            "items": {
+              "$ref": "#/components/schemas/ExternalResourceRequestPayload"
+            }
+          },
+          "service": {
+            "type": "string",
+            "description": "The technical name of the entitlement (service, application, environment) to assign."
+          }
+        }
+      },
+      "DirectoryAssignmentsPatchUpdateRequestPayloadCollection": {
+        "required": [
+          "entitlementUpdates"
+        ],
+        "type": "object",
+        "properties": {
+          "entitlementUpdates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryAssignmentsPatchUpdateRequestPayload"
+            }
+          }
+        },
+        "description": "JSON object that contains the specifications of an assignment, such as the name of the assigned plan and whether to distribute the quota and how much to subaccounts that currently exist in the directory and to subaccounts that will be added to the directory in the future."
+      },
+      "DirectoryAssignmentsRequestPayload": {
+        "required": [
+          "plan",
+          "service"
+        ],
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "The quantity of the plan to assign to the specified directory. Relevant and mandatory only for plans that have a numeric quota.  Do not set if enable=TRUE is specified."
+          },
+          "autoAssign": {
+            "type": "boolean",
+            "description": "Whether to automatically allocate the plans of entitlements that have a numeric quota with the amount specified in auto-distribute-amount to any new subaccount that is added to the directory in the future. For entitlements without a numeric quota, the plan is assigned to any new subaccount that is added to the directory in the future with the condition that enable=TRUE is set (autoDistributeAmount is not relevant in this case). If distribute=TRUE, the same assignment is also made to all subaccounts currently in the directory. Entitlements are subject to available quota in the directory."
+          },
+          "autoDistributeAmount": {
+            "type": "integer",
+            "description": "The quota of the specified plan to automatically allocate to any new subaccount that is created in the future in the directory.\nWhen applying this option, you must set autoAssign=TRUE and/or distribute=TRUE. Applies only to entitlements that have a numeric quota. Entitlements are subject to available quota in the directory.",
+            "format": "int32"
+          },
+          "distribute": {
+            "type": "boolean",
+            "description": "Whether to assign the plan with the quota specified in autoDistributeAmount to subaccounts currently located in the specified directory. For entitlements without a numeric quota, such as multitenant apps, the plan is assigned to the subaccounts currently located in the directory (autoDistributeAmount is not relevant in this case). In both cases, autoAssign must be set to TRUE."
+          },
+          "enable": {
+            "type": "boolean",
+            "description": "Whether to allocate the plan to the to the specified directory without quantity restrictions. Relevant and mandatory only for plans that don't have a numeric quota. Do not use if amount is specified."
+          },
+          "plan": {
+            "type": "string",
+            "description": "The technical name of the entitlement to assign to the directory."
+          },
+          "planUniqueIdentifier": {
+            "type": "string",
+            "description": "A unique identifier for service plans that can distinguish between the same service plans with different pricing plans."
+          },
+          "resources": {
+            "type": "array",
+            "description": "External resources to assign to subaccount",
+            "items": {
+              "$ref": "#/components/schemas/ExternalResourceRequestPayload"
+            }
+          },
+          "service": {
+            "type": "string",
+            "description": "The technical name of the entitlement (service, application, environment) to assign."
+          }
+        }
+      },
+      "DirectoryAssignmentsRequestPayloadCollection": {
+        "required": [
+          "entitlements"
+        ],
+        "type": "object",
+        "properties": {
+          "entitlements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryAssignmentsRequestPayload"
+            }
+          }
+        },
+        "description": "JSON object that contains the specifications of assignment, such as the name of the assigned plan, the quantity to distribute, and whether to distribute the quota and how much to subaccounts that currently exist in the directory and to subaccounts that will added to the directory in the future."
+      },
+      "EntitledAndAssignedServicesResponseObject": {
+        "type": "object",
+        "properties": {
+          "assignedServices": {
+            "type": "array",
+            "description": "The list of services that are assigned to subaccounts located under a global account.",
+            "items": {
+              "$ref": "#/components/schemas/AssignedServiceResponseObject"
+            }
+          },
+          "entitledServices": {
+            "uniqueItems": true,
+            "type": "array",
+            "description": "Services entitled to global account, its directories and subaccounts.",
+            "items": {
+              "$ref": "#/components/schemas/EntitledServicesResponseObject"
+            }
+          },
+          "fetchErrorFromExternalProviderRegistry": {
+            "type": "boolean",
+            "description": "Whether the External Provider Registry (XPR) is available."
+          }
+        }
+      },
+      "EntitledServicesResponseObject": {
+        "type": "object",
+        "properties": {
+          "applicationCoordinates": {
+            "type": "object"
+          },
+          "businessCategory": {
+            "$ref": "#/components/schemas/BusinessCategoryResponseObject"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the service for customer-facing UIs."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Display name of the service for customer-facing UIs."
+          },
+          "iconBase64": {
+            "type": "string",
+            "description": "The icon of the service in Base64 format."
+          },
+          "name": {
+            "type": "string",
+            "description": "The unique registration name of the deployed service as defined by the service provider."
+          },
+          "ownerType": {
+            "type": "string",
+            "description": "The owner type of the service. Possible values:\n* <b>VENDOR:</b> The owner is a service owner, who is affiliated with the cloud operator, that added the service to the product catalog for general consumption.\n* <b>CUSTOMER:</b> The owner is an SAP customer that added a custom service to the product catalog, and it is available only for consumption within the customer's global account.\n* <b>PARTNER:</b> The owner is an SAP partner that added the service to the product catalog, and it is available only to their customers for consumption.\n",
+            "enum": [
+              "VENDOR",
+              "CUSTOMER",
+              "PARTNER"
+            ]
+          },
+          "servicePlans": {
+            "type": "array",
+            "description": "List of service plans associated with the entitled service.",
+            "items": {
+              "$ref": "#/components/schemas/ServicePlanResponseObject"
+            }
+          }
+        },
+        "description": "Services entitled to global account, its directories and subaccounts."
+      },
+      "EntitlementAmountResponseObject": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "The quantity of the plan that is entitled to the global account. This quantity is calculated by applying a quantity function property (specific to each service and defined by the service's provider) to the licensedQuantity of the entitlement."
+          },
+          "autoAssign": {
+            "type": "boolean",
+            "description": "Specifies if a plan associated with this entitlement will be automatically assigned by the system to any new subaccount. For example, free plans that are available to all subaccounts."
+          },
+          "commercialModel": {
+            "$ref": "#/components/schemas/CommercialModelResponseObject"
+          },
+          "entitlementName": {
+            "type": "string",
+            "description": "The technical name of the product."
+          },
+          "licensedQuantity": {
+            "type": "number",
+            "description": "The number of units of the product purchased in accordance with the contractual agreement of the global account. Also applies to free and beta services."
+          },
+          "productId": {
+            "type": "string",
+            "description": "The unique ID of the material (product) to which the assigned service plan belongs."
+          }
+        },
+        "description": "Relevant entitlements for the source that added the product."
+      },
+      "ErrorResponse": {
+        "required": [
+          "code",
+          "correlationID",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Technical code of the error as a reference for support",
+            "format": "int32"
+          },
+          "correlationID": {
+            "type": "string",
+            "description": "Log correlation ID to track the event"
+          },
+          "description": {
+            "type": "string",
+            "description": "Error description in JSON format"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NestingErrorDetailsResponseObject"
+            }
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly description of the error."
+          },
+          "target": {
+            "type": "string",
+            "description": "Describes a data element (for example, a resource path: /online-store/v1/products/123)"
+          }
+        }
+      },
+      "ExternalResourceRequestPayload": {
+        "type": "object",
+        "properties": {
+          "resourceData": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "description": "Any additional data to include.",
+              "example": null
+            },
+            "description": "Any additional data to include."
+          },
+          "resourceName": {
+            "type": "string",
+            "description": "The name of the resource."
+          },
+          "resourceProvider": {
+            "type": "string",
+            "description": "The name of the provider."
+          },
+          "resourceTechnicalName": {
+            "type": "string",
+            "description": "The unique name of the resource."
+          },
+          "resourceType": {
+            "type": "string",
+            "description": "The type of the provider. For example infrastructure-as-a-service (IaaS)."
+          }
+        },
+        "description": "External resources to assign to subaccount"
+      },
+      "JobParameter": {
+        "type": "object",
+        "properties": {
+          "identifying": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "STRING",
+              "DATE",
+              "LONG",
+              "DOUBLE"
+            ]
+          },
+          "value": {
+            "type": "object",
+            "example": null
+          }
+        }
+      },
+      "JobStatusResponseObject": {
+        "required": [
+          "description",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "customParams": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "example": null
+            }
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of the exit status of a job when it ends."
+          },
+          "jobParams": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobParameter"
+            }
+          },
+          "status": {
+            "type": "string",
+            "description": "The current state of the job. \n* <b>IN_PROGRESS:</b> The job is being executed.\n* <b>COMPLETED:</b> The job has completed.\n* <b>FAILED:</b> The job failed and did not complete. The job can be restarted.",
+            "enum": [
+              "IN_PROGRESS",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "statusDetails": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "example": null
+            }
+          }
+        }
+      },
+      "NestingErrorDetailsResponseObject": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ServicePlanAssignmentRequestPayload": {
+        "required": [
+          "assignmentInfo",
+          "serviceName",
+          "servicePlanName"
+        ],
+        "type": "object",
+        "properties": {
+          "assignmentInfo": {
+            "type": "array",
+            "description": "List of assigned entitlements and their specifications.",
+            "items": {
+              "$ref": "#/components/schemas/SubaccountServicePlanRequestPayload"
+            }
+          },
+          "serviceName": {
+            "type": "string",
+            "description": "The technical name of the entitlement to assign to a subaccount."
+          },
+          "servicePlanName": {
+            "type": "string",
+            "description": "The technical name of the entitlement's plan."
+          },
+          "servicePlanUniqueIdentifier": {
+            "description": "The unique identifier of the entitlement's plan. As obtained in the GET assignments endpoint.",
+            "type": "string"
+          }
+        },
+        "description": "Contains information about the plans to assign to a subaccount."
+      },
+      "ServicePlanResponseObject": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "The total available quota for maximum allowed consumption of the plan by the global account. The total is the sum of all calculated quantities (\"amount\") from the plan's source entitlements in the given global account contract. Relevant for plan that have a numeric quota assignment."
+          },
+          "autoAssign": {
+            "type": "boolean",
+            "description": "Whether to automatically assign a quota of the entitlement to a subaccount when the subaccount is created in the entitlement's assigned directory."
+          },
+          "autoDistributeAmount": {
+            "type": "integer",
+            "description": "The amount of the entitlement to automatically assign to a subaccount when the subaccount is created in the entitlement's assigned directory.\nRequires that autoAssign is set to TRUE, and there is remaining quota for the entitlement. ",
+            "format": "int32"
+          },
+          "availableForInternal": {
+            "type": "boolean",
+            "description": "Whether the service plan is available internally to SAP users."
+          },
+          "beta": {
+            "type": "boolean",
+            "description": "Whether the service plan is a beta feature."
+          },
+          "category": {
+            "type": "string",
+            "description": "The type of service offering. Possible values:\n* <b>PLATFORM:</b> A service required for using a specific platform; for example, Application Runtime is required for the Cloud Foundry platform.\n* <b>SERVICE:</b> A commercial or technical service. that has a numeric quota (amount) when entitled or assigned to a resource. When assigning entitlements of this type, use the 'amount' option instead of 'enable'. See: PUT/entitlements/v1/directories/{directoryGUID}/assignments.\n* <b>ELASTIC_SERVICE:</b> A commercial or technical service that has no numeric quota (amount) when entitled or assigned to a resource. Generally this type of service can be as many times as needed when enabled, but may in some cases be restricted by the service owner. When assigning entitlements of this type, use the 'enable' option instead of 'amount'. See: PUT/entitlements/v1/directories/{directoryGUID}/assignments.\n* <b>ELASTIC_LIMITED:</b> An elastic service that can be enabled for only one subaccount per global account.\n* <b>APPLICATION:</b> A multitenant application to which consumers can subscribe. As opposed to applications defined as a 'QUOTA_BASED_APPLICATION', these applications do not have a numeric quota and are simply enabled or disabled as entitlements per subaccount.\n* <b>QUOTA_BASED_APPLICATION:</b> A multitenant application to which consumers can subscribe. As opposed to applications defined as 'APPLICATION', these applications have an numeric quota that limits consumer usage of the subscribed application per subaccount. When maxAllowedSubaccountQuota is > 0, this is the limit that can be set when assigning the max quota entitlement of the app to any subaccount. If maxAllowedSubaccountQuota is = 0 or null, the max quota that can be entitled to any subaccount is the amount purchased by the customer (the global account quota).\n* <b>ENVIRONMENT:</b> An environment service; for example, Cloud Foundry.",
+            "enum": [
+              "PLATFORM",
+              "SERVICE",
+              "ELASTIC_SERVICE",
+              "ELASTIC_LIMITED",
+              "APPLICATION",
+              "QUOTA_BASED_APPLICATION",
+              "ENVIRONMENT"
+            ]
+          },
+          "dataCenters": {
+            "type": "array",
+            "description": "Contains information about the data centers and regions in the cloud landscape",
+            "items": {
+              "$ref": "#/components/schemas/DataCenterResponseObject"
+            }
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the service plan for customer-facing UIs."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Display name of the service plan for customer-facing UIs."
+          },
+          "internalQuotaLimit": {
+            "type": "integer",
+            "description": "The quota limit that is allowed for this service plan for SAP internal users.\nIf null, the default quota limit is set to 200.\nApplies only when the availableForInternal property is set to TRUE.",
+            "format": "int32"
+          },
+          "maxAllowedSubaccountQuota": {
+            "type": "integer",
+            "description": "The maximum allowed usage quota per subaccount for multitenant applications and environments that are defined as \"quota-based\". This quota limits the usage of the application and/or environment per subaccount per a given usage metric that is defined within the application or environment by the service provider. If null, the usage limit per subaccount is the maximum free quota in the global account.\nFor example, a value of 1 could: (1) limit the number of subscriptions to a quota-based multitenant application within a global account according to the purchased quota, or (2) restrict the enablement of a single instance of an environment per subaccount.",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "description": "The unique registration name of the service plan."
+          },
+          "numberOfAssignedEntities": {
+            "type": "integer",
+            "description": "The number of directories and subaccounts to which the service plan is assigned.",
+            "format": "int64"
+          },
+          "providedBy": {
+            "type": "string",
+            "description": "[DEPRECATED] The source that added the service. Possible values:\n* <b>VENDOR:</b> The product has been added by SAP or the cloud operator to the product catalog for general use.\n* <b>GLOBAL_ACCOUNT_OWNER:</b> Custom services that are added by a customer and are available only for that customer\u2019s global account.\n* <b>PARTNER:</b> Service that are added by partners. And only available to its customers.\n\nNote: This property is deprecated. Please use the ownerType attribute on the entitledService level instead.",
+            "enum": [
+              "VENDOR",
+              "GLOBAL_ACCOUNT_OWNER",
+              "PARTNER"
+            ]
+          },
+          "provisioningMethod": {
+            "type": "string",
+            "description": "The method used to provision the service plan.\n* <b>SERVICE_BROKER:</b> Provisioning of Neo or Cloud Foundry quotas done by the service broker.\n* <b>NONE_REQUIRED:</b> Provisioning of Cloud Foundry quotas done by setting amount at provisioning-service.\n* <b>COMMERCIAL_SOLUTION_SCRIPT:</b> Provisioning is done by a script provided by the service owner and run by the Core Commercial Foundation service.\n* <b>GLOBAL_COMMERCIAL_SOLUTION_SCRIPT:</b> Provisioning is done by a script provided by the service owner and run by the Core Commercial Foundation service used for Global Account level.\n* <b>GLOBAL_QUOTA_DOMAIN_DB:</b> Provisioning is done by setting amount at Domain DB, this is relevant for non-ui quotas only.\n* <b>CLOUD_AUTOMATION:</b> Provisioning is done by the cloud automation service. This is relevant only for provisioning that requires external providers that are not within the scope of CIS.\n* <b>SPC:</b> Provisioning is done by Service Provider Cockpit.\n",
+            "enum": [
+              "SERVICE_BROKER",
+              "NONE_REQUIRED",
+              "COMMERCIAL_SOLUTION_SCRIPT",
+              "GLOBAL_COMMERCIAL_SOLUTION_SCRIPT",
+              "GLOBAL_QUOTA_DOMAIN_DB",
+              "CLOUD_AUTOMATION",
+              "SPC"
+            ]
+          },
+          "remainingAmount": {
+            "type": "number",
+            "description": "The remaining amount of the plan that can still be assigned. For plans that don't have a numeric quota, the remaining amount is always the maximum allowed quota."
+          },
+          "resources": {
+            "type": "array",
+            "description": "Remote service resources provided by non-SAP cloud vendors, and which are offered by this plan.",
+            "items": {
+              "$ref": "#/components/schemas/ExternalResourceRequestPayload"
+            }
+          },
+          "sourceEntitlements": {
+            "type": "array",
+            "description": "Relevant entitlements for the source that added the product.",
+            "items": {
+              "$ref": "#/components/schemas/EntitlementAmountResponseObject"
+            }
+          },
+          "uniqueIdentifier": {
+            "type": "string",
+            "description": "A unique identifier for service plans that can distinguish between the same service plans with different pricing plans."
+          },
+          "unlimited": {
+            "type": "boolean"
+          }
+        },
+        "description": "List of service plans associated with the entitled service."
+      },
+      "SubaccountServicePlanRequestPayload": {
+        "required": [
+          "subaccountGUID"
+        ],
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "The quantity of the plan that is assigned to the specified subaccount. Relevant and mandatory only for plans that have a numeric quota. Do not set if enable=TRUE is specified."
+          },
+          "enable": {
+            "type": "boolean",
+            "description": "Whether to enable the service plan assignment to the specified subaccount without quantity restrictions. Relevant and mandatory only for plans that do not have a numeric quota. Do not set if amount is specified."
+          },
+          "resources": {
+            "type": "array",
+            "description": "External resources to assign to subaccount",
+            "items": {
+              "$ref": "#/components/schemas/ExternalResourceRequestPayload"
+            }
+          },
+          "subaccountGUID": {
+            "type": "string",
+            "description": "The unique ID of the subaccount to which to assign a service plan."
+          }
+        },
+        "description": "List of assigned entitlements and their specifications."
+      },
+      "SubaccountServicePlansRequestPayloadCollection": {
+        "required": [
+          "subaccountServicePlans"
+        ],
+        "type": "object",
+        "properties": {
+          "subaccountServicePlans": {
+            "type": "array",
+            "description": "Contains information about the plans to assign to a subaccount.",
+            "items": {
+              "$ref": "#/components/schemas/ServicePlanAssignmentRequestPayload"
+            }
+          }
+        },
+        "description": "The details of entitlement's name, plan, amount and subaccount GUIDs to assign to a subaccount. The entitlement can be a service, multitenant application, or environment. Note that some environments, such as Cloud Foundry, are available by default to all subaccounts, and therefore are not displayed as entitlements."
+      },
+      "BusinessCategoryResponseObject": {
+        "properties": {
+          "displayName": {
+            "description": "Display name of the business category for customer-facing UIs.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Unique ID of the business category.",
+            "type": "string"
+          }
+        },
+        "title": "BusinessCategoryResponseObject",
+        "type": "object"
+      },
+      "ApiExceptionResponseObject": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "description": "List of assigned entitlements and their specifications.",
+            "properties": {
+              "code": {
+                "type": "number",
+                "description": "the error code."
+              },
+              "message": {
+                "type": "string",
+                "description": "error message helping to resolve the issue"
+              },
+              "target": {
+                "type": "string",
+                "description": "The susppect."
+              },
+              "correlationID": {
+                "type": "string",
+                "description": "in case of incident, please report this correlation id."
+              }
+            }
+          }
+        }
+      }
     },
-    {
-      "description": "Job Management",
-      "name": "Job Management"
-    },
-    {
-      "description": "Regions for Global Account",
-      "name": "Regions for Global Account"
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://{identityzone}.authentication.eu10.hana.ondemand.com/oauth/token",
+            "scopes": {}
+          },
+          "password": {
+            "tokenUrl": "https://{identityzone}.authentication.eu10.hana.ondemand.com/oauth/token",
+            "scopes": {}
+          }
+        }
+      }
     }
-  ],
+  },
   "x-sap-shortText": "Manage product entitlements and assignments across your global account, directories, and subaccounts.",
+  "externalDocs": {
+    "description": "Account Administration Using APIs of the SAP Cloud Management Service",
+    "url": "https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/17b6a171552544a6804f12ea83112a3f.html"
+  },
   "x-sap-stateInfo": {
     "state": "Active"
   },
