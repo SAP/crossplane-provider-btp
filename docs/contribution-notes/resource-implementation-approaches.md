@@ -13,7 +13,7 @@ The controller is implemented directly in Go and talks to BTP APIs
 ![Native controller concept](../img/concept-native-controller.png)
 
 The controller is hand-written and owns the full reconciliation logic — it decides what "up to date" means, how to handle drift, and how to map CR fields to API calls.
-The API calls themselfs are usually done via a generated api client of some sort.
+The API calls themselves are usually done via a generated api client of some sort.
 
 ### Resources using this approach
 
