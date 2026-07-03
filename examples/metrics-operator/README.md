@@ -12,7 +12,29 @@ For installation, DataSink configuration, and OTEL endpoint setup, follow the up
 
 ## Apply BTP Metrics
 
-Once the operator is running and a DataSink named `default` exists in the `metrics-operator-system` namespace, apply the resources from this directory:
+The resources in this directory are plain Kubernetes manifests and are best managed via **GitOps** — point your GitOps tool at this directory so that metric definitions are version-controlled, auditable, and automatically reconciled.
+
+**Flux v2 example** — create a `Kustomization` that watches this path:
+
+```yaml
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: btp-metrics
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: crossplane-provider-btp   # your existing GitRepository source
+  path: ./examples/metrics-operator
+  prune: true
+  wait: true
+```
+
+See the [Flux Kustomization documentation](https://fluxcd.io/flux/components/kustomize/kustomizations/) for full reference.
+
+If you prefer to apply manually, once the operator is running and a DataSink named `default` exists in `metrics-operator-system`:
 
 ```bash
 kubectl apply -f managed-metric-subaccounts.yaml
