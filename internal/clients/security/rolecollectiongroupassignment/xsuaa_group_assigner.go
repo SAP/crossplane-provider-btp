@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/clients/security"
 	xsuaa "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-xsuaa-service-api-go/pkg"
 	"golang.org/x/oauth2/clientcredentials"
 )
@@ -46,7 +47,7 @@ func (x *XsusaaGroupRoleAssigner) HasRole(ctx context.Context, origin, groupName
 	// Retrieve role collection attributes and check for the specified group
 	res, _, err := x.groupApi.GetIdpAttributeValuesFromRoleCollectionByAttribute(ctx, origin, GroupAttributeName, roleCollection).Execute()
 	if err != nil {
-		return false, err
+		return false, security.SpecifyAPIError(err)
 	}
 	return containsGroup(res, groupName), nil
 }
@@ -60,13 +61,13 @@ func (x *XsusaaGroupRoleAssigner) AssignRole(ctx context.Context, origin, groupN
 			AttributeValue:     internal.Ptr(groupName),
 			Operator:           internal.Ptr(GroupComparisionOperator),
 		}).Execute()
-	return err
+	return security.SpecifyAPIError(err)
 }
 
 // RevokeRole removes a specified role from a group within XSUAA.
 func (x *XsusaaGroupRoleAssigner) RevokeRole(ctx context.Context, origin, groupName, rolecollection string) error {
 	_, _, err := x.groupApi.DeleteIdpAttributeToRoleCollection(ctx, origin, GroupAttributeName, GroupComparisionOperator, groupName, rolecollection).Execute()
-	return err
+	return security.SpecifyAPIError(err)
 }
 
 // containsGroup checks if the role collection's attributes contain the specified group.
