@@ -86,7 +86,7 @@ This approach is used when a Terraform resource already exists and provides soli
 
 The user-facing CRD and its controller are natively implemented. In order to handle all the API-specific aspects it wraps an upjetted controller and delegates the usual CRUD methods (Observe, Create, Update, Delete) to it. In order to do so it defines a mapping between the two CRDs. Results are translated back and written into the native CR's status.
 
-> **Note:** The real implementation is more complex then shown here: whats referred to controller here is actually split into a connector (responsible for setup and mapping) and a controller (responsible for the CRUD calls). Some resources might also use more than one embedded upjet controller internally. There may also be additional initialization steps — for example, resolving a service plan ID before the first reconciliation.
+> **Note:** The real implementation is more complex than shown here: what is referred to controller here is actually split into a connector (responsible for setup and mapping) and a controller (responsible for the CRUD calls). Some resources might also use more than one embedded upjet controller internally. There may also be additional initialization steps — for example, resolving a service plan ID before the first reconciliation.
 
 ### Key parts of the implementation
 
