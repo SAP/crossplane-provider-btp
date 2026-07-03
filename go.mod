@@ -11,12 +11,12 @@ replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20260630
 
 require (
 	dario.cat/mergo v1.0.2
-	github.com/SAP/xp-clifford v0.0.0-20260420062843-efc3bf3491d1
+	github.com/SAP/xp-clifford v0.0.0-20260528123824-27644fae68e8
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/blang/semver/v4 v4.0.0
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.18
 	github.com/crossplane-contrib/xp-testing v1.9.2
-	github.com/crossplane/crossplane-runtime/v2 v2.2.0-rc.0
+	github.com/crossplane/crossplane-runtime/v2 v2.2.0
 	github.com/crossplane/crossplane-tools v0.0.0-20251017183449-dd4517244339
 	github.com/crossplane/upjet/v2 v2.2.0
 	github.com/go-logr/logr v1.4.3
@@ -41,7 +41,7 @@ require (
 	k8s.io/client-go v0.35.3
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
-	sigs.k8s.io/controller-runtime v0.22.0
+	sigs.k8s.io/controller-runtime v0.23.1
 	sigs.k8s.io/controller-tools v0.20.1
 	sigs.k8s.io/e2e-framework v0.6.0
 	sigs.k8s.io/yaml v1.6.0
@@ -79,7 +79,6 @@ require (
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.18.2 // indirect
 	github.com/coreos/go-oidc/v3 v3.11.0 // indirect
-	github.com/crossplane/crossplane-runtime v1.20.0 // indirect
 	github.com/dave/jennifer v1.7.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/distribution/reference v0.6.0 // indirect
