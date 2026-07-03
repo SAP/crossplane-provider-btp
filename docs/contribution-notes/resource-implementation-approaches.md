@@ -2,7 +2,7 @@
 We generally distinguish between 3 different approaches when imeplementing controller logic for a single resource. 
 Next to, what we call "native controllers", you will find another approach based on upjet as well as a hybrid one throughout the provider implementation.
 The choice depends on whether a native BTP API exists for the resource and how much custom logic is needed around lifecycle management.
-Lets have a closer look at those different approaches.
+Let's have a closer look at those different approaches.
 
 > **Diagram color coding:** Throughout this document, component colors indicate their origin: **red** = crossplane-runtime, **white** = provider implementation, **blue** = upjet.
 
