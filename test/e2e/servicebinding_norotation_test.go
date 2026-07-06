@@ -30,8 +30,8 @@ func TestServiceBinding_CreationFlow(t *testing.T) {
 	crudFeatureSuite := features.New("ServiceBinding Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/env")
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/no-rotation")
+				resources.ImportResources(ctx, t, cfg, crsPath("servicebinding/env"))
+				resources.ImportResources(ctx, t, cfg, crsPath("servicebinding/no-rotation"))
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 

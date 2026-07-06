@@ -22,7 +22,7 @@ import (
 func Test_DirectoryEntitlement_v1alpha1(t *testing.T) {
 	resource := resources.ResourceTestConfig{
 		Kind:              "DirectoryEntitlement",
-		ResourceDirectory: "testdata/crs/DirectoryEntitlement",
+		ResourceDirectory: crsPath("DirectoryEntitlement"),
 	}
 
 	fB := features.New(resource.Kind)
