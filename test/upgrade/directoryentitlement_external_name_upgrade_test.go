@@ -6,24 +6,26 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/e2e-framework/klient/wait"
+	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 )
 
 var (
-	directoryEntitlementFromCustomTag             = "v1.3.0"
+	directoryEntitlementFromCustomTag             = "v1.10.0"
 	directoryEntitlementToCustomTag               = "local"
 	directoryEntitlementCustomResourceDirectories = []string{
-		"./testdata/customCRs/directoryExternalName",
 		"./testdata/customCRs/directoryEntitlementExternalName",
 	}
 )
 
 // Test_DirectoryEntitlement_External_Name verifies that the external-name is migrated to the new format during upgrades.
-// ADR(external-name): before upgrade (v1.3.0) the external-name is the raw TF id (e.g. "cis-local");
+// ADR(external-name): before upgrade (v1.10.0) the external-name is the raw TF id (e.g. "cis-local");
 // after upgrade it must be the compound key "<directory-id>/<service-name>/<plan-name>" (e.g. "abc-123/cis/local").
 func Test_DirectoryEntitlement_External_Name(t *testing.T) {
 	const directoryEntitlementName = "upgrade-test-extn-dir-ent"
@@ -50,7 +52,7 @@ func Test_DirectoryEntitlement_External_Name(t *testing.T) {
 
 				klog.V(4).Infof("Pre-upgrade DirectoryEntitlement external name: %q", externalName)
 
-				// Before upgrade (v1.3.0): external-name is the raw TF id "<service-name>-<plan-name>" (e.g. "cis-local")
+				// Before upgrade (v1.10.0): external-name is the raw TF id "<service-name>-<plan-name>" (e.g. "cis-local")
 				expectedOldFormat := *dirEnt.Spec.ForProvider.ServiceName + "-" + *dirEnt.Spec.ForProvider.PlanName
 				if externalName != expectedOldFormat {
 					t.Fatalf("Pre-upgrade external-name %q does not match expected old format %q", externalName, expectedOldFormat)
@@ -104,6 +106,26 @@ func Test_DirectoryEntitlement_External_Name(t *testing.T) {
 				}
 
 				klog.V(4).Infof("External name migrated from %q to compound-key %q", preUpgradeExternalName, externalName)
+
+				// Delete the DirectoryEntitlement before teardown so the Directory is not deleted
+				// while the entitlement still references it.
+				//
+				// The 20-minute timeout accounts for the worst-case Upjet backoff: after upgrade,
+				// Crossplane immediately starts a `terraform apply -refresh-only`. If the delete
+				// arrives while this is running, Upjet blocks destroy ("apply operation still
+				// running") and Crossplane retries with exponential backoff capping at ~10 minutes.
+				klog.V(4).Info("Deleting DirectoryEntitlement before teardown")
+				if err := r.Delete(ctx, dirEnt); err != nil {
+					t.Fatalf("Failed to delete DirectoryEntitlement: %v", err)
+				}
+				if err := wait.For(
+					conditions.New(r).ResourceDeleted(dirEnt),
+					wait.WithTimeout(20*time.Minute),
+				); err != nil {
+					t.Fatalf("DirectoryEntitlement was not deleted within timeout: %v", err)
+				}
+				klog.V(4).Info("DirectoryEntitlement deleted before teardown")
+
 				return ctx
 			},
 		)

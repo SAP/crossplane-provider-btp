@@ -8,4 +8,4 @@ spec:
     serviceName: cis
     planName: local
     directoryRef:
-      name: upgrade-test-extn-dir
+      name: upgrade-test-extn-dir-fts-ent
