@@ -89,6 +89,7 @@ func TestTerraformSetupBuilder_ConditionalIDP(t *testing.T) {
 					}
 					return nil
 				},
+				MockList: test.NewMockListFn(nil),
 			}
 
 			// Create fake managed resource
