@@ -193,7 +193,7 @@ func TestPlanIDByName(t *testing.T) {
 				OfferingServiceFake{tc.args.listOfferingsMockFn},
 				PlansServiceFake{listPlansMockFn: tc.args.listPlansMockFn},
 			}
-			planID, err := smClient.PlanIDByName(context.TODO(), "Not relevant, since mocked", "Not relevant, since mocked", tc.args.dataCenter)
+			planID, err := smClient.PlanIDByName(context.TODO(), "Not relevant, since mocked", "Not relevant, since mocked", tc.args.dataCenter, "sapbtp")
 
 			if tc.wantErr != (err != nil) {
 				t.Errorf("Unexpected error return; Expected error: %v, Returned: %v", tc.wantErr, err)

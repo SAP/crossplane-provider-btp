@@ -178,7 +178,7 @@ type PlanIdResolverFake struct {
 	PlanLookupMockFn func() (string, error)
 }
 
-func (p *PlanIdResolverFake) PlanIDByName(ctx context.Context, offeringName, planName string, dataCenter string) (string, error) {
+func (p *PlanIdResolverFake) PlanIDByName(ctx context.Context, offeringName, planName, dataCenter, environment string) (string, error) {
 	return p.PlanLookupMockFn()
 }
 

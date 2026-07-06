@@ -36,6 +36,13 @@ type ServiceInstanceParameters struct {
 	// +kubebuilder:validation:Optional
 	ServicePlanID string `json:"servicePlanID,omitempty"`
 
+	// Environment for which to resolve the service plan. Valid values: sapbtp, kubernetes, cloudfoundry.
+	// Defaults to sapbtp if not set.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=sapbtp;kubernetes;cloudfoundry
+	// +kubebuilder:default=sapbtp
+	Environment string `json:"environment,omitempty"`
+
 	// Whether the service instance is shared or not
 	// +kubebuilder:validation:Optional
 	Shared *bool `json:"shared,omitempty"`

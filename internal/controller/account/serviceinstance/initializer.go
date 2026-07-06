@@ -57,7 +57,11 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 		return errors.Wrap(err, errInitPlanResolver)
 	}
 
-	planID, err := idResolver.PlanIDByName(ctx, cr.Spec.ForProvider.OfferingName, cr.Spec.ForProvider.PlanName, cr.Spec.ForProvider.DataCenter)
+	environment := cr.Spec.ForProvider.Environment
+	if environment == "" {
+		environment = "sapbtp"
+	}
+	planID, err := idResolver.PlanIDByName(ctx, cr.Spec.ForProvider.OfferingName, cr.Spec.ForProvider.PlanName, cr.Spec.ForProvider.DataCenter, environment)
 	if err != nil {
 		return errors.Wrap(err, errInitialize)
 	}

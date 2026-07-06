@@ -113,7 +113,7 @@ func TestConnect(t *testing.T) {
 				),
 				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
 					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
+						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string, environment string) (string, error) {
 							return "planID", nil
 						},
 					}, nil
@@ -161,7 +161,7 @@ func TestConnect(t *testing.T) {
 				),
 				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
 					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
+						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string, environment string) (string, error) {
 							return "planID", nil
 						},
 					}, nil
@@ -215,7 +215,7 @@ func TestConnect(t *testing.T) {
 				),
 				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
 					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
+						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string, environment string) (string, error) {
 							return "planID", nil
 						},
 					}, nil
@@ -676,11 +676,11 @@ func (t TfClientFake) DeleteResources(ctx context.Context, cr *v1beta1.CloudMana
 var _ servicemanager.PlanIdResolver = &PlanIDFake{}
 
 type PlanIDFake struct {
-	PlanIDByNameFn func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error)
+	PlanIDByNameFn func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string, environment string) (string, error)
 }
 
-func (p PlanIDFake) PlanIDByName(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
-	return p.PlanIDByNameFn(ctx, offeringName, servicePlanName, dataCenter)
+func (p PlanIDFake) PlanIDByName(ctx context.Context, offeringName string, servicePlanName string, dataCenter string, environment string) (string, error) {
+	return p.PlanIDByNameFn(ctx, offeringName, servicePlanName, dataCenter, environment)
 }
 
 var _ cmclient.ITfClientInitializer = &ClientInitializerFake{}
