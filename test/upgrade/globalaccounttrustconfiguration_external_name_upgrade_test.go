@@ -46,6 +46,11 @@ func Test_GlobalaccountTrustConfiguration_External_Name(t *testing.T) {
 				if externalName == "" {
 					t.Fatal("External name annotation is empty before upgrade")
 				}
+				// ADR(external-name): must be a real origin key, not the crossplane-runtime
+				// default (metadata.name).
+				if externalName == gaTrustName {
+					t.Fatalf("External name %q equals metadata.name — k8s default, not an origin key", externalName)
+				}
 
 				klog.V(4).Infof("Pre-upgrade GlobalaccountTrustConfiguration external name: %s", externalName)
 				return context.WithValue(ctx, "preUpgradeGaTrustExternalName", externalName)
