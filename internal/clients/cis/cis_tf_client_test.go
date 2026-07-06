@@ -704,7 +704,7 @@ func testServiceBinding(sbId, sbName string) *v1alpha1.SubaccountServiceBinding 
 
 // Fakes
 // Fake connectors from the embedded instance and binding resources / using whole tf roundtrip here would require external connection
-var _ managed.ExternalConnecter = &ExternalConnectorFake{}
+var _ managed.ExternalConnector = &ExternalConnectorFake{}
 
 type ExternalConnectorFake struct {
 	connectFn func() (managed.ExternalClient, error)

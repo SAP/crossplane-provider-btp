@@ -16,7 +16,7 @@ import (
 // Setup adds a controller that reconciles KymaEnvironment managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	name := managed.ControllerName(v1alpha1.KymaEnvironmentKind)
-	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(name))
+	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(name)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 	return providerconfig.DefaultSetupWithoutDefaultInitializer(mgr, o, &v1alpha1.KymaEnvironment{}, v1alpha1.KymaEnvironmentKind, v1alpha1.KymaEnvironmentGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 		return &connector{
 			kube:            kube,

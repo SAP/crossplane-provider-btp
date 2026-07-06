@@ -5,7 +5,7 @@ on:
 
 env:
   # it is important to use the exact same patch version here (compared to the go.mod) to avoid unexpected issues
-  GO_VERSION: '1.25.6'
+  GO_VERSION: '1.25.9'
 
 permissions:
   contents: read
@@ -28,4 +28,4 @@ jobs:
 
       - name: check licenses
         run: |
-          go-licenses check --allowed_licenses="Apache-2.0,BSD-3-Clause,MIT,MPL-2.0,ISC,BSD-2-Clause,Unicode-DFS-2016" ./...
+          go-licenses check --allowed_licenses="Apache-2.0,BSD-3-Clause,MIT,MPL-2.0,ISC,BSD-2-Clause,Unicode-DFS-2016,BSD-0-Clause" ./...
