@@ -77,6 +77,7 @@ Replace the 7 upjet resources with hand-written controllers backed by the existi
 
 ### Option 3 — All native on BTP CLI, side by side *(recommended long-term)*
 
+![Option 3 — Native on btpcli](../img/option3-native-btpcli.svg)
 
 Both Crossplane and Terraform call a shared client library to work with the BTP CLI server.
 
