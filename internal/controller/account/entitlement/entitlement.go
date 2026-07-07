@@ -139,14 +139,28 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	switch cr.Status.AtProvider.Assigned.EntityState { //nolint:exhaustive
 	case apisv1alpha1.EntitlementStatusOk:
 		cr.Status.SetConditions(xpv1.Available())
-	// the state relates to the last operation, not the current state
-	// at this point we already verified that the entity does match the desired state for all we know
-	// so we will ignore this state to avoid blocking healthy resources
-	// example case: attempting to delete an entitlement which is already consumed will fail in that way
-	// -> the only resolution is to discard and recreate the cr, in this case we just need to observe the still existing entitlement
-	// despite the last operation being a failure
+	// PROCESSING_FAILED reflects the *last operation* on the entitlement,
+	// not whether something is currently assigned. Two distinct shapes hit
+	// this branch:
+	//   1. Delete- or update-time failure on a still-assigned entitlement
+	//      (amount > 0). The entitlement is still in use; reporting
+	//      Available avoids flapping orchestration that depends on this CR.
+	//      Example: attempting to delete an entitlement that is already
+	//      consumed will fail in this way; the only resolution is to
+	//      discard and recreate the CR, in this case we just need to
+	//      observe the still existing entitlement despite the last operation
+	//      being a failure.
+	//   2. Assign-time failure with nothing reserved (amount == 0 / nil).
+	//      This is normally short-circuited above by needsCreate() so the
+	//      managed reconciler can retry via Create. The branch below is a
+	//      defensive fallback in case any future change bypasses that
+	//      short-circuit: reporting Available here would be a lie.
 	case apisv1alpha1.EntitlementStatusProcessingFailed:
-		cr.Status.SetConditions(xpv1.Available())
+		if c.assignFailedNoQuota(cr) {
+			cr.Status.SetConditions(xpv1.Unavailable())
+		} else {
+			cr.Status.SetConditions(xpv1.Available())
+		}
 	case apisv1alpha1.EntitlementStatusProcessing:
 		cr.Status.SetConditions(xpv1.Creating())
 	case apisv1alpha1.EntitlementStatusStarted:
@@ -304,8 +318,33 @@ func (c *external) needsUpdate(cr *apisv1alpha1.Entitlement) bool {
 	return false
 }
 
+// assignFailedNoQuota returns true when BTP reports a PROCESSING_FAILED
+// assignment for this entitlement and the reported amount is zero or unset,
+// i.e. nothing is actually reserved on the BTP side. This is distinct from
+// PROCESSING_FAILED with a non-zero amount, which typically reflects a
+// delete- or update-time failure on an entitlement that is still assigned
+// (and which should remain marked as Available so siblings/orchestration are
+// not flapped).
+func (c *external) assignFailedNoQuota(cr *apisv1alpha1.Entitlement) bool {
+	if cr.Status.AtProvider == nil || cr.Status.AtProvider.Assigned == nil {
+		return false
+	}
+	if cr.Status.AtProvider.Assigned.EntityState != apisv1alpha1.EntitlementStatusProcessingFailed {
+		return false
+	}
+	amount := cr.Status.AtProvider.Assigned.Amount
+	return amount == nil || *amount <= 0
+}
+
 func (c *external) needsCreate(cr *apisv1alpha1.Entitlement) bool {
-	return cr.Status.AtProvider.Assigned == nil
+	if cr.Status.AtProvider.Assigned == nil {
+		return true
+	}
+	// Previous assign attempt failed and BTP reserved nothing — treat as
+	// not-yet-created so Crossplane re-issues the assign via Create (which
+	// calls CreateInstance == UpdateInstance) under the managed reconciler's
+	// rate-limited retry.
+	return c.assignFailedNoQuota(cr)
 }
 
 // deletionComplete checks whether this CR's portion has already been removed from BTP.

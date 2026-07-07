@@ -15,7 +15,9 @@ import (
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
+	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -93,7 +95,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	response, _, err := c.btp.AccountsServiceClient.GlobalAccountOperationsAPI.GetGlobalAccount(ctx).Execute()
 
 	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetGlobalAccount)
+		return managed.ExternalObservation{}, errors.Wrap(specifyAPIError(err), errGetGlobalAccount)
 	}
 
 	globalAccountGuid := response.Guid
@@ -151,4 +153,16 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.Status.SetConditions(xpv1.Deleting())
 	return managed.ExternalDelete{}, nil
+}
+
+func specifyAPIError(err error) error {
+	if genericErr, ok := err.(*accountclient.GenericOpenAPIError); ok {
+		if accountError, ok := genericErr.Model().(accountclient.ApiExceptionResponseObject); ok {
+			return fmt.Errorf("API Error: %v, Code %v", internal.Val(accountError.Error.Message), internal.Val(accountError.Error.Code))
+		}
+		if genericErr.Body() != nil {
+			return fmt.Errorf("API Error: %s", string(genericErr.Body()))
+		}
+	}
+	return err
 }

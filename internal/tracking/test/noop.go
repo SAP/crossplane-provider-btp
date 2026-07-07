@@ -38,6 +38,6 @@ func (n NoOpReferenceResolverTracker) DeleteShouldBeBlocked(mg resource.Managed)
 // NoOpLegacyTracker implements providerconfig.LegacyTracker for testing purposes.
 type NoOpLegacyTracker struct{}
 
-func (n NoOpLegacyTracker) Track(ctx context.Context, mg resource.LegacyManaged) error {
+func (n NoOpLegacyTracker) Track(ctx context.Context, mg resource.LegacyManaged) error { //nolint:staticcheck // Existing tests use legacy ProviderConfig references.
 	return nil
 }

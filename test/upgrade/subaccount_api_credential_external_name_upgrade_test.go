@@ -15,8 +15,8 @@ var (
 	sacFromCustomTag             = "v1.3.0"
 	sacToCustomTag               = "local"
 	sacCustomResourceDirectories = []string{
-		"./testdata/customCRs/subaccountExternalName",
-		"./testdata/customCRs/subaccountApiCredentialExternalName",
+		upgradeCRsPath("customCRs/subaccountExternalName"),
+		upgradeCRsPath("customCRs/subaccountApiCredentialExternalName"),
 	}
 )
 

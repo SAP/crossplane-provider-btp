@@ -31,12 +31,22 @@ import (
 	"github.com/crossplane/upjet/v2/pkg/controller/handler"
 	"github.com/crossplane/upjet/v2/pkg/terraform"
 	"github.com/pkg/errors"
+	tfclient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	features "github.com/sap/crossplane-provider-btp/internal/features"
 )
+
+// SetupWebhookWithManager registers the conversion webhook for GlobalaccountTrustConfiguration.
+func SetupWebhookWithManager(mgr ctrl.Manager) error {
+	if err := ctrl.NewWebhookManagedBy(mgr, &v1alpha1.GlobalaccountTrustConfiguration{}).
+		Complete(); err != nil {
+		return errors.Wrap(err, "cannot register webhook for the kind v1alpha1.GlobalaccountTrustConfiguration")
+	}
+	return nil
+}
 
 // SetupGated adds a controller that reconciles GlobalaccountTrustConfiguration managed resources.
 func SetupGated(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
@@ -55,7 +65,7 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	eventHandler := handler.NewEventHandler(handler.WithLogger(o.Logger.WithValues("gvk", v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind)))
 	ac := tjcontroller.NewAPICallbacks(mgr, xpresource.ManagedKind(v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind), tjcontroller.WithEventHandler(eventHandler))
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnecter(tjcontroller.NewConnector(mgr.GetClient(), o.WorkspaceStore, o.SetupFn, o.Provider.Resources["btp_globalaccount_trust_configuration"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler),
+		managed.WithExternalConnecter(tjcontroller.NewConnector(mgr.GetClient(), tfclient.NewIdentityInjectingStore(o.WorkspaceStore, o.Logger), o.SetupFn, o.Provider.Resources["btp_globalaccount_trust_configuration"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler),
 			tjcontroller.WithCallbackProvider(ac),
 		)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
@@ -73,16 +83,6 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	}
 	if o.MetricOptions != nil {
 		opts = append(opts, managed.WithMetricRecorder(o.MetricOptions.MRMetrics))
-	}
-
-	// register webhooks for the kind v1alpha1.GlobalaccountTrustConfiguration
-	// if they're enabled.
-	if o.StartWebhooks {
-		if err := ctrl.NewWebhookManagedBy(mgr).
-			For(&v1alpha1.GlobalaccountTrustConfiguration{}).
-			Complete(); err != nil {
-			return errors.Wrap(err, "cannot register webhook for the kind v1alpha1.GlobalaccountTrustConfiguration")
-		}
 	}
 
 	if o.MetricOptions != nil && o.MetricOptions.MRStateMetrics != nil {

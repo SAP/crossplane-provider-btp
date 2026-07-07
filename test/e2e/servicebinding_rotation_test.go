@@ -28,8 +28,8 @@ func TestServiceBinding_RotationLifecycle(t *testing.T) {
 	rotationLifecycleFeature := features.New("ServiceBinding Complete Rotation Lifecycle").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/rotation-env")
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/rotation")
+				resources.ImportResources(ctx, t, cfg, crsPath("servicebinding/rotation-env"))
+				resources.ImportResources(ctx, t, cfg, crsPath("servicebinding/rotation"))
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
