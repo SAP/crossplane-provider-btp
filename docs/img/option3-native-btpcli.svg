@@ -19,8 +19,7 @@
 
   <!-- btpcli Go package (shared) -->
   <rect x="200" y="120" width="300" height="50" rx="6" fill="#e8eaf6" stroke="#5c6bc0"/>
-  <text x="350" y="142" text-anchor="middle" fill="#283593" font-weight="bold">btpcli client library</text>
-  <text x="350" y="160" text-anchor="middle" fill="#283593" font-size="11">shared — imported via go.mod</text>
+  <text x="350" y="150" text-anchor="middle" fill="#283593" font-weight="bold">btpcli — shared client library</text>
 
   <!-- Arrow -->
   <line x1="350" y1="170" x2="350" y2="215" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
