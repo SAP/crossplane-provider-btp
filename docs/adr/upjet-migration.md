@@ -4,7 +4,7 @@
 
 ## 1. Current Implementation
 
-crossplane-provider-btp manages 20+ BTP resources via two main routes:
+crossplane-provider-btp manages BTP resources via two main routes:
 
 ![Architecture overview](../img/btp-provider-implementation.svg)
 
