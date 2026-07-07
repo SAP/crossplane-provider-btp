@@ -26,7 +26,7 @@ The `SubaccountApiCredentials` can not be imported from an existing BTP landscap
 To fix the issue, use the BTP CLI to delete the previously generated credentials:
 
 ```sh
-btp delete security/api-credential managed-subbaccount-api-credential --subaccount [ID]
+btp delete security/api-credential managed-subaccount-api-credential --subaccount [ID]
 ```
 
 Once deleted, `SubaccountApiCredentials` will generate a new, correct secret.
