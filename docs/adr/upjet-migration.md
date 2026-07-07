@@ -2,9 +2,9 @@
 
 ---
 
-## 1. Current Architecture
+## 1. Current Implemetnation
 
-crossplane-provider-btp manages 30+ BTP resources inside a single controller-manager pod. Resources are reconciled via three paths:
+crossplane-provider-btp manages 30+ BTP resources via two main routes:  
 
 ```mermaid
 flowchart TD
@@ -14,32 +14,22 @@ flowchart TD
         OA[OpenAPI clients]
     end
 
-    subgraph HY[Hybrid — 2 resources\nServiceInstance · ServiceBinding]
-        SM[SM plan resolver]
-        TF2[Terraform subprocess]
-        SM --> TF2
-    end
-
-    subgraph UP[Upjet — 5 resources]
+    subgraph UP[Upjet — 7 resources]
         TF[Terraform Provider]
         CLI[cli.btp.cloud.sap]
         TF --> CLI
     end
 
     CP --> NA
-    CP --> HY
     CP --> UP
 
     OA --> BTP[BTP backends]
-    TF2 --> BTP
     CLI --> BTP
 ```
 
 **Native path (18 resources):** hand-written controllers call BTP REST APIs directly via generated OpenAPI clients. One HTTP call per operation, no subprocess, no disk state. Auth via OAuth2 client credentials (CIS binding).
 
-**Upjet path (5 resources):** upjet drives a Terraform subprocess per reconcile. The subprocess loads the SAP BTP Terraform provider binary, logs in to `cli.btp.cloud.sap` with username/password, and executes the operation. State is written to `terraform.tfstate` on the pod's temp disk.
-
-**Hybrid path (2 resources — ServiceInstance, ServiceBinding):** upjet-generated CRD types with hand-written controllers. A native Service Manager API call resolves the service plan ID on first reconcile; subsequent operations delegate to the upjet subprocess path.
+**Upjet path (7 resources):** upjet drives a Terraform subprocess per reconcile. The subprocess loads the SAP BTP Terraform provider binary, logs in to `cli.btp.cloud.sap` with username/password, and executes the operation. State is written to `terraform.tfstate` on the pod's temp disk. 2 resources (ServiceInstance, ServiceBinding) are using a hybrid controller: a native Service Manager API call resolves the service plan ID during initialization; subsequent operations delegate to the upjet subprocess path.
 
 ### The 7 upjet resources
 
@@ -55,20 +45,36 @@ flowchart TD
 
 ### Relationship to the Terraform provider
 
-The SAP Terraform BTP provider (`SAP/terraform-provider-btp`) is not a peer tool — it is a **runtime dependency** of this Crossplane provider. Its binary is bundled in the container image at build time. For resources that have no public REST API (notably `SubaccountApiCredential`), the Terraform provider wraps the BTP CLI server (`cli.btp.cloud.sap`) using an internal `btpcli` HTTP client. There is no REST API underneath — the CLI server is the authoritative interface.
+In the current **forked** mode, `SAP/terraform-provider-btp` is a **runtime dependency**: its binary is bundled in the container image and forked as a subprocess on every reconcile.
+
+With **no-fork** (Option 1), this changes: the Terraform provider becomes a **compile-time Go dependency** — imported as a Go module and called in-process. The binary is no longer bundled in the image, but the Go package and its CLI server dependency remain.
+
+With **full native** (Options 2 and 3), the Terraform provider dependency is eliminated entirely from the Crossplane provider.
+
+For resources that have no public REST API (notably `SubaccountApiCredential`), the Terraform provider wraps the BTP CLI server (`cli.btp.cloud.sap`) using an internal `btpcli` HTTP client. There is no REST API underneath — the CLI server is the authoritative interface.
 
 ---
 
-## 2. Challenges
+## 2. Benefits and Challenges
+
+### Benefits of the upjet approach
+
+**Development (initial) productivity** — upjet generates CRD types and reconciliation scaffolding directly from the Terraform provider schema. Adding a new resource required no REST client implementation, no auth wiring, and no CRUD logic — just configuration.
+
+**BTP CLI facade** — the `btpcli` library inside `SAP/terraform-provider-btp` provides a critical abstraction layer. BTP's underlying APIs — particularly UAA and the commercial/account management APIs — are low-level and not designed for direct tool consumption. Working with them directly means juggling dozens of credential types, managing OAuth flows per service, and handling API surfaces that expose platform internals rather than user-facing operations. The BTP CLI facade consolidates this into a single session-based interface: one login, one session token, one consistent command model across all resource types. Without upjet, a native controller would need to replicate this abstraction or take a direct dependency on the same library.
+
+**Proven CRUD logic** — the Terraform provider's resource implementations have been tested at scale. Reusing them via upjet avoided reimplementing error handling, state reconciliation, and edge cases for each resource.
+
+### Challenges
 
 ### Login / session ratio
-Upjet (forked mode) spawns a Terraform subprocess per reconcile loop per resource. Each subprocess performs a fresh login to `cli.btp.cloud.sap` to obtain a session token. With many resources reconciling on short intervals, this generates a disproportionate number of login calls — a ratio problem that grows with the number of managed resources.
+Upjet (forked mode) forks a Terraform subprocess per reconcile loop per resource. Each subprocess performs a fresh login to `cli.btp.cloud.sap` to obtain a session token. With many resources reconciling on short intervals, this generates a disproportionate number of login calls — a ratio problem that grows with the number of managed resources.
 
 ### Rate limits
 Each Terraform subprocess issues its own sequence of API calls (plan, apply, refresh) through the BTP CLI server, which enforces rate limits. The Crossplane reconcile loop adds continuous pressure on top of what a human operator or CI pipeline would generate.
 
 ### Performance
-Each reconcile spawns a Terraform subprocess, writes workspace files to disk, and reads back `terraform.tfstate` on completion. State lives in the pod's temp directory and is lost on pod restart — requiring a re-import from BTP on every restart.
+Each reconcile forks a Terraform subprocess, writes workspace files to disk, and reads back `terraform.tfstate` on completion. State lives in the pod's temp directory and is lost on pod restart — requiring a re-import from BTP on every restart.
 
 ### Version coupling
 The provider bundles a pinned Terraform binary (~100MB) and the SAP BTP Terraform provider binary. Every BTP Terraform provider release requires a coordinated image update. Breaking changes in the Terraform provider propagate directly into Crossplane behavior. Both providers must be kept in lockstep.
