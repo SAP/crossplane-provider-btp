@@ -4,15 +4,15 @@
 
 ## 1. Current Implementation
 
-crossplane-provider-btp manages 30+ BTP resources via two main routes:
+crossplane-provider-btp manages 20+ BTP resources via two main routes:
 
 ![Architecture overview](../img/btp-provider-implementation.svg)
 
-**Native path (18 resources):** Crossplane controllers call BTP REST APIs directly via generated OpenAPI clients. One HTTP call per operation, no subprocess, no disk state. Auth via OAuth2 client credentials (CIS binding).
+**Native path (13 resources):** Crossplane controllers call BTP REST APIs directly via generated OpenAPI clients. One HTTP call per operation, no subprocess, no disk state. Auth via OAuth2 client credentials (CIS binding).
 
-**Upjet path (7 resources):** upjet controllers fork a Terraform subprocess per reconcile. In the current **forked** mode, `SAP/terraform-provider-btp` is a **runtime dependency**: its binary is bundled in the container image and forked as a subprocess on every reconcile. With **no-fork**, this becomes a **compile-time Go dependency**. The binary is no longer bundled in the image, but the Go package and its CLI server dependency remain.
+**Upjet path ( 9 resources):** upjet controllers fork a Terraform subprocess per reconcile. In the current **forked** mode, `SAP/terraform-provider-btp` is a **runtime dependency**: its binary is bundled in the container image and forked as a subprocess on every reconcile. With **no-fork**, this becomes a **compile-time Go dependency**. The binary is no longer bundled in the image, but the Go package and its CLI server dependency remain.
 
-### The 7 upjet resources
+### The upjet-ed resources
 
 | Resource | Async | Native API exists? |
 |---|---|---|
@@ -23,6 +23,8 @@ crossplane-provider-btp manages 30+ BTP resources via two main routes:
 | `SubaccountServiceBroker` | No | Partial (SM API, read-only) |
 | `SubaccountServiceInstance` | Yes | Yes (SM API) |
 | `SubaccountServiceBinding` | Yes | Yes (SM API) |
+
+In addition,  `CloudManagement` and `ServiceManager` resources have upjet dependencies.
 
 ---
 
@@ -92,24 +94,8 @@ Both Crossplane and Terraform call a shared client library to work with the BTP 
 
 ---
 
-## 4. Per-resource migration path
-
-| Resource | Option 2 | Option 3 | External ask |
-|---|---|---|---|
-| `SubaccountTrustConfiguration` | ✅ XSUAA API | ✅ XSUAA API | None |
-| `GlobalAccountTrustConfiguration` | ✅ XSUAA API | ✅ XSUAA API | None |
-| `DirectoryEntitlement` | ✅ Entitlements API | ✅ Entitlements API | None |
-| `SubaccountServiceInstance` | ✅ SM API (already hybrid) | ✅ SM API | None |
-| `SubaccountServiceBinding` | ✅ SM API (already hybrid) | ✅ SM API | None |
-| `SubaccountServiceBroker` | ⚠️ SM write API needed | ⚠️ SM write API needed | SM team: confirm/publish write ops |
-| `SubaccountApiCredential` | ❌ no REST API | ✅ btpcli library | BTP CLI team: export `btpcli` |
-
----
-
 ## 5. Recommendation
 
-**Immediate (Option 1):** Migrate to no-fork upjet. Removes the Terraform binary from the image and eliminates subprocess overhead. No external dependencies. Can start today.
+**Immediate (Option 1):** Migrate to no-fork upjet. Removes the Terraform binary from the image and eliminates subprocess overhead.
 
-**Long-term (Option 3):** Go all native on BTP CLI, side by side with the Terraform provider. Both tools share the CLI server interface without coupling their release cycles. The key external ask is for the BTP CLI team to export the `btpcli` library as a reusable Go module.
-
-Option 2 is a valid stepping stone if the `btpcli` export is delayed — 5 of 7 resources can go native on REST APIs without any external action.
+**Long-term (Option 3):** Go all native on BTP CLI, side by side with the Terraform provider. 
