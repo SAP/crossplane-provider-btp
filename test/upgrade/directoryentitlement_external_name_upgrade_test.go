@@ -20,7 +20,7 @@ var (
 	directoryEntitlementFromCustomTag             = "v1.10.0"
 	directoryEntitlementToCustomTag               = "local"
 	directoryEntitlementCustomResourceDirectories = []string{
-		"./testdata/customCRs/directoryEntitlementExternalName",
+		upgradeCRsPath("customCRs/directoryEntitlementExternalName"),
 	}
 )
 
