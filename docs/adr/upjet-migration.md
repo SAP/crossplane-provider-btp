@@ -24,7 +24,7 @@ crossplane-provider-btp manages 20+ BTP resources via two main routes:
 | `SubaccountServiceInstance` | Yes | Yes (SM API) |
 | `SubaccountServiceBinding` | Yes | Yes (SM API) |
 
-In addition,  `CloudManagement` and `ServiceManager` resources have upjet dependencies.
+In addition,  `CloudManagement` and `ServiceManager` resources have upjet dependencies. `Destination` is planned to the upjet path in the future, but is not yet implemented.
 
 ---
 
@@ -39,7 +39,7 @@ In addition,  `CloudManagement` and `ServiceManager` resources have upjet depend
 ### Challenges
 
 **Login / session ratio**
-Upjet (forked mode) forks a Terraform subprocess per reconcile loop per resource. Each subprocess performs a fresh login to `cli.btp.cloud.sap` to obtain a session token. With many resources reconciling on short intervals, this generates a disproportionate number of login calls — a ratio problem that grows with the number of managed resources. This may be mitigated by switching to no-fork mode (Option 1).
+Upjet (forked mode) forks a Terraform subprocess per reconcile loop per resource. Each subprocess performs a fresh login to `cli.btp.cloud.sap` to obtain a session token. This generates a disproportionate number of login calls — a ratio problem that grows with the number of managed resources. This may be mitigated by switching to no-fork mode.
 
 **Rate limits**
 The workload of Crossplane and Terraform providers are of different nature and may require different session management and rate limiting policies. The current implementation requires the Terraform provider to support a mixture of both workloads, making it difficult to optimize for either.
