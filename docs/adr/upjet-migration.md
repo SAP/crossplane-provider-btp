@@ -54,25 +54,20 @@ The provider bundles a pinned Terraform binary (~100MB) and the SAP BTP Terrafor
 
 ### Option 1 — No-fork upjet *(intermediate — do now)*
 
+![Option 1 — No-fork](../img/option1-nofork.svg)
+
 Switch the 7 upjet resources from subprocess mode to in-process Go calls using upjet's no-fork architecture (`useTerraformPluginFrameworkClient`). The Terraform binary is removed from the image; the BTP Terraform provider becomes a compile-time Go dependency instead of a runtime binary.
 
-```
-Crossplane  →  upjet (in-process)  →  SAP BTP TF provider (Go)  →  cli.btp.cloud.sap  →  BTP
-```
-
 **What improves:** No subprocess overhead, no binary bundling in the image, potentially fewer login calls.  
-**What stays the same:** Rate limit pressure, version coupling.  
+**What stays the same:** Rate limit pressure, version coupling.
 
 ---
 
 ### Option 2 — All native on OpenAPI
 
-Replace the 7 upjet resources with hand-written controllers backed by the existing OpenAPI REST clients. Crossplane and Terraform operate as independent tools.
+![Option 2 — Native on OpenAPI](../img/option2-native-openapi.svg)
 
-```
-Crossplane  →  OpenAPI clients  →  BTP REST APIs
-Terraform   →  cli.btp.cloud.sap  →  BTP backends    (independent)
-```
+Replace the 7 upjet resources with hand-written controllers backed by the existing OpenAPI REST clients. Crossplane and Terraform operate as independent tools.
 
 **What improves:** Crossplane fully decoupled from Terraform — no version coupling, no subprocess, no login ratio problem.  
 **What's worse / blockers:**
@@ -80,23 +75,20 @@ Terraform   →  cli.btp.cloud.sap  →  BTP backends    (independent)
 - Some resources have no direct REST API or only partial support — requires workarounds that may introduce breaking changes
 - User experience degradation possible — users may be required to work with lower-level resources not intended for end-user consumption (e.g., Service Manager, Cloud Management APIs)
 
-
 ---
 
 ### Option 3 — All native on BTP CLI, side by side *(recommended long-term)*
 
-Both Crossplane and Terraform sit side by side on top of the BTP CLI server using the shared client library.
+![Option 3 — Native on btpcli](../img/option3-native-btpcli.svg)
 
-```
-Crossplane  →  btpcli library (in-process)  →  cli.btp.cloud.sap  →  BTP backends
-Terraform   →  btpcli library (in-process)  →  cli.btp.cloud.sap  →  BTP backends
-```
+Both Crossplane and Terraform call a shared client library to work with the BTP CLI server.
 
-Both tools are deployed independently and can target the same or different BTP CLI server instances.
+Both tools import `btpcli` as a regular Go library dependency. The BTP CLI team owns and maintains the library; both providers version it independently via `go.mod`. This is different from the current binary/subprocess model — it is a standard Go package import with no runtime artifact, no separate process, and no IPC overhead.
 
-**What improves:** Crossplane eliminates all Terraform and upjet dependencies. Login sessions and API calls are made directly and efficiently. 
+**What improves:** Crossplane eliminates all Terraform and upjet dependencies. Login sessions and API calls are made directly and efficiently.  
 **What is required:**
-- The cli client library inside `SAP/terraform-provider-btp` is shared. 
+
+- The `btpcli` client is available as a library.
 
 ---
 
