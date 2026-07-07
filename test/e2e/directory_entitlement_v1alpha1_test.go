@@ -42,7 +42,7 @@ func TestDirectoryEntitlementImportFlow(t *testing.T) {
 		importK8sResName,
 		WithWaitCreateTimeout[*v1alpha1.DirectoryEntitlement](wait.WithTimeout(5*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.DirectoryEntitlement](wait.WithTimeout(3*time.Minute)),
-		WithDependentResourceDirectory[*v1alpha1.DirectoryEntitlement]("./testdata/crs/DirectoryEntitlementImport"),
+		WithDependentResourceDirectory[*v1alpha1.DirectoryEntitlement](crsPath("DirectoryEntitlementImport")),
 		WithWaitDependentResourceTimeout[*v1alpha1.DirectoryEntitlement](wait.WithTimeout(15*time.Minute)),
 	)
 
