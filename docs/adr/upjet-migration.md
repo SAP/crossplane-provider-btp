@@ -6,26 +6,7 @@
 
 crossplane-provider-btp manages 30+ BTP resources via two main routes:
 
-```mermaid
-flowchart TD
-    CP[Crossplane Provider]
-
-    subgraph NA[Native — 18 resources]
-        OA[OpenAPI clients]
-    end
-
-    subgraph UP[Upjet — 7 resources]
-        TF[Terraform Provider]
-        CLI[cli.btp.cloud.sap]
-        TF --> CLI
-    end
-
-    CP --> NA
-    CP --> UP
-
-    OA --> BTP[BTP backends]
-    CLI --> BTP
-```
+![Architecture overview](../img/upjet-architecture.svg)
 
 **Native path (18 resources):** Crossplane controllers call BTP REST APIs directly via generated OpenAPI clients. One HTTP call per operation, no subprocess, no disk state. Auth via OAuth2 client credentials (CIS binding).
 
