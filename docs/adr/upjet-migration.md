@@ -62,7 +62,6 @@ Crossplane  →  upjet (in-process)  →  SAP BTP TF provider (Go)  →  cli.btp
 
 **What improves:** No subprocess overhead, no binary bundling in the image, potentially fewer login calls.  
 **What stays the same:** Rate limit pressure, version coupling.  
-**Effort:** Low — entirely within this repository, no external changes needed. `SAP/terraform-provider-btp` already uses Terraform Plugin Framework v1.19.0 (Protocol v6) — no-fork is compatible today.
 
 ---
 
@@ -80,10 +79,7 @@ Terraform   →  cli.btp.cloud.sap  →  BTP backends    (independent)
 
 - Some resources have no direct REST API or only partial support — requires workarounds that may introduce breaking changes
 - User experience degradation possible — users may be required to work with lower-level resources not intended for end-user consumption (e.g., Service Manager, Cloud Management APIs)
-- `SubaccountServiceBroker` — Service Manager OpenAPI spec currently lacks write operations; needs confirmation from the SM team
-- `SubaccountApiCredential` — no public REST API exists; the CLI server is the only interface
 
-**Effort:** Medium — 5 of 7 resources unblocked today, 2 require external action.
 
 ---
 
@@ -98,13 +94,9 @@ Terraform   →  btpcli library (in-process)  →  cli.btp.cloud.sap  →  BTP b
 
 Both tools are deployed independently and can target the same or different BTP CLI server instances.
 
-**What improves:** Crossplane eliminates all Terraform and upjet dependencies. Login sessions and API calls are made directly and efficiently. Both tools share the same authoritative interface without duplicating the wire protocol. The two providers can evolve independently.  
+**What improves:** Crossplane eliminates all Terraform and upjet dependencies. Login sessions and API calls are made directly and efficiently. 
 **What is required:**
-
-- The `btpcli` library inside `SAP/terraform-provider-btp` is currently `internal/` — it must be exported or published as a standalone Go module for Crossplane to import it
-- Alternatively, the BTP CLI team publishes a REST API for `SubaccountApiCredential` management (which would also unblock Option 2)
-
-**Effort:** Medium — same as Option 2 for the 5 unblocked resources; the 2 blocked resources are unblocked once `btpcli` is accessible.
+- The cli client library inside `SAP/terraform-provider-btp` is shared. 
 
 ---
 
