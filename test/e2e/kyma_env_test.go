@@ -23,7 +23,7 @@ import (
 )
 
 func TestKymaEnvironment(t *testing.T) {
-	var manifestDir = "testdata/crs/kyma_env"
+	var manifestDir = crsPath("kyma_env")
 	crudFeature := features.New("BTP Kyma Environment Controller").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
@@ -90,7 +90,7 @@ func TestKymaEnvironmentImportFlow(t *testing.T) {
 		WithWaitDependentResourceTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(15*time.Minute)),
 		WithWaitCreateTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(50*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(50*time.Minute)),
-		WithDependentResourceDirectory[*v1alpha1.KymaEnvironment]("testdata/crs/kyma_env_import"),
+		WithDependentResourceDirectory[*v1alpha1.KymaEnvironment](crsPath("kyma_env_import")),
 	)
 
 	importFeature := importTester.BuildTestFeature("BTP Kyma Environment Import Flow").Feature()

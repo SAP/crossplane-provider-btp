@@ -30,7 +30,7 @@ var (
 )
 
 func TestSubaccountApiCredentialsStandalone(t *testing.T) {
-	var manifestDir = "testdata/crs/SubaccountApiCredentialsStandalone"
+	var manifestDir = crsPath("SubaccountApiCredentialsStandalone")
 	crudFeature := features.New("SubaccountApiCredentials Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
@@ -102,7 +102,7 @@ func assertApiCredentialSecret(t *testing.T, ctx context.Context, cfg *envconf.C
 //
 // See: https://github.com/SAP/crossplane-provider-btp/issues/553
 func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
-	var orphanManifestDir = "testdata/crs/SubaccountApiCredentialOrphanImport"
+	var orphanManifestDir = crsPath("SubaccountApiCredentialOrphanImport")
 	// Prefix "sac-adr-" ensures the BTP credential name starts with a letter.
 	// The SAC is created in Setup (not Assess) so the controller picks it up
 	// reliably while Crossplane is already actively reconciling resources.

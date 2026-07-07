@@ -38,7 +38,7 @@ type ITfClient interface {
 	DeleteResources(ctx context.Context, cr *apisv1beta1.CloudManagement) error
 }
 
-func NewTfClient(sConnector managed.ExternalConnecter, sbConnector managed.ExternalConnecter) *TfClientInitializer {
+func NewTfClient(sConnector managed.ExternalConnector, sbConnector managed.ExternalConnector) *TfClientInitializer {
 	return &TfClientInitializer{
 		siConnector: sConnector,
 		sbConnector: sbConnector,
@@ -48,8 +48,8 @@ func NewTfClient(sConnector managed.ExternalConnecter, sbConnector managed.Exter
 var _ ITfClientInitializer = &TfClientInitializer{}
 
 type TfClientInitializer struct {
-	siConnector managed.ExternalConnecter
-	sbConnector managed.ExternalConnecter
+	siConnector managed.ExternalConnector
+	sbConnector managed.ExternalConnector
 }
 
 func (tfI *TfClientInitializer) ConnectResources(ctx context.Context, cr *apisv1beta1.CloudManagement) (ITfClient, error) {
