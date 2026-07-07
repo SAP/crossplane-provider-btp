@@ -6,7 +6,7 @@
 
 crossplane-provider-btp manages 30+ BTP resources via two main routes:
 
-![Architecture overview](../img/upjet-architecture.svg)
+![Architecture overview](../img/btp-provider-implementation.svg)
 
 **Native path (18 resources):** Crossplane controllers call BTP REST APIs directly via generated OpenAPI clients. One HTTP call per operation, no subprocess, no disk state. Auth via OAuth2 client credentials (CIS binding).
 
