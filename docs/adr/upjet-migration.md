@@ -64,14 +64,18 @@ Switch the 7 upjet resources from subprocess mode to in-process Go calls using u
 
 ### Option 2 — All native on OpenAPI
 
+![Option 2 — Native on OpenAPI](../img/option2-native-openapi.svg)
 
 Replace the 7 upjet resources with hand-written controllers backed by the existing OpenAPI REST clients. Crossplane and Terraform operate as independent tools.
 
 **What improves:** Crossplane fully decoupled from Terraform — no version coupling, no subprocess, no login ratio problem.  
 **What's worse / blockers:**
-
 - Some resources have no direct REST API or only partial support — requires workarounds that may introduce breaking changes
 - User experience degradation possible — users may be required to work with lower-level resources not intended for end-user consumption (e.g., Service Manager, Cloud Management APIs)
+
+**What is required:**
+
+- The public REST APIs must offer the same functional surface as the BTP CLI and they are kept in sync so that users do not experience discrepancy between tools.
 
 ---
 
@@ -79,14 +83,12 @@ Replace the 7 upjet resources with hand-written controllers backed by the existi
 
 ![Option 3 — Native on btpcli](../img/option3-native-btpcli.svg)
 
-Both Crossplane and Terraform call a shared client library to work with the BTP CLI server.
-
-Both tools import `btpcli` as a regular Go library dependency. The BTP CLI team owns and maintains the library; both providers version it independently via `go.mod`. This is different from the current binary/subprocess model — it is a standard Go package import with no runtime artifact, no separate process, and no IPC overhead.
+Both Crossplane and Terraform call a shared client library to work with the BTP CLI server. The BTP CLI team owns and maintains the library, and keep it in sync with underlying CLI server.
 
 **What improves:** Crossplane eliminates all Terraform and upjet dependencies. Login sessions and API calls are made directly and efficiently.  
 **What is required:**
 
-- The `btpcli` client is available as a library.
+- The `btpcli` client is available as a shared library.
 
 ---
 
