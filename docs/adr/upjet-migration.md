@@ -54,7 +54,6 @@ The provider bundles a pinned Terraform binary (~100MB) and the SAP BTP Terrafor
 
 ### Option 1 — No-fork upjet *(intermediate — do now)*
 
-![Option 1 — No-fork](../img/option1-nofork.svg)
 
 Switch the 7 upjet resources from subprocess mode to in-process Go calls using upjet's no-fork architecture (`useTerraformPluginFrameworkClient`). The Terraform binary is removed from the image; the BTP Terraform provider becomes a compile-time Go dependency instead of a runtime binary.
 
@@ -65,7 +64,6 @@ Switch the 7 upjet resources from subprocess mode to in-process Go calls using u
 
 ### Option 2 — All native on OpenAPI
 
-![Option 2 — Native on OpenAPI](../img/option2-native-openapi.svg)
 
 Replace the 7 upjet resources with hand-written controllers backed by the existing OpenAPI REST clients. Crossplane and Terraform operate as independent tools.
 
@@ -79,7 +77,6 @@ Replace the 7 upjet resources with hand-written controllers backed by the existi
 
 ### Option 3 — All native on BTP CLI, side by side *(recommended long-term)*
 
-![Option 3 — Native on btpcli](../img/option3-native-btpcli.svg)
 
 Both Crossplane and Terraform call a shared client library to work with the BTP CLI server.
 
