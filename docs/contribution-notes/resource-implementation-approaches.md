@@ -97,19 +97,19 @@ The following sections show some of the key aspects of the implementation by usi
 
 Before any reconciliation can happen, the native connector must construct the internal upjet controller it will delegate to. This involves creating the upjet-compatible connector (backed by a Terraform workspace) and wrapping it together with the mapper into a `TfProxyConnector`.
 
-For `ServiceInstance` this wiring happens in [`newClientCreatorFn`](../../internal/controller/account/serviceinstance/serviceinstance.go#L53) and [`NewServiceInstanceConnector`](../../internal/clients/account/serviceinstance/serviceinstance.go#L22).
+For `ServiceInstance` this wiring happens in [`newClientCreatorFn`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/controller/account/serviceinstance/serviceinstance.go#L53) and [`NewServiceInstanceConnector`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/clients/account/serviceinstance/serviceinstance.go#L22).
 
 #### Mapping
 
 The mapping translates the native `ServiceInstance` CR into the internal `SubaccountServiceInstance` (the upjet type) that the embedded controller actually operates on. This includes copying over field values, merging parameters from secrets, and transferring the external-name annotation so the Terraform workspace can identify the resource. This part is where most of the customization between different resource types comes in. 
 
-The mapping for `ServiceInstance` lives in [`ServiceInstanceMapper.TfResource`](../../internal/clients/account/serviceinstance/serviceinstance.go#L49), with the base resource construction in [`buildBaseTfResource`](../../internal/clients/account/serviceinstance/serviceinstance.go#L94).
+The mapping for `ServiceInstance` lives in [`ServiceInstanceMapper.TfResource`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/clients/account/serviceinstance/serviceinstance.go#L49), with the base resource construction in [`buildBaseTfResource`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/clients/account/serviceinstance/serviceinstance.go#L94).
 
 #### Delegating CRUD
 
 Once mapping and setup are done, the actual Create / Update / Delete calls are thin delegations to the embedded upjet controller. Observe is slightly richer — it inspects the status returned by the upjet controller and then calls `QueryAsyncData` to extract the current observed state once an async operation has finished.
 
-See [`Observe`](../../internal/controller/account/serviceinstance/serviceinstance.go#L136), [`Create`](../../internal/controller/account/serviceinstance/serviceinstance.go#L221), [`Update`](../../internal/controller/account/serviceinstance/serviceinstance.go#L242), and [`Delete`](../../internal/controller/account/serviceinstance/serviceinstance.go#L258) in the `ServiceInstance` controller.
+See [`Observe`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/controller/account/serviceinstance/serviceinstance.go#L136), [`Create`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/controller/account/serviceinstance/serviceinstance.go#L221), [`Update`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/controller/account/serviceinstance/serviceinstance.go#L242), and [`Delete`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/controller/account/serviceinstance/serviceinstance.go#L258) in the `ServiceInstance` controller.
 
 #### Saving conditions and external name
 
@@ -117,7 +117,7 @@ Terraform operations are often asynchronous. Once an async operation completes, 
 
 Similarly, the external name is read back from the upjet resource after creation and set on the native CR. Whether this happens after creation directly or in the Observe depends on whether async mode is being used or not. Also there are major differences between using no-fork or not. 
 
-In `ServiceInstance`, the external name and all other observed data is written back in [`saveInstanceData`](../../internal/controller/account/serviceinstance/serviceinstance.go#L280).
+In `ServiceInstance`, the external name and all other observed data is written back in [`saveInstanceData`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/controller/account/serviceinstance/serviceinstance.go#L280).
 
 ## Resources using this approach
 
