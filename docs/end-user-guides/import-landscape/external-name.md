@@ -50,6 +50,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
   - CLI: btp list accounts/directory (field: guid)
 
+### DirectoryEntitlement
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format:`<directory-id>/<service-name>/<plan-name>` (e.g. "abc-123-def-456/hana-cloud/hana")
+- How to find:
+
+  - UI: BTP Cockpit → Global Account → Account Explorer → [Select Directory] → Entitlements → Service Assignments > Service Technical Name and Plan
+  - CLI: `btp list accounts/entitlement --directory <directory-id>` → `entitledServices[].name` and `entitledServices[].servicePlans[].name`
+
 ### GlobalaccountTrustConfiguration
 
 - Follows Standard: no (origin key, not a GUID)

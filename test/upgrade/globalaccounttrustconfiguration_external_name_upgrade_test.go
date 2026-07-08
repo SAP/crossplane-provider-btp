@@ -15,7 +15,7 @@ var (
 	gaTrustFromCustomTag             = "v1.3.0"
 	gaTrustToCustomTag               = "local"
 	gaTrustCustomResourceDirectories = []string{
-		"./testdata/customCRs/globalaccountTrustConfigurationExternalName",
+		upgradeCRsPath("customCRs/globalaccountTrustConfigurationExternalName"),
 	}
 )
 

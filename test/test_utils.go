@@ -594,7 +594,7 @@ func DeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeConfig
 							Containers: []corev1.Container{
 								{
 									Name: "package-runtime",
-									Args: []string{"--debug", "--sync=10s"},
+									Args: []string{"--debug", "--sync=10s", "--poll=10s", "--backoff-base=1s", "--backoff-max=10s"},
 								},
 							},
 						},
