@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -704,7 +704,7 @@ func testServiceBinding(sbId, sbName string) *v1alpha1.SubaccountServiceBinding 
 
 // Fakes
 // Fake connectors from the embedded instance and binding resources / using whole tf roundtrip here would require external connection
-var _ managed.ExternalConnecter = &ExternalConnectorFake{}
+var _ managed.ExternalConnector = &ExternalConnectorFake{}
 
 type ExternalConnectorFake struct {
 	connectFn func() (managed.ExternalClient, error)

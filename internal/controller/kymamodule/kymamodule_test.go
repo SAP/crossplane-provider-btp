@@ -216,9 +216,9 @@ func TestObserve(t *testing.T) {
 	}{
 		"EmptyExternalName": {
 			args: args{
-				cr:     module(withBindingRef("test-binding")),
-				client: &fake.MockKymaModuleClient{},
-				kube:   &test.MockClient{},
+				cr:      module(withBindingRef("test-binding")),
+				client:  &fake.MockKymaModuleClient{},
+				kube:    &test.MockClient{},
 				tracker: &fake.MockTracker{},
 				secretfetcher: &fake.MockSecretFetcher{
 					MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {

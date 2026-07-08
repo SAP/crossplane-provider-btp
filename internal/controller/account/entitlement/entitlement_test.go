@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	entclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
@@ -246,6 +246,89 @@ func TestObserve(t *testing.T) {
 				o: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
 				comparefn: func(v *v1alpha1.Entitlement) string {
 					return cmp.Diff(v.Status.GetCondition(xpv1.Available().Type).Status, xpv1.Available().Status)
+				},
+				err: nil,
+			},
+		},
+		"Assign-time PROCESSING_FAILED with amount=0 (enable-style) -- retries via Create": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList:         test.NewMockListFn(nil, ListEntitlements(entitlement(withEnabled(true)))),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{
+							Category: internal.Ptr("ELASTIC_SERVICE"),
+						},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount:       internal.Ptr(float32(0)),
+							EntityState:  internal.Ptr("PROCESSING_FAILED"),
+							StateMessage: internal.Ptr("Failed to call Provisioning service to assign quota."),
+						},
+					}, nil
+				}},
+				cr: entitlement(withEnabled(true)),
+			},
+			want: want{
+				// Observe returns ResourceExists=false so the managed reconciler
+				// drives Create -> CreateInstance, which re-issues the assign.
+				o:   managed.ExternalObservation{ResourceExists: false},
+				err: nil,
+			},
+		},
+		"Assign-time PROCESSING_FAILED with nil amount (enable-style) -- retries via Create": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList:         test.NewMockListFn(nil, ListEntitlements(entitlement(withEnabled(true)))),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{
+							Category: internal.Ptr("ELASTIC_SERVICE"),
+						},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount:       nil,
+							EntityState:  internal.Ptr("PROCESSING_FAILED"),
+							StateMessage: internal.Ptr("Failed to call Provisioning service to assign quota."),
+						},
+					}, nil
+				}},
+				cr: entitlement(withEnabled(true)),
+			},
+			want: want{
+				o:   managed.ExternalObservation{ResourceExists: false},
+				err: nil,
+			},
+		},
+		"Assign-time PROCESSING_FAILED with amount=0 -- Ready must not be Available": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList:         test.NewMockListFn(nil, ListEntitlements(entitlement(withEnabled(true)))),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{
+							Category: internal.Ptr("ELASTIC_SERVICE"),
+						},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount:      internal.Ptr(float32(0)),
+							EntityState: internal.Ptr("PROCESSING_FAILED"),
+						},
+					}, nil
+				}},
+				cr: entitlement(withEnabled(true)),
+			},
+			want: want{
+				o: managed.ExternalObservation{ResourceExists: false},
+				comparefn: func(v *v1alpha1.Entitlement) string {
+					got := v.Status.GetCondition(xpv1.Available().Type).Status
+					if got == xpv1.Available().Status {
+						return "Ready=True/Available should not be set when BTP reports PROCESSING_FAILED with amount=0"
+					}
+					return ""
 				},
 				err: nil,
 			},

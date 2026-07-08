@@ -3,7 +3,7 @@ package test
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -33,4 +33,11 @@ func (n NoOpReferenceResolverTracker) ResolveTarget(ctx context.Context, ru prov
 
 func (n NoOpReferenceResolverTracker) DeleteShouldBeBlocked(mg resource.Managed) bool {
 	return n.IsResourceBlocked
+}
+
+// NoOpLegacyTracker implements providerconfig.LegacyTracker for testing purposes.
+type NoOpLegacyTracker struct{}
+
+func (n NoOpLegacyTracker) Track(ctx context.Context, mg resource.LegacyManaged) error { //nolint:staticcheck // Existing tests use legacy ProviderConfig references.
+	return nil
 }

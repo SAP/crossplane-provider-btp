@@ -2,59 +2,56 @@ package globalaccount
 
 import (
 	"context"
+	"reflect"
+	"strings"
 	"testing"
+	"unsafe"
 
-	"github.com/google/go-cmp/cmp"
-
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
-
+	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
+	trackingtest "github.com/sap/crossplane-provider-btp/internal/tracking/test"
 )
 
-// Unlike many Kubernetes projects Crossplane does not use third party testing
-// libraries, per the common Go test review comments. Crossplane encourages the
-// use of table driven unit tests. The tests of the crossplane-runtime project
-// are representative of the testing style Crossplane encourages.
-//
-// https://github.com/golang/go/wiki/TestComments
-// https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md#contributing-code
-
-func TestObserve(t *testing.T) {
-	type fields struct {
-		service btp.Client
+// TestObserve_GetAPI5xxWrappedWithSpecifyAPIError asserts that a 5xx
+// GenericOpenAPIError from GetGlobalAccount is routed through specifyAPIError
+// so the BTP body lands in the resource's Synced condition.
+func TestObserve_GetAPI5xxWrappedWithSpecifyAPIError(t *testing.T) {
+	e := external{
+		btp: btp.Client{
+			AccountsServiceClient: &accountclient.APIClient{
+				GlobalAccountOperationsAPI: &mockGlobalAccountClient{returnErr: create500Error()},
+			},
+		},
+		tracker: trackingtest.NoOpReferenceResolverTracker{},
 	}
-
-	type args struct {
-		ctx context.Context
-		mg  resource.Managed
+	_, err := e.Observe(context.Background(), &apisv1alpha1.GlobalAccount{})
+	if err == nil || !strings.Contains(err.Error(), "API Error") {
+		t.Errorf("expected error containing %q, got %v", "API Error", err)
 	}
+}
 
-	type want struct {
-		o   managed.ExternalObservation
-		err error
-	}
+// create500Error mirrors subaccount_test.go: builds a GenericOpenAPIError that
+// wraps an ApiExceptionResponseObject with code 500 to drive specifyAPIError's
+// model branch.
+func create500Error() error {
+	apiExceptionError := accountclient.NewApiExceptionResponseObjectError()
+	apiExceptionError.SetCode(500)
+	apiExceptionError.SetMessage("internal server error")
+	apiException := accountclient.NewApiExceptionResponseObject(*apiExceptionError)
 
-	cases := map[string]struct {
-		reason string
-		fields fields
-		args   args
-		want   want
-	}{
-		// TODO: Add test cases.
-	}
+	err := &accountclient.GenericOpenAPIError{}
+	errValue := reflect.ValueOf(err).Elem()
 
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			e := external{btp: tc.fields.service}
-			got, err := e.Observe(tc.args.ctx, tc.args.mg)
-			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want error, +got error:\n%s\n", tc.reason, diff)
-			}
-			if diff := cmp.Diff(tc.want.o, got); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
-			}
-		})
+	modelField := errValue.FieldByName("model")
+	if modelField.IsValid() {
+		reflect.NewAt(modelField.Type(), unsafe.Pointer(modelField.UnsafeAddr())).
+			Elem().Set(reflect.ValueOf(*apiException))
 	}
+	errorField := errValue.FieldByName("error")
+	if errorField.IsValid() {
+		reflect.NewAt(errorField.Type(), unsafe.Pointer(errorField.UnsafeAddr())).
+			Elem().SetString("500 Internal Server Error")
+	}
+	return err
 }

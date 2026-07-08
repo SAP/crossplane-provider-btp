@@ -16,7 +16,7 @@ var (
 	saFromCustomTag             = "v1.3.0"
 	saToCustomTag               = "local"
 	saCustomResourceDirectories = []string{
-		"./testdata/customCRs/subaccountExternalName",
+		upgradeCRsPath("customCRs/subaccountExternalName"),
 	}
 )
 

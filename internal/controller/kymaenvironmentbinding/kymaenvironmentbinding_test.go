@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	managed "github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	managed "github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -379,13 +379,13 @@ func Test_external_Observe(t *testing.T) {
 		mg  resource.Managed
 	}
 	tests := []struct {
-		name               string
-		args               args
-		client             *fakeClient
-		want               managed.ExternalObservation
-		wantErr            bool
-		expectedStatus     v1alpha1.KymaEnvironmentBindingObservation
-		wantDeletedIds     []string
+		name           string
+		args           args
+		client         *fakeClient
+		want           managed.ExternalObservation
+		wantErr        bool
+		expectedStatus v1alpha1.KymaEnvironmentBindingObservation
+		wantDeletedIds []string
 	}{
 		{
 			name: "not a KymaEnvironmentBinding",

@@ -1,12 +1,18 @@
 package btp
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"net/url"
+	"strings"
+	"sync"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
@@ -17,6 +23,8 @@ import (
 const (
 	errCouldNotParseCISSecret      = "CIS Secret seems malformed"
 	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
+	errCISBindingCredentialIsNil        = "CIS binding credential is nil"
+	errCISBindingMissingRequiredFields  = "CIS binding is missing required fields: %s"
 )
 
 type InstanceParameters = map[string]interface{}
@@ -46,36 +54,47 @@ type UserCredential struct {
 
 type CISCredential struct {
 	Endpoints struct {
-		AccountsServiceUrl          string `json:"accounts_service_url"`
-		CloudAutomationUrl          string `json:"cloud_automation_url"`
-		EntitlementsServiceUrl      string `json:"entitlements_service_url"`
-		EventsServiceUrl            string `json:"events_service_url"`
-		ExternalProviderRegistryUrl string `json:"external_provider_registry_url"`
-		MetadataServiceUrl          string `json:"metadata_service_url"`
-		OrderProcessingUrl          string `json:"order_processing_url"`
-		ProvisioningServiceUrl      string `json:"provisioning_service_url"`
-		SaasRegistryServiceUrl      string `json:"saas_registry_service_url"`
+		AccountsServiceUrl     string `json:"accounts_service_url"`
+		EntitlementsServiceUrl string `json:"entitlements_service_url"`
+		ProvisioningServiceUrl string `json:"provisioning_service_url"`
+		SaasRegistryServiceUrl string `json:"saas_registry_service_url"`
 	} `json:"endpoints"`
-	GrantType       string `json:"grant_type"`
-	SapCloudService string `json:"sap.cloud.service"`
-	Uaa             struct {
-		Apiurl          string `json:"apiurl"`
-		Clientid        string `json:"clientid"`
-		Clientsecret    string `json:"clientsecret"`
-		CredentialType  string `json:"credential-type"`
-		Identityzone    string `json:"identityzone"`
-		Identityzoneid  string `json:"identityzoneid"`
-		Sburl           string `json:"sburl"`
-		Subaccountid    string `json:"subaccountid"`
-		Tenantid        string `json:"tenantid"`
-		Tenantmode      string `json:"tenantmode"`
-		Uaadomain       string `json:"uaadomain"`
-		Url             string `json:"url"`
-		Verificationkey string `json:"verificationkey"`
-		Xsappname       string `json:"xsappname"`
-		Xsmasterappname string `json:"xsmasterappname"`
-		Zoneid          string `json:"zoneid"`
+	GrantType string `json:"grant_type"`
+	Uaa       struct {
+		Clientid     string `json:"clientid"`
+		Clientsecret string `json:"clientsecret"`
+		Url          string `json:"url"`
 	} `json:"uaa"`
+}
+
+func validateCISCredential(c *CISCredential) error {
+	if c == nil {
+		return errors.New(errCISBindingCredentialIsNil)
+
+	}
+	var missing []string
+	if c.Uaa.Clientid == "" {
+		missing = append(missing, "uaa.clientid")
+	}
+	if c.Uaa.Clientsecret == "" {
+		missing = append(missing, "uaa.clientsecret")
+	}
+	if c.Uaa.Url == "" {
+		missing = append(missing, "uaa.url")
+	}
+	if c.Endpoints.AccountsServiceUrl == "" {
+		missing = append(missing, "endpoints.accounts_service_url")
+	}
+	if c.Endpoints.EntitlementsServiceUrl == "" {
+		missing = append(missing, "endpoints.entitlements_service_url")
+	}
+	if c.Endpoints.ProvisioningServiceUrl == "" {
+		missing = append(missing, "endpoints.provisioning_service_url")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf(errCISBindingMissingRequiredFields, strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 const (
@@ -88,14 +107,55 @@ const (
 )
 
 func NewServiceClientWithCisCredential(credential *Credentials) Client {
+	// Cache the fully-built Client per credential hash so the oauth2 token
+	// cache survives across reconciles. Without this, the providerconfig
+	// connector would rebuild all 3 sub-clients + 3 token sources on every
+	// reconcile, producing ~1.7 token POSTs per Observe.
+	key := credentialCacheKey(credential)
+	if cached, ok := clientCache.Load(key); ok {
+		return cached.(Client)
+	}
 
 	authentication := authenticationParams(credential)
-
 	config := createConfig(credential, tokenURL, authentication)
-
 	client := createClient(credential, config)
 
-	return client
+	actual, _ := clientCache.LoadOrStore(key, client)
+	return actual.(Client)
+}
+
+// clientCache: process-wide btp.Client cache keyed by credential hash.
+// Credential rotation produces a new key automatically; old entries leak
+// until process restart. Add a TTL/LRU if rotation churn becomes an issue.
+var clientCache sync.Map
+
+// credentialCacheKey builds a stable string key from the credential bundle.
+// We need ALL credential fields to differentiate cache entries (including the
+// secret, so that a credential rotation produces a new entry), but we do not
+// need cryptographic hashing — this is an in-process map key, not a password
+// verifier. NUL separator can't appear in any of the input strings.
+func credentialCacheKey(c *Credentials) string {
+	var parts []string
+	if c.CISCredential != nil {
+		parts = append(parts,
+			c.CISCredential.Uaa.Clientid,
+			c.CISCredential.Uaa.Clientsecret,
+			c.CISCredential.Uaa.Url,
+			c.CISCredential.Endpoints.AccountsServiceUrl,
+			c.CISCredential.Endpoints.EntitlementsServiceUrl,
+			c.CISCredential.Endpoints.ProvisioningServiceUrl,
+			c.CISCredential.GrantType,
+		)
+	}
+	if c.UserCredential != nil {
+		parts = append(parts,
+			c.UserCredential.Email,
+			c.UserCredential.Username,
+			c.UserCredential.Password,
+			c.UserCredential.Idp,
+		)
+	}
+	return strings.Join(parts, "\x00")
 }
 
 func authenticationParams(credential *Credentials) url.Values {
@@ -128,18 +188,38 @@ func hasClientCredentials(credential *Credentials) bool {
 }
 
 func createClient(credential *Credentials, config *clientcredentials.Config) Client {
+	// One shared oauth2 *http.Client across all 3 sub-clients so the token
+	// cache is shared. Without this, each createXxxServiceClient builds its
+	// own *http.Client → 3 independent token caches → extra token POSTs per
+	// Observe.
+	sharedHTTPClient := sharedOAuthClient(config)
 	client := Client{
-		AccountsServiceClient:     createAccountsServiceClient(credential, config),
-		EntitlementsServiceClient: createEntitlementsServiceClient(credential, config),
-		ProvisioningServiceClient: createProvisioningServiceClient(credential, config),
+		AccountsServiceClient:     createAccountsServiceClient(credential, sharedHTTPClient),
+		EntitlementsServiceClient: createEntitlementsServiceClient(credential, sharedHTTPClient),
+		ProvisioningServiceClient: createProvisioningServiceClient(credential, sharedHTTPClient),
 		AuthInfo:                  GetBasicAuth(credential),
 		Credential:                credential,
 	}
 	return client
 }
 
+// sharedOAuthClient builds a single *http.Client backed by the debug-aware
+// HTTP transport and the oauth2 transport with a reused token source.
+// Sharing this client across the 3 sub-clients collapses 3 token caches into 1.
+func sharedOAuthClient(config *clientcredentials.Config) *http.Client {
+	baseHTTPClient := DebugPrintHTTPClient()
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, baseHTTPClient)
+	// config.TokenSource already wraps in oauth2.ReuseTokenSource internally.
+	return &http.Client{
+		Transport: &oauth2.Transport{
+			Source: config.TokenSource(ctx),
+			Base:   baseHTTPClient.Transport,
+		},
+	}
+}
+
 func createProvisioningServiceClient(
-	credential *Credentials, config *clientcredentials.Config,
+	credential *Credentials, sharedHTTPClient *http.Client,
 ) provisioningclient.EnvironmentsAPI {
 	provisioningServiceUrl, err := url.Parse(credential.CISCredential.Endpoints.ProvisioningServiceUrl)
 	if err != nil {
@@ -148,7 +228,7 @@ func createProvisioningServiceClient(
 
 	c := provisioningclient.NewConfiguration()
 
-	c.HTTPClient = config.Client(NewBackgroundContextWithDebugPrintHTTPClient())
+	c.HTTPClient = sharedHTTPClient
 	c.Servers = []provisioningclient.ServerConfiguration{{URL: provisioningServiceUrl.String()}}
 
 	client := provisioningclient.NewAPIClient(c)
@@ -168,7 +248,7 @@ func createConfig(credential *Credentials, tokenURL string, endPointParams url.V
 }
 
 func createEntitlementsServiceClient(
-	cisCredential *Credentials, config *clientcredentials.Config,
+	cisCredential *Credentials, sharedHTTPClient *http.Client,
 ) *entitlementsserviceclient.ManageAssignedEntitlementsAPIService {
 	entitlementsServiceUrl, err := url.Parse(cisCredential.CISCredential.Endpoints.EntitlementsServiceUrl)
 	if err != nil {
@@ -177,7 +257,7 @@ func createEntitlementsServiceClient(
 
 	c := entitlementsserviceclient.NewConfiguration()
 
-	c.HTTPClient = config.Client(NewBackgroundContextWithDebugPrintHTTPClient())
+	c.HTTPClient = sharedHTTPClient
 	c.Servers = []entitlementsserviceclient.ServerConfiguration{{URL: entitlementsServiceUrl.String()}}
 
 	client := entitlementsserviceclient.NewAPIClient(c)
@@ -186,7 +266,7 @@ func createEntitlementsServiceClient(
 }
 
 func createAccountsServiceClient(
-	cisCredential *Credentials, config *clientcredentials.Config,
+	cisCredential *Credentials, sharedHTTPClient *http.Client,
 ) *accountsserviceclient.APIClient {
 	accountServiceUrl, err := url.Parse(cisCredential.CISCredential.Endpoints.AccountsServiceUrl)
 	if err != nil {
@@ -195,7 +275,7 @@ func createAccountsServiceClient(
 
 	c := accountsserviceclient.NewConfiguration()
 
-	c.HTTPClient = config.Client(NewBackgroundContextWithDebugPrintHTTPClient())
+	c.HTTPClient = sharedHTTPClient
 	c.Servers = []accountsserviceclient.ServerConfiguration{{URL: accountServiceUrl.String()}}
 
 	client := accountsserviceclient.NewAPIClient(c)
@@ -214,6 +294,10 @@ func ServiceClientFromSecret(cisSecret []byte, userSecret []byte) (Client, error
 	var cisCredential CISCredential
 	if err := json.Unmarshal(cisSecret, &cisCredential); err != nil {
 		return Client{}, errors.Wrap(err, errCouldNotParseCISSecret)
+	}
+
+	if err := validateCISCredential(&cisCredential); err != nil {
+		return Client{}, err
 	}
 
 	var userCredential UserCredential

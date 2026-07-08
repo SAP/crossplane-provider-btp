@@ -21,36 +21,51 @@ package globalaccounttrustconfiguration
 import (
 	"time"
 
-	"github.com/crossplane/crossplane-runtime/pkg/connection"
-	"github.com/crossplane/crossplane-runtime/pkg/event"
-	xpfeature "github.com/crossplane/crossplane-runtime/pkg/feature"
-	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	xpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/statemetrics"
-	tjcontroller "github.com/crossplane/upjet/pkg/controller"
-	"github.com/crossplane/upjet/pkg/controller/handler"
-	"github.com/crossplane/upjet/pkg/terraform"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	xpfeature "github.com/crossplane/crossplane-runtime/v2/pkg/feature"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	xpresource "github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
+	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
+	"github.com/crossplane/upjet/v2/pkg/controller/handler"
+	"github.com/crossplane/upjet/v2/pkg/terraform"
 	"github.com/pkg/errors"
-	ctrl "sigs.k8s.io/controller-runtime"
+	tfclient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	features "github.com/sap/crossplane-provider-btp/internal/features"
 )
 
+// SetupWebhookWithManager registers the conversion webhook for GlobalaccountTrustConfiguration.
+func SetupWebhookWithManager(mgr ctrl.Manager) error {
+	if err := ctrl.NewWebhookManagedBy(mgr, &v1alpha1.GlobalaccountTrustConfiguration{}).
+		Complete(); err != nil {
+		return errors.Wrap(err, "cannot register webhook for the kind v1alpha1.GlobalaccountTrustConfiguration")
+	}
+	return nil
+}
+
+// SetupGated adds a controller that reconciles GlobalaccountTrustConfiguration managed resources.
+func SetupGated(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
+	o.Options.Gate.Register(func() {
+		if err := Setup(mgr, o); err != nil {
+			mgr.GetLogger().Error(err, "unable to setup reconciler", "gvk", v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind.String())
+		}
+	}, v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind)
+	return nil
+}
+
 // Setup adds a controller that reconciles GlobalaccountTrustConfiguration managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	name := managed.ControllerName(v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind.String())
 	var initializers managed.InitializerChain
-	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
-	if o.SecretStoreConfigGVK != nil {
-		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), *o.SecretStoreConfigGVK, connection.WithTLSConfig(o.ESSOptions.TLSConfig)))
-	}
 	eventHandler := handler.NewEventHandler(handler.WithLogger(o.Logger.WithValues("gvk", v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind)))
 	ac := tjcontroller.NewAPICallbacks(mgr, xpresource.ManagedKind(v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind), tjcontroller.WithEventHandler(eventHandler))
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnecter(tjcontroller.NewConnector(mgr.GetClient(), o.WorkspaceStore, o.SetupFn, o.Provider.Resources["btp_globalaccount_trust_configuration"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler),
+		managed.WithExternalConnecter(tjcontroller.NewConnector(mgr.GetClient(), tfclient.NewIdentityInjectingStore(o.WorkspaceStore, o.Logger), o.SetupFn, o.Provider.Resources["btp_globalaccount_trust_configuration"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler),
 			tjcontroller.WithCallbackProvider(ac),
 		)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
@@ -58,7 +73,6 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 		managed.WithFinalizer(terraform.NewWorkspaceFinalizer(o.WorkspaceStore, xpresource.NewAPIFinalizer(mgr.GetClient(), managed.FinalizerName))),
 		managed.WithTimeout(3 * time.Minute),
 		managed.WithInitializers(initializers),
-		managed.WithConnectionPublishers(cps...),
 		managed.WithPollInterval(o.PollInterval),
 	}
 	if o.PollJitter != 0 {
@@ -69,16 +83,6 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	}
 	if o.MetricOptions != nil {
 		opts = append(opts, managed.WithMetricRecorder(o.MetricOptions.MRMetrics))
-	}
-
-	// register webhooks for the kind v1alpha1.GlobalaccountTrustConfiguration
-	// if they're enabled.
-	if o.StartWebhooks {
-		if err := ctrl.NewWebhookManagedBy(mgr).
-			For(&v1alpha1.GlobalaccountTrustConfiguration{}).
-			Complete(); err != nil {
-			return errors.Wrap(err, "cannot register webhook for the kind v1alpha1.GlobalaccountTrustConfiguration")
-		}
 	}
 
 	if o.MetricOptions != nil && o.MetricOptions.MRStateMetrics != nil {

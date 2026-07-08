@@ -2,15 +2,15 @@ package tfclient
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	ujresource "github.com/crossplane/upjet/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -73,11 +73,11 @@ type TfMapper[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] interfac
 
 type TfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] struct {
 	tfMapper  TfMapper[NATIVE, UPJETTED]
-	connector managed.ExternalConnecter
+	connector managed.ExternalConnector
 	kube      client.Client
 }
 
-func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed](tfConnector managed.ExternalConnecter, tfMapper TfMapper[NATIVE, UPJETTED], kube client.Client) TfProxyConnector[NATIVE, UPJETTED] {
+func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed](tfConnector managed.ExternalConnector, tfMapper TfMapper[NATIVE, UPJETTED], kube client.Client) TfProxyConnector[NATIVE, UPJETTED] {
 	return TfProxyConnector[NATIVE, UPJETTED]{
 		connector: tfConnector,
 		tfMapper:  tfMapper,
@@ -199,36 +199,9 @@ func (t *TfProxyController[UPJETTED]) Observe(ctx context.Context) (Status, map[
 		return Drift, map[string][]byte{}, nil
 	}
 
-	flatDetails, err := flattenSecretData(obs.ConnectionDetails)
+	flatDetails, err := internal.FlattenConnectionDetails(obs.ConnectionDetails)
 	if err != nil {
 		return Unknown, nil, err
 	}
 	return UpToDate, flatDetails, nil
-}
-
-// flattenSecretData takes a map[string][]byte and flattens any JSON object values into the result map.
-// For each key whose value is a JSON object, its keys/values are added to the result map as top-level entries.
-// Non-JSON values are kept as-is.
-func flattenSecretData(secretData map[string][]byte) (map[string][]byte, error) {
-	result := make(map[string][]byte)
-	for k, v := range secretData {
-		var jsonMap map[string]any
-		if err := json.Unmarshal(v, &jsonMap); err == nil {
-			for jk, jv := range jsonMap {
-				switch val := jv.(type) {
-				case string:
-					result[jk] = []byte(val)
-				default:
-					b, err := json.Marshal(val)
-					if err != nil {
-						return nil, err
-					}
-					result[jk] = b
-				}
-			}
-		} else {
-			result[k] = v
-		}
-	}
-	return result, nil
 }

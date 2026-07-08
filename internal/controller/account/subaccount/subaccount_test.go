@@ -2,16 +2,16 @@ package subaccount
 
 import (
 	"context"
+	"io"
 	"net/http"
-	"reflect"
+	"strings"
 	"testing"
-	"unsafe"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -862,7 +862,7 @@ func TestObserve(t *testing.T) {
 						Subdomain:         "sub1",
 						Region:            "eu12",
 						DisplayName:       "unittest-sa",
-						Labels:            map[string][]string{"somekey": {"somevalue"}},
+						Labels:            map[string]v1alpha1.SubaccountLabelValueList{"somekey": {"somevalue"}},
 						UsedForProduction: "",
 						BetaEnabled:       false,
 					}), WithProviderConfig(xpv1.Reference{
@@ -1295,7 +1295,7 @@ func TestCreate(t *testing.T) {
 				cr: NewSubaccount("unittest-sa"),
 				mockClient: &MockSubaccountClient{
 					returnSubaccount: &accountclient.SubaccountResponseObject{},
-					returnErr:        create409Error(),
+					returnErr:        testutils.NewAccountAPIError(409, "", "409 Conflict"),
 					httpStatusCode:   http.StatusConflict,
 				},
 			},
@@ -1473,7 +1473,7 @@ func TestConnect(t *testing.T) {
 				Build()
 			ctrl := connector{
 				kube:            &kube,
-				usage:           trackingtest.NoOpReferenceResolverTracker{},
+				usage:           trackingtest.NoOpLegacyTracker{},
 				resourcetracker: trackingtest.NoOpReferenceResolverTracker{},
 				newServiceFn: func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error) {
 					if tc.want.newServiceArgs.cisCreds != nil && string(tc.want.newServiceArgs.cisCreds) != string(cisSecretData) {
@@ -1630,6 +1630,51 @@ func TestDelete(t *testing.T) {
 				err: nil, // 404 should not be treated as error
 			},
 		},
+		"DeleteAPI409SurfacesError": {
+			reason: "409 Conflict on delete (in-progress or blocked by children) is wrapped via specifyAPIError so the BTP message lands in the resource's Synced condition",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{}, &http.Response{
+							StatusCode: 409,
+							Body:       io.NopCloser(strings.NewReader(`{"error":{"code":409,"message":"subaccount has child resources"}}`)),
+						}, testutils.NewAccountAPIError(409, "", "409 Conflict")
+					},
+				},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				err: errors.New("deletion of subaccount failed"),
+			},
+		},
+		"DeleteAPI5xxWrappedWithSpecifyAPIError": {
+			reason: "5xx errors must produce a wrapped error containing 'API Error:' prefix from specifyAPIError when the error is a GenericOpenAPIError",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{}, &http.Response{StatusCode: 500}, testutils.NewAccountAPIError(500, "internal server error", "500 Internal Server Error")
+					},
+				},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				err: errors.New("API Error"),
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -1754,7 +1799,7 @@ func TestUpdate(t *testing.T) {
 					WithData(v1alpha1.SubaccountParameters{
 						DirectoryGuid: "234",
 						DirectoryRef:  &xpv1.Reference{Name: "dir-1"},
-						Labels:        map[string][]string{"somekey": {"somevalue"}},
+						Labels:        map[string]v1alpha1.SubaccountLabelValueList{"somekey": {"somevalue"}},
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
 						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
@@ -1769,7 +1814,7 @@ func TestUpdate(t *testing.T) {
 					WithData(v1alpha1.SubaccountParameters{
 						DirectoryGuid: "234",
 						DirectoryRef:  &xpv1.Reference{Name: "dir-1"},
-						Labels:        map[string][]string{"somekey": {"somevalue"}},
+						Labels:        map[string]v1alpha1.SubaccountLabelValueList{"somekey": {"somevalue"}},
 					}),
 					WithStatus(v1alpha1.SubaccountObservation{
 						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
@@ -1953,36 +1998,4 @@ func WithExternalName(externalName string) SubaccountModifier {
 	return func(r *v1alpha1.Subaccount) {
 		meta.SetExternalName(r, externalName)
 	}
-}
-
-// create409Error creates a GenericOpenAPIError with a 409 status code
-// that wraps an ApiExceptionResponseObject with code 409.
-// This mimics the actual API behavior for "resource already exists" errors.
-func create409Error() error {
-	// Create the inner error object with code 409
-	apiExceptionError := accountclient.NewApiExceptionResponseObjectError()
-	apiExceptionError.SetCode(409)
-
-	// Create the API exception response that wraps the error
-	apiException := accountclient.NewApiExceptionResponseObject(*apiExceptionError)
-
-	// Create GenericOpenAPIError
-	err := &accountclient.GenericOpenAPIError{}
-	errValue := reflect.ValueOf(err).Elem()
-
-	// Use unsafe to set unexported 'model' field
-	modelField := errValue.FieldByName("model")
-	if modelField.IsValid() {
-		reflect.NewAt(modelField.Type(), unsafe.Pointer(modelField.UnsafeAddr())).
-			Elem().Set(reflect.ValueOf(*apiException))
-	}
-
-	// Use unsafe to set unexported 'error' field
-	errorField := errValue.FieldByName("error")
-	if errorField.IsValid() {
-		reflect.NewAt(errorField.Type(), unsafe.Pointer(errorField.UnsafeAddr())).
-			Elem().SetString("409 Conflict")
-	}
-
-	return err
 }

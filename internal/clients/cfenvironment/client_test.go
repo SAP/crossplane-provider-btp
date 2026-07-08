@@ -4,11 +4,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 
 func TestGetConnectionDetails(t *testing.T) {
@@ -38,7 +39,7 @@ func TestGetConnectionDetails(t *testing.T) {
 				v1alpha1.ResourceOrgName:     []byte("name"),
 				v1alpha1.ResourceOrgId:       []byte("uuid"),
 				v1alpha1.ResourceAPIEndpoint: []byte("url"),
-				v1alpha1.ResourceRaw:         []byte("{\"API Endpoint\":\"url\",\"Org Name\":\"name\",\"Org ID\":\"uuid\"}"),
+				providerv1alpha1.RawBindingKey:         []byte("{\"API Endpoint\":\"url\",\"Org Name\":\"name\",\"Org ID\":\"uuid\"}"),
 			},
 			wantErr: false,
 		},
@@ -48,7 +49,7 @@ func TestGetConnectionDetails(t *testing.T) {
 				instance: instance(withLabels("{\"asd\":\"url\",\"asdf\":\"name\",\"bar\":\"uuid\"}")),
 			},
 			want: managed.ConnectionDetails{
-				v1alpha1.ResourceRaw: []byte("{\"asd\":\"url\",\"asdf\":\"name\",\"bar\":\"uuid\"}"),
+				providerv1alpha1.RawBindingKey: []byte("{\"asd\":\"url\",\"asdf\":\"name\",\"bar\":\"uuid\"}"),
 			},
 			wantErr: false,
 		},
@@ -69,7 +70,7 @@ func TestGetConnectionDetails(t *testing.T) {
 				v1alpha1.ResourceOrgName:     []byte("my-org"),
 				v1alpha1.ResourceOrgId:       []byte("old-uuid"),
 				v1alpha1.ResourceAPIEndpoint: []byte("https://api.cf.example.com"),
-				v1alpha1.ResourceRaw:         []byte("{\"API Endpoint:\":\"https://api.cf.example.com\",\"Org Name\":\"my-org\",\"Org ID:\":\"old-uuid\"}"),
+				providerv1alpha1.RawBindingKey:         []byte("{\"API Endpoint:\":\"https://api.cf.example.com\",\"Org Name\":\"my-org\",\"Org ID:\":\"old-uuid\"}"),
 			},
 			wantErr: false,
 		},

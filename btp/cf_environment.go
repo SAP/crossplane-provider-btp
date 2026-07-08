@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
@@ -19,9 +19,9 @@ func CloudFoundryEnvironmentType() EnvironmentType {
 }
 
 type CloudFoundryOrg struct {
-	Id          string `json:"Org Id,"`
-	Name        string `json:"Org Name,"`
-	ApiEndpoint string `json:"API Endpoint,"`
+	Id          string `json:"Org Id"`
+	Name        string `json:"Org Name"`
+	ApiEndpoint string `json:"API Endpoint"`
 }
 
 // CreateCloudFoundryEnvironment creates a Cloud Foundry environment instance with the given parameters. It returns the instance ID of the created environment.

@@ -3,7 +3,7 @@ package fake
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"

@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 type SubaccountTrustConfigurationInitParameters struct {
@@ -54,6 +54,10 @@ type SubaccountTrustConfigurationInitParameters struct {
 	// (String) The display name of the trust configuration.
 	// The display name of the trust configuration.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
+
+	// (String) The origin of the identity provider.
+	// The origin of the identity provider.
+	Origin *string `json:"origin,omitempty" tf:"origin,omitempty"`
 
 	// (String) Determines whether the identity provider is currently 'active' or 'inactive'.
 	// Determines whether the identity provider is currently 'active' or 'inactive'.
@@ -170,6 +174,11 @@ type SubaccountTrustConfigurationParameters struct {
 	// The display name of the trust configuration.
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
+
+	// (String) The origin of the identity provider.
+	// The origin of the identity provider.
+	// +kubebuilder:validation:Optional
+	Origin *string `json:"origin,omitempty" tf:"origin,omitempty"`
 
 	// (String) Determines whether the identity provider is currently 'active' or 'inactive'.
 	// Determines whether the identity provider is currently 'active' or 'inactive'.

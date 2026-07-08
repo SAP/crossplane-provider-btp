@@ -5,15 +5,15 @@ import (
 	"testing"
 
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
@@ -49,7 +49,7 @@ func TestObserve(t *testing.T) {
 		// External name handling tests (ADR compliance)
 		"EmptyExternalName": {
 			args: args{
-				cr: cr("spec-subaccount-admin-co", WithExternalName("")),
+				cr:     cr("spec-subaccount-admin-co", WithExternalName("")),
 				client: &RoleMaintainerMock{
 					// Client should not be called when external-name is empty
 				},
@@ -436,7 +436,7 @@ func TestConnect(t *testing.T) {
 
 	type args struct {
 		cr              *v1alpha1.RoleCollection
-		track           resource.Tracker
+		track           providerconfig.LegacyTracker
 		resourcetracker tracking.ReferenceResolverTracker
 		kube            client.Client
 		newServiceFn    func(_ *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error)
@@ -682,7 +682,7 @@ func cr(name string, m ...RoleCollectionModifier) *v1alpha1.RoleCollection {
 	return cr
 }
 
-func newTracker(err error) resource.Tracker {
+func newTracker(err error) providerconfig.LegacyTracker {
 	return &tracker{err: err}
 }
 
@@ -733,7 +733,7 @@ type tracker struct {
 	err error
 }
 
-func (t *tracker) Track(ctx context.Context, mg resource.Managed) error {
+func (t *tracker) Track(ctx context.Context, mg providerconfig.LegacyManaged) error {
 	return t.err
 }
 

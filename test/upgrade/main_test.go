@@ -27,8 +27,6 @@ const (
 
 	localTagName = "local"
 
-	resourceDirectoryRoot = "./testdata/baseCRs"
-
 	cisSecretName         = "cis-provider-secret"
 	serviceUserSecretName = "sa-provider-secret"
 
@@ -36,19 +34,51 @@ const (
 	cliServerUrlEnvVar  = "CLI_SERVER_URL"
 	uutImagesEnvVar     = "UUT_IMAGES"
 
-	fromTagEnvVar              = "UPGRADE_TEST_FROM_TAG"
-	toTagEnvVar                = "UPGRADE_TEST_TO_TAG"
-	fromProviderRepositoryEnvVar = "UPGRADE_TEST_FROM_PROVIDER_REPOSITORY"
-	toProviderRepositoryEnvVar   = "UPGRADE_TEST_TO_PROVIDER_REPOSITORY"
+	fromTagEnvVar                  = "UPGRADE_TEST_FROM_TAG"
+	toTagEnvVar                    = "UPGRADE_TEST_TO_TAG"
+	fromProviderRepositoryEnvVar   = "UPGRADE_TEST_FROM_PROVIDER_REPOSITORY"
+	toProviderRepositoryEnvVar     = "UPGRADE_TEST_TO_PROVIDER_REPOSITORY"
+	fromControllerRepositoryEnvVar = "UPGRADE_TEST_FROM_CONTROLLER_REPOSITORY"
+	toControllerRepositoryEnvVar   = "UPGRADE_TEST_TO_CONTROLLER_REPOSITORY"
 
 	verifyTimeoutEnvVar = "UPGRADE_TEST_VERIFY_TIMEOUT"
 	waitForPauseEnvVar  = "UPGRADE_TEST_WAIT_FOR_PAUSE"
 
-	defaultProviderRepository = "ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp"
+	defaultProviderRepository   = "ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp"
+	defaultControllerRepository = "ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp-controller"
 
 	defaultVerifyTimeoutMins = 30
 	defaultWaitForPauseMins  = 1
 )
+
+// upgradeCRsGeneratedPathEnv names the env var that points at the rendered
+// upgrade-test fixture tree (envsubst-substituted). `make generate-upgrade-test-crs`
+// renders templates from UPGRADE_TEST_CRS_PATH into this directory; the var
+// is exported at the top of the Makefile, so it is already in the test
+// binary's environment when invoked via `make upgrade-test`. Falls back to
+// the in-tree templates dir so raw `go test -tags=upgrade` keeps working
+// for inspection (values won't be substituted in that case).
+const upgradeCRsGeneratedPathEnv = "UPGRADE_TEST_CRS_GENERATED_PATH"
+
+// upgradeCRsPath resolves a fixture path relative to the upgrade-test CRs
+// directory. Pass the relative path you would have hard-coded under
+// `./testdata/`, e.g.
+//
+//	upgradeCRsPath("baseCRs")                       -> "<generated>/baseCRs"
+//	upgradeCRsPath("customCRs/directoryExternalName") -> "<generated>/customCRs/directoryExternalName"
+func upgradeCRsPath(rel string) string {
+	base := os.Getenv(upgradeCRsGeneratedPathEnv)
+	if base == "" {
+		base = "./testdata"
+	}
+	return base + "/" + rel
+}
+
+// resourceDirectoryRoot returns the rendered baseCRs directory. Defined as a
+// function (not a const) because the rendered root depends on the
+// UPGRADE_TEST_CRS_GENERATED_PATH env var, which is only set when the test
+// runs under `make upgrade-test`.
+func resourceDirectoryRoot() string { return upgradeCRsPath("baseCRs") }
 
 var (
 	globalVerifyTimeout time.Duration
@@ -59,8 +89,10 @@ var (
 	globalAccount     string
 	cliServerUrl      string
 
-	fromProviderRepository string
-	toProviderRepository   string
+	fromProviderRepository   string
+	toProviderRepository     string
+	fromControllerRepository string
+	toControllerRepository   string
 
 	kindClusterName string
 	namespace       string
@@ -83,6 +115,8 @@ func TestMain(m *testing.M) {
 	// Load repositories
 	fromProviderRepository = test.GetEnv(fromProviderRepositoryEnvVar, defaultProviderRepository)
 	toProviderRepository = test.GetEnv(toProviderRepositoryEnvVar, defaultProviderRepository)
+	fromControllerRepository = test.GetEnv(fromControllerRepositoryEnvVar, defaultControllerRepository)
+	toControllerRepository = test.GetEnv(toControllerRepositoryEnvVar, defaultControllerRepository)
 
 	// Load timeouts
 	globalVerifyTimeout = test.LoadDurationMins(verifyTimeoutEnvVar, defaultVerifyTimeoutMins)
@@ -91,14 +125,15 @@ func TestMain(m *testing.M) {
 	// Setup cluster
 	fromTag, toTag := LoadUpgradeTags()
 
-	fromProviderPackage, _ := test.LoadUpgradePackages(
+	fromProviderPackage, _, fromControllerPackage, _ := test.LoadUpgradePackages(
 		fromTag, toTag,
 		fromProviderRepository, toProviderRepository,
+		fromControllerRepository, toControllerRepository,
 		uutImagesEnvVar, localTagName,
 		true,
 	)
 
-	setupClusterWithCrossplane(fromProviderPackage)
+	setupClusterWithCrossplane(fromTag, fromProviderPackage, fromControllerPackage)
 
 	os.Exit(testenv.Run(m))
 }
@@ -106,13 +141,14 @@ func TestMain(m *testing.M) {
 // setupClusterWithCrossplane sets up a kind cluster with Crossplane and the specified provider version.
 // It does not create a ProviderConfig, as this is done in the individual tests.
 // Setting up the provider is technically not necessary for upgrade tests, but that's what xp-testing's setup does.
-func setupClusterWithCrossplane(providerPackage string) {
-	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName)
+func setupClusterWithCrossplane(fromTag, providerPackage, controllerPackage string) {
+	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName, fromTag)
 
 	cfg := setup.ClusterSetup{
 		ProviderName: providerName,
 		Images: images.ProviderImages{
-			Package: providerPackage,
+			Package:         providerPackage,
+			ControllerImage: &controllerPackage,
 		},
 		CrossplaneSetup: setup.CrossplaneSetup{
 			Version:  crossplaneVersion,

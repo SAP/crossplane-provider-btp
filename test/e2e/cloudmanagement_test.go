@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
@@ -32,7 +32,7 @@ func TestCloudManagement(t *testing.T) {
 	crudFeatureSuite := features.New("CloudManagement Controller Test").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/cloudmanagement/env")
+				resources.ImportResources(ctx, t, cfg, crsPath("cloudmanagement/env"))
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 				return ctx
@@ -40,7 +40,7 @@ func TestCloudManagement(t *testing.T) {
 		).
 		Assess(
 			"Check CloudManagement Resource is fully created and updated", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				cm := createAndReturnCloudmanagement(ctx, t, cfg, "testdata/crs/cloudmanagement/creation")
+				cm := createAndReturnCloudmanagement(ctx, t, cfg, crsPath("cloudmanagement/creation"))
 
 				// Status bound?
 				if cm.Status.AtProvider.Status != v1beta1.CisStatusBound {
@@ -67,7 +67,7 @@ func TestCloudManagement(t *testing.T) {
 			},
 		).Assess(
 		"Check CloudManagement Resource is fully created with default values", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			cm := createAndReturnCloudmanagement(ctx, t, cfg, "testdata/crs/cloudmanagement/creationDefaultName")
+			cm := createAndReturnCloudmanagement(ctx, t, cfg, crsPath("cloudmanagement/creationDefaultName"))
 
 			// Status bound?
 			if cm.Status.AtProvider.Status != v1beta1.CisStatusBound {
@@ -106,7 +106,7 @@ func TestCloudManagementImport(t *testing.T) {
 	importFeatureSuite := features.New("CloudManagement Import Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/cloudmanagement/import-env")
+				resources.ImportResources(ctx, t, cfg, crsPath("cloudmanagement/import-env"))
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 

@@ -1,7 +1,7 @@
 /*
 Entitlements Service
 
-The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.   NOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -35,6 +35,8 @@ type DirectoryAssignmentsRequestPayload struct {
 	Plan string `json:"plan"`
 	// A unique identifier for service plans that can distinguish between the same service plans with different pricing plans.
 	PlanUniqueIdentifier *string `json:"planUniqueIdentifier,omitempty"`
+	// External resources to assign to subaccount
+	Resources []ExternalResourceRequestPayload `json:"resources,omitempty"`
 	// The technical name of the entitlement (service, application, environment) to assign.
 	Service string `json:"service"`
 }
@@ -276,6 +278,38 @@ func (o *DirectoryAssignmentsRequestPayload) SetPlanUniqueIdentifier(v string) {
 	o.PlanUniqueIdentifier = &v
 }
 
+// GetResources returns the Resources field value if set, zero value otherwise.
+func (o *DirectoryAssignmentsRequestPayload) GetResources() []ExternalResourceRequestPayload {
+	if o == nil || IsNil(o.Resources) {
+		var ret []ExternalResourceRequestPayload
+		return ret
+	}
+	return o.Resources
+}
+
+// GetResourcesOk returns a tuple with the Resources field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *DirectoryAssignmentsRequestPayload) GetResourcesOk() ([]ExternalResourceRequestPayload, bool) {
+	if o == nil || IsNil(o.Resources) {
+		return nil, false
+	}
+	return o.Resources, true
+}
+
+// HasResources returns a boolean if a field has been set.
+func (o *DirectoryAssignmentsRequestPayload) HasResources() bool {
+	if o != nil && !IsNil(o.Resources) {
+		return true
+	}
+
+	return false
+}
+
+// SetResources gets a reference to the given []ExternalResourceRequestPayload and assigns it to the Resources field.
+func (o *DirectoryAssignmentsRequestPayload) SetResources(v []ExternalResourceRequestPayload) {
+	o.Resources = v
+}
+
 // GetService returns the Service field value
 func (o *DirectoryAssignmentsRequestPayload) GetService() string {
 	if o == nil {
@@ -328,6 +362,9 @@ func (o DirectoryAssignmentsRequestPayload) ToMap() (map[string]interface{}, err
 	toSerialize["plan"] = o.Plan
 	if !IsNil(o.PlanUniqueIdentifier) {
 		toSerialize["planUniqueIdentifier"] = o.PlanUniqueIdentifier
+	}
+	if !IsNil(o.Resources) {
+		toSerialize["resources"] = o.Resources
 	}
 	toSerialize["service"] = o.Service
 	return toSerialize, nil

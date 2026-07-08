@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	meta "github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
@@ -20,7 +20,7 @@ import (
 )
 
 func TestCloudFoundryEnvironment(t *testing.T) {
-	var manifestDir = "testdata/crs/cloudfoundry_env"
+	var manifestDir = crsPath("cloudfoundry_env")
 
 	crudFeature := features.New("BTP CF Environment Controller").
 		Setup(
@@ -75,7 +75,7 @@ func TestCloudFoundryEnvironmentImportFlow(t *testing.T) {
 		WithWaitDependentResourceTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(15*time.Minute)),
 		WithWaitCreateTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(10*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(10*time.Minute)),
-		WithDependentResourceDirectory[*v1alpha1.CloudFoundryEnvironment]("testdata/crs/cloudfoundry_env_import"),
+		WithDependentResourceDirectory[*v1alpha1.CloudFoundryEnvironment](crsPath("cloudfoundry_env_import")),
 	)
 
 	importFeature := importTester.BuildTestFeature("BTP CF Environment Import Flow").Feature()
