@@ -59,6 +59,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: BTP Cockpit → Global Account → Account Explorer → [Select Directory] → Entitlements → Service Assignments > Service Technical Name and Plan
   - CLI: `btp list accounts/entitlement --directory <directory-id>` → `entitledServices[].name` and `entitledServices[].servicePlans[].name`
 
+### GlobalaccountTrustConfiguration
+
+- Follows Standard: no (origin key, not a GUID)
+- Format: Origin key of the identity provider (e.g. "sap.custom")
+- How to find:
+
+  - UI: BTP Cockpit → Global Account → Security → Trust Configurations → [Origin column]
+  - CLI: `btp list security/trust` → `Origin Key`
+
 ### KubeConfigGenerator
 
 - Follows Standard: no - This resource does not support external name as it does not represent an external resource. Instead of using external name for importing, you can just create an instance of this resource.
