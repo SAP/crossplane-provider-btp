@@ -31,6 +31,7 @@ The API calls themselves are usually done via a generated api client of some sor
 | Role Collection Assignment | User/group assignment to a role collection |
 | Cert Based OIDC Login | Certificate-based OIDC login configuration |
 | Kube Config Generator | Kubeconfig generation for cluster access |
+| ResourceUsage | Internal resource to persist cross-references between MRs |
 
 ---
 
