@@ -50,9 +50,9 @@ env:
   CROSSPLANE_CLI_VERSION: v2.0.2
   # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable
   CROSSPLANE_CHART_VERSION: '2.1.7'
-  # SHA256 of crossplane-2.1.7.tgz from upstream charts.crossplane.io/stable
-  # index.yaml's `digest:` field. Update on every Crossplane version bump.
-  CROSSPLANE_CHART_SHA256: '2b5242e1e8d91612f2e77a0c34d3de29abd757b02d6292c5b5b10dadca531a9e'
+  # SHA256 of crossplane-2.1.7.tgz downloaded from charts.crossplane.io/stable
+  # Compute with: curl -sL https://charts.crossplane.io/stable/crossplane-<version>.tgz | sha256sum
+  CROSSPLANE_CHART_SHA256: '29e2d7c7671615bfcef868ab0cf4b7b8dbba1110bfff0d0db13609395021093b'
 
 jobs:
   prepare-matrix:
