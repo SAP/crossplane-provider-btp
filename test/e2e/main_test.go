@@ -5,6 +5,8 @@ package e2e
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
@@ -48,9 +50,12 @@ const (
 	// switches to the chart-tarball path. The fallback also lets local
 	// developers run e2e tests without pre-staging the chart.
 	crossplaneChartPathEnv = "CROSSPLANE_CHART_PATH"
-	// crossplaneVersion is the Crossplane chart version. Must match the
-	// version that was pulled into the tarball at CROSSPLANE_CHART_PATH.
-	crossplaneVersion = "2.1.3"
+	// crossplaneVersionDefault is the fallback Crossplane version used when
+	// CROSSPLANE_CHART_PATH is not set (local dev / PR CI on base branch).
+	// When CROSSPLANE_CHART_PATH is set the version is derived from the
+	// tarball filename, so this constant and the workflow version stay in sync
+	// automatically.
+	crossplaneVersionDefault = "2.3.3"
 
 	// reuseClusterEnv mirrors xp-testing's E2E_REUSE_CLUSTER semantics: when
 	// set, the cluster, Crossplane, and provider are reused across runs and
@@ -113,9 +118,16 @@ func SetupClusterWithCrossplane(namespace string) {
 	// Resolve the install func to use on a fresh cluster. On reuse runs the
 	// cluster already has Crossplane wired up, so we skip both paths via the
 	// xpenvfuncs.Conditional below.
+	crossplaneVersion := crossplaneVersionDefault
 	var installCrossplaneFunc env.Func
 	if !reuseCluster {
 		if chartRef := os.Getenv(crossplaneChartPathEnv); chartRef != "" {
+			// Derive the version from the tarball name (crossplane-X.Y.Z.tgz)
+			// so this stays in sync with the workflow without a separate constant.
+			base := filepath.Base(chartRef) // "crossplane-2.3.3.tgz"
+			if v := strings.TrimSuffix(strings.TrimPrefix(base, "crossplane-"), ".tgz"); v != "" && v != base {
+				crossplaneVersion = v
+			}
 			installCrossplaneFunc = testutil.InstallCrossplaneFromChart(clusterName, chartRef, crossplaneVersion)
 		} else {
 			// Fallback: xp-testing's bundled helm-repo install. Used (a) on
