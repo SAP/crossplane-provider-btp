@@ -4,6 +4,7 @@ package upgrade
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
@@ -20,8 +21,13 @@ var (
 	}
 )
 
-// Test_SubaccountTrustConfiguration_External_Name verifies that the external-name is preserved during upgrades.
-// ADR(external-name): uses compound key "<subaccount-id>/<origin>" (e.g. "abc-123/sap.custom") as identifier.
+// Test_SubaccountTrustConfiguration_External_Name verifies that the
+// SubaccountTrustConfiguration external-name is correctly migrated during
+// provider upgrades.
+//
+// ADR(external-name): SubaccountTrustConfiguration uses the compound key
+// "<subaccount-id>/<origin>" as identifier (see
+// config/subaccount_trust_configuration/config.go)
 func Test_SubaccountTrustConfiguration_External_Name(t *testing.T) {
 	const trustName = "upgrade-test-extn-trust"
 
@@ -75,16 +81,42 @@ func Test_SubaccountTrustConfiguration_External_Name(t *testing.T) {
 					t.Fatal("Could not retrieve pre-upgrade external name from context")
 				}
 
-				// ADR(external-name): compound key "<subaccount-id>/<origin>" must be preserved during upgrade — must not be migrated to UUID format.
-				if externalName != preUpgradeExternalName {
+				// After upgrade, the external-name must be the compound key
+				// "<subaccount-id>/<origin>".
+				parts := strings.SplitN(externalName, "/", 2)
+				if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+					t.Fatalf("Post-upgrade external-name %q is not in compound-key format \"<subaccount-id>/<origin>\"", externalName)
+				}
+				subaccountSegment, originSegment := parts[0], parts[1]
+
+				// The origin segment of the compound key must match
+				// status.atProvider.origin, which the controller populates from
+				// tfstate after the first Observe.
+				if trust.Status.AtProvider.Origin == nil || *trust.Status.AtProvider.Origin == "" {
+					t.Fatal("status.atProvider.origin is not populated after upgrade")
+				}
+				if originSegment != *trust.Status.AtProvider.Origin {
 					t.Fatalf(
-						"External name changed during upgrade: before=%q, after=%q (expected no change)",
-						preUpgradeExternalName,
-						externalName,
+						"Compound-key origin segment %q does not match status.atProvider.origin %q",
+						originSegment,
+						*trust.Status.AtProvider.Origin,
 					)
 				}
 
-				klog.V(4).Info("External name correctly preserved after upgrade")
+				// The subaccount segment must match status.atProvider.subaccountId,
+				// which the controller populates from tfstate after the first Observe.
+				if trust.Status.AtProvider.SubaccountID == nil || *trust.Status.AtProvider.SubaccountID == "" {
+					t.Fatal("status.atProvider.subaccountId is not populated after upgrade")
+				}
+				if subaccountSegment != *trust.Status.AtProvider.SubaccountID {
+					t.Fatalf(
+						"Compound-key subaccount segment %q does not match status.atProvider.subaccountId %q",
+						subaccountSegment,
+						*trust.Status.AtProvider.SubaccountID,
+					)
+				}
+
+				klog.V(4).Infof("External name migrated from %q to compound-key %q", preUpgradeExternalName, externalName)
 				return ctx
 			},
 		)
