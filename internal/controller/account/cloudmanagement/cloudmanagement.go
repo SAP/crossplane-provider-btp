@@ -63,7 +63,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotCloudManagement)
 	}
 
-	if err := c.usage.Track(ctx, mg.(resource.LegacyManaged)); err != nil {
+	if err := c.usage.Track(ctx, mg.(providerconfig.LegacyManaged)); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
@@ -144,7 +144,7 @@ func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1beta1
 		return errors.Wrap(err, errGetPlanId)
 	}
 
-	id, err := sm.PlanIDByName(ctx, "cis", "local")
+	id, err := sm.PlanIDByName(ctx, "cis", "local", "")
 	if err != nil {
 		return errors.Wrap(err, errGetPlanId)
 	}

@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: serviceinstances.account.btp.sap.crossplane.io
 spec:
   group: account.btp.sap.crossplane.io
@@ -83,6 +83,14 @@ spec:
                 description: ServiceInstanceParameters are the configurable fields
                   of a ServiceInstance.
                 properties:
+                  dataCenter:
+                    description: |-
+                      The data center to use when resolving the service plan.
+                      Required when the same service offering exists in multiple data centers
+                      (e.g., SAP HANA Cloud). The value corresponds to the data_center field
+                      in the Service Manager API (e.g., "cf-eu10", "cf-us10").
+                      Mutually exclusive with servicePlanID.
+                    type: string
                   name:
                     description: Name of the service instance in btp, required
                     type: string
@@ -198,6 +206,13 @@ spec:
                             type: string
                         type: object
                     type: object
+                  servicePlanID:
+                    description: |-
+                      The ID of the service plan (UUID). When set, plan resolution via
+                      offeringName/planName is skipped entirely. Use this as an escape hatch
+                      when name-based resolution is ambiguous or you already have the plan ID.
+                      Mutually exclusive with offeringName, planName, and dataCenter.
+                    type: string
                   shared:
                     description: Whether the service instance is shared or not
                     type: boolean

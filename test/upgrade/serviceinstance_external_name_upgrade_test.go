@@ -19,7 +19,7 @@ var (
 	siFromCustomTag             = "v1.9.0"
 	siToCustomTag               = "local"
 	siCustomResourceDirectories = []string{
-		"./testdata/customCRs/serviceinstanceExternalName",
+		upgradeCRsPath("customCRs/serviceinstanceExternalName"),
 	}
 )
 

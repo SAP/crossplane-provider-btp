@@ -13,6 +13,7 @@ import (
 	"github.com/crossplane/upjet/v2/pkg/resource/fake"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -200,8 +201,9 @@ func TestObserve(t *testing.T) {
 				status: UpToDate,
 				err:    nil,
 				details: map[string][]byte{
-					"key1": []byte("value1"),
-					"key2": []byte("value2"),
+					"key1":                         []byte("value1"),
+					"key2":                         []byte("value2"),
+					providerv1alpha1.RawBindingKey: []byte(`{"key1":"value1","key2":"value2"}`),
 				},
 			},
 		},
@@ -521,7 +523,7 @@ type ManagedMock struct {
 	resource.Managed
 }
 
-var _ managed.ExternalConnecter = &TfConnectorMock{}
+var _ managed.ExternalConnector = &TfConnectorMock{}
 
 // TF external connector mock
 type TfConnectorMock struct {
