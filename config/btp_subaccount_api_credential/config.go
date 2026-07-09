@@ -50,6 +50,9 @@ func Configure(p *config.Provider) {
 		r.ExternalName.SetIdentifierArgumentFn = setCredentialNameArgument
 
 		r.MetaResource.ArgumentDocs["name"] = "- The name if left unset defaults to managed-subaccount-api-credential"
+		if !strings.Contains(r.MetaResource.Description, "Importing or adopting existing API credentials is not supported.") {
+			r.MetaResource.Description += ". Importing or adopting existing API credentials is not supported."
+		}
 
 		// ADR(external-name): reconstruct the compound key from Terraform state after
 		// Create/Observe so Upjet records "<subaccount-id>/<name>" instead of the
