@@ -40,8 +40,6 @@ func DiffAgainstUpdateSchema(desired, current map[string]any, schema *Schema) (s
 
 // restrictToSchema copies m, keeping only keys named in schema.Properties.
 // Keys outside the schema (create-only fields, unknown extras) are dropped.
-// The result is always non-nil, even if empty, to keep cmp.Diff output
-// stable.
 func restrictToSchema(m map[string]any, schema *Schema) map[string]any {
 	out := map[string]any{}
 	for k, v := range m {

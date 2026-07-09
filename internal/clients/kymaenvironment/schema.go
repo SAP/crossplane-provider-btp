@@ -21,32 +21,27 @@ import (
 // (enums, minimum/maximum, patterns, descriptions, controlsOrder, etc.) are
 // intentionally dropped. If a future rule needs them, extend this type.
 type Schema struct {
-	// Properties are the top-level property names of the schema mapped to
-	// their parsed representation. A key that is NOT in this map is
-	// considered outside the update contract (e.g. create-only fields like
-	// `region`, `networking`, `modules`, `colocateControlPlane` on the Kyma
-	// plan).
+	// Properties are the top-level property names of the update contract.
+	// A key absent here is outside the contract (e.g. create-only fields
+	// like region, networking, modules, colocateControlPlane on Kyma).
 	Properties map[string]Property
 }
 
 // Property captures the pieces of a JSON Schema property node that the drift
 // detector needs.
 type Property struct {
-	// Type is the JSON Schema `type` value ("string", "integer", "boolean",
-	// "object", "array"). May be empty if the schema omits it (e.g. `oneOf`
-	// nodes) — the diff helper treats an empty Type as "opaque" and falls
-	// back to strict equality.
+	// Type is the JSON Schema `type`. May be empty when the schema omits it
+	// (e.g. oneOf nodes); the diff helper then treats the value as opaque
+	// and falls back to strict equality.
 	Type string
 
-	// Default is the schema-declared default value, or nil if the schema
-	// declares no `default` for this property. For objects, this may be nil
-	// even when the "effective default" is `{}` — the diff helper handles
-	// that case using the Properties map below.
+	// Default is the schema-declared default, or nil if none. For objects
+	// this may be nil even when the effective default is {}; the diff helper
+	// handles that using Properties below.
 	Default any
 
-	// Properties is populated for `type: object` properties and holds the
-	// nested property schemas. Used to recursively decide whether an
-	// observed object value matches the "all defaults" state.
+	// Properties holds nested property schemas for `type: object` nodes,
+	// used to recognise the "all defaults" state recursively.
 	Properties map[string]Property
 }
 

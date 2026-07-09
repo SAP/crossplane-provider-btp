@@ -72,8 +72,7 @@ func TestDiffAgainstUpdateSchema(t *testing.T) {
 			wantNeedsUpdate: false,
 		},
 
-		// Reporter's workaround: same three keys explicitly in desired.
-		// Must remain non-drifting.
+		// Reporter's workaround: the same keys set explicitly in desired.
 		"ReporterWorkaround_SchemaDefaultsInDesired": {
 			desired: func() map[string]any {
 				d := baseDesired()
@@ -90,8 +89,7 @@ func TestDiffAgainstUpdateSchema(t *testing.T) {
 			wantNeedsUpdate: false,
 		},
 
-		// A non-default observed value on a schema-defaulted field IS real
-		// drift — someone flipped ingressFiltering to true out-of-band.
+		// A non-default value on a schema-defaulted field IS real drift.
 		"RealDrift_NonDefaultOnDefaultedField": {
 			desired: baseDesired(),
 			current: func() map[string]any {
@@ -102,8 +100,7 @@ func TestDiffAgainstUpdateSchema(t *testing.T) {
 			wantNeedsUpdate: true,
 		},
 
-		// Create-only field in desired, absent from current — must not
-		// produce drift regardless of value.
+		// Create-only field in desired, absent from current: never drift.
 		"CreateOnlyField_InDesiredNotInCurrent": {
 			desired: baseDesired(),
 			current: func() map[string]any {
@@ -114,7 +111,6 @@ func TestDiffAgainstUpdateSchema(t *testing.T) {
 			wantNeedsUpdate: false,
 		},
 
-		// Legitimate mutable drift on autoScalerMax must surface.
 		"LegitimateMutableDrift": {
 			desired: baseDesired(),
 			current: func() map[string]any {
@@ -125,9 +121,8 @@ func TestDiffAgainstUpdateSchema(t *testing.T) {
 			wantNeedsUpdate: true,
 		},
 
-		// accessControlList {} materialised by BTP: no nested defaults but
-		// object schema with nested properties. Empty map must count as
-		// effective default.
+		// accessControlList {} materialised by BTP: object schema with nested
+		// properties but no explicit default. Empty map counts as default.
 		"AccessControlList_EmptyObjectIsDefault": {
 			desired: baseDesired(),
 			current: func() map[string]any {
@@ -138,8 +133,7 @@ func TestDiffAgainstUpdateSchema(t *testing.T) {
 			wantNeedsUpdate: false,
 		},
 
-		// accessControlList populated with a real CIDR is NOT a default —
-		// must surface as drift when spec doesn't set it.
+		// A populated accessControlList is not the default: drift.
 		"AccessControlList_NonEmptyIsDrift": {
 			desired: baseDesired(),
 			current: func() map[string]any {
@@ -152,7 +146,6 @@ func TestDiffAgainstUpdateSchema(t *testing.T) {
 			wantNeedsUpdate: true,
 		},
 
-		// gvisor.enabled = true is not default; drift.
 		"Gvisor_EnabledTrueIsDrift": {
 			desired: baseDesired(),
 			current: func() map[string]any {
@@ -163,9 +156,8 @@ func TestDiffAgainstUpdateSchema(t *testing.T) {
 			wantNeedsUpdate: true,
 		},
 
-		// User explicitly set gvisor.enabled = true. current matches. No
-		// drift, and the "user set it" branch of normalizeCurrent must
-		// preserve the value.
+		// User set gvisor.enabled=true and current matches: the "user set it"
+		// branch must preserve the value so no false drift appears.
 		"Gvisor_UserSetTrue_CurrentMatches": {
 			desired: func() map[string]any {
 				d := baseDesired()
@@ -180,9 +172,7 @@ func TestDiffAgainstUpdateSchema(t *testing.T) {
 			wantNeedsUpdate: false,
 		},
 
-		// Unknown key in current (schema doesn't know about it) must be
-		// dropped, not surfaced as drift. Protects against BTP adding an
-		// entirely new field without a matching schema update.
+		// Unknown key in current (not in schema) must be ignored, not drift.
 		"UnknownKeyInCurrent_Ignored": {
 			desired: baseDesired(),
 			current: func() map[string]any {

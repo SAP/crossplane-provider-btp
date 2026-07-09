@@ -21,11 +21,21 @@ const (
 )
 
 type KymaEnvironments struct {
-	btp btp.Client
+	btp           btp.Client
+	schemaFetcher SchemaFetcher
 }
 
 func NewKymaEnvironments(btp btp.Client) *KymaEnvironments {
-	return &KymaEnvironments{btp: btp}
+	return &KymaEnvironments{
+		btp:           btp,
+		schemaFetcher: NewSchemaFetcher(btp),
+	}
+}
+
+// SchemaFetcher returns the fetcher the client is bound to. Exposed so the
+// controller can reuse the same in-memory schema cache for drift detection.
+func (c *KymaEnvironments) SchemaFetcher() SchemaFetcher {
+	return c.schemaFetcher
 }
 
 // DescribeInstance retrieves a Kyma environment instance using the external-name annotation.

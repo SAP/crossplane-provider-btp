@@ -12,7 +12,6 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/go-logr/logr"
-	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -183,7 +182,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	details, readErr := kymaenv.GetConnectionDetails(instance, c.httpClient)
 
-	needsUpdate, diff, err := c.needsUpdateWithDiff(cr)
+	needsUpdate, diff, err := c.needsUpdateWithDiff(ctx, cr)
 	if err != nil {
 		return managed.ExternalObservation{
 			ResourceExists:    true,
@@ -300,7 +299,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalDelete{}, nil
 }
 
-func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, string, error) {
+func (c *external) needsUpdateWithDiff(ctx context.Context, cr *v1alpha1.KymaEnvironment) (bool, string, error) {
 
 	desired, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
 	desired = kymaenv.AddKymaDefaultParameters(desired, kymaenv.GetKymaEnvironmentName(*cr), string(cr.UID))
@@ -318,11 +317,24 @@ func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, stri
 		return false, "", err
 	}
 
-	diff := cmp.Diff(desired, current)
+	// Restrict drift detection to the BTP updateSchema and ignore the
+	// schema-defaults BTP materialises on every update (issue #682).
+	// Fail-closed: on fetch error we retry rather than fall back to the
+	// naive diff that caused the bug.
+	schema, err := c.client.SchemaFetcher().GetUpdateSchema(
+		ctx,
+		btp.KymaEnvironmentType().Identifier,
+		cr.Spec.ForProvider.PlanName,
+	)
+	if err != nil {
+		return false, "", errors.Wrap(err, errCheckUpdate)
+	}
+
+	diff, needsUpdate := kymaenv.DiffAgainstUpdateSchema(desired, current, schema)
 
 	updateCircuitBreakerStatus(cr, desired, current, diff, maxRetries)
 
-	return diff != "", diff, nil
+	return needsUpdate, diff, nil
 
 }
 
