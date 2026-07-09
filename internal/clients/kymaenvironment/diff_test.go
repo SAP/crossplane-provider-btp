@@ -207,6 +207,19 @@ func TestDiffAgainstUpdateSchema_NilSchemaFallsBack(t *testing.T) {
 	}
 }
 
+// Empty-schema fallback: a non-nil schema with no properties must NOT suppress
+// all drift (which would silently disable updates). It must behave like the
+// nil case and fall back to the naive comparison.
+func TestDiffAgainstUpdateSchema_EmptySchemaFallsBack(t *testing.T) {
+	desired := map[string]any{"machineType": "Standard_D4_v3"}
+	current := map[string]any{"machineType": "Standard_D8_v3"}
+
+	_, needsUpdate := DiffAgainstUpdateSchema(desired, current, &Schema{Properties: map[string]Property{}})
+	if !needsUpdate {
+		t.Errorf("empty-schema fallback should detect drift; got needsUpdate=false")
+	}
+}
+
 func TestFilterToUpdateSchema(t *testing.T) {
 	schema := kymaAzureSchemaForDiffTest()
 
@@ -241,6 +254,14 @@ func TestFilterToUpdateSchema(t *testing.T) {
 		out := FilterToUpdateSchema(in, nil)
 		if _, ok := out["region"]; !ok {
 			t.Errorf("nil schema must pass params through unchanged; got %v", out)
+		}
+	})
+
+	t.Run("EmptySchemaPassesThrough", func(t *testing.T) {
+		in := map[string]any{"region": "westeurope"}
+		out := FilterToUpdateSchema(in, &Schema{Properties: map[string]Property{}})
+		if _, ok := out["region"]; !ok {
+			t.Errorf("empty schema must pass params through unchanged (not strip all); got %v", out)
 		}
 	})
 }

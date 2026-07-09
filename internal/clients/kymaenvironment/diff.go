@@ -22,11 +22,14 @@ import (
 // See issue https://github.com/SAP/crossplane-provider-btp/issues/682 for the
 // full motivation.
 func DiffAgainstUpdateSchema(desired, current map[string]any, schema *Schema) (string, bool) {
-	if schema == nil {
-		// Without a schema we can't reason about defaults or the update
-		// contract. Fall back to the strict comparison the caller had before
-		// this helper existed. (In practice needsUpdateWithDiff should fail
-		// closed before ever reaching this helper with a nil schema.)
+	if !usableSchema(schema) {
+		// No usable schema (nil, or an empty property set) means we can't
+		// reason about defaults or the update contract. Fall back to the
+		// strict comparison the caller had before this helper existed rather
+		// than silently suppressing all drift. An empty schema in particular
+		// would otherwise drop every key and make the resource appear
+		// permanently up-to-date. (In practice needsUpdateWithDiff should
+		// fail closed before reaching here with an unfetchable schema.)
 		diff := cmp.Diff(desired, current)
 		return diff, diff != ""
 	}
@@ -38,14 +41,23 @@ func DiffAgainstUpdateSchema(desired, current map[string]any, schema *Schema) (s
 	return diff, diff != ""
 }
 
+// usableSchema reports whether schema carries enough information to drive
+// schema-aware diffing and payload filtering. A nil schema or one with no
+// properties is treated as unusable, so callers degrade to pre-#682 behaviour
+// instead of suppressing all drift or stripping the whole update payload.
+func usableSchema(schema *Schema) bool {
+	return schema != nil && len(schema.Properties) > 0
+}
+
 // FilterToUpdateSchema returns a copy of m containing only keys present in
 // schema.Properties. Keys outside the update contract (create-only fields
 // such as region, networking, modules on the Kyma plan) are dropped so they
 // are never compared for drift nor sent to the update API, which does not
-// accept them. A nil schema returns m unchanged; callers that require a
-// schema are expected to fail closed before reaching here.
+// accept them. An unusable schema (nil or no properties) returns m unchanged;
+// callers that require a schema are expected to fail closed before reaching
+// here.
 func FilterToUpdateSchema(m map[string]any, schema *Schema) map[string]any {
-	if schema == nil {
+	if !usableSchema(schema) {
 		return m
 	}
 	out := map[string]any{}
@@ -59,7 +71,7 @@ func FilterToUpdateSchema(m map[string]any, schema *Schema) map[string]any {
 
 // normalizeCurrent builds a version of current suitable for direct comparison
 // against restrictedDesired. Keys outside schema.Properties are dropped
-// (mirrors restrictToSchema). For keys not set in desired, values matching
+// (mirrors FilterToUpdateSchema). For keys not set in desired, values matching
 // the schema's effective default are dropped so they don't manifest as drift.
 func normalizeCurrent(desired, current map[string]any, schema *Schema) map[string]any {
 	out := map[string]any{}

@@ -114,8 +114,9 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 
 	// Drop create-only fields (region, networking, modules, ...) the update
 	// API does not accept; sending them makes BTP reject or silently ignore
-	// the update (issue #682). Fail-closed on schema errors so we never send
-	// an unfiltered payload.
+	// the update (issue #682). Fail-closed on schema fetch errors so we never
+	// send an unfiltered payload; an unusable schema passes params through
+	// (see FilterToUpdateSchema).
 	schema, err := c.schemaFetcher.GetUpdateSchema(
 		ctx,
 		btp.KymaEnvironmentType().Identifier,
