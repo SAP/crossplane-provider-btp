@@ -49,10 +49,10 @@ env:
   E2E_PROVIDER_IMAGE: index.docker.io/e2e/provider-btp-amd64
   CROSSPLANE_CLI_VERSION: v2.0.2
   # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable
-  CROSSPLANE_CHART_VERSION: '2.1.3'
-  # SHA256 of crossplane-2.1.3.tgz from upstream charts.crossplane.io/stable
-  # index.yaml's `digest:` field. Update on every Crossplane version bump.
-  CROSSPLANE_CHART_SHA256: '1059cc4b87167ba7e1b837a8e6bd787691bc9f84c5a29a7e91dbd0122086c682'
+  CROSSPLANE_CHART_VERSION: '2.1.7'
+  # SHA256 of crossplane-2.1.7.tgz downloaded from charts.crossplane.io/stable
+  # Compute with: curl -sL https://charts.crossplane.io/stable/crossplane-<version>.tgz | sha256sum
+  CROSSPLANE_CHART_SHA256: '29e2d7c7671615bfcef868ab0cf4b7b8dbba1110bfff0d0db13609395021093b'
 
 jobs:
   prepare-matrix:
@@ -62,7 +62,7 @@ jobs:
       test-names: ${{ steps.set-matrix.outputs.test-names }}
     steps:
       - name: checkout repo
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
@@ -70,7 +70,7 @@ jobs:
       - name: Set matrix with test names
         id: set-matrix
         run: |
-          echo "test-names=$(grep -rh --include='**_test.go' -o -E 'func (Test[A-Za-z0-9_]+)\(t \*testing.T\)' test/e2e | sed 's/func //;s/(t \*testing.T)//' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
+          echo "test-names=$(find test/e2e -name '*_test.go' | xargs grep -L 'go:build e2e_long' | xargs grep -oh -E 'func (Test[A-Za-z0-9_]+)\(t \*testing\.T\)' | sed 's/func //;s/(t \*testing.T)//' | jq -R . | jq -cs .)" >> $GITHUB_OUTPUT
 
       - name: Print test names
         run: |
@@ -84,18 +84,18 @@ jobs:
     needs: prepare-matrix
     steps:
       - name: checkout repo
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ inputs.checkout-ref }}
 
       - name: Install Helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
-          version: v3.14.0
+          version: v4.2.2
 
       - name: Restore Crossplane chart cache
         id: crossplane-chart-cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/charts
           key: crossplane-chart-${{ env.CROSSPLANE_CHART_VERSION }}-${{ runner.os }}
@@ -144,7 +144,7 @@ jobs:
 
       - name: Save Crossplane chart cache
         if: success() && steps.crossplane-chart-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/charts
           key: ${{ steps.crossplane-chart-cache.outputs.cache-primary-key }}
@@ -167,19 +167,19 @@ jobs:
     needs: prepare-matrix
     steps:
       - name: checkout repo
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ inputs.checkout-ref }}
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Restore CLI tools cache (kind, kubectl, crank)
         id: cli-tools-cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/tools
           key: e2e-tools-${{ runner.os }}-${{ runner.arch }}-crank-${{ env.CROSSPLANE_CLI_VERSION }}-${{ hashFiles('build/makelib/k8s_tools.mk') }}
@@ -211,7 +211,7 @@ jobs:
 
       - name: Save CLI tools cache (kind, kubectl, crank)
         if: success() && steps.cli-tools-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/tools
           key: ${{ steps.cli-tools-cache.outputs.cache-primary-key }}
@@ -262,13 +262,13 @@ jobs:
         testName: ${{ fromJson(needs.prepare-matrix.outputs.test-names) }}
     steps:
       - name: checkout repo
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
           submodules: true
 
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - run: go version
@@ -323,9 +323,9 @@ jobs:
         run: docker load -i "${{ runner.temp }}/artifacts/provider-image/provider-image.tar"
 
       - name: Install Helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
-          version: v3.14.0
+          version: v4.2.2
 
       - name: Download Crossplane chart
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -351,9 +351,6 @@ jobs:
       - name: Set BUILD_ID
         run: |
           echo "BUILD_ID=${{github.run_number}}-${{github.run_attempt}}" >> $GITHUB_ENV
-
-      - name: Install gettext for envsubst
-        run: sudo apt-get update && sudo apt-get install -y gettext
 
       - name: Run e2e test
         timeout-minutes: 120
@@ -385,13 +382,13 @@ jobs:
     if: always() && needs.prepare-matrix.result == 'success'  # only run if prepare-matrix was successful (requires manual approval) and then always run after e2e-test
     steps:
       - name: checkout repo
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # use github.base_ref to checkout the base branch, since the cleanup should always run on the base branch to make it harder for malicious code execution. Consequently, this will not pick up changes to the cleanup.go file in the PR, but that is accebtable.
           ref: ${{ github.base_ref }}
           submodules: true
 
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: ${{ env.GO_VERSION }}
 

@@ -334,13 +334,13 @@ func deleteBTPSubaccount(
 
 	_, raw, err := accountsServiceClient.AccountsServiceClient.SubaccountOperationsAPI.DeleteSubaccount(ctx, subaccountId).Execute()
 	// 404 not found means already deleted - not considered as error case
-	if raw.StatusCode == 404 {
+	if raw != nil && raw.StatusCode == 404 {
 		ctrl.Log.Info("associated BTP subaccount not found, continue deletion")
 		return nil
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "deletion of subaccount failed")
+		return errors.Wrap(specifyAPIError(err), "deletion of subaccount failed")
 	}
 
 	return nil
@@ -367,7 +367,7 @@ func (c *external) moveSubaccountAPI(ctx context.Context, subaccount *apisv1alph
 
 	err := c.accountsAccessor.MoveSubaccount(ctx, guid, targetID)
 	if err != nil {
-		return errors.Wrap(err, errMoveSubaccount)
+		return errors.Wrap(specifyAPIError(err), errMoveSubaccount)
 	}
 	return nil
 }
@@ -387,7 +387,7 @@ func (c *external) updateSubaccountAPI(ctx context.Context, subaccount *apisv1al
 
 	err := c.accountsAccessor.UpdateSubaccount(ctx, guid, params)
 	if err != nil {
-		return errors.Wrap(err, errUpdateAPI)
+		return errors.Wrap(specifyAPIError(err), errUpdateAPI)
 	}
 	return nil
 }
@@ -437,7 +437,7 @@ func (c *external) migrateExternalName(ctx context.Context, subaccount *apisv1al
 
 	response, _, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccounts(ctx).Execute()
 	if err != nil {
-		return errors.Wrap(err, errGetSubaccounts)
+		return errors.Wrap(specifyAPIError(err), errGetSubaccounts)
 	}
 
 	btpSubaccounts := response.Value
@@ -490,7 +490,9 @@ func addOperatorLabel(subaccount *apisv1alpha1.Subaccount) map[string][]string {
 		return map[string][]string{}
 	}
 	labels := map[string][]string{}
-	internal.CopyMaps(labels, subaccount.Spec.ForProvider.Labels)
+	for k, v := range subaccount.Spec.ForProvider.Labels {
+		labels[k] = v
+	}
 	labels[apisv1alpha1.SubaccountOperatorLabel] = []string{string(subaccount.UID)}
 	return labels
 }
@@ -520,7 +522,7 @@ func specifyAPIError(err error) error {
 	return err
 }
 
-func changedLabels(specLabels map[string][]string, statusLabels *map[string][]string) bool {
+func changedLabels(specLabels map[string]apisv1alpha1.SubaccountLabelValueList, statusLabels *map[string][]string) bool {
 	// pointer to maps can be pointer to nil values, which won't deep equal as expected here, so we need to treat this case manually
 	if statusLabels == nil {
 		return len(specLabels) != 0
@@ -528,5 +530,13 @@ func changedLabels(specLabels map[string][]string, statusLabels *map[string][]st
 	if len(*statusLabels) == 0 && len(specLabels) == 0 {
 		return false
 	}
-	return !reflect.DeepEqual(specLabels, *statusLabels)
+	if len(specLabels) != len(*statusLabels) {
+		return true
+	}
+	for k, v := range specLabels {
+		if !reflect.DeepEqual([]string(v), (*statusLabels)[k]) {
+			return true
+		}
+	}
+	return false
 }

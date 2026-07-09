@@ -1,5 +1,4 @@
-//go:build e2e
-// +build e2e
+//go:build e2e_long
 
 package e2e
 
@@ -24,11 +23,7 @@ import (
 )
 
 func TestKymaEnvironment(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping kyma in short mode")
-		return
-	}
-	var manifestDir = "testdata/crs/kyma_env"
+	var manifestDir = crsPath("kyma_env")
 	crudFeature := features.New("BTP Kyma Environment Controller").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
@@ -66,11 +61,6 @@ func TestKymaEnvironment(t *testing.T) {
 }
 
 func TestKymaEnvironmentImportFlow(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping kyma import in short mode")
-		return
-	}
-
 	kymaImportName := "e2e-kyma-import-test"
 
 	importTester := NewImportTester(
@@ -100,7 +90,7 @@ func TestKymaEnvironmentImportFlow(t *testing.T) {
 		WithWaitDependentResourceTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(15*time.Minute)),
 		WithWaitCreateTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(50*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(50*time.Minute)),
-		WithDependentResourceDirectory[*v1alpha1.KymaEnvironment]("testdata/crs/kyma_env_import"),
+		WithDependentResourceDirectory[*v1alpha1.KymaEnvironment](crsPath("kyma_env_import")),
 	)
 
 	importFeature := importTester.BuildTestFeature("BTP Kyma Environment Import Flow").Feature()

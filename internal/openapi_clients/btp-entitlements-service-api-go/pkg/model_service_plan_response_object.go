@@ -1,7 +1,7 @@
 /*
 Entitlements Service
 
-The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.   NOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -19,7 +19,7 @@ var _ MappedNullable = &ServicePlanResponseObject{}
 
 // ServicePlanResponseObject List of service plans associated with the entitled service.
 type ServicePlanResponseObject struct {
-	// The assigned quota for maximum allowed consumption of the plan. Relevant for services that have a numeric quota assignment.
+	// The total available quota for maximum allowed consumption of the plan by the global account. The total is the sum of all calculated quantities (\"amount\") from the plan's source entitlements in the given global account contract. Relevant for plan that have a numeric quota assignment.
 	Amount *float32 `json:"amount,omitempty"`
 	// Whether to automatically assign a quota of the entitlement to a subaccount when the subaccount is created in the entitlement's assigned directory.
 	AutoAssign *bool `json:"autoAssign,omitempty"`
@@ -43,6 +43,8 @@ type ServicePlanResponseObject struct {
 	MaxAllowedSubaccountQuota *int32 `json:"maxAllowedSubaccountQuota,omitempty"`
 	// The unique registration name of the service plan.
 	Name *string `json:"name,omitempty"`
+	// The number of directories and subaccounts to which the service plan is assigned.
+	NumberOfAssignedEntities *int64 `json:"numberOfAssignedEntities,omitempty"`
 	// [DEPRECATED] The source that added the service. Possible values: * <b>VENDOR:</b> The product has been added by SAP or the cloud operator to the product catalog for general use. * <b>GLOBAL_ACCOUNT_OWNER:</b> Custom services that are added by a customer and are available only for that customer’s global account. * <b>PARTNER:</b> Service that are added by partners. And only available to its customers.  Note: This property is deprecated. Please use the ownerType attribute on the entitledService level instead.
 	ProvidedBy *string `json:"providedBy,omitempty"`
 	// The method used to provision the service plan. * <b>SERVICE_BROKER:</b> Provisioning of Neo or Cloud Foundry quotas done by the service broker. * <b>NONE_REQUIRED:</b> Provisioning of Cloud Foundry quotas done by setting amount at provisioning-service. * <b>COMMERCIAL_SOLUTION_SCRIPT:</b> Provisioning is done by a script provided by the service owner and run by the Core Commercial Foundation service. * <b>GLOBAL_COMMERCIAL_SOLUTION_SCRIPT:</b> Provisioning is done by a script provided by the service owner and run by the Core Commercial Foundation service used for Global Account level. * <b>GLOBAL_QUOTA_DOMAIN_DB:</b> Provisioning is done by setting amount at Domain DB, this is relevant for non-ui quotas only. * <b>CLOUD_AUTOMATION:</b> Provisioning is done by the cloud automation service. This is relevant only for provisioning that requires external providers that are not within the scope of CIS. * <b>SPC:</b> Provisioning is done by Service Provider Cockpit. 
@@ -459,6 +461,38 @@ func (o *ServicePlanResponseObject) SetName(v string) {
 	o.Name = &v
 }
 
+// GetNumberOfAssignedEntities returns the NumberOfAssignedEntities field value if set, zero value otherwise.
+func (o *ServicePlanResponseObject) GetNumberOfAssignedEntities() int64 {
+	if o == nil || IsNil(o.NumberOfAssignedEntities) {
+		var ret int64
+		return ret
+	}
+	return *o.NumberOfAssignedEntities
+}
+
+// GetNumberOfAssignedEntitiesOk returns a tuple with the NumberOfAssignedEntities field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ServicePlanResponseObject) GetNumberOfAssignedEntitiesOk() (*int64, bool) {
+	if o == nil || IsNil(o.NumberOfAssignedEntities) {
+		return nil, false
+	}
+	return o.NumberOfAssignedEntities, true
+}
+
+// HasNumberOfAssignedEntities returns a boolean if a field has been set.
+func (o *ServicePlanResponseObject) HasNumberOfAssignedEntities() bool {
+	if o != nil && !IsNil(o.NumberOfAssignedEntities) {
+		return true
+	}
+
+	return false
+}
+
+// SetNumberOfAssignedEntities gets a reference to the given int64 and assigns it to the NumberOfAssignedEntities field.
+func (o *ServicePlanResponseObject) SetNumberOfAssignedEntities(v int64) {
+	o.NumberOfAssignedEntities = &v
+}
+
 // GetProvidedBy returns the ProvidedBy field value if set, zero value otherwise.
 func (o *ServicePlanResponseObject) GetProvidedBy() string {
 	if o == nil || IsNil(o.ProvidedBy) {
@@ -728,6 +762,9 @@ func (o ServicePlanResponseObject) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
+	}
+	if !IsNil(o.NumberOfAssignedEntities) {
+		toSerialize["numberOfAssignedEntities"] = o.NumberOfAssignedEntities
 	}
 	if !IsNil(o.ProvidedBy) {
 		toSerialize["providedBy"] = o.ProvidedBy

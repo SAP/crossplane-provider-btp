@@ -10,6 +10,17 @@
 
 All available CRDs can be found in the [API reference](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp).
 
+## 📦 Versioning and Support
+
+| Version | Status | Support |
+|---------|--------|---------|
+| v2.x (latest) | Active development | New feature development |
+| v1.10 | Support | Security patches and critical bug fixes until 2026-12-31 |
+
+New features will be published in upcoming **v2.x** releases. The previous **v1.10** release receives support for 6 months (until 2026-12-31), covering:
+- Security patches
+- Critical bug fixes, if deemed necessary
+
 ## 📊 Installation
 
 To install this provider in a kubernetes cluster running crossplane, you can use the provider custom resource, replacing the `<version>`placeholder with the current version of this provider:
@@ -95,8 +106,22 @@ If you want to run a single E2E Test locally simply set the `testFilter` variabl
 make test-acceptance testFilter=<functionNameOfTest>
 ````
 
-> [!WARNING]
-> Please be aware that as part of the e2e tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/e2e/testdata`after running the command. Make sure to not commit those changes into git.
+> [!NOTE]
+> The e2e fixtures under `test/e2e/testdata/crs/` are templates that reference environment variables (`$BUILD_ID`, `$TECHNICAL_USER_EMAIL`, …). `make test-acceptance` copies them into `.work/rendered-crs/e2e/` (gitignored), runs `envsubst` on the copies, then runs the tests against the rendered tree — the committed templates are not modified. Override the source and output directories with `TEST_CRS_PATH` and `TEST_CRS_GENERATED_PATH` if needed.
+
+#### Long-Running Tests
+
+Some tests (e.g. Kyma environment, service binding rotation) are excluded from `make test-acceptance` because they can take 10 minutes or more. These tests carry the `e2e_long` build tag and must be run explicitly:
+
+```bash
+make test-e2e-long testFilter=<functionNameOfTest>
+```
+
+To run the full long-running suite, omit the filter:
+
+```bash
+make test-e2e-long
+```
 
 Please note that when running multiple times you might want to delete the kind cluster again to avoid conflicts:
 
@@ -211,7 +236,7 @@ The default is `0`.
 
 ### Upgrade Tests
 
-The provider also comes with upgrade tests that can be run locally. These upgrade tests ensure that resources created with an older version of the provider can be properly handled by the current version. Find more detailed information in the [upgrade test docs](/docs/development/upgrade-tests.md).
+The provider also comes with upgrade tests that can be run locally. These upgrade tests ensure that resources created with an older version of the provider can be properly handled by the current version. Find more detailed information in the [upgrade test docs](/docs/contribution-notes/upgrade-tests.md).
 
 To run the upgrade tests, you can use the following command:
 
@@ -219,8 +244,8 @@ To run the upgrade tests, you can use the following command:
 make upgrade-test
 ```
 
-> [!WARNING]  
-> Please be aware that as part of the upgrade tests a script will be executed which injects the environment configuration (see below) into the test data. Therefor you will see a lot of changes in the directory `test/upgrade/testdata/baseCRs` after running the command. Make sure to not commit those changes into git.
+> [!NOTE]
+> As part of the upgrade tests, the CRs under `test/upgrade/testdata/` are rendered with the current environment configuration (see below). The committed templates are not modified — rendered output is written to `.work/rendered-crs/upgrade/` (gitignored). Override the source and output directories with `UPGRADE_TEST_CRS_PATH` and `UPGRADE_TEST_CRS_GENERATED_PATH` if needed.
 
 #### Required configuration
 

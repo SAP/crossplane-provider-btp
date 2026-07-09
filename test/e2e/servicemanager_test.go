@@ -32,7 +32,7 @@ func TestServiceManagerCreationFlow(t *testing.T) {
 	crudFeatureSuite := features.New("ServiceManager Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicemanager/create_flow")
+				resources.ImportResources(ctx, t, cfg, crsPath("servicemanager/create_flow"))
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
@@ -80,7 +80,7 @@ func TestServiceManagerImport(t *testing.T) {
 	importFeatureSuite := features.New("ServiceManager Import Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicemanager/import/environment")
+				resources.ImportResources(ctx, t, cfg, crsPath("servicemanager/import/environment"))
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 

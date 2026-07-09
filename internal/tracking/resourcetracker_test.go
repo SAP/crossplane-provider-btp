@@ -197,11 +197,12 @@ func Test_Track(t *testing.T) {
 		additionalObjects []kclient.Object
 	}
 	tests := []struct {
-		name     string
-		args     args
-		want     []*providerv1alpha1.ResourceUsage
-		err      error
-		postfunc func(ctx context.Context, client kclient.WithWatch, testname string) error
+		name          string
+		args          args
+		want          []*providerv1alpha1.ResourceUsage
+		err           error
+		postfunc      func(ctx context.Context, client kclient.WithWatch, testname string) error
+		wantCondition *xpv1.Condition
 	}{
 		{
 			name: "When there is an error to resolve a reference then an error is thrown",
@@ -251,6 +252,18 @@ func Test_Track(t *testing.T) {
 			},
 			want: []*providerv1alpha1.ResourceUsage{},
 		},
+		{
+			name: "When the resource is referenced by another then an in use condition is set",
+			args: args{
+				mg: newFakeDirectory(),
+				additionalObjects: []kclient.Object{
+					newResourceUsage(newFakeDirectory(), newFakeSubaccount()),
+					newFakeSubaccount(),
+				},
+			},
+			want:          []*providerv1alpha1.ResourceUsage{},
+			wantCondition: lo.ToPtr(providerv1alpha1.InUse()),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -275,6 +288,13 @@ func Test_Track(t *testing.T) {
 					got := &providerv1alpha1.ResourceUsage{}
 					if err = client.Get(ctx, kclient.ObjectKeyFromObject(want), got); err != nil {
 						t.Errorf("\n%s\ne.Track(...): got:\n%s\n", tt.name, err)
+					}
+				}
+
+				if tt.wantCondition != nil {
+					got := tt.args.mg.GetCondition(providerv1alpha1.UseCondition)
+					if diff := cmp.Diff(*tt.wantCondition, got); diff != "" {
+						t.Errorf("\n%s\ne.Track(...) condition: -want, +got:\n%s\n", tt.name, diff)
 					}
 				}
 
