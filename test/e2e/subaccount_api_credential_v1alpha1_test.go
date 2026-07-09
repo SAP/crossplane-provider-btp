@@ -91,15 +91,14 @@ func assertApiCredentialSecret(t *testing.T, ctx context.Context, cfg *envconf.C
 	}
 }
 
-// TestSubaccountApiCredentialOrphanImport verifies External-Name ADR compliance for
-// SubaccountApiCredential: after provisioning, the crossplane.io/external-name annotation
-// uses the compound key `<subaccount-id>/<name>` (via GetExternalNameFn reading
-// `subaccount_id` and `name` from Terraform state). The connection secret must also
-// contain a valid client_secret.
+// TestSubaccountApiCredentialExternalNameADRCompliance verifies that a newly
+// provisioned SubaccountApiCredential gets an ADR-compliant external-name
+// annotation in the compound `<subaccount-id>/<name>` format and produces a
+// connection secret containing a valid client_secret.
 //
 // Note: the BTP Terraform provider does not implement ImportState for this resource type,
 // so this test does not validate adoption/import of an existing credential.
-func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
+func TestSubaccountApiCredentialExternalNameADRCompliance(t *testing.T) {
 	var orphanManifestDir = crsPath("SubaccountApiCredentialOrphanImport")
 	// Prefix "sac-adr-" ensures the BTP credential name starts with a letter.
 	// The SAC is created in Setup (not Assess) so the controller picks it up
