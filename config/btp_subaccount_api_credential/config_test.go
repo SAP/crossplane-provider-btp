@@ -23,17 +23,68 @@ func TestCredentialNameFromExternalName(t *testing.T) {
 		externalName string
 		want         string
 	}{
-		"compound":       {externalName: "subaccount-guid/my-credential", want: "my-credential"},
-		"legacy name":    {externalName: "my-credential", want: "my-credential"},
-		"empty":          {externalName: "", want: ""},
-		"invalid prefix": {externalName: "/my-credential", want: "/my-credential"},
-		"invalid suffix": {externalName: "subaccount-guid/", want: "subaccount-guid/"},
+		"compound":                {externalName: "subaccount-guid/my-credential", want: "my-credential"},
+		"legacy name":             {externalName: "my-credential", want: "my-credential"},
+		"empty":                   {externalName: "", want: ""},
+		"invalid prefix":          {externalName: "/my-credential", want: "/my-credential"},
+		"invalid suffix":          {externalName: "subaccount-guid/", want: "subaccount-guid/"},
+		"invalid extra delimiter": {externalName: "subaccount-guid/my/credential", want: "subaccount-guid/my/credential"},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			if diff := cmp.Diff(tc.want, credentialNameFromExternalName(tc.externalName)); diff != "" {
 				t.Errorf("credentialNameFromExternalName() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateExternalName(t *testing.T) {
+	cases := map[string]struct {
+		externalName string
+		wantErr      error
+	}{
+		"empty": {
+			externalName: "",
+		},
+		"legacy name-only": {
+			externalName: "my-credential",
+		},
+		"compound": {
+			externalName: "subaccount-guid/my-credential",
+		},
+		"empty subaccount segment": {
+			externalName: "/my-credential",
+			wantErr:      errors.New(errInvalidExternalName),
+		},
+		"empty credential segment": {
+			externalName: "subaccount-guid/",
+			wantErr:      errors.New(errInvalidExternalName),
+		},
+		"extra delimiter": {
+			externalName: "a/b/c",
+			wantErr:      errors.New(errInvalidExternalName),
+		},
+		"legacy name with whitespace": {
+			externalName: "my credential",
+			wantErr:      errors.New(errInvalidExternalName),
+		},
+		"compound subaccount with whitespace": {
+			externalName: "subaccount guid/my-credential",
+			wantErr:      errors.New(errInvalidExternalName),
+		},
+		"compound credential with whitespace": {
+			externalName: "subaccount-guid/my credential",
+			wantErr:      errors.New(errInvalidExternalName),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := validateExternalName(tc.externalName)
+			if diff := cmp.Diff(tc.wantErr, err, test.EquateErrors()); diff != "" {
+				t.Errorf("validateExternalName() error mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -199,6 +250,74 @@ func TestCompoundExternalNameInitializer_Initialize(t *testing.T) {
 				MockUpdate: test.NewMockUpdateFn(nil),
 			},
 			want: want{externalName: "subaccount-guid/old-credential"},
+		},
+		"malformed annotation with empty subaccount segment - returns user-facing error": {
+			cr: func() *securityv1alpha1.SubaccountApiCredential {
+				cr := &securityv1alpha1.SubaccountApiCredential{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+					Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+						ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{
+							SubaccountID: ptr("subaccount-guid"),
+							Name:         ptr("my-credential"),
+						},
+					},
+				}
+				meta.SetExternalName(cr, "/my-credential")
+				return cr
+			}(),
+			kube: &test.MockClient{},
+			want: want{err: errors.New(errInvalidExternalName), externalName: "/my-credential"},
+		},
+		"malformed annotation with empty credential segment - returns user-facing error": {
+			cr: func() *securityv1alpha1.SubaccountApiCredential {
+				cr := &securityv1alpha1.SubaccountApiCredential{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+					Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+						ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{
+							SubaccountID: ptr("subaccount-guid"),
+							Name:         ptr("my-credential"),
+						},
+					},
+				}
+				meta.SetExternalName(cr, "subaccount-guid/")
+				return cr
+			}(),
+			kube: &test.MockClient{},
+			want: want{err: errors.New(errInvalidExternalName), externalName: "subaccount-guid/"},
+		},
+		"malformed annotation with extra delimiter - returns user-facing error": {
+			cr: func() *securityv1alpha1.SubaccountApiCredential {
+				cr := &securityv1alpha1.SubaccountApiCredential{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+					Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+						ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{
+							SubaccountID: ptr("subaccount-guid"),
+							Name:         ptr("my-credential"),
+						},
+					},
+				}
+				meta.SetExternalName(cr, "subaccount-guid/my/credential")
+				return cr
+			}(),
+			kube: &test.MockClient{},
+			want: want{err: errors.New(errInvalidExternalName), externalName: "subaccount-guid/my/credential"},
+		},
+		"malformed annotation with whitespace - returns user-facing error": {
+			cr: func() *securityv1alpha1.SubaccountApiCredential {
+				cr := &securityv1alpha1.SubaccountApiCredential{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+					Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+						ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{
+							SubaccountID: ptr("subaccount-guid"),
+							Name:         ptr("my-credential"),
+						},
+					},
+				}
+				meta.SetExternalName(cr, "subaccount-guid/my credential")
+				return cr
+			}(),
+			kube: &test.MockClient{},
+			want: want{err: errors.New(errInvalidExternalName), externalName: "subaccount-guid/my credential"},
 		},
 		"compound annotation already set - no-op": {
 			cr: func() *securityv1alpha1.SubaccountApiCredential {

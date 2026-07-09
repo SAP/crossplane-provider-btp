@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/pkg/errors"
 
@@ -27,6 +28,7 @@ const (
 	errUpdateExternalName              = "cannot update external-name annotation"
 	errMissingNameFromState            = "cannot reconstruct external-name: name missing from tfstate"
 	errMissingSubaccountIDFromState    = "cannot reconstruct external-name: subaccount_id missing from tfstate"
+	errInvalidExternalName             = "invalid external-name annotation for SubaccountApiCredential: expected \"<subaccount-id>/<name>\" or legacy \"<name>\"; segments must be non-empty and must not contain \"/\" or whitespace"
 	defaultSubaccountApiCredentialName = "managed-subaccount-api-credential"
 )
 
@@ -88,11 +90,39 @@ func compoundExternalName(subaccountID, credentialName string) string {
 }
 
 func splitCompoundExternalName(externalName string) (subaccountID, credentialName string, ok bool) {
-	parts := strings.SplitN(externalName, "/", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+	if strings.Count(externalName, "/") != 1 {
 		return "", "", false
 	}
-	return parts[0], parts[1], true
+	subaccountID, credentialName, _ = strings.Cut(externalName, "/")
+	if subaccountID == "" || credentialName == "" {
+		return "", "", false
+	}
+	return subaccountID, credentialName, true
+}
+
+func hasWhitespace(value string) bool {
+	return strings.IndexFunc(value, unicode.IsSpace) >= 0
+}
+
+func validExternalNameSegment(value string) bool {
+	return value != "" && !strings.Contains(value, "/") && !hasWhitespace(value)
+}
+
+func validateExternalName(externalName string) error {
+	if externalName == "" {
+		return nil
+	}
+	if strings.Count(externalName, "/") == 0 {
+		if validExternalNameSegment(externalName) {
+			return nil
+		}
+		return errors.New(errInvalidExternalName)
+	}
+	subaccountID, credentialName, ok := splitCompoundExternalName(externalName)
+	if !ok || !validExternalNameSegment(subaccountID) || !validExternalNameSegment(credentialName) {
+		return errors.New(errInvalidExternalName)
+	}
+	return nil
 }
 
 func credentialNameFromExternalName(externalName string) string {
@@ -168,6 +198,9 @@ func (n *CompoundExternalNameInitializer) Initialize(ctx context.Context, mg res
 	}
 
 	currentExternalName := meta.GetExternalName(cr)
+	if err := validateExternalName(currentExternalName); err != nil {
+		return err
+	}
 	if _, _, ok := splitCompoundExternalName(currentExternalName); ok {
 		return nil
 	}
