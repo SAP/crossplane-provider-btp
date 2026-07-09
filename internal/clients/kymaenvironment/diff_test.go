@@ -206,3 +206,41 @@ func TestDiffAgainstUpdateSchema_NilSchemaFallsBack(t *testing.T) {
 		t.Errorf("nil-schema fallback should detect drift between {a:1} and {a:2}")
 	}
 }
+
+func TestFilterToUpdateSchema(t *testing.T) {
+	schema := kymaAzureSchemaForDiffTest()
+
+	t.Run("DropsCreateOnlyFields", func(t *testing.T) {
+		in := baseDesired() // includes create-only "region"
+		out := FilterToUpdateSchema(in, schema)
+		if _, ok := out["region"]; ok {
+			t.Errorf("region should have been dropped; got %v", out)
+		}
+		// A shared/updatable field must survive.
+		if _, ok := out["machineType"]; !ok {
+			t.Errorf("machineType should have survived; got %v", out)
+		}
+	})
+
+	t.Run("KeepsInSchemaFields", func(t *testing.T) {
+		in := map[string]any{
+			"name":             "kyma",
+			"ingressFiltering": false,
+			"gvisor":           map[string]any{"enabled": false},
+		}
+		out := FilterToUpdateSchema(in, schema)
+		for _, k := range []string{"name", "ingressFiltering", "gvisor"} {
+			if _, ok := out[k]; !ok {
+				t.Errorf("%q should have survived; got %v", k, out)
+			}
+		}
+	})
+
+	t.Run("NilSchemaPassesThrough", func(t *testing.T) {
+		in := map[string]any{"region": "westeurope"}
+		out := FilterToUpdateSchema(in, nil)
+		if _, ok := out["region"]; !ok {
+			t.Errorf("nil schema must pass params through unchanged; got %v", out)
+		}
+	})
+}

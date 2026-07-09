@@ -107,10 +107,25 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 	}
 
 	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
-	parameters = AddKymaDefaultParameters(parameters, GetKymaEnvironmentName(cr), string(cr.UID))
 	if err != nil {
 		return err
 	}
+	parameters = AddKymaDefaultParameters(parameters, GetKymaEnvironmentName(cr), string(cr.UID))
+
+	// Drop create-only fields (region, networking, modules, ...) the update
+	// API does not accept; sending them makes BTP reject or silently ignore
+	// the update (issue #682). Fail-closed on schema errors so we never send
+	// an unfiltered payload.
+	schema, err := c.schemaFetcher.GetUpdateSchema(
+		ctx,
+		btp.KymaEnvironmentType().Identifier,
+		cr.Spec.ForProvider.PlanName,
+	)
+	if err != nil {
+		return errors.Wrap(err, errKymaInstanceUpdateFailed)
+	}
+	parameters = FilterToUpdateSchema(parameters, schema)
+
 	err = c.btp.UpdateKymaEnvironment(
 		ctx,
 		externalName,

@@ -31,16 +31,23 @@ func DiffAgainstUpdateSchema(desired, current map[string]any, schema *Schema) (s
 		return diff, diff != ""
 	}
 
-	restrictedDesired := restrictToSchema(desired, schema)
+	restrictedDesired := FilterToUpdateSchema(desired, schema)
 	normalizedCurrent := normalizeCurrent(desired, current, schema)
 
 	diff := cmp.Diff(restrictedDesired, normalizedCurrent)
 	return diff, diff != ""
 }
 
-// restrictToSchema copies m, keeping only keys named in schema.Properties.
-// Keys outside the schema (create-only fields, unknown extras) are dropped.
-func restrictToSchema(m map[string]any, schema *Schema) map[string]any {
+// FilterToUpdateSchema returns a copy of m containing only keys present in
+// schema.Properties. Keys outside the update contract (create-only fields
+// such as region, networking, modules on the Kyma plan) are dropped so they
+// are never compared for drift nor sent to the update API, which does not
+// accept them. A nil schema returns m unchanged; callers that require a
+// schema are expected to fail closed before reaching here.
+func FilterToUpdateSchema(m map[string]any, schema *Schema) map[string]any {
+	if schema == nil {
+		return m
+	}
 	out := map[string]any{}
 	for k, v := range m {
 		if _, ok := schema.Properties[k]; ok {
