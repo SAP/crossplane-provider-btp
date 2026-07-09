@@ -133,7 +133,7 @@ func TestMain(m *testing.M) {
 		true,
 	)
 
-	setupClusterWithCrossplane(fromProviderPackage, fromControllerPackage)
+	setupClusterWithCrossplane(fromTag, fromProviderPackage, fromControllerPackage)
 
 	os.Exit(testenv.Run(m))
 }
@@ -141,8 +141,8 @@ func TestMain(m *testing.M) {
 // setupClusterWithCrossplane sets up a kind cluster with Crossplane and the specified provider version.
 // It does not create a ProviderConfig, as this is done in the individual tests.
 // Setting up the provider is technically not necessary for upgrade tests, but that's what xp-testing's setup does.
-func setupClusterWithCrossplane(providerPackage, controllerPackage string) {
-	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName)
+func setupClusterWithCrossplane(fromTag, providerPackage, controllerPackage string) {
+	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName, fromTag)
 
 	cfg := setup.ClusterSetup{
 		ProviderName: providerName,

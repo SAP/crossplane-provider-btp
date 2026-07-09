@@ -7,14 +7,14 @@ tool golang.org/x/tools/cmd/goimports
 // Module conflict in Go dependencies. The package google.golang.org/genproto/googleapis/api/httpbody exists in two different modules:
 // - google.golang.org/genproto (older version)
 // - google.golang.org/genproto/googleapis/api (newer, split module)
-replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20260630182238-925bb5da69e7
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20260706201446-f0a921348800
 
 require (
 	dario.cat/mergo v1.0.2
 	github.com/SAP/xp-clifford v0.0.0-20260528123824-27644fae68e8
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/blang/semver/v4 v4.0.0
-	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.18
+	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.21
 	github.com/crossplane-contrib/xp-testing v1.9.2
 	github.com/crossplane/crossplane-runtime/v2 v2.2.0
 	github.com/crossplane/crossplane-tools v0.0.0-20251017183449-dd4517244339
@@ -40,7 +40,7 @@ require (
 	k8s.io/apimachinery v0.35.3
 	k8s.io/client-go v0.35.3
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/utils v0.0.0-20260626114624-be93311217bd
+	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 	sigs.k8s.io/controller-runtime v0.23.3
 	sigs.k8s.io/controller-tools v0.20.1
 	sigs.k8s.io/e2e-framework v0.7.0
@@ -249,7 +249,7 @@ require (
 	golang.org/x/tools v0.47.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260622175928-b703f567277d // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260630182238-925bb5da69e7 // indirect
 	google.golang.org/grpc v1.81.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect

@@ -149,7 +149,7 @@ func SetupClusterWithCrossplane(namespace string) {
 						Name:                    "btp-account",
 						Package:                 uutConfig,
 						ControllerImage:         &uutController,
-						DeploymentRuntimeConfig: internal.Ptr(test.DeploymentRuntimeConfig("btp-provider")),
+						DeploymentRuntimeConfig: internal.Ptr(test.DeploymentRuntimeConfig("btp-provider", "local")),
 					}),
 			), !reuseCluster),
 		xpenvfuncs.ApplyProviderConfigFromDir("./provider"),
