@@ -133,7 +133,7 @@ func TestKymaModuleImportFlow(t *testing.T) {
 		WithWaitDependentResourceTimeout[*v1alpha1.KymaModule](wait.WithTimeout(60*time.Minute)),
 		WithWaitCreateTimeout[*v1alpha1.KymaModule](wait.WithTimeout(15*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.KymaModule](wait.WithTimeout(15*time.Minute)),
-		WithDependentResourceDirectory[*v1alpha1.KymaModule]("testdata/crs/kyma_module_import"),
+		WithDependentResourceDirectory[*v1alpha1.KymaModule](crsPath("kyma_module_import")),
 	)
 
 	importFeature := importTester.BuildTestFeature("BTP Kyma Module Import Flow").Feature()
