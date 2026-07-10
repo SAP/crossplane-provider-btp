@@ -342,7 +342,7 @@ generate-test-crs:
 	@# envsubst with an explicit allowlist — any other $VAR-shaped string in the
 	@# YAML (e.g. unrelated provider-config references) is preserved verbatim.
 	@for template in $$(find "$(TEST_CRS_GENERATED_PATH)" -type f -name "*.yaml"); do \
-		envsubst '$$BUILD_ID $$IDP_URL $$SECOND_DIRECTORY_ADMIN_EMAIL $$TECHNICAL_USER_EMAIL' < $$template > $$template.tmp && mv $$template.tmp $$template; \
+		envsubst '$$BUILD_ID $$IDP_URL $$SECOND_DIRECTORY_ADMIN_EMAIL $$TECHNICAL_USER_EMAIL $$SERVICE_BROKER_URL $$SERVICE_BROKER_USERNAME' < $$template > $$template.tmp && mv $$template.tmp $$template; \
 	done
 	@$(OK) CRS rendered
 
