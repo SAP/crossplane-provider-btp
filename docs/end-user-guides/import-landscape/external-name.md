@@ -144,7 +144,7 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 - Note: import requires managementPolicies: ["*"]; observe-only import is not supported for this resource
 - How to find:
 
-  - UI: BTP Cockpit → Subaccount → Services → Service Brokers → [Select Broker] → ID
+  - UI: Not available. The BTP cockpit does not show service brokers, only Service Marketplace and Instances and Subscriptions. Use the CLI or the Service Manager API.
   - CLI: `btp list services/broker --subaccount <subaccount-id>` (field: id)
 
 ### SubaccountTrustConfiguration
