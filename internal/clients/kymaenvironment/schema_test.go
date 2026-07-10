@@ -225,8 +225,7 @@ func TestSchemaFetcher_FetchFailure_WarmCacheOverrides(t *testing.T) {
 	}
 	if got == nil {
 		t.Fatalf("stale-cache fallback returned nil schema")
-	}
-	if _, ok := got.Properties["ingressFiltering"]; !ok {
+	} else if _, ok := got.Properties["ingressFiltering"]; !ok {
 		t.Errorf("stale-cache result missing ingressFiltering")
 	}
 }
