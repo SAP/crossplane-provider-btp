@@ -4,6 +4,7 @@ package upgrade
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
@@ -20,16 +21,14 @@ var (
 	}
 )
 
-// Test_SubaccountApiCredential_External_Name verifies that the SubaccountApiCredential
-// external-name is correctly preserved during provider upgrades.
-//
-// Unlike most resources, SubaccountApiCredential is an ADR exception: the SAP BTP Terraform
-// provider uses the credential name (not a GUID) as its resource identifier. Therefore the
-// external-name is the credential name (e.g. "my-api-credential"), and no migration to UUID
-// format is expected. This test ensures that:
-// 1. The external-name exists before upgrade and equals the credential name
-// 2. After upgrade, the external-name is unchanged
-// 3. The resource remains healthy after upgrade
+// Test_SubaccountApiCredential_External_Name verifies that legacy name-only
+// SubaccountApiCredential external-name annotations are migrated to the ADR
+// compound key "<subaccount-id>/<name>" during provider upgrades.
+// This test ensures that:
+// 1. The pre-upgrade external-name exists in the legacy name-only format
+// 2. After upgrade, the external-name is migrated to the compound-key format
+// 3. The credential-name segment is preserved, so the existing external resource remains targeted
+// 4. The resource remains healthy after upgrade
 func Test_SubaccountApiCredential_External_Name(t *testing.T) {
 	const sacName = "upgrade-test-extn-sac"
 
@@ -83,18 +82,19 @@ func Test_SubaccountApiCredential_External_Name(t *testing.T) {
 					t.Fatal("Could not retrieve pre-upgrade external name from context")
 				}
 
-				// The external-name must be unchanged: SubaccountApiCredential uses the
-				// credential name as its Terraform resource identifier (ADR exception).
-				// No migration to UUID format should occur.
-				if externalName != preUpgradeExternalName {
+				parts := strings.SplitN(externalName, "/", 2)
+				if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+					t.Fatalf("Post-upgrade external-name %q is not in compound-key format", externalName)
+				}
+				if parts[1] != preUpgradeExternalName {
 					t.Fatalf(
-						"External name changed during upgrade: before=%q, after=%q (expected no change)",
+						"Credential-name segment changed during migration: before=%q, after compound=%q",
 						preUpgradeExternalName,
 						externalName,
 					)
 				}
 
-				klog.V(4).Info("External name correctly preserved after upgrade")
+				klog.V(4).Info("External name correctly migrated after upgrade")
 				return ctx
 			},
 		)

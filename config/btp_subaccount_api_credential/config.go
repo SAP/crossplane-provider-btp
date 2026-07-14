@@ -2,6 +2,9 @@ package btp_subaccount_api_credential
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/pkg/errors"
 
@@ -19,10 +22,14 @@ import (
 )
 
 const (
-	errTrackRUsage         = "cannot track ResourceUsage"
-	errTypeAssertion       = "managed resource is not of type SubaccountApiCredential"
-	errMissingClientSecret = "cannot read client_secret from source, please delete external resource and re-create Crossplane resource"
-	errUpdateExternalName  = "cannot update external-name annotation"
+	errTrackRUsage                     = "cannot track ResourceUsage"
+	errTypeAssertion                   = "managed resource is not of type SubaccountApiCredential"
+	errMissingClientSecret             = "cannot read client_secret from source, please delete external resource and re-create Crossplane resource"
+	errUpdateExternalName              = "cannot update external-name annotation"
+	errMissingNameFromState            = "cannot reconstruct external-name: name missing from tfstate"
+	errMissingSubaccountIDFromState    = "cannot reconstruct external-name: subaccount_id missing from tfstate"
+	errInvalidExternalName             = "invalid external-name annotation for SubaccountApiCredential: expected \"<subaccount-id>/<name>\" or legacy \"<name>\"; segments must be non-empty and must not contain \"/\" or whitespace"
+	defaultSubaccountApiCredentialName = "managed-subaccount-api-credential"
 )
 
 // Configure configures individual resources by adding custom ResourceConfigurators.
@@ -38,18 +45,22 @@ func Configure(p *config.Provider) {
 		r.TerraformResource.Schema["token_url"].Sensitive = true
 		r.TerraformResource.Schema["api_url"].Sensitive = true
 
-		r.ExternalName.SetIdentifierArgumentFn = func(base map[string]any, name string) {
-			if name == "" {
-				base["name"] = "managed-subbaccount-api-credential"
-			} else {
-				base["name"] = name
-			}
+		// ADR(external-name): SubaccountApiCredential is identified by the compound key
+		// "<subaccount-id>/<name>". Terraform still expects only the credential name
+		// in its "name" argument, so strip the compound-key prefix before rendering
+		// Terraform configuration or reconstructed state.
+		r.ExternalName.SetIdentifierArgumentFn = setCredentialNameArgument
+
+		r.MetaResource.ArgumentDocs["name"] = "- The name if left unset defaults to managed-subaccount-api-credential"
+		if !strings.Contains(r.MetaResource.Description, "Importing or adopting existing API credentials is not supported.") {
+			r.MetaResource.Description += ". Importing or adopting existing API credentials is not supported."
 		}
 
-		r.MetaResource.ArgumentDocs["name"] = "The name if left unset defaults to managedsubbaccountapicredential"
-
+		// ADR(external-name): reconstruct the compound key from Terraform state after
+		// Create/Observe so Upjet records "<subaccount-id>/<name>" instead of the
+		// Terraform resource ID or just the credential name.
 		r.ExternalName.GetExternalNameFn = func(tfstate map[string]any) (string, error) {
-			return tfstate["name"].(string), nil
+			return compoundExternalNameFromState(tfstate)
 		}
 
 		r.References["subaccount_id"] = config.Reference{
@@ -59,9 +70,12 @@ func Configure(p *config.Provider) {
 			SelectorFieldName: "SubaccountSelector",
 		}
 
-		// Add pre-delete hook using InitializerFns for finalizer management
+		// ADR(external-name): migrate legacy name-only annotations to
+		// "<subaccount-id>/<name>" without deleting the existing connection secret.
+		// New resources are created without pre-setting external-name; after Create,
+		// GetExternalNameFn reconstructs the compound annotation from Terraform state.
 		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
-			return &NameAsExternalName{Kube: kube}
+			return &CompoundExternalNameInitializer{Kube: kube}
 		})
 		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
 			return &DeletionProtectionInitializer{Kube: kube}
@@ -71,14 +85,109 @@ func Configure(p *config.Provider) {
 	p.ConfigureResources()
 }
 
-// NameAsExternalName propagates forProvider.name to the external-name annotation.
-// When the name changes, the connection secret is deleted so that
-// DeletionProtectionInitializer does not block with stale data.
-type NameAsExternalName struct {
+func compoundExternalName(subaccountID, credentialName string) string {
+	return fmt.Sprintf("%s/%s", subaccountID, credentialName)
+}
+
+func splitCompoundExternalName(externalName string) (subaccountID, credentialName string, ok bool) {
+	if strings.Count(externalName, "/") != 1 {
+		return "", "", false
+	}
+	subaccountID, credentialName, _ = strings.Cut(externalName, "/")
+	if subaccountID == "" || credentialName == "" {
+		return "", "", false
+	}
+	return subaccountID, credentialName, true
+}
+
+func hasWhitespace(value string) bool {
+	return strings.IndexFunc(value, unicode.IsSpace) >= 0
+}
+
+func validExternalNameSegment(value string) bool {
+	return value != "" && !strings.Contains(value, "/") && !hasWhitespace(value)
+}
+
+func validateExternalName(externalName string) error {
+	if externalName == "" {
+		return nil
+	}
+	if strings.Count(externalName, "/") == 0 {
+		if validExternalNameSegment(externalName) {
+			return nil
+		}
+		return errors.New(errInvalidExternalName)
+	}
+	subaccountID, credentialName, ok := splitCompoundExternalName(externalName)
+	if !ok || !validExternalNameSegment(subaccountID) || !validExternalNameSegment(credentialName) {
+		return errors.New(errInvalidExternalName)
+	}
+	return nil
+}
+
+func credentialNameFromExternalName(externalName string) string {
+	_, credentialName, ok := splitCompoundExternalName(externalName)
+	if ok {
+		return credentialName
+	}
+	return externalName
+}
+
+func setCredentialNameArgument(base map[string]any, externalName string) {
+	if externalName != "" {
+		credentialName := credentialNameFromExternalName(externalName)
+		if credentialName != "" {
+			base["name"] = credentialName
+			return
+		}
+	}
+	if name, ok := base["name"].(string); ok && name != "" {
+		return
+	}
+	base["name"] = defaultSubaccountApiCredentialName
+}
+
+func stringField(tfstate map[string]any, field string) string {
+	value, _ := tfstate[field].(string)
+	return value
+}
+
+func compoundExternalNameFromState(tfstate map[string]any) (string, error) {
+	subaccountID := stringField(tfstate, "subaccount_id")
+	if subaccountID == "" {
+		return "", errors.New(errMissingSubaccountIDFromState)
+	}
+	credentialName := stringField(tfstate, "name")
+	if credentialName == "" {
+		return "", errors.New(errMissingNameFromState)
+	}
+	return compoundExternalName(subaccountID, credentialName), nil
+}
+
+func specSubaccountID(cr *securityv1alpha1.SubaccountApiCredential) string {
+	if cr.Spec.ForProvider.SubaccountID != nil && *cr.Spec.ForProvider.SubaccountID != "" {
+		return *cr.Spec.ForProvider.SubaccountID
+	}
+	return ""
+}
+
+func subaccountIDForLegacyMigration(cr *securityv1alpha1.SubaccountApiCredential) string {
+	if subaccountID := specSubaccountID(cr); subaccountID != "" {
+		return subaccountID
+	}
+	if cr.Status.AtProvider.SubaccountID != nil && *cr.Status.AtProvider.SubaccountID != "" {
+		return *cr.Status.AtProvider.SubaccountID
+	}
+	return ""
+}
+
+// CompoundExternalNameInitializer migrates legacy name-only external-name annotations
+// to the ADR-compliant compound key "<subaccount-id>/<name>".
+type CompoundExternalNameInitializer struct {
 	Kube client.Client
 }
 
-func (n *NameAsExternalName) Initialize(ctx context.Context, mg resource.Managed) error {
+func (n *CompoundExternalNameInitializer) Initialize(ctx context.Context, mg resource.Managed) error {
 	cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
 	if !ok {
 		return errors.New(errTypeAssertion)
@@ -88,38 +197,32 @@ func (n *NameAsExternalName) Initialize(ctx context.Context, mg resource.Managed
 		return nil
 	}
 
-	if cr.Spec.ForProvider.Name == nil || *cr.Spec.ForProvider.Name == "" {
-		return nil
-	}
-
-	desiredName := *cr.Spec.ForProvider.Name
-	if meta.GetExternalName(cr) == desiredName {
-		return nil
-	}
-
-	if err := n.deleteConnectionSecret(ctx, cr); err != nil {
+	currentExternalName := meta.GetExternalName(cr)
+	if err := validateExternalName(currentExternalName); err != nil {
 		return err
 	}
-
-	meta.SetExternalName(cr, desiredName)
-	return errors.Wrap(n.Kube.Update(ctx, cr), errUpdateExternalName)
-}
-
-func (n *NameAsExternalName) deleteConnectionSecret(ctx context.Context, cr *securityv1alpha1.SubaccountApiCredential) error {
-	secretRef := cr.GetWriteConnectionSecretToReference()
-	if secretRef == nil || secretRef.Name == "" {
+	if _, _, ok := splitCompoundExternalName(currentExternalName); ok {
 		return nil
 	}
 
-	secret := &corev1.Secret{}
-	if err := n.Kube.Get(ctx, client.ObjectKey{
-		Name:      secretRef.Name,
-		Namespace: secretRef.Namespace,
-	}, secret); err != nil {
-		return resource.IgnoreNotFound(err)
+	if currentExternalName == "" {
+		return nil
 	}
 
-	return resource.IgnoreNotFound(n.Kube.Delete(ctx, secret))
+	// Legacy annotations used the credential name only. Treat the existing
+	// annotation as authoritative during migration to preserve the currently
+	// managed external credential, even if spec.forProvider.name was changed.
+	// Status is only a fallback for the subaccount ID during legacy migration,
+	// because already-managed resources may have observed state while their
+	// resolved spec.forProvider.subaccountId is not populated yet.
+	subaccountID := subaccountIDForLegacyMigration(cr)
+	if subaccountID == "" {
+		return nil
+	}
+	desiredExternalName := compoundExternalName(subaccountID, currentExternalName)
+
+	meta.SetExternalName(cr, desiredExternalName)
+	return errors.Wrap(n.Kube.Update(ctx, cr), errUpdateExternalName)
 }
 
 // DeletionProtectionInitializer implements the managed.Initializer interface
