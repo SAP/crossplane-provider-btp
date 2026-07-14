@@ -6,6 +6,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/internal"
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const ServiceManagerOfferingName = "service-manager"
@@ -129,8 +130,17 @@ func (t ServiceManagerInstanceProxyClient) EnsureSemanticLookuper(ctx context.Co
 		if err != nil {
 			return nil, noop, err
 		}
+		// Detach the cleanup delete from ctx so that a reconcile timeout /
+		// cancellation — the common case that motivates cleanup in the first
+		// place — does not silently orphan the temporary admin binding when the
+		// caller defers cleanup(). Also log the error instead of dropping it on
+		// the floor so a persistent failure is at least visible.
 		cleanup = func() {
-			_ = t.deleteAdminBinding(ctx, subaccountGuid)
+			delCtx := context.WithoutCancel(ctx)
+			if dErr := t.deleteAdminBinding(delCtx, subaccountGuid); dErr != nil {
+				ctrl.Log.Info("EnsureSemanticLookuper cleanup: failed to delete temporary admin binding",
+					"subaccountGuid", subaccountGuid, "error", dErr.Error())
+			}
 		}
 	}
 

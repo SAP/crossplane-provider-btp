@@ -13,10 +13,17 @@ import (
 	runtimeobj "k8s.io/apimachinery/pkg/runtime"
 
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/internal/adoption"
+	"github.com/sap/crossplane-provider-btp/internal/recovery"
 )
 
-var crCreatedAtSA = time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)
+var (
+	crCreatedAtSA = time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)
+	// createPendingAtSA is a plausible Create-attempt time (a few seconds
+	// after the CR was born) used as the reference point for the ownership
+	// window. BTP created_at values `crCreatedAtSA.Add(time.Hour)` etc. in
+	// the tests below are relative to THIS pending time.
+	createPendingAtSA = crCreatedAtSA.Add(5 * time.Second)
+)
 
 type saRecorderFake struct{ events []string }
 
@@ -37,8 +44,22 @@ func saWithSubdomain(subdomain string) *apisv1alpha1.Subaccount {
 	cr := &apisv1alpha1.Subaccount{}
 	cr.SetName(subdomain)
 	cr.SetCreationTimestamp(metav1.NewTime(crCreatedAtSA))
+	// Stamp the external-create-pending annotation to simulate
+	// crossplane-runtime having invoked Create() for this CR. Without it,
+	// the heal short-circuits (see recovery.HasCreateBeenAttempted).
+	meta.SetExternalCreatePending(cr, createPendingAtSA)
 	cr.Spec.ForProvider.Subdomain = subdomain
 	// external-name intentionally left empty (fallback)
+	return cr
+}
+
+// saWithoutCreatePending returns a CR that mirrors saWithSubdomain but with
+// NO external-create-pending annotation — the state a CR is in before this
+// controller has ever invoked Create() (e.g. an unresolved reference blocks
+// Create). The heal must short-circuit and refuse to adopt anything.
+func saWithoutCreatePending(subdomain string) *apisv1alpha1.Subaccount {
+	cr := saWithSubdomain(subdomain)
+	delete(cr.GetAnnotations(), "crossplane.io/external-create-pending")
 	return cr
 }
 
@@ -49,7 +70,7 @@ func TestObserve_SubaccountAdoption(t *testing.T) {
 		cr := saWithSubdomain("ek-test-2")
 		acc := &MockAccountsApiAccessor{
 			lookupGuid:      guid,
-			lookupCreatedAt: crCreatedAtSA.Add(time.Hour),
+			lookupCreatedAt: createPendingAtSA.Add(2 * time.Second), // inside window
 			lookupFound:     true,
 		}
 		e := external{
@@ -57,7 +78,7 @@ func TestObserve_SubaccountAdoption(t *testing.T) {
 			accountsAccessor: acc,
 		}
 		_, err := e.Observe(context.TODO(), cr)
-		if !errors.Is(err, adoption.ErrRequeueAfterAdopt) {
+		if !errors.Is(err, recovery.ErrRequeueAfterRecovery) {
 			t.Fatalf("expected ErrRequeueAfterAdopt, got %v", err)
 		}
 		if meta.GetExternalName(cr) != guid {
@@ -68,13 +89,14 @@ func TestObserve_SubaccountAdoption(t *testing.T) {
 		}
 	})
 
-	// Regression: ownership check refuses to adopt a subaccount that predates
-	// our CR (brownfield). See adoption.IsOwnedByCR.
-	t.Run("brownfield (BTP created before CR): refuses adoption, emits Warning", func(t *testing.T) {
+	// Regression: ownership check refuses to adopt a subaccount whose BTP
+	// created_at falls outside the window around our recorded Create attempt
+	// (brownfield). See recovery.IsOwnedByCR.
+	t.Run("brownfield (BTP created outside pending window): refuses adoption, emits Warning", func(t *testing.T) {
 		cr := saWithSubdomain("ek-brown")
 		acc := &MockAccountsApiAccessor{
 			lookupGuid:      guid,
-			lookupCreatedAt: crCreatedAtSA.Add(-time.Hour), // OLDER than CR
+			lookupCreatedAt: createPendingAtSA.Add(-time.Hour), // far outside the ownership window
 			lookupFound:     true,
 		}
 		rec := &saRecorderFake{}
@@ -93,8 +115,8 @@ func TestObserve_SubaccountAdoption(t *testing.T) {
 		if meta.GetExternalName(cr) != "" {
 			t.Errorf("external-name must stay empty (unchanged), got %q", meta.GetExternalName(cr))
 		}
-		if !rec.has(adoption.EventReasonRefusedBrownfield) {
-			t.Errorf("expected %q event, got %+v", adoption.EventReasonRefusedBrownfield, rec.events)
+		if !rec.has(recovery.EventReasonRefusedBrownfield) {
+			t.Errorf("expected %q event, got %+v", recovery.EventReasonRefusedBrownfield, rec.events)
 		}
 	})
 
@@ -130,6 +152,36 @@ func TestObserve_SubaccountAdoption(t *testing.T) {
 		}
 		if obs.ResourceExists {
 			t.Errorf("expected ResourceExists=false")
+		}
+	})
+
+	// New: no external-create-pending annotation means this controller never
+	// attempted Create() for this CR, so adoption must be refused up-front
+	// (before running the expensive subdomain lookup). Guards the safety
+	// property that motivated dropping the creationTimestamp fallback.
+	t.Run("no create-pending annotation: short-circuits, does not lookup", func(t *testing.T) {
+		cr := saWithoutCreatePending("ek-test-2")
+		acc := &MockAccountsApiAccessor{
+			lookupGuid:      guid,
+			lookupCreatedAt: createPendingAtSA.Add(2 * time.Second),
+			lookupFound:     true,
+		}
+		e := external{
+			Client:           test.NewMockClient(),
+			accountsAccessor: acc,
+		}
+		obs, err := e.Observe(context.TODO(), cr)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+		if obs.ResourceExists {
+			t.Errorf("expected ResourceExists=false")
+		}
+		if meta.GetExternalName(cr) != "" {
+			t.Errorf("external-name must stay empty (adoption refused), got %q", meta.GetExternalName(cr))
+		}
+		if acc.lookupCalls != 0 {
+			t.Errorf("lookup must not run when Create has never been attempted, got calls=%d", acc.lookupCalls)
 		}
 	})
 }

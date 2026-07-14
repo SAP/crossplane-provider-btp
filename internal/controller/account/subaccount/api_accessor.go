@@ -20,7 +20,7 @@ type AccountsApiAccessor interface {
 	// (refuse to guess) or the API call fails.
 	//
 	// createdAt is the BTP-reported creation time of the matched subaccount.
-	// Callers use it to enforce the ownership check (adoption.IsOwnedByCR)
+	// Callers use it to enforce the ownership check (recovery.IsOwnedByCR)
 	// before actually adopting — only subaccounts born at/after the CR's own
 	// creationTimestamp were plausibly created by us; anything older is a
 	// brownfield resource that must be adopted explicitly.

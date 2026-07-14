@@ -12,8 +12,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/internal"
-	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
+	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -216,9 +216,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	// natural output of the operator's phase-1 Create (createInstance) — the
 	// same reconcile loop is expected to run phase-2 (createBinding) next and
 	// upgrade to the compound "<sID>/<bID>" key. Re-firing adoption in that
-	// state used to trap CM in an infinite adoption loop; see adoption.go.
+	// state used to trap CM in an infinite adoption loop; see recovery.go.
 	if err == nil && !resStatus.ResourceExists &&
-		adoption.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+		recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
 		if healErr := c.healExternalName(ctx, cr); healErr != nil {
 			return managed.ExternalObservation{}, healErr
 		}
@@ -239,6 +239,11 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudMa
 	if c.newAdminLookuperFn == nil {
 		return nil
 	}
+	// Short-circuit: no create-pending annotation means we never attempted
+	// Create() for this CR, so any match would fail the ownership check.
+	if !recovery.HasCreateBeenAttempted(cr) {
+		return nil
+	}
 	if cr.Status.AtProvider.DataSourceLookup == nil {
 		return nil
 	}
@@ -250,7 +255,7 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudMa
 	lookuper, cleanup, err := c.newAdminLookuperFn(ctx, cr)
 	if err != nil {
 		log.FromContext(ctx).Info("external-name adoption: cannot obtain admin lookup client", "error", err.Error())
-		c.emit(cr, event.Warning(event.Reason(adoption.EventReasonLookupFailed), err))
+		c.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
 		return nil
 	}
 	defer cleanup()
@@ -258,25 +263,27 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudMa
 	siID, sbID, instanceCreatedAt, found, err := lookuper.LookupInstanceAndBinding(ctx, planID, cmInstanceName(cr), cmBindingName(cr))
 	if err != nil {
 		log.FromContext(ctx).Info("external-name adoption lookup failed", "planID", planID, "error", err.Error())
-		c.emit(cr, event.Warning(event.Reason(adoption.EventReasonLookupFailed), err))
+		c.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
 		return nil
 	}
 	if !found {
 		return nil
 	}
 
-	// Ownership check: refuse to adopt cloud-management pair that predates our
-	// CR (brownfield). Uses the instance's created_at because phase-1 creates
-	// the instance first — if it's older than us, we couldn't have created it.
-	if !adoption.IsOwnedByCR(cr.GetCreationTimestamp().Time, instanceCreatedAt) {
-		log.FromContext(ctx).Info("external-name adoption refused: BTP cloud management predates the CR (brownfield)",
+	// Ownership check: refuse to adopt a cloud-management pair outside the
+	// window in which our own Create() attempt could have produced it
+	// (brownfield). Uses the instance's created_at because phase-1 creates
+	// the instance first — if it's outside our window, we couldn't have
+	// created it.
+	if !recovery.IsOwnedByCR(cr, instanceCreatedAt) {
+		log.FromContext(ctx).Info("external-name adoption refused: BTP cloud management is outside our Create-attempt window (brownfield)",
 			"serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID,
 			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", instanceCreatedAt)
 		c.emit(cr, event.Warning(
-			event.Reason(adoption.EventReasonRefusedBrownfield),
+			event.Reason(recovery.EventReasonRefusedBrownfield),
 			errors.Errorf(
-				"refusing to adopt existing BTP cloud management %s/%s: instance created_at %s predates the CR's creationTimestamp %s (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
-				siID, sbID, instanceCreatedAt.Format(time.RFC3339), cr.GetCreationTimestamp().Time.Format(time.RFC3339))))
+				"refusing to adopt existing BTP cloud management %s/%s: instance created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				siID, sbID, instanceCreatedAt.Format(time.RFC3339))))
 		return nil
 	}
 
@@ -286,9 +293,9 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudMa
 	}
 
 	log.FromContext(ctx).Info("adopted existing BTP cloud management by external-name", "serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID)
-	c.emit(cr, event.Normal(event.Reason(adoption.EventReasonAdopted),
+	c.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
 		fmt.Sprintf("Adopted existing BTP cloud management %s/%s (semantic key: planID=%s, instance created_at=%s)", siID, sbID, planID, instanceCreatedAt.Format(time.RFC3339))))
-	return adoption.ErrRequeueAfterAdopt
+	return recovery.ErrRequeueAfterRecovery
 }
 
 // emit records a Kubernetes event when a recorder is configured.

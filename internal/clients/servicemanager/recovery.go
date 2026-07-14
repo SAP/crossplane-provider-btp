@@ -28,7 +28,7 @@ import (
 //
 // Every lookup also returns the BTP-reported created_at timestamp of the
 // matched resource, so the caller can enforce an ownership check
-// (adoption.IsOwnedByCR) before actually adopting: only resources whose
+// (recovery.IsOwnedByCR) before actually adopting: only resources whose
 // created_at is at (or after) the CR's own creationTimestamp were plausibly
 // created by our Create() call — anything older is a brownfield resource
 // and must be adopted explicitly via the ADR-documented import flow.

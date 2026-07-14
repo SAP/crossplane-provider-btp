@@ -231,7 +231,7 @@ func TestLookupServiceBinding_Rotation(t *testing.T) {
 
 // TestLookupCreatedAtPropagation makes sure the BTP-reported created_at
 // timestamp flows through each lookup method. This is what the ownership
-// check (adoption.IsOwnedByCR) uses to distinguish our own lost-ID create
+// check (recovery.IsOwnedByCR) uses to distinguish our own lost-ID create
 // from a brownfield resource.
 func TestLookupCreatedAtPropagation(t *testing.T) {
 	sample := time.Date(2026, 7, 15, 10, 30, 0, 0, time.UTC)

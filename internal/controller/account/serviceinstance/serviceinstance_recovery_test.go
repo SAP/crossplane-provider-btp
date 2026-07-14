@@ -18,9 +18,9 @@ import (
 	runtimeobj "k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	tfclient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/recovery"
 )
 
 // recorderFake collects event.Reasons for assertions.
@@ -72,14 +72,22 @@ func mkFactory(lk *lookuperFake) func(context.Context, *v1alpha1.ServiceInstance
 }
 
 // crCreatedAt is the reference K8s creationTimestamp used by test CRs. The
-// lookuperFake defaults its siCreatedAt to 1h AFTER this so ownership checks
-// pass by default; brownfield cases set siCreatedAt to BEFORE this.
-var crCreatedAt = time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)
+// lookuperFake defaults its siCreatedAt to a few seconds AFTER the pending
+// annotation so ownership checks pass by default; brownfield cases push
+// siCreatedAt OUTSIDE the [pending-60s, pending+5min] window.
+var (
+	crCreatedAt     = time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)
+	createPendingAt = crCreatedAt.Add(5 * time.Second)
+)
 
 func siWithConflict(name string) *v1alpha1.ServiceInstance {
 	cr := &v1alpha1.ServiceInstance{}
 	cr.SetName(name)
 	cr.SetCreationTimestamp(metav1.NewTime(crCreatedAt))
+	// Stamp external-create-pending to simulate the runtime having invoked
+	// Create() for this CR. Without it, the heal short-circuits (see
+	// recovery.HasCreateBeenAttempted) and no adoption happens.
+	meta.SetExternalCreatePending(cr, createPendingAt)
 	cr.Generation = 2
 	cr.Spec.ForProvider.Name = name
 	meta.SetExternalName(cr, name) // fallback external-name == metadata.name
@@ -93,12 +101,21 @@ func siWithConflict(name string) *v1alpha1.ServiceInstance {
 	return cr
 }
 
+// siWithConflictNoPending mirrors siWithConflict but leaves off the
+// external-create-pending annotation — no Create() has ever been attempted
+// for this CR. The heal must refuse to adopt anything.
+func siWithConflictNoPending(name string) *v1alpha1.ServiceInstance {
+	cr := siWithConflict(name)
+	delete(cr.GetAnnotations(), "crossplane.io/external-create-pending")
+	return cr
+}
+
 func TestObserve_AdoptionConflictBranch(t *testing.T) {
 	const guid = "80540c06-2955-4bce-9c43-ad78fecc7f62"
 
 	t.Run("match adopts external-name and requeues", func(t *testing.T) {
 		cr := siWithConflict("cls-1")
-		lk := &lookuperFake{siGUID: guid, siCreatedAt: crCreatedAt.Add(time.Hour), siFound: true}
+		lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(2 * time.Second), siFound: true}
 		rec := &recorderFake{}
 		e := external{
 			tfClient: &TfProxyMock{status: tfclient.NotExisting},
@@ -110,7 +127,7 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 			recorder:           rec,
 		}
 		_, err := e.Observe(context.TODO(), cr)
-		if !errors.Is(err, adoption.ErrRequeueAfterAdopt) {
+		if !errors.Is(err, recovery.ErrRequeueAfterRecovery) {
 			t.Fatalf("expected ErrRequeueAfterAdopt, got %v", err)
 		}
 		if meta.GetExternalName(cr) != guid {
@@ -126,18 +143,19 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 			t.Errorf("stale ApplyFailure condition was not cleared")
 		}
 		// a real ID was resolved -> an ExternalNameAdopted event must be logged.
-		if !rec.has(adoption.EventReasonAdopted) {
-			t.Errorf("expected an %q event to be recorded, got %+v", adoption.EventReasonAdopted, rec.events)
+		if !rec.has(recovery.EventReasonRecovered) {
+			t.Errorf("expected an %q event to be recorded, got %+v", recovery.EventReasonRecovered, rec.events)
 		}
 	})
 
-	// Regression: ownership check refuses to adopt a BTP resource that predates
-	// the CR. That is the brownfield case — the user must adopt it explicitly
-	// by setting crossplane.io/external-name (per the external-name ADR).
-	t.Run("brownfield (BTP created before CR): refuses adoption, emits Warning", func(t *testing.T) {
+	// Regression: ownership check refuses to adopt a BTP resource whose
+	// created_at falls outside the window around our recorded Create attempt.
+	// That is the brownfield case — the user must adopt it explicitly by
+	// setting crossplane.io/external-name (per the external-name ADR).
+	t.Run("brownfield (BTP created outside pending window): refuses adoption, emits Warning", func(t *testing.T) {
 		cr := siWithConflict("cls-brown")
-		// BTP instance is 1h OLDER than our CR -> not ours -> refuse.
-		lk := &lookuperFake{siGUID: guid, siCreatedAt: crCreatedAt.Add(-time.Hour), siFound: true}
+		// BTP instance is 1h OLDER than our pending annotation -> outside window -> refuse.
+		lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(-time.Hour), siFound: true}
 		rec := &recorderFake{}
 		e := external{
 			tfClient: &TfProxyMock{status: tfclient.NotExisting},
@@ -151,17 +169,17 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 		_, err := e.Observe(context.TODO(), cr)
 		// The Conflict-branch fall-through still returns the "already exists"
 		// error (adoption declined, so the original error is preserved).
-		if err == nil || errors.Is(err, adoption.ErrRequeueAfterAdopt) {
+		if err == nil || errors.Is(err, recovery.ErrRequeueAfterRecovery) {
 			t.Fatalf("expected the original conflict error (adoption refused), got %v", err)
 		}
 		if meta.GetExternalName(cr) != "cls-brown" {
 			t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
 		}
-		if !rec.has(adoption.EventReasonRefusedBrownfield) {
-			t.Errorf("expected a %q event, got %+v", adoption.EventReasonRefusedBrownfield, rec.events)
+		if !rec.has(recovery.EventReasonRefusedBrownfield) {
+			t.Errorf("expected a %q event, got %+v", recovery.EventReasonRefusedBrownfield, rec.events)
 		}
-		if rec.has(adoption.EventReasonAdopted) {
-			t.Errorf("must not record an %q event when refusing brownfield", adoption.EventReasonAdopted)
+		if rec.has(recovery.EventReasonRecovered) {
+			t.Errorf("must not record an %q event when refusing brownfield", recovery.EventReasonRecovered)
 		}
 	})
 
@@ -174,7 +192,7 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 			newAdminLookuperFn: mkFactory(lk),
 		}
 		obs, err := e.Observe(context.TODO(), cr)
-		if err == nil || errors.Is(err, adoption.ErrRequeueAfterAdopt) {
+		if err == nil || errors.Is(err, recovery.ErrRequeueAfterRecovery) {
 			t.Fatalf("expected the original conflict error, got %v", err)
 		}
 		if obs.ResourceExists {
@@ -196,18 +214,44 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 			recorder:           rec,
 		}
 		_, err := e.Observe(context.TODO(), cr)
-		if err == nil || errors.Is(err, adoption.ErrRequeueAfterAdopt) {
+		if err == nil || errors.Is(err, recovery.ErrRequeueAfterRecovery) {
 			t.Fatalf("expected the original conflict error, got %v", err)
 		}
 		if meta.GetExternalName(cr) != "cls-3" {
 			t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
 		}
 		// a lookup failure logs a Warning, never an adoption.
-		if !rec.has(adoption.EventReasonLookupFailed) {
-			t.Errorf("expected an %q event, got %+v", adoption.EventReasonLookupFailed, rec.events)
+		if !rec.has(recovery.EventReasonLookupFailed) {
+			t.Errorf("expected an %q event, got %+v", recovery.EventReasonLookupFailed, rec.events)
 		}
-		if rec.has(adoption.EventReasonAdopted) {
-			t.Errorf("must not record an %q event on lookup failure", adoption.EventReasonAdopted)
+		if rec.has(recovery.EventReasonRecovered) {
+			t.Errorf("must not record an %q event on lookup failure", recovery.EventReasonRecovered)
+		}
+	})
+
+	// New: no external-create-pending annotation means this controller never
+	// invoked Create() for this CR, so the heal must short-circuit BEFORE
+	// running the expensive semantic lookup. Guards the safety property that
+	// motivated dropping the creationTimestamp fallback.
+	t.Run("no create-pending annotation: short-circuits, does not lookup", func(t *testing.T) {
+		cr := siWithConflictNoPending("cls-nopending")
+		lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(2 * time.Second), siFound: true}
+		e := external{
+			tfClient:           &TfProxyMock{status: tfclient.NotExisting},
+			kube:               &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			newAdminLookuperFn: mkFactory(lk),
+		}
+		_, err := e.Observe(context.TODO(), cr)
+		// The Conflict-branch fall-through still returns the "already exists"
+		// error; but adoption is refused up-front so the lookup must not run.
+		if err == nil || errors.Is(err, recovery.ErrRequeueAfterRecovery) {
+			t.Fatalf("expected the original conflict error (adoption refused), got %v", err)
+		}
+		if meta.GetExternalName(cr) != "cls-nopending" {
+			t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
+		}
+		if lk.calls != 0 {
+			t.Errorf("lookup must not run when Create has never been attempted, got calls=%d", lk.calls)
 		}
 	})
 }
@@ -220,9 +264,10 @@ func TestObserve_AdoptionNotExistingBranch(t *testing.T) {
 	cr := &v1alpha1.ServiceInstance{}
 	cr.SetName("cls-x")
 	cr.SetCreationTimestamp(metav1.NewTime(crCreatedAt))
+	meta.SetExternalCreatePending(cr, createPendingAt)
 	cr.Spec.ForProvider.Name = "cls-x"
 	meta.SetExternalName(cr, "cls-x")
-	lk := &lookuperFake{siGUID: guid, siCreatedAt: crCreatedAt.Add(time.Hour), siFound: true}
+	lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(2 * time.Second), siFound: true}
 	e := external{
 		tfClient: &TfProxyMock{status: tfclient.NotExisting},
 		kube: &test.MockClient{
@@ -232,7 +277,7 @@ func TestObserve_AdoptionNotExistingBranch(t *testing.T) {
 		newAdminLookuperFn: mkFactory(lk),
 	}
 	_, err := e.Observe(context.TODO(), cr)
-	if !errors.Is(err, adoption.ErrRequeueAfterAdopt) {
+	if !errors.Is(err, recovery.ErrRequeueAfterRecovery) {
 		t.Fatalf("expected ErrRequeueAfterAdopt, got %v", err)
 	}
 	if meta.GetExternalName(cr) != guid {
@@ -248,9 +293,10 @@ func TestObserve_AdoptionBrownfieldNotExistingBranch(t *testing.T) {
 	cr := &v1alpha1.ServiceInstance{}
 	cr.SetName("cls-brown-x")
 	cr.SetCreationTimestamp(metav1.NewTime(crCreatedAt))
+	meta.SetExternalCreatePending(cr, createPendingAt)
 	cr.Spec.ForProvider.Name = "cls-brown-x"
 	meta.SetExternalName(cr, "cls-brown-x")
-	lk := &lookuperFake{siGUID: guid, siCreatedAt: crCreatedAt.Add(-time.Hour), siFound: true}
+	lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(-time.Hour), siFound: true}
 	rec := &recorderFake{}
 	e := external{
 		tfClient: &TfProxyMock{status: tfclient.NotExisting},
@@ -271,8 +317,8 @@ func TestObserve_AdoptionBrownfieldNotExistingBranch(t *testing.T) {
 	if meta.GetExternalName(cr) != "cls-brown-x" {
 		t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
 	}
-	if !rec.has(adoption.EventReasonRefusedBrownfield) {
-		t.Errorf("expected a %q event, got %+v", adoption.EventReasonRefusedBrownfield, rec.events)
+	if !rec.has(recovery.EventReasonRefusedBrownfield) {
+		t.Errorf("expected a %q event, got %+v", recovery.EventReasonRefusedBrownfield, rec.events)
 	}
 }
 
