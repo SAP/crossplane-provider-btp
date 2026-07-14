@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -20,6 +22,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -51,6 +54,9 @@ type connector struct {
 	resourcetracker tracking.ReferenceResolverTracker
 
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
+
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 // Connect typically produces an ExternalClient by:
@@ -74,6 +80,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		btp:              *btpclient,
 		tracker:          c.resourcetracker,
 		accountsAccessor: &AccountsClient{btp: *btpclient},
+		recorder:         c.recorder,
 	}, nil
 }
 
@@ -87,6 +94,9 @@ type external struct {
 	tracker tracking.ReferenceResolverTracker
 
 	accountsAccessor AccountsApiAccessor
+
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -103,6 +113,14 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// ADR Step 1: Check if external-name is empty
 	if meta.GetExternalName(desiredCR) == "" {
+		// Orphaned-external-name adoption: an async create may have created the
+		// subaccount in BTP without the GUID ever landing on the CR. Try a
+		// semantic lookup by subdomain (unique within the global account).
+		// Also covers the delete leg: healing here lets the next reconcile's
+		// Delete target the real subaccount instead of orphaning it.
+		if hErr := c.healExternalName(ctx, desiredCR); hErr != nil {
+			return managed.ExternalObservation{}, hErr
+		}
 		// Backwards compatibility: not necessary since previously it was in another format
 		return managed.ExternalObservation{
 			ResourceExists: false,
@@ -152,6 +170,82 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		ResourceUpToDate:  true,
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
+}
+
+// healExternalName performs the orphaned-external-name adoption for a
+// Subaccount. It runs a semantic lookup by subdomain (unique within the global
+// account) and, on a unique match, patches crossplane.io/external-name with the
+// real BTP subaccount GUID.
+//
+// Return contract matches the other controllers: adoption.ErrRequeueAfterAdopt
+// on a successful adoption (forces a requeue so the client operates on the
+// adopted GUID and, on the delete leg, does not strip the finalizer and orphan
+// the BTP subaccount), nil when there is nothing to adopt or the lookup failed,
+// a real error only when persisting the adopted name fails.
+// healExternalName performs the orphaned-external-name adoption for a
+// Subaccount. It runs a semantic lookup by subdomain (unique within the global
+// account) and, on a unique match that ALSO passes the ownership check
+// (adoption.IsOwnedByCR), patches crossplane.io/external-name with the real
+// BTP subaccount GUID.
+//
+// The ownership check is what keeps this a strict bug-fix rather than an
+// import mechanism: the BTP subaccount must have been created at or after the
+// CR's own creationTimestamp. Anything older is a brownfield resource and the
+// user must adopt it explicitly by setting crossplane.io/external-name (per
+// the external-name ADR).
+//
+// Return contract matches the other controllers: adoption.ErrRequeueAfterAdopt
+// on a successful adoption (forces a requeue so the client operates on the
+// adopted GUID and, on the delete leg, does not strip the finalizer and orphan
+// the BTP subaccount), nil when there is nothing to adopt (no match / ownership
+// mismatch / lookup failure), a real error only when persisting the adopted
+// name fails.
+func (c *external) healExternalName(ctx context.Context, cr *apisv1alpha1.Subaccount) error {
+	// Defensive: unit tests exercise `external` directly without wiring up the
+	// accounts accessor. In production Connect() always sets it.
+	if c.accountsAccessor == nil {
+		return nil
+	}
+	subdomain := cr.Spec.ForProvider.Subdomain
+	guid, createdAt, found, err := c.accountsAccessor.SubaccountGuidBySubdomain(ctx, subdomain)
+	if err != nil {
+		ctrl.Log.Info("external-name adoption lookup failed", "subdomain", subdomain, "error", err.Error())
+		c.emit(cr, event.Warning(event.Reason(adoption.EventReasonLookupFailed), err))
+		return nil
+	}
+	if !found {
+		return nil
+	}
+
+	// Ownership check: refuse to adopt subaccounts that predate our CR.
+	if !adoption.IsOwnedByCR(cr.GetCreationTimestamp().Time, createdAt) {
+		ctrl.Log.Info("external-name adoption refused: BTP subaccount predates the CR (brownfield)",
+			"subdomain", subdomain, "guid", guid,
+			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", createdAt)
+		c.emit(cr, event.Warning(
+			event.Reason(adoption.EventReasonRefusedBrownfield),
+			errors.Errorf(
+				"refusing to adopt existing BTP subaccount %s: created_at %s predates the CR's creationTimestamp %s (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				guid, createdAt.Format(time.RFC3339), cr.GetCreationTimestamp().Time.Format(time.RFC3339))))
+		return nil
+	}
+
+	meta.SetExternalName(cr, guid)
+	if uErr := c.Client.Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, errUpdateExternalName)
+	}
+
+	ctrl.Log.Info("adopted existing BTP subaccount by external-name", "guid", guid, "subdomain", subdomain)
+	c.emit(cr, event.Normal(event.Reason(adoption.EventReasonAdopted),
+		fmt.Sprintf("Adopted existing BTP subaccount %s (semantic key: subdomain=%s, created_at=%s)", guid, subdomain, createdAt.Format(time.RFC3339))))
+	return adoption.ErrRequeueAfterAdopt
+}
+
+// emit records a Kubernetes event when a recorder is configured.
+func (c *external) emit(cr resource.Managed, ev event.Event) {
+	if c.recorder != nil {
+		c.recorder.Event(cr, ev)
+	}
 }
 
 func (c *external) generateObservation(

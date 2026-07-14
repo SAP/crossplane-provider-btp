@@ -190,8 +190,8 @@ func TestPlanIDByName(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			smClient := &ServiceManagerClient{
-				OfferingServiceFake{tc.args.listOfferingsMockFn},
-				PlansServiceFake{listPlansMockFn: tc.args.listPlansMockFn},
+				ServiceOfferingsAPI: OfferingServiceFake{tc.args.listOfferingsMockFn},
+				ServicePlansAPI:     PlansServiceFake{listPlansMockFn: tc.args.listPlansMockFn},
 			}
 			planID, err := smClient.PlanIDByName(context.TODO(), "Not relevant, since mocked", "Not relevant, since mocked", tc.args.dataCenter)
 

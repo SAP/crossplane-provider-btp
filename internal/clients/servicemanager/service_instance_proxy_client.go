@@ -89,6 +89,59 @@ func (t ServiceManagerInstanceProxyClient) describeAdminBinding(ctx context.Cont
 	return mapBindingCredentialTypes(response), specifyAccountsAPIError(err)
 }
 
+// SemanticLookuper returns a SemanticLookuper backed by the subaccount's
+// existing service-manager admin binding, used by the orphaned-external-name
+// adoption heal path for the ServiceManager resource. It returns (nil, nil)
+// when no admin binding exists yet (i.e. the service-manager instance has not
+// been created in BTP, so there is nothing to adopt).
+func (t ServiceManagerInstanceProxyClient) SemanticLookuper(ctx context.Context, subaccountGuid string) (SemanticLookuper, error) {
+	binding, err := t.describeAdminBinding(ctx, subaccountGuid)
+	if err != nil {
+		return nil, err
+	}
+	if binding == nil {
+		return nil, nil
+	}
+	return NewServiceManagerClient(ctx, binding)
+}
+
+// EnsureSemanticLookuper returns a SemanticLookuper with full subaccount
+// visibility, backed by the subaccount-admin service-manager binding. Unlike
+// SemanticLookuper it MINTS a temporary admin binding via the accounts-service
+// when none exists yet, and returns a cleanup function that removes that
+// temporary binding again (no-op when an existing binding was reused).
+//
+// This is the credential source the SI/SB/CM adoption heal must use: the
+// per-resource serviceManagerSecret bindings are platform-scoped and do not
+// list instances created via the btp terraform provider, whereas the
+// subaccount-admin binding sees the whole subaccount.
+func (t ServiceManagerInstanceProxyClient) EnsureSemanticLookuper(ctx context.Context, subaccountGuid string) (SemanticLookuper, func(), error) {
+	noop := func() {}
+
+	binding, err := t.describeAdminBinding(ctx, subaccountGuid)
+	if err != nil {
+		return nil, noop, err
+	}
+	cleanup := noop
+	if binding == nil {
+		// mint a temporary admin binding; caller must call cleanup to remove it.
+		binding, err = t.createAdminBinding(ctx, subaccountGuid)
+		if err != nil {
+			return nil, noop, err
+		}
+		cleanup = func() {
+			_ = t.deleteAdminBinding(ctx, subaccountGuid)
+		}
+	}
+
+	cl, err := NewServiceManagerClient(ctx, binding)
+	if err != nil {
+		cleanup()
+		return nil, noop, err
+	}
+	return cl, cleanup, nil
+}
+
 func (t ServiceManagerInstanceProxyClient) createAdminBinding(ctx context.Context, subaccountGuid string) (*BindingCredentials, error) {
 	result, _, err := t.CreateServiceManagementBinding(ctx, subaccountGuid).Execute()
 	if err != nil {

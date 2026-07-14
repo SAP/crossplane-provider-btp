@@ -5,16 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -54,6 +58,12 @@ type connector struct {
 	newPlanIdResolverFn func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error)
 
 	newClientInitalizerFn func() cmclient.ITfClientInitializer
+
+	// newAdminLookuperFn builds a SemanticLookuper backed by the subaccount-admin
+	// SM binding (via the accounts-service), returning a cleanup func.
+	newAdminLookuperFn func(ctx context.Context, cr *apisv1beta1.CloudManagement) (servicemanager.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -100,11 +110,15 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errConnectResources)
 	}
 
-	return &external{
-		kube:     c.kube,
-		tracker:  c.resourcetracker,
-		tfClient: tfClient,
-	}, nil
+	ext := &external{
+		kube:               c.kube,
+		tracker:            c.resourcetracker,
+		tfClient:           tfClient,
+		recorder:           c.recorder,
+		newAdminLookuperFn: c.newAdminLookuperFn,
+	}
+
+	return ext, nil
 }
 
 func (c *connector) ensureCompatibility(ctx context.Context, cr *apisv1beta1.CloudManagement) error {
@@ -166,6 +180,11 @@ type external struct {
 	tracker tracking.ReferenceResolverTracker
 
 	tfClient cmclient.ITfClient
+
+	// newAdminLookuperFn builds the subaccount-admin-backed SemanticLookuper.
+	newAdminLookuperFn func(ctx context.Context, cr *apisv1beta1.CloudManagement) (servicemanager.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -187,7 +206,114 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
 
+	// Orphaned-external-name adoption: BTP has a resource matching this
+	// managed CR, but our external-name is still a fallback (empty or ==
+	// metadata.name) — Observe cannot resolve it and Delete would strip the
+	// finalizer, orphaning the BTP resource. Try a semantic lookup by the
+	// cis/local plan (1-per-subaccount) and adopt on a unique match.
+	//
+	// NOTE: only fires on TRUE fallback. A single-UUID external-name is the
+	// natural output of the operator's phase-1 Create (createInstance) — the
+	// same reconcile loop is expected to run phase-2 (createBinding) next and
+	// upgrade to the compound "<sID>/<bID>" key. Re-firing adoption in that
+	// state used to trap CM in an infinite adoption loop; see adoption.go.
+	if err == nil && !resStatus.ResourceExists &&
+		adoption.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+		if healErr := c.healExternalName(ctx, cr); healErr != nil {
+			return managed.ExternalObservation{}, healErr
+		}
+	}
+
 	return resStatus.ExternalObservation, errors.Wrap(err, errObserve)
+}
+
+// healExternalName performs the orphaned-external-name adoption for a
+// CloudManagement. It runs a semantic lookup by the resolved cis/local plan ID
+// (1-per-subaccount) and, on a unique match, patches crossplane.io/external-name
+// with the "<serviceInstanceID>/<serviceBindingID>" compound key.
+//
+// Return contract matches the ServiceInstance heal: ErrRequeueAfterAdopt on a
+// successful adoption, nil when there is nothing to adopt or the lookup failed,
+// a real error only when persisting fails.
+func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudManagement) error {
+	if c.newAdminLookuperFn == nil {
+		return nil
+	}
+	if cr.Status.AtProvider.DataSourceLookup == nil {
+		return nil
+	}
+	planID := cr.Status.AtProvider.DataSourceLookup.CloudManagementPlanID
+	if planID == "" {
+		return nil
+	}
+
+	lookuper, cleanup, err := c.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		log.FromContext(ctx).Info("external-name adoption: cannot obtain admin lookup client", "error", err.Error())
+		c.emit(cr, event.Warning(event.Reason(adoption.EventReasonLookupFailed), err))
+		return nil
+	}
+	defer cleanup()
+
+	siID, sbID, instanceCreatedAt, found, err := lookuper.LookupInstanceAndBinding(ctx, planID, cmInstanceName(cr), cmBindingName(cr))
+	if err != nil {
+		log.FromContext(ctx).Info("external-name adoption lookup failed", "planID", planID, "error", err.Error())
+		c.emit(cr, event.Warning(event.Reason(adoption.EventReasonLookupFailed), err))
+		return nil
+	}
+	if !found {
+		return nil
+	}
+
+	// Ownership check: refuse to adopt cloud-management pair that predates our
+	// CR (brownfield). Uses the instance's created_at because phase-1 creates
+	// the instance first — if it's older than us, we couldn't have created it.
+	if !adoption.IsOwnedByCR(cr.GetCreationTimestamp().Time, instanceCreatedAt) {
+		log.FromContext(ctx).Info("external-name adoption refused: BTP cloud management predates the CR (brownfield)",
+			"serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID,
+			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", instanceCreatedAt)
+		c.emit(cr, event.Warning(
+			event.Reason(adoption.EventReasonRefusedBrownfield),
+			errors.Errorf(
+				"refusing to adopt existing BTP cloud management %s/%s: instance created_at %s predates the CR's creationTimestamp %s (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				siID, sbID, instanceCreatedAt.Format(time.RFC3339), cr.GetCreationTimestamp().Time.Format(time.RFC3339))))
+		return nil
+	}
+
+	meta.SetExternalName(cr, formExternalName(siID, sbID))
+	if uErr := c.kube.Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, "cannot persist adopted external-name")
+	}
+
+	log.FromContext(ctx).Info("adopted existing BTP cloud management by external-name", "serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID)
+	c.emit(cr, event.Normal(event.Reason(adoption.EventReasonAdopted),
+		fmt.Sprintf("Adopted existing BTP cloud management %s/%s (semantic key: planID=%s, instance created_at=%s)", siID, sbID, planID, instanceCreatedAt.Format(time.RFC3339))))
+	return adoption.ErrRequeueAfterAdopt
+}
+
+// emit records a Kubernetes event when a recorder is configured.
+func (c *external) emit(cr resource.Managed, ev event.Event) {
+	if c.recorder != nil {
+		c.recorder.Event(cr, ev)
+	}
+}
+
+// cmInstanceName returns the managed cloud-management instance name used to
+// disambiguate the cis/local plan.
+func cmInstanceName(cr *apisv1beta1.CloudManagement) string {
+	if cr.Spec.ForProvider.ServiceInstanceName != "" {
+		return cr.Spec.ForProvider.ServiceInstanceName
+	}
+	return apisv1beta1.DefaultCloudManagementInstanceName
+}
+
+// cmBindingName returns the managed cloud-management binding name so a transient
+// admin binding is never adopted.
+func cmBindingName(cr *apisv1beta1.CloudManagement) string {
+	if cr.Spec.ForProvider.ServiceBindingName != "" {
+		return cr.Spec.ForProvider.ServiceBindingName
+	}
+	return apisv1beta1.DefaultCloudManagementBindingName
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {

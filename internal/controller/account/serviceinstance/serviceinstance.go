@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -13,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -23,11 +25,14 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
+	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/di"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -92,6 +97,15 @@ type connector struct {
 	clientConnector             tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance]
 	newServicePlanInitializerFn func() Initializer
 	resourcetracker             tracking.ReferenceResolverTracker
+
+	// newAdminLookuperFn builds a SemanticLookuper backed by the subaccount-admin
+	// SM binding (via the accounts-service), returning a cleanup func. The
+	// per-resource serviceManagerSecret bindings are platform-scoped and do NOT
+	// list instances created via the btp terraform provider, so adoption must
+	// use the subaccount-admin binding.
+	newAdminLookuperFn func(ctx context.Context, cr *v1alpha1.ServiceInstance) (smClient.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -118,13 +132,21 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errConnectClient)
 	}
 
-	return &external{tfClient: client, kube: c.kube, tracker: c.resourcetracker}, nil
+	ext := &external{tfClient: client, kube: c.kube, tracker: c.resourcetracker, recorder: c.recorder,
+		newAdminLookuperFn: c.newAdminLookuperFn}
+
+	return ext, nil
 }
 
 type external struct {
 	tfClient tfClient.TfProxyControllerI
 	kube     client.Client
 	tracker  tracking.ReferenceResolverTracker
+
+	// newAdminLookuperFn builds the subaccount-admin-backed SemanticLookuper.
+	newAdminLookuperFn func(ctx context.Context, cr *v1alpha1.ServiceInstance) (smClient.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -145,6 +167,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if lastAsyncOp.Status == corev1.ConditionFalse &&
 		strings.Contains(lastAsyncOp.Message, "Conflict") &&
 		lastAsyncOp.ObservedGeneration == cr.Generation {
+		// Orphaned-external-name adoption: a Conflict with a fallback external-name
+		// means BTP already has this instance but we never linked it. Try to adopt
+		// it instead of erroring out (which used to require manual intervention).
+		if adoption.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+			if healErr := e.healExternalName(ctx, cr); healErr != nil {
+				return managed.ExternalObservation{}, healErr
+			}
+		}
 		return managed.ExternalObservation{ResourceExists: false},
 			errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
 	}
@@ -173,6 +203,16 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	switch status {
 	case tfClient.NotExisting:
+		// Orphaned-external-name adoption: the TF layer reports the resource as
+		// non-existent, but with a fallback external-name that may simply mean we
+		// never linked an instance BTP actually created. Try a semantic lookup.
+		// This also covers the delete leg: healing here lets the next reconcile's
+		// Delete() target the real BTP resource instead of orphaning it.
+		if adoption.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+			if healErr := e.healExternalName(ctx, cr); healErr != nil {
+				return managed.ExternalObservation{}, healErr
+			}
+		}
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	case tfClient.Drift:
 		// ADR(external-name): Calculate and report diff between desired state and what was observed from the API
@@ -275,6 +315,92 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteInstance)
 	}
 	return managed.ExternalDelete{}, nil
+}
+
+// healExternalName performs the orphaned-external-name adoption for a
+// ServiceInstance. It runs a semantic lookup (by name, within the SM binding's
+// subaccount) and, on a unique match, patches crossplane.io/external-name with
+// the real BTP GUID and clears the stale async-failure conditions.
+//
+// Return contract:
+//   - adoption.ErrRequeueAfterAdopt when a resource was adopted (caller must
+//     surface it so Crossplane requeues and rebuilds the client against the
+//     adopted name; see the doc on ErrRequeueAfterAdopt for why an error is the
+//     only safe signal on the delete leg).
+//   - nil when there is nothing to adopt (no match) or the lookup call itself
+//     failed (best-effort: a Warning event is emitted and the caller falls
+//     through to its pre-heal result, retrying on the next reconcile).
+//   - a real error only when persisting the adopted name fails.
+func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
+	if e.newAdminLookuperFn == nil {
+		return nil
+	}
+	lookuper, cleanup, err := e.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		log.FromContext(ctx).Info("external-name adoption: cannot obtain admin lookup client", "error", err.Error())
+		e.emit(cr, event.Warning(event.Reason(adoption.EventReasonLookupFailed), err))
+		return nil
+	}
+	defer cleanup()
+
+	name := cr.Spec.ForProvider.Name
+	guid, createdAt, found, err := lookuper.LookupServiceInstance(ctx, name)
+	if err != nil {
+		log.FromContext(ctx).Info("external-name adoption lookup failed", "name", name, "error", err.Error())
+		e.emit(cr, event.Warning(event.Reason(adoption.EventReasonLookupFailed), err))
+		return nil
+	}
+	if !found {
+		return nil
+	}
+
+	// Ownership check: refuse to adopt BTP resources that predate our CR.
+	// See adoption.IsOwnedByCR for the invariant.
+	if !adoption.IsOwnedByCR(cr.GetCreationTimestamp().Time, createdAt) {
+		log.FromContext(ctx).Info("external-name adoption refused: BTP service instance predates the CR (brownfield)",
+			"name", name, "guid", guid,
+			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", createdAt)
+		e.emit(cr, event.Warning(
+			event.Reason(adoption.EventReasonRefusedBrownfield),
+			errors.Errorf(
+				"refusing to adopt existing BTP service instance %s: created_at %s predates the CR's creationTimestamp %s (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				guid, createdAt.Format(time.RFC3339), cr.GetCreationTimestamp().Time.Format(time.RFC3339))))
+		return nil
+	}
+
+	meta.SetExternalName(cr, guid)
+	if uErr := e.kube.Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, "cannot persist adopted external-name")
+	}
+	clearAsyncFailureConditions(cr)
+	if uErr := e.kube.Status().Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, "cannot clear async-failure conditions after adoption")
+	}
+
+	log.FromContext(ctx).Info("adopted existing BTP service instance by external-name", "guid", guid, "name", name)
+	e.emit(cr, event.Normal(event.Reason(adoption.EventReasonAdopted),
+		fmt.Sprintf("Adopted existing BTP service instance %s (semantic key: name=%s, created_at=%s)", guid, name, createdAt.Format(time.RFC3339))))
+	return adoption.ErrRequeueAfterAdopt
+}
+
+// emit records a Kubernetes event when a recorder is configured.
+func (e *external) emit(cr resource.Managed, ev event.Event) {
+	if e.recorder != nil {
+		e.recorder.Event(cr, ev)
+	}
+}
+
+// clearAsyncFailureConditions resets the stale LastAsyncOperation failure so a
+// subsequent reconcile is not tricked back into the Conflict branch after the
+// external-name has been adopted.
+func clearAsyncFailureConditions(cr *v1alpha1.ServiceInstance) {
+	cr.SetConditions(xpv1.Condition{
+		Type:               xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+		Status:             corev1.ConditionUnknown,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "AdoptedExternalName",
+		ObservedGeneration: cr.Generation,
+	})
 }
 
 func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceInstance, sid tfClient.ObservationData) error {

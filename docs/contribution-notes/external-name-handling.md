@@ -56,6 +56,97 @@ Upjet resources are an exception as we dont control how the external-name is def
 
 In general, all exceptions should be noted in the appropriate location: for user in the docs and for developer in the appropriate code location (Observe/Create/Update/Delete functions or API definition).
 
+### Orphaned external-name adoption (always-on bug-fix)
+
+The four hand-written wrapper resources — `ServiceInstance`, `ServiceBinding`,
+`ServiceManager`, `CloudManagement` — plus `Subaccount` implement the ADR's
+"backwards compatibility" branch of Observe() (see the implementation
+guideline below) as an **always-on** heal path scoped to the provider's own
+lost-ID create attempts. It does NOT provide an import mechanism: brownfield
+resources are refused (see "Ownership check" below) and the user must
+continue to adopt them explicitly by setting `crossplane.io/external-name`.
+
+**Motivation.** Under certain async-create failure modes (pod restart mid
+create; two reconcilers racing a create; a ServiceManager torn down and
+recreated while its instances persist in BTP) a CR can end up with only a
+fallback external-name (empty, or equal to `metadata.name`) even though BTP
+successfully created the resource. The CR is then orphaned: Observe/Update
+can never resolve it, and — critically — Delete tries to delete a
+non-existent ID, gets a 404, treats it as "already gone", strips the
+finalizer and leaves the BTP resource orphaned.
+
+**Behaviour.** During `Observe()`, if the underlying client reports the
+resource as non-existent (or, for ServiceInstance, a same-generation
+`Conflict` from a failed Create) AND the external-name is a fallback
+(`""` or `metadata.name`), the controller performs a semantic lookup against
+the BTP APIs:
+
+| Resource | Semantic key (subaccount enforced by credential scope) | Credentials |
+|----------|--------------------------------------------------------|-------------|
+| Subaccount | `subdomain` (unique within global account) | provider config (accounts-service) |
+| ServiceInstance | `name` | `spec.forProvider.serviceManagerSecret` |
+| ServiceBinding | `(serviceInstanceID, name)` | parent ServiceInstance's `serviceManagerSecret` |
+| ServiceManager | `servicePlanID` (subaccount-admin plan) → `sID/bID` | subaccount admin binding via accounts-service |
+| CloudManagement | `servicePlanID` (cis/local plan) → `sID/bID` | subaccount admin binding via accounts-service |
+
+**Ownership check (what keeps this a bug-fix, not an import).** A semantic
+match alone is not enough. The lookup also returns the BTP-reported
+`created_at` of the matched resource, and the controller adopts only when
+`btpCreatedAt >= crCreatedAt - 60s` (60s tolerates NTP drift between the
+K8s API server and BTP; see `adoption.IsOwnedByCR`).
+
+Since the CR always exists before the provider calls `Create()`, any resource
+that WE created must be born at or after our CR's `metadata.creationTimestamp`.
+Anything meaningfully older cannot be ours — it is a brownfield resource, and
+the controller emits `Warning:AdoptionRefusedBrownfield` and leaves the
+external-name unchanged. The user must fall back to the documented import
+flow (management policy `Observe` first, set external-name explicitly, then
+switch to full control).
+
+Users who follow the documented import flow never touch this feature at all:
+under `managementPolicies: [Observe]`, the reconciler never attempts a Create,
+so `Conflict` never fires and the fallback-external-name branch is only
+entered on genuine failure modes.
+
+**Adopt path.** On a unique match that passes the ownership check, the
+controller patches `crossplane.io/external-name` (a GUID, or a `sID/bID`
+compound key), clears any stale async-failure condition, emits a
+`Normal:ExternalNameAdopted` event, and returns
+`adoption.ErrRequeueAfterAdopt` to force a requeue. The error is required
+because all four SM-backed resources capture the external-name at
+`Connect()` time — a same-cycle Update/Delete would still act on the stale
+name. Returning an error (rather than `ResourceExists:false`) also prevents
+the delete-leg finalizer from being stripped, so the requeue can rebuild the
+client and Delete the real resource. On the next reconcile the client is
+built from the adopted name and Observe returns the real state.
+
+**Trigger is strictly the fallback external-name.** Adoption is only invoked
+when the external-name is empty or equal to `metadata.name` — the two values
+Crossplane's default initializer can produce. In particular, a non-compound
+single-UUID external-name is NOT treated as adoption-eligible: SM/CM use a
+two-phase `Create()` (createInstance sets the external-name to a single UUID
+before createBinding runs) and re-firing adoption on that intermediate state
+would deadlock phase-2 forever.
+
+**Safety.**
+- Ownership check refuses brownfield resources (see above); the audit-trail
+  event `Warning:AdoptionRefusedBrownfield` records every refusal.
+- Only fallback external-names are healed — a user-typed non-UUID
+  external-name still returns the "not a valid UUID" error (user intent is
+  respected).
+- `>1` semantic match refuses to adopt (a `Warning:AdoptionAmbiguous`
+  event is emitted) rather than guessing.
+- Lookup call failures are best-effort: a `Warning:AdoptionLookupFailed`
+  event is emitted and Observe falls through to its pre-heal result,
+  retrying next reconcile.
+- Compatibility: with the ownership check, this cannot silently adopt any
+  existing resource; the effect on a healthy system is exactly nothing.
+
+Implementation: `internal/adoption` (shared helpers, sentinel error, and the
+`IsOwnedByCR` ownership check), `internal/clients/servicemanager/adoption.go`
+(`SemanticLookuper` — returns `created_at` alongside the ID), and the
+`healExternalName` method on each controller's `external` type.
+
 ### Implementation guideline
 
 #### Observe()
