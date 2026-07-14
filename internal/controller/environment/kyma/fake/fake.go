@@ -4,10 +4,9 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	environments "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
-
-	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 )
 
 var _ environments.Client = &MockClient{}

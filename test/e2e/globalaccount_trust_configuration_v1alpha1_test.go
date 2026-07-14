@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
+	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -21,7 +23,7 @@ func Test_TrustConfiguration_v1alpha1(t *testing.T) {
 
 	resource := resources.ResourceTestConfig{
 		Kind:              "GlobalaccountTrustConfiguration",
-		ResourceDirectory: "testdata/crs/GlobalaccountTrustConfiguration",
+		ResourceDirectory: crsPath("GlobalaccountTrustConfiguration"),
 	}
 
 	fB := features.New(resource.Kind)
@@ -51,4 +53,31 @@ func Test_TrustConfiguration_v1alpha1(t *testing.T) {
 	fB.Teardown(resource.Teardown)
 
 	testenv.Test(t, fB.Feature())
+}
+
+// TestGlobalaccountTrustConfigurationImportFlow tests the import flow for GlobalaccountTrustConfiguration.
+// ADR(external-name): uses the origin key (e.g. "sap.custom") as identifier; the global
+// account scope comes from the provider credentials, so no compound key is needed.
+func TestGlobalaccountTrustConfigurationImportFlow(t *testing.T) {
+	const importK8sResName = "ga-trust-config-import-test"
+
+	idpURL := envvar.GetOrPanic(IDP_URL_ENV_KEY)
+
+	importTester := NewImportTester(
+		&v1alpha1.GlobalaccountTrustConfiguration{
+			Spec: v1alpha1.GlobalaccountTrustConfigurationSpec{
+				ForProvider: v1alpha1.GlobalaccountTrustConfigurationParameters{
+					IdentityProvider: &idpURL,
+				},
+			},
+		},
+		importK8sResName,
+		WithWaitCreateTimeout[*v1alpha1.GlobalaccountTrustConfiguration](wait.WithTimeout(5*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.GlobalaccountTrustConfiguration](wait.WithTimeout(3*time.Minute)),
+	)
+
+	testenv.Test(
+		t,
+		importTester.BuildTestFeature("GlobalaccountTrustConfiguration Import Flow").Feature(),
+	)
 }

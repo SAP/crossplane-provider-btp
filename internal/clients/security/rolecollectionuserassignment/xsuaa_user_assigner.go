@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/sap/crossplane-provider-btp/internal/clients/security"
 	xsuaa "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-xsuaa-service-api-go/pkg"
 	"golang.org/x/oauth2/clientcredentials"
 )
@@ -43,7 +44,7 @@ func (x *XsusaaUserRoleAssigner) HasRole(ctx context.Context, origin, username, 
 		if h != nil && h.StatusCode == http.StatusNotFound {
 			return false, nil
 		}
-		return false, err
+		return false, security.SpecifyAPIError(err)
 	}
 	return containsRole(user, roleCollection), nil
 }
@@ -52,13 +53,13 @@ func (x *XsusaaUserRoleAssigner) HasRole(ctx context.Context, origin, username, 
 func (x *XsusaaUserRoleAssigner) AssignRole(ctx context.Context, origin, username, rolecollection string) error {
 	// Add the role collection to the user
 	_, _, err := x.userApi.AddRoleCollection(ctx, origin, username, rolecollection).CreateUserIfMissing(true).Execute()
-	return err
+	return security.SpecifyAPIError(err)
 }
 
 // RevokeRole removes a specified role from a user within XSUAA.
 func (x *XsusaaUserRoleAssigner) RevokeRole(ctx context.Context, origin, username, rolecollection string) error {
 	_, _, err := x.userApi.RemoveRoleCollection(ctx, origin, username, rolecollection).Execute()
-	return err
+	return security.SpecifyAPIError(err)
 }
 
 // containsRole checks if the user's role collections contain the specified role.

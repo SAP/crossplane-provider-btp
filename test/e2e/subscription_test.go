@@ -31,7 +31,7 @@ func TestSubscriptionCRUDFlow(t *testing.T) {
 	crudFeatureSuite := features.New("Subscription Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/subscription/create_flow")
+				resources.ImportResources(ctx, t, cfg, crsPath("subscription/create_flow"))
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = meta_api.AddToScheme(r.GetScheme())
 
@@ -122,7 +122,7 @@ func TestSubscriptionImport(t *testing.T) {
 	importTester := NewImportTester(
 		baseSubscription,
 		"sub-import-test",
-		WithDependentResourceDirectory[*v1alpha1.Subscription]("testdata/crs/subscription/import/environment"),
+		WithDependentResourceDirectory[*v1alpha1.Subscription](crsPath("subscription/import/environment")),
 		WithWaitCreateTimeout[*v1alpha1.Subscription](wait.WithTimeout(10*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.Subscription](wait.WithTimeout(7*time.Minute)),
 		WithWaitDependentResourceTimeout[*v1alpha1.Subscription](wait.WithTimeout(15*time.Minute)),

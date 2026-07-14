@@ -50,6 +50,7 @@ func TestPlanIDByName(t *testing.T) {
 	type args struct {
 		listOfferingsMockFn func() (*servicemanager.ServiceOfferingResponseList, *http.Response, error)
 		listPlansMockFn     func() (*servicemanager.ServicePlanResponseList, *http.Response, error)
+		dataCenter          string
 	}
 	tests := []struct {
 		name string
@@ -145,6 +146,46 @@ func TestPlanIDByName(t *testing.T) {
 			wantErr: false,
 			wantID:  "somePlanID",
 		},
+		{
+			name: "offeringNotFoundWithDataCenter",
+			args: args{
+				dataCenter: "cf-eu10",
+				listOfferingsMockFn: func() (*servicemanager.ServiceOfferingResponseList, *http.Response, error) {
+					return &servicemanager.ServiceOfferingResponseList{
+						Items: []servicemanager.ServiceOfferingResponseObject{},
+					}, nil, nil
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "successWithDataCenter",
+			args: args{
+				dataCenter: "cf-eu10",
+				listOfferingsMockFn: func() (*servicemanager.ServiceOfferingResponseList, *http.Response, error) {
+					return &servicemanager.ServiceOfferingResponseList{
+						Items: []servicemanager.ServiceOfferingResponseObject{
+							{
+								Name: internal.Ptr("hana-cloud"),
+								Id:   internal.Ptr("hana-offering-id-eu10"),
+							},
+						},
+					}, nil, nil
+				},
+				listPlansMockFn: func() (*servicemanager.ServicePlanResponseList, *http.Response, error) {
+					return &servicemanager.ServicePlanResponseList{
+						Items: []servicemanager.ServicePlanResponseObject{
+							{
+								Name: internal.Ptr("hana"),
+								Id:   internal.Ptr("hana-plan-id-eu10"),
+							},
+						},
+					}, nil, nil
+				},
+			},
+			wantErr: false,
+			wantID:  "hana-plan-id-eu10",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -152,7 +193,7 @@ func TestPlanIDByName(t *testing.T) {
 				OfferingServiceFake{tc.args.listOfferingsMockFn},
 				PlansServiceFake{listPlansMockFn: tc.args.listPlansMockFn},
 			}
-			planID, err := smClient.PlanIDByName(context.TODO(), "Not relevant, since mocked", "Not relevant, since mocked")
+			planID, err := smClient.PlanIDByName(context.TODO(), "Not relevant, since mocked", "Not relevant, since mocked", tc.args.dataCenter)
 
 			if tc.wantErr != (err != nil) {
 				t.Errorf("Unexpected error return; Expected error: %v, Returned: %v", tc.wantErr, err)

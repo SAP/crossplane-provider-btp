@@ -27,7 +27,7 @@ const (
 func Test_SubaccountTrustConfiguration_v1alpha1(t *testing.T) {
 	resource := resources.ResourceTestConfig{
 		Kind:              "SubaccountTrustConfiguration",
-		ResourceDirectory: "testdata/crs/SubaccountTrustConfiguration",
+		ResourceDirectory: crsPath("SubaccountTrustConfiguration"),
 	}
 
 	fB := features.New(resource.Kind)
@@ -78,7 +78,7 @@ func TestSubaccountTrustConfigurationImportFlow(t *testing.T) {
 		importK8sResName,
 		WithWaitCreateTimeout[*v1alpha1.SubaccountTrustConfiguration](wait.WithTimeout(5*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.SubaccountTrustConfiguration](wait.WithTimeout(3*time.Minute)),
-		WithDependentResourceDirectory[*v1alpha1.SubaccountTrustConfiguration]("./testdata/crs/SubaccountTrustConfigurationImport"),
+		WithDependentResourceDirectory[*v1alpha1.SubaccountTrustConfiguration](crsPath("SubaccountTrustConfigurationImport")),
 		WithWaitDependentResourceTimeout[*v1alpha1.SubaccountTrustConfiguration](wait.WithTimeout(15*time.Minute)),
 	)
 

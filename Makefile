@@ -4,20 +4,30 @@ PROJECT_NAME := crossplane-provider-btp
 PROJECT_REPO := github.com/sap/$(PROJECT_NAME)
 
 # Terraform Related variables
-export TERRAFORM_VERSION ?= 1.3.9
+# OpenTofu (MPL-2.0) is used as the `terraform` CLI to avoid the BSL of
+# Terraform CLI ≥ 1.6. We install the `tofu` binary under the name `terraform`
+# everywhere upjet expects it — upjet's executor hardcodes the binary name
+# "terraform" (workspace.go:413). OpenTofu is a drop-in replacement at the
+# CLI level. Required for the identity-injector workaround (#521): identity
+# forwarding to the provider lands in CLI 1.12+; OpenTofu 1.12+ has it too.
+export TERRAFORM_VERSION ?= 1.12.3
 
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
-export TERRAFORM_PROVIDER_VERSION ?= 1.15.1
+export TERRAFORM_PROVIDER_VERSION ?= 1.23.1
 export TERRAFORM_PROVIDER_DOWNLOAD_NAME ?= terraform-provider-btp
 export TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX ?= https://releases.hashicorp.com/$(TERRAFORM_PROVIDER_DOWNLOAD_NAME)/$(TERRAFORM_PROVIDER_VERSION)
-export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.15.1_x5
+export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.23.1_x5
 export TERRAFORM_DOCS_PATH ?= docs/resources
 
 # set BUILD_ID if its not running in an action
 BUILD_ID ?= $(shell date +"%H%M%S")
 
 export TEST_CRS_PATH ?= test/e2e/testdata/crs
+export TEST_CRS_GENERATED_PATH ?= $(abspath .work/rendered-crs/e2e)
+
+export UPGRADE_TEST_CRS_PATH ?= test/upgrade/testdata
+export UPGRADE_TEST_CRS_GENERATED_PATH ?= $(abspath .work/rendered-crs/upgrade)
 
 PLATFORMS ?= linux_amd64
 #get version from current git release tag
@@ -144,13 +154,13 @@ $(TERRAFORM_PROVIDER_SCHEMA): $(TERRAFORM)
 	@$(OK) generating provider schema for $(TERRAFORM_PROVIDER_SOURCE) $(TERRAFORM_PROVIDER_VERSION)
 
 $(TERRAFORM):
-	@$(INFO) installing terraform $(HOSTOS)-$(HOSTARCH)
+	@$(INFO) installing opentofu $(TERRAFORM_VERSION) as terraform $(HOSTOS)-$(HOSTARCH)
 	@mkdir -p $(TOOLS_HOST_DIR)/tmp-terraform
-	@curl -fsSL https://releases.hashicorp.com/terraform/$(TERRAFORM_VERSION)/terraform_$(TERRAFORM_VERSION)_$(SAFEHOST_PLATFORM).zip -o $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip
+	@curl -fsSL https://github.com/opentofu/opentofu/releases/download/v$(TERRAFORM_VERSION)/tofu_$(TERRAFORM_VERSION)_$(SAFEHOST_PLATFORM).zip -o $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip
 	@unzip $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip -d $(TOOLS_HOST_DIR)/tmp-terraform
-	@mv $(TOOLS_HOST_DIR)/tmp-terraform/terraform $(TERRAFORM)
+	@mv $(TOOLS_HOST_DIR)/tmp-terraform/tofu $(TERRAFORM)
 	@rm -fr $(TOOLS_HOST_DIR)/tmp-terraform
-	@$(OK) installing terraform $(HOSTOS)-$(HOSTARCH)
+	@$(OK) installing opentofu $(TERRAFORM_VERSION) as terraform $(HOSTOS)-$(HOSTARCH)
 pull-docs:
 	@$(INFO) pull-docs called
 	@if [ ! -d "$(WORK_DIR)/$(TERRAFORM_PROVIDER_SOURCE)" ]; then \
@@ -165,7 +175,13 @@ clean-work:
 	@$(INFO) cleaning work directory
 	@rm -rf .work
 
-generate.init: clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
+.PHONY: install-tools
+install-tools:
+	@$(INFO) installing Go tools from go.mod
+	@$(GO) install tool
+	@$(OK) installing Go tools from go.mod
+
+generate.init: install-tools clean-work $(TERRAFORM_PROVIDER_SCHEMA) pull-docs
 
 .PHONY: $(TERRAFORM_PROVIDER_SCHEMA) pull-docs terraform.buildvars
 
@@ -279,7 +295,7 @@ e2e.run: test-acceptance
 #run single test-e2e-long test with <make e2e testFilter=functionNameOfTest>
 test-e2e-long: local-build $(KIND) $(HELM3) generate-test-crs
 	@$(INFO) running integration tests
-	go test -v $(PROJECT_REPO)/test/... -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 240m 2>&1 | tee test-output.log
+	go test -v $(PROJECT_REPO)/test/e2e -tags=e2e_long -count=1 -test.v -run '^$(testFilter)$$' -timeout 150m 2>&1 | tee test-output.log
 	@$(OK) integration tests passed
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
@@ -297,7 +313,7 @@ ACCEPTANCE_DEPLOY ?= local-build
 test-acceptance: $(ACCEPTANCE_DEPLOY) $(KIND) generate-test-crs
 	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
-	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -short -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
+	go test -v  $(PROJECT_REPO)/test/e2e -tags=e2e -count=1 -test.v -run '^$(testFilter)$$' -timeout 120m 2>&1 | tee test-output.log
 	@echo "===========Test Summary==========="
 	@grep -E "PASS|FAIL" test-output.log
 	@case `tail -n 1 test-output.log` in \
@@ -310,17 +326,25 @@ test-acceptance-debug: local-build $(KIND) $(HELM3) generate-test-crs
 	@$(INFO) running end-to-end tests
 	@$(INFO) Skipping long running tests
 	go test -gcflags="all=-N -l" -c -v  $(PROJECT_REPO)/test/e2e/ -tags=e2e -o ./test/e2e/test-acceptance-debug.test -timeout 30m
-	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.short -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
+	dlv exec ./test/e2e/test-acceptance-debug.test --wd ./test/e2e/ --headless --listen=:2345 --log --api-version=2 --accept-multiclient -- -test.count=1 -test.v -test.run '^$(testFilter)$$'; EXIT_CODE=$$?; rm ./test/e2e/test-acceptance-debug.test; exit $$EXIT_CODE
 	@$(OK) end-to-end tests passed
 
 .PHONY: generate-test-crs
 generate-test-crs:
-	@$(INFO) Generating CRS in $(TEST_CRS_PATH)
-	@find $(TEST_CRS_PATH) -type f -name "*.yaml" -exec sh -c '\
-    	for template; do \
-    		envsubst < "$$template" > "$${template}.tmp" && mv "$${template}.tmp" "$$template"; \
-    	done' sh {} +
-	@$(OK) CRS generated
+	@$(INFO) Rendering CRS templates from $(TEST_CRS_PATH) into $(TEST_CRS_GENERATED_PATH)
+	@if [ "$(abspath $(TEST_CRS_PATH))" = "$(abspath $(TEST_CRS_GENERATED_PATH))" ]; then \
+		echo "❌ TEST_CRS_PATH and TEST_CRS_GENERATED_PATH must differ; both point at $(TEST_CRS_PATH)"; \
+		exit 1; \
+	fi
+	@rm -rf "$(TEST_CRS_GENERATED_PATH)"
+	@mkdir -p "$(TEST_CRS_GENERATED_PATH)"
+	@cp -R "$(TEST_CRS_PATH)/." "$(TEST_CRS_GENERATED_PATH)/"
+	@# envsubst with an explicit allowlist — any other $VAR-shaped string in the
+	@# YAML (e.g. unrelated provider-config references) is preserved verbatim.
+	@for template in $$(find "$(TEST_CRS_GENERATED_PATH)" -type f -name "*.yaml"); do \
+		envsubst '$$BUILD_ID $$IDP_URL $$SECOND_DIRECTORY_ADMIN_EMAIL $$TECHNICAL_USER_EMAIL $$SERVICE_BROKER_URL $$SERVICE_BROKER_USERNAME' < $$template > $$template.tmp && mv $$template.tmp $$template; \
+	done
+	@$(OK) CRS rendered
 
 
 
@@ -339,7 +363,10 @@ docs.generate-external-name:
 UPGRADE_TEST_CRS_TAG ?= $(UPGRADE_TEST_FROM_TAG)
 
 .PHONY: generate-upgrade-test-crs
-generate-upgrade-test-crs: TEST_CRS_PATH := test/upgrade/testdata # Should also generate for custom CRs
+# Renders the upgrade-test fixtures from UPGRADE_TEST_CRS_PATH into
+# UPGRADE_TEST_CRS_GENERATED_PATH. Templates stay untouched on disk.
+generate-upgrade-test-crs: TEST_CRS_PATH := $(UPGRADE_TEST_CRS_PATH)
+generate-upgrade-test-crs: TEST_CRS_GENERATED_PATH := $(UPGRADE_TEST_CRS_GENERATED_PATH)
 generate-upgrade-test-crs: generate-test-crs
 
 .PHONY: check-upgrade-test-vars
@@ -402,6 +429,8 @@ upgrade-test-debug: $(KIND) check-upgrade-test-vars build-upgrade-test-images pu
 	 esac
 
 .PHONY: upgrade-test-restore-crs
+# Restores `test/upgrade/testdata/baseCRs` to HEAD. This undoes the working-tree
+# overwrite that `pull-upgrade-test-version-crs` performs.
 upgrade-test-restore-crs:
 	@$(INFO) Restoring test/upgrade/testdata/baseCRs
 	@git restore test/upgrade/testdata/baseCRs

@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: kymamodules.environment.btp.sap.crossplane.io
 spec:
   group: environment.btp.sap.crossplane.io
@@ -37,8 +37,15 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A KymaModule is an object to manage the configuration for a specific
-          Module in the Kyma cluster.
+        description: |-
+          A KymaModule is an object to manage the configuration for a specific Module in the Kyma cluster.
+
+          External-Name Configuration:
+            - Follows Standard: yes
+            - Format: Kyma module name (e.g. "keda", "serverless")
+            - How to find:
+            - UI: Kyma Dashboard → Modules → [Module Name]
+            - CLI: `kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'`
         properties:
           apiVersion:
             description: |-
@@ -95,6 +102,8 @@ spec:
                 - name
                 type: object
               kymaEnvironmentBindingId:
+                description: 'Deprecated: This id is not required anymore, will be
+                  ignored'
                 type: string
               kymaEnvironmentBindingRef:
                 description: A Reference to a named object.
