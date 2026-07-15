@@ -33,7 +33,7 @@ on:
 jobs:
   upgrade-test:
     runs-on: ubuntu-latest
-    environment: pr-e2e-approval
+    environment: pr-e2e-no-approval # TODO: TEMPORARY for branch validation — REVERT to pr-e2e-approval before merge
     env:
       # hardcoded BTP CLI version
       btp_cli_version: 2.90.2
