@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 // KymaEnvironmentBindingParameters are the configurable fields of a KymaEnvironmentBinding.
@@ -81,6 +81,12 @@ type KymaEnvironmentBindingStatus struct {
 // +kubebuilder:object:root=true
 
 // A KymaEnvironmentBinding is an API to retrieve a binding for a specific Kyma Instance.
+//
+// External-Name Configuration:
+//   - Follows Standard: no - This resource does not support external-name based importing.
+//     Instead of importing, create a new KymaEnvironmentBinding resource.
+//   - Format: Not applicable
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

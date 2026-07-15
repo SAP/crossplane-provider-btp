@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 type RoleReference struct {
@@ -21,6 +21,7 @@ type RoleReference struct {
 // RoleCollectionParameters are the configurable fields of a RoleCollection
 type RoleCollectionParameters struct {
 	// Name of the role collection
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name can't be updated once set"
 	Name string `json:"name"`
 	// +kubebuilder:validation:Optional
 	Description *string `json:"description,omitempty"`
@@ -57,6 +58,14 @@ type RoleCollectionStatus struct {
 // +kubebuilder:object:root=true
 
 // A RoleCollection aggregates roles into a single entity to assign it to users / groups
+//
+// External-Name Configuration:
+//   - Follows Standard: no (uses name as identifier, not a GUID)
+//   - Format: Role Collection Name (string)
+//   - How to find:
+//   - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
+//   - CLI: btp get security/role-collection `"<name>"` → `name`
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

@@ -1,12 +1,13 @@
 package providerconfig
 
 import (
-	"github.com/crossplane/crossplane-runtime/pkg/connection"
-	"github.com/crossplane/crossplane-runtime/pkg/controller"
-	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"context"
+
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	"github.com/sap/crossplane-provider-btp/internal/features"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -16,22 +17,33 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
+// LegacyManaged aliases the legacy Crossplane managed resource interface used by the
+// provider's existing cluster-scoped APIs.
+//
+//nolint:staticcheck // Existing cluster-scoped APIs still use legacy ProviderConfig references.
+type LegacyManaged = resource.LegacyManaged
+
+// LegacyTracker tracks usage of a ProviderConfig by a LegacyManaged resource.
+type LegacyTracker interface {
+	Track(ctx context.Context, mg LegacyManaged) error
+}
+
 type ConnectorFn func(
 	kube client.Client,
-	usage resource.Tracker,
+	usage LegacyTracker,
 	resourcetracker tracking.ReferenceResolverTracker,
-) managed.ExternalConnecter
+) managed.ExternalConnector
 
-// DefaultSetup supports the creation of a controller for a given managed resource type. Accepts any type that implements the ConnectorFn or KymaModuleConnectorFn signature.
-// DEPRECAED: use DefaultSetupWithoutDefaultInitializer instead to not have the external-name default initializer added automatically (new external-name handling requires external-name to be empty not defaulted on create).
-func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, kind string, gvk schema.GroupVersionKind, connectorFn ConnectorFn) error {
+// DefaultSetup supports the creation of a controller for a given managed resource type. Accepts any type that implements the ConnectorFn signature.
+// DEPRECATED: use DefaultSetupWithoutDefaultInitializer instead to not have the external-name default initializer added automatically (new external-name handling requires external-name to be empty not defaulted on create).
+func DefaultSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions, object client.Object, kind string, gvk schema.GroupVersionKind, connectorFn ConnectorFn) error {
 	name := managed.ControllerName(kind)
 
 	referenceTracker := tracking.NewDefaultReferenceResolverTracker(
 		mgr.GetClient(),
 	)
 	usageTracker :=
-		resource.NewProviderConfigUsageTracker(
+		resource.NewLegacyProviderConfigUsageTracker(
 			mgr.GetClient(),
 			&providerv1alpha1.ProviderConfigUsage{},
 		)
@@ -39,31 +51,30 @@ func DefaultSetup(mgr ctrl.Manager, o controller.Options, object client.Object, 
 	r := managed.NewReconciler(
 		mgr,
 		resource.ManagedKind(gvk),
-		managed.WithExternalConnecter(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
+		managed.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		managed.WithPollInterval(o.PollInterval),
-		connectionPublishers(mgr, o),
 		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
 	)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(o.ForControllerRuntime()).
+		WithOptions(o.ForControllerRuntimeWithBackoff()).
 		For(object).
 		WithEventFilter(resource.DesiredStateChanged()).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
-// DefaultSetupWithoutDefaultInitializer works like DefaultSetup but without DefaultInitializer (to adhere to new external-name handling). It supports the creation of a controller for a given managed resource type. Accepts any type that implements the ConnectorFn or KymaModuleConnectorFn signature.
-func DefaultSetupWithoutDefaultInitializer(mgr ctrl.Manager, o controller.Options, object client.Object, kind string, gvk schema.GroupVersionKind, connectorFn ConnectorFn) error {
+// DefaultSetupWithoutDefaultInitializer works like DefaultSetup but without DefaultInitializer (to adhere to new external-name handling). It supports the creation of a controller for a given managed resource type. Accepts any type that implements the ConnectorFn signature.
+func DefaultSetupWithoutDefaultInitializer(mgr ctrl.Manager, o internalopts.CrossplaneOptions, object client.Object, kind string, gvk schema.GroupVersionKind, connectorFn ConnectorFn) error {
 	name := managed.ControllerName(kind)
 
 	referenceTracker := tracking.NewDefaultReferenceResolverTracker(
 		mgr.GetClient(),
 	)
 	usageTracker :=
-		resource.NewProviderConfigUsageTracker(
+		resource.NewLegacyProviderConfigUsageTracker(
 			mgr.GetClient(),
 			&providerv1alpha1.ProviderConfigUsage{},
 		)
@@ -71,29 +82,20 @@ func DefaultSetupWithoutDefaultInitializer(mgr ctrl.Manager, o controller.Option
 	r := managed.NewReconciler(
 		mgr,
 		resource.ManagedKind(gvk),
-		managed.WithExternalConnecter(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
+		managed.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithInitializers(), // No default initializer
-		connectionPublishers(mgr, o),
 		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
 	)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(o.ForControllerRuntime()).
+		WithOptions(o.ForControllerRuntimeWithBackoff()).
 		For(object).
 		WithEventFilter(resource.DesiredStateChanged()).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
-}
-
-func connectionPublishers(mgr ctrl.Manager, o controller.Options) managed.ReconcilerOption {
-	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
-	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
-		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), providerv1alpha1.StoreConfigGroupVersionKind))
-	}
-	return managed.WithConnectionPublishers(cps...)
 }
 
 func enableBetaManagementPolicies(enable bool) managed.ReconcilerOption {

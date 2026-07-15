@@ -1,7 +1,7 @@
 /*
 Entitlements Service
 
-The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.   NOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -21,12 +21,12 @@ var _ MappedNullable = &ApiExceptionResponseObjectError{}
 type ApiExceptionResponseObjectError struct {
 	// the error code.
 	Code *float32 `json:"code,omitempty"`
-	// in case of incident, please report this correlation id.
-	CorrelationID *string `json:"correlationID,omitempty"`
 	// error message helping to resolve the issue
 	Message *string `json:"message,omitempty"`
 	// The susppect.
 	Target *string `json:"target,omitempty"`
+	// in case of incident, please report this correlation id.
+	CorrelationID *string `json:"correlationID,omitempty"`
 }
 
 // NewApiExceptionResponseObjectError instantiates a new ApiExceptionResponseObjectError object
@@ -76,38 +76,6 @@ func (o *ApiExceptionResponseObjectError) HasCode() bool {
 // SetCode gets a reference to the given float32 and assigns it to the Code field.
 func (o *ApiExceptionResponseObjectError) SetCode(v float32) {
 	o.Code = &v
-}
-
-// GetCorrelationID returns the CorrelationID field value if set, zero value otherwise.
-func (o *ApiExceptionResponseObjectError) GetCorrelationID() string {
-	if o == nil || IsNil(o.CorrelationID) {
-		var ret string
-		return ret
-	}
-	return *o.CorrelationID
-}
-
-// GetCorrelationIDOk returns a tuple with the CorrelationID field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ApiExceptionResponseObjectError) GetCorrelationIDOk() (*string, bool) {
-	if o == nil || IsNil(o.CorrelationID) {
-		return nil, false
-	}
-	return o.CorrelationID, true
-}
-
-// HasCorrelationID returns a boolean if a field has been set.
-func (o *ApiExceptionResponseObjectError) HasCorrelationID() bool {
-	if o != nil && !IsNil(o.CorrelationID) {
-		return true
-	}
-
-	return false
-}
-
-// SetCorrelationID gets a reference to the given string and assigns it to the CorrelationID field.
-func (o *ApiExceptionResponseObjectError) SetCorrelationID(v string) {
-	o.CorrelationID = &v
 }
 
 // GetMessage returns the Message field value if set, zero value otherwise.
@@ -174,6 +142,38 @@ func (o *ApiExceptionResponseObjectError) SetTarget(v string) {
 	o.Target = &v
 }
 
+// GetCorrelationID returns the CorrelationID field value if set, zero value otherwise.
+func (o *ApiExceptionResponseObjectError) GetCorrelationID() string {
+	if o == nil || IsNil(o.CorrelationID) {
+		var ret string
+		return ret
+	}
+	return *o.CorrelationID
+}
+
+// GetCorrelationIDOk returns a tuple with the CorrelationID field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ApiExceptionResponseObjectError) GetCorrelationIDOk() (*string, bool) {
+	if o == nil || IsNil(o.CorrelationID) {
+		return nil, false
+	}
+	return o.CorrelationID, true
+}
+
+// HasCorrelationID returns a boolean if a field has been set.
+func (o *ApiExceptionResponseObjectError) HasCorrelationID() bool {
+	if o != nil && !IsNil(o.CorrelationID) {
+		return true
+	}
+
+	return false
+}
+
+// SetCorrelationID gets a reference to the given string and assigns it to the CorrelationID field.
+func (o *ApiExceptionResponseObjectError) SetCorrelationID(v string) {
+	o.CorrelationID = &v
+}
+
 func (o ApiExceptionResponseObjectError) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -187,14 +187,14 @@ func (o ApiExceptionResponseObjectError) ToMap() (map[string]interface{}, error)
 	if !IsNil(o.Code) {
 		toSerialize["code"] = o.Code
 	}
-	if !IsNil(o.CorrelationID) {
-		toSerialize["correlationID"] = o.CorrelationID
-	}
 	if !IsNil(o.Message) {
 		toSerialize["message"] = o.Message
 	}
 	if !IsNil(o.Target) {
 		toSerialize["target"] = o.Target
+	}
+	if !IsNil(o.CorrelationID) {
+		toSerialize["correlationID"] = o.CorrelationID
 	}
 	return toSerialize, nil
 }

@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 // ServiceInstanceParameters are the configurable fields of a ServiceInstance.
@@ -20,6 +20,21 @@ type ServiceInstanceParameters struct {
 
 	// Name of the service plan of that offering
 	PlanName string `json:"planName,omitempty"`
+
+	// The data center to use when resolving the service plan.
+	// Required when the same service offering exists in multiple data centers
+	// (e.g., SAP HANA Cloud). The value corresponds to the data_center field
+	// in the Service Manager API (e.g., "cf-eu10", "cf-us10").
+	// Mutually exclusive with servicePlanID.
+	// +kubebuilder:validation:Optional
+	DataCenter string `json:"dataCenter,omitempty"`
+
+	// The ID of the service plan (UUID). When set, plan resolution via
+	// offeringName/planName is skipped entirely. Use this as an escape hatch
+	// when name-based resolution is ambiguous or you already have the plan ID.
+	// Mutually exclusive with offeringName, planName, and dataCenter.
+	// +kubebuilder:validation:Optional
+	ServicePlanID string `json:"servicePlanID,omitempty"`
 
 	// Whether the service instance is shared or not
 	// +kubebuilder:validation:Optional
@@ -64,6 +79,11 @@ type ServiceInstanceParameters struct {
 	// Selector for a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
 	SubaccountSelector *xpv1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+
+	// Arbitrary labels to attach to the service instance in BTP Service Manager.
+	// Each key maps to a list of string values. Labels are propagated to the SM API on create and update.
+	// +kubebuilder:validation:Optional
+	Labels map[string][]*string `json:"labels,omitempty"`
 }
 
 // ServiceInstanceObservation are the observable fields of a ServiceInstance.
@@ -72,6 +92,27 @@ type ServiceInstanceObservation struct {
 
 	// The ID of the service plan as resolved by the ServiceManager
 	ServiceplanID string `json:"serviceplanId,omitempty"`
+
+	// The URL of the web-based management UI for the service instance.
+	DashboardURL string `json:"dashboardUrl,omitempty"`
+
+	// The date and time when the resource was created.
+	CreatedDate *metav1.Time `json:"createdDate,omitempty"`
+
+	// The date and time when the resource was last modified.
+	LastModified *metav1.Time `json:"lastModified,omitempty"`
+
+	// The current state of the service instance.
+	State string `json:"state,omitempty"`
+
+	// Shows whether the service instance is ready.
+	Ready *bool `json:"ready,omitempty"`
+
+	// Shows whether the resource can be used.
+	Usable *bool `json:"usable,omitempty"`
+
+	// The platform ID of the service instance.
+	PlatformID string `json:"platformId,omitempty"`
 }
 
 // A ServiceInstanceSpec defines the desired state of a ServiceInstance.
@@ -89,6 +130,15 @@ type ServiceInstanceStatus struct {
 // +kubebuilder:object:root=true
 
 // A ServiceInstance allows to manage a ServiceInstance in BTP [Environment: 'Other']
+//
+// External-Name Configuration:
+//   - Follows Standard: no
+//   - Format: ServiceInstance GUID (UUID format)
+//   - Note: spec.ForProvider.SubaccountRef, spec.ForProvider.SubaccountSelector, or spec.ForProvider.SubaccountID must be set for adoption to work
+//   - How to find:
+//   - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
+//   - CLI: btp list services/instance --subaccount `<subaccount-guid>` (field: id)
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

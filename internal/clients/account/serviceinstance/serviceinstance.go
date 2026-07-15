@@ -8,9 +8,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
@@ -98,7 +98,8 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: si.Name,
+			// since terraform resources are not allowed to start with a number we ensure it by prefixing them with "TF-"
+			Name: "TF-" + si.Name,
 			// make sure no naming conflicts are there for upjet tmp folder creation
 			UID:               si.UID + "-service-instance",
 			DeletionTimestamp: si.DeletionTimestamp,
@@ -108,13 +109,17 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 				ProviderConfigReference: &xpv1.Reference{
 					Name: pcName(si),
 				},
-				ManagementPolicies:               si.GetManagementPolicies(),
+				// ADR(external-name): We need to set the management policies to * for the tf resource,
+				// this way the behaivor of the crossplane resource is the same but TF uses refresh() instead of import()
+				// which allows to set the external name to the service instance id and the subaccount id in the spec for imports
+				ManagementPolicies:               xpv1.ManagementPolicies{"*"},
 				WriteConnectionSecretToReference: si.GetWriteConnectionSecretToReference(),
 			},
 			ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
 				SubaccountID: si.Spec.ForProvider.SubaccountID,
 				Name:         internal.Ptr(si.Spec.ForProvider.Name),
 				Shared:       si.Spec.ForProvider.Shared,
+				Labels:       si.Spec.ForProvider.Labels,
 			},
 			InitProvider: v1alpha1.SubaccountServiceInstanceInitParameters{},
 		},

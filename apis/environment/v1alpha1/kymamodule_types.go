@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 const (
@@ -38,9 +38,8 @@ type KymaModuleParameters struct {
 type KymaModuleSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 	ForProvider       KymaModuleParameters `json:"forProvider"`
-	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1.KymaEnvironmentBinding
-	// +crossplane:generate:reference:refFieldName=KymaEnvironmentBindingRef
-	// +crossplane:generate:reference:selectorFieldName=KymaEnvironmentBindingSelector
+	// Deprecated: This id is not required anymore, will be ignored
+	// +kubebuilder:validation:Optional
 	KymaEnvironmentBindingId string `json:"kymaEnvironmentBindingId,omitempty"`
 	// +kubebuilder:validation:Optional
 	KymaEnvironmentBindingSelector *xpv1.Selector `json:"kymaEnvironmentBindingSelector,omitempty"`
@@ -77,6 +76,14 @@ type ModuleStatus struct {
 // +kubebuilder:object:root=true
 
 // A KymaModule is an object to manage the configuration for a specific Module in the Kyma cluster.
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: Kyma module name (e.g. "keda", "serverless")
+//   - How to find:
+//   - UI: Kyma Dashboard → Modules → [Module Name]
+//   - CLI: `kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'`
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

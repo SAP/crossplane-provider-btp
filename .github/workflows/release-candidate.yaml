@@ -25,7 +25,7 @@ jobs:
       runs-on: ubuntu-latest
       steps:
       - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: true
       - name: Set Version
@@ -35,9 +35,9 @@ jobs:
         run: echo "Effective version ${{ steps.version.outputs.version }}"
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
         with:
-          version: v0.15.1
+          version: v0.35.0
           install: true
 
 
@@ -45,7 +45,7 @@ jobs:
         run: git fetch --prune --unshallow
 
       - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -53,23 +53,42 @@ jobs:
         run: make vendor vendor.check
 
       - name: Build Images
-        run: make build VERSION=${{ steps.version.outputs.version }}
-        env:
-          # We're using docker buildx, which doesn't actually load the images it
-          # builds by default. Specifying --load does so.
-          BUILD_ARGS: "--load"
-          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
-          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
+        run: |
+          make build PLATFORM=linux_amd64 VERSION=${{ steps.version.outputs.version }}
+          make build PLATFORM=linux_arm64 VERSION=${{ steps.version.outputs.version }}
 
       - name: Login to Container Registry
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           registry: ${{ vars.REGISTRY_URL }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish Artifacts to DockerHub
-        run: make publish VERSION=${{ steps.version.outputs.version }}
+        run: |
+          make xpkg.build PLATFORM=linux_amd64 VERSION=${{ steps.version.outputs.version }}
+          make xpkg.build PLATFORM=linux_arm64 VERSION=${{ steps.version.outputs.version }}
+          make xpkg.release.publish VERSION=${{ steps.version.outputs.version }}
         env:
-          DOCKER_REGISTRY: ${{ vars.REGISTRY_URL }}
-          BUILD_REGISTRY: ${{ vars.REGISTRY_URL }}
+          XPKG_REG_ORGS: ${{ vars.REGISTRY_URL }}/crossplane
+
+      - name: Build Exporter Binaries
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          for GOOS in linux darwin; do
+            for GOARCH in amd64 arm64; do
+              GOOS=$GOOS GOARCH=$GOARCH go build \
+                -trimpath \
+                -o dist/crossplane-provider-btp_exporter_${VERSION}_${GOOS}_${GOARCH} \
+                ./cmd/exporter
+            done
+          done
+
+      - name: Upload Exporter Binaries
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          # The binaries will appear in the Artifacts section
+          # at the bottom of the workflow run summary page, downloadable as a zip.
+          name: exporter-binaries-${{ steps.version.outputs.version }}.zip
+          path: dist/crossplane-provider-btp_exporter_*
+          retention-days: 14

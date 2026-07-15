@@ -2,21 +2,30 @@ package serviceinstance
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	"regexp"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/di"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
@@ -37,6 +46,8 @@ const (
 	errConnectClient   = "while connecting to service"
 	errDeleteInstance  = "cannot delete serviceinstance"
 )
+
+var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Dependency Injection
 var newClientCreatorFn = func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
@@ -62,6 +73,11 @@ var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube clie
 		return errors.Wrap(kErr, errGetInstance)
 	}
 
+	// Store the CR's current generation on each condition so that Observe() can
+	// detect whether the spec has changed since the async operation was triggered.
+	for i := range conditions {
+		conditions[i].ObservedGeneration = si.Generation
+	}
 	si.SetConditions(conditions...)
 
 	uErr := kube.Status().Update(ctx, si)
@@ -71,7 +87,7 @@ var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube clie
 
 type connector struct {
 	kube  client.Client
-	usage resource.Tracker
+	usage providerconfig.LegacyTracker
 
 	clientConnector             tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance]
 	newServicePlanInitializerFn func() Initializer
@@ -122,29 +138,77 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
+
+	// ADR(external-name): check for conflict condition from a previous failed Create()
+	// Only block if the spec hasn't changed since the conflict (same Generation)
+	lastAsyncOp := cr.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation))
+	if lastAsyncOp.Status == corev1.ConditionFalse &&
+		strings.Contains(lastAsyncOp.Message, "Conflict") &&
+		lastAsyncOp.ObservedGeneration == cr.Generation {
+		return managed.ExternalObservation{ResourceExists: false},
+			errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
+	}
+
+	// ADR(external-name): validate external-name is a UUID if set
+	externalName := meta.GetExternalName(cr)
+	if externalName != "" && externalName != cr.Name {
+		if !isValidUUID(externalName) {
+			return managed.ExternalObservation{},
+				errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one")
+		}
+	}
+
 	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
+		return managed.ExternalObservation{}, err
+	}
+
+	//Check for failed async operations ONCE, before the switch
+	if e.checkAsyncOperationFailure(cr) {
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: false,
+		}, nil
 	}
 
 	switch status {
 	case tfClient.NotExisting:
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	case tfClient.Drift:
+		// ADR(external-name): Calculate and report diff between desired state and what was observed from the API
+		diff := e.calculateDiff(cr)
+
+		// ADR(external-name): Set condition with drift information so it appears in events
+		cr.SetConditions(xpv1.Condition{
+			Type:               xpv1.TypeReady,
+			Status:             corev1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "DriftDetected",
+			Message:            fmt.Sprintf("Drift detected: %s", diff),
+		})
+
 		return managed.ExternalObservation{
 			ResourceExists:    true,
 			ResourceUpToDate:  false,
 			ConnectionDetails: managed.ConnectionDetails{},
+			Diff:              diff,
 		}, nil
 	case tfClient.UpToDate:
+
 		data := e.tfClient.QueryAsyncData(ctx)
 
 		if data != nil {
+			// since its an async resource, we need to save the external-name in the observe()
 			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
 				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 			}
-			cr.SetConditions(xpv1.Available())
+			// Only set Available condition if ManagementPolicy is not only "Observe", since Available condition sets Ready to True
+			// and we don't want that for Observe-only resources
+			if !isObserveOnly(cr) {
+				cr.SetConditions(xpv1.Available())
+			}
 		}
+
 		return managed.ExternalObservation{
 			ResourceExists:    true,
 			ResourceUpToDate:  true,
@@ -159,6 +223,11 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotServiceInstance)
 	}
+
+	// ADR(external-name): setting external-name not possible due to an async operation
+	// After creation, external-name will be populated by Observe() in the next reconciliation
+	// If creation fails with conflict, the AsyncOperation condition will be set by upjet's callback
+	// and will be handled in the next Observe() call (see conflict detection logic above)
 
 	cr.SetConditions(xpv1.Creating())
 	if err := e.tfClient.Create(ctx); err != nil {
@@ -202,6 +271,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	if err := c.tfClient.Delete(ctx); err != nil {
+		// 404 not found, does not need to be handeled since already done by upjet/terrarform
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteInstance)
 	}
 	return managed.ExternalDelete{}, nil
@@ -217,5 +287,87 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 	}
 	// we rely on status being saved in crossplane reconciler here
 	cr.Status.AtProvider.ID = sid.ID
+	cr.Status.AtProvider.DashboardURL = sid.DashboardURL
+	// Save additional observation fields from the Terraform resource
+	cr.Status.AtProvider.CreatedDate = sid.CreatedDate
+	cr.Status.AtProvider.LastModified = sid.LastModified
+	cr.Status.AtProvider.State = sid.State
+	cr.Status.AtProvider.Ready = sid.Ready
+	cr.Status.AtProvider.Usable = sid.Usable
+	cr.Status.AtProvider.PlatformID = sid.PlatformID
 	return nil
+}
+
+// checkAsyncOperationFailure checks if there's a failed async operation and sets appropriate conditions
+func (e *external) checkAsyncOperationFailure(cr *v1alpha1.ServiceInstance) bool {
+	lastAsyncOp := cr.GetCondition(xpv1.ConditionType("LastAsyncOperation"))
+	if lastAsyncOp.Status == corev1.ConditionFalse && lastAsyncOp.Reason == "ApplyFailure" {
+		return true
+	}
+
+	// Also check AsyncOperation as fallback
+	asyncOp := cr.GetCondition(ujresource.TypeAsyncOperation)
+	if asyncOp.Status == corev1.ConditionFalse && asyncOp.Reason == "ApplyFailure" {
+		return true
+	}
+
+	return false
+}
+
+func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
+	policies := cr.GetManagementPolicies()
+	return len(policies) == 1 && policies[0] == xpv1.ManagementActionObserve
+}
+
+// calculateDiff compares the desired state (spec) with the observed state from the API
+// Returns a human-readable diff string following the ADR(external-name) requirement for drift reporting
+func (e *external) calculateDiff(cr *v1alpha1.ServiceInstance) string {
+	// Get the Terraform resource to access both desired and observed state
+	tfResource := e.tfClient.GetTfResource()
+	if tfResource == nil {
+		return "Drift detected: unable to retrieve Terraform resource details"
+	}
+
+	// Type assert to SubaccountServiceInstance (the upjetted resource)
+	upjettedSI, ok := tfResource.(*v1alpha1.SubaccountServiceInstance)
+	if !ok {
+		return fmt.Sprintf("Drift detected: unexpected resource type %T", tfResource)
+	}
+
+	// Build desired state from Spec.ForProvider (what user wants)
+	desired := map[string]any{
+		"name":           upjettedSI.Spec.ForProvider.Name,
+		"subaccount_id":  upjettedSI.Spec.ForProvider.SubaccountID,
+		"shared":         upjettedSI.Spec.ForProvider.Shared,
+		"parameters":     upjettedSI.Spec.ForProvider.Parameters,
+		"serviceplan_id": upjettedSI.Spec.ForProvider.ServiceplanID,
+		"labels":         upjettedSI.Spec.ForProvider.Labels,
+	}
+
+	// Build observed state from Status.AtProvider (what API returned)
+	observed := map[string]any{
+		"name":           upjettedSI.Status.AtProvider.Name,
+		"subaccount_id":  upjettedSI.Status.AtProvider.SubaccountID,
+		"shared":         upjettedSI.Status.AtProvider.Shared,
+		"parameters":     upjettedSI.Status.AtProvider.Parameters,
+		"serviceplan_id": upjettedSI.Status.AtProvider.ServiceplanID,
+		"labels":         upjettedSI.Status.AtProvider.Labels,
+	}
+
+	// Compare all fields between desired and observed state
+	diff := cmp.Diff(desired, observed)
+
+	if diff == "" {
+		// If no structural diff found, check async operation message
+		if asyncCond := cr.GetCondition(ujresource.TypeAsyncOperation); asyncCond.Message != "" {
+			return fmt.Sprintf("Drift detected. Terraform message: %s", asyncCond.Message)
+		}
+		return "Drift detected: external resource differs from desired state"
+	}
+
+	return diff
+}
+
+func isValidUUID(s string) bool {
+	return uuidRegex.MatchString(strings.ToLower(s))
 }

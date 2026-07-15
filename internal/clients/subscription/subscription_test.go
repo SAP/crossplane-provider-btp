@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -288,6 +288,18 @@ age: 30`)
 	assert.Equal(t, internal.Ptr("plan2"), mapped.PlanName)
 	assert.Equal(t, "John", mapped.SubscriptionParams["name"])
 	assert.Equal(t, float64(30), mapped.SubscriptionParams["age"])
+}
+
+func TestSubscriptionTypeMapper_ConvertToCreatePayloadEmptyPlan(t *testing.T) {
+	raw := rawExtension(`{}`)
+	cr := NewSubscription("someName", "name1", "", raw)
+
+	uut := NewSubscriptionTypeMapper()
+	mapped := uut.ConvertToCreatePayload(cr)
+
+	assert.NotNil(t, mapped)
+	assert.Equal(t, "name1", mapped.appName)
+	assert.Nil(t, mapped.PlanName)
 }
 
 func TestSubscriptionTypeMapper_IsSynced(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -17,8 +17,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 )
 
 func TestConnect(t *testing.T) {
@@ -113,7 +113,7 @@ func TestConnect(t *testing.T) {
 				),
 				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
 					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string) (string, error) {
+						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
 							return "planID", nil
 						},
 					}, nil
@@ -161,7 +161,7 @@ func TestConnect(t *testing.T) {
 				),
 				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
 					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string) (string, error) {
+						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
 							return "planID", nil
 						},
 					}, nil
@@ -215,7 +215,7 @@ func TestConnect(t *testing.T) {
 				),
 				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
 					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string) (string, error) {
+						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
 							return "planID", nil
 						},
 					}, nil
@@ -255,7 +255,7 @@ func TestConnect(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			uua := &connector{
 				kube:                  &tc.args.kube,
-				usage:                 test2.NoOpReferenceResolverTracker{},
+				usage:                 test2.NoOpLegacyTracker{},
 				resourcetracker:       test2.NoOpReferenceResolverTracker{},
 				newClientInitalizerFn: tc.args.clientInitializerFn,
 				newPlanIdResolverFn:   tc.args.planIdResolverFn,
@@ -676,11 +676,11 @@ func (t TfClientFake) DeleteResources(ctx context.Context, cr *v1beta1.CloudMana
 var _ servicemanager.PlanIdResolver = &PlanIDFake{}
 
 type PlanIDFake struct {
-	PlanIDByNameFn func(ctx context.Context, offeringName string, servicePlanName string) (string, error)
+	PlanIDByNameFn func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error)
 }
 
-func (p PlanIDFake) PlanIDByName(ctx context.Context, offeringName string, servicePlanName string) (string, error) {
-	return p.PlanIDByNameFn(ctx, offeringName, servicePlanName)
+func (p PlanIDFake) PlanIDByName(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
+	return p.PlanIDByNameFn(ctx, offeringName, servicePlanName, dataCenter)
 }
 
 var _ cmclient.ITfClientInitializer = &ClientInitializerFake{}

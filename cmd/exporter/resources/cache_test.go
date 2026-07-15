@@ -364,3 +364,222 @@ func TestResourceCache_ValuesForSelection(t *testing.T) {
 		})
 	}
 }
+
+func TestResourceCache_Copy(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+
+	tests := []struct {
+		name         string
+		initialCache []*mockResource
+		wantIDs      []string
+	}{
+		{
+			name: "copy with multiple resources",
+			initialCache: []*mockResource{
+				{id: "id-1", displayName: "Resource One"},
+				{id: "id-2", displayName: "Resource Two"},
+				{id: "id-3", displayName: "Resource Three"},
+			},
+			wantIDs: []string{"id-1", "id-2", "id-3"},
+		},
+		{
+			name: "copy with single resource",
+			initialCache: []*mockResource{
+				{id: "id-1", displayName: "Resource One"},
+			},
+			wantIDs: []string{"id-1"},
+		},
+		{
+			name:         "copy empty cache",
+			initialCache: []*mockResource{},
+			wantIDs:      nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewResourceCache[*mockResource]()
+			cache.Store(tt.initialCache...)
+
+			copiedCache := cache.Copy()
+
+			// Verify the copied cache has the same resources
+			r.Equal(cache.Len(), copiedCache.Len(), "copied cache should have same length")
+			r.ElementsMatch(tt.wantIDs, copiedCache.AllIDs(), "copied cache should have same IDs")
+
+			// Verify each resource is accessible from the copy
+			for _, resource := range tt.initialCache {
+				copiedResource := copiedCache.Get(resource.id)
+				r.NotNil(copiedResource, "resource should exist in copied cache")
+				r.Equal(resource.id, copiedResource.GetID())
+				r.Equal(resource.displayName, copiedResource.GetDisplayName())
+			}
+		})
+	}
+}
+
+func TestResourceCache_Copy_Independence(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+
+	tests := []struct {
+		name            string
+		initialCache    []*mockResource
+		modifyOriginal  func(cache ResourceCache[*mockResource])
+		modifyCopy      func(cache ResourceCache[*mockResource])
+		wantOriginalIDs []string
+		wantCopiedIDs   []string
+	}{
+		{
+			name: "adding to original does not affect copy",
+			initialCache: []*mockResource{
+				{id: "id-1", displayName: "Resource One"},
+			},
+			modifyOriginal: func(cache ResourceCache[*mockResource]) {
+				cache.Set(&mockResource{id: "id-2", displayName: "Resource Two"})
+			},
+			modifyCopy:      func(cache ResourceCache[*mockResource]) {},
+			wantOriginalIDs: []string{"id-1", "id-2"},
+			wantCopiedIDs:   []string{"id-1"},
+		},
+		{
+			name: "adding to copy does not affect original",
+			initialCache: []*mockResource{
+				{id: "id-1", displayName: "Resource One"},
+			},
+			modifyOriginal: func(cache ResourceCache[*mockResource]) {},
+			modifyCopy: func(cache ResourceCache[*mockResource]) {
+				cache.Set(&mockResource{id: "id-2", displayName: "Resource Two"})
+			},
+			wantOriginalIDs: []string{"id-1"},
+			wantCopiedIDs:   []string{"id-1", "id-2"},
+		},
+		{
+			name: "deleting from original via KeepSelectedOnly does not affect copy",
+			initialCache: []*mockResource{
+				{id: "id-1", displayName: "Resource One"},
+				{id: "id-2", displayName: "Resource Two"},
+				{id: "id-3", displayName: "Resource Three"},
+			},
+			modifyOriginal: func(cache ResourceCache[*mockResource]) {
+				cache.KeepSelectedOnly([]string{"id-1"})
+			},
+			modifyCopy:      func(cache ResourceCache[*mockResource]) {},
+			wantOriginalIDs: []string{"id-1"},
+			wantCopiedIDs:   []string{"id-1", "id-2", "id-3"},
+		},
+		{
+			name: "deleting from copy via KeepSelectedOnly does not affect original",
+			initialCache: []*mockResource{
+				{id: "id-1", displayName: "Resource One"},
+				{id: "id-2", displayName: "Resource Two"},
+				{id: "id-3", displayName: "Resource Three"},
+			},
+			modifyOriginal: func(cache ResourceCache[*mockResource]) {},
+			modifyCopy: func(cache ResourceCache[*mockResource]) {
+				cache.KeepSelectedOnly([]string{"id-2"})
+			},
+			wantOriginalIDs: []string{"id-1", "id-2", "id-3"},
+			wantCopiedIDs:   []string{"id-2"},
+		},
+		{
+			name: "both caches modified independently",
+			initialCache: []*mockResource{
+				{id: "id-1", displayName: "Resource One"},
+				{id: "id-2", displayName: "Resource Two"},
+			},
+			modifyOriginal: func(cache ResourceCache[*mockResource]) {
+				cache.Set(&mockResource{id: "id-3", displayName: "Resource Three"})
+				cache.KeepSelectedOnly([]string{"id-1", "id-3"})
+			},
+			modifyCopy: func(cache ResourceCache[*mockResource]) {
+				cache.Set(&mockResource{id: "id-4", displayName: "Resource Four"})
+				cache.KeepSelectedOnly([]string{"id-2", "id-4"})
+			},
+			wantOriginalIDs: []string{"id-1", "id-3"},
+			wantCopiedIDs:   []string{"id-2", "id-4"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewResourceCache[*mockResource]()
+			cache.Store(tt.initialCache...)
+
+			copiedCache := cache.Copy()
+
+			// Apply modifications
+			tt.modifyOriginal(cache)
+			tt.modifyCopy(copiedCache)
+
+			// Verify independence
+			r.ElementsMatch(tt.wantOriginalIDs, cache.AllIDs(), "original cache IDs mismatch")
+			r.ElementsMatch(tt.wantCopiedIDs, copiedCache.AllIDs(), "copied cache IDs mismatch")
+		})
+	}
+}
+
+func TestResourceCache_Copy_ModifyViaEitherCache(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+
+	tests := []struct {
+		name                 string
+		initialCache         []*mockResource
+		modifyViaCopiedCache bool
+		resourceIDToModify   string
+		newDisplayName       string
+	}{
+		{
+			name: "modify resource via original cache, visible in copy",
+			initialCache: []*mockResource{
+				{id: "id-1", displayName: "Original Name"},
+			},
+			modifyViaCopiedCache: false,
+			resourceIDToModify:   "id-1",
+			newDisplayName:       "Changed via Original",
+		},
+		{
+			name: "modify resource via copied cache, visible in original",
+			initialCache: []*mockResource{
+				{id: "id-1", displayName: "Original Name"},
+			},
+			modifyViaCopiedCache: true,
+			resourceIDToModify:   "id-1",
+			newDisplayName:       "Changed via Copy",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewResourceCache[*mockResource]()
+			cache.Store(tt.initialCache...)
+
+			copiedCache := cache.Copy()
+
+			// Modify resource via one of the caches
+			var resourceToModify *mockResource
+			if tt.modifyViaCopiedCache {
+				resourceToModify = copiedCache.Get(tt.resourceIDToModify)
+			} else {
+				resourceToModify = cache.Get(tt.resourceIDToModify)
+			}
+			r.NotNil(resourceToModify)
+			resourceToModify.displayName = tt.newDisplayName
+
+			// Verify the change is visible in both caches (shallow copy behavior)
+			resourceFromOriginal := cache.Get(tt.resourceIDToModify)
+			resourceFromCopy := copiedCache.Get(tt.resourceIDToModify)
+
+			r.Equal(tt.newDisplayName, resourceFromOriginal.GetDisplayName(),
+				"change should be visible from original cache")
+			r.Equal(tt.newDisplayName, resourceFromCopy.GetDisplayName(),
+				"change should be visible from copied cache")
+
+			// Verify both point to the same object
+			r.Same(resourceFromOriginal, resourceFromCopy,
+				"both caches should reference the same underlying object")
+		})
+	}
+}

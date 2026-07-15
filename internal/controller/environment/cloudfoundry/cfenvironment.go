@@ -2,20 +2,22 @@ package cloudfoundry
 
 import (
 	"context"
+	"net/http"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	env "github.com/sap/crossplane-provider-btp/internal/clients/cfenvironment"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -42,7 +44,7 @@ const (
 // is called.
 type connector struct {
 	kube            client.Client
-	usage           resource.Tracker
+	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
 
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
@@ -59,12 +61,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotEnvironment)
 	}
 
+	lm := mg.(providerconfig.LegacyManaged)
+
 	pc := &providerv1alpha1.ProviderConfig{}
-	if err := c.kube.Get(ctx, types.NamespacedName{Name: mg.GetProviderConfigReference().Name}, pc); err != nil {
+	if err := c.kube.Get(ctx, types.NamespacedName{Name: lm.GetProviderConfigReference().Name}, pc); err != nil {
 		return nil, errors.Wrap(err, errGetPC)
 	}
 
-	if err := c.usage.Track(ctx, mg); err != nil {
+	if err := c.usage.Track(ctx, lm); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
@@ -124,10 +128,36 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotEnvironment)
 	}
 
+	// Check if external-name is empty
+	externalName := meta.GetExternalName(cr)
+	if externalName == "" {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
 	instance, managers, err := c.client.DescribeInstance(ctx, *cr)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errDescribeInstance)
 	}
+
+	// If instance not found, it's a drift (external resource was deleted)
+	if instance == nil {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	// Set external-name to GUID format if necessary. This means it migrates from old formats
+	// Backwards compatibility:  > v1.1.0 (orgName) and v1.0.0 (metadata.name)
+	orgName := env.FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
+	if externalName == cr.Name || externalName == orgName {
+		meta.SetExternalName(cr, *instance.Id)
+		if err := c.kube.Update(ctx, cr); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, "failed to update external-name to GUID format")
+		}
+	}
+
 	cr.Status.AtProvider = env.GenerateObservation(instance, managers)
 
 	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateOk {
@@ -156,15 +186,20 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotEnvironment)
 	}
 
-	createdOrgName, err := c.client.CreateInstance(ctx, *cr)
+	createdInstanceId, err := c.client.CreateInstance(ctx, *cr)
 	if err != nil {
+		// Do not set external-name on error (including "already exists" errors)
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
-	meta.SetExternalName(cr, createdOrgName)
+
+	meta.SetExternalName(cr, createdInstanceId)
+	if err := c.kube.Update(ctx, cr); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, "failed to update external-name with created instance id")
+	}
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
+		// external resource. These will be stored as the connection secret.x	x
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
@@ -184,9 +219,27 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotEnvironment)
 	}
-	cr.SetConditions(xpv1.Deleting())
 
-	return managed.ExternalDelete{}, errors.Wrap(c.client.DeleteInstance(ctx, *cr), errDelete)
+	cr.SetConditions(xpv1.Deleting())
+	// Check if resource is already in deletion state
+	if cr.Status.AtProvider.State != nil {
+		state := *cr.Status.AtProvider.State
+		if state == v1alpha1.InstanceStateDeleting {
+			// Already deleting, no need to call delete again
+			return managed.ExternalDelete{}, nil
+		}
+	}
+
+	resp, err := c.client.DeleteInstance(ctx, *cr)
+	// Don't treat 404 as error - resource was already deleted externally
+	if err != nil && resp != nil && resp.StatusCode == http.StatusNotFound {
+		return managed.ExternalDelete{}, nil
+	}
+	if err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errDelete)
+	}
+
+	return managed.ExternalDelete{}, nil
 }
 
 func (c *external) needsCreation(cr *v1alpha1.CloudFoundryEnvironment) bool {

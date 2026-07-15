@@ -30,12 +30,20 @@ type ServiceBinding struct {
 }
 
 type BindingCredentials struct {
-	ClientID     string `json:"clientid,omitempty"`
-	ClientSecret string `json:"clientsecret,omitempty"`
-	SmURL        string `json:"sm_url,omitempty"`
-	UAADomain    string `json:"uaadomain,omitempty"`
-	URL          string `json:"url,omitempty"`
-	XSAppName    string `json:"xsappname,omitempty"`
+	ClientID        string   `json:"clientid,omitempty"`
+	ClientSecret    string   `json:"clientsecret,omitempty"`
+	CredentialType  string   `json:"credential-type,omitempty"`
+	IdentityZone    string   `json:"identityzone,omitempty"`
+	InstanceID      string   `json:"instanceid,omitempty"`
+	SmURL           string   `json:"sm_url,omitempty"`
+	TenantID        string   `json:"tenantid,omitempty"`
+	TenantMode      string   `json:"tenantmode,omitempty"`
+	TokenType       []string `json:"token-type,omitempty"`
+	UAADomain       string   `json:"uaadomain,omitempty"`
+	URI             string   `json:"uri,omitempty"`
+	URL             string   `json:"url,omitempty"`
+	VerificationKey string   `json:"verificationkey,omitempty"`
+	XSAppName       string   `json:"xsappname,omitempty"`
 }
 
 type BindingContext struct {

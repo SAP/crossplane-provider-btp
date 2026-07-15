@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -278,8 +278,36 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 		},
-		"Without ManagementPolicies": {
-			reason: "Make sure ManagementPolicies transfered to tf resource",
+		"Labels are propagated to tf resource": {
+			reason: "Labels set in forProvider should be passed through to the tf resource",
+			args: args{
+				si: expectedServiceInstance(
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+					withLabels(map[string][]*string{
+						"env":  {internal.Ptr("dev"), internal.Ptr("test")},
+						"team": {internal.Ptr("platform")},
+					}),
+				),
+			},
+			want: want{
+				hasErr: false,
+				tfResource: expectedTfSerivceInstance(
+					withTfParameters(`{}`),
+					withTfExternalName("123"),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+					withTfLabels(map[string][]*string{
+						"env":  {internal.Ptr("dev"), internal.Ptr("test")},
+						"team": {internal.Ptr("platform")},
+					}),
+				),
+			},
+		},
+		"TfResource_ManagementPolicies_AlwaysSetToAll": {
+			reason: "ADR: ManagementPolicies on the TfResource must always be '*' regardless of the native CR's policies, so that tf does use refresh instead of import",
 			args: args{
 				si: expectedServiceInstance(
 					withExternalName("123"),
@@ -292,6 +320,7 @@ func TestTfResource(t *testing.T) {
 					withTfExternalName("123"),
 					withTfParameters(`{}`),
 					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
 					withTfCondition(conditionUnknown),
 				),
 			},
@@ -333,6 +362,7 @@ func expectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.
 // Helper function to build a complete SubaccountServiceInstance CR dynamically
 func expectedTfSerivceInstance(opts ...func(*v1alpha1.SubaccountServiceInstance)) *v1alpha1.SubaccountServiceInstance {
 	cr := &v1alpha1.SubaccountServiceInstance{}
+	cr.Name = "TF-"
 	cr.Spec.ForProvider.Name = internal.Ptr("")
 
 	// Apply each option to modify the CR
@@ -442,5 +472,17 @@ func withObservation(obs v1alpha1.ServiceInstanceObservation) func(*v1alpha1.Ser
 func withTfServicePlanID(servicePlanID string) func(*v1alpha1.SubaccountServiceInstance) {
 	return func(cr *v1alpha1.SubaccountServiceInstance) {
 		cr.Spec.ForProvider.ServiceplanID = &servicePlanID
+	}
+}
+
+func withLabels(labels map[string][]*string) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Spec.ForProvider.Labels = labels
+	}
+}
+
+func withTfLabels(labels map[string][]*string) func(*v1alpha1.SubaccountServiceInstance) {
+	return func(cr *v1alpha1.SubaccountServiceInstance) {
+		cr.Spec.ForProvider.Labels = labels
 	}
 }

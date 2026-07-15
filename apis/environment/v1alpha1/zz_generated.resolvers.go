@@ -20,7 +20,7 @@ package v1alpha1
 
 import (
 	"context"
-	reference "github.com/crossplane/crossplane-runtime/pkg/reference"
+	reference "github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	errors "github.com/pkg/errors"
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +36,7 @@ func (mg *CloudFoundryEnvironment) ResolveReferences(ctx context.Context, c clie
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.SubaccountGuid,
 		Extract:      v1alpha1.SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.SubaccountRef,
 		Selector:     mg.Spec.SubaccountSelector,
 		To: reference.To{
@@ -52,6 +53,7 @@ func (mg *CloudFoundryEnvironment) ResolveReferences(ctx context.Context, c clie
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSecret,
 		Extract:      v1alpha1.CloudManagementSecret(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
@@ -68,6 +70,7 @@ func (mg *CloudFoundryEnvironment) ResolveReferences(ctx context.Context, c clie
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSecretNamespace,
 		Extract:      v1alpha1.CloudManagementSecretNamespace(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
@@ -84,6 +87,7 @@ func (mg *CloudFoundryEnvironment) ResolveReferences(ctx context.Context, c clie
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSubaccountGuid,
 		Extract:      v1alpha1.CloudManagementSubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
@@ -110,6 +114,7 @@ func (mg *KymaEnvironment) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.SubaccountGuid,
 		Extract:      v1alpha1.SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.SubaccountRef,
 		Selector:     mg.Spec.SubaccountSelector,
 		To: reference.To{
@@ -126,6 +131,7 @@ func (mg *KymaEnvironment) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSecret,
 		Extract:      v1alpha1.CloudManagementSecret(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
@@ -142,6 +148,7 @@ func (mg *KymaEnvironment) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSecretNamespace,
 		Extract:      v1alpha1.CloudManagementSecretNamespace(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
@@ -158,6 +165,7 @@ func (mg *KymaEnvironment) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSubaccountGuid,
 		Extract:      v1alpha1.CloudManagementSubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
@@ -184,6 +192,7 @@ func (mg *KymaEnvironmentBinding) ResolveReferences(ctx context.Context, c clien
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.KymaEnvironmentId,
 		Extract:      KymaInstanceId(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.KymaEnvironmentRef,
 		Selector:     mg.Spec.KymaEnvironmentSelector,
 		To: reference.To{
@@ -200,6 +209,7 @@ func (mg *KymaEnvironmentBinding) ResolveReferences(ctx context.Context, c clien
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSecret,
 		Extract:      v1alpha1.CloudManagementSecret(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
@@ -216,6 +226,7 @@ func (mg *KymaEnvironmentBinding) ResolveReferences(ctx context.Context, c clien
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSecretNamespace,
 		Extract:      v1alpha1.CloudManagementSecretNamespace(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
@@ -232,6 +243,7 @@ func (mg *KymaEnvironmentBinding) ResolveReferences(ctx context.Context, c clien
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.CloudManagementSubaccountGuid,
 		Extract:      v1alpha1.CloudManagementSubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.CloudManagementRef,
 		Selector:     mg.Spec.CloudManagementSelector,
 		To: reference.To{
@@ -256,24 +268,9 @@ func (mg *KymaModule) ResolveReferences(ctx context.Context, c client.Reader) er
 	var err error
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.KymaEnvironmentBindingId,
-		Extract:      reference.ExternalName(),
-		Reference:    mg.Spec.KymaEnvironmentBindingRef,
-		Selector:     mg.Spec.KymaEnvironmentBindingSelector,
-		To: reference.To{
-			List:    &KymaEnvironmentBindingList{},
-			Managed: &KymaEnvironmentBinding{},
-		},
-	})
-	if err != nil {
-		return errors.Wrap(err, "mg.Spec.KymaEnvironmentBindingId")
-	}
-	mg.Spec.KymaEnvironmentBindingId = rsp.ResolvedValue
-	mg.Spec.KymaEnvironmentBindingRef = rsp.ResolvedReference
-
-	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.KymaEnvironmentBindingSecret,
 		Extract:      KymaEnvironmentBindingSecret(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.KymaEnvironmentBindingRef,
 		Selector:     mg.Spec.KymaEnvironmentBindingSelector,
 		To: reference.To{
@@ -290,6 +287,7 @@ func (mg *KymaModule) ResolveReferences(ctx context.Context, c client.Reader) er
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.KymaEnvironmentBindingSecretNamespace,
 		Extract:      KymaEnvironmentBindingSecretNamespace(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.KymaEnvironmentBindingRef,
 		Selector:     mg.Spec.KymaEnvironmentBindingSelector,
 		To: reference.To{

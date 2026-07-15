@@ -5,43 +5,45 @@ import (
 	"testing"
 
 	"github.com/SAP/xp-clifford/yaml"
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 )
 
 func TestConvertServiceManagerResource(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 
-	instanceID := "987f6543-b21a-43c9-b321-876543210000"
+	instanceID := "x987f6543-b21a-43c9-b321-87654321000"
 	bindingID := "456a7890-c12d-45e6-b987-654321098765"
 	instanceName := "service-manager-instance"
-	subAccountGuid := "123e4567-e89b-12d3-a456-426614174000"
+	subAccountGuid := "x123e4567-e89b-12d3-a456-42661417400"
 	smExternalName := fmt.Sprintf("%s/%s", instanceID, bindingID)
 	siExternalName := fmt.Sprintf("%s,%s", subAccountGuid, instanceID)
-	resourceName := fmt.Sprintf("%s-%s", instanceName, subAccountGuid)
+	resourceName := fmt.Sprintf("%s.%s", instanceName, instanceID)
+	siResourceName := fmt.Sprintf("%s-%s", instanceName, instanceID)
 
 	tests := []struct {
 		name string
-		si   *ServiceInstance
+		si   *serviceinstancebase.ServiceInstance
 		want *yaml.ResourceWithComment
 	}{
 		{
 			name: "all required fields present",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
 					SubaccountID: subAccountGuid,
 					Usable:       true,
 				},
-				OfferingName:        OfferingServiceManager,
-				BindingID:           bindingID,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
+				BindingIDs:          []string{bindingID},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: yaml.NewResourceWithComment(
@@ -63,18 +65,19 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 							WriteConnectionSecretToReference: &v1.SecretReference{
 								Name:      resourceName,
-								Namespace: DefaultSecretNamespace,
+								Namespace: resources.DefaultSecretNamespace,
 							},
 						},
 						ForProvider: v1beta1.ServiceManagerParameters{
-							SubaccountGuid: subAccountGuid,
+							SubaccountGuid:      subAccountGuid,
+							ServiceInstanceName: instanceName,
 						},
 					},
 				}),
 		},
 		{
 			name: "not a service manager",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
@@ -82,7 +85,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 					Usable:       true,
 				},
 				OfferingName:        "not-a-service-manager-offering",
-				BindingID:           bindingID,
+				BindingIDs:          []string{bindingID},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -93,7 +96,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							APIVersion: v1beta1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: siResourceName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": siExternalName,
 							},
@@ -104,12 +107,13 @@ func TestConvertServiceManagerResource(t *testing.T) {
 									v1.ManagementActionObserve,
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resourceName,
-									Namespace: DefaultSecretNamespace,
+									Name:      siResourceName,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: subAccountGuid,
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -119,107 +123,15 @@ func TestConvertServiceManagerResource(t *testing.T) {
 		},
 		{
 			name: "missing instance id",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           "",
 					Name:         instanceName,
 					SubaccountID: subAccountGuid,
 					Usable:       true,
 				},
-				OfferingName:        OfferingServiceManager,
-				BindingID:           bindingID,
-				ResourceWithComment: yaml.NewResourceWithComment(nil),
-			},
-			want: func() *yaml.ResourceWithComment {
-				rwc := yaml.NewResourceWithComment(
-					&v1beta1.ServiceManager{
-						TypeMeta: metav1.TypeMeta{
-							Kind:       v1beta1.ServiceManagerKind,
-							APIVersion: v1beta1.SchemeGroupVersion.String(),
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
-							Annotations: map[string]string{
-								"crossplane.io/external-name": resources.UndefinedExternalName,
-							},
-						},
-						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
-								ManagementPolicies: []v1.ManagementAction{
-									v1.ManagementActionObserve,
-								},
-								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resourceName,
-									Namespace: DefaultSecretNamespace,
-								},
-							},
-							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: subAccountGuid,
-							},
-						},
-					})
-				rwc.AddComment(resources.WarnUndefinedExternalName)
-				rwc.AddComment(resources.WarnMissingInstanceId)
-				return rwc
-			}(),
-		},
-		{
-			name: "missing binding id",
-			si: &ServiceInstance{
-				ServiceInstance: &btpcli.ServiceInstance{
-					ID:           instanceID,
-					Name:         instanceName,
-					SubaccountID: subAccountGuid,
-					Usable:       true,
-				},
-				OfferingName:        OfferingServiceManager,
-				BindingID:           "",
-				ResourceWithComment: yaml.NewResourceWithComment(nil),
-			},
-			want: func() *yaml.ResourceWithComment {
-				rwc := yaml.NewResourceWithComment(
-					&v1beta1.ServiceManager{
-						TypeMeta: metav1.TypeMeta{
-							Kind:       v1beta1.ServiceManagerKind,
-							APIVersion: v1beta1.SchemeGroupVersion.String(),
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
-							Annotations: map[string]string{
-								"crossplane.io/external-name": resources.UndefinedExternalName,
-							},
-						},
-						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
-								ManagementPolicies: []v1.ManagementAction{
-									v1.ManagementActionObserve,
-								},
-								WriteConnectionSecretToReference: &v1.SecretReference{
-									Name:      resourceName,
-									Namespace: DefaultSecretNamespace,
-								},
-							},
-							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: subAccountGuid,
-							},
-						},
-					})
-				rwc.AddComment(resources.WarnUndefinedExternalName)
-				rwc.AddComment(resources.WarnMissingBindingId)
-				return rwc
-			}(),
-		},
-		{
-			name: "missing subaccount guid",
-			si: &ServiceInstance{
-				ServiceInstance: &btpcli.ServiceInstance{
-					ID:           instanceID,
-					Name:         instanceName,
-					SubaccountID: "",
-					Usable:       true,
-				},
-				OfferingName:        OfferingServiceManager,
-				BindingID:           bindingID,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
+				BindingIDs:          []string{bindingID},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -232,7 +144,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UndefinedName,
 							Annotations: map[string]string{
-								"crossplane.io/external-name": fmt.Sprintf("%s/%s", instanceID, bindingID),
+								"crossplane.io/external-name": resources.UndefinedExternalName,
 							},
 						},
 						Spec: v1beta1.ServiceManagerSpec{
@@ -242,30 +154,218 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: "",
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: instanceName,
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnUndefinedExternalName)
+				rwc.AddComment(resources.WarnMissingInstanceId)
+				return rwc
+			}(),
+		},
+		{
+			name: "missing instance name",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         "",
+					SubaccountID: subAccountGuid,
+					Usable:       true,
+				},
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
+				BindingIDs:          []string{bindingID},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1beta1.ServiceManager{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1beta1.ServiceManagerKind,
+							APIVersion: v1beta1.SchemeGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": smExternalName,
+							},
+						},
+						Spec: v1beta1.ServiceManagerSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{
+									v1.ManagementActionObserve,
+								},
+								WriteConnectionSecretToReference: &v1.SecretReference{
+									Name:      resources.UndefinedName,
+									Namespace: resources.DefaultSecretNamespace,
+								},
+							},
+							ForProvider: v1beta1.ServiceManagerParameters{
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: "",
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnMissingInstanceName)
+				return rwc
+			}(),
+		},
+		{
+			name: "missing binding id",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         instanceName,
+					SubaccountID: subAccountGuid,
+					Usable:       true,
+				},
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1beta1.ServiceManager{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1beta1.ServiceManagerKind,
+							APIVersion: v1beta1.SchemeGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
+						},
+						Spec: v1beta1.ServiceManagerSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{
+									v1.ManagementActionObserve,
+								},
+								WriteConnectionSecretToReference: &v1.SecretReference{
+									Name:      resourceName,
+									Namespace: resources.DefaultSecretNamespace,
+								},
+							},
+							ForProvider: v1beta1.ServiceManagerParameters{
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: instanceName,
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnUndefinedExternalName)
+				rwc.AddComment(resources.WarnMissingBindingId)
+				return rwc
+			}(),
+		},
+		{
+			name: "too many binding IDs",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         instanceName,
+					SubaccountID: subAccountGuid,
+					Usable:       true,
+				},
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
+				BindingIDs:          []string{bindingID, "another-binding-id"},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1beta1.ServiceManager{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1beta1.ServiceManagerKind,
+							APIVersion: v1beta1.SchemeGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
+						},
+						Spec: v1beta1.ServiceManagerSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{
+									v1.ManagementActionObserve,
+								},
+								WriteConnectionSecretToReference: &v1.SecretReference{
+									Name:      resourceName,
+									Namespace: resources.DefaultSecretNamespace,
+								},
+							},
+							ForProvider: v1beta1.ServiceManagerParameters{
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: instanceName,
+							},
+						},
+					})
+				rwc.AddComment(resources.WarnUndefinedExternalName)
+				rwc.AddComment(fmt.Sprintf(resources.WarnTooManyBindingIDs, 2))
+				return rwc
+			}(),
+		},
+		{
+			name: "missing subaccount guid",
+			si: &serviceinstancebase.ServiceInstance{
+				ServiceInstance: &btpcli.ServiceInstance{
+					ID:           instanceID,
+					Name:         instanceName,
+					SubaccountID: "",
+					Usable:       true,
+				},
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
+				BindingIDs:          []string{bindingID},
+				ResourceWithComment: yaml.NewResourceWithComment(nil),
+			},
+			want: func() *yaml.ResourceWithComment {
+				rwc := yaml.NewResourceWithComment(
+					&v1beta1.ServiceManager{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1beta1.ServiceManagerKind,
+							APIVersion: v1beta1.SchemeGroupVersion.String(),
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": fmt.Sprintf("%s/%s", instanceID, bindingID),
+							},
+						},
+						Spec: v1beta1.ServiceManagerSpec{
+							ResourceSpec: v1.ResourceSpec{
+								ManagementPolicies: []v1.ManagementAction{
+									v1.ManagementActionObserve,
+								},
+								WriteConnectionSecretToReference: &v1.SecretReference{
+									Name:      resourceName,
+									Namespace: resources.DefaultSecretNamespace,
+								},
+							},
+							ForProvider: v1beta1.ServiceManagerParameters{
+								SubaccountGuid:      "",
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
-				rwc.AddComment(resources.WarnUndefinedResourceName)
 				return rwc
 			}(),
 		},
 		{
 			name: "service manager not usable",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           instanceID,
 					Name:         instanceName,
 					SubaccountID: subAccountGuid,
 					Usable:       false,
 				},
-				OfferingName:        OfferingServiceManager,
-				BindingID:           bindingID,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
+				BindingIDs:          []string{bindingID},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -288,11 +388,12 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: subAccountGuid,
+								SubaccountGuid:      subAccountGuid,
+								ServiceInstanceName: instanceName,
 							},
 						},
 					})
@@ -302,16 +403,16 @@ func TestConvertServiceManagerResource(t *testing.T) {
 		},
 		{
 			name: "multiple missing fields",
-			si: &ServiceInstance{
+			si: &serviceinstancebase.ServiceInstance{
 				ServiceInstance: &btpcli.ServiceInstance{
 					ID:           "",
 					Name:         "",
 					SubaccountID: "",
 					Usable:       false,
 				},
-				OfferingName:        OfferingServiceManager,
+				OfferingName:        serviceinstancebase.ServiceManagerOffering,
 				PlanName:            "",
-				BindingID:           "",
+				BindingIDs:          []string{},
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
 			},
 			want: func() *yaml.ResourceWithComment {
@@ -334,11 +435,12 @@ func TestConvertServiceManagerResource(t *testing.T) {
 								},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
-								SubaccountGuid: "",
+								SubaccountGuid:      "",
+								ServiceInstanceName: "",
 							},
 						},
 					})
@@ -348,6 +450,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 				rwc.AddComment(resources.WarnMissingInstanceId)
 				rwc.AddComment(resources.WarnMissingBindingId)
 				rwc.AddComment(resources.WarnServiceInstanceNotUsable)
+				rwc.AddComment(resources.WarnMissingInstanceName)
 				return rwc
 			}(),
 		},
@@ -381,8 +484,8 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 
-	subAccountGuid := "123e4567-e89b-12d3-a456-426614174000"
-	resourceName := fmt.Sprintf("%s-%s", DefaultNamePrefix, subAccountGuid)
+	subAccountGuid := "x123e4567-e89b-12d3-a456-42661417400"
+	resourceName := fmt.Sprintf("%s.%s", defaultNamePrefix, subAccountGuid)
 
 	tests := []struct {
 		name         string
@@ -405,7 +508,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 						ResourceSpec: v1.ResourceSpec{
 							WriteConnectionSecretToReference: &v1.SecretReference{
 								Name:      resourceName,
-								Namespace: DefaultSecretNamespace,
+								Namespace: resources.DefaultSecretNamespace,
 							},
 						},
 						ForProvider: v1beta1.ServiceManagerParameters{
@@ -431,7 +534,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 							ResourceSpec: v1.ResourceSpec{
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
-									Namespace: DefaultSecretNamespace,
+									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 							ForProvider: v1beta1.ServiceManagerParameters{
@@ -448,7 +551,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := defaultServiceManagerResource(t.Context(), nil, tt.subaccountID, nil, false)
+			result := convertDefaultServiceManagerResource(t.Context(), nil, defaultServiceManager(tt.subaccountID), nil, false)
 			r.NotNil(result)
 
 			// Verify comments.

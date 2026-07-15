@@ -24,7 +24,7 @@ import (
 //	test := NewCustomUpgradeTest("my-custom-test").
 //		FromVersion("v1.0.0").
 //		ToVersion("v1.1.0").
-//		WithResourceDirectories([]string{"./testdata/customCRs"}).
+//		WithResourceDirectories([]string{upgradeCRsPath("customCRs")}).
 //		WithCustomPreUpgradeAssessment("Verify custom field", assessFunc).
 //		Build()
 type CustomUpgradeTestBuilder struct {
@@ -92,8 +92,8 @@ func (b *CustomUpgradeTestBuilder) ToVersion(version string) *CustomUpgradeTestB
 // Example:
 //
 //	builder.WithResourceDirectories([]string{
-//	    "./testdata/customCRs/subaccount",
-//	    "./testdata/customCRs/directory",
+//	    upgradeCRsPath("customCRs/subaccount"),
+//	    upgradeCRsPath("customCRs/directory"),
 //	})
 func (b *CustomUpgradeTestBuilder) WithResourceDirectories(dirs []string) *CustomUpgradeTestBuilder {
 	b.resourceDirectories = dirs
@@ -272,7 +272,8 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 func loadPackages(fromTag, toTag string) (string, string, string, string) {
 	return test.LoadUpgradePackages(
 		fromTag, toTag,
-		fromProviderRepository, toProviderRepository, fromControllerRepository, toControllerRepository,
+		fromProviderRepository, toProviderRepository,
+		fromControllerRepository, toControllerRepository,
 		uutImagesEnvVar, localTagName,
 		true,
 	)

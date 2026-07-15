@@ -15,4 +15,4 @@ spec:
         roleTemplateAppId: "cis-local!b14"
         roleTemplateName: "Subaccount_Admin"
   subaccountApiCredentialRef:
-    name: sac-subaccountapicredentials
+    name: sac-int-subaccountapicredentials

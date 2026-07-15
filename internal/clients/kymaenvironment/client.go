@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
@@ -19,12 +19,13 @@ import (
 type Client interface {
 	DescribeInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (
 		*provisioningclient.BusinessEnvironmentInstanceResponseObject,
-		bool, // true if the external name was updated
 		error,
 	)
 	CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error)
 	UpdateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error
-	DeleteInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error
+	// DeleteInstance deletes the Kyma environment using the external-name.
+	// Returns the HTTP response (for status code checking) and any error.
+	DeleteInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (*http.Response, error)
 }
 
 func GenerateObservation(

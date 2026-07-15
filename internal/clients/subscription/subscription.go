@@ -110,9 +110,14 @@ func (s *SubscriptionApiHandler) DeleteSubscription(ctx context.Context, externa
 		return fmt.Errorf("invalid external name %s: %w", externalName, err)
 	}
 
-	if _, err := s.client.SubscriptionOperationsForAppConsumersAPI.
+	raw, err := s.client.SubscriptionOperationsForAppConsumersAPI.
 		DeleteSubscriptionAsync(ctx, appName).
-		Execute(); err != nil {
+		Execute()
+	if err != nil {
+		// Handle 404 as success - resource was already deleted externally
+		if raw != nil && (raw.StatusCode == 404 || raw.StatusCode == 429) {
+			return nil
+		}
 		return specifyAPIError(err)
 	}
 	return nil
@@ -174,16 +179,24 @@ func (s *SubscriptionTypeMapper) SyncStatus(get *SubscriptionGet, crStatus *v1al
 }
 
 func (s *SubscriptionTypeMapper) ConvertToCreatePayload(cr *v1alpha1.Subscription) SubscriptionPost {
+	// Passing { "planName": "" } to the SAP SaaS Provisioning Service API when subscribing creates a new entitled application instead of subscribing to the existing one.
+	// This leaves the existing one with "state": "NOT_SUBSCRIBED".
+	// Observe gets the existing one, tries to subscribe and receives a HTTP 409 Conflict because the subaccount is already subscribed to the application.
+	// We avoid this by omitting the planName when it's empty.
+	var planName *string
+	if cr.Spec.ForProvider.PlanName != "" {
+		planName = &cr.Spec.ForProvider.PlanName
+	}
 	return SubscriptionPost{
 		appName: cr.Spec.ForProvider.AppName,
 		CreateSubscriptionRequestPayload: saas_client.CreateSubscriptionRequestPayload{
-			PlanName:           &cr.Spec.ForProvider.PlanName,
+			PlanName:           planName,
 			SubscriptionParams: s.ConvertToClientParams(cr),
 		},
 	}
 }
 
-func (s *SubscriptionTypeMapper) ConvertToClientParams(cr *v1alpha1.Subscription) map[string]interface{} {
+func (s *SubscriptionTypeMapper) ConvertToClientParams(cr *v1alpha1.Subscription) map[string]any {
 	subscriptionParams, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.SubscriptionParameters.DeepCopy().Raw)
 	if err != nil {
 		return nil
@@ -208,6 +221,11 @@ func splitExternalName(externalName string) (string, string, error) {
 		return "", "", errors.New("incorrect format, should be <appName>/<planName>")
 	}
 	return fragments[0], fragments[1], nil
+}
+
+// FormExternalName creates an external-name from appName and planName (exported for controller use)
+func FormExternalName(appName string, planName string) string {
+	return formExternalName(appName, planName)
 }
 
 // formExternalName combines appName and planName into a single string of the form <appName>/<planName>

@@ -1,0 +1,15 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subaccount
+metadata:
+  namespace: default
+  name: kyma-import-test-subaccount
+spec:
+  forProvider:
+    displayName: "$BUILD_ID-Kyma Environment Import Test"
+    labels:
+      safe-to-delete: ["yes"]
+      BUILD_ID: ["$BUILD_ID"]
+    region: eu20
+    subdomain: $BUILD_ID-kyma-import-e2e-test
+    subaccountAdmins:
+      - $TECHNICAL_USER_EMAIL

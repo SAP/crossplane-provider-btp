@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/providerconfig"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/upjet/pkg/controller"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/providerconfig"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -36,44 +36,64 @@ const (
 
 // Setup adds a controller that reconciles ProviderConfigs by accounting for
 // their current usage.
-func Setup(mgr ctrl.Manager, o controller.Options) error {
+func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	name := providerconfig.ControllerName(v1alpha1.ProviderConfigGroupKind)
 
 	of := resource.ProviderConfigKinds{
 		Config:    v1alpha1.ProviderConfigGroupVersionKind,
+		Usage:     v1alpha1.ProviderConfigUsageGroupVersionKind,
 		UsageList: v1alpha1.ProviderConfigUsageListGroupVersionKind,
 	}
 
 	r := providerconfig.NewReconciler(
 		mgr, of,
 		providerconfig.WithLogger(o.Logger.WithValues("controller", name)),
-		providerconfig.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		providerconfig.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 	)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		WithOptions(o.ForControllerRuntime()).
+		WithOptions(o.ForControllerRuntimeWithBackoff()).
 		For(&v1alpha1.ProviderConfig{}).
 		Watches(&v1alpha1.ProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
 		WithEventFilter(resource.DesiredStateChanged()).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
+// SetupGated is equivalent to Setup for providerconfig (no feature gating needed).
+func SetupGated(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
+	return Setup(mgr, o)
+}
+
+// SetupWebhookWithManager registers the conversion webhook for ProviderConfig.
+func SetupWebhookWithManager(mgr ctrl.Manager) error {
+	if err := ctrl.NewWebhookManagedBy(mgr, &v1alpha1.ProviderConfig{}).
+		Complete(); err != nil {
+		return errors.Wrap(err, "cannot register webhook for the kind v1alpha1.ProviderConfig")
+	}
+	return nil
+}
+
 func CreateClient(
 	ctx context.Context,
 	mg resource.Managed,
 	kube client.Client,
-	track resource.Tracker,
+	track LegacyTracker,
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error),
 	resourcetracker tracking.ReferenceResolverTracker,
 ) (*btp.Client, error) {
 
-	pc, err := ResolveProviderConfig(ctx, mg, kube)
+	lm, ok := mg.(LegacyManaged)
+	if !ok {
+		return nil, errors.New("managed resource does not implement LegacyManaged")
+	}
+
+	pc, err := ResolveProviderConfig(ctx, lm, kube)
 	if err != nil {
 		return nil, errors.Wrap(err, errGetPC)
 	}
 
-	if err = track.Track(ctx, mg); err != nil {
+	if err = track.Track(ctx, lm); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
@@ -95,9 +115,13 @@ func CreateClient(
 	return svc, errors.Wrap(err, errNewClient)
 }
 
-func ResolveProviderConfig(ctx context.Context, mg resource.Managed, kube client.Client) (*v1alpha1.ProviderConfig, error) {
+func ResolveProviderConfig(ctx context.Context, mg LegacyManaged, kube client.Client) (*v1alpha1.ProviderConfig, error) {
 	pc := &v1alpha1.ProviderConfig{}
-	err := kube.Get(ctx, types.NamespacedName{Name: mg.GetProviderConfigReference().Name}, pc)
+	ref := mg.GetProviderConfigReference()
+	if ref == nil {
+		return nil, errors.New("managed resource has no ProviderConfigReference")
+	}
+	err := kube.Get(ctx, types.NamespacedName{Name: ref.Name}, pc)
 	return pc, err
 }
 

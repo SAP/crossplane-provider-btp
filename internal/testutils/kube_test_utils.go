@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	v1 "k8s.io/api/core/v1"
@@ -90,6 +90,7 @@ func (b FakeKubeClientBuilder) Build() test.MockClient {
 		return errors.Errorf("No resource with name %v available", key.Name)
 	}
 	return test.MockClient{
-		MockGet: b.getFn,
+		MockGet:  b.getFn,
+		MockList: test.NewMockListFn(nil),
 	}
 }

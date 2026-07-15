@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/resource/fake"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	corev1 "k8s.io/api/core/v1"
@@ -89,10 +89,11 @@ func TestTerraformSetupBuilder_ConditionalIDP(t *testing.T) {
 					}
 					return nil
 				},
+				MockList: test.NewMockListFn(nil),
 			}
 
 			// Create fake managed resource
-			mg := &fake.Managed{}
+			mg := &fake.LegacyManaged{}
 			mg.SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
 
 			// Call TerraformSetupBuilder
@@ -200,7 +201,7 @@ func TestTerraformSetupBuilderNoTracking_ConditionalIDP(t *testing.T) {
 			}
 
 			// Create fake managed resource
-			mg := &fake.Managed{}
+			mg := &fake.LegacyManaged{}
 			mg.SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
 
 			// Call TerraformSetupBuilderNoTracking

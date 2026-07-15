@@ -1,0 +1,246 @@
+---
+sidebar_position: 0
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Create service instances and subscriptions
+
+This guide shows how to create entitlements, service instances, and subscriptions using the BTP provider. As examples, we'll use the [SAP HANA Cloud](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/using-sap-btp-command-line-interface-btp-cli-with-sap-hana-cloud?locale=en-US&version=LATEST) service and [SAP HANA Cloud Administration Tools](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/subscribing-to-sap-hana-cloud-administration-tools?locale=en-US&version=LATEST) subscription.
+
+## 🚧 Prerequisites
+
+- You've created a running control plane.
+- You've [configured the BTP provider](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp).
+- You've [created and set up a subaccount managed in code](/docs/crossplane-provider-btp/docs/end-user-guides/account/subaccount).
+- You're connected to your control plane.
+
+## Service instance
+
+With the `Entitlement` and `ServiceInstance` custom resources, you can orchestrate [entitlements and service instances](https://help.sap.com/docs/btp/sap-business-technology-platform/entitlements-and-quotas?locale=en-US&version=LATEST) on SAP BTP. The following steps show how to entitle the SAP HANA Cloud service to your managed subaccount and then create a SAP HANA Cloud service instance.
+
+### Create an `Entitlement`
+
+To entitle the SAP HANA Cloud service to your subaccount, apply the `Entitlement` custom resource as described below.
+
+1. Save the following YAML content to `hana-cloud-entitlement.yaml`:
+
+    ```yaml title="hana-cloud-entitlement.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: Entitlement
+    metadata:
+      name: hana-cloud-entitlement
+    spec:
+      forProvider:
+        serviceName: hana-cloud
+        servicePlanName: hana
+        servicePlanUniqueIdentifier: hana-cloud-hana
+        enable: true
+        subaccountRef:
+          name: my-subaccount
+      providerConfigRef:
+        name: account-provider-config
+    ```
+
+    :::note
+    Don't forget to set the `spec.forProvider.servicePlanUniqueIdentifier` field. Use `servicePlanUniqueIdentifier: hana-cloud-hana-sap_eu-de-1` for the SAP Europe Data Center or `servicePlanUniqueIdentifier: hana-cloud-hana` for other supported data centers.
+    :::
+
+    <button onClick={() => window.open("https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/Entitlement/v1alpha1@v1.6.0", "_blank")} className='button button--secondary'>See full CRD reference</button>
+
+2. Apply `hana-cloud-entitlement.yaml` to your control plane:
+
+    ```sh title="Run in terminal"
+    kubectl create -f hana-cloud-entitlement.yaml
+    ```
+
+### Create a `ServiceInstance`
+
+Once the SAP HANA Cloud service is entitled, you can create your first managed service instance. The steps below show how to create a SAP HANA Cloud service instance using our `ServiceInstance` custom resource.
+
+1. Save the following YAML content to `hana-cloud-instance.yaml`:
+
+    <Tabs groupId="service-instance">
+      <TabItem value="yaml" label="YAML params" default>
+        ```yaml {17} title="hana-cloud-instance.yaml"
+        apiVersion: account.btp.sap.crossplane.io/v1alpha1
+        kind: ServiceInstance
+        metadata:
+          name: hana-cloud-instance
+        spec:
+          forProvider:
+            name: hana-cloud-instance
+            serviceManagerRef:
+              name: my-subaccount-service-manager
+            subaccountRef:
+              name: my-subaccount
+            offeringName: hana-cloud
+            planName: hana
+            parameters:
+              data:
+                memory: 16
+                systempassword: Cloud-12345! # TODO change
+                edition: cloud
+          providerConfigRef:
+            name: account-provider-config
+        ```
+      </TabItem>
+      <TabItem value="json" label="JSON params">
+        ```yaml {18} title="hana-cloud-instance.yaml"
+        apiVersion: account.btp.sap.crossplane.io/v1alpha1
+        kind: ServiceInstance
+        metadata:
+          name: hana-cloud-instance
+        spec:
+          forProvider:
+            name: hana-cloud-instance
+            serviceManagerRef:
+              name: my-subaccount-service-manager
+            subaccountRef:
+              name: my-subaccount
+            offeringName: hana-cloud
+            planName: hana
+            parameters: |
+              {
+                "data": {
+                  "memory": 16,
+                  "systempassword": "Cloud-12345!", # TODO change
+                  "edition": "cloud"
+                }
+              }
+          providerConfigRef:
+            name: account-provider-config
+        ```
+      </TabItem>
+    </Tabs>
+
+      :::info
+      Check out all supported parameters for the creation of the SAP HANA Cloud service instance in the [SAP HANA Cloud Administration Guide](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/create-sap-hana-database-instance-using-cli?locale=en-US&version=LATEST).
+      :::
+
+      <button onClick={() => window.open("https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceInstance/v1alpha1@v1.6.0", "_blank")} className='button button--secondary'>See full CRD reference</button>
+
+2. Apply `hana-cloud-instance.yaml` to your control plane:
+
+    ```sh title="Run in terminal"
+    kubectl create -f hana-cloud-instance.yaml
+    ```
+
+That's it! You now have a managed instance of the SAP HANA Cloud service. Your SAP HANA Cloud service instance will be visible in the SAP BTP cockpit too.
+
+## Subscription
+
+With the BTP provider, you can also subscribe to SAP BTP services. The following example guides you through creating a managed subscription to SAP HANA Cloud Administration Tools.
+
+### Create an `Entitlement`
+
+Before subscribing to SAP HANA Cloud Administration Tools, you must entitle the service to your subaccount.
+
+1. Save the following YAML content as `hana-cloud-tools-entitlement.yaml`:
+
+    ```yaml title="hana-cloud-tools-entitlement.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: Entitlement
+    metadata:
+      name: hana-cloud-tools-entitlement
+    spec:
+      forProvider:
+        serviceName: hana-cloud-tools
+        servicePlanName: tools
+        enable: true
+        subaccountRef:
+          name: my-subaccount
+      providerConfigRef:
+        name: account-provider-config
+    ```
+
+2. Apply `hana-cloud-tools-entitlement.yaml` to your control plane:
+
+    ```sh title="Run in terminal"
+    kubectl create -f hana-cloud-tools-entitlement.yaml
+    ```
+
+### Create a `Subscription`
+
+Once the entitlement is in place, you can subscribe to SAP HANA Cloud Administration Tools by using the `Subscription` custom resource.
+
+1. Save the following YAML content as `hana-cloud-tools-subscription.yaml`:
+
+    ```yaml title="hana-cloud-tools-subscription.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: Subscription
+    metadata:
+      name: hana-cloud-tools-subscription
+    spec:
+      forProvider:
+        appName: hana-cloud-tools
+        planName: tools
+      cloudManagementRef:
+        name: cis-local
+    ```
+
+    <button onClick={() => window.open("https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/Subscription/v1alpha1@v1.6.0", "_blank")} className='button button--secondary'>See full CRD reference</button>
+
+2. Apply `hana-cloud-tools-subscription.yaml` to your control plane:
+
+    ```sh title="Run in terminal"
+    kubectl create -f hana-cloud-tools-subscription.yaml
+    ```
+
+:::tip
+SAP HANA Cloud Administration Tools provides [multiple role collections](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/role-collections-for-sap-hana-cloud?locale=en-US&version=LATEST). To assign these to users or user groups, see [Configure user access](/docs/crossplane-provider-btp/docs/end-user-guides/account/usermanagement).
+:::
+
+## Next steps
+
+- [Consume services](/docs/crossplane-provider-btp/docs/end-user-guides/services/consume-service.mdx)
+
+## ⁉ FAQs
+
+### What entitlements are available in my subaccount?
+
+To list available services and plans in your subaccount, run the following commands:
+
+```sh title="Run in terminal"
+btp target # target your subaccount
+btp --format=json list accounts/entitlement | jq '.quotas[] | {service, plan, uniqueIdentifier, quota, unlimited}'
+```
+
+### What's the difference between Crossplane BTP Provider and BTP Service Operator
+
+#### Service Instance Feature Comparison Matrix
+
+| Feature                                    | Crossplane Provider BTP                                                                                                                                                                                    | BTP Service Operator                                                                                                                 |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Create / Update / Delete service instances | ✅ Yes                                                                                                                                                                                                      | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#creating-service-instances)                     |
+| Service parameters                         | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceInstance/v1alpha1@v1.5.0#spec-forProvider-parameters) `.spec.forProvider.parameters`              | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator?tab=readme-ov-file#specifying-parameters) `.spec.parameters`                 |
+| Parameters from secrets                    | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceInstance/v1alpha1@v1.5.0#spec-forProvider-parameterSecretRefs) `.spec.forProvider.parametersFrom` | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator?tab=readme-ov-file#specifying-parameters) `.spec.parametersFrom`             |
+| Watch secret changes                       | 🟡 [In progress](https://github.com/SAP/crossplane-provider-btp/issues/447)                                                                                                                                 | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator?tab=readme-ov-file#specifying-parameters) `.spec.watchParametersFromChanges` |
+| Custom tags (labels)                       | ✅ Yes `.spec.forProvider.labels`                                                                                                                                                                            | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator?tab=readme-ov-file#spec)                                                     |
+| Import of existing resources               | ✅ Yes via `.spec.forProvider.name`                                                                                                                                                                             | ✅ Yes `.spec.externalName`                                                                                                           |
+| Shared instances                           | ✅ Yes `.spec.forProvider.shared`                                                                                                                                                                           | ✅ Yes `.spec.shared`                                                                                                                 |
+| Service plan ID                            | ✅ Yes `.spec.forProvider.servicePlanID`                                                                                                                                                                    | ✅ Yes `.spec.servicePlanID`                                                                                                          |
+| Data center selection                      | ✅ Yes `.spec.forProvider.dataCenter`                                                                                                                                                                       | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/blob/main/api/v1/serviceinstance_types.go#L50) `.spec.dataCenter`            |
+| Prevent deletion                           | ✅ Yes                                                                                                                                                                                                       | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#annotations) (annotation)                       |
+
+**Last update:** 03.06.2026
+
+#### Service Binding Feature Comparison Matrix
+
+| Feature                                   | Crossplane Provider BTP                                                                                                                                                                                                                                                                                     | BTP Service Operator                                                                                                                                |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create / Update / Delete service bindings | ✅ Yes                                                                                                                                                                                                                                                                                                       | ✅ Yes                                                                                                                                               |
+| Binding parameters                        | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-forProvider-parameters)                                                                                                                                               | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#specifying-parameters) `.spec.parameters`                      |
+| Parameters from secrets                   | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-forProvider-parameterSecretRefs)                                                                                                                                      | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#specifying-parameters) `.spec.parametersFrom`                  |
+| Custom secret name                        | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-writeConnectionSecretToRef)                                                                                                                                           | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#spec-1) `.spec.secretName`                                     |
+| Secret key mapping                        | ✅ Yes `.spec.forProvider.secretKey` (bundles credentials into a single JSON key)                                                                                                                                                                                                                             | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#spec-1) `.spec.secretKey`                                      |
+| Secret root key                           | ❌ Create [GitHub Feature Request](https://github.com/SAP/crossplane-provider-btp/issues)                                                                                                                                                                                                                    | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#spec-1) `.spec.secretRootKey`                                  |
+| Custom secret template                    | ❌ [Pending implementation](https://github.com/SAP/crossplane-provider-btp/issues/350)                                                                                                                                                                                                                       | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#custom-formats) `.spec.secretTemplate` (Go templates)          |
+| Credentials rotation                      | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-rotation) (RotationParameters)                                                                                                                                        | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#enabling-automatic-rotation) `.spec.credentialsRotationPolicy` |
+| Rotation frequency                        | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-rotation)                                                                                                                                                             | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#enabling-automatic-rotation) `.spec.credentialsRotationPolicy` |
+| Rotated binding TTL                       | ✅ [Yes](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v1.5.0#spec-rotation)                                                                                                                                                             | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#enabling-automatic-rotation) `.spec.credentialsRotationPolicy` |
+| Force rotation                            | 🟡 Implemented via [annotation](https://github.com/SAP/crossplane-provider-btp/blob/main/internal/clients/account/servicebinding/keyrotator.go#L17) (requires rotation config). [Feature Request #448](https://github.com/SAP/crossplane-provider-btp/issues/448) for force rotation without rotation config | ✅ [Yes](https://github.com/SAP/sap-btp-service-operator/tree/main?tab=readme-ov-file#immediate-rotation) `metadata.annotations`                     |
+| Cross-namespace binding                   | 🟡 Only relevant for Crossplane V2 with namespaced CRDs. Should be included in standard CRD for Crossplane V2 (no feature request needed)                                                                                                                                                                    | ✅ Yes (serviceInstanceNamespace)                                                                                                                    |
+
+**Last update:** 03.06.2026

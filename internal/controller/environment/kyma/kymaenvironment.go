@@ -9,17 +9,19 @@ import (
 	"reflect"
 	"strconv"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/internal"
 
@@ -27,6 +29,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	kymaenv "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -54,11 +57,12 @@ const (
 // is called.
 type connector struct {
 	kube            client.Client
-	usage           resource.Tracker
+	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
 
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
 	log          logr.Logger
+	record       event.Recorder
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
@@ -69,6 +73,28 @@ type external struct {
 	kube       client.Client
 	httpClient *http.Client
 	log        logr.Logger
+	record     event.Recorder
+}
+
+var creationFailureStates = []string{
+	v1alpha1.InstanceStateCreationFailed,
+}
+
+func environmentBeingDeleted(cr *v1alpha1.KymaEnvironment) bool {
+	readyCondition := cr.GetCondition(xpv1.TypeReady)
+	return readyCondition.Status == corev1.ConditionFalse && readyCondition.Reason == xpv1.ReasonDeleting
+}
+
+func (c *external) shouldRecreateOnFailure(cr *v1alpha1.KymaEnvironment, state *string) bool {
+	if !cr.Spec.RecreateOnCreationFailure || state == nil {
+		return false
+	}
+	for _, s := range creationFailureStates {
+		if *state == s {
+			return true
+		}
+	}
+	return false
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -83,14 +109,58 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaEnvironment)
 	}
 
-	instance, hasUpdate, err := c.client.DescribeInstance(ctx, *cr)
+	// Check if external-name is empty first - resource needs creation
+	externalName := meta.GetExternalName(cr)
+	if externalName == "" {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	// Validate external-name format:
+	// - New format (>= v1.2.2): must be a valid UUID
+	// - Legacy format (< v1.2.2): must match the CR name
+	// Legacy external-names are automatically migrated to UUID format below
+	if !internal.IsValidUUID(externalName) && externalName != cr.Name {
+		return managed.ExternalObservation{}, errors.New("external-name must be a valid UUID or legacy name format (name)")
+	}
+
+	instance, err := c.client.DescribeInstance(ctx, *cr)
 
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errCantDescribe)
 	}
 
+	// If instance not found (nil), it's a drift scenario - resource was deleted externally or user defined external-name does not relate to an external resource
+	if instance == nil {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	// Migrate legacy external-name (< v1.2.2) to UUID format
+	// This happens when instance exists with a name-based external-name
+	if instance.Id != nil && *instance.Id != meta.GetExternalName(cr) {
+		meta.SetExternalName(cr, *instance.Id)
+		if err := c.kube.Update(ctx, cr); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, "failed to update external-name to GUID format")
+		}
+	}
+
 	lastModified := cr.Status.AtProvider.ModifiedDate
 	cr.Status.AtProvider = kymaenv.GenerateObservation(instance)
+
+	if c.shouldRecreateOnFailure(cr, cr.Status.AtProvider.State) {
+		var err error
+		if !environmentBeingDeleted(cr) {
+			_, err = c.Delete(ctx, mg)
+		}
+		return managed.ExternalObservation{
+			ResourceExists:    true,
+			ResourceUpToDate:  true,
+			ConnectionDetails: managed.ConnectionDetails{},
+		}, err
+	}
 
 	if cr.Status.AtProvider.State == nil {
 		cr.Status.SetConditions(xpv1.Unavailable())
@@ -106,38 +176,48 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		cr.Status.SetConditions(xpv1.Unavailable())
 	}
 
-	if needsCreation := c.needsCreation(cr); needsCreation {
-		return managed.ExternalObservation{
-			ResourceExists: !needsCreation,
-		}, nil
-	}
-
-	needsUpdate, diff, err := c.needsUpdateWithDiff(cr)
-	if needsUpdate || err != nil {
-		return managed.ExternalObservation{
-			ResourceExists:   true,
-			ResourceUpToDate: !needsUpdate,
-			Diff:             diff,
-		}, errors.Wrap(err, errCheckUpdate)
-	}
-
 	if connectionDetailsNeedUpdate(lastModified, cr) {
 		// remove the connection details from memoization map
 		// to force fetching a new ConnectionDetails object
 		kymaenv.InvalidateConnectionDetails(instance)
 	}
 	details, readErr := kymaenv.GetConnectionDetails(instance, c.httpClient)
+
+	needsUpdate, diff, err := c.needsUpdateWithDiff(cr)
+	if err != nil {
+		return managed.ExternalObservation{
+			ResourceExists:    true,
+			ResourceUpToDate:  !needsUpdate,
+			ConnectionDetails: details,
+		}, errors.Wrap(err, errCheckUpdate)
+	}
+	if needsUpdate {
+		if readErr != nil {
+			// we want to emit an event if there was an error during reading the connection details, because we want to return the details in any case and if it was an error, the details will just be empty. We logged the error below.
+			c.record.Event(cr, event.Warning("ConnectionDetailsReadFailed - Failed to read connection details. While the resource needs update, this can be ignored. Once the resource is updated, the connection details will be refreshed or it will result in an error", readErr))
+		}
+
+		return managed.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: false,
+			// we set the ConnectionDetails even if there was an error during reading them, because we want to return the details in any case and if it was an error, the details will just be empty. We logged the error above.
+			ConnectionDetails: details,
+			Diff:              diff,
+		}, nil
+	}
 	if readErr != nil {
 		return managed.ExternalObservation{
 			ResourceExists:   true,
-			ResourceUpToDate: true,
+			ResourceUpToDate: !needsUpdate,
+			Diff:             diff,
 		}, errors.Wrap(readErr, errGetConnectionDetails)
 	}
+
 	return managed.ExternalObservation{
-		ResourceExists:          true,
-		ResourceUpToDate:        true,
-		ConnectionDetails:       details,
-		ResourceLateInitialized: hasUpdate,
+		ResourceExists:    true,
+		ResourceUpToDate:  true,
+		ConnectionDetails: details,
+		Diff:              diff,
 	}, nil
 }
 
@@ -192,20 +272,32 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotKymaEnvironment)
 	}
+
 	c.tracker.SetConditions(ctx, cr)
 	if blocked := c.tracker.DeleteShouldBeBlocked(mg); blocked {
 		return managed.ExternalDelete{}, errors.New(providerv1alpha1.ErrResourceInUse)
 	}
 
-	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateDeleting {
-		return managed.ExternalDelete{}, nil
+	cr.SetConditions(xpv1.Deleting())
+
+	// Check if resource is already in deletion state
+	if cr.Status.AtProvider.State != nil {
+		state := *cr.Status.AtProvider.State
+		if state == v1alpha1.InstanceStateDeleting {
+			// Already deleting, no need to call delete again
+			return managed.ExternalDelete{}, nil
+		}
 	}
 
-	return managed.ExternalDelete{}, errors.Wrap(c.client.DeleteInstance(ctx, *cr), errDelete)
-}
-
-func (c *external) needsCreation(cr *v1alpha1.KymaEnvironment) bool {
-	return cr.Status.AtProvider.State == nil
+	resp, err := c.client.DeleteInstance(ctx, *cr)
+	// Don't treat 404 as error - resource was already deleted externally
+	if err != nil && resp != nil && resp.StatusCode == http.StatusNotFound {
+		return managed.ExternalDelete{}, nil
+	}
+	if err != nil {
+		return managed.ExternalDelete{}, errors.Wrap(err, errDelete)
+	}
+	return managed.ExternalDelete{}, nil
 }
 
 func (c *external) needsUpdateWithDiff(cr *v1alpha1.KymaEnvironment) (bool, string, error) {

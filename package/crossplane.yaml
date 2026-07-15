@@ -1,4 +1,4 @@
-apiVersion: meta.pkg.crossplane.io/v1alpha1
+apiVersion: meta.pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-btp
@@ -10,8 +10,4 @@ metadata:
     friendly-name.meta.crossplane.io: Provider BTP
     meta.crossplane.io/description: |
       A Crossplane Provider for SAP BTP. Supports with management of Subaccounts, Environments, Entitlements and Services.
-
-spec:
-  controller:
-    image: DOCKER_REGISTRY/crossplane/provider-btp-controller:VERSION
 

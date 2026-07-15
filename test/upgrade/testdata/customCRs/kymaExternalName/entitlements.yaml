@@ -1,0 +1,25 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: kyma-azure-entitlement-extn
+  namespace: default
+spec:
+  forProvider:
+    serviceName: kymaruntime
+    servicePlanName: azure
+    amount: 1
+    subaccountRef:
+      name: upgrade-test-kyma-extn-sa
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: cis-local-entitlement-kyma-extn
+  namespace: default
+spec:
+  forProvider:
+    serviceName: cis
+    servicePlanName: local
+    enable: true
+    subaccountRef:
+      name: upgrade-test-kyma-extn-sa

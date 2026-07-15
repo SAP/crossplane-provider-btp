@@ -1,6 +1,6 @@
 // This tool scans all *_types.go files in the apis directory, extracts External-Name
 // Configuration comments from resource type definitions, and generates comprehensive
-// documentation in docs/user/external-name.md.
+// documentation in docs/end-user-guides/import-landscape/external-name.md.
 //
 // The External-Name Configuration comment format should be:
 //
@@ -39,7 +39,7 @@ const (
 	// defaultApisDir is the default directory containing API type definitions
 	defaultApisDir = "apis"
 	// defaultDocsFile is the default path to the external-name documentation file
-	defaultDocsFile = "docs/user/external-name.md"
+	defaultDocsFile = "docs/end-user-guides/import-landscape/external-name.md"
 )
 
 var (
@@ -162,6 +162,8 @@ func extractFromFile(filePath string) (*ResourceConfig, error) {
 	commentRegex := regexp.MustCompile(`^\s*//\s*(.*)$`)
 	// Regex to match type definition
 	typeRegex := regexp.MustCompile(`^type\s+([A-Za-z0-9_]+)\s+struct`)
+	// Regex to match explicit resource name annotation: - Resource: TypeName
+	resourceAnnotationRegex := regexp.MustCompile(`^\s*-\s+Resource:\s+([A-Za-z0-9_]+)\s*$`)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -178,12 +180,32 @@ func extractFromFile(filePath string) (*ResourceConfig, error) {
 				// Empty comment line ends the External-Name block
 				if strings.TrimSpace(content) == "" {
 					state = stateAfterComment
+					// If resource name was already set via annotation, return now
+					if resourceName != "" {
+						return &ResourceConfig{
+							Name:    resourceName,
+							Content: formatCommentContent(commentLines),
+						}, nil
+					}
 				} else {
-					commentLines = append(commentLines, content)
+					// Check for explicit resource name annotation
+					if annotationMatches := resourceAnnotationRegex.FindStringSubmatch(content); annotationMatches != nil {
+						resourceName = annotationMatches[1]
+						// Don't include the Resource: line in the docs content
+					} else {
+						commentLines = append(commentLines, content)
+					}
 				}
 			} else {
 				// Non-comment line, stop collecting
 				state = stateAfterComment
+				// If resource name was already set via annotation, return now
+				if resourceName != "" {
+					return &ResourceConfig{
+						Name:    resourceName,
+						Content: formatCommentContent(commentLines),
+					}, nil
+				}
 			}
 
 		case stateAfterComment:
@@ -200,6 +222,14 @@ func extractFromFile(filePath string) (*ResourceConfig, error) {
 
 	if err := scanner.Err(); err != nil {
 		return nil, err
+	}
+
+	// Handle case where file ends without a trailing empty comment line
+	if resourceName != "" {
+		return &ResourceConfig{
+			Name:    resourceName,
+			Content: formatCommentContent(commentLines),
+		}, nil
 	}
 
 	return nil, nil
@@ -247,7 +277,7 @@ func generateDocumentation(configs []ResourceConfig) string {
 		if i > 0 {
 			sb.WriteString("\n")
 		}
-		sb.WriteString(fmt.Sprintf("### %s\n\n", config.Name))
+		fmt.Fprintf(&sb, "### %s\n\n", config.Name)
 		sb.WriteString(config.Content)
 		sb.WriteString("\n")
 	}

@@ -5,16 +5,17 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/btp"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	service "github.com/sap/crossplane-provider-btp/internal/clients/security/rolecollection"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -59,7 +60,7 @@ var configureRoleCollectionMaintainerFn = func(binding *v1alpha1.XsuaaBinding) (
 
 type connector struct {
 	kube            client.Client
-	usage           resource.Tracker
+	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
 	newServiceFn    func(binding *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error)
 }
@@ -70,7 +71,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotRoleCollection)
 	}
 
-	if err := c.usage.Track(ctx, mg); err != nil {
+	if err := c.usage.Track(ctx, mg.(providerconfig.LegacyManaged)); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
@@ -108,7 +109,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotRoleCollection)
 	}
 
-	obs, err := c.client.GenerateObservation(ctx, meta.GetExternalName(cr))
+	// Check if external-name is empty (ADR requirement)
+	externalName := meta.GetExternalName(cr)
+	if externalName == "" {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	// Use external-name to query the API. If the resource is not found, GenerateObservation will return with an empty name that will be later used in NeedsCreation.
+	obs, err := c.client.GenerateObservation(ctx, externalName)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetRolecollection)
 	}

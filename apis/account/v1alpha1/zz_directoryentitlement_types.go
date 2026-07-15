@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 type DirectoryEntitlementInitParameters struct {
@@ -63,8 +63,8 @@ type DirectoryEntitlementInitParameters struct {
 	// The name of the entitled service plan.
 	PlanName *string `json:"planName,omitempty" tf:"plan_name,omitempty"`
 
-	// (String) The unique identifier of the service plan.
-	// The unique identifier of the service plan.
+	// (String) The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
+	// The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
 	PlanUniqueIdentifier *string `json:"planUniqueIdentifier,omitempty" tf:"plan_unique_identifier,omitempty"`
 
 	// (String) The name of the entitled service.
@@ -119,8 +119,8 @@ type DirectoryEntitlementObservation struct {
 	// The name of the entitled service plan.
 	PlanName *string `json:"planName,omitempty" tf:"plan_name,omitempty"`
 
-	// (String) The unique identifier of the service plan.
-	// The unique identifier of the service plan.
+	// (String) The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
+	// The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
 	PlanUniqueIdentifier *string `json:"planUniqueIdentifier,omitempty" tf:"plan_unique_identifier,omitempty"`
 
 	// (String) The name of the entitled service.
@@ -172,8 +172,8 @@ type DirectoryEntitlementParameters struct {
 	// +kubebuilder:validation:Optional
 	PlanName *string `json:"planName,omitempty" tf:"plan_name,omitempty"`
 
-	// (String) The unique identifier of the service plan.
-	// The unique identifier of the service plan.
+	// (String) The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
+	// The unique identifier of the service plan. The unique identifier for service plans is required only if you need to differentiate between identical plans that have different pricing.
 	// +kubebuilder:validation:Optional
 	PlanUniqueIdentifier *string `json:"planUniqueIdentifier,omitempty" tf:"plan_unique_identifier,omitempty"`
 

@@ -6,23 +6,24 @@ import (
 	"github.com/SAP/xp-clifford/cli/export"
 	"github.com/SAP/xp-clifford/erratt"
 	"github.com/SAP/xp-clifford/yaml"
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicemanager"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
-func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCli, si *servicemanager.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
+func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCli, si *serviceinstancebase.ServiceInstance, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
 	serviceName := si.OfferingName
 	servicePlanName := si.PlanName
 	subAccountGuid := si.SubaccountID
 	resourceName := si.GenerateK8sResourceName()
 	externalName := si.GetExternalName()
 	instanceID := si.ID
+	instanceName := si.Name
 	smName := si.ServiceManagerName
 
 	serviceInstance := yaml.NewResourceWithComment(
@@ -44,7 +45,7 @@ func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCl
 					},
 				},
 				ForProvider: v1alpha1.ServiceInstanceParameters{
-					Name:         si.Name,
+					Name:         instanceName,
 					OfferingName: serviceName,
 					PlanName:     servicePlanName,
 					SubaccountID: &subAccountGuid,
@@ -80,8 +81,14 @@ func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCl
 	if instanceID == "" {
 		serviceInstance.AddComment(resources.WarnMissingInstanceId)
 	}
+	if instanceName == "" {
+		serviceInstance.AddComment(resources.WarnMissingInstanceName)
+	}
 	if !si.Usable {
 		serviceInstance.AddComment(resources.WarnServiceInstanceNotUsable)
+	}
+	if smName == "" {
+		serviceInstance.AddComment(resources.WarnMissingServiceManagerName)
 	}
 
 	// Reference subaccount resource, if requested.

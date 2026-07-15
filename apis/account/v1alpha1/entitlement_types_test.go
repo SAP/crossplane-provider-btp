@@ -3,7 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 

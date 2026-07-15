@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 type SubaccountServiceInstanceInitParameters struct {
@@ -39,9 +39,17 @@ type SubaccountServiceInstanceInitParameters struct {
 	// The configuration parameters for the service instance.
 	Parameters *string `json:"parameters,omitempty" tf:"parameters,omitempty"`
 
+	// (String) The name of the service offering of the plan.
+	// The name of the service offering of the plan.
+	ServiceOfferingName *string `json:"serviceOfferingName,omitempty" tf:"service_offering_name,omitempty"`
+
 	// (String) The ID of the service plan.
 	// The ID of the service plan.
 	ServiceplanID *string `json:"serviceplanId,omitempty" tf:"serviceplan_id,omitempty"`
+
+	// (String) The name of the service plan.
+	// The name of the service plan.
+	ServiceplanName *string `json:"serviceplanName,omitempty" tf:"serviceplan_name,omitempty"`
 
 	// (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
 	// The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
@@ -96,9 +104,17 @@ type SubaccountServiceInstanceObservation struct {
 	// The ID of the instance to which the service instance refers.
 	ReferencedInstanceID *string `json:"referencedInstanceId,omitempty" tf:"referenced_instance_id,omitempty"`
 
+	// (String) The name of the service offering of the plan.
+	// The name of the service offering of the plan.
+	ServiceOfferingName *string `json:"serviceOfferingName,omitempty" tf:"service_offering_name,omitempty"`
+
 	// (String) The ID of the service plan.
 	// The ID of the service plan.
 	ServiceplanID *string `json:"serviceplanId,omitempty" tf:"serviceplan_id,omitempty"`
+
+	// (String) The name of the service plan.
+	// The name of the service plan.
+	ServiceplanName *string `json:"serviceplanName,omitempty" tf:"serviceplan_name,omitempty"`
 
 	// (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
 	// The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
@@ -134,10 +150,20 @@ type SubaccountServiceInstanceParameters struct {
 	// +kubebuilder:validation:Optional
 	Parameters *string `json:"parameters,omitempty" tf:"parameters,omitempty"`
 
+	// (String) The name of the service offering of the plan.
+	// The name of the service offering of the plan.
+	// +kubebuilder:validation:Optional
+	ServiceOfferingName *string `json:"serviceOfferingName,omitempty" tf:"service_offering_name,omitempty"`
+
 	// (String) The ID of the service plan.
 	// The ID of the service plan.
 	// +kubebuilder:validation:Optional
 	ServiceplanID *string `json:"serviceplanId,omitempty" tf:"serviceplan_id,omitempty"`
+
+	// (String) The name of the service plan.
+	// The name of the service plan.
+	// +kubebuilder:validation:Optional
+	ServiceplanName *string `json:"serviceplanName,omitempty" tf:"serviceplan_name,omitempty"`
 
 	// (Boolean) The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
 	// The configuration parameter for service instance sharing. Ensure that the instance is created with a plan that supports instance sharing.
@@ -187,7 +213,6 @@ type SubaccountServiceInstance struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="!('*' in self.managementPolicies || 'Create' in self.managementPolicies || 'Update' in self.managementPolicies) || has(self.forProvider.name) || (has(self.initProvider) && has(self.initProvider.name))",message="spec.forProvider.name is a required parameter"
-	// +kubebuilder:validation:XValidation:rule="!('*' in self.managementPolicies || 'Create' in self.managementPolicies || 'Update' in self.managementPolicies) || has(self.forProvider.serviceplanId) || (has(self.initProvider) && has(self.initProvider.serviceplanId))",message="spec.forProvider.serviceplanId is a required parameter"
 	// +kubebuilder:validation:XValidation:rule="!('*' in self.managementPolicies || 'Create' in self.managementPolicies || 'Update' in self.managementPolicies) || has(self.forProvider.subaccountId) || (has(self.initProvider) && has(self.initProvider.subaccountId))",message="spec.forProvider.subaccountId is a required parameter"
 	Spec   SubaccountServiceInstanceSpec   `json:"spec"`
 	Status SubaccountServiceInstanceStatus `json:"status,omitempty"`

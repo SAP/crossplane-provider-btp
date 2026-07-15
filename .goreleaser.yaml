@@ -20,10 +20,33 @@ builds:
       - goos: darwin
         goarch: "386"
     binary: "{{ .ProjectName }}_v{{ .Version }}"
+  - id: exporter-build
+    env:
+      - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    main: ./cmd/exporter
+    flags:
+      - -trimpath
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: darwin
+        goarch: "386"
+    binary: "{{ .ProjectName }}_exporter_v{{ .Version }}"
 archives:
-  - format: zip
-    builds:
+  - id: provider-archive
+    formats: [zip]
+    ids:
       - binary-build
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: exporter-archive
+    formats: [binary]
+    ids:
+      - exporter-build
+    name_template: "{{ .ProjectName }}_exporter_v{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 changelog:
   use: github-native

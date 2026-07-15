@@ -6,19 +6,26 @@ import (
 	"net/http"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	kymabinding "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironmentbinding"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
+	"github.com/sap/crossplane-provider-btp/internal/reconcilerutil"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
+)
+
+const (
+	reasonStatusUpdate event.Reason = "StatusUpdate"
 )
 
 const (
@@ -43,8 +50,9 @@ const (
 // is called.
 type connector struct {
 	kube            client.Client
-	usage           resource.Tracker
+	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
+	record          event.Recorder
 
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
 }
@@ -54,6 +62,7 @@ type connector struct {
 type external struct {
 	client  kymabinding.Client
 	tracker tracking.ReferenceResolverTracker
+	record  event.Recorder
 
 	httpClient *http.Client
 	kube       client.Client
@@ -71,7 +80,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaEnvironmentBinding)
 	}
 
-	if cr.GetWriteConnectionSecretToReference() == nil && cr.GetPublishConnectionDetailsTo() == nil {
+	if cr.GetWriteConnectionSecretToReference() == nil {
 		return managed.ExternalObservation{}, errors.New(errNoSecretsToPublish)
 	}
 
@@ -79,9 +88,21 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateBindings)
 	}
-	validBindings, bindings := c.validateBindings(cr)
-	cr.Status.AtProvider.Bindings = bindings
-	_ = c.kube.Status().Update(ctx, cr)
+	var validBindings bool
+	var expiredBindings []v1alpha1.Binding
+	if err := reconcilerutil.UpdateStatusWithRetry(ctx, c.kube, cr, 3, func(cr *v1alpha1.KymaEnvironmentBinding) error {
+		validBindings, cr.Status.AtProvider.Bindings, expiredBindings = c.validateBindings(cr)
+		return nil
+	}); err != nil {
+		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, "while updating status during observe")))
+	}
+
+	// Delete expired bindings from BTP API to prevent orphaned resources
+	if len(expiredBindings) > 0 {
+		if err := c.client.DeleteInstances(ctx, expiredBindings, cr.Spec.KymaEnvironmentId); err != nil {
+			c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(err, "while deleting expired bindings. This binding will be orphanedd in the external system")))
+		}
+	}
 	if !validBindings {
 		return managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: true}, nil
 	}
@@ -119,15 +140,17 @@ func (c *external) updateBindingsFromService(ctx context.Context, cr *v1alpha1.K
 	return nil
 }
 
-// validateBindings checks if bindings in status are still active (did not reach rotation deadline) or not yet expired (reached time to live)
-func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, []v1alpha1.Binding) {
+// validateBindings checks if bindings in status are still active (did not reach rotation deadline) or not yet expired (reached time to live).
+// Returns: hasActiveBinding, validBindings (non-expired), expiredBindings (TTL-expired, to be deleted from BTP API).
+func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, []v1alpha1.Binding, []v1alpha1.Binding) {
 	bindings := cr.Status.AtProvider.Bindings
 	if bindings == nil {
-		return false, nil
+		return false, nil, nil
 	}
 
 	hasActiveBinding := false
 	validBindings := []v1alpha1.Binding{}
+	expiredBindings := []v1alpha1.Binding{}
 	now := time.Now()
 
 	// First pass: deactivate bindings that need rotation or are expired
@@ -149,14 +172,16 @@ func (c *external) validateBindings(cr *v1alpha1.KymaEnvironmentBinding) (bool, 
 		}
 	}
 
-	// Second pass: keep non-expired bindings (active or inactive)
+	// Second pass: separate non-expired from expired bindings
 	for _, b := range bindings {
 		if !ttlIsExpired(&b, now) {
 			validBindings = append(validBindings, b)
+		} else {
+			expiredBindings = append(expiredBindings, b)
 		}
 	}
 
-	return hasActiveBinding, validBindings
+	return hasActiveBinding, validBindings, expiredBindings
 }
 
 func reachedRotationDeadline(now time.Time, b *v1alpha1.Binding, cr *v1alpha1.KymaEnvironmentBinding) bool {
@@ -166,6 +191,15 @@ func reachedRotationDeadline(now time.Time, b *v1alpha1.Binding, cr *v1alpha1.Ky
 
 func ttlIsExpired(b *v1alpha1.Binding, now time.Time) bool {
 	return b.ExpiresAt.Time.Before(now)
+}
+
+func appendIfNotExists(bindings []v1alpha1.Binding, newBinding v1alpha1.Binding) []v1alpha1.Binding {
+	for _, b := range bindings {
+		if b.Id == newBinding.Id {
+			return bindings
+		}
+	}
+	return append(bindings, newBinding)
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -194,8 +228,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		ExpiresAt: metav1.NewTime(clientBinding.Metadata.ExpiresAt.UTC()),
 	}
 
-	// Add new binding to status
-	cr.Status.AtProvider.Bindings = append(cr.Status.AtProvider.Bindings, newBinding)
 	// Prepare connection details
 	connectionDetails := managed.ConnectionDetails{
 		"binding_id": []byte(newBinding.Id),
@@ -204,9 +236,28 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		"kubeconfig": []byte(clientBinding.Credentials.Kubeconfig),
 	}
 
+	// Try to update status with retry, re-applying the new binding on conflict re-fetch
+	statusErr := reconcilerutil.UpdateStatusWithRetry(ctx, c.kube, cr, 5, func(cr *v1alpha1.KymaEnvironmentBinding) error {
+		cr.Status.AtProvider.Bindings = appendIfNotExists(cr.Status.AtProvider.Bindings, newBinding)
+		return nil
+	})
+	if statusErr != nil {
+		c.record.Event(cr, event.Warning(reasonStatusUpdate, errors.Wrap(statusErr, "while updating status during creation - rolling back binding (binding will be deleted again)")))
+		// Status update failed after all retries. Roll back the binding on the provisioning API
+		// to prevent it from becoming orphaned and consuming quota.
+		rollbackErr := c.client.DeleteInstances(ctx, []v1alpha1.Binding{newBinding}, cr.Spec.KymaEnvironmentId)
+		if rollbackErr != nil {
+			return managed.ExternalCreation{}, errors.Wrap(rollbackErr, "failed to roll back binding after status update failure: "+errCreate)
+		}
+		return managed.ExternalCreation{
+			// In case the status update errored, we return ConnectionDetails nil and an error. Due to the error return, existing connectionDetails will not be updated by crossplane.
+			ConnectionDetails: nil,
+		}, errors.Wrap(statusErr, errStatusUpdate)
+	}
+
 	return managed.ExternalCreation{
 		ConnectionDetails: connectionDetails,
-	}, errors.Wrap(c.kube.Status().Update(ctx, cr), errStatusUpdate)
+	}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {

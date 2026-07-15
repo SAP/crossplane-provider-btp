@@ -5,15 +5,15 @@ import (
 	"testing"
 
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
@@ -46,6 +46,38 @@ func TestObserve(t *testing.T) {
 		args args
 		want want
 	}{
+		// External name handling tests (ADR compliance)
+		"EmptyExternalName": {
+			args: args{
+				cr:     cr("spec-subaccount-admin-co", WithExternalName("")),
+				client: &RoleMaintainerMock{
+					// Client should not be called when external-name is empty
+				},
+			},
+			want: want{
+				cr:               cr("spec-subaccount-admin-co", WithExternalName("")),
+				o:                managed.ExternalObservation{ResourceExists: false},
+				err:              nil,
+				CalledIdentifier: "", // Not called
+			},
+		},
+		"ValidNameDoesNotExist404": {
+			args: args{
+				cr: cr("spec-subaccount-admin-co", WithExternalName("ext-subaccount-admin-co")),
+				client: &RoleMaintainerMock{
+					err:                 nil,
+					needsCreation:       true,
+					generateObservation: v1alpha1.RoleCollectionObservation{Name: nil}, // 404 returns empty observation
+				},
+			},
+			want: want{
+				cr:               cr("spec-subaccount-admin-co", WithExternalName("ext-subaccount-admin-co"), WithObservation(v1alpha1.RoleCollectionObservation{Name: nil})),
+				o:                managed.ExternalObservation{ResourceExists: false},
+				err:              nil,
+				CalledIdentifier: "ext-subaccount-admin-co",
+			},
+		},
+		// Original tests
 		"LookupError": {
 			args: args{
 				cr: cr("spec-subaccount-admin-co", WithExternalName("ext-subaccount-admin-co")),
@@ -143,10 +175,42 @@ func TestCreate(t *testing.T) {
 		err error
 	}
 
+	alreadyExistsErr := errors.New("resource already exists")
+
 	cases := map[string]struct {
 		args args
 		want want
 	}{
+		// ADR compliance tests
+		"SuccessfulCreationSetsExternalName": {
+			args: args{
+				cr: cr("subaccount-admin-co"),
+				client: &RoleMaintainerMock{
+					err:              nil,
+					CalledIdentifier: "subaccount-admin-co",
+				},
+			},
+			want: want{
+				cr: cr("subaccount-admin-co", WithExternalName("subaccount-admin-co"), WithConditions(xpv1.Creating())),
+				o: managed.ExternalCreation{
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+			},
+		},
+		"ResourceAlreadyExistsErrorDoesNotSetExternalName": {
+			args: args{
+				cr: cr("subaccount-admin-co"),
+				client: &RoleMaintainerMock{
+					err: alreadyExistsErr,
+				},
+			},
+			want: want{
+				cr:  cr("subaccount-admin-co", WithConditions(xpv1.Creating())), // No external name set
+				o:   managed.ExternalCreation{},
+				err: alreadyExistsErr,
+			},
+		},
+		// Original tests
 		"api error": {
 			args: args{
 				cr: cr("subaccount-admin-co"),
@@ -276,6 +340,32 @@ func TestDelete(t *testing.T) {
 		args args
 		want want
 	}{
+		// external name ADR compliance tests
+		"DeletionWithValidExternalName": {
+			args: args{
+				cr: cr("subaccount-admin-co", WithExternalName("ext-subaccount-admin-co")),
+				client: &RoleMaintainerMock{
+					err: nil,
+				},
+			},
+			want: want{
+				cr:               cr("subaccount-admin-co", WithExternalName("ext-subaccount-admin-co"), WithConditions(xpv1.Deleting())),
+				CalledIdentifier: "ext-subaccount-admin-co",
+			},
+		},
+		"404ResponseNotTreatedAsError": {
+			args: args{
+				cr: cr("subaccount-admin-co", WithExternalName("ext-subaccount-admin-co")),
+				client: &RoleMaintainerMock{
+					err: nil, // The client implementation already handles 404 gracefully
+				},
+			},
+			want: want{
+				cr:               cr("subaccount-admin-co", WithExternalName("ext-subaccount-admin-co"), WithConditions(xpv1.Deleting())),
+				CalledIdentifier: "ext-subaccount-admin-co",
+			},
+		},
+		// Original tests
 		"api error": {
 			args: args{
 				cr: cr("subaccount-admin-co", WithExternalName("ext-subaccount-admin-co")),
@@ -346,7 +436,7 @@ func TestConnect(t *testing.T) {
 
 	type args struct {
 		cr              *v1alpha1.RoleCollection
-		track           resource.Tracker
+		track           providerconfig.LegacyTracker
 		resourcetracker tracking.ReferenceResolverTracker
 		kube            client.Client
 		newServiceFn    func(_ *v1alpha1.XsuaaBinding) (RoleCollectionMaintainer, error)
@@ -592,7 +682,7 @@ func cr(name string, m ...RoleCollectionModifier) *v1alpha1.RoleCollection {
 	return cr
 }
 
-func newTracker(err error) resource.Tracker {
+func newTracker(err error) providerconfig.LegacyTracker {
 	return &tracker{err: err}
 }
 
@@ -643,7 +733,7 @@ type tracker struct {
 	err error
 }
 
-func (t *tracker) Track(ctx context.Context, mg resource.Managed) error {
+func (t *tracker) Track(ctx context.Context, mg providerconfig.LegacyManaged) error {
 	return t.err
 }
 

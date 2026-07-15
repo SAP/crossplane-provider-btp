@@ -2,13 +2,12 @@ package servicebinding
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -18,13 +17,14 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
+	"github.com/sap/crossplane-provider-btp/internal/reconcilerutil"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
 const (
 	errNotServiceBinding    = "managed resource is not a ServiceBinding custom resource"
 	errCreateBinding        = "cannot create servicebinding"
-	errObserveSaveBinding   = "cannot save observed data"
 	errUpdateStatus         = "cannot update status"
 	errGetBinding           = "cannot get servicebinding"
 	errDeleteExpiredKeys    = "cannot delete expired keys"
@@ -77,7 +77,7 @@ var newSBKeyRotatorFn = func(bindingDeleter servicebindingclient.BindingDeleter)
 
 type connector struct {
 	kube              kubeclient.Client
-	usage             resource.Tracker
+	usage             providerconfig.LegacyTracker
 	resourcetracker   tracking.ReferenceResolverTracker
 	clientFactory     ServiceBindingClientFactory
 	newSBKeyRotatorFn func(servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator
@@ -149,18 +149,23 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	if observation.ResourceUpToDate && tfResource != nil {
-		if err := e.updateServiceBindingFromTfResource(cr, tfResource); err != nil {
-			return managed.ExternalObservation{}, errors.Wrap(err, errObserveSaveBinding)
-		}
-
-		if err := e.kube.Status().Update(ctx, cr); err != nil {
+		if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) error {
+			return e.updateServiceBindingFromTfResource(cr, tfResource)
+		}); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
 		}
 	}
 
-	observation.ConnectionDetails, err = flattenSecretData(observation.ConnectionDetails)
+	observation.ConnectionDetails, err = processConnectionDetails(cr, observation.ConnectionDetails)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errFlattenSecret)
+	}
+
+	if cr.Spec.SecretFormat == SecretFormatSAPKubernetes && observation.ConnectionDetails != nil {
+		observation.ConnectionDetails, err = e.enrichWithSAPMetadata(ctx, cr, observation.ConnectionDetails)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, "cannot enrich connection details")
+		}
 	}
 
 	observation.ResourceUpToDate = observation.ResourceUpToDate && !e.keyRotator.HasExpiredKeys(cr)
@@ -169,14 +174,17 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	e.keyRotator.ValidateRotationSettings(cr)
 
 	// Retire binding conditionally
-	if !e.keyRotator.RetireBinding(cr) {
+	if !e.keyRotator.NeedRetirement(cr) {
 		if !cr.GetDeletionTimestamp().IsZero() {
 			return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 		}
 		return observation, nil
 	}
 
-	if err := e.kube.Status().Update(ctx, cr); err != nil {
+	if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 5, func(cr *v1alpha1.ServiceBinding) error {
+		e.keyRotator.RetireBinding(cr)
+		return nil
+	}); err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateStatus)
 	}
 
@@ -217,6 +225,18 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
+	creation.ConnectionDetails, err = processConnectionDetails(cr, creation.ConnectionDetails)
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errFlattenSecret)
+	}
+
+	if cr.Spec.SecretFormat == SecretFormatSAPKubernetes && creation.ConnectionDetails != nil {
+		creation.ConnectionDetails, err = e.enrichWithSAPMetadata(ctx, cr, creation.ConnectionDetails)
+		if err != nil {
+			return managed.ExternalCreation{}, errors.Wrap(err, "cannot enrich connection details")
+		}
+	}
+
 	return creation, nil
 }
 
@@ -233,11 +253,12 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	// Clean up expired keys if there are any retired keys
 	newRetiredKeys, deleteErr := e.keyRotator.DeleteExpiredKeys(ctx, cr)
 
-	cr.Status.RetiredKeys = newRetiredKeys
-
 	// store the result in the status even if errors are returned,
 	// to remove keys for those where deletion was successfull
-	if err := e.kube.Status().Update(ctx, cr); err != nil {
+	if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) error {
+		cr.Status.RetiredKeys = newRetiredKeys
+		return nil
+	}); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateStatus)
 	}
 	if deleteErr != nil {
@@ -363,31 +384,4 @@ func parseIso8601Date(t string) (metav1.Time, error) {
 	return metav1.Time{
 		Time: iTime,
 	}, nil
-}
-
-// flattenSecretData takes a map[string][]byte and flattens any JSON object values into the result map.
-// For each key whose value is a JSON object, its keys/values are added to the result map as top-level entries.
-// Non-JSON values are kept as-is.
-func flattenSecretData(secretData map[string][]byte) (map[string][]byte, error) {
-	result := make(map[string][]byte)
-	for k, v := range secretData {
-		var jsonMap map[string]any
-		if err := json.Unmarshal(v, &jsonMap); err == nil {
-			for jk, jv := range jsonMap {
-				switch val := jv.(type) {
-				case string:
-					result[jk] = []byte(val)
-				default:
-					b, err := json.Marshal(val)
-					if err != nil {
-						return nil, err
-					}
-					result[jk] = b
-				}
-			}
-		} else {
-			result[k] = v
-		}
-	}
-	return result, nil
 }

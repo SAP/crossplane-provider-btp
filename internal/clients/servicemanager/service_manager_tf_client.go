@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"strings"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/pkg/errors"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 
 	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +43,7 @@ type Defaults struct {
 	BindingName  string `json:"bindingName,omitempty"`
 }
 
-func NewServiceManagerTfClient(sConnector managed.ExternalConnecter, sbConnector managed.ExternalConnecter, defaults Defaults) *TfClientInitializer {
+func NewServiceManagerTfClient(sConnector managed.ExternalConnector, sbConnector managed.ExternalConnector, defaults Defaults) *TfClientInitializer {
 	return &TfClientInitializer{
 		siConnector: sConnector,
 		sbConnector: sbConnector,
@@ -54,8 +55,8 @@ func NewServiceManagerTfClient(sConnector managed.ExternalConnecter, sbConnector
 var _ ITfClientInitializer = &TfClientInitializer{}
 
 type TfClientInitializer struct {
-	siConnector managed.ExternalConnecter
-	sbConnector managed.ExternalConnecter
+	siConnector managed.ExternalConnector
+	sbConnector managed.ExternalConnector
 
 	defaults Defaults
 }
@@ -284,5 +285,6 @@ func mapTfConnectionDetails(conDetails map[string][]byte) (managed.ConnectionDet
 		apisv1beta1.ResourceCredentialsXsuaaUrl:          []byte(internal.Val(creds.Url)),
 		apisv1beta1.ResourceCredentialsXsappname:         []byte(internal.Val(creds.Xsappname)),
 		apisv1beta1.ResourceCredentialsXsuaaUrlSufix:     []byte("/oauth/token"),
+		providerv1alpha1.RawBindingKey:                   bindingAsBytes,
 	}, nil
 }

@@ -4,14 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 )
+
+type NeedsExternalNameFormatMigration bool
 
 type Client interface {
 	DescribeInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (
@@ -21,7 +25,7 @@ type Client interface {
 	)
 	CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error)
 	UpdateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error
-	DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error
+	DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error)
 
 	NeedsUpdate(cr v1alpha1.CloudFoundryEnvironment) bool
 }
@@ -102,7 +106,7 @@ func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstan
 		return managed.ConnectionDetails{}, err
 	}
 	details := managed.ConnectionDetails{
-		v1alpha1.ResourceRaw: label,
+		providerv1alpha1.RawBindingKey: label,
 	}
 
 	if orgName, ok := cflabels["Org Name"]; ok {

@@ -4,22 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/subscription"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 )
 
 const (
@@ -66,7 +68,7 @@ var newSubscriptionClientFn = func(ctx context.Context, cisSecretData map[string
 
 type connector struct {
 	kube            client.Client
-	usage           resource.Tracker
+	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
 	newServiceFn    func(ctx context.Context, cisSecretData map[string][]byte) (subscription.SubscriptionApiHandlerI, error)
 }
@@ -77,7 +79,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotSubscription)
 	}
 
-	if err := c.usage.Track(ctx, mg); err != nil {
+	if err := c.usage.Track(ctx, mg.(providerconfig.LegacyManaged)); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
@@ -128,6 +130,20 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr, ok := mg.(*v1alpha1.Subscription)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotSubscription)
+	}
+	externalName := meta.GetExternalName(cr)
+	if externalName == cr.Name {
+		// Set correct external-name format for import/observe scenarios
+		if isObserveOnly(cr) && cr.Spec.ForProvider.AppName != "" && cr.Spec.ForProvider.PlanName != "" {
+			expectedExternalName := fmt.Sprintf("%s/%s", cr.Spec.ForProvider.AppName, cr.Spec.ForProvider.PlanName)
+			return managed.ExternalObservation{}, errors.Errorf(
+				"For Observe-only Subscriptions, external-name must be set to 'appName/planName' format. "+
+					"Found: '%s'. Expected: '%s'. "+
+					"Please set the annotation: crossplane.io/external-name: \"%s\"",
+				externalName, expectedExternalName, expectedExternalName,
+			)
+
+		}
 	}
 
 	apiRes, err := c.loadSubscription(ctx, cr)
@@ -228,12 +244,26 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 // loadSubscription gets a Subscription using the APIHandler if a proper externalName has been set, otherwise returns nil
 func (c *external) loadSubscription(ctx context.Context, cr *v1alpha1.Subscription) (*subscription.SubscriptionGet, error) {
 	externalName := meta.GetExternalName(cr)
-	if externalName == cr.Name {
-		// in case a subscription has never been created (or imported) the externalName will be set from the resource name
-		// -> resource needs creation in this case
+
+	// Check if external-name is empty - means resource doesn't exist yet
+	if externalName == "" {
 		return nil, nil
 	}
-	return c.apiHandler.GetSubscription(ctx, meta.GetExternalName(cr))
+
+	// Validate external-name format (should be appName/planName, planName may be empty)
+	if !isValidExternalNameFormat(externalName) {
+		return nil, errors.Errorf("invalid external-name format: %s, expected format: <appName>/<planName> (planName may be empty)", externalName)
+	}
+
+	// Get subscription from API - if it returns nil, it means resource doesn't exist (drift scenario)
+	return c.apiHandler.GetSubscription(ctx, externalName)
+}
+
+// isValidExternalNameFormat validates that the external name is in the format appName/planName
+// planName may be empty
+func isValidExternalNameFormat(externalName string) bool {
+	parts := strings.Split(externalName, "/")
+	return len(parts) == 2 && parts[0] != ""
 }
 
 // syncStatus delegates saving the observation based on external resource to the typemapper
@@ -259,4 +289,19 @@ func (c *external) shouldRecreateOnFailure(cr *v1alpha1.Subscription, apiRes *su
 		}
 	}
 	return false
+}
+
+func isObserveOnly(cr *v1alpha1.Subscription) bool {
+	if len(cr.Spec.ManagementPolicies) == 0 {
+		return false // default is full management
+	}
+	for _, policy := range cr.Spec.ManagementPolicies {
+		if policy == xpv1.ManagementActionCreate {
+			return false // allowed to create
+		}
+		if policy == xpv1.ManagementActionAll {
+			return false // allowed to create
+		}
+	}
+	return true // only Observe/Update/Delete, no Create
 }

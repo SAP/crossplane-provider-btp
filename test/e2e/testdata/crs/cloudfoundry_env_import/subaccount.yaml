@@ -1,0 +1,15 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subaccount
+metadata:
+  namespace: default
+  name: cf-import-test-subaccount
+spec:
+  forProvider:
+    displayName: "$BUILD_ID-CF Environment Import Test"
+    labels:
+      safe-to-delete: ["yes"]
+      BUILD_ID: ["$BUILD_ID"]
+    region: eu10
+    subdomain: $BUILD_ID-cf-import-e2e-test
+    subaccountAdmins:
+      - $TECHNICAL_USER_EMAIL

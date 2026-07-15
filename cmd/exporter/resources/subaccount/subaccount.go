@@ -137,10 +137,15 @@ func (s *subaccount) GetExternalName() string {
 }
 
 func (s *subaccount) GenerateK8sResourceName() string {
-	resourceName, err := resources.GenerateK8sResourceName(s.GetID(), s.GetDisplayName(), KindName)
+	if s.GetDisplayName() == "" || s.Region == "" {
+		return resources.UndefinedName
+	}
+
+	// Format: <display-name>.<region>
+	rn, err := resources.GenerateK8sResourceName("", fmt.Sprintf("%s.%s", s.GetDisplayName(), s.Region))
 	if err != nil {
 		s.AddComment(fmt.Sprintf("cannot generate subaccount resource name: %s", err))
 	}
 
-	return resourceName
+	return rn
 }

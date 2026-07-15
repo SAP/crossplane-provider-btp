@@ -1,4 +1,3 @@
-
 ---
 apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: Entitlement
@@ -45,15 +44,3 @@ spec:
       name: co-mirza-sa-test
   providerConfigRef:
     name: account-provider-config
----
-#apiVersion: account.btp.sap.crossplane.io/v1alpha1
-#kind: Entitlement
-#metadata:
-#  name: test-123455-cis-entitlement2
-#  namespace: default
-#spec:
-#  forProvider:
-#    serviceName: "cis"
-#    servicePlanName: "local"
-#  SubaccountRef:
-#    name: test-123455

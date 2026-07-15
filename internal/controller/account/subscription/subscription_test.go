@@ -6,11 +6,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -50,14 +50,61 @@ func TestObserve(t *testing.T) {
 				err: errors.New(errNotSubscription),
 			},
 		},
-		"NoExternalName": {
-			reason: "When externalName isn't in expected format, it has never been created",
+		"EmptyExternalName": {
+			reason: "Empty external-name means resource doesn't exist yet (ADR compliance)",
 			args: args{
-				cr: NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("dir-unittests")),
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("")),
 			},
 			want: want{
 				o:  managed.ExternalObservation{ResourceExists: false},
-				cr: NewSubscription("dir-unittests", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("dir-unittests")),
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("")),
+			},
+		},
+		"InvalidExternalNameFormat": {
+			reason: "Invalid external-name format should return error",
+			args: args{
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("invalid-format-without-slash")),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.Wrap(errors.New("invalid external-name format: invalid-format-without-slash, expected format: <appName>/<planName> (planName may be empty)"), "while loading subscription"),
+				cr:  NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("invalid-format-without-slash")),
+			},
+		},
+		"InvalidExternalNameFormatOnlySlash": {
+			reason: "Invalid external-name format with only slash should return error",
+			args: args{
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("/")),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.Wrap(errors.New("invalid external-name format: /, expected format: <appName>/<planName> (planName may be empty)"), "while loading subscription"),
+				cr:  NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("/")),
+			},
+		},
+		"InvalidExternalNameFormatEmptyAppName": {
+			reason: "Invalid external-name format with empty app name should return error",
+			args: args{
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("/planName")),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.Wrap(errors.New("invalid external-name format: /planName, expected format: <appName>/<planName> (planName may be empty)"), "while loading subscription"),
+				cr:  NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("/planName")),
+			},
+		},
+		"ValidExternalNameFormatEmptyPlanName": {
+			reason: "External-name format with empty plan name should be valid",
+			args: args{
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("appname/")),
+				mockApiHandler: &MockApiHandler{
+					returnGet: nil,
+					returnErr: nil,
+				},
+			},
+			want: want{
+				o:  managed.ExternalObservation{ResourceExists: false},
+				cr: NewSubscription("sub-test", WithStatus(v1alpha1.SubscriptionObservation{}), WithExternalName("appname/")),
 			},
 		},
 		"APIErrorOnRead": {
@@ -167,6 +214,35 @@ func TestObserve(t *testing.T) {
 				}), WithExternalName("name1/plan2")),
 			},
 		},
+		"ObserveOnly_RequiresCorrectExternalNameFormat": {
+			reason: "Observe-only resource with default external-name should return validation error",
+			args: args{
+				cr: NewSubscription("test-subscription",
+					WithData(v1alpha1.SubscriptionSpec{
+						ForProvider: v1alpha1.SubscriptionParameters{
+							AppName:  "sapappstudio",
+							PlanName: "standard-edition",
+						},
+					}),
+					WithManagementPolicies(xpv1.ManagementActionObserve),
+					WithExternalName("test-subscription"), // Wrong - equals metadata.name
+				),
+			},
+			want: want{
+				o:   managed.ExternalObservation{},
+				err: errors.New("For Observe-only Subscriptions, external-name must be set to 'appName/planName' format. Found: 'test-subscription'. Expected: 'sapappstudio/standard-edition'. Please set the annotation: crossplane.io/external-name: \"sapappstudio/standard-edition\""),
+				cr: NewSubscription("test-subscription",
+					WithData(v1alpha1.SubscriptionSpec{
+						ForProvider: v1alpha1.SubscriptionParameters{
+							AppName:  "sapappstudio",
+							PlanName: "standard-edition",
+						},
+					}),
+					WithManagementPolicies(xpv1.ManagementActionObserve),
+					WithExternalName("test-subscription"),
+				),
+			},
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -273,7 +349,7 @@ func TestCreate(t *testing.T) {
 
 func TestRecreateOnFailed(t *testing.T) {
 	mockKube := testutils.NewFakeKubeClientBuilder().Build()
-	extName := "test-ext-name"
+	extName := "test-app/test-plan"
 	ctrl := external{
 		tracker: nil,
 		kube:    &mockKube,
@@ -622,7 +698,7 @@ func TestConnect(t *testing.T) {
 				Build()
 			c := connector{
 				kube:            &kube,
-				usage:           tracking_test.NoOpReferenceResolverTracker{},
+				usage:           tracking_test.NoOpLegacyTracker{},
 				newServiceFn:    newSubscriptionClientFn,
 				resourcetracker: tracking.NewDefaultReferenceResolverTracker(&kube),
 			}
@@ -679,5 +755,56 @@ func WithExternalName(externalName string) SubscriptionModifier {
 func WithRecreateOnSubscriptionFailure() SubscriptionModifier {
 	return func(r *v1alpha1.Subscription) {
 		r.Spec.RecreateOnSubscriptionFailure = true
+	}
+}
+
+func TestIsObserveOnly(t *testing.T) {
+	tests := map[string]struct {
+		managementPolicies []xpv1.ManagementAction
+		expected           bool
+	}{
+		"ObserveOnly": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve},
+			expected:           true,
+		},
+		"AllActions": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionAll},
+			expected:           false,
+		},
+		"IncludesCreate": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve, xpv1.ManagementActionCreate},
+			expected:           false,
+		},
+		"ObserveAndUpdate": {
+			managementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve, xpv1.ManagementActionUpdate},
+			expected:           true,
+		},
+		"EmptyDefault": {
+			managementPolicies: []xpv1.ManagementAction{},
+			expected:           false,
+		},
+		"NilDefault": {
+			managementPolicies: nil,
+			expected:           false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cr := &v1alpha1.Subscription{
+				Spec: v1alpha1.SubscriptionSpec{},
+			}
+			cr.Spec.ManagementPolicies = tc.managementPolicies
+			got := isObserveOnly(cr)
+			if got != tc.expected {
+				t.Errorf("isObserveOnly() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func WithManagementPolicies(policies ...xpv1.ManagementAction) SubscriptionModifier {
+	return func(r *v1alpha1.Subscription) {
+		r.Spec.ManagementPolicies = policies
 	}
 }

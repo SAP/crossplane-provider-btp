@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/SAP/xp-clifford/yaml"
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -30,7 +30,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 	labels := map[string][]string{"env": {"dev"}, "team": {"platform"}}
 	displayNameSpecial := "Test_Subaccount With Spaces & Special!@#"
 	empty := ""
-	wantResourceName := "test-subaccount"
+	wantResourceName := "test-subaccount.eu10"
 
 	tests := []struct {
 		name string
@@ -112,7 +112,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							Description:       description,
 							UsedForProduction: usedForProd,
 							BetaEnabled:       true,
-							Labels:            map[string][]string{"env": {"dev"}, "team": {"platform"}},
+							Labels:            map[string]v1alpha1.SubaccountLabelValueList{"env": {"dev"}, "team": {"platform"}},
 						},
 					},
 				}),
@@ -133,7 +133,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: "subaccount-" + saGuid,
+							Name: resources.UndefinedName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": saGuid,
 							},
@@ -206,7 +206,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 							APIVersion: v1alpha1.CRDGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: wantResourceName,
+							Name: resources.UndefinedName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": saGuid,
 							},
@@ -352,7 +352,7 @@ func TestConvertSubaccountResource(t *testing.T) {
 						APIVersion: v1alpha1.CRDGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-subaccount-with-spaces---special--at-x",
+						Name: "test-subaccount-with-spaces---special--at-x.eu10",
 						Annotations: map[string]string{
 							"crossplane.io/external-name": saGuid,
 						},

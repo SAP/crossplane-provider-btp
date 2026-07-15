@@ -6,21 +6,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 const (
-	InstanceStateOk       = "OK"
-	InstanceStateCreating = "CREATING"
-	InstanceStateDeleting = "DELETING"
-	InstanceStateUpdating = "UPDATING"
+	InstanceStateOk             = "OK"
+	InstanceStateCreating       = "CREATING"
+	InstanceStateDeleting       = "DELETING"
+	InstanceStateUpdating       = "UPDATING"
+	InstanceStateCreationFailed = "CREATION_FAILED"
+	InstanceStateDeletionFailed = "DELETION_FAILED"
+	InstanceStateUpdateFailed   = "UPDATE_FAILED"
 )
 
 const (
 	ResourceAPIEndpoint = "apiEndpoint"
 	ResourceOrgId       = "orgId"
 	ResourceOrgName     = "orgName"
-	ResourceRaw         = "__raw"
 )
 
 // User identifies a user by username and origin
@@ -43,7 +45,8 @@ func (u *User) String() string {
 
 // CfEnvironmentParameters are the configurable fields of a CloudFoundryEnvironment.
 type CfEnvironmentParameters struct {
-	// A list of users (with username/email and origin) to assign as the Org Manager role.
+	// A list of users (email) to assign as the Org Manager role.
+	// The technical user referenced in the ProviderConfig is automatically added as Org Manager and can be omitted from this list (see https://help.sap.com/docs/btp/sap-business-technology-platform/about-roles-in-cloud-foundry-environment).
 	// Cannot be updated after creation --> initial creation only
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="OrgManagers can't be updated once set"
 	// +optional
@@ -116,6 +119,14 @@ type EnvironmentStatus struct {
 // +kubebuilder:object:root=true
 
 // A CloudFoundryEnvironment is a managed resource that represents a Cloud Foundry environment in the SAP Business Technology Platform
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: Environment Instance GUID (UUID format)
+//   - How to find:
+//   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
+//   - CLI: Use BTP ClI: `btp list accounts/environment-instance`
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

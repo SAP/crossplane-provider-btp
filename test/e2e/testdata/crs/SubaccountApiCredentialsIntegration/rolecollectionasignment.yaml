@@ -9,4 +9,4 @@ spec:
     roleCollectionName: "Subaccount Administrator"
     groupName: some-usergroup
   subaccountApiCredentialRef:
-    name: sac-subaccountapicredentials
+    name: sac-int-subaccountapicredentials
