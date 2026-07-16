@@ -1,5 +1,16 @@
 package v1beta1
 
+// External-Name Configuration:
+//   - Resource: CloudManagement
+//   - Follows Standard: no (compound key: two UUIDs — instance ID and binding ID)
+//   - Format: <serviceInstanceID>/<serviceBindingID>
+//   - How to find:
+//     - UI: BTP Cockpit → Subaccount → Services → Service Instances → [instance] → ID
+//          and Service Bindings → [binding] → ID
+//     - CLI: btp list services/instance --subaccount-id <guid> (field: id)
+//            btp list services/binding --subaccount-id <guid> (field: id)
+//
+
 import (
 	"reflect"
 
@@ -137,15 +148,6 @@ type CloudManagementStatus struct {
 // +kubebuilder:object:root=true
 
 // A CloudManagement is a managed resource that represents a cloud management instance and its api credentials in the SAP Business Technology Platform
-//
-// External-Name Configuration:
-//   - Follows Standard: no (compound key: two UUIDs — instance ID and binding ID)
-//   - Format: <serviceInstanceID>/<serviceBindingID>
-//   - How to find:
-//     - UI: BTP Cockpit → Subaccount → Services → Service Instances → [instance] → ID
-//          and Service Bindings → [binding] → ID
-//     - CLI: btp list services/instance --subaccount-id <guid> (field: id)
-//            btp list services/binding --subaccount-id <guid> (field: id)
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
