@@ -180,6 +180,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotCloudManagement)
 	}
 
+	// ADR(external-name) Observe Step 1: empty external-name means the resource does not exist yet.
+	if meta.GetExternalName(cr) == "" {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
+
+	// ADR(external-name) Observe Step 2: validate external-name format.
+	if err := validateExternalName(meta.GetExternalName(cr)); err != nil {
+		return managed.ExternalObservation{}, err
+	}
+
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
@@ -320,4 +330,17 @@ func unmarshalContext(src *string) *map[string]string {
 		return nil
 	}
 	return &contextData
+}
+
+// validateExternalName checks that the external-name is either a single UUID (instance created,
+// binding pending — two-phase create) or a compound <uuid>/<uuid> key (fully created).
+func validateExternalName(s string) error {
+	if internal.IsValidUUID(s) {
+		return nil
+	}
+	parts := strings.SplitN(s, "/", 2)
+	if len(parts) == 2 && internal.IsValidUUID(parts[0]) && internal.IsValidUUID(parts[1]) {
+		return nil
+	}
+	return fmt.Errorf("invalid external-name %q: must be a UUID or <uuid>/<uuid>", s)
 }
