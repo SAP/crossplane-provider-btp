@@ -32,15 +32,6 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 - Follows Standard: no - This resource does not support external name as it does not represent an external resource. Instead of using external name for importing, you can just create an instance of this resource.
 - Format: Not applicable
 
-### CloudManagement
-
-- Follows Standard: no (compound key: two UUIDs — instance ID and binding ID)
-- Format: `<serviceInstanceID>/<serviceBindingID>`
-- How to find:
-
-  - UI: BTP Cockpit → Subaccount → Services → Service Instances → [instance] → ID and Service Bindings → [binding] → ID
-  - CLI: `btp list services/instance --subaccount-id <guid>` (field: id) and `btp list services/binding --subaccount-id <guid>` (field: id)
-
 ### CloudFoundryEnvironment
 
 - Follows Standard: yes
@@ -53,13 +44,13 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 ### CloudManagement
 
 - Follows Standard: no (compound key: two UUIDs — instance ID and binding ID)
-- Format: <serviceInstanceID>/<serviceBindingID>
+- Format: `<serviceInstanceID>/<serviceBindingID>`
 - How to find:
 
   - UI: BTP Cockpit → Subaccount → Services → Service Instances → [instance] → ID
 and Service Bindings → [binding] → ID
-- CLI: btp list services/instance --subaccount-id <guid> (field: id)
-btp list services/binding --subaccount-id <guid> (field: id)
+- CLI: `btp list services/instance --subaccount-id <guid> (field: id)`
+`btp list services/binding --subaccount-id <guid> (field: id)`
 
 ### Directory
 

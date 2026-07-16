@@ -3,12 +3,12 @@ package v1beta1
 // External-Name Configuration:
 //   - Resource: CloudManagement
 //   - Follows Standard: no (compound key: two UUIDs — instance ID and binding ID)
-//   - Format: <serviceInstanceID>/<serviceBindingID>
+//   - Format: `<serviceInstanceID>/<serviceBindingID>`
 //   - How to find:
 //     - UI: BTP Cockpit → Subaccount → Services → Service Instances → [instance] → ID
 //          and Service Bindings → [binding] → ID
-//     - CLI: btp list services/instance --subaccount-id <guid> (field: id)
-//            btp list services/binding --subaccount-id <guid> (field: id)
+//     - CLI: `btp list services/instance --subaccount-id <guid> (field: id)`
+//            `btp list services/binding --subaccount-id <guid> (field: id)`
 //
 
 import (
