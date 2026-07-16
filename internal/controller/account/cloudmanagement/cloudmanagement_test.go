@@ -2,6 +2,7 @@ package cloudmanagement
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -272,6 +273,8 @@ func TestConnect(t *testing.T) {
 }
 
 func TestObserve(t *testing.T) {
+	const testUUID = "00000000-0000-0000-0000-000000000001"
+	const testUUID2 = "00000000-0000-0000-0000-000000000002"
 	type want struct {
 		err error
 		obs managed.ExternalObservation
@@ -288,9 +291,33 @@ func TestObserve(t *testing.T) {
 		want want
 	}{
 		{
+			name: "EmptyExternalName",
+			args: args{
+				cr:       NewCloudManagement("test", WithExternalName("")),
+				tfClient: nil,
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: false},
+				err: nil,
+				cr:  NewCloudManagement("test", WithExternalName("")),
+			},
+		},
+		{
+			name: "InvalidExternalNameFormat",
+			args: args{
+				cr:       NewCloudManagement("test", WithExternalName("not-a-uuid")),
+				tfClient: nil,
+			},
+			want: want{
+				obs: managed.ExternalObservation{},
+				err: fmt.Errorf("invalid external-name %q: must be a UUID or <uuid>/<uuid>", "not-a-uuid"),
+				cr:  NewCloudManagement("test", WithExternalName("not-a-uuid")),
+			},
+		},
+		{
 			name: "InstanceObserveError",
 			args: args{
-				cr: NewCloudManagement("test"),
+				cr: NewCloudManagement("test", WithExternalName(testUUID)),
 				tfClient: &TfClientFake{
 					observeFn: func() (cmclient.ResourcesStatus, error) {
 						return cmclient.ResourcesStatus{}, errors.New("observeError")
@@ -301,6 +328,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{},
 				err: errors.Wrap(errors.New("observeError"), "while observing resources"),
 				cr: NewCloudManagement("test",
+					WithExternalName(testUUID),
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status: v1alpha1.CisStatusUnbound,
 					}),
@@ -310,7 +338,7 @@ func TestObserve(t *testing.T) {
 		{
 			name: "NotAvailable",
 			args: args{
-				cr: NewCloudManagement("test"),
+				cr: NewCloudManagement("test", WithExternalName(testUUID)),
 				tfClient: &TfClientFake{
 					observeFn: func() (cmclient.ResourcesStatus, error) {
 						// Doesn't matter what observe is returned exactly, as long as its passed through and IDs are persisted
@@ -325,6 +353,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{ResourceExists: false},
 				err: nil,
 				cr: NewCloudManagement("test",
+					WithExternalName(testUUID),
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status:            v1alpha1.CisStatusUnbound,
 						ServiceInstanceID: "someID",
@@ -337,7 +366,7 @@ func TestObserve(t *testing.T) {
 		{
 			name: "IsAvailable",
 			args: args{
-				cr: NewCloudManagement("test"),
+				cr: NewCloudManagement("test", WithExternalName(testUUID+"/"+testUUID2)),
 				tfClient: &TfClientFake{
 					observeFn: func() (cmclient.ResourcesStatus, error) {
 						// Doesn't matter if updated or not
@@ -358,6 +387,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, ConnectionDetails: map[string][]byte{"key": []byte("value")}},
 				err: nil,
 				cr: NewCloudManagement("test",
+					WithExternalName(testUUID+"/"+testUUID2),
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status:            v1alpha1.CisStatusBound,
 						ServiceInstanceID: "someID",
@@ -371,7 +401,7 @@ func TestObserve(t *testing.T) {
 		{
 			name: "IsAvailableWithContext",
 			args: args{
-				cr: NewCloudManagement("test"),
+				cr: NewCloudManagement("test", WithExternalName(testUUID+"/"+testUUID2)),
 				tfClient: &TfClientFake{
 					observeFn: func() (cmclient.ResourcesStatus, error) {
 						// Doesn't matter if updated or not
@@ -392,6 +422,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, ConnectionDetails: map[string][]byte{"key": []byte("value")}},
 				err: nil,
 				cr: NewCloudManagement("test",
+					WithExternalName(testUUID+"/"+testUUID2),
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status:            v1alpha1.CisStatusBound,
 						ServiceInstanceID: "someID",
