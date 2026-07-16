@@ -180,6 +180,11 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotCloudManagement)
 	}
 
+	// ADR(external-name) Observe Step 1: empty external-name means the resource does not exist yet.
+	if meta.GetExternalName(cr) == "" {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
+
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
