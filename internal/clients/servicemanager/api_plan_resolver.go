@@ -120,7 +120,10 @@ func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*S
 }
 
 func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, planName, dataCenter string) (string, error) {
-	offeringQuery := fmt.Sprintf("catalog_name eq '%s' and data_center eq '%s'", offeringName, dataCenter)
+	offeringQuery := fmt.Sprintf("catalog_name eq '%s'", offeringName)
+	if dataCenter != "" {
+		offeringQuery = fmt.Sprintf("%s and data_center eq '%s'", offeringQuery, dataCenter)
+	}
 
 	execute, _, err := sm.GetServiceOfferings(ctx).FieldQuery(offeringQuery).Execute()
 	if err != nil {
@@ -139,7 +142,28 @@ func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, 
 		return "", specifyAPIError(err)
 	}
 
+	if len(object.Items) == 0 && len(execute.Items) > 1 {
+		// catalog_name is not unique across data centers (e.g. cloud-logging,
+		// hana-cloud). When dataCenter is not set, the offering query can
+		// return multiple offerings sharing the same catalog_name; the plan
+		// may only exist under some of them. Try the remaining offerings
+		// before giving up so the result doesn't depend on SM API ordering.
+		for _, off := range execute.Items[1:] {
+			planQuery = fmt.Sprintf("catalog_name eq '%s' and service_offering_id eq '%s'", planName, *off.Id)
+			object, _, err = sm.GetAllServicePlans(ctx).FieldQuery(planQuery).Execute()
+			if err != nil {
+				return "", err
+			}
+			if len(object.Items) > 0 {
+				break
+			}
+		}
+	}
+
 	if len(object.Items) == 0 {
+		if len(execute.Items) > 1 {
+			return "", errors.Errorf("no service plan '%s' found for offering '%s' across %d data centers; set spec.forProvider.dataCenter to disambiguate", planName, offeringName, len(execute.Items))
+		}
 		return "", errors.Errorf("No service plan '%s' found for offering '%s'", planName, offeringName)
 	}
 
