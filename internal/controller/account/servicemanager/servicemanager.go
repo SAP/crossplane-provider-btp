@@ -326,10 +326,20 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) setStatus(ctx context.Context, status sm.ResourcesStatus, cr *apisv1beta1.ServiceManager) error {
-	if status.ResourceExists {
+	switch {
+	case meta.WasDeleted(cr) && status.ResourceExists:
+		// Mid-deletion, external instance still present. Status-only cosmetic:
+		// finalization is gated on ExternalObservation.ResourceExists, not on
+		// this condition. But without this branch the CR flips back to
+		// Available/Bound between the Delete() call (which set Deleting()) and
+		// the reconcile that finally observes the instance gone, which is
+		// misleading in kubectl output and dashboards.
+		cr.Status.SetConditions(xpv1.Deleting())
+		cr.Status.AtProvider.Status = apisv1beta1.ServiceManagerUnbound
+	case status.ResourceExists:
 		cr.Status.SetConditions(xpv1.Available())
 		cr.Status.AtProvider.Status = apisv1beta1.ServiceManagerBound
-	} else {
+	default:
 		cr.Status.SetConditions(xpv1.Unavailable())
 		cr.Status.AtProvider.Status = apisv1beta1.ServiceManagerUnbound
 	}
