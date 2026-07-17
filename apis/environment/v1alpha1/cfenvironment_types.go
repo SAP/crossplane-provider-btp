@@ -45,7 +45,8 @@ func (u *User) String() string {
 
 // CfEnvironmentParameters are the configurable fields of a CloudFoundryEnvironment.
 type CfEnvironmentParameters struct {
-	// A list of users (email) to assign as the Org Manager role.
+	// A list of users to assign as the Org Manager role.
+	// Each entry is either a plain email address (uses "sap.ids" as origin) or "email|origin" to specify a custom identity provider (e.g. "user@company.com|custom.idp").
 	// The technical user referenced in the ProviderConfig is automatically added as Org Manager and can be omitted from this list (see https://help.sap.com/docs/btp/sap-business-technology-platform/about-roles-in-cloud-foundry-environment).
 	// Cannot be updated after creation --> initial creation only
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="OrgManagers can't be updated once set"
