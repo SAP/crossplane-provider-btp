@@ -28,12 +28,6 @@ var (
 //  5. Verify all resources remain healthy after upgrade
 //  6. Clean up resources and provider
 func Test_BaselineUpgradeProvider(t *testing.T) {
-	// TODO: TEMPORARY — skip the kymamodule group while the shared BTP account's
-	// kymaruntime/azure quota is exhausted (subaccounts stuck pending-deletion)
-	// and KymaEnvironment provisioning is unauthorized (code 11004 / 405).
-	// REVERT before merge — this masks kymamodule from baseline coverage.
-	ignoreResourceDirectories = []string{upgradeCRsPath("baseCRs/kymamodule")}
-
 	resourceDirectories = loadResourceDirectories()
 
 	fromTag, toTag := loadTags()
