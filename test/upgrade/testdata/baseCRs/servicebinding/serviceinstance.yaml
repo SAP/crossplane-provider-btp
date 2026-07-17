@@ -1,16 +1,16 @@
 apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: ServiceInstance
 metadata:
-  name: upgrade-test-extn-sb-si
+  name: upgrade-test-sb-instance
   namespace: default
 spec:
   forProvider:
-    name: upgrade-test-extn-sb-si
-    offeringName: destination
-    planName: lite
+    name: upgrade-test-sb-instance
     parameters:
       HTML5Runtime_enabled: false
     serviceManagerRef:
-      name: service-manager-sb-extn
+      name: upgrade-test-sb-sm
+    offeringName: destination
+    planName: lite
     subaccountRef:
-      name: upgrade-test-extn-sb-sa
+      name: upgrade-test-sb-sa
