@@ -101,11 +101,14 @@ const (
 const ownershipClockSkew = 60 * time.Second
 
 // ownershipUpperWindow bounds how long AFTER our recorded Create attempt the
-// BTP resource may have been born and still be treated as ours. BTP Creates
-// return in seconds; five minutes is generously above that while still
+// BTP resource may have been born and still be treated as ours. The reference
+// (external-create-pending) is stamped right before our Create call, but BTP's
+// server-reported created_at can lag that call for asynchronously-provisioned
+// resources whose created_at is stamped at completion rather than at request.
+// One hour is generously above any observed provisioning lag while still
 // refusing a same-key resource that appeared much later (which cannot be the
 // result of our attempt).
-const ownershipUpperWindow = 5 * time.Minute
+const ownershipUpperWindow = 1 * time.Hour
 
 // IsOwnedByCR reports whether a BTP resource whose server-reported creation
 // time is btpCreatedAt could plausibly have been created by our own Create()

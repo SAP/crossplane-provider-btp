@@ -86,9 +86,9 @@ func TestIsOwnedByCR_RequiresPendingAnnotation(t *testing.T) {
 
 // TestIsOwnedByCR_PendingWindow covers the bounded window around the
 // recorded Create-attempt time — [pending-clockSkew, pending+upperWindow].
-// BTP Creates return in seconds, so a matching resource should be born very
-// close to the attempt; anything much later cannot be the result of our
-// attempt and is refused.
+// A matching resource should be born close to the attempt; anything much
+// later (beyond the async-provisioning upper window) cannot be the result of
+// our attempt and is refused.
 func TestIsOwnedByCR_PendingWindow(t *testing.T) {
 	crCreated := time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)
 	// Simulate a real recovery: CR created at 10:00, Create actually attempted
@@ -103,9 +103,9 @@ func TestIsOwnedByCR_PendingWindow(t *testing.T) {
 	}{
 		{name: "btp exactly at attempt: ours", btpCreatedAt: attemptAt, want: true},
 		{name: "btp attempt+3s (normal BTP roundtrip): ours", btpCreatedAt: attemptAt.Add(3 * time.Second), want: true},
-		{name: "btp attempt+4m (slow BTP, still within upper window): ours", btpCreatedAt: attemptAt.Add(4 * time.Minute), want: true},
-		{name: "btp attempt+5m (exactly upper boundary): ours", btpCreatedAt: attemptAt.Add(5 * time.Minute), want: true},
-		{name: "btp attempt+6m (past upper window): refused as someone-else-later", btpCreatedAt: attemptAt.Add(6 * time.Minute), want: false},
+		{name: "btp attempt+30m (slow async provisioning, still within upper window): ours", btpCreatedAt: attemptAt.Add(30 * time.Minute), want: true},
+		{name: "btp attempt+1h (exactly upper boundary): ours", btpCreatedAt: attemptAt.Add(1 * time.Hour), want: true},
+		{name: "btp attempt+1h1m (past upper window): refused as someone-else-later", btpCreatedAt: attemptAt.Add(61 * time.Minute), want: false},
 		{name: "btp attempt-30s (within clock skew): ours", btpCreatedAt: attemptAt.Add(-30 * time.Second), want: true},
 		{name: "btp attempt-60s (skew boundary): ours", btpCreatedAt: attemptAt.Add(-60 * time.Second), want: true},
 		{name: "btp attempt-61s (past lower skew): refused as brownfield", btpCreatedAt: attemptAt.Add(-61 * time.Second), want: false},

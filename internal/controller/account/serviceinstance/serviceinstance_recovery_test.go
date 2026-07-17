@@ -74,7 +74,7 @@ func mkFactory(lk *lookuperFake) func(context.Context, *v1alpha1.ServiceInstance
 // crCreatedAt is the reference K8s creationTimestamp used by test CRs. The
 // lookuperFake defaults its siCreatedAt to a few seconds AFTER the pending
 // annotation so ownership checks pass by default; brownfield cases push
-// siCreatedAt OUTSIDE the [pending-60s, pending+5min] window.
+// siCreatedAt OUTSIDE the [pending-60s, pending+1h] window.
 var (
 	crCreatedAt     = time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)
 	createPendingAt = crCreatedAt.Add(5 * time.Second)
