@@ -9,15 +9,48 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
+	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 )
+
+// TestDirectoryEntitlementImportFlow tests the import flow for DirectoryEntitlement.
+// ADR(external-name): uses compound key "<directory-id>/<service-name>/<plan-name>" (e.g. "abc-123/alert-notification/free") as identifier.
+func TestDirectoryEntitlementImportFlow(t *testing.T) {
+	const importK8sResName = "dir-entitlement-import-test"
+
+	serviceName := "cis"
+	planName := "local"
+
+	importTester := NewImportTester(
+		&v1alpha1.DirectoryEntitlement{
+			Spec: v1alpha1.DirectoryEntitlementSpec{
+				ForProvider: v1alpha1.DirectoryEntitlementParameters{
+					ServiceName: &serviceName,
+					PlanName:    &planName,
+					DirectoryRef: &xpv1.Reference{
+						Name: importK8sResName,
+					},
+				},
+			},
+		},
+		importK8sResName,
+		WithWaitCreateTimeout[*v1alpha1.DirectoryEntitlement](wait.WithTimeout(5*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.DirectoryEntitlement](wait.WithTimeout(3*time.Minute)),
+		WithDependentResourceDirectory[*v1alpha1.DirectoryEntitlement](crsPath("DirectoryEntitlementImport")),
+		WithWaitDependentResourceTimeout[*v1alpha1.DirectoryEntitlement](wait.WithTimeout(15*time.Minute)),
+	)
+
+	testenv.Test(
+		t,
+		importTester.BuildTestFeature("DirectoryEntitlement Import Flow").Feature(),
+	)
+}
 
 func Test_DirectoryEntitlement_v1alpha1(t *testing.T) {
 	resource := resources.ResourceTestConfig{

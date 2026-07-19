@@ -8,12 +8,10 @@ import (
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
-	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
+	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/test"
 	testutil "github.com/sap/crossplane-provider-btp/test"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
@@ -99,29 +97,6 @@ func SetupClusterWithCrossplane(namespace string) {
 	// Setup uses pre-defined funcs to create kind cluster
 	// and create a namespace for the environment
 
-	deploymentRuntimeConfig := vendored.DeploymentRuntimeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "btp-provider-runtime-config",
-		},
-		Spec: vendored.DeploymentRuntimeConfigSpec{
-			DeploymentTemplate: &vendored.DeploymentTemplate{
-				Spec: &appsv1.DeploymentSpec{
-					Selector: &metav1.LabelSelector{},
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name: "package-runtime",
-									Args: []string{"--debug", "--sync=10s"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
 	// Replicate the slice of setup.ClusterSetup.Configure that we need, swapping
 	// xp-testing's bundled InstallCrossplane (which goes through
 	// `helm repo add https://charts.crossplane.io/stable`) for an install from
@@ -174,7 +149,7 @@ func SetupClusterWithCrossplane(namespace string) {
 						Name:                    "btp-account",
 						Package:                 uutConfig,
 						ControllerImage:         &uutController,
-						DeploymentRuntimeConfig: &deploymentRuntimeConfig,
+						DeploymentRuntimeConfig: internal.Ptr(test.DeploymentRuntimeConfig("btp-provider", "local")),
 					}),
 			), !reuseCluster),
 		xpenvfuncs.ApplyProviderConfigFromDir("./provider"),

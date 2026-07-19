@@ -10,6 +10,17 @@
 
 All available CRDs can be found in the [API reference](https://doc.crds.dev/github.com/SAP/crossplane-provider-btp).
 
+## 📦 Versioning and Support
+
+| Version | Status | Support |
+|---------|--------|---------|
+| v2.x (latest) | Active development | New feature development |
+| v1.10 | Support | Security patches and critical bug fixes until 2026-12-31 |
+
+New features will be published in upcoming **v2.x** releases. The previous **v1.10** release receives support for 6 months (until 2026-12-31), covering:
+- Security patches
+- Critical bug fixes, if deemed necessary
+
 ## 📊 Installation
 
 To install this provider in a kubernetes cluster running crossplane, you can use the provider custom resource, replacing the `<version>`placeholder with the current version of this provider:

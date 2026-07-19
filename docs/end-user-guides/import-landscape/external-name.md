@@ -50,6 +50,24 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
   - CLI: btp list accounts/directory (field: guid)
 
+### DirectoryEntitlement
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format:`<directory-id>/<service-name>/<plan-name>` (e.g. "abc-123-def-456/hana-cloud/hana")
+- How to find:
+
+  - UI: BTP Cockpit → Global Account → Account Explorer → [Select Directory] → Entitlements → Service Assignments > Service Technical Name and Plan
+  - CLI: `btp list accounts/entitlement --directory <directory-id>` → `entitledServices[].name` and `entitledServices[].servicePlans[].name`
+
+### GlobalaccountTrustConfiguration
+
+- Follows Standard: no (origin key, not a GUID)
+- Format: Origin key of the identity provider (e.g. "sap.custom")
+- How to find:
+
+  - UI: BTP Cockpit → Global Account → Security → Trust Configurations → [Origin column]
+  - CLI: `btp list security/trust` → `Origin Key`
+
 ### KubeConfigGenerator
 
 - Follows Standard: no - This resource does not support external name as it does not represent an external resource. Instead of using external name for importing, you can just create an instance of this resource.
@@ -69,6 +87,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 - Follows Standard: no - This resource does not support external-name based importing.
 Instead of importing, create a new KymaEnvironmentBinding resource.
 - Format: Not applicable
+
+### KymaModule
+
+- Follows Standard: yes
+- Format: Kyma module name (e.g. "keda", "serverless")
+- How to find:
+
+  - UI: Kyma Dashboard → Modules → [Module Name]
+  - CLI: `kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'`
 
 ### RoleCollection
 
@@ -112,12 +139,23 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 
 ### SubaccountApiCredential
 
-- Follows Standard: no (uses credential name as identifier, not a GUID)
-- Format: Credential Name (string)
+- Follows Standard: no (compound key; credentials are identified by subaccount ID and credential name)
+- Format: `<subaccount-id>/<name>` (e.g. "abc-123-def-456/my-credential")
+- Note: Existing name-only annotations are migrated automatically to the compound-key format; importing/adopting existing credentials is unsupported.
 - How to find:
 
   - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Client Name]
   - CLI: `btp list security/app --subaccount <subaccount-id>` → `name`
+
+### SubaccountServiceBroker
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<subaccount-id>/<service-broker-id>` (e.g. "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f/6a55f158-41b5-4e63-aa77-84089fa0ab98")
+- Note: import requires managementPolicies: ["*"]; observe-only import is not supported for this resource
+- How to find:
+
+  - UI: Not available. The BTP cockpit does not show service brokers, only Service Marketplace and Instances and Subscriptions. Use the CLI or the Service Manager API.
+  - CLI: `btp list services/broker --subaccount <subaccount-id>` (field: id)
 
 ### SubaccountTrustConfiguration
 
