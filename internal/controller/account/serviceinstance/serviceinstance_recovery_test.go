@@ -86,7 +86,7 @@ func siWithConflict(name string) *v1alpha1.ServiceInstance {
 	cr.SetCreationTimestamp(metav1.NewTime(crCreatedAt))
 	// Stamp external-create-pending to simulate the runtime having invoked
 	// Create() for this CR. Without it, the heal short-circuits (see
-	// recovery.HasCreateBeenAttempted) and no adoption happens.
+	// recovery.HasCreateBeenAttempted) and no recovery happens.
 	meta.SetExternalCreatePending(cr, createPendingAt)
 	cr.Generation = 2
 	cr.Spec.ForProvider.Name = name
@@ -103,17 +103,17 @@ func siWithConflict(name string) *v1alpha1.ServiceInstance {
 
 // siWithConflictNoPending mirrors siWithConflict but leaves off the
 // external-create-pending annotation — no Create() has ever been attempted
-// for this CR. The heal must refuse to adopt anything.
+// for this CR. The heal must refuse to recover anything.
 func siWithConflictNoPending(name string) *v1alpha1.ServiceInstance {
 	cr := siWithConflict(name)
 	delete(cr.GetAnnotations(), "crossplane.io/external-create-pending")
 	return cr
 }
 
-func TestObserve_AdoptionConflictBranch(t *testing.T) {
+func TestObserve_RecoveryConflictBranch(t *testing.T) {
 	const guid = "80540c06-2955-4bce-9c43-ad78fecc7f62"
 
-	t.Run("match adopts external-name and requeues", func(t *testing.T) {
+	t.Run("match recovers external-name and requeues", func(t *testing.T) {
 		cr := siWithConflict("cls-1")
 		lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(2 * time.Second), siFound: true}
 		rec := &recorderFake{}
@@ -128,7 +128,7 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 		}
 		_, err := e.Observe(context.TODO(), cr)
 		if !errors.Is(err, recovery.ErrRequeueAfterRecovery) {
-			t.Fatalf("expected ErrRequeueAfterAdopt, got %v", err)
+			t.Fatalf("expected ErrRequeueAfterRecovery, got %v", err)
 		}
 		if meta.GetExternalName(cr) != guid {
 			t.Errorf("external-name = %q, want %q", meta.GetExternalName(cr), guid)
@@ -142,17 +142,17 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 		if cond.Reason == "ApplyFailure" {
 			t.Errorf("stale ApplyFailure condition was not cleared")
 		}
-		// a real ID was resolved -> an ExternalNameAdopted event must be logged.
+		// a real ID was resolved -> an ExternalNameRecovered event must be logged.
 		if !rec.has(recovery.EventReasonRecovered) {
 			t.Errorf("expected an %q event to be recorded, got %+v", recovery.EventReasonRecovered, rec.events)
 		}
 	})
 
-	// Regression: ownership check refuses to adopt a BTP resource whose
+	// Regression: ownership check refuses to recover a BTP resource whose
 	// created_at falls outside the window around our recorded Create attempt.
 	// That is the brownfield case — the user must adopt it explicitly by
 	// setting crossplane.io/external-name (per the external-name ADR).
-	t.Run("brownfield (BTP created outside pending window): refuses adoption, emits Warning", func(t *testing.T) {
+	t.Run("brownfield (BTP created outside pending window): refuses recovery, emits Warning", func(t *testing.T) {
 		cr := siWithConflict("cls-brown")
 		// BTP instance is 1h OLDER than our pending annotation -> outside window -> refuse.
 		lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(-time.Hour), siFound: true}
@@ -168,9 +168,9 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 		}
 		_, err := e.Observe(context.TODO(), cr)
 		// The Conflict-branch fall-through still returns the "already exists"
-		// error (adoption declined, so the original error is preserved).
+		// error (recovery declined, so the original error is preserved).
 		if err == nil || errors.Is(err, recovery.ErrRequeueAfterRecovery) {
-			t.Fatalf("expected the original conflict error (adoption refused), got %v", err)
+			t.Fatalf("expected the original conflict error (recovery refused), got %v", err)
 		}
 		if meta.GetExternalName(cr) != "cls-brown" {
 			t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
@@ -220,7 +220,7 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 		if meta.GetExternalName(cr) != "cls-3" {
 			t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
 		}
-		// a lookup failure logs a Warning, never an adoption.
+		// a lookup failure logs a Warning, never a recovery.
 		if !rec.has(recovery.EventReasonLookupFailed) {
 			t.Errorf("expected an %q event, got %+v", recovery.EventReasonLookupFailed, rec.events)
 		}
@@ -243,9 +243,9 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 		}
 		_, err := e.Observe(context.TODO(), cr)
 		// The Conflict-branch fall-through still returns the "already exists"
-		// error; but adoption is refused up-front so the lookup must not run.
+		// error; but recovery is refused up-front so the lookup must not run.
 		if err == nil || errors.Is(err, recovery.ErrRequeueAfterRecovery) {
-			t.Fatalf("expected the original conflict error (adoption refused), got %v", err)
+			t.Fatalf("expected the original conflict error (recovery refused), got %v", err)
 		}
 		if meta.GetExternalName(cr) != "cls-nopending" {
 			t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
@@ -256,9 +256,9 @@ func TestObserve_AdoptionConflictBranch(t *testing.T) {
 	})
 }
 
-// TestObserve_AdoptionNotExistingBranch covers the plain not-found path (no
+// TestObserve_RecoveryNotExistingBranch covers the plain not-found path (no
 // Conflict condition) which also serves the delete leg.
-func TestObserve_AdoptionNotExistingBranch(t *testing.T) {
+func TestObserve_RecoveryNotExistingBranch(t *testing.T) {
 	const guid = "aaaaaaaa-2955-4bce-9c43-ad78fecc7f62"
 
 	cr := &v1alpha1.ServiceInstance{}
@@ -278,16 +278,16 @@ func TestObserve_AdoptionNotExistingBranch(t *testing.T) {
 	}
 	_, err := e.Observe(context.TODO(), cr)
 	if !errors.Is(err, recovery.ErrRequeueAfterRecovery) {
-		t.Fatalf("expected ErrRequeueAfterAdopt, got %v", err)
+		t.Fatalf("expected ErrRequeueAfterRecovery, got %v", err)
 	}
 	if meta.GetExternalName(cr) != guid {
 		t.Errorf("external-name = %q, want %q", meta.GetExternalName(cr), guid)
 	}
 }
 
-// TestObserve_AdoptionBrownfieldNotExistingBranch: same as above but a
-// brownfield resource — adoption must be refused and external-name unchanged.
-func TestObserve_AdoptionBrownfieldNotExistingBranch(t *testing.T) {
+// TestObserve_RecoveryBrownfieldNotExistingBranch: same as above but a
+// brownfield resource — recovery must be refused and external-name unchanged.
+func TestObserve_RecoveryBrownfieldNotExistingBranch(t *testing.T) {
 	const guid = "aaaaaaaa-2955-4bce-9c43-ad78fecc7f62"
 
 	cr := &v1alpha1.ServiceInstance{}
@@ -309,7 +309,7 @@ func TestObserve_AdoptionBrownfieldNotExistingBranch(t *testing.T) {
 	}
 	obs, err := e.Observe(context.TODO(), cr)
 	if err != nil {
-		t.Fatalf("expected nil error (adoption refused silently on not-existing branch), got %v", err)
+		t.Fatalf("expected nil error (recovery refused silently on not-existing branch), got %v", err)
 	}
 	if obs.ResourceExists {
 		t.Errorf("expected ResourceExists=false")

@@ -163,10 +163,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Extract and update data from TF resource if available and up-to-date
 	if !observation.ResourceExists {
-		// Orphaned-external-name adoption: the binding is reported as
-		// non-existent but with a fallback external-name. Try a semantic lookup
-		// against the parent instance's SM binding. Also covers the delete leg
-		// (heal here so the next reconcile's Delete targets the real binding).
+		// Recovery: binding not found in BTP but with a fallback external-name.
+		// Semantic lookup + ownership check; also covers the delete leg (heal
+		// here so the next reconcile's Delete targets the real binding).
 		if recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
 			if healErr := e.healExternalName(ctx, cr); healErr != nil {
 				return managed.ExternalObservation{}, healErr
@@ -323,24 +322,15 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	return deletion, nil
 }
 
-// healExternalName performs the orphaned-external-name adoption for a
-// ServiceBinding. It runs a semantic lookup by (serviceInstanceID, name) and,
-// on a unique match, patches crossplane.io/external-name with the real BTP GUID.
-//
-// The serviceInstanceID comes from the (already reference-resolved) parent
-// instance's external-name. If the parent instance has not been healed yet its
-// ID is a fallback value, the lookup finds nothing, and we fall through — the
-// next reconcile (after the parent heals) succeeds.
-//
-// Return contract matches the ServiceInstance heal: ErrRequeueAfterAdopt on a
-// successful adoption, nil when there is nothing to adopt or the lookup failed,
-// a real error only when persisting fails.
+// healExternalName performs the recovery for a ServiceBinding. The
+// serviceInstanceID comes from the (already reference-resolved) parent
+// instance's external-name; if the parent hasn't been recovered yet the
+// lookup finds nothing and the next reconcile (after the parent recovers)
+// succeeds.
 func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
 	if e.newAdminLookuperFn == nil {
 		return nil
 	}
-	// Short-circuit: no create-pending annotation means we never attempted
-	// Create() for this CR, so any match would fail the ownership check.
 	if !recovery.HasCreateBeenAttempted(cr) {
 		return nil
 	}
@@ -355,7 +345,7 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBin
 
 	lookuper, cleanup, err := e.newAdminLookuperFn(ctx, cr)
 	if err != nil {
-		log.FromContext(ctx).Info("external-name adoption: cannot obtain admin lookup client", "error", err.Error())
+		log.FromContext(ctx).Info("external-name recovery: cannot obtain admin lookup client", "error", err.Error())
 		e.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
 		return nil
 	}
@@ -363,7 +353,7 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBin
 
 	guid, createdAt, found, err := lookuper.LookupServiceBinding(ctx, serviceInstanceID, name)
 	if err != nil {
-		log.FromContext(ctx).Info("external-name adoption lookup failed", "serviceInstanceID", serviceInstanceID, "name", name, "error", err.Error())
+		log.FromContext(ctx).Info("external-name recovery lookup failed", "serviceInstanceID", serviceInstanceID, "name", name, "error", err.Error())
 		e.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
 		return nil
 	}
@@ -371,28 +361,26 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBin
 		return nil
 	}
 
-	// Ownership check: refuse to adopt bindings outside the window in which
-	// our own Create() attempt could have produced them (brownfield).
 	if !recovery.IsOwnedByCR(cr, createdAt) {
-		log.FromContext(ctx).Info("external-name adoption refused: BTP service binding is outside our Create-attempt window (brownfield)",
+		log.FromContext(ctx).Info("external-name recovery refused: BTP service binding is outside our Create-attempt window (brownfield)",
 			"serviceInstanceID", serviceInstanceID, "name", name, "guid", guid,
 			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", createdAt)
 		e.emit(cr, event.Warning(
 			event.Reason(recovery.EventReasonRefusedBrownfield),
 			errors.Errorf(
-				"refusing to adopt existing BTP service binding %s: created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				"refusing to recover existing BTP service binding %s: created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
 				guid, createdAt.Format(time.RFC3339))))
 		return nil
 	}
 
 	meta.SetExternalName(cr, guid)
 	if uErr := e.kube.Update(ctx, cr); uErr != nil {
-		return errors.Wrap(uErr, "cannot persist adopted external-name")
+		return errors.Wrap(uErr, "cannot persist recovered external-name")
 	}
 
-	log.FromContext(ctx).Info("adopted existing BTP service binding by external-name", "guid", guid, "serviceInstanceID", serviceInstanceID, "name", name)
+	log.FromContext(ctx).Info("recovered existing BTP service binding by external-name", "guid", guid, "serviceInstanceID", serviceInstanceID, "name", name)
 	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
-		fmt.Sprintf("Adopted existing BTP service binding %s (semantic key: serviceInstanceID=%s name=%s, created_at=%s)", guid, serviceInstanceID, name, createdAt.Format(time.RFC3339))))
+		fmt.Sprintf("Recovered existing BTP service binding %s (semantic key: serviceInstanceID=%s name=%s, created_at=%s)", guid, serviceInstanceID, name, createdAt.Format(time.RFC3339))))
 	return recovery.ErrRequeueAfterRecovery
 }
 

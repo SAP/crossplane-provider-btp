@@ -206,17 +206,11 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
 
-	// Orphaned-external-name adoption: BTP has a resource matching this
-	// managed CR, but our external-name is still a fallback (empty or ==
-	// metadata.name) — Observe cannot resolve it and Delete would strip the
-	// finalizer, orphaning the BTP resource. Try a semantic lookup by the
-	// cis/local plan (1-per-subaccount) and adopt on a unique match.
-	//
-	// NOTE: only fires on TRUE fallback. A single-UUID external-name is the
-	// natural output of the operator's phase-1 Create (createInstance) — the
-	// same reconcile loop is expected to run phase-2 (createBinding) next and
-	// upgrade to the compound "<sID>/<bID>" key. Re-firing adoption in that
-	// state used to trap CM in an infinite adoption loop; see recovery.go.
+	// Recovery: BTP has a resource matching this managed CR, but our
+	// external-name is still a fallback — semantic lookup + ownership check
+	// (see internal/recovery). Fires only on TRUE fallback: a single-UUID
+	// external-name is the natural output of phase-1 Create and must NOT
+	// re-trigger recovery (would trap CM in an infinite loop before phase-2).
 	if err == nil && !resStatus.ResourceExists &&
 		recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
 		if healErr := c.healExternalName(ctx, cr); healErr != nil {
@@ -227,20 +221,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	return resStatus.ExternalObservation, errors.Wrap(err, errObserve)
 }
 
-// healExternalName performs the orphaned-external-name adoption for a
-// CloudManagement. It runs a semantic lookup by the resolved cis/local plan ID
-// (1-per-subaccount) and, on a unique match, patches crossplane.io/external-name
-// with the "<serviceInstanceID>/<serviceBindingID>" compound key.
-//
-// Return contract matches the ServiceInstance heal: ErrRequeueAfterAdopt on a
-// successful adoption, nil when there is nothing to adopt or the lookup failed,
-// a real error only when persisting fails.
 func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudManagement) error {
 	if c.newAdminLookuperFn == nil {
 		return nil
 	}
-	// Short-circuit: no create-pending annotation means we never attempted
-	// Create() for this CR, so any match would fail the ownership check.
 	if !recovery.HasCreateBeenAttempted(cr) {
 		return nil
 	}
@@ -254,7 +238,7 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudMa
 
 	lookuper, cleanup, err := c.newAdminLookuperFn(ctx, cr)
 	if err != nil {
-		log.FromContext(ctx).Info("external-name adoption: cannot obtain admin lookup client", "error", err.Error())
+		log.FromContext(ctx).Info("external-name recovery: cannot obtain admin lookup client", "error", err.Error())
 		c.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
 		return nil
 	}
@@ -262,7 +246,7 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudMa
 
 	siID, sbID, instanceCreatedAt, found, err := lookuper.LookupInstanceAndBinding(ctx, planID, cmInstanceName(cr), cmBindingName(cr))
 	if err != nil {
-		log.FromContext(ctx).Info("external-name adoption lookup failed", "planID", planID, "error", err.Error())
+		log.FromContext(ctx).Info("external-name recovery lookup failed", "planID", planID, "error", err.Error())
 		c.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
 		return nil
 	}
@@ -270,31 +254,28 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudMa
 		return nil
 	}
 
-	// Ownership check: refuse to adopt a cloud-management pair outside the
-	// window in which our own Create() attempt could have produced it
-	// (brownfield). Uses the instance's created_at because phase-1 creates
-	// the instance first — if it's outside our window, we couldn't have
-	// created it.
+	// Uses the instance's created_at (phase-1 creates the instance first — if
+	// the instance isn't ours, the binding inside it isn't either).
 	if !recovery.IsOwnedByCR(cr, instanceCreatedAt) {
-		log.FromContext(ctx).Info("external-name adoption refused: BTP cloud management is outside our Create-attempt window (brownfield)",
+		log.FromContext(ctx).Info("external-name recovery refused: BTP cloud management is outside our Create-attempt window (brownfield)",
 			"serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID,
 			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", instanceCreatedAt)
 		c.emit(cr, event.Warning(
 			event.Reason(recovery.EventReasonRefusedBrownfield),
 			errors.Errorf(
-				"refusing to adopt existing BTP cloud management %s/%s: instance created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				"refusing to recover existing BTP cloud management %s/%s: instance created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
 				siID, sbID, instanceCreatedAt.Format(time.RFC3339))))
 		return nil
 	}
 
 	meta.SetExternalName(cr, formExternalName(siID, sbID))
 	if uErr := c.kube.Update(ctx, cr); uErr != nil {
-		return errors.Wrap(uErr, "cannot persist adopted external-name")
+		return errors.Wrap(uErr, "cannot persist recovered external-name")
 	}
 
-	log.FromContext(ctx).Info("adopted existing BTP cloud management by external-name", "serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID)
+	log.FromContext(ctx).Info("recovered existing BTP cloud management by external-name", "serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID)
 	c.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
-		fmt.Sprintf("Adopted existing BTP cloud management %s/%s (semantic key: planID=%s, instance created_at=%s)", siID, sbID, planID, instanceCreatedAt.Format(time.RFC3339))))
+		fmt.Sprintf("Recovered existing BTP cloud management %s/%s (semantic key: planID=%s, instance created_at=%s)", siID, sbID, planID, instanceCreatedAt.Format(time.RFC3339))))
 	return recovery.ErrRequeueAfterRecovery
 }
 
@@ -315,7 +296,7 @@ func cmInstanceName(cr *apisv1beta1.CloudManagement) string {
 }
 
 // cmBindingName returns the managed cloud-management binding name so a transient
-// admin binding is never adopted.
+// admin binding is never selected.
 func cmBindingName(cr *apisv1beta1.CloudManagement) string {
 	if cr.Spec.ForProvider.ServiceBindingName != "" {
 		return cr.Spec.ForProvider.ServiceBindingName

@@ -98,11 +98,9 @@ type connector struct {
 	newServicePlanInitializerFn func() Initializer
 	resourcetracker             tracking.ReferenceResolverTracker
 
-	// newAdminLookuperFn builds a SemanticLookuper backed by the subaccount-admin
-	// SM binding (via the accounts-service), returning a cleanup func. The
-	// per-resource serviceManagerSecret bindings are platform-scoped and do NOT
-	// list instances created via the btp terraform provider, so adoption must
-	// use the subaccount-admin binding.
+	// newAdminLookuperFn uses a subaccount-admin SM binding. Per-resource
+	// serviceManagerSecret bindings are platform-scoped and do NOT list
+	// instances created via the btp terraform provider.
 	newAdminLookuperFn func(ctx context.Context, cr *v1alpha1.ServiceInstance) (smClient.SemanticLookuper, func(), error)
 	// recorder emits Kubernetes events for the heal path. May be nil.
 	recorder event.Recorder
@@ -167,9 +165,8 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if lastAsyncOp.Status == corev1.ConditionFalse &&
 		strings.Contains(lastAsyncOp.Message, "Conflict") &&
 		lastAsyncOp.ObservedGeneration == cr.Generation {
-		// Orphaned-external-name adoption: a Conflict with a fallback external-name
-		// means BTP already has this instance but we never linked it. Try to adopt
-		// it instead of erroring out (which used to require manual intervention).
+		// Try recovery instead of forcing the ADR-prescribed error-loop path (see
+		// docs/contribution-notes/external-name-handling.md).
 		if recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
 			if healErr := e.healExternalName(ctx, cr); healErr != nil {
 				return managed.ExternalObservation{}, healErr
@@ -203,11 +200,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	switch status {
 	case tfClient.NotExisting:
-		// Orphaned-external-name adoption: the TF layer reports the resource as
-		// non-existent, but with a fallback external-name that may simply mean we
-		// never linked an instance BTP actually created. Try a semantic lookup.
-		// This also covers the delete leg: healing here lets the next reconcile's
-		// Delete() target the real BTP resource instead of orphaning it.
+		// Recovery also covers the delete leg: healing here lets the next
+		// reconcile's Delete() target the real BTP resource instead of
+		// stripping the finalizer and orphaning it.
 		if recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
 			if healErr := e.healExternalName(ctx, cr); healErr != nil {
 				return managed.ExternalObservation{}, healErr
@@ -317,36 +312,16 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalDelete{}, nil
 }
 
-// healExternalName performs the orphaned-external-name adoption for a
-// ServiceInstance. It runs a semantic lookup (by name, within the SM binding's
-// subaccount) and, on a unique match that passes the ownership check, patches
-// crossplane.io/external-name with the real BTP GUID and clears the stale
-// async-failure conditions.
-//
-// Return contract:
-//   - recovery.ErrRequeueAfterRecovery when a resource was adopted (caller must
-//     surface it so Crossplane requeues and rebuilds the client against the
-//     adopted name; see the doc on ErrRequeueAfterAdopt for why an error is the
-//     only safe signal on the delete leg).
-//   - nil when there is nothing to adopt (no match, no create attempted,
-//     ownership refused) or the lookup call itself failed (best-effort: a
-//     Warning event is emitted and the caller falls through to its pre-heal
-//     result, retrying on the next reconcile).
-//   - a real error only when persisting the adopted name fails.
 func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
 	if e.newAdminLookuperFn == nil {
 		return nil
 	}
-	// Short-circuit: if crossplane-runtime never stamped an
-	// external-create-pending annotation, we have no evidence THIS controller
-	// ever attempted Create() for this CR, so any match would fail the
-	// ownership check and adoption is unsafe. Skip the expensive lookup.
 	if !recovery.HasCreateBeenAttempted(cr) {
 		return nil
 	}
 	lookuper, cleanup, err := e.newAdminLookuperFn(ctx, cr)
 	if err != nil {
-		log.FromContext(ctx).Info("external-name adoption: cannot obtain admin lookup client", "error", err.Error())
+		log.FromContext(ctx).Info("external-name recovery: cannot obtain admin lookup client", "error", err.Error())
 		e.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
 		return nil
 	}
@@ -355,7 +330,7 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceIns
 	name := cr.Spec.ForProvider.Name
 	guid, createdAt, found, err := lookuper.LookupServiceInstance(ctx, name)
 	if err != nil {
-		log.FromContext(ctx).Info("external-name adoption lookup failed", "name", name, "error", err.Error())
+		log.FromContext(ctx).Info("external-name recovery lookup failed", "name", name, "error", err.Error())
 		e.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
 		return nil
 	}
@@ -363,41 +338,35 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceIns
 		return nil
 	}
 
-	// Ownership check: refuse to adopt BTP resources outside the window in
-	// which our own Create() attempt could have produced them.
-	// See recovery.IsOwnedByCR for the invariant.
 	if !recovery.IsOwnedByCR(cr, createdAt) {
-		log.FromContext(ctx).Info("external-name adoption refused: BTP service instance is outside our Create-attempt window (brownfield)",
+		log.FromContext(ctx).Info("external-name recovery refused: BTP service instance is outside our Create-attempt window (brownfield)",
 			"name", name, "guid", guid,
 			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", createdAt)
 		e.emit(cr, event.Warning(
 			event.Reason(recovery.EventReasonRefusedBrownfield),
 			errors.Errorf(
-				"refusing to adopt existing BTP service instance %s: created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				"refusing to recover existing BTP service instance %s: created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
 				guid, createdAt.Format(time.RFC3339))))
 		return nil
 	}
 
-	// Persist ordering (#5): clear the stale async-failure conditions FIRST
-	// (status subresource), THEN persist the adopted external-name
-	// (metadata annotations via spec). If either write fails, the CR still
-	// has a fallback external-name on the next reconcile so the heal re-runs
-	// and self-recovers. The reverse order used to leave the CR with a real
-	// external-name AND stale conditions if the status write failed — a
-	// permanent stuck state because the heal is then skipped
-	// (IsFallbackExternalName is false).
+	// Clear stale async-failure conditions BEFORE persisting the recovered
+	// external-name. If either write fails, the CR still has a fallback
+	// external-name and the heal re-runs on the next reconcile. Reversed, a
+	// mid-way failure would leave the CR with a real external-name AND stale
+	// conditions — a permanent stuck state (heal then skipped).
 	clearAsyncFailureConditions(cr)
 	if uErr := e.kube.Status().Update(ctx, cr); uErr != nil {
-		return errors.Wrap(uErr, "cannot clear async-failure conditions before adoption")
+		return errors.Wrap(uErr, "cannot clear async-failure conditions before recovery")
 	}
 	meta.SetExternalName(cr, guid)
 	if uErr := e.kube.Update(ctx, cr); uErr != nil {
-		return errors.Wrap(uErr, "cannot persist adopted external-name")
+		return errors.Wrap(uErr, "cannot persist recovered external-name")
 	}
 
-	log.FromContext(ctx).Info("adopted existing BTP service instance by external-name", "guid", guid, "name", name)
+	log.FromContext(ctx).Info("recovered existing BTP service instance by external-name", "guid", guid, "name", name)
 	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
-		fmt.Sprintf("Adopted existing BTP service instance %s (semantic key: name=%s, created_at=%s)", guid, name, createdAt.Format(time.RFC3339))))
+		fmt.Sprintf("Recovered existing BTP service instance %s (semantic key: name=%s, created_at=%s)", guid, name, createdAt.Format(time.RFC3339))))
 	return recovery.ErrRequeueAfterRecovery
 }
 
@@ -410,13 +379,13 @@ func (e *external) emit(cr resource.Managed, ev event.Event) {
 
 // clearAsyncFailureConditions resets the stale LastAsyncOperation failure so a
 // subsequent reconcile is not tricked back into the Conflict branch after the
-// external-name has been adopted.
+// external-name has been recovered.
 func clearAsyncFailureConditions(cr *v1alpha1.ServiceInstance) {
 	cr.SetConditions(xpv1.Condition{
 		Type:               xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
 		Status:             corev1.ConditionUnknown,
 		LastTransitionTime: metav1.Now(),
-		Reason:             "AdoptedExternalName",
+		Reason:             "RecoveredExternalName",
 		ObservedGeneration: cr.Generation,
 	})
 }

@@ -13,17 +13,9 @@ import (
 type AccountsApiAccessor interface {
 	MoveSubaccount(ctx context.Context, subaccountGuid string, targetId string) error
 	UpdateSubaccount(ctx context.Context, subaccountGuid string, payload accountclient.UpdateSubaccountRequestPayload) error
-	// SubaccountGuidBySubdomain looks up an existing subaccount in the global
-	// account by its subdomain (unique within a global account) for the
-	// orphaned-external-name adoption heal path. found is false when no
-	// subaccount matches; an error is returned when more than one matches
-	// (refuse to guess) or the API call fails.
-	//
-	// createdAt is the BTP-reported creation time of the matched subaccount.
-	// Callers use it to enforce the ownership check (recovery.IsOwnedByCR)
-	// before actually adopting — only subaccounts born at/after the CR's own
-	// creationTimestamp were plausibly created by us; anything older is a
-	// brownfield resource that must be adopted explicitly.
+	// SubaccountGuidBySubdomain looks up a subaccount by subdomain (unique in a
+	// global account) and returns its BTP-reported createdAt for the ownership
+	// check in internal/recovery.
 	SubaccountGuidBySubdomain(ctx context.Context, subdomain string) (guid string, createdAt time.Time, found bool, err error)
 }
 
@@ -86,6 +78,6 @@ func (a *AccountsClient) SubaccountGuidBySubdomain(ctx context.Context, subdomai
 		return matches[0].guid, matches[0].created, true, nil
 	default:
 		return "", time.Time{}, false, errors.Errorf(
-			"refusing to adopt: %d subaccounts match subdomain %q in this global account", len(matches), subdomain)
+			"refusing to recover: %d subaccounts match subdomain %q in this global account", len(matches), subdomain)
 	}
 }
