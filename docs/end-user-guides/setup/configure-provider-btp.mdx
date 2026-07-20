@@ -256,6 +256,25 @@ They are typically granted specific permissions tailored to the tasks they need 
 ### Validate the technical user
 
 1. Once the technical user is created, please add it to the global account and the subaccount with admin privilege as described in the SAP Help Portal: [Assign User Groups to Role Collections](https://help.sap.com/docs/btp/sap-business-technology-platform/assign-user-groups-to-role-collections?locale=en-US&version=LATEST).
+
+    ```sh
+    btp assign security/role-collection "Global Account Administrator" \
+      --to-user <technical-user-email> \
+      --create-user-if-missing true \
+      --global-account <global-account-subdomain>
+
+    btp assign security/role-collection "Subaccount Administrator" \
+      --to-user <technical-user-email> \
+      --create-user-if-missing true \
+      --subaccount <cloud-management-subaccount-id>
+    ```
+
+    Replace the following:
+    - `<technical-user-email>`: The email of the technical user
+    - `<global-account-subdomain>`: The subdomain of the global account. To be found in the BTP cockpit in the **Account
+      Overview** of the global account under heading **Global Account: ...** or under **Switch Global Account**
+    - `<cloud-management-subaccount-id>`: The ID of the `cloud-management-subaccount` you created previously
+
 2. Log in to the SAP BTP cockpit using the technical user in an incognito browser window of your choice, ensuring that SSO is disabled.
 3. Verify that the technical user can authenticate with the BTP through the btp CLI:
 
@@ -267,7 +286,8 @@ They are typically granted specific permissions tailored to the tasks they need 
     - `<btp-environment-url>`: The CLI server URL
     - `<technical-user-email>`: The email of the technical user
     - `<technical-user-password>`: The password of the technical user
-    - ` <global-account-subdomain>`: The subdomain of the global account. To be found in the BTP cockpit under **Switch Global Account**
+    - ` <global-account-subdomain>`: The subdomain of the global account. To be found in the BTP cockpit in the **Account
+      Overview** of the global account under heading **Global Account: ...** or under **Switch Global Account**
 
 
 ## Create a `Secret` for the technical user
