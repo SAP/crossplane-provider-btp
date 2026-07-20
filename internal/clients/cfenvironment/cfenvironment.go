@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	cfv3 "github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/config"
@@ -161,8 +162,9 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 		return "", errors.Wrap(err, instanceCreateFailed)
 	}
 
-	for _, managerEmail := range filterOutUser(cr.Spec.ForProvider.Managers, adminServiceAccountEmail) {
-		if err := cloudFoundryClient.addManager(ctx, managerEmail, defaultOrigin); err != nil {
+	for _, managerEntry := range filterOutUser(cr.Spec.ForProvider.Managers, adminServiceAccountEmail) {
+		username, origin := parseManagerString(managerEntry)
+		if err := cloudFoundryClient.addManager(ctx, username, origin); err != nil {
 			return "", errors.Wrap(err, instanceCreateFailed)
 		}
 	}
@@ -193,6 +195,15 @@ func filterOutUser(users []string, exclude string) []string {
 		}
 	}
 	return result
+}
+
+// parseManagerString parses "email" or "email|origin" into (username, origin).
+// If no origin is provided, defaults to defaultOrigin.
+func parseManagerString(s string) (username, origin string) {
+	if idx := strings.Index(s, "|"); idx >= 0 {
+		return s[:idx], s[idx+1:]
+	}
+	return s, defaultOrigin
 }
 
 type organizationClient struct {
