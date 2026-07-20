@@ -2,23 +2,28 @@ package servicebinding
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
+	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/reconcilerutil"
+	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -81,6 +86,12 @@ type connector struct {
 	resourcetracker   tracking.ReferenceResolverTracker
 	clientFactory     ServiceBindingClientFactory
 	newSBKeyRotatorFn func(servicebindingclient.BindingDeleter) servicebindingclient.KeyRotator
+
+	// newAdminLookuperFn builds a SemanticLookuper backed by the subaccount-admin
+	// SM binding (via the accounts-service), returning a cleanup func.
+	newAdminLookuperFn func(ctx context.Context, cr *v1alpha1.ServiceBinding) (smClient.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -111,9 +122,11 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		clientFactory: c.clientFactory,
 		tracker:       c.resourcetracker,
 		client:        client,
+		recorder:      c.recorder,
 	}
 
 	ext.keyRotator = c.newSBKeyRotatorFn(ext)
+	ext.newAdminLookuperFn = c.newAdminLookuperFn
 
 	return ext, nil
 }
@@ -124,6 +137,11 @@ type external struct {
 	client        servicebindingclient.ServiceBindingClientInterface
 	clientFactory ServiceBindingClientFactory
 	tracker       tracking.ReferenceResolverTracker
+
+	// newAdminLookuperFn builds the subaccount-admin-backed SemanticLookuper.
+	newAdminLookuperFn func(ctx context.Context, cr *v1alpha1.ServiceBinding) (smClient.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -145,6 +163,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Extract and update data from TF resource if available and up-to-date
 	if !observation.ResourceExists {
+		// Recovery: binding not found in BTP but with a fallback external-name.
+		// Semantic lookup + ownership check; also covers the delete leg (heal
+		// here so the next reconcile's Delete targets the real binding).
+		if recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+			if healErr := e.healExternalName(ctx, cr); healErr != nil {
+				return managed.ExternalObservation{}, healErr
+			}
+		}
 		return observation, nil
 	}
 
@@ -294,6 +320,75 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	return deletion, nil
+}
+
+// healExternalName performs the recovery for a ServiceBinding. The
+// serviceInstanceID comes from the (already reference-resolved) parent
+// instance's external-name; if the parent hasn't been recovered yet the
+// lookup finds nothing and the next reconcile (after the parent recovers)
+// succeeds.
+func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
+	if e.newAdminLookuperFn == nil {
+		return nil
+	}
+	if !recovery.HasCreateBeenAttempted(cr) {
+		return nil
+	}
+	serviceInstanceID := internal.Val(cr.Spec.ForProvider.ServiceInstanceID)
+	name := cr.Spec.ForProvider.Name
+	if cr.Status.AtProvider.Name != "" {
+		name = cr.Status.AtProvider.Name
+	}
+	if serviceInstanceID == "" {
+		return nil
+	}
+
+	lookuper, cleanup, err := e.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		log.FromContext(ctx).Info("external-name recovery: cannot obtain admin lookup client", "error", err.Error())
+		e.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
+		return nil
+	}
+	defer cleanup()
+
+	guid, createdAt, found, err := lookuper.LookupServiceBinding(ctx, serviceInstanceID, name)
+	if err != nil {
+		log.FromContext(ctx).Info("external-name recovery lookup failed", "serviceInstanceID", serviceInstanceID, "name", name, "error", err.Error())
+		e.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
+		return nil
+	}
+	if !found {
+		return nil
+	}
+
+	if !recovery.IsOwnedByCR(cr, createdAt) {
+		log.FromContext(ctx).Info("external-name recovery refused: BTP service binding is outside our Create-attempt window (brownfield)",
+			"serviceInstanceID", serviceInstanceID, "name", name, "guid", guid,
+			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", createdAt)
+		e.emit(cr, event.Warning(
+			event.Reason(recovery.EventReasonRefusedBrownfield),
+			errors.Errorf(
+				"refusing to recover existing BTP service binding %s: created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				guid, createdAt.Format(time.RFC3339))))
+		return nil
+	}
+
+	meta.SetExternalName(cr, guid)
+	if uErr := e.kube.Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, "cannot persist recovered external-name")
+	}
+
+	log.FromContext(ctx).Info("recovered existing BTP service binding by external-name", "guid", guid, "serviceInstanceID", serviceInstanceID, "name", name)
+	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
+		fmt.Sprintf("Recovered existing BTP service binding %s (semantic key: serviceInstanceID=%s name=%s, created_at=%s)", guid, serviceInstanceID, name, createdAt.Format(time.RFC3339))))
+	return recovery.ErrRequeueAfterRecovery
+}
+
+// emit records a Kubernetes event when a recorder is configured.
+func (e *external) emit(cr resource.Managed, ev event.Event) {
+	if e.recorder != nil {
+		e.recorder.Event(cr, ev)
+	}
 }
 
 // DeleteBinding implements the BindingDeleter interface for the key rotator

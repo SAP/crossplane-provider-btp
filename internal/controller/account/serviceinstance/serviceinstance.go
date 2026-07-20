@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -13,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -24,10 +26,13 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
+	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/di"
+	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -92,6 +97,13 @@ type connector struct {
 	clientConnector             tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance]
 	newServicePlanInitializerFn func() Initializer
 	resourcetracker             tracking.ReferenceResolverTracker
+
+	// newAdminLookuperFn uses a subaccount-admin SM binding. Per-resource
+	// serviceManagerSecret bindings are platform-scoped and do NOT list
+	// instances created via the btp terraform provider.
+	newAdminLookuperFn func(ctx context.Context, cr *v1alpha1.ServiceInstance) (smClient.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -118,13 +130,21 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errConnectClient)
 	}
 
-	return &external{tfClient: client, kube: c.kube, tracker: c.resourcetracker}, nil
+	ext := &external{tfClient: client, kube: c.kube, tracker: c.resourcetracker, recorder: c.recorder,
+		newAdminLookuperFn: c.newAdminLookuperFn}
+
+	return ext, nil
 }
 
 type external struct {
 	tfClient tfClient.TfProxyControllerI
 	kube     client.Client
 	tracker  tracking.ReferenceResolverTracker
+
+	// newAdminLookuperFn builds the subaccount-admin-backed SemanticLookuper.
+	newAdminLookuperFn func(ctx context.Context, cr *v1alpha1.ServiceInstance) (smClient.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -145,6 +165,13 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if lastAsyncOp.Status == corev1.ConditionFalse &&
 		strings.Contains(lastAsyncOp.Message, "Conflict") &&
 		lastAsyncOp.ObservedGeneration == cr.Generation {
+		// Try recovery instead of forcing the ADR-prescribed error-loop path (see
+		// docs/contribution-notes/external-name-handling.md).
+		if recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+			if healErr := e.healExternalName(ctx, cr); healErr != nil {
+				return managed.ExternalObservation{}, healErr
+			}
+		}
 		return managed.ExternalObservation{ResourceExists: false},
 			errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
 	}
@@ -173,6 +200,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	switch status {
 	case tfClient.NotExisting:
+		// Recovery also covers the delete leg: healing here lets the next
+		// reconcile's Delete() target the real BTP resource instead of
+		// stripping the finalizer and orphaning it.
+		if recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+			if healErr := e.healExternalName(ctx, cr); healErr != nil {
+				return managed.ExternalObservation{}, healErr
+			}
+		}
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	case tfClient.Drift:
 		// ADR(external-name): Calculate and report diff between desired state and what was observed from the API
@@ -275,6 +310,84 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteInstance)
 	}
 	return managed.ExternalDelete{}, nil
+}
+
+func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
+	if e.newAdminLookuperFn == nil {
+		return nil
+	}
+	if !recovery.HasCreateBeenAttempted(cr) {
+		return nil
+	}
+	lookuper, cleanup, err := e.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		log.FromContext(ctx).Info("external-name recovery: cannot obtain admin lookup client", "error", err.Error())
+		e.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
+		return nil
+	}
+	defer cleanup()
+
+	name := cr.Spec.ForProvider.Name
+	guid, createdAt, found, err := lookuper.LookupServiceInstance(ctx, name)
+	if err != nil {
+		log.FromContext(ctx).Info("external-name recovery lookup failed", "name", name, "error", err.Error())
+		e.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
+		return nil
+	}
+	if !found {
+		return nil
+	}
+
+	if !recovery.IsOwnedByCR(cr, createdAt) {
+		log.FromContext(ctx).Info("external-name recovery refused: BTP service instance is outside our Create-attempt window (brownfield)",
+			"name", name, "guid", guid,
+			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", createdAt)
+		e.emit(cr, event.Warning(
+			event.Reason(recovery.EventReasonRefusedBrownfield),
+			errors.Errorf(
+				"refusing to recover existing BTP service instance %s: created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				guid, createdAt.Format(time.RFC3339))))
+		return nil
+	}
+
+	// Clear stale async-failure conditions BEFORE persisting the recovered
+	// external-name. If either write fails, the CR still has a fallback
+	// external-name and the heal re-runs on the next reconcile. Reversed, a
+	// mid-way failure would leave the CR with a real external-name AND stale
+	// conditions — a permanent stuck state (heal then skipped).
+	clearAsyncFailureConditions(cr)
+	if uErr := e.kube.Status().Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, "cannot clear async-failure conditions before recovery")
+	}
+	meta.SetExternalName(cr, guid)
+	if uErr := e.kube.Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, "cannot persist recovered external-name")
+	}
+
+	log.FromContext(ctx).Info("recovered existing BTP service instance by external-name", "guid", guid, "name", name)
+	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
+		fmt.Sprintf("Recovered existing BTP service instance %s (semantic key: name=%s, created_at=%s)", guid, name, createdAt.Format(time.RFC3339))))
+	return recovery.ErrRequeueAfterRecovery
+}
+
+// emit records a Kubernetes event when a recorder is configured.
+func (e *external) emit(cr resource.Managed, ev event.Event) {
+	if e.recorder != nil {
+		e.recorder.Event(cr, ev)
+	}
+}
+
+// clearAsyncFailureConditions resets the stale LastAsyncOperation failure so a
+// subsequent reconcile is not tricked back into the Conflict branch after the
+// external-name has been recovered.
+func clearAsyncFailureConditions(cr *v1alpha1.ServiceInstance) {
+	cr.SetConditions(xpv1.Condition{
+		Type:               xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+		Status:             corev1.ConditionUnknown,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "RecoveredExternalName",
+		ObservedGeneration: cr.Generation,
+	})
 }
 
 func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceInstance, sid tfClient.ObservationData) error {

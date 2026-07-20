@@ -2,14 +2,19 @@ package servicemanager
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
 	sm "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
+	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -45,6 +50,12 @@ type connector struct {
 
 	newPlanIdInitializerFn func(ctx context.Context, cr *apisv1beta1.ServiceManager) (ServiceManagerPlanIdInitializer, error)
 	newClientInitalizerFn  func() sm.ITfClientInitializer
+
+	// newAdminLookuperFn builds a SemanticLookuper backed by the subaccount-admin
+	// SM binding (minted via the accounts-service), returning a cleanup func.
+	newAdminLookuperFn func(ctx context.Context, cr *apisv1beta1.ServiceManager) (sm.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -69,9 +80,11 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 
 	return &external{
-		tracker:  c.resourcetracker,
-		tfClient: tfClient,
-		kube:     c.kube,
+		tracker:            c.resourcetracker,
+		tfClient:           tfClient,
+		kube:               c.kube,
+		recorder:           c.recorder,
+		newAdminLookuperFn: c.newAdminLookuperFn,
 	}, nil
 }
 
@@ -119,6 +132,12 @@ type external struct {
 	tracker tracking.ReferenceResolverTracker
 
 	tfClient sm.ITfClient
+
+	// newAdminLookuperFn builds the subaccount-admin-backed SemanticLookuper
+	// (minted via the accounts-service), returning a cleanup func.
+	newAdminLookuperFn func(ctx context.Context, cr *apisv1beta1.ServiceManager) (sm.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -140,7 +159,102 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
 
+	// Recovery: BTP has a resource matching this managed CR, but our
+	// external-name is still a fallback — semantic lookup + ownership check
+	// (see internal/recovery). Fires only on TRUE fallback: a single-UUID
+	// external-name is the natural output of phase-1 Create and must NOT
+	// re-trigger recovery (would trap SM in an infinite loop before phase-2).
+	if err == nil && !resStatus.ResourceExists &&
+		recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+		if healErr := c.healExternalName(ctx, cr); healErr != nil {
+			return managed.ExternalObservation{}, healErr
+		}
+	}
+
 	return resStatus.ExternalObservation, err
+}
+
+func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
+	if c.newAdminLookuperFn == nil {
+		return nil
+	}
+	if !recovery.HasCreateBeenAttempted(cr) {
+		return nil
+	}
+	if cr.Status.AtProvider.DataSourceLookup == nil {
+		return nil
+	}
+	planID := cr.Status.AtProvider.DataSourceLookup.ServiceManagerPlanID
+	if planID == "" {
+		return nil
+	}
+
+	lookuper, cleanup, err := c.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		log.FromContext(ctx).Info("external-name recovery: cannot obtain admin lookup client", "error", err.Error())
+		c.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
+		return nil
+	}
+	defer cleanup()
+
+	siID, sbID, instanceCreatedAt, found, err := lookuper.LookupInstanceAndBinding(ctx, planID, smInstanceName(cr), smBindingName(cr))
+	if err != nil {
+		log.FromContext(ctx).Info("external-name recovery lookup failed", "planID", planID, "error", err.Error())
+		c.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
+		return nil
+	}
+	if !found {
+		return nil
+	}
+
+	// Uses the instance's created_at (phase-1 creates the instance first — if
+	// the instance isn't ours, the binding inside it isn't either).
+	if !recovery.IsOwnedByCR(cr, instanceCreatedAt) {
+		log.FromContext(ctx).Info("external-name recovery refused: BTP service manager is outside our Create-attempt window (brownfield)",
+			"serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID,
+			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", instanceCreatedAt)
+		c.emit(cr, event.Warning(
+			event.Reason(recovery.EventReasonRefusedBrownfield),
+			errors.Errorf(
+				"refusing to recover existing BTP service manager %s/%s: instance created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				siID, sbID, instanceCreatedAt.Format(time.RFC3339))))
+		return nil
+	}
+
+	meta.SetExternalName(cr, formExternalName(siID, sbID))
+	if uErr := c.kube.Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, "cannot persist recovered external-name")
+	}
+
+	log.FromContext(ctx).Info("recovered existing BTP service manager by external-name", "serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID)
+	c.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
+		fmt.Sprintf("Recovered existing BTP service manager %s/%s (semantic key: planID=%s, instance created_at=%s)", siID, sbID, planID, instanceCreatedAt.Format(time.RFC3339))))
+	return recovery.ErrRequeueAfterRecovery
+}
+
+// emit records a Kubernetes event when a recorder is configured.
+func (c *external) emit(cr resource.Managed, ev event.Event) {
+	if c.recorder != nil {
+		c.recorder.Event(cr, ev)
+	}
+}
+
+// smInstanceName returns the managed service-manager instance name used to
+// disambiguate the subaccount-admin plan (which also holds an access instance).
+func smInstanceName(cr *apisv1beta1.ServiceManager) string {
+	if cr.Spec.ForProvider.ServiceInstanceName != "" {
+		return cr.Spec.ForProvider.ServiceInstanceName
+	}
+	return apisv1beta1.DefaultServiceInstanceName
+}
+
+// smBindingName returns the managed service-manager binding name so a transient
+// admin binding is never selected.
+func smBindingName(cr *apisv1beta1.ServiceManager) string {
+	if cr.Spec.ForProvider.ServiceBindingName != "" {
+		return cr.Spec.ForProvider.ServiceBindingName
+	}
+	return apisv1beta1.DefaultServiceBindingName
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
