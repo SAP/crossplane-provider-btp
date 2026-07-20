@@ -72,7 +72,7 @@ func (t ServiceManagerInstanceProxyClient) resolveServicePlan(ctx context.Contex
 			return "", err
 		}
 
-		id, err := resolver.PlanIDByName(ctx, ServiceManagerOfferingName, servicePlanName, "")
+		id, err := resolver.PlanIDByName(ctx, ServiceManagerOfferingName, servicePlanName, "", "sapbtp")
 		if err != nil {
 			return "", err
 		}

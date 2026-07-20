@@ -24,7 +24,7 @@ const ErrMissingXsappname = "Xsappname (xsappname) is missing"
 
 // PlanIdResolver used as its own resolval implementation downstream
 type PlanIdResolver interface {
-	PlanIDByName(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error)
+	PlanIDByName(ctx context.Context, offeringName string, servicePlanName string, dataCenter string, environment string) (string, error)
 }
 
 // NewCredsFromOperatorSecret creates a new BindingCredentials from a secret data
@@ -123,8 +123,11 @@ func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*S
 	}, nil
 }
 
-func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, planName, dataCenter string) (string, error) {
-	offeringQuery := fmt.Sprintf("catalog_name eq '%s' and data_center eq '%s'", offeringName, dataCenter)
+func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, planName, dataCenter, environment string) (string, error) {
+	offeringQuery := fmt.Sprintf("catalog_name eq '%s'", offeringName)
+	if dataCenter != "" {
+		offeringQuery = fmt.Sprintf("catalog_name eq '%s' and data_center eq '%s'", offeringName, dataCenter)
+	}
 
 	execute, _, err := sm.GetServiceOfferings(ctx).FieldQuery(offeringQuery).Execute()
 	if err != nil {
@@ -138,13 +141,13 @@ func (sm *ServiceManagerClient) PlanIDByName(ctx context.Context, offeringName, 
 	}
 
 	planQuery := fmt.Sprintf("catalog_name eq '%s' and service_offering_id eq '%s'", planName, *execute.Items[0].Id)
-	object, _, err := sm.GetAllServicePlans(ctx).FieldQuery(planQuery).Execute()
+	object, _, err := sm.GetAllServicePlans(ctx).FieldQuery(planQuery).Environment(environment).Execute()
 	if err != nil {
 		return "", specifyAPIError(err)
 	}
 
 	if len(object.Items) == 0 {
-		return "", errors.Errorf("No service plan '%s' found for offering '%s'", planName, offeringName)
+		return "", errors.Errorf("No service plan '%s' found for offering '%s' in environment '%s'", planName, offeringName, environment)
 	}
 
 	servicePlanID := *object.Items[0].Id

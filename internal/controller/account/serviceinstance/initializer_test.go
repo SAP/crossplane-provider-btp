@@ -210,6 +210,6 @@ type mockPlanIdResolver struct {
 	err    error
 }
 
-func (m *mockPlanIdResolver) PlanIDByName(ctx context.Context, offeringName, planName string, dataCenter string) (string, error) {
+func (m *mockPlanIdResolver) PlanIDByName(ctx context.Context, offeringName, planName, dataCenter, environment string) (string, error) {
 	return m.planID, m.err
 }
