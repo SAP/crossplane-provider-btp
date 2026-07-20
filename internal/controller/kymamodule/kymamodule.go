@@ -57,8 +57,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotKymaModule)
 	}
 
-	if err := c.resourcetracker.Track(ctx, mg); err != nil {
-		return nil, errors.Wrap(err, errTrackRUsage)
+	// Skip ResourceUsage tracking when the MR is being deleted: Track() walks
+	// references and Gets each upstream MR; if any was deleted out from under
+	// us, that Get returns NotFound and Connect would abort before Delete()
+	// runs, leaving the Kyma module and the finalizer in place forever.
+	if !meta.WasDeleted(mg) {
+		if err := c.resourcetracker.Track(ctx, mg); err != nil {
+			return nil, errors.Wrap(err, errTrackRUsage)
+		}
 	}
 
 	secretfetcher := &SecretFetcher{
