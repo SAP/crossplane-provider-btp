@@ -1,0 +1,50 @@
+# ──────────────────────────────────────────────────────────────────
+# account.btp.sap.crossplane.io — ServiceInstance + ServiceBinding
+# ──────────────────────────────────────────────────────────────────
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: ManagedMetric
+metadata:
+  name: btp-service-instances
+spec:
+  name: btp_service_instance_count
+  description: "Count of SAP BTP ServiceInstance managed resources per offering/plan"
+  kind: ServiceInstance
+  group: account.btp.sap.crossplane.io
+  version: v1alpha1
+  interval: "1m"
+  dimensions:
+    - name: name
+      fieldPath: "metadata.name"
+    - name: offering_name
+      fieldPath: "spec.forProvider.serviceOfferingName"
+    - name: plan_name
+      fieldPath: "spec.forProvider.servicePlanName"
+    - name: condition_ready
+      fieldPath: "status.conditions[?(@.type=='Ready')]"
+      type: slice
+    - name: condition_synced
+      fieldPath: "status.conditions[?(@.type=='Synced')]"
+      type: slice
+---
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: ManagedMetric
+metadata:
+  name: btp-service-bindings
+spec:
+  name: btp_service_binding_count
+  description: "Count of SAP BTP ServiceBinding managed resources"
+  kind: ServiceBinding
+  group: account.btp.sap.crossplane.io
+  version: v1alpha1
+  interval: "1m"
+  dimensions:
+    - name: name
+      fieldPath: "metadata.name"
+    - name: instance_name
+      fieldPath: "spec.forProvider.serviceInstanceName"
+    - name: condition_ready
+      fieldPath: "status.conditions[?(@.type=='Ready')]"
+      type: slice
+    - name: condition_synced
+      fieldPath: "status.conditions[?(@.type=='Synced')]"
+      type: slice
