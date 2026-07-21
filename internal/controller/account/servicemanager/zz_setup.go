@@ -3,6 +3,7 @@ package servicemanager
 import (
 	"context"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
@@ -18,6 +19,8 @@ import (
 
 // Setup adds a controller that reconciles GlobalAccount managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
+	controllerName := managed.ControllerName(apisv1beta1.ServiceManagerKind)
+	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(controllerName)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 	return providerconfig.DefaultSetup(
 		mgr,
 		o,
@@ -53,6 +56,16 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 						},
 					)
 				},
+
+				newAdminLookuperFn: func(ctx context.Context, cr *apisv1beta1.ServiceManager) (servicemanager.SemanticLookuper, func(), error) {
+					btpclient, err := providerconfig.CreateClient(ctx, cr, mgr.GetClient(), usage, btp.NewBTPClient, resourcetracker)
+					if err != nil {
+						return nil, func() {}, err
+					}
+					proxy := servicemanager.NewServiceManagerInstanceProxyClient(btpclient.AccountsServiceClient)
+					return proxy.EnsureSemanticLookuper(ctx, cr.Spec.ForProvider.SubaccountGuid)
+				},
+				recorder: recorder,
 			}
 		})
 }

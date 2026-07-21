@@ -56,6 +56,50 @@ Upjet resources are an exception as we dont control how the external-name is def
 
 In general, all exceptions should be noted in the appropriate location: for user in the docs and for developer in the appropriate code location (Observe/Create/Update/Delete functions or API definition).
 
+### Orphaned external-name recovery (always-on bug-fix)
+
+`Subaccount`, `ServiceInstance`, `ServiceBinding`, `ServiceManager`, and
+`CloudManagement` implement a narrow always-on recovery path for the provider's
+own lost-ID `Create()` attempts. This is **not** an import mechanism: brownfield
+resources are refused and still require the documented user-driven import flow.
+
+During `Observe()`, if the underlying client reports the resource as
+non-existent (or, for ServiceInstance, a same-generation `Conflict` from a
+failed Create) and the external-name is a fallback (`""` or `metadata.name`),
+the controller may run a semantic lookup:
+
+| Resource | Semantic key (subaccount enforced by credential scope) | Credentials |
+|----------|--------------------------------------------------------|-------------|
+| Subaccount | `subdomain` (unique within global account) | provider config (accounts-service) |
+| ServiceInstance | `name` | `spec.forProvider.serviceManagerSecret` |
+| ServiceBinding | `(serviceInstanceID, name)` | parent ServiceInstance's `serviceManagerSecret` |
+| ServiceManager | `servicePlanID` (subaccount-admin plan) → `sID/bID` | subaccount admin binding via accounts-service |
+| CloudManagement | `servicePlanID` (cis/local plan) → `sID/bID` | subaccount admin binding via accounts-service |
+
+The lookup is only attempted when the CR has
+`crossplane.io/external-create-pending`. That annotation is written by
+crossplane-runtime immediately before Create(), so it proves this controller
+attempted a Create for this CR. A missing annotation means recovery is skipped.
+
+A semantic match must also pass the ownership check in `internal/recovery`:
+`created_at` must fall inside the bounded window around the pending timestamp
+(currently `pending - 60s` to `pending + 1h`). Matches outside that window emit
+`Warning:RecoveryRefusedBrownfield` and leave the external-name unchanged.
+
+On success, the controller patches `crossplane.io/external-name`, emits
+`Normal:ExternalNameRecovered`, and returns `recovery.ErrRequeueAfterRecovery`.
+The requeue is required because controllers build their external clients from
+the external-name at Connect() time; continuing the same reconcile would still
+act on the stale fallback name.
+
+Trigger is strictly fallback external-name. In particular, a single-UUID
+external-name is not recoverable: it is the normal phase-1 output of SM/CM's
+two-phase Create and must be allowed to proceed to phase-2.
+
+Implementation: `internal/recovery`,
+`internal/clients/servicemanager/recovery.go` (`SemanticLookuper` returns
+`created_at` alongside the ID), and `healExternalName` on each controller.
+
 ### Implementation guideline
 
 #### Observe()
@@ -78,6 +122,8 @@ If the request is sucessful, set the external-name with the necessary GUID or co
 It might be possible that the API works asynchronous and the final external-name is not available after the request. This is a possible szenario but out of scope here.
 
 If the response is `creation failed – resource already exist`, we treat it as an error. We do NOT set the external-name. In the next reconcile Observe(), the resource will be shown as resourceExist: False since the external name is not set and we intend to stay in an error loop. The error documents that the resource could not be created because it already exists. To resume, the user needs to set the external-name properly.
+
+For the narrow lost-ID recovery exception, see "Orphaned external-name recovery" above.
 
 If the request fails for any other reason, we will return the error and dont set the external-name.
 

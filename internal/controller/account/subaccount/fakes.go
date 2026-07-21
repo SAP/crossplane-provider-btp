@@ -3,6 +3,7 @@ package subaccount
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-openapi/runtime"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
@@ -11,6 +12,12 @@ import (
 type MockAccountsApiAccessor struct {
 	LastMoveTarget string
 	returnErr      error
+
+	lookupGuid      string
+	lookupCreatedAt time.Time
+	lookupFound     bool
+	lookupErr       error
+	lookupCalls     int
 }
 
 func (m *MockAccountsApiAccessor) MoveSubaccount(ctx context.Context, subaccountGuid string, targetId string) error {
@@ -20,6 +27,11 @@ func (m *MockAccountsApiAccessor) MoveSubaccount(ctx context.Context, subaccount
 
 func (m *MockAccountsApiAccessor) UpdateSubaccount(ctx context.Context, subaccountGuid string, payload accountclient.UpdateSubaccountRequestPayload) error {
 	return m.returnErr
+}
+
+func (m *MockAccountsApiAccessor) SubaccountGuidBySubdomain(ctx context.Context, subdomain string) (string, time.Time, bool, error) {
+	m.lookupCalls++
+	return m.lookupGuid, m.lookupCreatedAt, m.lookupFound, m.lookupErr
 }
 
 var _ AccountsApiAccessor = &MockAccountsApiAccessor{}
