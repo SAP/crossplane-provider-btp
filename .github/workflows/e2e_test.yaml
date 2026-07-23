@@ -49,10 +49,10 @@ env:
   E2E_PROVIDER_IMAGE: index.docker.io/e2e/provider-btp-amd64
   CROSSPLANE_CLI_VERSION: v2.0.2
   # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable
-  CROSSPLANE_CHART_VERSION: '2.1.7'
-  # SHA256 of crossplane-2.1.7.tgz downloaded from charts.crossplane.io/stable
+  CROSSPLANE_CHART_VERSION: '2.3.4'
+  # SHA256 of crossplane-2.3.4.tgz downloaded from charts.crossplane.io/stable
   # Compute with: curl -sL https://charts.crossplane.io/stable/crossplane-<version>.tgz | sha256sum
-  CROSSPLANE_CHART_SHA256: '29e2d7c7671615bfcef868ab0cf4b7b8dbba1110bfff0d0db13609395021093b'
+  CROSSPLANE_CHART_SHA256: '72c349c911a7ba521208538caf9ea48b31974403a64534bc00dae750e2f95b30'
 
 jobs:
   prepare-matrix:
