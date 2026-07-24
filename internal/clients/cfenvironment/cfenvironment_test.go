@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"slices"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -248,8 +247,28 @@ func TestFilterOutUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := filterOutUser(tt.users, tt.exclude)
-			if !slices.Equal(got, tt.want) {
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("filterOutUser() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseManagerString(t *testing.T) {
+	tests := []struct {
+		input          string
+		wantUsername   string
+		wantOrigin     string
+	}{
+		{"user@example.com", "user@example.com", defaultOrigin},
+		{"user@example.com|custom.idp", "user@example.com", "custom.idp"},
+		{"user@example.com|sap.ids", "user@example.com", "sap.ids"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			gotUsername, gotOrigin := parseManagerString(tt.input)
+			if gotUsername != tt.wantUsername || gotOrigin != tt.wantOrigin {
+				t.Errorf("parseManagerString(%q) = (%q, %q), want (%q, %q)", tt.input, gotUsername, gotOrigin, tt.wantUsername, tt.wantOrigin)
 			}
 		})
 	}
