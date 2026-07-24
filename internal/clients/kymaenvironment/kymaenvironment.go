@@ -21,11 +21,21 @@ const (
 )
 
 type KymaEnvironments struct {
-	btp btp.Client
+	btp           btp.Client
+	schemaFetcher SchemaFetcher
 }
 
 func NewKymaEnvironments(btp btp.Client) *KymaEnvironments {
-	return &KymaEnvironments{btp: btp}
+	return &KymaEnvironments{
+		btp:           btp,
+		schemaFetcher: NewSchemaFetcher(btp),
+	}
+}
+
+// SchemaFetcher returns the fetcher the client is bound to. Exposed so the
+// controller can reuse the same in-memory schema cache for drift detection.
+func (c *KymaEnvironments) SchemaFetcher() SchemaFetcher {
+	return c.schemaFetcher
 }
 
 // DescribeInstance retrieves a Kyma environment instance using the external-name annotation.
@@ -97,10 +107,26 @@ func (c KymaEnvironments) UpdateInstance(ctx context.Context, cr v1alpha1.KymaEn
 	}
 
 	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)
-	parameters = AddKymaDefaultParameters(parameters, GetKymaEnvironmentName(cr), string(cr.UID))
 	if err != nil {
 		return err
 	}
+	parameters = AddKymaDefaultParameters(parameters, GetKymaEnvironmentName(cr), string(cr.UID))
+
+	// Drop create-only fields (region, networking, modules, ...) the update
+	// API does not accept; sending them makes BTP reject or silently ignore
+	// the update (issue #682). Fail-closed on schema fetch errors so we never
+	// send an unfiltered payload; an unusable schema passes params through
+	// (see FilterToUpdateSchema).
+	schema, err := c.schemaFetcher.GetUpdateSchema(
+		ctx,
+		btp.KymaEnvironmentType().Identifier,
+		cr.Spec.ForProvider.PlanName,
+	)
+	if err != nil {
+		return errors.Wrap(err, errKymaInstanceUpdateFailed)
+	}
+	parameters = FilterToUpdateSchema(parameters, schema)
+
 	err = c.btp.UpdateKymaEnvironment(
 		ctx,
 		externalName,

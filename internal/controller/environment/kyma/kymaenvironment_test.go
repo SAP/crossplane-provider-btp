@@ -905,6 +905,84 @@ func TestMaxRetriesExtraction(t *testing.T) {
 	}
 }
 
+// TestObserve_SchemaAwareDriftSuppressesIssue682 exercises the end-to-end
+// controller path with a real (fixture) BTP updateSchema wired in. It
+// reproduces the failure mode from issue #682 — spec has the base fields,
+// BTP echoes them back plus the three schema-default fields — and asserts
+// that the schema-aware diff correctly reports no drift, preventing the
+// circuit breaker from ever tripping.
+func TestObserve_SchemaAwareDriftSuppressesIssue682(t *testing.T) {
+	// Fixture schema mirroring the Kyma azure updateSchema. Only fields
+	// relevant to the bug are declared; anything else is out of contract.
+	schema := &kyma.Schema{Properties: map[string]kyma.Property{
+		"administrators":   {Type: "array"},
+		"autoScalerMax":    {Type: "integer", Default: float64(20)},
+		"autoScalerMin":    {Type: "integer", Default: float64(3)},
+		"ingressFiltering": {Type: "boolean", Default: false},
+		"machineType":      {Type: "string"},
+		"name":             {Type: "string"},
+		"gvisor": {
+			Type: "object",
+			Properties: map[string]kyma.Property{
+				"enabled": {Type: "boolean", Default: false},
+			},
+		},
+	}}
+
+	// User's spec: no ingressFiltering, no gvisor. Same shape as
+	// btp-kyma-fresh/kyma-environment.yaml minus the recovery workaround.
+	specParams := `{"region":"westeurope","machineType":"Standard_D4_v3","autoScalerMin":3,"autoScalerMax":3,"administrators":["justin.luong@sap.com"]}`
+
+	// BTP echo: user's fields plus the two schema-default ghosts.
+	btpEcho := `{"name":"kyma","region":"westeurope","machineType":"Standard_D4_v3","autoScalerMin":3,"autoScalerMax":3,"administrators":["justin.luong@sap.com"],"ingressFiltering":false,"gvisor":{"enabled":false}}`
+
+	mockClient := fake.MockClient{
+		MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+			return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+				Id:         internal.Ptr(testUUID),
+				State:      internal.Ptr("OK"),
+				Labels:     internal.Ptr(`{"name": "kyma", "KubeconfigURL": "someUrl"}`),
+				Parameters: internal.Ptr(btpEcho),
+			}, nil
+		},
+		MockSchemaFetcher: fixtureSchemaFetcher{schema: schema},
+	}
+
+	e := external{
+		client:     mockClient,
+		httpClient: mockedHttpClient(kubeConfigData),
+		kube:       test.NewMockClient(),
+		record:     event.NewNopRecorder(),
+	}
+
+	cr := environment(
+		withExternalName(testUUID),
+		withUID("1234"),
+		withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+			Parameters: runtime.RawExtension{Raw: []byte(specParams)},
+		}),
+	)
+
+	got, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe returned unexpected error: %v", err)
+	}
+	if !got.ResourceUpToDate {
+		t.Errorf("ResourceUpToDate = false, want true (schema-aware diff should suppress ghost fields)")
+		if cr.Status.RetryStatus != nil {
+			t.Logf("retry status: %+v", *cr.Status.RetryStatus)
+		}
+	}
+}
+
+// fixtureSchemaFetcher is a tiny SchemaFetcher for tests: always returns the
+// stored schema regardless of arguments.
+type fixtureSchemaFetcher struct{ schema *kyma.Schema }
+
+func (f fixtureSchemaFetcher) GetUpdateSchema(_ context.Context, _, _ string) (*kyma.Schema, error) {
+	return f.schema, nil
+}
+
 type environmentModifier func(*v1alpha1.KymaEnvironment)
 
 func withConditions(c ...xpv1.Condition) environmentModifier {
