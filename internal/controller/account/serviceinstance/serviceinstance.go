@@ -2,6 +2,7 @@ package serviceinstance
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -244,6 +245,22 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			}
 		}
 
+		// The bundled BTP Terraform provider discards service-instance
+		// `parameters` on read, so its diff never covers them and a
+		// parameters-only change is reported as UpToDate. Compensate by
+		// comparing the desired parameters against what the Service Manager
+		// actually has, and force an update when they diverge. Skipped for
+		// Observe-only resources and whenever the server exposes no parameters
+		// (see parametersDrifted).
+		if !isObserveOnly(cr) {
+			if e.parametersDrifted(ctx, cr) {
+				return managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+				}, nil
+			}
+		}
+
 		return managed.ExternalObservation{
 			ResourceExists:    true,
 			ResourceUpToDate:  true,
@@ -310,6 +327,71 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteInstance)
 	}
 	return managed.ExternalDelete{}, nil
+}
+
+// parametersDrifted reports whether the desired service-instance parameters
+// (spec + resolved secret refs) are NOT fully reflected by what the Service
+// Manager currently has. It exists to compensate for the bundled BTP Terraform
+// provider dropping `parameters` on read, which otherwise makes a
+// parameters-only change invisible to drift detection.
+//
+// It is deliberately fail-safe: any inability to determine drift with
+// confidence (no admin lookuper, lookup/fetch error, offering that does not
+// return parameters, unparseable desired spec) returns false, preserving the
+// pre-existing behaviour rather than forcing a spurious update. It never
+// returns true unless it positively observed that a desired key is missing or
+// differs on the server, so it cannot cause an update loop: after Update()
+// writes the parameters, the next fetch reflects them and the comparison
+// matches.
+//
+// The comparison is a subset match (desired ⊆ server), which tolerates the two
+// BTP constraints that block a Terraform-side fix (terraform-provider-btp#1643):
+// offerings that do not return parameters (handled via found==false) and
+// server-added defaults / extra fields (ignored by the subset semantics). It
+// detects added/changed parameters only, never deletions — see paramsSubsetMatch
+// for why parameter removal is not expressible over the update API.
+func (e *external) parametersDrifted(ctx context.Context, cr *v1alpha1.ServiceInstance) bool {
+	if e.newAdminLookuperFn == nil {
+		return false
+	}
+
+	// Desired parameters, built exactly as they are sent to the TF layer.
+	desiredJSON, err := siClient.BuildComplexParameterJson(
+		ctx, e.kube, cr.Spec.ForProvider.ParameterSecretRefs, cr.Spec.ForProvider.Parameters.Raw)
+	if err != nil {
+		log.FromContext(ctx).V(1).Info("parameter drift check skipped: cannot build desired parameters", "error", err.Error())
+		return false
+	}
+	desired := map[string]any{}
+	if uerr := json.Unmarshal(desiredJSON, &desired); uerr != nil || len(desired) == 0 {
+		// No desired parameters -> nothing to enforce.
+		return false
+	}
+
+	guid := meta.GetExternalName(cr)
+	if guid == "" || guid == cr.Name {
+		// No real BTP id yet (not created / not adopted) -> nothing to compare.
+		return false
+	}
+
+	lookuper, cleanup, err := e.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		log.FromContext(ctx).V(1).Info("parameter drift check skipped: cannot obtain admin lookup client", "error", err.Error())
+		return false
+	}
+	defer cleanup()
+
+	server, found, err := lookuper.GetInstanceParameters(ctx, guid)
+	if err != nil {
+		log.FromContext(ctx).V(1).Info("parameter drift check skipped: cannot read server parameters", "error", err.Error())
+		return false
+	}
+	if !found {
+		// Offering does not return parameters (or none set) -> no drift signal.
+		return false
+	}
+
+	return !paramsSubsetMatch(desired, server)
 }
 
 func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
