@@ -278,6 +278,34 @@ func TestTfResource(t *testing.T) {
 				),
 			},
 		},
+		"Labels are propagated to tf resource": {
+			reason: "Labels set in forProvider should be passed through to the tf resource",
+			args: args{
+				si: expectedServiceInstance(
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+					withLabels(map[string][]*string{
+						"env":  {internal.Ptr("dev"), internal.Ptr("test")},
+						"team": {internal.Ptr("platform")},
+					}),
+				),
+			},
+			want: want{
+				hasErr: false,
+				tfResource: expectedTfSerivceInstance(
+					withTfParameters(`{}`),
+					withTfExternalName("123"),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+					withTfLabels(map[string][]*string{
+						"env":  {internal.Ptr("dev"), internal.Ptr("test")},
+						"team": {internal.Ptr("platform")},
+					}),
+				),
+			},
+		},
 		"TfResource_ManagementPolicies_AlwaysSetToAll": {
 			reason: "ADR: ManagementPolicies on the TfResource must always be '*' regardless of the native CR's policies, so that tf does use refresh instead of import",
 			args: args{
@@ -444,5 +472,17 @@ func withObservation(obs v1alpha1.ServiceInstanceObservation) func(*v1alpha1.Ser
 func withTfServicePlanID(servicePlanID string) func(*v1alpha1.SubaccountServiceInstance) {
 	return func(cr *v1alpha1.SubaccountServiceInstance) {
 		cr.Spec.ForProvider.ServiceplanID = &servicePlanID
+	}
+}
+
+func withLabels(labels map[string][]*string) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Spec.ForProvider.Labels = labels
+	}
+}
+
+func withTfLabels(labels map[string][]*string) func(*v1alpha1.SubaccountServiceInstance) {
+	return func(cr *v1alpha1.SubaccountServiceInstance) {
+		cr.Spec.ForProvider.Labels = labels
 	}
 }

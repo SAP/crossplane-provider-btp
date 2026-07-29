@@ -36,12 +36,15 @@ var (
 )
 
 func TestSubaccountImportFlow(t *testing.T) {
+	buildID := envvar.GetOrDefault(UUT_BUILD_ID_KEY, "0000")
+	importName := NewID(subaccountImportK8sResName, buildID)
+
 	importTester := NewImportTester(
 		&v1alpha1.Subaccount{
 			Spec: v1alpha1.SubaccountSpec{
 				ForProvider: v1alpha1.SubaccountParameters{
-					DisplayName:      subaccountImportK8sResName,
-					Subdomain:        subaccountImportK8sResName,
+					DisplayName:      importName,
+					Subdomain:        importName,
 					Region:           "eu10",
 					SubaccountAdmins: []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
 				},

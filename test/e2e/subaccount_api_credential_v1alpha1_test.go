@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -90,18 +91,14 @@ func assertApiCredentialSecret(t *testing.T, ctx context.Context, cfg *envconf.C
 	}
 }
 
-// TestSubaccountApiCredentialOrphanImport verifies External-Name ADR compliance for
-// SubaccountApiCredential: after provisioning, the crossplane.io/external-name annotation
-// reflects the BTP credential name (via GetExternalNameFn reading `name` from Terraform
-// state). The connection secret must also contain a valid client_secret.
+// TestSubaccountApiCredentialExternalNameADRCompliance verifies that a newly
+// provisioned SubaccountApiCredential gets an ADR-compliant external-name
+// annotation in the compound `<subaccount-id>/<name>` format and produces a
+// connection secret containing a valid client_secret.
 //
-// Note: the BTP Terraform provider does not implement ImportState for this resource type.
-// Setting the external-name annotation before creation would trigger Upjet's terraform-import
-// path, which always fails for this resource. The external-name is therefore set by the
-// provider after successful creation, not by the user before creation.
-//
-// See: https://github.com/SAP/crossplane-provider-btp/issues/553
-func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
+// Note: the BTP Terraform provider does not implement ImportState for this resource type,
+// so this test does not validate adoption/import of an existing credential.
+func TestSubaccountApiCredentialExternalNameADRCompliance(t *testing.T) {
 	var orphanManifestDir = crsPath("SubaccountApiCredentialOrphanImport")
 	// Prefix "sac-adr-" ensures the BTP credential name starts with a letter.
 	// The SAC is created in Setup (not Assess) so the controller picks it up
@@ -124,10 +121,9 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 				}, cfg, t, wait.WithTimeout(time.Minute*12))
 
 				// Create the SAC in Setup so the controller picks it up while Crossplane
-				// is already actively reconciling. Do NOT set the external-name annotation
-				// before creation — that would trigger Upjet's terraform-import path, which
-				// always fails because the BTP Terraform provider does not implement
-				// ImportState for btp_subaccount_api_credential.
+				// is already actively reconciling. Do not set the external-name annotation
+				// manually here: this is a creation test, not an adoption/import test. The
+				// controller will default/reconstruct the compound external-name.
 				readOnly := false
 				sac := &v1alpha1.SubaccountApiCredential{
 					ObjectMeta: metav1.ObjectMeta{Name: sacName, Namespace: cfg.Namespace()},
@@ -153,15 +149,17 @@ func TestSubaccountApiCredentialOrphanImport(t *testing.T) {
 			},
 		).
 		Assess(
-			"SAC external-name annotation reflects BTP credential name after provisioning (ADR compliance)",
+			"SAC external-name annotation uses compound key after provisioning (ADR compliance)",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				sac := &v1alpha1.SubaccountApiCredential{}
 				MustGetResource(t, cfg, sacName, nil, sac)
 
-				// ADR compliance: after provisioning, GetExternalNameFn reads `name` from
-				// the Terraform state and writes it back to the annotation.
-				if externalName := xpmeta.GetExternalName(sac); externalName == "" {
-					t.Error("External name ADR compliance: annotation is empty after provisioning — GetExternalNameFn did not run")
+				// ADR compliance: after provisioning, GetExternalNameFn reads `subaccount_id`
+				// and `name` from Terraform state and writes the compound key back to the annotation.
+				externalName := xpmeta.GetExternalName(sac)
+				parts := strings.SplitN(externalName, "/", 2)
+				if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+					t.Errorf("External name ADR compliance: annotation %q is not in <subaccount-id>/<name> format", externalName)
 				}
 
 				// Verify the connection secret contains a valid client_secret.

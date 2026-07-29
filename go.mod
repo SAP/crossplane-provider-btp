@@ -14,7 +14,7 @@ require (
 	github.com/SAP/xp-clifford v0.0.0-20260528123824-27644fae68e8
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/blang/semver/v4 v4.0.0
-	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.18
+	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.21
 	github.com/crossplane-contrib/xp-testing v1.9.2
 	github.com/crossplane/crossplane-runtime/v2 v2.2.0
 	github.com/crossplane/crossplane-tools v0.0.0-20251017183449-dd4517244339

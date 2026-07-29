@@ -31,7 +31,7 @@ type SubaccountApiCredentialInitParameters struct {
 	// If the user prefers to use a certificate, they must provide the certificate value in PEM format "----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----".
 	CertificatePassed *string `json:"certificatePassed,omitempty" tf:"certificate_passed,omitempty"`
 
-	// The name if left unset defaults to managedsubbaccountapicredential
+	// The name if left unset defaults to managed-subaccount-api-credential
 	// The name for the API credential.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
 
@@ -76,7 +76,7 @@ type SubaccountApiCredentialObservation struct {
 	// RSA key generated if the API credential is created with a certificate.
 	Key *string `json:"key,omitempty" tf:"key,omitempty"`
 
-	// The name if left unset defaults to managedsubbaccountapicredential
+	// The name if left unset defaults to managed-subaccount-api-credential
 	// The name for the API credential.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
 
@@ -96,7 +96,7 @@ type SubaccountApiCredentialParameters struct {
 	// +kubebuilder:validation:Optional
 	CertificatePassed *string `json:"certificatePassed,omitempty" tf:"certificate_passed,omitempty"`
 
-	// The name if left unset defaults to managedsubbaccountapicredential
+	// The name if left unset defaults to managed-subaccount-api-credential
 	// The name for the API credential.
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
@@ -151,7 +151,7 @@ type SubaccountApiCredentialStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 
-// SubaccountApiCredential is the Schema for the SubaccountApiCredentials API. Manage API Credentials at the Subaccount level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted subaccount. Tip: You must be assigned to the subaccount admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/managing-api-credentials-for-calling-rest-apis-of-sap-authorization-and-trust-management-service
+// SubaccountApiCredential is the Schema for the SubaccountApiCredentials API. Manage API Credentials at the Subaccount level. These credentials will enable you to consume the REST APIs of the SAP Authorization and Trust Management service (XSUAA). With the client ID and client secret, or certificate, you can request an access token for the APIs in the targeted subaccount. Tip: You must be assigned to the subaccount admin or viewer role. Further documentation: https://help.sap.com/docs/btp/sap-business-technology-platform/managing-api-credentials-for-calling-rest-apis-of-sap-authorization-and-trust-management-service. Importing or adopting existing API credentials is not supported.
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

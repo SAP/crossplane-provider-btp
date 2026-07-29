@@ -282,6 +282,10 @@ func TestDelete_DeletionBlocking(t *testing.T) {
 }
 
 func TestObserve(t *testing.T) {
+	// deletionTime is captured once at test-setup so cases that read/write
+	// DeletionTimestamp share the exact same value (otherwise two separate
+	// metav1.Now() calls in args vs want disagree at microsecond precision).
+	deletionTime := metav1.Now()
 	type want struct {
 		err error
 		obs managed.ExternalObservation
@@ -372,6 +376,39 @@ func TestObserve(t *testing.T) {
 						ServiceBindingID:  "anotherID",
 					}),
 					WithConditions(xpv1.Available())),
+			},
+		},
+		{
+			// Regression: while the CR is being deleted and the underlying
+			// instance still exists (binding may or may not — the tf-client
+			// keys ResourceExists off the instance during delete), setStatus
+			// must report Deleting()/Unbound, not Available()/Bound. Under the
+			// pre-fix code the delete-aware ObserveResources returned
+			// ResourceExists:true which then flipped the CR back to Available
+			// on every reconcile between Delete() and the final finalize —
+			// misleading in kubectl output and dashboards.
+			name: "DeletingInstanceStillExists",
+			args: args{
+				cr: NewServiceManager("test", WithDeletionTimestamp(deletionTime)),
+				tfClient: &TfClientFake{
+					observeFn: func() (sm.ResourcesStatus, error) {
+						return sm.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+							InstanceID:          "someID",
+						}, nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+				cr: NewServiceManager("test",
+					WithDeletionTimestamp(deletionTime),
+					WithStatus(apisv1beta1.ServiceManagerObservation{
+						Status:            apisv1beta1.ServiceManagerUnbound,
+						ServiceInstanceID: "someID",
+					}),
+					WithConditions(xpv1.Deleting())),
 			},
 		},
 	}
@@ -664,6 +701,12 @@ func WithConditions(c ...xpv1.Condition) ServiceManagerModifier {
 func WithExternalName(externalName string) ServiceManagerModifier {
 	return func(r *apisv1beta1.ServiceManager) {
 		meta.SetExternalName(r, externalName)
+	}
+}
+
+func WithDeletionTimestamp(t metav1.Time) ServiceManagerModifier {
+	return func(r *apisv1beta1.ServiceManager) {
+		r.SetDeletionTimestamp(&t)
 	}
 }
 

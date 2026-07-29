@@ -394,6 +394,94 @@ func TestObserveResources(t *testing.T) {
 				err: nil,
 			},
 		},
+		{
+			// REGRESSION GUARD (orphan bug): CR is being deleted, the instance
+			// still exists in BTP but the binding is already gone (e.g. the
+			// binding delete landed and the instance delete then errored/lagged,
+			// or the binding was removed out-of-band). The OLD code reported
+			// ResourceExists:false here ("binding needs creation"), which under a
+			// deletion timestamp made the managed reconciler skip Delete(), strip
+			// the finalizer and ORPHAN the instance in BTP. We must report
+			// ResourceExists:true so Delete() keeps firing until the instance is
+			// actually gone.
+			//
+			// The binding is intentionally NOT observed on the delete path (BTP
+			// invariant: an instance cannot be deleted while a binding references
+			// it, so instance-gone implies binding-gone). To prove the binding is
+			// never consulted here, its observeFn returns an error: if the code
+			// observed it, this test would surface that error.
+			name: "DeletingInstanceExistsBindingGone",
+			args: args{
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{}, errors.New("binding must not be observed on the delete path")
+					},
+				},
+				cr: deletingCMCr(utilCloudManagementParams{extName: defaultExtName, siName: defaultInstanceName, sbName: defaultBindingName, statusInstanceID: defaultStatusInstanceID}),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+					Instance:            v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr(defaultInstanceID), Name: internal.Ptr(defaultInstanceName)},
+				},
+				err: nil,
+			},
+		},
+		{
+			// CR being deleted and the instance is gone from BTP. The binding is
+			// necessarily gone too (BTP invariant), so nothing remains: report
+			// ResourceExists:false and let the reconciler finalize the CR.
+			name: "DeletingInstanceGoneFinalizes",
+			args: args{
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: false}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{}, errors.New("binding must not be observed on the delete path")
+					},
+				},
+				cr: deletingCMCr(utilCloudManagementParams{extName: defaultExtName, siName: defaultInstanceName, sbName: defaultBindingName, statusInstanceID: defaultStatusInstanceID}),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: true},
+				},
+				err: nil,
+			},
+		},
+		{
+			// CR being deleted and the instance still exists. Keep reporting
+			// exists so Delete() runs; binding is not consulted.
+			name: "DeletingInstanceExistsKeepsDeleting",
+			args: args{
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{}, errors.New("binding must not be observed on the delete path")
+					},
+				},
+				cr: deletingCMCr(utilCloudManagementParams{extName: defaultExtName, siName: defaultInstanceName, sbName: defaultBindingName, statusInstanceID: defaultStatusInstanceID}),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+					Instance:            v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr(defaultInstanceID), Name: internal.Ptr(defaultInstanceName)},
+				},
+				err: nil,
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -665,6 +753,16 @@ func testCMCr(params utilCloudManagementParams) *v1beta1.CloudManagement {
 	}
 	meta.SetExternalName(sm, params.extName)
 	return sm
+}
+
+// deletingCMCr returns a CloudManagement CR that is mid-deletion (has a
+// DeletionTimestamp), which is what drives the delete-path branch in
+// ObserveResources.
+func deletingCMCr(params utilCloudManagementParams) *v1beta1.CloudManagement {
+	cr := testCMCr(params)
+	now := metav1.Now()
+	cr.SetDeletionTimestamp(&now)
+	return cr
 }
 
 func testServiceInstance(siId, siName string) *v1alpha1.SubaccountServiceInstance {
