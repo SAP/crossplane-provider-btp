@@ -4,14 +4,15 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 )
@@ -27,17 +28,21 @@ import (
 // because the outcome is precisely what the spike must discover. See
 //   ~/SAPDevelop/_tracking/crossplane-provider-btp/plan-161-remove-globalaccount.md
 //
-// Design constraints from the framework (custom_upgrade_framework_test.go):
-//   - The GlobalAccount CR is NOT passed to WithResourceDirectories(): that set
-//     is imported into and verified against BOTH provider versions and torn
-//     down at the end. The to-version (this branch) has no GlobalAccount CRD,
-//     so a shared fixture would break post-upgrade VerifyResources + teardown.
-//     Instead we create the CR manually in a pre-upgrade assessment.
+// Design constraints:
+//   - The GlobalAccount Go type is DELETED from apis/ on this branch (the "to"
+//     version). The test therefore cannot import accountv1alpha1.GlobalAccount —
+//     it would not compile. Instead the CR is built as an *unstructured.Unstructured
+//     with the GVK baked into local constants below, so the production code stays
+//     clean and the test still exercises the from-version CRD at runtime.
+//   - The CR is NOT passed to WithResourceDirectories(): that set is imported
+//     into and verified against BOTH provider versions and torn down at the end.
+//     The to-version has no GlobalAccount CRD, so a shared fixture would break
+//     post-upgrade VerifyResources + teardown. We create the CR manually in a
+//     pre-upgrade assessment.
 //   - SkipDefaultResourceVerification() is required: the default "resources
 //     become healthy" assertion is meaningless once the CRD is dropped.
-//   - The CR is deleted defensively in a post-upgrade assessment (tolerating a
-//     kind that is no longer served), since there is no shared directory for
-//     the framework teardown to clean.
+//   - The CR is deleted defensively post-upgrade (tolerating a kind that is no
+//     longer served), since there is no shared directory for teardown to clean.
 const gaRemovalCRName = "upgrade-test-ga-removal"
 
 var (
@@ -46,6 +51,19 @@ var (
 	// to   = this branch (local build) where GlobalAccount is removed.
 	gaRemovalFromTag = "v1.11.0"
 	gaRemovalToTag   = "local"
+
+	// GlobalAccount GVK, baked in locally because the Go type no longer exists
+	// on this branch. Mirrors what apis/account/v1alpha1 exposed before removal.
+	gaGVK = schema.GroupVersionKind{
+		Group:   "account.btp.sap.crossplane.io",
+		Version: "v1alpha1",
+		Kind:    "GlobalAccount",
+	}
+	gaListGVK = schema.GroupVersionKind{
+		Group:   "account.btp.sap.crossplane.io",
+		Version: "v1alpha1",
+		Kind:    "GlobalAccountList",
+	}
 )
 
 func Test_GlobalAccount_Removal(t *testing.T) {
@@ -62,24 +80,25 @@ func Test_GlobalAccount_Removal(t *testing.T) {
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				r := cfg.Client().Resources()
 
-				ga := newGlobalAccountCR()
-				if err := r.Create(ctx, ga); err != nil {
+				if err := r.Create(ctx, newGlobalAccountCR()); err != nil {
 					t.Fatalf("create GlobalAccount CR (from-version): %v", err)
 				}
 
-				// Wait until observed Ready so we upgrade from an established CR.
-				got := &accountv1alpha1.GlobalAccount{}
-				werr := waitFor(ctx, 5*time.Minute, func() (bool, error) {
-					if err := r.Get(ctx, gaRemovalCRName, "", got); err != nil {
-						return false, nil
-					}
-					return got.GetCondition(xpv1.TypeReady).Status == corev1.ConditionTrue, nil
-				})
-				if werr != nil {
-					t.Logf("GlobalAccount CR not Ready before upgrade (continuing): %v", werr)
+				// We do NOT gate on the CR reaching Ready before upgrade. The
+				// from-version provider (v1.11.0) is a prebuilt image we cannot
+				// patch, and its GlobalAccount Observe fails to decode the live
+				// accounts-service response (globalAccountGUID wrongly marked
+				// required in that release's vendored client), so the CR stays
+				// Synced=False there. That is a pre-existing bug in the released
+				// image, unrelated to the CRD-removal question this spike tests:
+				// orphaning behaviour depends only on the CR EXISTING at upgrade
+				// time, not on it being Ready. We just confirm it is stored, then
+				// log its conditions once for the record.
+				got := newGlobalAccountObj()
+				if err := r.Get(ctx, gaRemovalCRName, "", got); err != nil {
+					t.Fatalf("GlobalAccount CR not retrievable after create: %v", err)
 				}
-				klog.V(4).Infof("[371] pre-upgrade GlobalAccount CR ready=%v",
-					got.GetCondition(xpv1.TypeReady).Status == corev1.ConditionTrue)
+				klog.V(4).Infof("[371] pre-upgrade GlobalAccount stored; conditions: %s", formatConditions(got))
 				return ctx
 			},
 		).
@@ -89,7 +108,8 @@ func Test_GlobalAccount_Removal(t *testing.T) {
 				r := cfg.Client().Resources()
 
 				// 1. Is the GlobalAccount kind still served by the apiserver?
-				list := &accountv1alpha1.GlobalAccountList{}
+				list := &unstructured.UnstructuredList{}
+				list.SetGroupVersionKind(gaListGVK)
 				listErr := r.List(ctx, list)
 				crdServed := listErr == nil
 				if listErr != nil && meta.IsNoMatchError(listErr) {
@@ -98,7 +118,7 @@ func Test_GlobalAccount_Removal(t *testing.T) {
 				findings["crd_still_served"] = boolStr(crdServed)
 
 				// 2. Is the previously-created CR still stored (orphaned) or gone?
-				got := &accountv1alpha1.GlobalAccount{}
+				got := newGlobalAccountObj()
 				getErr := r.Get(ctx, gaRemovalCRName, "", got)
 				switch {
 				case getErr == nil:
@@ -113,11 +133,41 @@ func Test_GlobalAccount_Removal(t *testing.T) {
 				klog.V(4).Infof("[371] post-upgrade crd_served=%s cr_state=%s",
 					findings["crd_still_served"], findings["cr_state"])
 
-				// 3. Defensive cleanup of the orphaned CR (best effort).
+				// 3. Can the user still DELETE the orphaned CR once its controller
+				//    is gone? A finalizer left by the old controller could block
+				//    removal (nothing runs to clear it). Issue the delete, then
+				//    poll: does the CR actually disappear, or hang Terminating?
+				//    This answers #371's "what can you recommend to customer" item.
 				if getErr == nil {
-					if delErr := r.Delete(ctx, got); delErr != nil {
-						t.Logf("cleanup: delete orphaned GlobalAccount CR: %v", delErr)
+					fins := got.GetFinalizers()
+					findings["cr_finalizers"] = strings.Join(fins, ",")
+					if len(fins) == 0 {
+						findings["cr_finalizers"] = "(none)"
 					}
+
+					if delErr := r.Delete(ctx, got); delErr != nil {
+						findings["cr_delete"] = "delete call failed: " + delErr.Error()
+					} else {
+						// Poll up to 60s for the object to actually be gone.
+						deleted := false
+						deadline := 12
+						for i := 0; i < deadline; i++ {
+							probe := newGlobalAccountObj()
+							e := r.Get(ctx, gaRemovalCRName, "", probe)
+							if apierrors.IsNotFound(e) {
+								deleted = true
+								break
+							}
+							time.Sleep(5 * time.Second)
+						}
+						if deleted {
+							findings["cr_delete"] = "deleted cleanly"
+						} else {
+							findings["cr_delete"] = "STILL PRESENT after delete (finalizer blocks removal)"
+						}
+					}
+					klog.V(4).Infof("[371] orphan delete: finalizers=%s result=%s",
+						findings["cr_finalizers"], findings["cr_delete"])
 				}
 				return ctx
 			},
@@ -125,22 +175,55 @@ func Test_GlobalAccount_Removal(t *testing.T) {
 
 	testenv.Test(t, upgradeTest.Feature())
 
-	klog.Infof("[371] SPIKE FINDINGS: crd_still_served=%s cr_state=%s",
-		findings["crd_still_served"], findings["cr_state"])
+	klog.Infof("[371] SPIKE FINDINGS: crd_still_served=%s cr_state=%s cr_finalizers=%s cr_delete=%s",
+		findings["crd_still_served"], findings["cr_state"], findings["cr_finalizers"], findings["cr_delete"])
+}
+
+// newGlobalAccountObj returns an empty unstructured object typed as GlobalAccount,
+// ready to be filled by a client Get.
+func newGlobalAccountObj() *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(gaGVK)
+	return u
 }
 
 // newGlobalAccountCR builds a GlobalAccount CR wired to the "default"
 // ProviderConfig that the framework creates. external-name points at the real
 // global account subdomain from the GLOBAL_ACCOUNT env var (loaded in TestMain).
-func newGlobalAccountCR() *accountv1alpha1.GlobalAccount {
-	ga := &accountv1alpha1.GlobalAccount{}
-	ga.SetGroupVersionKind(accountv1alpha1.GlobalAccountGroupVersionKind)
-	ga.SetName(gaRemovalCRName)
-	ga.SetAnnotations(map[string]string{
+func newGlobalAccountCR() *unstructured.Unstructured {
+	u := newGlobalAccountObj()
+	u.SetName(gaRemovalCRName)
+	u.SetAnnotations(map[string]string{
 		"crossplane.io/external-name": globalAccount,
 	})
-	ga.Spec.ResourceSpec.ProviderConfigReference = &xpv1.Reference{Name: "default"}
-	return ga
+	// The from-version GlobalAccountParameters is empty; only providerConfigRef
+	// is meaningful on spec.
+	_ = unstructured.SetNestedMap(u.Object, map[string]interface{}{
+		"providerConfigRef": map[string]interface{}{"name": "default"},
+	}, "spec")
+	return u
+}
+
+// formatConditions renders status.conditions as "Type=Status(Reason): Message; ..."
+// so a non-Ready CR's reconcile error is visible in the test log.
+func formatConditions(u *unstructured.Unstructured) string {
+	conds, found, err := unstructured.NestedSlice(u.Object, "status", "conditions")
+	if err != nil || !found || len(conds) == 0 {
+		return "(no conditions)"
+	}
+	parts := make([]string, 0, len(conds))
+	for _, c := range conds {
+		m, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		s := fmt.Sprintf("%v=%v(%v)", m["type"], m["status"], m["reason"])
+		if msg, _ := m["message"].(string); msg != "" {
+			s += ": " + msg
+		}
+		parts = append(parts, s)
+	}
+	return strings.Join(parts, "; ")
 }
 
 func boolStr(b bool) string {
@@ -148,26 +231,4 @@ func boolStr(b bool) string {
 		return "true"
 	}
 	return "false"
-}
-
-// waitFor polls fn until it returns true or the timeout elapses.
-func waitFor(ctx context.Context, timeout time.Duration, fn func() (bool, error)) error {
-	deadline := time.Now().Add(timeout)
-	for {
-		ok, err := fn()
-		if err != nil {
-			return err
-		}
-		if ok {
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return context.DeadlineExceeded
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(5 * time.Second):
-		}
-	}
 }
