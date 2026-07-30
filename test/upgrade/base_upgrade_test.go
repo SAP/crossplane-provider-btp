@@ -28,11 +28,6 @@ var (
 //  5. Verify all resources remain healthy after upgrade
 //  6. Clean up resources and provider
 func Test_BaselineUpgradeProvider(t *testing.T) {
-	// TODO: TEMPORARY — skip the kymamodule group; its teardown hangs on the shared
-	// BTP account (deletion/GC does not complete, stalling the whole baseline run).
-	// REVERT before merge — this masks kymamodule from baseline coverage.
-	ignoreResourceDirectories = []string{upgradeCRsPath("baseCRs/kymamodule")}
-
 	resourceDirectories = loadResourceDirectories()
 
 	fromTag, toTag := loadTags()
