@@ -1,0 +1,20 @@
+# Fixtures imported into the from-version provider only.
+#
+# The framework's WithResourceDirectories() applies a directory to BOTH the
+# from- and to-version providers and tears it down at the end. A GlobalAccount
+# CR cannot live in that shared set: the to-version (this branch) no longer
+# has the CRD, so post-upgrade VerifyResources and teardown would fail on a
+# missing kind. Therefore this directory is imported manually inside a
+# pre-upgrade assessment (see globalaccount_removal_upgrade_test.go) and the
+# default resource verification is skipped.
+
+# GlobalAccount CR — exists only in the from-version schema (v1.x).
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: GlobalAccount
+metadata:
+  name: upgrade-test-ga-removal
+  annotations:
+    crossplane.io/external-name: $GLOBAL_ACCOUNT
+spec:
+  providerConfigRef:
+    name: default
