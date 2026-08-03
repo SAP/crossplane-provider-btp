@@ -10,6 +10,30 @@
   "labels": ["release-notes/dependencies"],
   "prConcurrentLimit": 10,
   "prHourlyLimit": 0,
+  "packageRules": [
+    {
+      "groupName": "crossplane and upjet",
+      "matchPackageNames": [
+        "github.com/crossplane/**",
+        "github.com/crossplane-contrib/**"
+      ]
+    },
+    {
+      "groupName": "kubernetes",
+      "matchPackageNames": [
+        "k8s.io/**",
+        "sigs.k8s.io/**"
+      ]
+    },
+    {
+      "groupName": "golang.org/x",
+      "matchPackageNames": ["golang.org/x/**"]
+    },
+    {
+      "groupName": "github actions",
+      "matchManagers": ["github-actions"]
+    }
+  ],
   "customManagers": [
     {
       "fileMatch": [
