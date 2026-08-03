@@ -5,8 +5,6 @@ metadata:
   namespace: default
 spec:
   forProvider:
-    name: $BUILD_ID-upgrade-test-sub-trust
-    description: "upgrade-testing-of-subaccount-trust"
+    identityProvider: "$IDP_URL"
     subaccountRef:
       name: upgrade-test-sub-trust-sa
-    identityProvider: "$IDP_URL"
