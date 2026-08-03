@@ -1,7 +1,0 @@
-apiVersion: account.btp.sap.crossplane.io/v1alpha1
-kind: GlobalAccount
-metadata:
-  name: upgrade-test-global-account
-spec:
-  providerConfigRef:
-    name: default
