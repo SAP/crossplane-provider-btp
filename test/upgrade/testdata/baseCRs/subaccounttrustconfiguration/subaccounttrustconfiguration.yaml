@@ -1,0 +1,12 @@
+apiVersion: security.btp.sap.crossplane.io/v1alpha1
+kind: SubaccountTrustConfiguration
+metadata:
+  name: upgrade-test-sub-trust
+  namespace: default
+spec:
+  forProvider:
+    name: $BUILD_ID-upgrade-test-sub-trust
+    description: "upgrade-testing-of-subaccount-trust"
+    subaccountRef:
+      name: upgrade-test-sub-trust-sa
+    identityProvider: "$IDP_URL"
