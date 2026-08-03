@@ -1,6 +1,6 @@
 module github.com/sap/crossplane-provider-btp
 
-go 1.25.9
+go 1.26.0
 
 tool golang.org/x/tools/cmd/goimports
 
@@ -17,7 +17,7 @@ require (
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.21
 	github.com/crossplane-contrib/xp-testing v1.9.2
 	github.com/crossplane/crossplane-runtime/v2 v2.2.0
-	github.com/crossplane/crossplane-tools v0.0.0-20251017183449-dd4517244339
+	github.com/crossplane/crossplane-tools v0.0.0-20260719180100-659f1dc036c5
 	github.com/crossplane/upjet/v2 v2.3.0
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/runtime v0.32.4
@@ -33,12 +33,12 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/vladimirvivien/gexe v0.5.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sync v0.21.0
+	golang.org/x/sync v0.22.0
 	gopkg.in/validator.v2 v2.0.1
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.35.3
-	k8s.io/apimachinery v0.35.3
-	k8s.io/client-go v0.35.3
+	k8s.io/api v0.36.2
+	k8s.io/apimachinery v0.36.2
+	k8s.io/client-go v0.36.2
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 	sigs.k8s.io/controller-runtime v0.23.3
@@ -172,7 +172,7 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
-	github.com/moby/spdystream v0.5.0 // indirect
+	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
@@ -181,7 +181,6 @@ require (
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/oasdiff/oasdiff v1.11.8 // indirect
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
@@ -237,30 +236,31 @@ require (
 	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
-	golang.org/x/mod v0.37.0 // indirect
-	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/telemetry v0.0.0-20260625142307-59b4966ccb57 // indirect
-	golang.org/x/term v0.44.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/mod v0.38.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/telemetry v0.0.0-20260708182218-49f421fb7959 // indirect
+	golang.org/x/term v0.45.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.47.0 // indirect
+	golang.org/x/tools v0.48.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260630182238-925bb5da69e7 // indirect
 	google.golang.org/grpc v1.81.1 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	k8s.io/apiextensions-apiserver v0.35.2 // indirect
-	k8s.io/code-generator v0.35.2 // indirect
-	k8s.io/component-base v0.35.3 // indirect
+	k8s.io/apiextensions-apiserver v0.36.2 // indirect
+	k8s.io/code-generator v0.36.2 // indirect
+	k8s.io/component-base v0.36.2 // indirect
 	k8s.io/gengo/v2 v2.0.0-20251215205346-5ee0d033ba5b // indirect
-	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4 // indirect
+	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a // indirect
+	k8s.io/streaming v0.36.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
 )
