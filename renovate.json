@@ -8,6 +8,8 @@
     "gomodTidy"
   ],
   "labels": ["release-notes/dependencies"],
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 0,
   "customManagers": [
     {
       "fileMatch": [
