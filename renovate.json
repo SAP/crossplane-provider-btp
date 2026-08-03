@@ -36,6 +36,7 @@
   ],
   "customManagers": [
     {
+      "customType": "regex",
       "fileMatch": [
         "(^|/)Makefile$",
         "(^|/)Dockerfile$",
