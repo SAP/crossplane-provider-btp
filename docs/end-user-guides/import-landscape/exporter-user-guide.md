@@ -219,8 +219,34 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter export [flags]
 | Flag | Short | Description |
 |------|-------|-------------|
 | `--kind <kinds>` | | Comma-separated list of resource kinds to export |
+| `--all` | | Export every supported resource kind and all matching resources in the selected subaccount |
 | `--resolve-references` | `-r` | Resolve inter-resource references (use resource names instead of IDs) |
 | `-o <file>` | | Output file path. If not specified, output is written to stdout |
+
+Set `all: true` in the YAML configuration file passed with `--config` to enable the same export-all behavior as `--all`. Export-all requires the subaccount selector to resolve to exactly one subaccount; it fails when the selector matches none or more than one.
+
+`--all` cannot be combined with `--kind` or a per-kind resource selector (`--entitlement`, `--serviceinstance`, `--servicebinding`, or `--cloudfoundry-environment`). The equivalent YAML `kind` and per-kind selector keys are also rejected with `all: true`. The `--subaccount` selector is required to identify the single source subaccount and is allowed; independent options such as `--resolve-references` and `--entitlement-auto-assigned` are also allowed.
+
+#### Export-All Configuration Example
+
+Create `export-all.yaml` with one source-subaccount selector and an output path:
+
+```yaml
+all: true
+subaccount:
+  - '^source-subaccount$'
+resolve-references: true
+output: exported-resources.yaml
+```
+
+Run the export with:
+
+```bash
+btp-exporter --config export-all.yaml export
+```
+
+For a reproducible local kind demonstration that transforms one export into a
+new subaccount clone, see the [Exporter Clone Demo](./exporter-clone-demo.md).
 
 ## Supported Resource Kinds
 
@@ -258,6 +284,8 @@ Exports BTP service plan entitlements assigned to subaccounts.
 |------|-------------|
 | `--entitlement <value>` | Service plan name or regex expression to match |
 | `--entitlement-auto-assigned` | Include service plans that are automatically assigned to all subaccounts |
+
+Auto-assigned entitlements are excluded by default, including from `--all`. BTP automatically grants them to cloned subaccounts, so explicitly managing them is redundant and can cause conflicting assignments. To export them when needed, pass `--entitlement-auto-assigned` together with your entitlement selection or `--all`.
 
 **Selection criteria:**
 - Service plan name pattern (regex)
@@ -375,7 +403,7 @@ After building, you can run the exporter using:
 
 ### Interactive Mode
 
-In interactive mode, the exporter prompts you to select resources from available options. This is useful for exploring available resources.
+A normal export (without `--all`) remains selective: you choose the resource kinds and resources to export. In interactive mode, the exporter first prompts you to select the source subaccount, then prompts for resource kinds and the selected kinds' resources. This is useful for exploring available resources.
 
 ```bash
 # Export subaccounts interactively (prompts for selection)
