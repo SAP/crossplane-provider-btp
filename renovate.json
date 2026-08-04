@@ -5,6 +5,7 @@
     ":dependencyDashboard",
     "schedule:weekly"
   ],
+  "ignorePresets": ["group:goOpenapi"],
   "postUpdateOptions": [
     "gomodTidy"
   ],
@@ -20,7 +21,13 @@
       ]
     },
     {
+      "groupName": "crossplane and upjet",
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["crossplane"]
+    },
+    {
       "groupName": "kubernetes",
+      "groupSlug": "kubernetes",
       "matchPackageNames": [
         "k8s.io/**",
         "sigs.k8s.io/**"
