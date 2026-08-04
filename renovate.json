@@ -45,10 +45,10 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": [
-        "(^|/)Makefile$",
-        "(^|/)Dockerfile$",
-        "(^|/)config.yml$"
+      "managerFilePatterns": [
+        "/(^|/)Makefile$/",
+        "/(^|/)Dockerfile$/",
+        "/(^|/)config.yml$/"
       ],
       "matchStrings": [
         "(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)"
@@ -59,7 +59,9 @@
     },
     {
       "customType": "regex",
-      "fileMatch": ["^\\.github/workflows/e2e_test\\.yaml$"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/e2e_test\\.yaml$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=helm depName=crossplane registryUrl=https://charts\\.crossplane\\.io/stable\\s*\\n\\s*CROSSPLANE_CHART_VERSION:\\s*['\"]?(?<currentValue>[^'\"\\s]+)['\"]?(?:\\s*\\n[^\\n]*)*?\\s*\\n\\s*CROSSPLANE_CHART_SHA256:\\s*['\"]?(?<currentDigest>[a-f0-9]{64})['\"]?"
       ],
