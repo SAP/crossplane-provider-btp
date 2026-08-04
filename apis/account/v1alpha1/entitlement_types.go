@@ -1,5 +1,15 @@
 package v1alpha1
 
+// External-Name Configuration:
+//   - Resource: Entitlement
+//   - Follows Standard: no (compound key, not a single GUID)
+//   - Format: `<subaccount-guid>/<service-name>/<service-plan-name>`; append `/<service-plan-unique-identifier>` when `spec.forProvider.servicePlanUniqueIdentifier` is set
+//   - Note: Entitlement CRs can share one assignment; the first must carry the annotation, later ones join it. See docs/contribution-notes/external-name-handling.md
+//   - Note: every field in the key is immutable after creation, and `servicePlanUniqueIdentifier` can be neither added nor removed later. Changing any of them requires deleting and recreating the resource.
+//   - How to find:
+//     - UI: BTP Cockpit → Subaccount → Entitlements → Service Assignments > Service Technical Name and Plan
+//     - CLI: `btp list accounts/entitlement --subaccount <subaccount-guid>` → `entitledServices[].name`, `entitledServices[].servicePlans[].name`, and `entitledServices[].servicePlans[].uniqueIdentifier` when duplicate names exist
+
 import (
 	"reflect"
 	"strings"
@@ -18,10 +28,18 @@ const (
 	EntitlementStatusStarted          = "STARTED"
 )
 
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.subaccountGuid) || size(oldSelf.subaccountGuid) == 0 || (has(self.subaccountGuid) && self.subaccountGuid == oldSelf.subaccountGuid)",message="subaccountGuid cannot be changed after resolution"
+// +kubebuilder:validation:XValidation:rule="has(self.servicePlanUniqueIdentifier) == has(oldSelf.servicePlanUniqueIdentifier) && (!has(self.servicePlanUniqueIdentifier) || self.servicePlanUniqueIdentifier == oldSelf.servicePlanUniqueIdentifier)",message="servicePlanUniqueIdentifier cannot be changed"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.subaccountGuid) || size(oldSelf.subaccountGuid) == 0 || (has(self.subaccountRef) == has(oldSelf.subaccountRef) && (!has(self.subaccountRef) || self.subaccountRef == oldSelf.subaccountRef))",message="subaccountRef cannot be changed after subaccountGuid is resolved"
 type EntitlementParameters struct {
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="servicePlanName cannot be changed"
 	ServicePlanName string `json:"servicePlanName"`
-	ServiceName     string `json:"serviceName"`
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serviceName cannot be changed"
+	ServiceName string `json:"serviceName"`
 	//+kubebuilder:validation:Optional
+	// +kubebuilder:validation:MinLength=1
 	// The unique identifier of the service plan. This is a unique identifier for service plans that can distinguish between the same service plans with different hosting datacenters. Options Include `hana-cloud-hana` or `hana-cloud-hana-sap_eu-de-1`.
 	ServicePlanUniqueIdentifier *string `json:"servicePlanUniqueIdentifier,omitempty"`
 	// Whether to enable the service plan assignment to the specified subaccount without quantity restrictions. Relevant and mandatory only for plans that do not have a numeric quota. Do not set if amount is specified.
@@ -284,4 +302,45 @@ func ValidationCondition(validationIssues []string) xpv1.Condition {
 	}
 
 	return ValidationError(strings.Join(validationIssues, "\n"))
+}
+
+const (
+	DriftConditionType  xpv1.ConditionType   = "Drift"
+	DriftDetectedReason xpv1.ConditionReason = "DriftDetected"
+	NoDriftReason       xpv1.ConditionReason = "NoDrift"
+)
+
+// DriftDetected reports that calculateDiff found the aggregate desired
+// state (status.atProvider.required) and BTP's reported assignment
+// (status.atProvider.assigned) disagree. message is calculateDiff's
+// human-readable description of the single differing component (the
+// amount or enable comparison, whichever the aggregate's shape selects
+// -- the two are mutually exclusive, never both).
+//
+// Drift is reported whether or not the controller intends to correct it:
+// an AutoAssign, AutoAssigned, or unlimited assignment is never written
+// by needsUpdate, so it can hold Drift=True indefinitely. That is the
+// ADR's intent -- a spec disagreeing with reality is most worth
+// surfacing precisely when nothing will fix it. Synced=True alongside
+// Drift=True is how a user tells "observed, not corrected" apart from a
+// pending Update.
+func DriftDetected(message string) xpv1.Condition {
+	return xpv1.Condition{
+		Type:               DriftConditionType,
+		Status:             corev1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             DriftDetectedReason,
+		Message:            message,
+	}
+}
+
+// NoDrift reports that the aggregate desired state and BTP's reported
+// assignment agree.
+func NoDrift() xpv1.Condition {
+	return xpv1.Condition{
+		Type:               DriftConditionType,
+		Status:             corev1.ConditionFalse,
+		LastTransitionTime: metav1.Now(),
+		Reason:             NoDriftReason,
+	}
 }
