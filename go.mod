@@ -4,11 +4,6 @@ go 1.26.0
 
 tool golang.org/x/tools/cmd/goimports
 
-// Module conflict in Go dependencies. The package google.golang.org/genproto/googleapis/api/httpbody exists in two different modules:
-// - google.golang.org/genproto (older version)
-// - google.golang.org/genproto/googleapis/api (newer, split module)
-replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20260706201446-f0a921348800
-
 require (
 	dario.cat/mergo v1.0.2
 	github.com/SAP/xp-clifford v0.0.0-20260528123824-27644fae68e8
