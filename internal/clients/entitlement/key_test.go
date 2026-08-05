@@ -261,6 +261,10 @@ func TestNewExternalNameKeyRejectsInvalidSpec(t *testing.T) {
 			cr:      entitlementCR("sa", "svc", "plan", internal.Ptr("")),
 			wantErr: ErrEmptyExternalNameSegment,
 		},
+		"slash in qualifier": {
+			cr:      entitlementCR("sa", "svc", "plan", internal.Ptr("qual/extra")),
+			wantErr: ErrInvalidExternalName,
+		},
 		"compound value over max length": {
 			cr:      entitlementCR(tooLong, "b", "c", nil),
 			wantErr: ErrExternalNameTooLong,

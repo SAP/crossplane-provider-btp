@@ -659,6 +659,8 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 // Delete resolves cr's identity via keyForObserve, not the strict
 // currentExternalNameKey Update uses: a deleting CR may still carry an
 // empty or legacy annotation from adopting mid-deletion, which keyForObserve accepts.
+// Ownership is not re-checked either: the reconciler only calls Delete after an
+// Observe that returned ResourceExists, and Observe is where the guard runs.
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*apisv1alpha1.Entitlement)
 	if !ok {
