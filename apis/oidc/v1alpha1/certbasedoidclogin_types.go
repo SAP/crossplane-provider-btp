@@ -114,10 +114,6 @@ var (
 	CertBasedOIDCLoginGroupVersionKind = SchemeGroupVersion.WithKind(CertBasedOIDCLoginKind)
 )
 
-func init() {
-	SchemeBuilder.Register(&CertBasedOIDCLogin{}, &CertBasedOIDCLoginList{})
-}
-
 const Introspection xpv1.ConditionType = "TokenIntrospection"
 const CannotIntrospect xpv1.ConditionReason = "ErrIntrospect"
 const IntrospectSuccess xpv1.ConditionReason = "IntrospectSuccess"

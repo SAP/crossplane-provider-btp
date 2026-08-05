@@ -99,7 +99,3 @@ var (
 	KubeConfigGeneratorKindAPIVersion   = KubeConfigGeneratorKind + "." + SchemeGroupVersion.String()
 	KubeConfigGeneratorGroupVersionKind = SchemeGroupVersion.WithKind(KubeConfigGeneratorKind)
 )
-
-func init() {
-	SchemeBuilder.Register(&KubeConfigGenerator{}, &KubeConfigGeneratorList{})
-}
