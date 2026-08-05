@@ -1,18 +1,54 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    ":dependencyDashboard",
+    "schedule:weekly"
   ],
+  "ignorePresets": ["group:goOpenapi"],
   "postUpdateOptions": [
     "gomodTidy"
   ],
   "labels": ["release-notes/dependencies"],
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 0,
+  "packageRules": [
+    {
+      "groupName": "crossplane and upjet",
+      "matchPackageNames": [
+        "github.com/crossplane/**",
+        "github.com/crossplane-contrib/**"
+      ]
+    },
+    {
+      "groupName": "crossplane and upjet",
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["crossplane"]
+    },
+    {
+      "groupName": "kubernetes",
+      "groupSlug": "kubernetes",
+      "matchPackageNames": [
+        "k8s.io/**",
+        "sigs.k8s.io/**"
+      ]
+    },
+    {
+      "groupName": "golang.org/x",
+      "matchPackageNames": ["golang.org/x/**"]
+    },
+    {
+      "groupName": "github actions",
+      "matchManagers": ["github-actions"]
+    }
+  ],
   "customManagers": [
     {
-      "fileMatch": [
-        "(^|/)Makefile$",
-        "(^|/)Dockerfile$",
-        "(^|/)config.yml$"
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)Makefile$/",
+        "/(^|/)Dockerfile$/",
+        "/(^|/)config.yml$/"
       ],
       "matchStrings": [
         "(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)"
@@ -23,7 +59,9 @@
     },
     {
       "customType": "regex",
-      "fileMatch": ["^\\.github/workflows/e2e_test\\.yaml$"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/e2e_test\\.yaml$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=helm depName=crossplane registryUrl=https://charts\\.crossplane\\.io/stable\\s*\\n\\s*CROSSPLANE_CHART_VERSION:\\s*['\"]?(?<currentValue>[^'\"\\s]+)['\"]?(?:\\s*\\n[^\\n]*)*?\\s*\\n\\s*CROSSPLANE_CHART_SHA256:\\s*['\"]?(?<currentDigest>[a-f0-9]{64})['\"]?"
       ],
