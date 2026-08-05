@@ -158,7 +158,3 @@ var (
 	CfEnvironmentKindAPIVersion   = CfEnvironmentKind + "." + SchemeGroupVersion.String()
 	CfEnvironmentGroupVersionKind = SchemeGroupVersion.WithKind(CfEnvironmentKind)
 )
-
-func init() {
-	SchemeBuilder.Register(&CloudFoundryEnvironment{}, &CloudFoundryEnvironmentList{})
-}

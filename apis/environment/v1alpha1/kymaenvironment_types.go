@@ -152,7 +152,3 @@ var (
 	KymaEnvironmentKindAPIVersion   = KymaEnvironmentKind + "." + SchemeGroupVersion.String()
 	KymaEnvironmentGroupVersionKind = SchemeGroupVersion.WithKind(KymaEnvironmentKind)
 )
-
-func init() {
-	SchemeBuilder.Register(&KymaEnvironment{}, &KymaEnvironmentList{})
-}

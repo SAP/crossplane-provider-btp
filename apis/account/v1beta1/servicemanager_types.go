@@ -148,7 +148,3 @@ var (
 	ServiceManagerKindAPIVersion   = ServiceManagerKind + "." + SchemeGroupVersion.String()
 	ServiceManagerGroupVersionKind = SchemeGroupVersion.WithKind(ServiceManagerKind)
 )
-
-func init() {
-	SchemeBuilder.Register(&ServiceManager{}, &ServiceManagerList{})
-}
