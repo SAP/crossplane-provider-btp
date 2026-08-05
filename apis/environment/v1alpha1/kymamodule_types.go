@@ -115,7 +115,3 @@ var (
 	KymaModuleKindAPIVersion   = KymaModuleKind + "." + SchemeGroupVersion.String()
 	KymaModuleGroupVersionKind = SchemeGroupVersion.WithKind(KymaModuleKind)
 )
-
-func init() {
-	SchemeBuilder.Register(&KymaModule{}, &KymaModuleList{})
-}
