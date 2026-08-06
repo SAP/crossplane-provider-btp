@@ -29,6 +29,16 @@ const maxStateLabelBytes = 64
 // into, so a missing observation never mints a series of its own.
 const unknownState = "unknown"
 
+// defaultListTimeout bounds a single List. Listing through the manager's cache
+// starts an informer for that kind and waits for it to sync, and that wait only
+// ends when the manager stops: an informer that can never sync - list/watch
+// denied by RBAC, or a stalled initial LIST - would otherwise block collect()
+// forever. The ticker would never fire again, the gauge would silently freeze
+// at its last value, and the Runnable would not return on shutdown. With the
+// bound, an unsyncable kind degrades into a skipped kind that is retried on the
+// next tick.
+const defaultListTimeout = 30 * time.Second
+
 // gauge counts managed resources per managed kind and external state.
 //
 // Cardinality: kind x state only - never the resource name. BTP states come
@@ -49,6 +59,14 @@ var gauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 // Collection runs on a timer rather than at scrape time on purpose: a
 // collector that lists at scrape time would make /metrics block on an unsynced
 // informer, turning a metrics scrape into a liveness hazard.
+//
+// It reads through the manager's cache rather than issuing live LISTs: the
+// controllers for these kinds run in the same process and already watch them,
+// so the cache read is free, whereas an unpaginated LIST per kind on every
+// tick would add exactly the kind of API-server load this provider has to stay
+// clear of. Every List is bounded (see defaultListTimeout) so a kind whose
+// informer cannot sync degrades to a skipped kind instead of wedging the
+// collector.
 func Setup(mgr ctrl.Manager, log logging.Logger, interval time.Duration) error {
 	if err := metrics.Registry.Register(gauge); err != nil {
 		// AlreadyRegisteredError is benign: Setup is idempotent so that tests
@@ -69,6 +87,8 @@ type collector struct {
 	reader   client.Reader
 	log      logging.Logger
 	interval time.Duration
+	// listTimeout bounds a single List; zero means defaultListTimeout.
+	listTimeout time.Duration
 }
 
 // Start implements manager.Runnable. It collects once immediately so the gauge
@@ -152,13 +172,15 @@ var kinds = []kindCollector{
 //
 // A List error is logged and that kind is skipped: a trimmed installation may
 // have the CRD of a disabled controller removed entirely, and a metrics
-// collector must never take the provider down over it.
+// collector must never take the provider down over it. Each List is bounded so
+// a kind whose informer cannot sync is skipped rather than hanging the
+// collector (see defaultListTimeout).
 func (c *collector) collect(ctx context.Context) {
 	counts := map[string]map[string]int{}
 
 	for _, k := range kinds {
 		list := k.list()
-		if err := c.reader.List(ctx, list); err != nil {
+		if err := c.listKind(ctx, list); err != nil {
 			c.log.Debug("cannot list managed resources for the external-state metric",
 				"kind", k.kind, "error", err)
 			continue
@@ -176,6 +198,18 @@ func (c *collector) collect(ctx context.Context) {
 			gauge.WithLabelValues(kind, state).Set(float64(n))
 		}
 	}
+}
+
+// listKind performs one bounded List. The timeout is what keeps an unsyncable
+// informer from wedging the whole collector.
+func (c *collector) listKind(ctx context.Context, list client.ObjectList) error {
+	timeout := c.listTimeout
+	if timeout <= 0 {
+		timeout = defaultListTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return c.reader.List(ctx, list)
 }
 
 // normalizeState maps a platform-reported state onto a bounded label value:
