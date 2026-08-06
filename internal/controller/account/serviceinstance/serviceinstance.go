@@ -9,8 +9,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -56,9 +58,14 @@ const (
 var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Dependency Injection
-var newClientCreatorFn = func(kube client.Client, recorder event.Recorder) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
+//
+// reader is the source the async callbacks re-read the ServiceInstance from
+// before writing an async result. Setup passes the manager's uncached API
+// reader so a retried write is rebased on the freshest object; nil falls back
+// to kube.
+var newClientCreatorFn = func(kube client.Client, reader client.Reader, recorder event.Recorder) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
 	return siClient.NewServiceInstanceConnector(
-		saveCallback,
+		newSaveCallback(reader),
 		kube,
 		recorder)
 }
@@ -70,29 +77,66 @@ var newServicePlanInitializerFn = func() Initializer {
 	}
 }
 
-// SaveConditionsFn Callback for persisting conditions in the CR.
+// newSaveCallback builds the callback that persists the result of an
+// asynchronous terraform operation on the ServiceInstance.
 //
 // name identifies the ServiceInstance itself: the terraform shadow identity
 // the callbacks receive is resolved back to it by tfclient before we are
 // called, so it can be used as the lookup key directly.
-var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error {
+//
+// The write is retried on conflict. Upjet invokes an async callback exactly
+// once and only logs a returned error, so a single lost write is a permanently
+// lost async result — the very failure this whole path exists to prevent: an
+// unrecorded create failure lets the resource go Available, an unrecorded
+// destroy failure wedges the deprovision into an unbounded blind-retry loop.
+// The ServiceInstance status is written on every reconcile, so a callback
+// landing between a reconcile's read and its status write races it routinely.
+//
+// reader is the source the object is (re-)read from. It should be an uncached
+// reader: rebasing a conflict retry on a stale informer cache would just
+// produce the same conflict. A nil reader falls back to kube, which keeps the
+// function usable with a plain fake client.
+func newSaveCallback(reader client.Reader) tfClient.SaveConditionsFn {
+	return func(ctx context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error {
+		read := reader
+		if read == nil {
+			read = kube
+		}
 
-	si := &v1alpha1.ServiceInstance{}
+		write := func() error {
+			si := &v1alpha1.ServiceInstance{}
 
-	if kErr := kube.Get(ctx, name, si); kErr != nil {
-		return errors.Wrap(kErr, errGetInstance)
+			if kErr := read.Get(ctx, name, si); kErr != nil {
+				return errors.Wrap(kErr, errGetInstance)
+			}
+
+			// Store the CR's current generation on each condition so that Observe() can
+			// detect whether the spec has changed since the async operation was triggered.
+			for i := range conditions {
+				conditions[i].ObservedGeneration = si.Generation
+			}
+			si.SetConditions(conditions...)
+
+			if uErr := kube.Status().Update(ctx, si); uErr != nil {
+				// Returned unwrapped so RetryOnConflict still recognises it.
+				if kerrors.IsConflict(uErr) {
+					return uErr
+				}
+				return errors.Wrap(uErr, errSaveData)
+			}
+			return nil
+		}
+
+		if err := retry.RetryOnConflict(retry.DefaultRetry, write); err != nil {
+			if kerrors.IsConflict(err) {
+				// Retries exhausted; wrapped here rather than inside write so
+				// the conflict stays recognisable across the retry loop.
+				return errors.Wrap(err, errSaveData)
+			}
+			return err
+		}
+		return nil
 	}
-
-	// Store the CR's current generation on each condition so that Observe() can
-	// detect whether the spec has changed since the async operation was triggered.
-	for i := range conditions {
-		conditions[i].ObservedGeneration = si.Generation
-	}
-	si.SetConditions(conditions...)
-
-	uErr := kube.Status().Update(ctx, si)
-
-	return errors.Wrap(uErr, errSaveData)
 }
 
 type connector struct {

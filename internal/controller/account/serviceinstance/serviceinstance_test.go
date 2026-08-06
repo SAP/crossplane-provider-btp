@@ -14,7 +14,9 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -1006,7 +1008,7 @@ func TestSaveCallback(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := saveCallback(context.Background(), tc.args.kube, tc.args.name, tc.args.conditions...)
+			err := newSaveCallback(nil)(context.Background(), tc.args.kube, tc.args.name, tc.args.conditions...)
 			expectedErrorBehaviour(t, tc.want.err, err)
 		})
 	}
@@ -1027,11 +1029,80 @@ func TestSaveCallback_LooksUpTheNativeResource(t *testing.T) {
 	}
 
 	want := types.NamespacedName{Name: "test-instance"}
-	if err := saveCallback(context.Background(), kube, want, ujresource.AsyncOperationFinishedCondition()); err != nil {
+	if err := newSaveCallback(nil)(context.Background(), kube, want, ujresource.AsyncOperationFinishedCondition()); err != nil {
 		t.Fatalf("saveCallback returned unexpected error: %v", err)
 	}
 	if diff := cmp.Diff(want, gotKey); diff != "" {
 		t.Errorf("lookup key mismatch (-want, +got):\n%s", diff)
+	}
+}
+
+// TestSaveCallback_RetriesOnConflict pins that a conflicting status write is
+// retried instead of dropping the async result.
+//
+// Upjet calls an async callback exactly once and only logs whatever error it
+// returns, so a single lost write is a permanently lost async result: an
+// unrecorded create failure lets the instance report Available, an unrecorded
+// destroy failure leaves the deprovision retrying blind with nothing recorded
+// anywhere. The callback races the reconciler's own status writes (the
+// ServiceInstance status is written on every poll), so a conflict is routine.
+func TestSaveCallback_RetriesOnConflict(t *testing.T) {
+	gets, updates := 0, 0
+	kube := &test.MockClient{
+		MockGet: func(_ context.Context, _ client.ObjectKey, _ client.Object) error {
+			gets++
+			return nil
+		},
+		MockStatusUpdate: func(_ context.Context, _ client.Object, _ ...client.SubResourceUpdateOption) error {
+			updates++
+			if updates == 1 {
+				return kerrors.NewConflict(
+					schema.GroupResource{Group: v1alpha1.CRDGroup, Resource: "serviceinstances"},
+					"test-instance", errors.New("object has been modified"))
+			}
+			return nil
+		},
+	}
+
+	err := newSaveCallback(nil)(context.Background(), kube,
+		types.NamespacedName{Name: "test-instance"},
+		ujresource.LastAsyncOperationCondition(errors.New("destroy failed")))
+	if err != nil {
+		t.Fatalf("expected the conflicting write to be retried, got error: %v", err)
+	}
+	if updates != 2 {
+		t.Errorf("expected a second status update after the conflict, got %d update(s)", updates)
+	}
+	// The retry has to be rebased on a re-read object, otherwise it just
+	// resubmits the same stale resourceVersion and conflicts again.
+	if gets != 2 {
+		t.Errorf("expected the object to be re-read before the retry, got %d get(s)", gets)
+	}
+}
+
+// TestSaveCallback_ReadsThroughTheGivenReader pins that the (uncached) reader
+// Setup hands in is what the object is read from: rebasing a conflict retry on
+// a stale informer cache would only reproduce the conflict.
+func TestSaveCallback_ReadsThroughTheGivenReader(t *testing.T) {
+	readerUsed := false
+	reader := &test.MockClient{
+		MockGet: func(_ context.Context, _ client.ObjectKey, _ client.Object) error {
+			readerUsed = true
+			return nil
+		},
+	}
+	kube := &test.MockClient{
+		MockGet:          test.NewMockGetFn(errKube),
+		MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+	}
+
+	if err := newSaveCallback(reader)(context.Background(), kube,
+		types.NamespacedName{Name: "test-instance"},
+		ujresource.AsyncOperationFinishedCondition()); err != nil {
+		t.Fatalf("saveCallback returned unexpected error: %v", err)
+	}
+	if !readerUsed {
+		t.Error("expected the supplied reader to be used for the lookup")
 	}
 }
 

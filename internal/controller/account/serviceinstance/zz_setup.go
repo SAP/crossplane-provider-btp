@@ -30,7 +30,10 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 
 			// instead of passing the creatorFn as usual we need to execute here to make sure the connector has only one instance of the client
 			// this is required to ensure terraform workspace is shared among reconciliation loops, since the state of async operations is stored in the client
-			clientConnector: newClientCreatorFn(mgr.GetClient(), recorder),
+			// GetAPIReader (uncached) is handed to the async callbacks: they
+			// race the reconciler's own status writes, so a conflict retry has
+			// to rebase on the freshest object, not on the informer cache.
+			clientConnector: newClientCreatorFn(mgr.GetClient(), mgr.GetAPIReader(), recorder),
 			resourcetracker: resourcetracker,
 
 			// Adoption uses the subaccount-admin SM binding (via the accounts-service),
