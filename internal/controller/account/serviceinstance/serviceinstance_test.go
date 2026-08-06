@@ -1527,3 +1527,163 @@ func TestObserve_ExternalHealthMessageIsBounded(t *testing.T) {
 		t.Errorf("expected a truncation marker in the bounded message, got: %s", msg)
 	}
 }
+
+// TestObserve_DeleteFailureVisible pins that a refused external deprovision is
+// visible on the managed resource. Before this, a BTP-side refusal produced no
+// event, no condition and no error - the only artifact of the whole failure
+// class was an info-level line from upjet's terraform workspace, so a blocked
+// teardown looked healthy at every observable layer.
+func TestObserve_DeleteFailureVisible(t *testing.T) {
+	const destroyErr = "cannot destroy: BTP refused the deprovision"
+
+	deleting := func(cr *v1alpha1.ServiceInstance) {
+		ts := metav1.NewTime(time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC))
+		cr.SetDeletionTimestamp(&ts)
+	}
+
+	cases := map[string]struct {
+		reason string
+		mutate func(*v1alpha1.ServiceInstance)
+
+		wantCondition bool
+		wantMessage   string
+	}{
+		"DestroyFailure": {
+			reason: "a failed async destroy must surface as an ExternalDeletion condition",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonDestroyFailure,
+					Message: destroyErr,
+				})
+			},
+			wantCondition: true,
+			wantMessage:   destroyErr,
+		},
+		"AsyncDeleteFailure": {
+			reason: "upjet's AsyncDeleteFailure classification must be recognised too",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonAsyncDeleteFailure,
+					Message: destroyErr,
+				})
+			},
+			wantCondition: true,
+			wantMessage:   destroyErr,
+		},
+		"UnknownTypeFallback": {
+			reason: "upjet emits a condition of type \"Unknown\" for errors it cannot classify; a BTP refusal relayed through terraform frequently lands there",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(xpv1.Condition{
+					Type:    xpv1.ConditionType("Unknown"),
+					Status:  corev1.ConditionFalse,
+					Reason:  "Unknown",
+					Message: destroyErr,
+				})
+			},
+			wantCondition: true,
+			wantMessage:   destroyErr,
+		},
+		"SuccessfulDestroy": {
+			reason: "a deleting instance whose last async operation succeeded must not be reported as a delete failure",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(xpv1.Condition{
+					Type:   xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status: corev1.ConditionTrue,
+					Reason: ujresource.ReasonSuccess,
+				})
+			},
+			wantCondition: false,
+		},
+		"NotDeleting": {
+			reason: "a failed apply on a live instance is not a delete failure",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.SetConditions(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonDestroyFailure,
+					Message: destroyErr,
+				})
+			},
+			wantCondition: false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := &v1alpha1.ServiceInstance{}
+			tc.mutate(cr)
+			rec := &recorderFake{}
+
+			e := external{
+				tfClient: &TfProxyMock{
+					status:  tfclient.UpToDate,
+					details: map[string][]byte{},
+					data: &tfclient.ObservationData{
+						// A valid UUID: Observe persists it as the
+						// external-name, and the second pass re-validates it.
+						ExternalName: "123e4567-e89b-12d3-a456-426614174000", ID: "some-id",
+						State: "succeeded", Ready: internal.Ptr(true), Usable: internal.Ptr(true),
+					},
+				},
+				kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+				recorder: rec,
+			}
+
+			got, err := e.Observe(context.Background(), cr)
+			if err != nil {
+				t.Fatalf("\n%s\nObserve returned unexpected error: %v", tc.reason, err)
+			}
+			// Observe must keep reporting the resource as existing so the
+			// reconciler re-issues Delete - which is what eventually succeeds
+			// once the BTP-side blocker clears.
+			if !got.ResourceExists {
+				t.Errorf("\n%s\nexpected ResourceExists to stay true so Delete is re-issued, got %+v", tc.reason, got)
+			}
+
+			cond := cr.GetCondition(mrstatus.TypeExternalDeletion)
+			if !tc.wantCondition {
+				if cond.Reason == mrstatus.ReasonDeleteFailed {
+					t.Errorf("\n%s\nexpected no ExternalDeletion condition, got %+v", tc.reason, cond)
+				}
+				if len(rec.events) != 0 {
+					t.Errorf("\n%s\nexpected no event, got %v", tc.reason, rec.events)
+				}
+				return
+			}
+
+			if cond.Status != corev1.ConditionFalse || cond.Reason != mrstatus.ReasonDeleteFailed {
+				t.Errorf("\n%s\nexpected an ExternalDeletion=False/DeleteFailed condition, got %+v", tc.reason, cond)
+			}
+			if !strings.Contains(cond.Message, tc.wantMessage) {
+				t.Errorf("\n%s\nexpected the last destroy error in the message, got %q", tc.reason, cond.Message)
+			}
+			if !strings.Contains(cond.Message, "2026-08-05T12:00:00Z") {
+				t.Errorf("\n%s\nexpected the attempt context (failing since) in the message, got %q", tc.reason, cond.Message)
+			}
+			if !rec.has(string(mrstatus.EventReasonDeleteFailed)) {
+				t.Errorf("\n%s\nexpected a Warning event, got %v", tc.reason, rec.events)
+			}
+			if len(rec.events) != 1 {
+				t.Fatalf("\n%s\nexpected exactly 1 event, got %d", tc.reason, len(rec.events))
+			}
+
+			// A second pass over the SAME failure must not emit another event:
+			// the deprovision is retried every reconcile, and a per-pass event
+			// would be exactly the spam this replaces.
+			if _, err := e.Observe(context.Background(), cr); err != nil {
+				t.Fatalf("\n%s\nsecond Observe returned unexpected error: %v", tc.reason, err)
+			}
+			if len(rec.events) != 1 {
+				t.Errorf("\n%s\nexpected the event to be edge-triggered, got %d events", tc.reason, len(rec.events))
+			}
+		})
+	}
+}

@@ -190,6 +190,17 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 
+	// A refused external deprovision used to be completely invisible: no
+	// event, no condition, no error - only an info-level line from upjet's
+	// workspace. Surface it on the MR, once per distinct failure.
+	if meta.WasDeleted(cr) {
+		if lastErr, failed := lastAsyncDeleteFailure(cr); failed {
+			mrstatus.RecordOnChange(e.recorder, cr,
+				mrstatus.DeleteFailed(*cr.GetDeletionTimestamp(), lastErr),
+				mrstatus.EventReasonDeleteFailed)
+		}
+	}
+
 	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, err
@@ -441,6 +452,43 @@ func (e *external) checkAsyncOperationFailure(cr *v1alpha1.ServiceInstance) bool
 	}
 
 	return false
+}
+
+// lastAsyncDeleteFailure returns the message of the last failed async destroy,
+// if there was one.
+//
+// Upjet classifies destroy failures as DestroyFailure or AsyncDeleteFailure
+// and, for errors it cannot classify at all, falls back to a condition of type
+// "Unknown". All of them are inspected, plus ApplyFailure, which terraform
+// also produces for a refused deprovision.
+//
+// This is deliberately separate from checkAsyncOperationFailure, which matches
+// only ApplyFailure and drives the not-up-to-date path: reporting a destroy
+// failure there would make the reconciler call Update() on a resource that is
+// being deleted.
+func lastAsyncDeleteFailure(cr *v1alpha1.ServiceInstance) (string, bool) {
+	failureReasons := map[xpv1.ConditionReason]bool{
+		ujresource.ReasonDestroyFailure:     true,
+		ujresource.ReasonAsyncDeleteFailure: true,
+		ujresource.ReasonApplyFailure:       true,
+	}
+
+	for _, t := range []xpv1.ConditionType{
+		xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+		// Upjet's LastAsyncOperationCondition default branch emits a condition
+		// of type "Unknown" for errors it cannot classify; a BTP-side refusal
+		// relayed through the terraform provider frequently lands there.
+		xpv1.ConditionType("Unknown"),
+	} {
+		c := cr.GetCondition(t)
+		if c.Status != corev1.ConditionFalse {
+			continue
+		}
+		if t == xpv1.ConditionType("Unknown") || failureReasons[c.Reason] {
+			return c.Message, true
+		}
+	}
+	return "", false
 }
 
 // siStateFailed is the state BTP reports for a service instance whose last
