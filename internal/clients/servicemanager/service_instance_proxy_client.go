@@ -2,9 +2,8 @@ package servicemanager
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/apierror"
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -181,13 +180,5 @@ func mapBindingCredentialTypes(in *accountsserviceclient.ServiceManagerBindingRe
 
 // specifyAccountsAPIError surfaces the BTP accounts-service error body when present.
 func specifyAccountsAPIError(err error) error {
-	if genericErr, ok := err.(*accountsserviceclient.GenericOpenAPIError); ok {
-		if accountError, ok := genericErr.Model().(accountsserviceclient.ApiExceptionResponseObject); ok {
-			return fmt.Errorf("API Error: %v, Code %v", internal.Val(accountError.Error.Message), internal.Val(accountError.Error.Code))
-		}
-		if genericErr.Body() != nil {
-			return fmt.Errorf("API Error: %s", string(genericErr.Body()))
-		}
-	}
-	return err
+	return apierror.FromAccounts(err)
 }
