@@ -47,11 +47,14 @@ env:
   E2E_BUILD_REGISTRY: index.docker.io/e2e
   E2E_PROVIDER_IMAGE: index.docker.io/e2e/provider-btp-amd64
   CROSSPLANE_CLI_VERSION: v2.0.2
-  # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable
-  CROSSPLANE_CHART_VERSION: '2.3.4'
-  # SHA256 of crossplane-2.3.4.tgz downloaded from charts.crossplane.io/stable
+  # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable versioning=semver allowedVersions=<2.2.0
+  # Pinned to last 2.1.x: 2.2.0+ (crossplane/crossplane#6981) resolves spec.package
+  # against a real registry before the cache, breaking the local :latest install path.
+  # Hold below 2.2.0 until the digest-pinned side-load fix lands.
+  CROSSPLANE_CHART_VERSION: '2.1.8'
+  # SHA256 of crossplane-2.1.8.tgz downloaded from charts.crossplane.io/stable
   # Compute with: curl -sL https://charts.crossplane.io/stable/crossplane-<version>.tgz | sha256sum
-  CROSSPLANE_CHART_SHA256: '72c349c911a7ba521208538caf9ea48b31974403a64534bc00dae750e2f95b30'
+  CROSSPLANE_CHART_SHA256: '958f331eeab96d4f1c1153c9c0ed36cc91659b79b0779f52e4fc0ffe230863ed'
 
 jobs:
   prepare-matrix:
