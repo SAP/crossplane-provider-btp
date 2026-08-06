@@ -30,6 +30,7 @@ import (
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/di"
+	"github.com/sap/crossplane-provider-btp/internal/mrstatus"
 	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -241,11 +242,22 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
 				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 			}
-			// Only set Available condition if ManagementPolicy is not only "Observe", since Available condition sets Ready to True
-			// and we don't want that for Observe-only resources
+		}
+
+		// upstream issue #280: readiness must reflect the health of the external
+		// resource, not merely the fact that terraform applied our spec. Only set
+		// conditions if ManagementPolicy is not only "Observe", since readiness is
+		// not ours to assert for Observe-only resources.
+		//
+		// No error is returned for an unhealthy instance: Synced stays truthful
+		// (the provider did apply the spec) and the reconciler is not driven into
+		// a retry loop for a condition no retry can fix.
+		if cond, unhealthy := externalHealthCondition(cr); unhealthy {
 			if !isObserveOnly(cr) {
-				cr.SetConditions(xpv1.Available())
+				cr.SetConditions(cond)
 			}
+		} else if data != nil && !isObserveOnly(cr) {
+			cr.SetConditions(xpv1.Available())
 		}
 
 		return managed.ExternalObservation{
@@ -429,6 +441,68 @@ func (e *external) checkAsyncOperationFailure(cr *v1alpha1.ServiceInstance) bool
 	}
 
 	return false
+}
+
+// siStateFailed is the state BTP reports for a service instance whose last
+// provisioning, update or deprovisioning operation failed.
+const siStateFailed = "failed"
+
+// externalHealthCondition reports whether BTP considers the service instance
+// unhealthy, and builds the Ready=False condition carrying the platform detail.
+//
+// It reads status.atProvider — which upjet repopulates from the terraform
+// state on every Observe — rather than the async-operation conditions, so it
+// still fires if the async callback path is broken. That is deliberate defence
+// in depth: the callback path being broken is exactly what let unhealthy
+// instances report Ready=True in the first place.
+//
+// state == "failed" counts unconditionally. ready=false / usable=false on
+// their own count only on a NON-deleting instance, because both legitimately
+// go false while a deprovision is in flight.
+func externalHealthCondition(cr *v1alpha1.ServiceInstance) (xpv1.Condition, bool) {
+	at := cr.Status.AtProvider
+
+	failed := strings.EqualFold(at.State, siStateFailed)
+	degraded := !meta.WasDeleted(cr) &&
+		((at.Ready != nil && !*at.Ready) || (at.Usable != nil && !*at.Usable))
+	if !failed && !degraded {
+		return xpv1.Condition{}, false
+	}
+
+	msg := fmt.Sprintf("BTP reports the service instance as unhealthy: state=%q ready=%s usable=%s",
+		at.State, boolPtrStr(at.Ready), boolPtrStr(at.Usable))
+	if detail := lastAsyncFailureMessage(cr); detail != "" {
+		msg += "; last terraform operation: " + mrstatus.Truncate(detail, mrstatus.MaxMessageBytes)
+	}
+	return mrstatus.ExternalResourceFailed(msg, cr.Generation), true
+}
+
+// lastAsyncFailureMessage returns the message of the last failed async
+// operation, if any. Upjet records recognised failures under
+// "LastAsyncOperation" but falls back to a condition of type "Unknown" for
+// errors it cannot classify, so both are inspected.
+func lastAsyncFailureMessage(cr *v1alpha1.ServiceInstance) string {
+	for _, t := range []xpv1.ConditionType{
+		xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+		xpv1.ConditionType("Unknown"),
+	} {
+		if c := cr.GetCondition(t); c.Status == corev1.ConditionFalse && c.Message != "" {
+			return c.Message
+		}
+	}
+	return ""
+}
+
+// boolPtrStr renders an optional BTP boolean for a condition message,
+// distinguishing "reported false" from "not reported at all".
+func boolPtrStr(b *bool) string {
+	if b == nil {
+		return "unknown"
+	}
+	if *b {
+		return "true"
+	}
+	return "false"
 }
 
 func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {

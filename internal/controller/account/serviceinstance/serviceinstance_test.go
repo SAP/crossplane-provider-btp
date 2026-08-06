@@ -13,6 +13,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,6 +23,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal/mrstatus"
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
 )
 
@@ -1322,5 +1324,206 @@ func TestSaveInstanceData(t *testing.T) {
 				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
 			}
 		})
+	}
+}
+
+// ====================================================================================
+// External health readiness (upstream issue #280)
+// ====================================================================================
+
+// TestObserve_ExternalHealth pins that readiness follows the health BTP
+// reports for the instance, not merely the fact that terraform applied the
+// spec. Before this, the up-to-date branch set Available unconditionally, so
+// instances the platform reported as failed still showed Ready=True.
+func TestObserve_ExternalHealth(t *testing.T) {
+	// Deliberately not an ApplyFailure and free of the "Conflict" marker: both
+	// are short-circuited earlier in Observe by the create-conflict handling.
+	tfDetail := "destroy failed: the service instance is in state failed and cannot be deprovisioned"
+
+	cases := map[string]struct {
+		reason string
+		data   *tfclient.ObservationData
+		mutate func(*v1alpha1.ServiceInstance)
+
+		wantReadyStatus  corev1.ConditionStatus
+		wantReason       xpv1.ConditionReason
+		wantMsgContains  []string
+		wantNoReadyCond  bool
+		wantMsgMaxLength int
+	}{
+		"Failed_MaskedCohort": {
+			reason: "state=failed must not report Available even when BTP still claims ready and usable",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "failed", Ready: internal.Ptr(true), Usable: internal.Ptr(true),
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+			wantMsgContains: []string{`state="failed"`, "ready=true", "usable=true"},
+		},
+		"Failed_NotReadyNotUsable": {
+			reason: "state=failed with ready=false/usable=false must report Ready=False",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "failed", Ready: internal.Ptr(false), Usable: internal.Ptr(false),
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+			wantMsgContains: []string{"ready=false", "usable=false"},
+		},
+		"Healthy": {
+			reason: "a succeeded, ready and usable instance must report Available",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "succeeded", Ready: internal.Ptr(true), Usable: internal.Ptr(true),
+			},
+			wantReadyStatus: corev1.ConditionTrue,
+			wantReason:      xpv1.ReasonAvailable,
+		},
+		"NotReadyOnNonDeleting": {
+			reason: "ready=false on a non-deleting instance is unhealthy even without state=failed",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "in progress", Ready: internal.Ptr(false),
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+			wantMsgContains: []string{"usable=unknown"},
+		},
+		"NotReadyWhileDeleting": {
+			reason: "ready=false while a deprovision is in flight is expected, not a failure",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "in progress", Ready: internal.Ptr(false), Usable: internal.Ptr(false),
+			},
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				ts := metav1.Now()
+				cr.SetDeletionTimestamp(&ts)
+			},
+			wantReadyStatus: corev1.ConditionTrue,
+			wantReason:      xpv1.ReasonAvailable,
+		},
+		"FailedWhileDeleting": {
+			reason: "state=failed counts unconditionally, including during a deprovision",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "failed", Ready: internal.Ptr(false), Usable: internal.Ptr(false),
+			},
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				ts := metav1.Now()
+				cr.SetDeletionTimestamp(&ts)
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+		},
+		"ObserveOnlyPolicy": {
+			reason: "readiness is not ours to assert for Observe-only resources",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "failed", Ready: internal.Ptr(false), Usable: internal.Ptr(false),
+			},
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.Spec.ManagementPolicies = xpv1.ManagementPolicies{xpv1.ManagementActionObserve}
+			},
+			wantNoReadyCond: true,
+		},
+		"MessageCarriesTfDetail": {
+			reason: "the terraform failure detail must be readable on the managed resource",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "failed", Ready: internal.Ptr(false), Usable: internal.Ptr(false),
+			},
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.SetConditions(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonDestroyFailure,
+					Message: tfDetail,
+				})
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+			wantMsgContains: []string{tfDetail},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := &v1alpha1.ServiceInstance{}
+			if tc.mutate != nil {
+				tc.mutate(cr)
+			}
+
+			e := external{
+				tfClient: &TfProxyMock{status: tfclient.UpToDate, data: tc.data, details: map[string][]byte{}},
+				kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			}
+
+			got, err := e.Observe(context.Background(), cr)
+			if err != nil {
+				// Synced must stay truthful: an unhealthy external resource is
+				// not a reconcile error, so no retry loop is triggered.
+				t.Fatalf("\n%s\nObserve must not return an error for an unhealthy instance: %v", tc.reason, err)
+			}
+			if !got.ResourceExists || !got.ResourceUpToDate {
+				t.Errorf("\n%s\nexpected the instance to stay reported as existing and up to date, got %+v", tc.reason, got)
+			}
+
+			ready := cr.GetCondition(xpv1.TypeReady)
+			if tc.wantNoReadyCond {
+				// GetCondition renders an absent condition as Unknown with no reason.
+				if ready.Status != corev1.ConditionUnknown || ready.Reason != "" {
+					t.Errorf("\n%s\nexpected no Ready condition to be set, got %+v", tc.reason, ready)
+				}
+				return
+			}
+			if ready.Status != tc.wantReadyStatus {
+				t.Errorf("\n%s\nexpected Ready=%s, got %s (reason %q, message %q)",
+					tc.reason, tc.wantReadyStatus, ready.Status, ready.Reason, ready.Message)
+			}
+			if ready.Reason != tc.wantReason {
+				t.Errorf("\n%s\nexpected reason %q, got %q", tc.reason, tc.wantReason, ready.Reason)
+			}
+			for _, substr := range tc.wantMsgContains {
+				if !strings.Contains(ready.Message, substr) {
+					t.Errorf("\n%s\nexpected the condition message to contain %q, got: %s", tc.reason, substr, ready.Message)
+				}
+			}
+		})
+	}
+}
+
+// TestObserve_ExternalHealthMessageIsBounded pins that a huge terraform error
+// cannot bloat the status of a failing managed resource.
+func TestObserve_ExternalHealthMessageIsBounded(t *testing.T) {
+	cr := &v1alpha1.ServiceInstance{}
+	cr.SetConditions(xpv1.Condition{
+		Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+		Status:  corev1.ConditionFalse,
+		Reason:  ujresource.ReasonDestroyFailure,
+		Message: strings.Repeat("z", 16*1024),
+	})
+
+	e := external{
+		tfClient: &TfProxyMock{
+			status:  tfclient.UpToDate,
+			details: map[string][]byte{},
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id", State: "failed",
+			},
+		},
+		kube: &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+	}
+
+	if _, err := e.Observe(context.Background(), cr); err != nil {
+		t.Fatalf("Observe returned unexpected error: %v", err)
+	}
+
+	msg := cr.GetCondition(xpv1.TypeReady).Message
+	if len(msg) > 2*mrstatus.MaxMessageBytes {
+		t.Errorf("expected the condition message to be bounded, got %d bytes", len(msg))
+	}
+	if !strings.Contains(msg, "truncated") {
+		t.Errorf("expected a truncation marker in the bounded message, got: %s", msg)
 	}
 }
