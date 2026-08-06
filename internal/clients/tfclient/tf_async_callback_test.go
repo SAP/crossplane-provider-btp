@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
@@ -47,14 +48,21 @@ type saveSpy struct {
 	gotConds   []xpv1.Condition
 	returnErr  error
 	gotKubeNil bool
+	// Context state is captured at call time: the callback cancels its write
+	// context on return, so a post-hoc inspection would always see canceled.
+	gotCtxErr      error
+	gotDeadline    time.Time
+	gotHasDeadline bool
 }
 
 func (s *saveSpy) fn() SaveConditionsFn {
-	return func(_ context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error {
+	return func(ctx context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error {
 		s.calls++
 		s.gotName = name
 		s.gotConds = conditions
 		s.gotKubeNil = kube == nil
+		s.gotCtxErr = ctx.Err()
+		s.gotDeadline, s.gotHasDeadline = ctx.Deadline()
 		return s.returnErr
 	}
 }
@@ -119,6 +127,40 @@ func TestAPICallbacks_ResolvesShadowName(t *testing.T) {
 			}
 			if spy.gotKubeNil {
 				t.Error("expected the callbacks to pass their kube client through")
+			}
+		})
+	}
+}
+
+func TestAPICallbacks_SurvivesExpiredOperationContext(t *testing.T) {
+	// Upjet hands the callback the async operation's own context, deadline
+	// included. When the operation is killed BY that deadline — the very
+	// long-hang failure class this package exists to record — the callback
+	// must still persist the result: the write needs a live context of its
+	// own, decoupled from the operation's expired one.
+	for _, verb := range []string{"create", "update", "destroy"} {
+		t.Run(verb, func(t *testing.T) {
+			spy := &saveSpy{}
+			ac := NewAPICallbacks(&test.MockClient{}, spy.fn())
+
+			expired, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Hour))
+			defer cancel()
+
+			cb := callbackFor(t, ac, verb, types.NamespacedName{Name: "TF-x"})
+			if err := cb(nil, expired); err != nil {
+				t.Fatalf("callback returned unexpected error: %v", err)
+			}
+			if spy.calls != 1 {
+				t.Fatalf("expected exactly one save call, got %d", spy.calls)
+			}
+			if spy.gotCtxErr != nil {
+				t.Fatalf("save ran under a dead context (%v); the write must not inherit the operation's deadline", spy.gotCtxErr)
+			}
+			if !spy.gotHasDeadline {
+				t.Fatal("save context has no deadline; the write must carry its own bounded budget")
+			}
+			if remaining := time.Until(spy.gotDeadline); remaining <= 0 || remaining > saveResultTimeout {
+				t.Errorf("save context deadline %s from now, want within (0, %s]", remaining, saveResultTimeout)
 			}
 		})
 	}

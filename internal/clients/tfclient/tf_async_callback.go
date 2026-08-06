@@ -3,6 +3,7 @@ package tfclient
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,6 +37,11 @@ const (
 	// eventReasonAsyncCallbackFailed is raised when an async result cannot be
 	// persisted on the managed resource it belongs to.
 	eventReasonAsyncCallbackFailed = "AsyncCallbackFailed"
+
+	// saveResultTimeout is the write budget of one async result. Independent
+	// of the async operation's own deadline: a result produced BY that
+	// deadline expiring must still be persisted — see callback().
+	saveResultTimeout = time.Minute
 )
 
 var errUpdateStatusFmt = "cannot update status of the resource %s after an async %s"
@@ -144,6 +150,12 @@ func (ac *APICallbacks) Destroy(name types.NamespacedName, _ bool) terraform.Cal
 
 // callback is the single implementation behind all three verbs.
 //
+// The requestReconcile bool the interface carries is deliberately dropped:
+// upjet's own APICallbacks uses it to enqueue an immediate reconcile of the
+// (watched) terraform resource, but the shadow resource here is not watched
+// by any controller and the native resource is driven by its own poll cadence,
+// so completion is picked up on the next poll.
+//
 // name is the identity of the terraform shadow resource upjet built for this
 // operation, which for shadow-driven kinds is not the identity of any object
 // that exists in the API server. It is resolved back to the native managed
@@ -153,6 +165,16 @@ func (ac *APICallbacks) Destroy(name types.NamespacedName, _ bool) terraform.Cal
 func (ac *APICallbacks) callback(op string, name types.NamespacedName) terraform.CallbackFn {
 	target := ac.resolveName(name)
 	return func(err error, ctx context.Context) error {
+		// The context upjet hands the callback carries the async operation's
+		// own deadline (StartTime + defaultAsyncTimeout, pkg/terraform/
+		// workspace.go). When the operation is killed BY that deadline — a
+		// platform call hung past the async budget, the one failure class
+		// that most needs recording — the callback runs with the context
+		// already expired and every write would fail instantly with
+		// DeadlineExceeded. Decouple the persistence of the result from the
+		// operation's lifetime, keeping a short budget of its own.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), saveResultTimeout)
+		defer cancel()
 		conds := []xpv1.Condition{
 			ac.bound(ujresource.LastAsyncOperationCondition(err)),
 			ujresource.AsyncOperationFinishedCondition(),
