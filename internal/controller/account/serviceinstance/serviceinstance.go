@@ -55,10 +55,11 @@ const (
 var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Dependency Injection
-var newClientCreatorFn = func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
+var newClientCreatorFn = func(kube client.Client, recorder event.Recorder) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
 	return siClient.NewServiceInstanceConnector(
 		saveCallback,
-		kube)
+		kube,
+		recorder)
 }
 
 var newServicePlanInitializerFn = func() Initializer {
@@ -68,13 +69,16 @@ var newServicePlanInitializerFn = func() Initializer {
 	}
 }
 
-// SaveConditionsFn Callback for persisting conditions in the CR
-var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error {
+// SaveConditionsFn Callback for persisting conditions in the CR.
+//
+// name identifies the ServiceInstance itself: the terraform shadow identity
+// the callbacks receive is resolved back to it by tfclient before we are
+// called, so it can be used as the lookup key directly.
+var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error {
 
 	si := &v1alpha1.ServiceInstance{}
 
-	nn := types.NamespacedName{Name: name}
-	if kErr := kube.Get(ctx, nn, si); kErr != nil {
+	if kErr := kube.Get(ctx, name, si); kErr != nil {
 		return errors.Wrap(kErr, errGetInstance)
 	}
 

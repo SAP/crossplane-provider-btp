@@ -14,6 +14,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
@@ -948,7 +949,7 @@ func TestCalculateDiff(t *testing.T) {
 func TestSaveCallback(t *testing.T) {
 	type args struct {
 		kube       client.Client
-		name       string
+		name       types.NamespacedName
 		conditions []xpv1.Condition
 	}
 
@@ -965,7 +966,7 @@ func TestSaveCallback(t *testing.T) {
 			reason: "should return an error if the ServiceInstance cannot be retrieved",
 			args: args{
 				kube: &test.MockClient{MockGet: test.NewMockGetFn(errKube)},
-				name: "test-instance",
+				name: types.NamespacedName{Name: "test-instance"},
 			},
 			want: want{
 				err: errKube,
@@ -978,7 +979,7 @@ func TestSaveCallback(t *testing.T) {
 					MockGet:          test.NewMockGetFn(nil),
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(errKube),
 				},
-				name:       "test-instance",
+				name:       types.NamespacedName{Name: "test-instance"},
 				conditions: []xpv1.Condition{ujresource.AsyncOperationFinishedCondition()},
 			},
 			want: want{
@@ -992,7 +993,7 @@ func TestSaveCallback(t *testing.T) {
 					MockGet:          test.NewMockGetFn(nil),
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				name:       "test-instance",
+				name:       types.NamespacedName{Name: "test-instance"},
 				conditions: []xpv1.Condition{ujresource.AsyncOperationFinishedCondition()},
 			},
 			want: want{
@@ -1006,6 +1007,29 @@ func TestSaveCallback(t *testing.T) {
 			err := saveCallback(context.Background(), tc.args.kube, tc.args.name, tc.args.conditions...)
 			expectedErrorBehaviour(t, tc.want.err, err)
 		})
+	}
+}
+
+// TestSaveCallback_LooksUpTheNativeResource pins the identity the callback
+// resolves to. Before the shadow identity was resolved, the lookup key was the
+// stringified NamespacedName of the terraform shadow ("/TF-test-instance"),
+// which never matched an object and made every async result vanish.
+func TestSaveCallback_LooksUpTheNativeResource(t *testing.T) {
+	var gotKey types.NamespacedName
+	kube := &test.MockClient{
+		MockGet: func(_ context.Context, key client.ObjectKey, _ client.Object) error {
+			gotKey = key
+			return nil
+		},
+		MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+	}
+
+	want := types.NamespacedName{Name: "test-instance"}
+	if err := saveCallback(context.Background(), kube, want, ujresource.AsyncOperationFinishedCondition()); err != nil {
+		t.Fatalf("saveCallback returned unexpected error: %v", err)
+	}
+	if diff := cmp.Diff(want, gotKey); diff != "" {
+		t.Errorf("lookup key mismatch (-want, +got):\n%s", diff)
 	}
 }
 

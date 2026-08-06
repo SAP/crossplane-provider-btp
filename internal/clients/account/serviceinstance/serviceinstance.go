@@ -10,16 +10,22 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// NewServiceInstanceConnector creates a connector for the service instance client using the generic TfProxyConnector
-func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsFn, kube client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
+// NewServiceInstanceConnector creates a connector for the service instance client using the generic TfProxyConnector.
+//
+// recorder may be nil; when set, the async callbacks raise a Warning event on
+// the ServiceInstance if an async result cannot be persisted.
+func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsFn, kube client.Client, recorder event.Recorder) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
 	con := &ServiceInstanceConnector{
 		TfProxyConnector: tfclient.NewTfProxyConnector(
 			tfclient.NewInternalTfConnector(
@@ -30,6 +36,7 @@ func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsF
 				tfclient.NewAPICallbacks(
 					kube,
 					saveConditionsCallback,
+					tfclient.WithCallbackEventRecorder(recorder, newEventTarget),
 				),
 			),
 			&ServiceInstanceMapper{},
@@ -37,6 +44,18 @@ func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsF
 		),
 	}
 	return con
+}
+
+// newEventTarget builds the object a callback failure is reported against. The
+// managed resource could not be fetched at that point, so only the identity is
+// available. TypeMeta is set explicitly so building a reference to it needs no
+// scheme lookup and cannot fail.
+func newEventTarget(nn types.NamespacedName) resource.Managed {
+	si := &v1alpha1.ServiceInstance{}
+	si.SetGroupVersionKind(v1alpha1.ServiceInstanceGroupVersionKind)
+	si.SetName(nn.Name)
+	si.SetNamespace(nn.Namespace)
+	return si
 }
 
 type ServiceInstanceConnector struct {
@@ -98,8 +117,13 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// since terraform resources are not allowed to start with a number we ensure it by prefixing them with "TF-"
-			Name: "TF-" + si.Name,
+			// Since terraform resources are not allowed to start with a number
+			// we ensure it by prefixing them with tfclient.ShadowNamePrefix.
+			// The async callbacks strip this prefix again through
+			// tfclient.StripShadowPrefix to find the ServiceInstance this
+			// shadow belongs to — use the constant on both ends so they cannot
+			// drift apart.
+			Name: tfclient.ShadowNamePrefix + si.Name,
 			// make sure no naming conflicts are there for upjet tmp folder creation
 			UID:               si.UID + "-service-instance",
 			DeletionTimestamp: si.DeletionTimestamp,
