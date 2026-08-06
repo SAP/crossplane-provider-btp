@@ -12,7 +12,12 @@ func (c *Client) GetEnvironmentInstanceByID(ctx context.Context, instanceID stri
 	response, resp, err := c.ProvisioningServiceClient.GetEnvironmentInstance(ctx, instanceID).Execute()
 
 	if err != nil {
-		return nil, resp.StatusCode == 404, specifyAPIError(err)
+		// resp is nil whenever the request never produced an HTTP response at
+		// all (DNS failure, TLS handshake failure, connection reset, ...), so it
+		// must not be dereferenced here. Only a real HTTP response can tell us
+		// that the resource is absent; anything else is a plain error.
+		notFound := resp != nil && resp.StatusCode == http.StatusNotFound
+		return nil, notFound, specifyAPIError(err)
 	}
 
 	return response, false, nil

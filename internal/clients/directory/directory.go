@@ -104,8 +104,10 @@ func (d *DirectoryClient) getDirectory(ctx context.Context) (*accountclient.Dire
 
 	directory, raw, err := d.btpClient.AccountsServiceClient.DirectoryOperationsAPI.GetDirectory(ctx, extID).Execute()
 	// ADR: If resource is not found, that is drift, not an error - return nil to trigger Create()
-	if raw.StatusCode == 404 {
-		// Unfortunately the API has no error type for 404 errors, so we can only extract that from raw status
+	if raw != nil && raw.StatusCode == http.StatusNotFound {
+		// Unfortunately the API has no error type for 404 errors, so we can only extract that from raw status.
+		// raw is nil when the request never produced an HTTP response (transport-level failure), in which case
+		// the error below is the only thing we can report.
 		return nil, nil
 	}
 	if err != nil {
