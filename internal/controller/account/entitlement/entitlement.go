@@ -104,9 +104,15 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errUpdateObservation)
 	}
 
-	// upstream issue #280: a rejected assignment must never look healthy. Set
-	// before the early returns below so the retry-via-Create path (amount == 0)
-	// carries the platform's rejection message too.
+	// upstream issue #280: a rejected assignment must never look healthy.
+	//
+	// This lands on the resource for every path that leaves Observe reporting
+	// the external resource as existing. It does NOT survive the needsCreate
+	// path (amount == 0): there the managed reconciler goes on to mark
+	// Creating(), which replaces the Ready condition before the status is
+	// persisted. That path is a retry of the assignment, and the rejection
+	// reason resurfaces here as soon as BTP reports PROCESSING_FAILED again on
+	// an assignment that reserved a non-zero amount.
 	if entitlementProcessingFailed(cr) {
 		cr.Status.SetConditions(entitlementFailedCondition(cr))
 	}
@@ -348,9 +354,13 @@ func entitlementFailedCondition(cr *apisv1alpha1.Entitlement) xpv1.Condition {
 // assignment for this entitlement and the reported amount is zero or unset,
 // i.e. nothing is actually reserved on the BTP side. This is distinct from
 // PROCESSING_FAILED with a non-zero amount, which typically reflects a
-// delete- or update-time failure on an entitlement that is still assigned
-// (and which should remain marked as Available so siblings/orchestration are
-// not flapped).
+// delete- or update-time failure on an entitlement that is still assigned:
+// that one keeps its assignment and is only re-observed, not re-created.
+//
+// Neither is reported as Available any more. Since upstream issue #280 every
+// PROCESSING_FAILED assignment carries Ready=False with BTP's own stateMessage
+// (see entitlementFailedCondition); this predicate decides only whether the
+// assignment has to be re-issued, not how it is reported.
 func (c *external) assignFailedNoQuota(cr *apisv1alpha1.Entitlement) bool {
 	if cr.Status.AtProvider == nil || cr.Status.AtProvider.Assigned == nil {
 		return false

@@ -349,7 +349,16 @@ func TestObserve(t *testing.T) {
 				err: nil,
 			},
 		},
-		"Assign-time PROCESSING_FAILED with amount=0 -- Ready must not be Available": {
+		// Scope note: this pins what Observe itself leaves on the resource. On
+		// the amount==0 path Observe reports the external resource as absent,
+		// so the managed reconciler goes on to mark Creating() - which replaces
+		// Ready - before it persists the status. What an operator reads off
+		// this resource while the assignment is being retried is therefore
+		// Creating, not ExternalResourceFailed; the rejection resurfaces on the
+		// resource once the failed assignment reserves a non-zero amount (the
+		// "PROCESSING_FAILED stateMessage lands on the condition" case above,
+		// which does persist because Observe reports the resource as existing).
+		"Assign-time PROCESSING_FAILED with amount=0 -- Observe must not leave Available behind": {
 			args: args{
 				kube: &test.MockClient{
 					MockStatusUpdate: noopStatusUpdate,
