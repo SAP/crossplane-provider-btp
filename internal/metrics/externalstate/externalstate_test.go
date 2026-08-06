@@ -214,6 +214,42 @@ func TestCollectSurvivesAWedgedList(t *testing.T) {
 	}
 }
 
+// TestCollectFailedListKeepsLastKnownSeries pins that one kind's failed List
+// does not blank that kind's series for the tick: absence-based alerting on
+// the "failed" populations must not misfire because a single List timed out.
+func TestCollectFailedListKeepsLastKnownSeries(t *testing.T) {
+	gauge.Reset()
+	t.Cleanup(gauge.Reset)
+
+	listShouldFail := false
+	kube := fake.NewClientBuilder().WithScheme(scheme(t)).
+		WithObjects(serviceInstance("si-a", "failed"), subaccount("sa-a", "OK")).
+		WithInterceptorFuncs(interceptor.Funcs{
+			List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				if _, ok := list.(*v1alpha1.ServiceInstanceList); ok && listShouldFail {
+					return context.DeadlineExceeded
+				}
+				return c.List(ctx, list, opts...)
+			},
+		}).Build()
+
+	c := newCollector(kube)
+	c.collect(context.Background())
+	if got := testutil.ToFloat64(gauge.WithLabelValues("ServiceInstance", "failed")); got != 1 {
+		t.Fatalf("expected 1 failed ServiceInstance after the first collect, got %v", got)
+	}
+
+	listShouldFail = true
+	c.collect(context.Background())
+
+	if got := testutil.ToFloat64(gauge.WithLabelValues("ServiceInstance", "failed")); got != 1 {
+		t.Errorf("expected the failed-List kind to keep its last-known series, got %v", got)
+	}
+	if got := testutil.ToFloat64(gauge.WithLabelValues("Subaccount", "OK")); got != 1 {
+		t.Errorf("expected the healthy kind to keep collecting, got %v", got)
+	}
+}
+
 func TestNormalizeState(t *testing.T) {
 	cases := map[string]struct {
 		in   string

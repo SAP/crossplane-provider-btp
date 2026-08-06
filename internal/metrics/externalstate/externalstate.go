@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,6 +69,9 @@ var gauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 // informer cannot sync degrades to a skipped kind instead of wedging the
 // collector.
 func Setup(mgr ctrl.Manager, log logging.Logger, interval time.Duration) error {
+	if interval <= 0 {
+		return errors.Errorf("external-state metric interval must be positive, got %s", interval)
+	}
 	if err := metrics.Registry.Register(gauge); err != nil {
 		// AlreadyRegisteredError is benign: Setup is idempotent so that tests
 		// and any future second manager do not fail on a duplicate register.
@@ -165,10 +169,11 @@ var kinds = []kindCollector{
 	},
 }
 
-// collect rebuilds the whole gauge from scratch. Reset() before repopulating
-// drops the series of states that no longer have any resource, so a "failed"
-// series does not linger at its last value after the last failed resource is
-// gone.
+// collect rebuilds the gauge one kind at a time. A kind's series are replaced
+// (DeletePartialMatch, then Set) only after its List succeeded, so states that
+// no longer have any resource are dropped without a "failed" series lingering —
+// while a kind whose List failed this tick keeps its last-known series instead
+// of blinking to no-data, which would trip absence-based alerting.
 //
 // A List error is logged and that kind is skipped: a trimmed installation may
 // have the CRD of a disabled controller removed entirely, and a metrics
@@ -176,8 +181,6 @@ var kinds = []kindCollector{
 // a kind whose informer cannot sync is skipped rather than hanging the
 // collector (see defaultListTimeout).
 func (c *collector) collect(ctx context.Context) {
-	counts := map[string]map[string]int{}
-
 	for _, k := range kinds {
 		list := k.list()
 		if err := c.listKind(ctx, list); err != nil {
@@ -189,13 +192,9 @@ func (c *collector) collect(ctx context.Context) {
 		for _, s := range k.states(list) {
 			perState[normalizeState(s)]++
 		}
-		counts[k.kind] = perState
-	}
-
-	gauge.Reset()
-	for kind, perState := range counts {
+		gauge.DeletePartialMatch(prometheus.Labels{"kind": k.kind})
 		for state, n := range perState {
-			gauge.WithLabelValues(kind, state).Set(float64(n))
+			gauge.WithLabelValues(k.kind, state).Set(float64(n))
 		}
 	}
 }
