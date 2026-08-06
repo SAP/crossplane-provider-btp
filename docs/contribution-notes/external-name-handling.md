@@ -138,6 +138,30 @@ A blank segment (e.g. `sa//plan`) is rejected, matching `RoleCollectionAssignmen
 Compound-Key External Name Format section above governs only leading/trailing
 whitespace and the 512-character length cap.
 
+#### Reserved/absent predicates
+
+Five predicates in `internal/controller/account/entitlement/entitlement.go` answer
+"does this assignment reserve anything, or is it absent?" at different scopes:
+
+| Predicate | Returns true when | Callers |
+| --- | --- | --- |
+| `assignFailedNoQuota` | `status.atProvider.assigned` reports `PROCESSING_FAILED` with `Amount` nil or `<= 0`. No deletion check; false when the status is absent. | `needsCreate`, `Observe`'s readiness condition switch, `observeExternalName`, `adoptionGuardApplies` |
+| `deletingWithReservedQuota` | The CR is deleting and `UnlimitedAmountAssigned` is set. This is the reservation `assignFailedNoQuota` cannot see, since an enable-based assignment reserves without a positive `Amount`. | `observeExternalName`, `Observe`'s `needsCreate` gate, `adoptionGuardApplies` |
+| `deletingAutoAssigned` | The CR is deleting and the assignment is `AutoAssigned`, so it finalizes with no BTP write and only a `reasonAutoAssignedPreserved` event. | `observeExternalName`, `Observe` |
+| `assignmentStillReserved` | The assignment reserves anything: `UnlimitedAmountAssigned`, or `Amount` nil or `> 0`. No deletion check; true when the status is absent. | `resolveUnjoinedDeletion`, zero-remaining-sibling branch only |
+| `adoptionGuardApplies` | The annotation is empty rather than legacy, BTP returned an assignment, that assignment is not `AutoAssigned`, and either `assignFailedNoQuota` is false or `deletingWithReservedQuota` holds. Sibling proof via `mayAdopt` is then required. | `observeExternalName`, `Create` |
+
+`deletingWithReservedQuota` and `assignmentStillReserved` are the pair worth reading twice.
+Both sound like "still reserved", but the first is narrow (deleting, and only the
+`UnlimitedAmountAssigned` flag) while the second is broad (any reservation, any lifecycle
+phase). They also disagree when `status.atProvider.assigned` is absent:
+`deletingWithReservedQuota` returns false, which lets `observeExternalName` and `Observe`
+report the resource as absent, whereas `assignmentStillReserved` returns true, which makes
+`resolveUnjoinedDeletion` refuse to finalize with `errUnownedAssignmentBlocksFinalize`.
+
+`assignFailedNoQuota` and `assignmentStillReserved` are not negations of each other either:
+a `PROCESSING_FAILED` assignment with a nil `Amount` satisfies both.
+
 ### Implementation guideline
 
 #### Observe()
