@@ -83,10 +83,38 @@ func (s *ServiceInstanceMapper) TfResource(ctx context.Context, si *v1alpha1.Ser
 	}
 
 	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
-	condition := si.GetCondition(xpv1.TypeReady)
-	sInstance.SetConditions(condition)
+	sInstance.SetConditions(shadowReadyCondition(si))
 
 	return sInstance, nil
+}
+
+// shadowReadyCondition derives the Ready condition carried by the terraform
+// shadow resource from the native ServiceInstance.
+//
+// The shadow is rebuilt from the native resource on every Connect, so whatever
+// Ready condition is put on it here is what upjet sees for the whole reconcile.
+// upjet's Observe short-circuits before Workspace.Plan whenever the resource is
+// not marked Available: it sets Available in memory and returns
+// ResourceUpToDate=true without planning. Mirroring a Ready=False onto the
+// shadow therefore parks upjet in that arm on every single pass — terraform
+// never plans, no drift is ever reported and no Update is ever issued.
+//
+// Readiness that reflects external health (upstream issue #280) is a statement
+// about BTP, not about whether terraform still has work to do, and it lives on
+// the native resource only. Once the external resource is known to exist, the
+// shadow is always handed an Available condition so drift detection keeps
+// running and a spec change meant to repair an unhealthy instance is still
+// planned and applied.
+//
+// Before the external resource exists (no ID observed yet) the native condition
+// is mirrored unchanged: that is the create path, where upjet's
+// mark-available-first behaviour is the intended one.
+func shadowReadyCondition(si *v1alpha1.ServiceInstance) xpv1.Condition {
+	condition := si.GetCondition(xpv1.TypeReady)
+	if si.Status.AtProvider.ID != "" {
+		return xpv1.Available()
+	}
+	return condition
 }
 
 func BuildComplexParameterJson(ctx context.Context, kube client.Client, secretRefs []xpv1.SecretKeySelector, specParams []byte) ([]byte, error) {
