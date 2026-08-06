@@ -252,6 +252,16 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	//Check for failed async operations ONCE, before the switch
 	if e.checkAsyncOperationFailure(cr) {
+		// This early return skips the UpToDate branch where the external-
+		// health veto normally runs, so an instance parked in a failed-update
+		// retry loop would keep whatever Ready condition it last had. Evaluate
+		// the veto here too. Known limitation: atProvider is refreshed only in
+		// the UpToDate branch, so on this path the veto judges the last
+		// refreshed observation (the folded-in async failure message is
+		// current either way).
+		if cond, unhealthy := externalHealthCondition(cr); unhealthy && !isObserveOnly(cr) {
+			cr.SetConditions(cond)
+		}
 		return managed.ExternalObservation{
 			ResourceExists:   true,
 			ResourceUpToDate: false,

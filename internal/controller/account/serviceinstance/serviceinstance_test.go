@@ -1539,28 +1539,114 @@ func TestObserve_ExternalHealth(t *testing.T) {
 			if !got.ResourceExists || !got.ResourceUpToDate {
 				t.Errorf("\n%s\nexpected the instance to stay reported as existing and up to date, got %+v", tc.reason, got)
 			}
-
-			ready := cr.GetCondition(xpv1.TypeReady)
-			if tc.wantNoReadyCond {
-				// GetCondition renders an absent condition as Unknown with no reason.
-				if ready.Status != corev1.ConditionUnknown || ready.Reason != "" {
-					t.Errorf("\n%s\nexpected no Ready condition to be set, got %+v", tc.reason, ready)
-				}
-				return
-			}
-			if ready.Status != tc.wantReadyStatus {
-				t.Errorf("\n%s\nexpected Ready=%s, got %s (reason %q, message %q)",
-					tc.reason, tc.wantReadyStatus, ready.Status, ready.Reason, ready.Message)
-			}
-			if ready.Reason != tc.wantReason {
-				t.Errorf("\n%s\nexpected reason %q, got %q", tc.reason, tc.wantReason, ready.Reason)
-			}
-			for _, substr := range tc.wantMsgContains {
-				if !strings.Contains(ready.Message, substr) {
-					t.Errorf("\n%s\nexpected the condition message to contain %q, got: %s", tc.reason, substr, ready.Message)
-				}
-			}
+			assertReadyCondition(t, cr, tc.reason, tc.wantNoReadyCond, tc.wantReadyStatus, tc.wantReason, tc.wantMsgContains)
 		})
+	}
+}
+
+// TestObserve_ExternalHealthOnAsyncFailurePath pins the veto on the
+// failed-async-operation early return: an instance parked in a failed-update
+// retry loop skips the UpToDate branch, and the veto must still be evaluated
+// there so the last refreshed observation is judged instead of keeping a stale
+// Ready=Available.
+func TestObserve_ExternalHealthOnAsyncFailurePath(t *testing.T) {
+	applyFailed := xpv1.Condition{
+		Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+		Status:  corev1.ConditionFalse,
+		Reason:  "ApplyFailure",
+		Message: "apply failed: platform rejected the update",
+	}
+
+	cases := map[string]struct {
+		reason string
+		mutate func(*v1alpha1.ServiceInstance)
+
+		wantReadyStatus corev1.ConditionStatus
+		wantReason      xpv1.ConditionReason
+		wantMsgContains []string
+		wantNoReadyCond bool
+	}{
+		"FailedStateIsVetoed": {
+			reason: "a failed instance on the async-failure path must not keep a healthy Ready condition",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.SetConditions(applyFailed)
+				cr.Status.AtProvider.State = "failed"
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+			wantMsgContains: []string{`state="failed"`, "apply failed: platform rejected the update"},
+		},
+		"HealthyObservationLeavesConditionAlone": {
+			reason: "an async failure over a healthy last observation must not invent an unhealthy condition",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.SetConditions(applyFailed)
+				cr.Status.AtProvider.State = "succeeded"
+				cr.Status.AtProvider.Ready = internal.Ptr(true)
+				cr.Status.AtProvider.Usable = internal.Ptr(true)
+			},
+			wantNoReadyCond: true,
+		},
+		"ObserveOnlyPolicyIsRespected": {
+			reason: "readiness is not ours to assert for Observe-only resources, on this path either",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.SetConditions(applyFailed)
+				cr.Status.AtProvider.State = "failed"
+				cr.Spec.ManagementPolicies = xpv1.ManagementPolicies{xpv1.ManagementActionObserve}
+			},
+			wantNoReadyCond: true,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := &v1alpha1.ServiceInstance{}
+			tc.mutate(cr)
+
+			e := external{
+				tfClient: &TfProxyMock{status: tfclient.UpToDate, details: map[string][]byte{}},
+				kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			}
+
+			got, err := e.Observe(context.Background(), cr)
+			if err != nil {
+				t.Fatalf("\n%s\nObserve returned an unexpected error: %v", tc.reason, err)
+			}
+			if !got.ResourceExists || got.ResourceUpToDate {
+				t.Errorf("\n%s\nexpected the async-failure path (exists, not up to date), got %+v", tc.reason, got)
+			}
+			assertReadyCondition(t, cr, tc.reason, tc.wantNoReadyCond, tc.wantReadyStatus, tc.wantReason, tc.wantMsgContains)
+		})
+	}
+}
+
+// assertReadyCondition is the shared Ready-condition assertion of the
+// external-health specs.
+func assertReadyCondition(
+	t *testing.T, cr *v1alpha1.ServiceInstance, reason string,
+	wantNoReadyCond bool, wantReadyStatus corev1.ConditionStatus,
+	wantReason xpv1.ConditionReason, wantMsgContains []string,
+) {
+	t.Helper()
+
+	ready := cr.GetCondition(xpv1.TypeReady)
+	if wantNoReadyCond {
+		// GetCondition renders an absent condition as Unknown with no reason.
+		if ready.Status != corev1.ConditionUnknown || ready.Reason != "" {
+			t.Errorf("\n%s\nexpected no Ready condition to be set, got %+v", reason, ready)
+		}
+		return
+	}
+	if ready.Status != wantReadyStatus {
+		t.Errorf("\n%s\nexpected Ready=%s, got %s (reason %q, message %q)",
+			reason, wantReadyStatus, ready.Status, ready.Reason, ready.Message)
+	}
+	if ready.Reason != wantReason {
+		t.Errorf("\n%s\nexpected reason %q, got %q", reason, wantReason, ready.Reason)
+	}
+	for _, substr := range wantMsgContains {
+		if !strings.Contains(ready.Message, substr) {
+			t.Errorf("\n%s\nexpected the condition message to contain %q, got: %s", reason, substr, ready.Message)
+		}
 	}
 }
 
