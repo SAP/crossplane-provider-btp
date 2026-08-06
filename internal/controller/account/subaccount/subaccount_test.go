@@ -1517,6 +1517,9 @@ func TestDelete(t *testing.T) {
 		// msgContains are substrings the surfaced error must carry. Used where
 		// the point of the case is what an operator can read off the resource.
 		msgContains []string
+		// msgOmits are substrings the surfaced error must NOT carry, so a
+		// diagnosis is not asserted on a path where it does not hold.
+		msgOmits []string
 	}
 	tests := map[string]struct {
 		reason string
@@ -1713,8 +1716,8 @@ func TestDelete(t *testing.T) {
 				},
 			},
 		},
-		"Delete70011ListerErrorsFallsBackToHint": {
-			reason: "the enumeration is best-effort: a failing lookup must degrade to the hint, never panic or swallow the original rejection",
+		"Delete70011ListErrorNamesTheRealCause": {
+			reason: "an enumeration that fails for a reason the provider knows (denied scope, expired binding, transport error) must report that reason: the whole point of this path is actionability, and blaming a missing admin binding that does exist sends the operator after the wrong thing",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName(SAMPLE_GUID),
@@ -1724,12 +1727,42 @@ func TestDelete(t *testing.T) {
 					})),
 				mockClient: mockDelete70011(),
 				newInstanceListerFn: staticLister(&MockInstanceLister{
-					listErr: errors.New("service manager unreachable"),
+					listErr: errors.New("API Error: insufficient scope for this resource, Code 403"),
 				}),
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
 			},
 			want: want{
-				msgContains: []string{SAMPLE_GUID, "/v1/service_instances"},
+				msgContains: []string{
+					SAMPLE_GUID,
+					"/v1/service_instances",
+					"could not enumerate them",
+					"insufficient scope for this resource",
+				},
+				msgOmits: []string{"no service-manager admin binding is available"},
+			},
+		},
+		"Delete70011ListerFactoryErrorNamesTheRealCause": {
+			reason: "a binding that exists but cannot be used must not be reported as a binding that does not exist",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: mockDelete70011(),
+				newInstanceListerFn: func(ctx context.Context, subaccountGuid string) (smClient.InstanceLister, error) {
+					return nil, errors.New("service manager credentials expired")
+				},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				msgContains: []string{
+					SAMPLE_GUID,
+					"/v1/service_instances",
+					"service manager credentials expired",
+				},
+				msgOmits: []string{"no service-manager admin binding is available"},
 			},
 		},
 		"Delete70011ListerFactoryErrorsFallsBackToHint": {
@@ -1748,7 +1781,29 @@ func TestDelete(t *testing.T) {
 				tracker: trackingtest.NoOpReferenceResolverTracker{},
 			},
 			want: want{
-				msgContains: []string{SAMPLE_GUID, "/v1/service_instances"},
+				msgContains: []string{
+					SAMPLE_GUID,
+					"/v1/service_instances",
+					"no service-manager admin binding is available",
+				},
+			},
+		},
+		"Delete70011EmptyListIsNotReportedAsAMissingBinding": {
+			reason: "BTP says there are instances and the binding could see none of them: that is a visibility gap, not a missing binding, and the message must say which",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient:          mockDelete70011(),
+				newInstanceListerFn: staticLister(&MockInstanceLister{}),
+				tracker:             trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				msgContains: []string{SAMPLE_GUID, "/v1/service_instances", "found none"},
+				msgOmits:    []string{"no service-manager admin binding is available"},
 			},
 		},
 		"Delete70011TruncatesLongBlockerList": {
@@ -1841,6 +1896,11 @@ func TestDelete(t *testing.T) {
 			for _, substr := range tc.want.msgContains {
 				if err == nil || !strings.Contains(err.Error(), substr) {
 					t.Errorf("\n%s\ne.Delete(...): expected the error to contain %q, got: %v", tc.reason, substr, err)
+				}
+			}
+			for _, substr := range tc.want.msgOmits {
+				if err != nil && strings.Contains(err.Error(), substr) {
+					t.Errorf("\n%s\ne.Delete(...): expected the error NOT to contain %q, got: %v", tc.reason, substr, err)
 				}
 			}
 		})
