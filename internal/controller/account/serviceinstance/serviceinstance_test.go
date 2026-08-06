@@ -1607,9 +1607,25 @@ func TestObserve_ExternalHealthMessageIsBounded(t *testing.T) {
 func TestObserve_DeleteFailureVisible(t *testing.T) {
 	const destroyErr = "cannot destroy: BTP refused the deprovision"
 
+	deletedAt := metav1.NewTime(time.Now().Add(-time.Hour).Truncate(time.Second))
+
 	deleting := func(cr *v1alpha1.ServiceInstance) {
-		ts := metav1.NewTime(time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC))
+		ts := deletedAt
 		cr.SetDeletionTimestamp(&ts)
+	}
+
+	// afterDeletion / beforeDeletion stamp a condition on either side of the
+	// deletion timestamp. The verb is not recoverable from the condition
+	// itself - the create and update paths write the very same ApplyFailure
+	// and "Unknown" conditions - so only a failure recorded at or after the
+	// deletion timestamp can be a destroy failure.
+	afterDeletion := func(c xpv1.Condition) xpv1.Condition {
+		c.LastTransitionTime = metav1.NewTime(deletedAt.Add(time.Minute))
+		return c
+	}
+	beforeDeletion := func(c xpv1.Condition) xpv1.Condition {
+		c.LastTransitionTime = metav1.NewTime(deletedAt.Add(-time.Minute))
+		return c
 	}
 
 	cases := map[string]struct {
@@ -1623,12 +1639,12 @@ func TestObserve_DeleteFailureVisible(t *testing.T) {
 			reason: "a failed async destroy must surface as an ExternalDeletion condition",
 			mutate: func(cr *v1alpha1.ServiceInstance) {
 				deleting(cr)
-				cr.SetConditions(xpv1.Condition{
+				cr.SetConditions(afterDeletion(xpv1.Condition{
 					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
 					Status:  corev1.ConditionFalse,
 					Reason:  ujresource.ReasonDestroyFailure,
 					Message: destroyErr,
-				})
+				}))
 			},
 			wantCondition: true,
 			wantMessage:   destroyErr,
@@ -1637,12 +1653,26 @@ func TestObserve_DeleteFailureVisible(t *testing.T) {
 			reason: "upjet's AsyncDeleteFailure classification must be recognised too",
 			mutate: func(cr *v1alpha1.ServiceInstance) {
 				deleting(cr)
-				cr.SetConditions(xpv1.Condition{
+				cr.SetConditions(afterDeletion(xpv1.Condition{
 					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
 					Status:  corev1.ConditionFalse,
 					Reason:  ujresource.ReasonAsyncDeleteFailure,
 					Message: destroyErr,
-				})
+				}))
+			},
+			wantCondition: true,
+			wantMessage:   destroyErr,
+		},
+		"ApplyFailureAfterDeletion": {
+			reason: "terraform also reports a refused deprovision as an ApplyFailure; recorded after the deletion timestamp it can only be a destroy",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(afterDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonApplyFailure,
+					Message: destroyErr,
+				}))
 			},
 			wantCondition: true,
 			wantMessage:   destroyErr,
@@ -1651,25 +1681,64 @@ func TestObserve_DeleteFailureVisible(t *testing.T) {
 			reason: "upjet emits a condition of type \"Unknown\" for errors it cannot classify; a BTP refusal relayed through terraform frequently lands there",
 			mutate: func(cr *v1alpha1.ServiceInstance) {
 				deleting(cr)
-				cr.SetConditions(xpv1.Condition{
+				cr.SetConditions(afterDeletion(xpv1.Condition{
 					Type:    xpv1.ConditionType("Unknown"),
 					Status:  corev1.ConditionFalse,
 					Reason:  "Unknown",
 					Message: destroyErr,
-				})
+				}))
 			},
 			wantCondition: true,
 			wantMessage:   destroyErr,
+		},
+		"StaleApplyFailureFromBeforeDeletion": {
+			reason: "an async CREATE that failed before the user deleted the instance is not a delete failure: Delete() had not been called even once when it was recorded, so reporting one would assert something that never happened",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(beforeDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonApplyFailure,
+					Message: "apply failed: cannot create service instance",
+				}))
+			},
+			wantCondition: false,
+		},
+		"StaleUnclassifiedFailureFromBeforeDeletion": {
+			reason: "the \"Unknown\" fallback is written by the create and update paths too, so a stale one is not a delete failure either",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(beforeDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType("Unknown"),
+					Status:  corev1.ConditionFalse,
+					Reason:  "Unknown",
+					Message: "apply failed: cannot create service instance",
+				}))
+			},
+			wantCondition: false,
+		},
+		"UnknownTypeWithUnrelatedReason": {
+			reason: "a condition of type \"Unknown\" that is not upjet's unclassified-failure fallback must not be read as a destroy failure on its type alone",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(afterDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType("Unknown"),
+					Status:  corev1.ConditionFalse,
+					Reason:  "SomethingElse",
+					Message: "not a destroy failure",
+				}))
+			},
+			wantCondition: false,
 		},
 		"SuccessfulDestroy": {
 			reason: "a deleting instance whose last async operation succeeded must not be reported as a delete failure",
 			mutate: func(cr *v1alpha1.ServiceInstance) {
 				deleting(cr)
-				cr.SetConditions(xpv1.Condition{
+				cr.SetConditions(afterDeletion(xpv1.Condition{
 					Type:   xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
 					Status: corev1.ConditionTrue,
 					Reason: ujresource.ReasonSuccess,
-				})
+				}))
 			},
 			wantCondition: false,
 		},
@@ -1677,10 +1746,11 @@ func TestObserve_DeleteFailureVisible(t *testing.T) {
 			reason: "a failed apply on a live instance is not a delete failure",
 			mutate: func(cr *v1alpha1.ServiceInstance) {
 				cr.SetConditions(xpv1.Condition{
-					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
-					Status:  corev1.ConditionFalse,
-					Reason:  ujresource.ReasonDestroyFailure,
-					Message: destroyErr,
+					Type:               xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:             corev1.ConditionFalse,
+					LastTransitionTime: metav1.Now(),
+					Reason:             ujresource.ReasonDestroyFailure,
+					Message:            destroyErr,
 				})
 			},
 			wantCondition: false,
@@ -1736,7 +1806,7 @@ func TestObserve_DeleteFailureVisible(t *testing.T) {
 			if !strings.Contains(cond.Message, tc.wantMessage) {
 				t.Errorf("\n%s\nexpected the last destroy error in the message, got %q", tc.reason, cond.Message)
 			}
-			if !strings.Contains(cond.Message, "2026-08-05T12:00:00Z") {
+			if !strings.Contains(cond.Message, deletedAt.UTC().Format(time.RFC3339)) {
 				t.Errorf("\n%s\nexpected the attempt context (failing since) in the message, got %q", tc.reason, cond.Message)
 			}
 			if !rec.has(string(mrstatus.EventReasonDeleteFailed)) {

@@ -501,39 +501,66 @@ func (e *external) checkAsyncOperationFailure(cr *v1alpha1.ServiceInstance) bool
 // lastAsyncDeleteFailure returns the message of the last failed async destroy,
 // if there was one.
 //
-// Upjet classifies destroy failures as DestroyFailure or AsyncDeleteFailure
-// and, for errors it cannot classify at all, falls back to a condition of type
-// "Unknown". All of them are inspected, plus ApplyFailure, which terraform
-// also produces for a refused deprovision.
+// Upjet classifies destroy failures as DestroyFailure or AsyncDeleteFailure,
+// and for errors it cannot classify at all falls back to a condition of type
+// "Unknown" with reason "Unknown". ApplyFailure is accepted as well because
+// terraform also reports a refused deprovision that way.
+//
+// None of those reasons identify the verb: the create and update paths write
+// exactly the same ApplyFailure and "Unknown" conditions. A failure is
+// therefore only read as a DESTROY failure when it was recorded at or after the
+// deletion timestamp — before that timestamp the managed reconciler has not
+// called Delete() even once, so the failure necessarily belongs to an earlier
+// create or update. Without that gate the first Observe after a user deletes an
+// instance whose async create had failed would assert a delete failure that
+// never happened, and emit a Warning event for it.
 //
 // This is deliberately separate from checkAsyncOperationFailure, which matches
 // only ApplyFailure and drives the not-up-to-date path: reporting a destroy
 // failure there would make the reconciler call Update() on a resource that is
 // being deleted.
 func lastAsyncDeleteFailure(cr *v1alpha1.ServiceInstance) (string, bool) {
+	deletedAt := cr.GetDeletionTimestamp()
+	if deletedAt == nil {
+		return "", false
+	}
+
 	failureReasons := map[xpv1.ConditionReason]bool{
 		ujresource.ReasonDestroyFailure:     true,
 		ujresource.ReasonAsyncDeleteFailure: true,
 		ujresource.ReasonApplyFailure:       true,
+		// Upjet's LastAsyncOperationCondition default branch emits reason
+		// "Unknown" for errors it cannot classify; a BTP-side refusal relayed
+		// through the terraform provider frequently lands there.
+		unclassifiedFailureReason: true,
 	}
 
 	for _, t := range []xpv1.ConditionType{
 		xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
-		// Upjet's LastAsyncOperationCondition default branch emits a condition
-		// of type "Unknown" for errors it cannot classify; a BTP-side refusal
-		// relayed through the terraform provider frequently lands there.
-		xpv1.ConditionType("Unknown"),
+		unclassifiedFailureType,
 	} {
 		c := cr.GetCondition(t)
-		if c.Status != corev1.ConditionFalse {
+		if c.Status != corev1.ConditionFalse || !failureReasons[c.Reason] {
 			continue
 		}
-		if t == xpv1.ConditionType("Unknown") || failureReasons[c.Reason] {
-			return c.Message, true
+		// Second-granularity timestamps on both sides, so the boundary second
+		// counts as "after": missing a real destroy failure is worse than
+		// reporting one a second early.
+		if c.LastTransitionTime.Before(deletedAt) {
+			continue
 		}
+		return c.Message, true
 	}
 	return "", false
 }
+
+const (
+	// unclassifiedFailureType and unclassifiedFailureReason are what upjet's
+	// LastAsyncOperationCondition falls back to for an error it cannot map onto
+	// one of its known failure classes.
+	unclassifiedFailureType   = xpv1.ConditionType("Unknown")
+	unclassifiedFailureReason = xpv1.ConditionReason("Unknown")
+)
 
 // siStateFailed is the state BTP reports for a service instance whose last
 // provisioning, update or deprovisioning operation failed.
@@ -576,7 +603,7 @@ func externalHealthCondition(cr *v1alpha1.ServiceInstance) (xpv1.Condition, bool
 func lastAsyncFailureMessage(cr *v1alpha1.ServiceInstance) string {
 	for _, t := range []xpv1.ConditionType{
 		xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
-		xpv1.ConditionType("Unknown"),
+		unclassifiedFailureType,
 	} {
 		if c := cr.GetCondition(t); c.Status == corev1.ConditionFalse && c.Message != "" {
 			return c.Message
