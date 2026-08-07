@@ -48,9 +48,6 @@ const (
 	// switches to the chart-tarball path. The fallback also lets local
 	// developers run e2e tests without pre-staging the chart.
 	crossplaneChartPathEnv = "CROSSPLANE_CHART_PATH"
-	// crossplaneVersion is the Crossplane chart version. Must match the
-	// version that was pulled into the tarball at CROSSPLANE_CHART_PATH.
-	crossplaneVersion = "2.1.3"
 
 	// reuseClusterEnv mirrors xp-testing's E2E_REUSE_CLUSTER semantics: when
 	// set, the cluster, Crossplane, and provider are reused across runs and
@@ -67,6 +64,18 @@ const (
 var (
 	testenv  env.Environment
 	BUILD_ID string
+
+	// crossplaneVersion is the Crossplane chart version to install. It reads the
+	// workflow's CROSSPLANE_CHART_VERSION env so CI and the chart tarball at
+	// CROSSPLANE_CHART_PATH share a single source of truth (the workflow pin);
+	// falls back to the current pinned version for local dev without the env set.
+	// Keep the fallback in sync with CROSSPLANE_CHART_VERSION in e2e_test.yaml.
+	crossplaneVersion = func() string {
+		if v := os.Getenv("CROSSPLANE_CHART_VERSION"); v != "" {
+			return v
+		}
+		return "2.1.8"
+	}()
 )
 
 func TestMain(m *testing.M) {
