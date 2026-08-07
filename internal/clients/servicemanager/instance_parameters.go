@@ -29,13 +29,11 @@ type ParameterClient interface {
 
 var _ ParameterClient = &ServiceManagerClient{}
 
-// GetInstanceParameters returns the parameters currently in effect for the
-// instance. See the SemanticLookuper interface doc for found-semantics.
+// GetInstanceParameters implements ParameterClient.
 func (sm *ServiceManagerClient) GetInstanceParameters(ctx context.Context, serviceInstanceID string) (map[string]any, bool, error) {
 	// The generated Execute() decodes into map[string]string and fails on
-	// non-string values (nested objects, bools, nulls). On that decode error it
-	// still returns a GenericOpenAPIError whose Body() holds the raw 200 payload,
-	// which we decode into map[string]any ourselves (resp.Body is consumed).
+	// non-string values. On that error it returns a GenericOpenAPIError whose
+	// Body() still holds the raw 200 payload, which we decode ourselves.
 	_, resp, err := sm.ServiceInstancesAPI.
 		GetServiceInstanceParameters(ctx, serviceInstanceID).Execute()
 	if resp != nil {
@@ -82,10 +80,9 @@ func (sm *ServiceManagerClient) GetInstanceParameters(ctx context.Context, servi
 	return params, true, nil
 }
 
-// UpdateInstanceParameters PATCHes the instance parameters synchronously via a
-// raw HTTP request, because the generated client models parameters as
-// map[string]string and cannot carry nested objects. desiredParamsJSON must be
-// a JSON object; it becomes the "parameters" field of the payload.
+// UpdateInstanceParameters implements ParameterClient. Uses a raw HTTP request
+// because the generated client models parameters as map[string]string and
+// cannot carry nested objects.
 func (sm *ServiceManagerClient) UpdateInstanceParameters(ctx context.Context, serviceInstanceID string, desiredParamsJSON []byte) error {
 	if sm.httpClient == nil || sm.smBaseURL == nil {
 		return errors.New("service manager client not configured for raw updates")

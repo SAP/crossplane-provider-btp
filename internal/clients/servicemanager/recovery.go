@@ -96,10 +96,6 @@ func (sm *ServiceManagerClient) lookupRotatedBinding(ctx context.Context, servic
 	}
 }
 
-// GetInstanceParameters and UpdateInstanceParameters are implemented in
-// instance_parameters.go — they handle service-instance parameter drift, not
-// external-name recovery.
-
 func (sm *ServiceManagerClient) LookupInstanceAndBinding(ctx context.Context, planID, instanceName, bindingName string) (string, string, time.Time, bool, error) {
 	instanceQuery := fmt.Sprintf("service_plan_id eq '%s' and name eq '%s'", planID, instanceName)
 

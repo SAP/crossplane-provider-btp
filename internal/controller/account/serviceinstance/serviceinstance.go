@@ -324,12 +324,10 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-// syncParametersViaServiceManager pushes the desired parameters straight to the
-// Service Manager, the write-side counterpart to parametersDrifted. crossplane
-// only calls Update() after Observe reported drift, so it PATCHes without
-// re-comparing. Needed because terraform apply is a no-op for parameters-only
-// changes (see UpdateInstanceParameters). Fail-safe: returns nil on any
-// precondition miss.
+// syncParametersViaServiceManager pushes the desired parameters to the Service
+// Manager, the write-side counterpart to parametersDrifted. Since crossplane
+// only calls Update() after Observe reported drift, it PATCHes without
+// re-comparing. Fail-safe: returns nil on any precondition miss.
 func (c *external) syncParametersViaServiceManager(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
 	if c.newAdminLookuperFn == nil || isObserveOnly(cr) {
 		return nil
