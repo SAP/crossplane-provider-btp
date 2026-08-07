@@ -1,11 +1,8 @@
 package servicemanager
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -31,16 +28,6 @@ type SemanticLookuper interface {
 	// instance, and the binding name avoids returning a transient admin binding.
 	// The returned created_at is the instance's timestamp (phase-1 happens first).
 	LookupInstanceAndBinding(ctx context.Context, planID, instanceName, bindingName string) (serviceInstanceID, serviceBindingID string, instanceCreatedAt time.Time, found bool, err error)
-
-	// GetInstanceParameters returns the configuration parameters currently in
-	// effect for the given service instance, as reported by the Service Manager
-	// (GET /v1/service_instances/{id}/parameters). found is false when the
-	// offering does not return parameters (instances_retrievable=false) or the
-	// instance has none; callers must treat !found as "no drift signal
-	// available" and skip the parameter comparison. Nested objects are
-	// preserved (the value is decoded from the raw response body, not the
-	// flattened map[string]string the generated client returns).
-	GetInstanceParameters(ctx context.Context, serviceInstanceID string) (params map[string]any, found bool, err error)
 }
 
 var _ SemanticLookuper = &ServiceManagerClient{}
@@ -109,49 +96,9 @@ func (sm *ServiceManagerClient) lookupRotatedBinding(ctx context.Context, servic
 	}
 }
 
-// GetInstanceParameters implements SemanticLookuper.
-func (sm *ServiceManagerClient) GetInstanceParameters(ctx context.Context, serviceInstanceID string) (map[string]any, bool, error) {
-	// The generated Execute() decodes into map[string]string, which flattens
-	// nested parameter objects; we ignore that value and re-decode the raw
-	// response body (buffered back onto resp.Body by the generated client) into
-	// map[string]any so nested objects like {"backend":{...}} survive.
-	_, resp, err := sm.ServiceInstancesAPI.
-		GetServiceInstanceParameters(ctx, serviceInstanceID).Execute()
-	if resp != nil {
-		defer func() { _ = resp.Body.Close() }()
-	}
-	if err != nil {
-		// A 404 / 400 (e.g. offering with instances_retrievable=false) is not a
-		// hard error for drift purposes: no parameters available means no drift
-		// signal, so the caller skips the comparison.
-		if resp != nil && (resp.StatusCode == 404 || resp.StatusCode == 400) {
-			return nil, false, nil
-		}
-		return nil, false, specifyAPIError(err)
-	}
-	if resp == nil {
-		return nil, false, nil
-	}
-
-	body, rerr := io.ReadAll(resp.Body)
-	if rerr != nil {
-		return nil, false, rerr
-	}
-	body = bytes.TrimSpace(body)
-	if len(body) == 0 || string(body) == "null" || string(body) == "{}" {
-		return nil, false, nil
-	}
-
-	params := map[string]any{}
-	if jerr := json.Unmarshal(body, &params); jerr != nil {
-		// A non-object body is treated as "no parameters", not an error.
-		return nil, false, nil
-	}
-	if len(params) == 0 {
-		return nil, false, nil
-	}
-	return params, true, nil
-}
+// GetInstanceParameters and UpdateInstanceParameters are implemented in
+// instance_parameters.go — they handle service-instance parameter drift, not
+// external-name recovery.
 
 func (sm *ServiceManagerClient) LookupInstanceAndBinding(ctx context.Context, planID, instanceName, bindingName string) (string, string, time.Time, bool, error) {
 	instanceQuery := fmt.Sprintf("service_plan_id eq '%s' and name eq '%s'", planID, instanceName)

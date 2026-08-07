@@ -48,10 +48,6 @@ func (l *cmLookuperFake) LookupInstanceAndBinding(ctx context.Context, planID, i
 	return l.siID, l.sbID, l.siCreatedAt, l.found, l.err
 }
 
-func (l *cmLookuperFake) GetInstanceParameters(ctx context.Context, serviceInstanceID string) (map[string]any, bool, error) {
-	return nil, false, nil
-}
-
 type cmRecorderFake struct{ events []string }
 
 func (r *cmRecorderFake) Event(_ runtimeobj.Object, e event.Event) {

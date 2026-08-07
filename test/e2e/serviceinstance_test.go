@@ -212,6 +212,10 @@ func TestServiceInstance_ParameterDrift(t *testing.T) {
 				return ctx
 			},
 		).
+		// NOTE: No independent BTP parameter read-back here — only the
+		// subaccount-admin binding can list a TF-created instance's parameters,
+		// which is the code under test. BTP-side persistence is verified
+		// manually; the condition and no-loop assertions above are the guard.
 		Assess(
 			"instance stays settled (no update loop, defaults not drift)", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				// Sample the metadata.generation, wait through several reconcile

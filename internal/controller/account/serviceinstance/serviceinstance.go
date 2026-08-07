@@ -74,7 +74,18 @@ var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube clie
 
 	si := &v1alpha1.ServiceInstance{}
 
-	nn := types.NamespacedName{Name: name}
+	// upjet calls the async callback with the internal terraform name
+	// ("/TF-<cr-name>": "TF-" prefix + empty namespace). Strip both to recover
+	// the real CR name; otherwise Get fails with "/TF-<name>" not found, the
+	// AsyncOperationFinished condition is never written, and every Observe
+	// re-triggers the update in a loop.
+	crName := name
+	if idx := strings.LastIndex(crName, "/"); idx >= 0 {
+		crName = crName[idx+1:]
+	}
+	crName = strings.TrimPrefix(crName, "TF-")
+
+	nn := types.NamespacedName{Name: crName}
 	if kErr := kube.Get(ctx, nn, si); kErr != nil {
 		return errors.Wrap(kErr, errGetInstance)
 	}
@@ -292,19 +303,66 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	_, ok := mg.(*v1alpha1.ServiceInstance)
+	cr, ok := mg.(*v1alpha1.ServiceInstance)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotServiceInstance)
 	}
 
-	err := c.tfClient.Update(ctx)
-	if err != nil {
+	if err := c.tfClient.Update(ctx); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateInstance)
+	}
+
+	// terraform apply is a no-op for a parameters-only change, so push the
+	// parameters directly through the Service Manager.
+	if err := c.syncParametersViaServiceManager(ctx, cr); err != nil {
+		c.emit(cr, event.Warning(event.Reason("ParameterSyncFailed"), err))
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateInstance)
 	}
 
 	return managed.ExternalUpdate{
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
+}
+
+// syncParametersViaServiceManager pushes the desired parameters straight to the
+// Service Manager, the write-side counterpart to parametersDrifted. crossplane
+// only calls Update() after Observe reported drift, so it PATCHes without
+// re-comparing. Needed because terraform apply is a no-op for parameters-only
+// changes (see UpdateInstanceParameters). Fail-safe: returns nil on any
+// precondition miss.
+func (c *external) syncParametersViaServiceManager(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
+	if c.newAdminLookuperFn == nil || isObserveOnly(cr) {
+		return nil
+	}
+
+	desiredJSON, err := siClient.BuildComplexParameterJson(
+		ctx, c.kube, cr.Spec.ForProvider.ParameterSecretRefs, cr.Spec.ForProvider.Parameters.Raw)
+	if err != nil {
+		log.FromContext(ctx).V(1).Info("parameter sync skipped: cannot build desired parameters", "error", err.Error())
+		return nil
+	}
+	if trimmed := strings.TrimSpace(string(desiredJSON)); len(trimmed) == 0 || trimmed == "{}" {
+		return nil
+	}
+
+	guid := meta.GetExternalName(cr)
+	if guid == "" || guid == cr.Name {
+		return nil
+	}
+
+	lookuper, cleanup, err := c.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		log.FromContext(ctx).V(1).Info("parameter sync skipped: cannot obtain admin lookup client", "error", err.Error())
+		return nil
+	}
+	defer cleanup()
+
+	paramClient, ok := lookuper.(smClient.ParameterClient)
+	if !ok {
+		log.FromContext(ctx).V(1).Info("parameter sync skipped: lookuper is not a ParameterClient")
+		return nil
+	}
+	return paramClient.UpdateInstanceParameters(ctx, guid, desiredJSON)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
@@ -329,27 +387,11 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalDelete{}, nil
 }
 
-// parametersDrifted reports whether the desired service-instance parameters
-// (spec + resolved secret refs) are NOT fully reflected by what the Service
-// Manager currently has. It exists to compensate for the bundled BTP Terraform
-// provider dropping `parameters` on read, which otherwise makes a
-// parameters-only change invisible to drift detection.
-//
-// It is deliberately fail-safe: any inability to determine drift with
-// confidence (no admin lookuper, lookup/fetch error, offering that does not
-// return parameters, unparseable desired spec) returns false, preserving the
-// pre-existing behaviour rather than forcing a spurious update. It never
-// returns true unless it positively observed that a desired key is missing or
-// differs on the server, so it cannot cause an update loop: after Update()
-// writes the parameters, the next fetch reflects them and the comparison
-// matches.
-//
-// The comparison is a subset match (desired ⊆ server), which tolerates the two
-// BTP constraints that block a Terraform-side fix (terraform-provider-btp#1643):
-// offerings that do not return parameters (handled via found==false) and
-// server-added defaults / extra fields (ignored by the subset semantics). It
-// detects added/changed parameters only, never deletions — see paramsSubsetMatch
-// for why parameter removal is not expressible over the update API.
+// parametersDrifted reports whether the desired parameters are NOT fully
+// reflected by what the Service Manager currently has. It compensates for the
+// bundled BTP Terraform provider dropping `parameters` on read, which otherwise
+// hides a parameters-only change from drift detection. Fail-safe: returns false
+// on any inability to determine drift, so it never forces a spurious update.
 func (e *external) parametersDrifted(ctx context.Context, cr *v1alpha1.ServiceInstance) bool {
 	if e.newAdminLookuperFn == nil {
 		return false
@@ -381,7 +423,11 @@ func (e *external) parametersDrifted(ctx context.Context, cr *v1alpha1.ServiceIn
 	}
 	defer cleanup()
 
-	server, found, err := lookuper.GetInstanceParameters(ctx, guid)
+	paramClient, ok := lookuper.(smClient.ParameterClient)
+	if !ok {
+		return false
+	}
+	server, found, err := paramClient.GetInstanceParameters(ctx, guid)
 	if err != nil {
 		log.FromContext(ctx).V(1).Info("parameter drift check skipped: cannot read server parameters", "error", err.Error())
 		return false
@@ -391,7 +437,12 @@ func (e *external) parametersDrifted(ctx context.Context, cr *v1alpha1.ServiceIn
 		return false
 	}
 
-	return !paramsSubsetMatch(desired, server)
+	driftKey, drifted := firstDriftingKey(desired, server)
+	if drifted {
+		e.emit(cr, event.Normal(event.Reason("ParameterDriftDetected"),
+			fmt.Sprintf("parameter drift detected on key %q; forcing update", driftKey)))
+	}
+	return drifted
 }
 
 func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
@@ -565,4 +616,78 @@ func (e *external) calculateDiff(cr *v1alpha1.ServiceInstance) string {
 
 func isValidUUID(s string) bool {
 	return uuidRegex.MatchString(strings.ToLower(s))
+}
+
+// paramsSubsetMatch reports whether every key in desired is present in server
+// with an equal (deep, order-independent) value; server-only keys are ignored.
+// The subset asymmetry tolerates broker-added defaults, which a full equality
+// check would flag as drift forever (terraform-provider-btp#1643).
+//
+// Add/change only, no delete: a key removed from desired is not detected,
+// because the Service Manager update API cannot clear a parameter (empty {} is
+// a no-op, omitting a key merges, explicit null 500s the broker). Removal is
+// left to the recreate path.
+func paramsSubsetMatch(desired, server map[string]any) bool {
+	for k, dv := range desired {
+		sv, ok := server[k]
+		if !ok {
+			return false
+		}
+		if !deepValueEqual(dv, sv) {
+			return false
+		}
+	}
+	return true
+}
+
+// firstDriftingKey returns the first desired key missing or differing on the
+// server, for observability. Returns ("", false) when desired ⊆ server.
+func firstDriftingKey(desired, server map[string]any) (string, bool) {
+	for k, dv := range desired {
+		sv, ok := server[k]
+		if !ok {
+			return k, true
+		}
+		if !deepValueEqual(dv, sv) {
+			return k, true
+		}
+	}
+	return "", false
+}
+
+// deepValueEqual compares two JSON-decoded values: objects as a recursive
+// subset (desired ⊆ server), arrays and scalars by full equality.
+func deepValueEqual(desired, server any) bool {
+	switch dv := desired.(type) {
+	case map[string]any:
+		sv, ok := server.(map[string]any)
+		if !ok {
+			return false
+		}
+		return paramsSubsetMatch(dv, sv)
+	case []any:
+		sv, ok := server.([]any)
+		if !ok || len(dv) != len(sv) {
+			return false
+		}
+		for i := range dv {
+			if !deepValueEqual(dv[i], sv[i]) {
+				return false
+			}
+		}
+		return true
+	default:
+		return scalarEqual(desired, server)
+	}
+}
+
+// scalarEqual compares two scalar JSON values via their JSON encoding, tolerant
+// of Go type differences from json.Unmarshal (e.g. int vs float64).
+func scalarEqual(a, b any) bool {
+	ab, err1 := json.Marshal(a)
+	bb, err2 := json.Marshal(b)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return string(ab) == string(bb)
 }

@@ -49,10 +49,6 @@ func (l *sbLookuperFake) LookupInstanceAndBinding(ctx context.Context, planID, i
 	return "", "", time.Time{}, false, nil
 }
 
-func (l *sbLookuperFake) GetInstanceParameters(ctx context.Context, serviceInstanceID string) (map[string]any, bool, error) {
-	return nil, false, nil
-}
-
 type sbRecorderFake struct{ events []string }
 
 func (r *sbRecorderFake) Event(_ runtimeobj.Object, e event.Event) {
