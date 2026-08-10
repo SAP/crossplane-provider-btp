@@ -316,6 +316,16 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
+	// Keep an already-complete instanceID/bindingID external-name intact when a
+	// re-entered Create returns an empty binding ID; only a real binding ID
+	// overwrites it (#289).
+	existingSID, existingBID := splitExternalName(meta.GetExternalName(cr))
+	if sID == "" {
+		sID = existingSID
+	}
+	if bID == "" {
+		bID = existingBID
+	}
 	meta.SetExternalName(cr, formExternalName(sID, bID))
 
 	return managed.ExternalCreation{}, nil
@@ -391,6 +401,18 @@ func formExternalName(serviceInstanceID, serviceBindingID string) string {
 		return serviceInstanceID
 	}
 	return serviceInstanceID + "/" + serviceBindingID
+}
+
+// splitExternalName is the inverse of formExternalName: it splits an
+// external-name of the form "serviceInstanceID/serviceBindingID" back into its
+// two segments. A bare "serviceInstanceID" (no separator) yields an empty
+// binding ID.
+func splitExternalName(externalName string) (serviceInstanceID, serviceBindingID string) {
+	instanceID, bindingID, found := strings.Cut(externalName, "/")
+	if !found {
+		return externalName, ""
+	}
+	return instanceID, bindingID
 }
 
 func mapToInstance(src *apisv1alpha1.SubaccountServiceInstanceObservation) *apisv1beta1.Instance {
