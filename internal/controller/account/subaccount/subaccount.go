@@ -22,6 +22,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/apierror"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	"github.com/sap/crossplane-provider-btp/internal/recovery"
@@ -576,15 +577,7 @@ func emptyDirectoryRef(spec *apisv1alpha1.SubaccountParameters) bool {
 }
 
 func specifyAPIError(err error) error {
-	if genericErr, ok := err.(*accountclient.GenericOpenAPIError); ok {
-		if accountError, ok := genericErr.Model().(accountclient.ApiExceptionResponseObject); ok {
-			return errors.New(fmt.Sprintf("API Error: %v, Code %v", internal.Val(accountError.Error.Message), internal.Val(accountError.Error.Code)))
-		}
-		if genericErr.Body() != nil {
-			return fmt.Errorf("API Error: %s", string(genericErr.Body()))
-		}
-	}
-	return err
+	return apierror.FromAccounts(err)
 }
 
 func changedLabels(specLabels map[string]apisv1alpha1.SubaccountLabelValueList, statusLabels *map[string][]string) bool {
