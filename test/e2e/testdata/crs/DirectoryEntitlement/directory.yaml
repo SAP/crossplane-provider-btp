@@ -15,6 +15,7 @@ spec:
       - "AUTHORIZATIONS"
     displayName: $BUILD_ID-e2e-directory-for-entitlement-testing
     labels:
+      safe-to-delete: [ "yes" ]
       custom_label: ["custom_value"]
       another_label: ["onevalue", "twovalue"]
       BUILD_ID: [ "$BUILD_ID" ]
