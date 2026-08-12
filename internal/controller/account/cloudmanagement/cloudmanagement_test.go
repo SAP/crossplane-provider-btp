@@ -297,13 +297,25 @@ func TestObserve(t *testing.T) {
 		{
 			name: "EmptyExternalName",
 			args: args{
-				cr:       NewCloudManagement("test", WithExternalName("")),
-				tfClient: nil,
+				cr: NewCloudManagement("test", WithExternalName("")),
+				tfClient: &TfClientFake{
+					observeFn: func() (cmclient.ResourcesStatus, error) {
+						return cmclient.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{ResourceExists: false},
+						}, nil
+					},
+				},
 			},
 			want: want{
 				obs: managed.ExternalObservation{ResourceExists: false},
 				err: nil,
-				cr:  NewCloudManagement("test", WithExternalName("")),
+				cr: NewCloudManagement("test",
+					WithExternalName(""),
+					WithStatus(v1beta1.CloudManagementObservation{
+						Status: v1alpha1.CisStatusUnbound,
+					}),
+					WithConditions(xpv1.Unavailable()),
+				),
 			},
 		},
 		{

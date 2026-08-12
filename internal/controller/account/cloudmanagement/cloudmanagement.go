@@ -199,10 +199,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotCloudManagement)
 	}
 
-	// ADR(external-name) Observe Step 1: empty external-name means the resource does not exist yet.
-	if meta.GetExternalName(cr) == "" {
-		return managed.ExternalObservation{ResourceExists: false}, nil
-	}
+	// ADR(external-name) Observe Step 1 is intentionally omitted here: we do
+	// not short-circuit on an empty external-name because IsFallbackExternalName
+	// covers "" and the recovery path below must get a chance to run when
+	// ObserveResources returns !ResourceExists with a fallback name.
 
 	// ADR(external-name) Observe Step 2: validate external-name format, but
 	// only when it is a real BTP identifier. A fallback external-name (==
