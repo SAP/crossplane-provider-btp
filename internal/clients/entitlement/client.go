@@ -18,10 +18,11 @@ const (
 )
 
 type Client interface {
-	DescribeInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) (*Instance, error)
-	CreateInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) error
-	DeleteInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) error
-	UpdateInstance(ctx context.Context, cr *apisv1alpha1.Entitlement) error
+	DescribeInstance(ctx context.Context, key ExternalNameKey) (*Instance, error)
+	DescribeInstanceFresh(ctx context.Context, key ExternalNameKey) (*Instance, error)
+	CreateInstance(ctx context.Context, key ExternalNameKey, cr *apisv1alpha1.Entitlement) error
+	UpdateInstance(ctx context.Context, key ExternalNameKey, cr *apisv1alpha1.Entitlement) error
+	DeleteInstance(ctx context.Context, key ExternalNameKey, cr *apisv1alpha1.Entitlement) error
 }
 
 type Instance struct {

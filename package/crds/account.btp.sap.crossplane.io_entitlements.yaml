@@ -107,14 +107,23 @@ spec:
                       type: object
                     type: array
                   serviceName:
+                    minLength: 1
                     type: string
+                    x-kubernetes-validations:
+                    - message: serviceName cannot be changed
+                      rule: self == oldSelf
                   servicePlanName:
+                    minLength: 1
                     type: string
+                    x-kubernetes-validations:
+                    - message: servicePlanName cannot be changed
+                      rule: self == oldSelf
                   servicePlanUniqueIdentifier:
                     description: The unique identifier of the service plan. This is
                       a unique identifier for service plans that can distinguish between
                       the same service plans with different hosting datacenters. Options
                       Include `hana-cloud-hana` or `hana-cloud-hana-sap_eu-de-1`.
+                    minLength: 1
                     type: string
                   subaccountGuid:
                     type: string
@@ -196,6 +205,19 @@ spec:
                 - serviceName
                 - servicePlanName
                 type: object
+                x-kubernetes-validations:
+                - message: subaccountGuid cannot be changed after resolution
+                  rule: '!has(oldSelf.subaccountGuid) || size(oldSelf.subaccountGuid)
+                    == 0 || (has(self.subaccountGuid) && self.subaccountGuid == oldSelf.subaccountGuid)'
+                - message: servicePlanUniqueIdentifier cannot be changed
+                  rule: has(self.servicePlanUniqueIdentifier) == has(oldSelf.servicePlanUniqueIdentifier)
+                    && (!has(self.servicePlanUniqueIdentifier) || self.servicePlanUniqueIdentifier
+                    == oldSelf.servicePlanUniqueIdentifier)
+                - message: subaccountRef cannot be changed after subaccountGuid is
+                    resolved
+                  rule: '!has(oldSelf.subaccountGuid) || size(oldSelf.subaccountGuid)
+                    == 0 || (has(self.subaccountRef) == has(oldSelf.subaccountRef)
+                    && (!has(self.subaccountRef) || self.subaccountRef == oldSelf.subaccountRef))'
               managementPolicies:
                 default:
                 - '*'
