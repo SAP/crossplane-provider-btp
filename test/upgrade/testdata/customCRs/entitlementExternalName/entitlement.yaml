@@ -1,0 +1,12 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: upgrade-test-extn-ent
+  namespace: default
+spec:
+  forProvider:
+    serviceName: postgresql-db
+    servicePlanName: development
+    amount: 1
+    subaccountRef:
+      name: upgrade-test-extn-ent-sa
