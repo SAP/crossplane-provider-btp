@@ -68,6 +68,9 @@ jobs:
         with:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
+          # Opt in to checking out fork PR code under pull_request_target. actions/checkout v7 refuses this by default.
+          # Safe here: the pr-e2e-approval environment (required_reviewers) gates this job, so a maintainer inspects the fork diff before it runs with secrets.
+          allow-unsafe-pr-checkout: true
 
       - name: Set matrix with test names
         id: set-matrix
@@ -89,6 +92,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.checkout-ref }}
+          # See prepare-matrix: opt in to fork PR checkout; approval gate on prepare-matrix is the trust boundary.
+          allow-unsafe-pr-checkout: true
 
       - name: Install Helm
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
@@ -173,6 +178,8 @@ jobs:
         with:
           ref: ${{ inputs.checkout-ref }}
           submodules: true
+          # See prepare-matrix: opt in to fork PR checkout; approval gate on prepare-matrix is the trust boundary.
+          allow-unsafe-pr-checkout: true
 
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
@@ -269,6 +276,8 @@ jobs:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
           submodules: true
+          # See prepare-matrix: opt in to fork PR checkout; approval gate on prepare-matrix is the trust boundary.
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
