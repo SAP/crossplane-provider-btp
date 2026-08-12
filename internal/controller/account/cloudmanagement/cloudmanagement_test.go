@@ -275,6 +275,10 @@ func TestConnect(t *testing.T) {
 func TestObserve(t *testing.T) {
 	const testUUID = "00000000-0000-0000-0000-000000000001"
 	const testUUID2 = "00000000-0000-0000-0000-000000000002"
+	// deletionTime is captured once so cases that read/write DeletionTimestamp
+	// share the exact same value (otherwise two separate metav1.Now() calls
+	// in args vs want disagree at microsecond precision).
+	deletionTime := metav1.Now()
 	type want struct {
 		err error
 		obs managed.ExternalObservation
@@ -433,6 +437,40 @@ func TestObserve(t *testing.T) {
 					WithConditions(xpv1.Available())),
 			},
 		},
+		{
+			// Regression: while the CR is being deleted and the underlying
+			// instance still exists (binding may or may not — the tf-client
+			// keys ResourceExists off the instance during delete), setStatus
+			// must report Deleting()/Unbound, not Available()/Bound. Under the
+			// pre-fix code the delete-aware ObserveResources returned
+			// ResourceExists:true which then flipped the CR back to Available
+			// on every reconcile between Delete() and the final finalize —
+			// misleading in kubectl output and dashboards.
+			name: "DeletingInstanceStillExists",
+			args: args{
+				cr: NewCloudManagement("test", WithDeletionTimestamp(deletionTime)),
+				tfClient: &TfClientFake{
+					observeFn: func() (cmclient.ResourcesStatus, error) {
+						return cmclient.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+							Instance:            v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr("someID")},
+						}, nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithDeletionTimestamp(deletionTime),
+					WithStatus(v1beta1.CloudManagementObservation{
+						Status:            v1alpha1.CisStatusUnbound,
+						ServiceInstanceID: "someID",
+						Instance:          &v1beta1.Instance{Id: internal.Ptr("someID")},
+					}),
+					WithConditions(xpv1.Deleting())),
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -500,6 +538,116 @@ func TestCreate(t *testing.T) {
 			},
 			want: want{
 				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName("someID/anotherID"),
+					WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		{
+			// First-ever provisioning, phase-1: external-name is unset. The guard
+			// has no existing binding ID to preserve and must write the bare
+			// instance ID (phase-2 later appends the binding). Confirms the guard
+			// is a no-op at creation time and never blocks a normal first create.
+			name: "FirstCreatePhase1NoExternalNameYet",
+			args: args{
+				cr: NewCloudManagement("test"),
+				tfClient: &TfClientFake{
+					createFn: func() (string, string, error) {
+						return "someID", "", nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName("someID"),
+					WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		{
+			// Regression for #289: a phase-1 re-entry (CreateResources returns an
+			// empty binding ID) must NOT truncate an already-complete
+			// instanceID/bindingID external-name down to the bare instanceID.
+			// That truncation strands the CM in a permanent "Service Binding
+			// (Subaccount): Conflict" loop because the binding ID is then lost
+			// from the CR while the binding still exists in BTP.
+			name: "Phase1ReEntryPreservesExistingBindingID",
+			args: args{
+				cr: NewCloudManagement("test", WithExternalName("someID/anotherID")),
+				tfClient: &TfClientFake{
+					createFn: func() (string, string, error) {
+						return "someID", "", nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName("someID/anotherID"),
+					WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		{
+			// A phase-1 re-entry that also loses the instance ID must keep both
+			// segments from the existing external-name rather than blanking it.
+			name: "Phase1ReEntryPreservesBothIDs",
+			args: args{
+				cr: NewCloudManagement("test", WithExternalName("someID/anotherID")),
+				tfClient: &TfClientFake{
+					createFn: func() (string, string, error) {
+						return "", "", nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName("someID/anotherID"),
+					WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		{
+			// Genuine self-heal: instance still there, binding was deleted in BTP,
+			// so phase-2 creates a NEW binding and returns its real ID. The guard
+			// must NOT block this — the new binding ID replaces the old one.
+			name: "Phase2NewBindingReplacesOldID",
+			args: args{
+				cr: NewCloudManagement("test", WithExternalName("someID/oldBinding")),
+				tfClient: &TfClientFake{
+					createFn: func() (string, string, error) {
+						return "someID", "newBinding", nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName("someID/newBinding"),
+					WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		{
+			// Both instance and binding gone in BTP (a formerly-healthy CM whose
+			// external-name is still the complete instanceID/bindingID): the
+			// re-create attempt returns an error, so Create() returns before the
+			// external-name is written. The guard must leave the existing
+			// external-name untouched rather than truncating it.
+			name: "BothGoneCreateErrorLeavesExternalNameIntact",
+			args: args{
+				cr: NewCloudManagement("test", WithExternalName("someID/anotherID")),
+				tfClient: &TfClientFake{
+					createFn: func() (string, string, error) {
+						return "", "", errors.New("createError")
+					},
+				},
+			},
+			want: want{
+				err: errors.Wrap(errors.New("createError"), "while creating resources"),
 				cr: NewCloudManagement("test",
 					WithExternalName("someID/anotherID"),
 					WithConditions(xpv1.Creating()),
@@ -674,6 +822,12 @@ func WithConditions(c ...xpv1.Condition) CloudManagementModifier {
 func WithExternalName(externalName string) CloudManagementModifier {
 	return func(r *v1beta1.CloudManagement) {
 		meta.SetExternalName(r, externalName)
+	}
+}
+
+func WithDeletionTimestamp(t metav1.Time) CloudManagementModifier {
+	return func(r *v1beta1.CloudManagement) {
+		r.SetDeletionTimestamp(&t)
 	}
 }
 

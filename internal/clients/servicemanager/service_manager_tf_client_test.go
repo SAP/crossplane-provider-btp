@@ -405,6 +405,71 @@ func TestObserveResources(t *testing.T) {
 				err: nil,
 			},
 		},
+		{
+			// REGRESSION GUARD (orphan bug): CR is being deleted, the instance
+			// still exists in BTP but the binding is already gone (binding delete
+			// landed and the instance delete then errored/lagged, or the binding
+			// was removed out-of-band). The OLD code reported ResourceExists:false
+			// here ("binding needs creation"), which under a deletion timestamp
+			// made the managed reconciler skip Delete(), strip the finalizer and
+			// ORPHAN the instance in BTP. We must report ResourceExists:true so
+			// Delete() keeps firing until the instance is actually gone.
+			//
+			// The binding is intentionally NOT observed on the delete path (BTP
+			// invariant: an instance cannot be deleted while a binding references
+			// it, so instance-gone implies binding-gone). Its observeFn returns an
+			// error to prove it is never consulted while deleting.
+			name: "DeletingInstanceExistsBindingGone",
+			args: args{
+				cr: deletingSMCr("subaccountId", "planId", "someID/anotherID", "", "", ""),
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{}, errors.New("binding must not be observed on the delete path")
+					},
+				},
+				sInstance: testServiceInstance("someID"),
+				sBinding:  testServiceBinding("anotherID"),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+					InstanceID:          "someID",
+				},
+				err: nil,
+			},
+		},
+		{
+			// CR being deleted and the instance is gone from BTP. The binding is
+			// necessarily gone too (BTP invariant), so nothing remains: report
+			// ResourceExists:false and let the reconciler finalize the CR.
+			name: "DeletingInstanceGoneFinalizes",
+			args: args{
+				cr: deletingSMCr("subaccountId", "planId", "someID/anotherID", "", "", ""),
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: false}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{}, errors.New("binding must not be observed on the delete path")
+					},
+				},
+				sInstance: testServiceInstance("someID"),
+				sBinding:  testServiceBinding("anotherID"),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: true},
+				},
+				err: nil,
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -722,6 +787,15 @@ func testSMCr(saId, planId, extName, statusInstanceID, serviceInstanceName, serv
 	}
 	meta.SetExternalName(sm, extName)
 	return sm
+}
+
+// deletingSMCr returns a ServiceManager CR that is mid-deletion (has a
+// DeletionTimestamp), which drives the delete-path branch in ObserveResources.
+func deletingSMCr(saId, planId, extName, statusInstanceID, serviceInstanceName, serviceBindingName string) *v1beta1.ServiceManager {
+	cr := testSMCr(saId, planId, extName, statusInstanceID, serviceInstanceName, serviceBindingName)
+	now := metav1.Now()
+	cr.SetDeletionTimestamp(&now)
+	return cr
 }
 
 func testServiceInstance(extName string) *v1alpha1.SubaccountServiceInstance {

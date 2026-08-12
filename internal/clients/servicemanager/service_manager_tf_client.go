@@ -203,6 +203,39 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 	if err != nil {
 		return ResourcesStatus{}, err
 	}
+
+	// Deletion path: key ResourceExists off the INSTANCE alone.
+	//
+	// BTP invariant: a service instance cannot be deleted while a service
+	// binding still references it, so the binding is necessarily gone once the
+	// instance is gone. The instance's existence is therefore the
+	// authoritative "is there anything left in BTP" signal during deletion.
+	//
+	// Why this matters: the crossplane managed reconciler only calls Delete()
+	// while the observed resource still exists (reconciler.go: `if
+	// observation.ResourceExists && policy.ShouldDelete()`). If we report
+	// ResourceExists:false while the CR is being deleted, it skips Delete(),
+	// strips the finalizer and removes the CR — orphaning whatever is still in
+	// BTP. DeleteResources() deletes the binding FIRST and then the instance;
+	// if the instance delete errors or lags, the next Observe sees the binding
+	// gone, and the two-phase-create gating below would report
+	// ResourceExists:false ("binding needs creation") which, under a deletion
+	// timestamp, finalizes the CR and strands the instance. Keying off the
+	// instance keeps Delete() firing until the instance is actually gone; only
+	// then do we report false and let the finalizer drop.
+	if meta.WasDeleted(cr) {
+		status := ResourcesStatus{
+			ExternalObservation: managed.ExternalObservation{
+				ResourceExists:   siObs.ResourceExists,
+				ResourceUpToDate: true,
+			},
+		}
+		if siObs.ResourceExists {
+			status.InstanceID = meta.GetExternalName(tf.sInstance)
+		}
+		return status, nil
+	}
+
 	if !siObs.ResourceExists {
 		return ResourcesStatus{
 			ExternalObservation: managed.ExternalObservation{ResourceExists: false},

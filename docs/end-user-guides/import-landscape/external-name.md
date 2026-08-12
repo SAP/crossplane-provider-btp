@@ -70,6 +70,19 @@ and Service Bindings → [binding] → ID
   - UI: BTP Cockpit → Global Account → Account Explorer → [Select Directory] → Entitlements → Service Assignments > Service Technical Name and Plan
   - CLI: `btp list accounts/entitlement --directory <directory-id>` → `entitledServices[].name` and `entitledServices[].servicePlans[].name`
 
+### Entitlement
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<subaccount-guid>/<service-name>/<service-plan-name>`; append `/<service-plan-unique-identifier>` when `spec.forProvider.servicePlanUniqueIdentifier` is set
+- Note: Entitlement CRs can share one assignment; the first must carry the annotation, later ones join it. See docs/contribution-notes/external-name-handling.md
+- Note: every field in the key is immutable after creation, and `servicePlanUniqueIdentifier` can be neither added nor removed later. Changing any of them requires deleting and recreating the resource.
+- Note: deletion refuses to finalize when this resource carries no external-name annotation, no sibling resource proves the provider created the matching BTP assignment, and that assignment cannot be shown to have released this resource's share. The error explains both remediations: remove the finalizer to delete the resource without touching BTP, or set the annotation to the compound key so deletion removes the assignment.
+- Note: BTP `AutoAssigned` entitlements are never revoked by this provider. Deleting the resource finalizes without modifying BTP and emits an `AutoAssignedPreserved` event, because BTP reports these as always available and not removable by admin action.
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Entitlements → Service Assignments > Service Technical Name and Plan
+  - CLI: `btp list accounts/entitlement --subaccount <subaccount-guid>` → `entitledServices[].name`, `entitledServices[].servicePlans[].name`, and `entitledServices[].servicePlans[].uniqueIdentifier` when duplicate names exist
+
 ### GlobalaccountTrustConfiguration
 
 - Follows Standard: no (origin key, not a GUID)

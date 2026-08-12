@@ -179,7 +179,3 @@ var (
 	CloudManagementKindAPIVersion   = CloudManagementKind + "." + SchemeGroupVersion.String()
 	CloudManagementGroupVersionKind = SchemeGroupVersion.WithKind(CloudManagementKind)
 )
-
-func init() {
-	SchemeBuilder.Register(&CloudManagement{}, &CloudManagementList{})
-}
