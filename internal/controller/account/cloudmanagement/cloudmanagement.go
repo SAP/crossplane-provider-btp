@@ -204,9 +204,15 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 
-	// ADR(external-name) Observe Step 2: validate external-name format.
-	if err := validateExternalName(meta.GetExternalName(cr)); err != nil {
-		return managed.ExternalObservation{}, err
+	// ADR(external-name) Observe Step 2: validate external-name format, but
+	// only when it is a real BTP identifier. A fallback external-name (==
+	// metadata.name) is handled by the recovery path below and must not be
+	// rejected here before recovery gets a chance to run.
+	extName := meta.GetExternalName(cr)
+	if !recovery.IsFallbackExternalName(cr.Name, extName) {
+		if err := validateExternalName(extName); err != nil {
+			return managed.ExternalObservation{}, err
+		}
 	}
 
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
