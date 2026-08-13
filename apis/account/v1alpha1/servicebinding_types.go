@@ -71,11 +71,14 @@ type ServiceBindingParameters struct {
 // +kubebuilder:validation:XValidation:rule="!has(self.ttl) || (has(self.frequency) && duration(self.ttl) >= duration(self.frequency))",message="ttl must be greater than or equal to frequency"
 type RotationParameters struct {
 	// Frequency defines how often the active key should be rotated.
+	// Use the canonical Go duration form, including all units down to seconds:
+	// "720h0m0s", not "720h".
 	// +kubebuilder:validation:Required
 	Frequency *metav1.Duration `json:"frequency"`
 
 	// TTL (Time-To-Live) defines the total time a credential is valid for before it is deleted.
 	// Must be >= frequency
+	// Use the canonical Go duration form as well: "1080h0m0s", not "1080h".
 	// +kubebuilder:validation:Optional
 	TTL *metav1.Duration `json:"ttl,omitempty"`
 }

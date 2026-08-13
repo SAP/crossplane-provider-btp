@@ -57,4 +57,25 @@ The credentials are stored in a `Secret` you specify via `spec.writeConnectionSe
 
 ## ⁉ FAQs
 
-No FAQs yet. Got a question? Reach out to us and help us build this section.
+### Why does re-applying my `ServiceBinding` fail with a conflict on `spec.rotation`?
+
+If you enable credential rotation via `spec.rotation` with shorthand durations, applying the very same manifest a second time fails:
+
+```text
+Apply failed with 2 conflicts: conflicts with "crossplane-provider-btp" using account.btp.sap.crossplane.io/v1alpha1:
+- .spec.rotation.frequency
+- .spec.rotation.ttl
+```
+
+The provider rewrites duration values into the canonical Go form that spells out every unit down to seconds — `720h` becomes `720h0m0s` — and becomes the field manager of those fields while doing so. Your next server-side apply (`kubectl apply --server-side`, Helm, Flux, Argo CD) still sends `720h`, so the API server sees a competing value and reports a conflict. Any other duration field in a resource spec, such as a `KymaEnvironmentBinding`'s `spec.forProvider.rotationInterval` and `spec.forProvider.ttl`, can be rewritten the same way.
+
+Write durations in canonical form from the start:
+
+```yaml title="hana-binding.yaml"
+spec:
+  rotation:
+    frequency: 720h0m0s # 30 days
+    ttl: 1080h0m0s # 45 days
+```
+
+If you already hit the conflict, changing the manifest to the canonical form resolves it — no need to force-apply or delete the resource.
