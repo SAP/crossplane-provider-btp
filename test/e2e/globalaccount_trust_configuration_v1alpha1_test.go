@@ -19,8 +19,19 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/features"
 )
 
+// Both features drive the same external object: one trust configuration per
+// global account, keyed by the origin from IDP_URL. CI runs a parallel job per
+// top-level test, so they stay features of one sequential testenv.Test.
+// TestInParallel would race them.
 func Test_TrustConfiguration_v1alpha1(t *testing.T) {
+	testenv.Test(
+		t,
+		globalaccountTrustConfigurationFeature().Feature(),
+		globalaccountTrustConfigurationImportFeature().Feature(),
+	)
+}
 
+func globalaccountTrustConfigurationFeature() *features.FeatureBuilder {
 	resource := resources.ResourceTestConfig{
 		Kind:              "GlobalaccountTrustConfiguration",
 		ResourceDirectory: crsPath("GlobalaccountTrustConfiguration"),
@@ -52,13 +63,13 @@ func Test_TrustConfiguration_v1alpha1(t *testing.T) {
 	fB.Assess("delete", resource.AssessDelete)
 	fB.Teardown(resource.Teardown)
 
-	testenv.Test(t, fB.Feature())
+	return fB
 }
 
-// TestGlobalaccountTrustConfigurationImportFlow tests the import flow for GlobalaccountTrustConfiguration.
+// globalaccountTrustConfigurationImportFeature tests the import flow for GlobalaccountTrustConfiguration.
 // ADR(external-name): uses the origin key (e.g. "sap.custom") as identifier; the global
 // account scope comes from the provider credentials, so no compound key is needed.
-func TestGlobalaccountTrustConfigurationImportFlow(t *testing.T) {
+func globalaccountTrustConfigurationImportFeature() *features.FeatureBuilder {
 	const importK8sResName = "ga-trust-config-import-test"
 
 	idpURL := envvar.GetOrPanic(IDP_URL_ENV_KEY)
@@ -76,8 +87,5 @@ func TestGlobalaccountTrustConfigurationImportFlow(t *testing.T) {
 		WithWaitDeletionTimeout[*v1alpha1.GlobalaccountTrustConfiguration](wait.WithTimeout(3*time.Minute)),
 	)
 
-	testenv.Test(
-		t,
-		importTester.BuildTestFeature("GlobalaccountTrustConfiguration Import Flow").Feature(),
-	)
+	return importTester.BuildTestFeature("GlobalaccountTrustConfiguration Import Flow")
 }
