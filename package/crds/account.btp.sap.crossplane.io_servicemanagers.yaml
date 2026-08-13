@@ -364,8 +364,12 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: ServiceManagerParameters are the configurable fields
-                  of a ServiceManager.
+                description: |-
+                  ServiceManagerParameters are the configurable fields of a ServiceManager.
+
+                  ADR(external-name): every field that selects the external resource is immutable
+                  once set. Changing one would leave crossplane.io/external-name pointing at the
+                  instance/binding pair created for the old value, stranding it in BTP.
                 properties:
                   planName:
                     default: service-operator-access
@@ -381,14 +385,19 @@ spec:
                     - message: planName can't be updated once set
                       rule: self == oldSelf
                   serviceBindingName:
+                    default: managed-service-manager-binding
                     description: Name of created service binding, Defaults to "managed-service-manager-binding"
                     type: string
                     x-kubernetes-validations:
                     - message: serviceBindingName can't be updated once set
                       rule: self == oldSelf
                   serviceInstanceName:
+                    default: managed-service-manager
                     description: Name of created service instance, Defaults to "managed-service-manager"
                     type: string
+                    x-kubernetes-validations:
+                    - message: serviceInstanceName can't be updated once set
+                      rule: self == oldSelf
                   subaccountGuid:
                     type: string
                   subaccountRef:
@@ -466,6 +475,20 @@ spec:
                         type: object
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: subaccountGuid can't be updated once resolved
+                  rule: '!has(oldSelf.subaccountGuid) || size(oldSelf.subaccountGuid)
+                    == 0 || (has(self.subaccountGuid) && self.subaccountGuid == oldSelf.subaccountGuid)'
+                - message: subaccountRef can't be repointed after subaccountGuid is
+                    resolved
+                  rule: '!has(oldSelf.subaccountGuid) || size(oldSelf.subaccountGuid)
+                    == 0 || !has(self.subaccountRef) || !has(oldSelf.subaccountRef)
+                    || self.subaccountRef.name == oldSelf.subaccountRef.name'
+                - message: subaccountSelector can't be repointed after subaccountGuid
+                    is resolved
+                  rule: '!has(oldSelf.subaccountGuid) || size(oldSelf.subaccountGuid)
+                    == 0 || !has(self.subaccountSelector) || !has(oldSelf.subaccountSelector)
+                    || self.subaccountSelector == oldSelf.subaccountSelector'
               managementPolicies:
                 default:
                 - '*'
