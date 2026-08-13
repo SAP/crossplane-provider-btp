@@ -200,7 +200,7 @@ The error indicates that the client cannot recognize the specified subaccount. T
 1. [The `ProviderConfig`](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp#create-a-providerconfig) references the correct global account subdomain.
 2. The `ServiceManager` references the correct `Subaccount` name.
 
-###  When creating a `ServiceManager` instance, I receive a response with unexpected status (405).
+###  When creating a `ServiceManager` instance, I receive a response with unexpected status (403/405).
 
 The error indicates that the operation is not allowed via the requested endpoint.
 The most likely cause is that the `cliServerUrl` in the `ProviderConfig` is not correct.
