@@ -20,15 +20,8 @@ var (
 	}
 )
 
-// Test_Subaccount_External_Name verifies that the Subaccount external-name is correctly
-// preserved and/or migrated during provider upgrades.
-//
-// The Subaccount controller has backwards compatibility logic that migrates
-// external-names from old formats (metadata.name prior to ADR compliance) to GUID format.
-// This test ensures that:
-// 1. The external-name exists before upgrade
-// 2. After upgrade, the external-name is in GUID format (UUID)
-// 3. The resource remains healthy after upgrade
+// Test_Subaccount_External_Name verifies that upgrading from v1.3.0 migrates the metadata.name
+// external-name to the GUID of the Subaccount managed before the upgrade.
 func Test_Subaccount_External_Name(t *testing.T) {
 	const subaccountName = "upgrade-test-extn-sa"
 
@@ -37,85 +30,103 @@ func Test_Subaccount_External_Name(t *testing.T) {
 		ToVersion(saToCustomTag).
 		WithResourceDirectories(saCustomResourceDirectories).
 		WithCustomPreUpgradeAssessment(
-			"verify external name before upgrade",
+			"verify legacy external name before upgrade",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				subaccount := &accountv1alpha1.Subaccount{}
 				r := cfg.Client().Resources()
 
-				err := r.Get(ctx, subaccountName, cfg.Namespace(), subaccount)
-				if err != nil {
+				if err := r.Get(ctx, subaccountName, cfg.Namespace(), subaccount); err != nil {
 					t.Fatalf("Failed to get Subaccount resource: %v", err)
 				}
 
-				// Get the external name annotation
-				annotations := subaccount.GetAnnotations()
-				externalName, exists := annotations["crossplane.io/external-name"]
-
+				externalName, exists := subaccount.GetAnnotations()["crossplane.io/external-name"]
 				if !exists {
 					t.Fatal("External name annotation does not exist")
 				}
 
-				klog.V(4).Infof("Pre-upgrade Subaccount external name: %s", externalName)
+				// The old controller never set an external-name, so the runtime default stands.
+				if externalName != subaccount.GetName() {
+					t.Fatalf(
+						"Pre-upgrade external name %q does not match the legacy sentinel (metadata.name) %q",
+						externalName,
+						subaccount.GetName(),
+					)
+				}
 
-				// Store the external name in context for post-upgrade verification
-				// Note: In older versions, the external-name may be in metadata.name format.
-				// After upgrade it should be migrated to GUID format.
-				return context.WithValue(ctx, "preUpgradeSaExternalName", externalName)
+				if subaccount.Status.AtProvider.SubaccountGuid == nil {
+					t.Fatal("status.atProvider.subaccountGuid is not set before upgrade")
+				}
+				guid := *subaccount.Status.AtProvider.SubaccountGuid
+				if !internal.IsValidUUID(guid) {
+					t.Fatalf("Pre-upgrade status.atProvider.subaccountGuid %q is not a valid UUID", guid)
+				}
+
+				klog.V(4).Infof("Pre-upgrade Subaccount external name: %s, guid: %s", externalName, guid)
+
+				ctx = context.WithValue(ctx, "preUpgradeSaExternalName", externalName)
+				return context.WithValue(ctx, "preUpgradeSaGuid", guid)
 			},
 		).
 		WithCustomPostUpgradeAssessment(
-			"verify external name after upgrade",
+			"verify migrated external name after upgrade",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				preUpgradeExternalName, ok := ctx.Value("preUpgradeSaExternalName").(string)
+				if !ok {
+					t.Fatal("Could not retrieve pre-upgrade external name from context")
+				}
+				preUpgradeGuid, ok := ctx.Value("preUpgradeSaGuid").(string)
+				if !ok {
+					t.Fatal("Could not retrieve pre-upgrade subaccount guid from context")
+				}
+
 				subaccount := &accountv1alpha1.Subaccount{}
 				r := cfg.Client().Resources()
 
-				err := r.Get(ctx, subaccountName, cfg.Namespace(), subaccount)
-				if err != nil {
+				if err := r.Get(ctx, subaccountName, cfg.Namespace(), subaccount); err != nil {
 					t.Fatalf("Failed to get Subaccount resource: %v", err)
 				}
 
-				// Get the external name annotation
-				annotations := subaccount.GetAnnotations()
-				externalName, exists := annotations["crossplane.io/external-name"]
-
+				externalName, exists := subaccount.GetAnnotations()["crossplane.io/external-name"]
 				if !exists {
 					t.Fatal("External name annotation does not exist after upgrade")
 				}
 
 				klog.V(4).Infof("Post-upgrade Subaccount external name: %s", externalName)
 
-				// After upgrade, the external-name should be in GUID format (UUID)
-				// The controller migrates from metadata.name format to GUID
-				if !internal.IsValidUUID(externalName) {
-					t.Fatalf("External name '%s' does not match expected UUID format after upgrade", externalName)
-				}
-
-				// Retrieve pre-upgrade external name from context
-				preUpgradeExternalName, ok := ctx.Value("preUpgradeSaExternalName").(string)
-				if !ok {
-					t.Fatal("Could not retrieve pre-upgrade external name from context")
-				}
-
-				// If the pre-upgrade external name was already a GUID, it should remain unchanged
-				// If it was in metadata.name format, it should have been migrated to GUID format
-				if internal.IsValidUUID(preUpgradeExternalName) {
-					// Pre-upgrade was already GUID format - should remain the same
-					if externalName != preUpgradeExternalName {
-						t.Fatalf(
-							"External name changed during upgrade when it shouldn't have. Before: %s, After: %s",
-							preUpgradeExternalName,
-							externalName,
-						)
-					}
-					klog.V(4).Info("External name was already in GUID format and remained unchanged after upgrade")
-				} else {
-					// Pre-upgrade was not GUID format (metadata.name) - should have been migrated
-					klog.V(4).Infof(
-						"External name migrated from '%s' to GUID format '%s'",
-						preUpgradeExternalName,
+				if externalName == preUpgradeExternalName {
+					t.Fatalf(
+						"External name %q was not migrated away from the legacy sentinel",
 						externalName,
 					)
 				}
+				if !internal.IsValidUUID(externalName) {
+					t.Fatalf("Post-upgrade external name %q is not a valid UUID", externalName)
+				}
+				if externalName != preUpgradeGuid {
+					t.Fatalf(
+						"Migrated external name %q does not match the pre-upgrade subaccount guid %q",
+						externalName,
+						preUpgradeGuid,
+					)
+				}
+
+				observedGuid := ""
+				if subaccount.Status.AtProvider.SubaccountGuid != nil {
+					observedGuid = *subaccount.Status.AtProvider.SubaccountGuid
+				}
+				if observedGuid != externalName {
+					t.Fatalf(
+						"status.atProvider.subaccountGuid %q does not match external name %q after upgrade",
+						observedGuid,
+						externalName,
+					)
+				}
+
+				klog.V(4).Infof(
+					"External name migrated from %q to GUID %q",
+					preUpgradeExternalName,
+					externalName,
+				)
 
 				return ctx
 			},
