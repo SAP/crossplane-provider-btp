@@ -2,12 +2,12 @@ apiVersion: account.btp.sap.crossplane.io/v1alpha1
 kind: Subaccount
 metadata:
   namespace: default
-  name: entitlement-cf-sa-test
+  name: entitlement-import-test
 spec:
   forProvider:
-    displayName: $BUILD_ID-e2e-test-sa-ent-cf
+    displayName: $BUILD_ID-e2e-ent-import-sa
     region: eu10
-    subdomain: $BUILD_ID-e2e-test-sa-ent-cf
+    subdomain: $BUILD_ID-e2e-ent-import-sa-sub
     labels:
       safe-to-delete: [ "yes" ]
       BUILD_ID: [ "$BUILD_ID" ]
