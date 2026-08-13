@@ -34,6 +34,8 @@ const (
 	errDelete            = "while deleting resources"
 	errSetStatus         = "while setting status"
 	errGetServicePlan    = "while getting service manager plan ID by name"
+
+	errExternalNameFormat = "crossplane.io/external-name is malformed; fix the annotation to resume reconciliation"
 )
 
 // ServiceManagerPlanIdInitializer is will provide implementation of service plan id lookup by name
@@ -152,6 +154,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceManager)
 	}
 
+	// ADR(external-name) Observe() step 2: reject a malformed key before
+	// splitExternalName degrades it to instance-only and Create() duplicates the
+	// binding. Not while deleting: the error returns before the reconciler's
+	// meta.WasDeleted branch, stranding the finalizer and orphaning BTP resources.
+	if !meta.WasDeleted(cr) {
+		if err := sm.ValidateExternalName(cr.Name, meta.GetExternalName(cr)); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errExternalNameFormat)
+		}
+	}
+
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
@@ -264,10 +276,17 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	cr.SetConditions(xpv1.Creating())
 
+	// ADR(external-name) Create(): on error we leave the annotation alone. Phase 1
+	// keeps it a fallback, which is what lets the recovery path adopt an instance a
+	// failed attempt already created; phase 2 keeps the instance UUID, so a failed
+	// binding create cannot strand the instance.
 	sID, bID, err := c.tfClient.CreateResources(ctx, cr)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
+	// bID is empty until the instance exists: phase 1 yields a single-UUID key,
+	// phase 2 completes it. No kube.Update, as crossplane-runtime persists this via
+	// UpdateCriticalAnnotations, an update that also reverts in-memory status.
 	meta.SetExternalName(cr, formExternalName(sID, bID))
 
 	return managed.ExternalCreation{}, nil
@@ -279,6 +298,8 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotServiceManager)
 	}
 
+	// ADR(external-name) Update() cannot rebuild the key: both halves are
+	// BTP-assigned GUIDs from Create(), and the fields selecting them are immutable.
 	err := c.tfClient.UpdateResources(ctx, cr)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
