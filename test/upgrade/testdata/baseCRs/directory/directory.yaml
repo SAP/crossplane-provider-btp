@@ -13,6 +13,7 @@ spec:
       - "DEFAULT"
     displayName: $BUILD_ID-upgrade-test-parent-directory
     labels:
+      safe-to-delete: [ "yes" ]
       custom_label: ["custom_value"]
       another_label: ["onevalue", "twovalue"]
       BUILD_ID: ["$BUILD_ID"]
@@ -34,6 +35,7 @@ spec:
       - "DEFAULT"
     displayName: $BUILD_ID-upgrade-test-child-directory
     labels:
+      safe-to-delete: [ "yes" ]
       custom_label: ["custom_value"]
       another_label: ["onevalue", "twovalue"]
       BUILD_ID: ["$BUILD_ID"]

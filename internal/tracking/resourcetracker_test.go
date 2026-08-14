@@ -351,13 +351,13 @@ func Test_Track_SourceGone(t *testing.T) {
 		},
 		{
 			name: "MultipleReferences_OneGoneWhileDeleting",
-			mg:   markDeleted(newFakeSubaccountWithTwoReferences()),
+			mg:   markDeleted(newFakeServiceBindingWithTwoReferences()),
 			additionalObjects: []kclient.Object{
-				newFakeDirectory(),
+				newFakeSubaccount(),
 			},
 			wantErr: nil,
 			wantTracked: []*providerv1alpha1.ResourceUsage{
-				newResourceUsage(newFakeDirectory(), newFakeSubaccountWithTwoReferences()),
+				newResourceUsage(newFakeSubaccount(), newFakeServiceBindingWithTwoReferences()),
 			},
 		},
 	}
@@ -422,12 +422,21 @@ func markDeleted(mg resource.Managed) resource.Managed {
 	return mg
 }
 
-// newFakeSubaccountWithTwoReferences carries two tracked references: the directory,
-// which exists in these tests, and a global account that never does.
-func newFakeSubaccountWithTwoReferences() *v1alpha1.Subaccount {
-	sa := newFakeSubaccount()
-	sa.Spec.ForProvider.GlobalAccountRef = &xpv1.Reference{Name: "gone-global-account"}
-	return sa
+// newFakeServiceBindingWithTwoReferences carries two tracked references: the
+// subaccount, which exists in these tests, and a service instance that never
+// does. Both SubaccountRef and ServiceInstanceRef carry the reference-* tags
+// the tracker walks, so both are resolved (unlike Subaccount, which since the
+// removal of the GlobalAccount MR has only one tracked reference field).
+func newFakeServiceBindingWithTwoReferences() *v1alpha1.ServiceBinding {
+	return &v1alpha1.ServiceBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "fake-servicebinding", UID: "servicebinding-uid"},
+		Spec: v1alpha1.ServiceBindingSpec{
+			ForProvider: v1alpha1.ServiceBindingParameters{
+				SubaccountRef:      &xpv1.Reference{Name: "fake-subaccount"},
+				ServiceInstanceRef: &xpv1.Reference{Name: "gone-service-instance"},
+			},
+		},
+	}
 }
 
 func checkNoResourceUsagesExist(t *testing.T) func(
