@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.1
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: servicebindings.account.btp.sap.crossplane.io
 spec:
   group: account.btp.sap.crossplane.io
@@ -342,13 +342,16 @@ spec:
                   credential binding.
                 properties:
                   frequency:
-                    description: Frequency defines how often the active key should
-                      be rotated.
+                    description: |-
+                      Frequency defines how often the active key should be rotated.
+                      Use the canonical Go duration form, including all units down to seconds:
+                      "720h0m0s", not "720h".
                     type: string
                   ttl:
                     description: |-
                       TTL (Time-To-Live) defines the total time a credential is valid for before it is deleted.
                       Must be >= frequency
+                      Use the canonical Go duration form as well: "1080h0m0s", not "1080h".
                     type: string
                 required:
                 - frequency
