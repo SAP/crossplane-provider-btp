@@ -1,0 +1,95 @@
+---
+sidebar_position: 0
+---
+# Migrate from v1.x to v2.0.0
+
+v2.0.0 lifts the provider to the Crossplane v2 runtime and removes two legacy concepts. Managed
+resources stay cluster-scoped, so most manifests are unchanged.
+
+## Do I need to upgrade Crossplane core?
+
+**No.** v2.0.0 runs on both Crossplane core **v1 and v2** control planes. The provider's runtime bump
+to v2 is independent of the Crossplane core version - you can adopt v2.0.0 without upgrading core, and
+upgrade core on its own schedule.
+
+## Before you upgrade
+
+Do these while the **v1.x provider is still running**.
+
+### 1. Move off External Secret Stores (ESS)
+
+v2.0.0 removes the ESS code path. If any resource publishes connection details via
+`publishConnectionDetailsTo`, publishing stops the moment you install v2.0.0 - on any core version,
+with no error. Check whether you use it:
+
+```sh
+kubectl get storeconfigs.secrets.crossplane.io -A
+kubectl get managed -A -o yaml | grep -i publishConnectionDetailsTo
+```
+
+Any hits: switch those resources to a native connection secret via `spec.writeConnectionSecretToRef`,
+or use the [External Secrets Operator](https://external-secrets.io/), before upgrading. Upstream detail:
+[Crossplane upgrade-to-v2, External Secret Stores](https://docs.crossplane.io/latest/guides/upgrade-to-crossplane-v2/#external-secret-stores).
+
+### 2. Set the global account in `ProviderConfig`, drop `GlobalAccount` refs
+
+The `GlobalAccount` managed resource is removed. Check whether you use it:
+
+```sh
+kubectl get globalaccounts.account.btp.sap.crossplane.io -A
+kubectl get subaccounts.account.btp.sap.crossplane.io -A -o yaml | grep -iE 'globalAccountRef|globalAccountSelector'
+```
+
+Set the global account in `ProviderConfig` instead:
+
+```yaml
+apiVersion: btp.sap.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  globalAccount: <your-global-account-guid>
+```
+
+Then remove `spec.forProvider.globalAccountRef` / `globalAccountSelector` from any `Subaccount` (or
+similar) that used them - they reference the removed CR.
+
+### 3. Delete the `GlobalAccount` CRs
+
+While the v1.x controller still runs, so it clears finalizers cleanly:
+
+```sh
+kubectl delete globalaccounts.account.btp.sap.crossplane.io --all
+```
+
+## After you upgrade
+
+Upgrade succeeds either way and **no BTP-side data is lost**. If you skipped step 3, clean up now -
+Crossplane does **not** GC the removed CRD (the inactive old `ProviderRevision` keeps it). Order:
+**CRs first, then CRD.**
+
+```sh
+kubectl delete globalaccounts.account.btp.sap.crossplane.io --all
+
+# Any stuck in Terminating:
+kubectl patch globalaccount <name> --type=merge -p '{"metadata":{"finalizers":[]}}'
+
+kubectl delete crd globalaccounts.account.btp.sap.crossplane.io
+```
+
+Delete the CRD before the CRs and the `customresourcecleanup` finalizer holds it in `Terminating`
+until the CRs are gone - just delete the CRs and it resolves.
+
+## If you skip the steps
+
+- **ESS (1)** - connection details stop being published. Consumers reading that secret (workloads,
+  other resources, GitOps) get stale or missing credentials. No error is raised, so the break is
+  easy to miss. Highest impact.
+- **Refs (2)** - resources using `globalAccountRef` / `globalAccountSelector` fail to resolve.
+- **Cleanup (3)** - orphaned CRs and the `globalaccounts` CRD linger until removed manually.
+
+## Not covered
+
+General Crossplane v1 → v2 core migration (Compositions, functions, namespaced XRs) - see the
+[upstream guide](https://docs.crossplane.io/latest/guides/upgrade-to-crossplane-v2/). This page is
+the btp-specific delta only.
