@@ -32,6 +32,8 @@ type KymaEnvironmentParameters struct {
 	// single-landscape regions default it server-side. Set at create only - landscape is fixed
 	// once the environment exists.
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="landscapeLabel is immutable after creation"
 	LandscapeLabel *string `json:"landscapeLabel,omitempty"`
 
 	// Provisioning parameters for the instance.

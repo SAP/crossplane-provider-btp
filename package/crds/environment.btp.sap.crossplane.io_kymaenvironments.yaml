@@ -168,7 +168,11 @@ spec:
                       environment instance is created. Only required when the region has more than one landscape;
                       single-landscape regions default it server-side. Set at create only - landscape is fixed
                       once the environment exists.
+                    minLength: 1
                     type: string
+                    x-kubernetes-validations:
+                    - message: landscapeLabel is immutable after creation
+                      rule: self == oldSelf
                   name:
                     description: |-
                       Can be provided, if empty the client will use metadata.name as the default value.
