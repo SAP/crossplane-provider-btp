@@ -157,15 +157,18 @@ func TestObserve_CloudManagementAdoption(t *testing.T) {
 		}
 	})
 
-	// A healthy phase-1 (bare UUID, binding not yet created) must not heal: the
-	// lookup finds no binding (sbID == ""), so the instance-ID proof does not
-	// apply and the two-phase Create resumes on its own.
+	// A healthy phase-1 (bare UUID, binding not yet created) must not heal or
+	// requeue: the lookup finds no binding (sbID == ""), so there is nothing to
+	// heal and the two-phase Create must run phase-2 on its own. The instance is
+	// freshly created (in the ownership time window), which is the normal path —
+	// healing here would rewrite external-name to the same bare UUID and requeue,
+	// starving phase-2.
 	t.Run("healthy phase-1 (bare UUID, no binding in BTP) does NOT heal", func(t *testing.T) {
 		cr := cmForAdoption("cis-5", "plan-5")
 		meta.SetExternalName(cr, "80540c06-2955-4bce-9c43-ad78fecc7f62") // real instance UUID, non-compound
-		// Lookup finds our instance but NO binding yet (phase-1). Time window is
-		// also broken so only the (inapplicable) instance-ID proof could fire.
-		lk := &cmLookuperFake{siID: "80540c06-2955-4bce-9c43-ad78fecc7f62", sbID: "", siCreatedAt: createPendingAtCM.Add(-time.Hour), found: true}
+		// Lookup finds our instance but NO binding yet (phase-1). Instance is
+		// freshly created → within the ownership time window.
+		lk := &cmLookuperFake{siID: "80540c06-2955-4bce-9c43-ad78fecc7f62", sbID: "", siCreatedAt: createPendingAtCM.Add(2 * time.Second), found: true}
 		e := external{
 			kube: &test.MockClient{
 				MockUpdate:       test.NewMockUpdateFn(nil),

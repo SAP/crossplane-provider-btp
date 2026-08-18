@@ -254,13 +254,22 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudMa
 		return nil
 	}
 
+	externalNameInstanceID, existingBID := splitExternalName(meta.GetExternalName(cr))
+
+	// Truncated external-name (bare instance UUID) with no binding found in BTP
+	// is a healthy phase-1: the instance UUID is already correct and there is no
+	// binding to heal. Do nothing so the two-phase Create runs phase-2 — healing
+	// here would rewrite the same bare UUID and requeue, starving phase-2.
+	truncated := recovery.IsTruncatedCompoundExternalName(cr.Name, meta.GetExternalName(cr))
+	if truncated && sbID == "" {
+		return nil
+	}
+
 	// Ownership proof, either of:
 	//  - the time window vs external-create-pending (IsOwnedByCR); or
 	//  - the truncated-compound match: external-name is truncated (existingBID
 	//    == ""), the lookup found a real binding (sbID != ""), and the instance
 	//    UUID we hold equals the found instance.
-	// Requiring sbID != "" leaves a healthy phase-1 (no binding yet) untouched.
-	externalNameInstanceID, existingBID := splitExternalName(meta.GetExternalName(cr))
 	ownedByTime := recovery.IsOwnedByCR(cr, instanceCreatedAt)
 	ownedByTruncatedMatch := existingBID == "" && sbID != "" &&
 		recovery.IsOwnedByExternalNameInstanceID(externalNameInstanceID, siID)
