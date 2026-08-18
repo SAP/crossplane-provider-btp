@@ -27,6 +27,15 @@ type KymaEnvironmentParameters struct {
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name"`
 
+	// LandscapeLabel is the name of the landscape within the logged-in region on which the
+	// environment instance is created. Only required when the region has more than one landscape;
+	// single-landscape regions default it server-side. Set at create only - landscape is fixed
+	// once the environment exists.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="landscapeLabel is immutable after creation"
+	LandscapeLabel *string `json:"landscapeLabel,omitempty"`
+
 	// Provisioning parameters for the instance.
 	//
 	// The Parameters field is NOT secret or secured in any way and should
