@@ -11,7 +11,7 @@
     "gomodTidy"
   ],
   "labels": ["release-notes/dependencies"],
-  "prConcurrentLimit": 10,
+  "prConcurrentLimit": 20,
   "prHourlyLimit": 0,
   "packageRules": [
     {
