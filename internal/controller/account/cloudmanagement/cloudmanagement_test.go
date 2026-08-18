@@ -2,7 +2,6 @@ package cloudmanagement
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -326,7 +325,7 @@ func TestObserve(t *testing.T) {
 			},
 			want: want{
 				obs: managed.ExternalObservation{},
-				err: fmt.Errorf("invalid external-name %q: must be a UUID or <uuid>/<uuid>", "not-a-uuid"),
+				err: servicemanager.ValidateExternalName("test", "not-a-uuid"),
 				cr:  NewCloudManagement("test", WithExternalName("not-a-uuid")),
 			},
 		},

@@ -204,13 +204,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	// covers "" and the recovery path below must get a chance to run when
 	// ObserveResources returns !ResourceExists with a fallback name.
 
-	// ADR(external-name) Observe Step 2: validate external-name format, but
-	// only when it is a real BTP identifier. A fallback external-name (==
-	// metadata.name) is handled by the recovery path below and must not be
-	// rejected here before recovery gets a chance to run.
+	// ADR(external-name) Observe Step 2: skip on deletion so a malformed
+	// annotation can't strand the finalizer; ValidateExternalName handles
+	// fallbacks internally, so no separate IsFallbackExternalName guard needed.
 	extName := meta.GetExternalName(cr)
-	if !recovery.IsFallbackExternalName(cr.Name, extName) {
-		if err := validateExternalName(extName); err != nil {
+	if !meta.WasDeleted(cr) {
+		if err := servicemanager.ValidateExternalName(cr.Name, extName); err != nil {
 			return managed.ExternalObservation{}, err
 		}
 	}
@@ -482,17 +481,4 @@ func unmarshalContext(src *string) *map[string]string {
 		return nil
 	}
 	return &contextData
-}
-
-// validateExternalName checks that the external-name is either a single UUID (instance created,
-// binding pending — two-phase create) or a compound <uuid>/<uuid> key (fully created).
-func validateExternalName(s string) error {
-	if internal.IsValidUUID(s) {
-		return nil
-	}
-	parts := strings.SplitN(s, "/", 2)
-	if len(parts) == 2 && internal.IsValidUUID(parts[0]) && internal.IsValidUUID(parts[1]) {
-		return nil
-	}
-	return fmt.Errorf("invalid external-name %q: must be a UUID or <uuid>/<uuid>", s)
 }
