@@ -7,7 +7,7 @@ tool golang.org/x/tools/cmd/goimports
 // Module conflict in Go dependencies. The package google.golang.org/genproto/googleapis/api/httpbody exists in two different modules:
 // - google.golang.org/genproto (older version)
 // - google.golang.org/genproto/googleapis/api (newer, split module)
-replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20260817212433-ac3dfec99bb1
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7
 
 require (
 	dario.cat/mergo v1.0.2
