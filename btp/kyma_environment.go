@@ -40,7 +40,7 @@ func (c *Client) GetKymaEnvironment(
 	return c.GetEnvironmentByNameAndType(ctx, instanceName, environmentType)
 }
 
-func (c *Client) CreateKymaEnvironment(ctx context.Context, instanceName string, planeName string, parameters InstanceParameters, resourceUID string, serviceAccountEmail string) (string, error) {
+func (c *Client) CreateKymaEnvironment(ctx context.Context, instanceName string, planeName string, parameters InstanceParameters, resourceUID string, serviceAccountEmail string, landscapeLabel *string) (string, error) {
 	envType := KymaEnvironmentType()
 	payload := provisioningclient.CreateEnvironmentInstanceRequestPayload{
 		Description:     internal.Ptr("created via crossplane-provider-btp-account"),
@@ -52,6 +52,7 @@ func (c *Client) CreateKymaEnvironment(ctx context.Context, instanceName string,
 		ServiceName:     envType.ServiceName,
 		TechnicalKey:    nil,
 		User:            &serviceAccountEmail,
+		LandscapeLabel:  landscapeLabel,
 	}
 	obj, _, err := c.ProvisioningServiceClient.CreateEnvironmentInstance(ctx).CreateEnvironmentInstanceRequestPayload(payload).Execute()
 

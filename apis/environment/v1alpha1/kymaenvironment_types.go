@@ -35,6 +35,11 @@ type KymaEnvironmentParameters struct {
 	// in a Secret and use the ParametersFrom field.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Parameters runtime.RawExtension `json:"parameters,omitempty"`
+
+	// The name of the landscape within the logged-in region on which the environment instance is created.
+	// Only required if the region has multiple landscapes.
+	// +kubebuilder:validation:Optional
+	LandscapeLabel *string `json:"landscapeLabel,omitempty"`
 }
 
 // KymaEnvironmentObservation are the observable fields of a KymaEnvironment.
