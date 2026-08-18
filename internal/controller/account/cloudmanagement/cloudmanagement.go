@@ -206,13 +206,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
 
-	// Recovery: BTP has a resource matching this managed CR, but our
-	// external-name is still a fallback — semantic lookup + ownership check
-	// (see internal/recovery). Fires only on TRUE fallback: a single-UUID
-	// external-name is the natural output of phase-1 Create and must NOT
-	// re-trigger recovery (would trap CM in an infinite loop before phase-2).
+	// Recovery: BTP has a matching resource but our external-name is a fallback
+	// or a truncated compound (bare instance UUID). Fires only when
+	// ResourceExists is false, so a healthy phase-1→phase-2 create is untouched.
+	extName := meta.GetExternalName(cr)
 	if err == nil && !resStatus.ResourceExists &&
-		recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+		(recovery.IsFallbackExternalName(cr.Name, extName) ||
+			recovery.IsTruncatedCompoundExternalName(cr.Name, extName)) {
 		if healErr := c.healExternalName(ctx, cr); healErr != nil {
 			return managed.ExternalObservation{}, healErr
 		}
@@ -254,9 +254,17 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudMa
 		return nil
 	}
 
-	// Uses the instance's created_at (phase-1 creates the instance first — if
-	// the instance isn't ours, the binding inside it isn't either).
-	if !recovery.IsOwnedByCR(cr, instanceCreatedAt) {
+	// Ownership proof, either of:
+	//  - the time window vs external-create-pending (IsOwnedByCR); or
+	//  - the truncated-compound match: external-name is truncated (existingBID
+	//    == ""), the lookup found a real binding (sbID != ""), and the instance
+	//    UUID we hold equals the found instance.
+	// Requiring sbID != "" leaves a healthy phase-1 (no binding yet) untouched.
+	externalNameInstanceID, existingBID := splitExternalName(meta.GetExternalName(cr))
+	ownedByTime := recovery.IsOwnedByCR(cr, instanceCreatedAt)
+	ownedByTruncatedMatch := existingBID == "" && sbID != "" &&
+		recovery.IsOwnedByExternalNameInstanceID(externalNameInstanceID, siID)
+	if !ownedByTime && !ownedByTruncatedMatch {
 		log.FromContext(ctx).Info("external-name recovery refused: BTP cloud management is outside our Create-attempt window (brownfield)",
 			"serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID,
 			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", instanceCreatedAt)
