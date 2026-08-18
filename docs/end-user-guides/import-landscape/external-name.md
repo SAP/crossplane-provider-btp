@@ -152,6 +152,16 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
   - CLI: btp list services/instance --subaccount `<subaccount-guid>` (field: id)
 
+### ServiceManager
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<service-instance-id>/<service-binding-id>` (e.g. "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f/9c2b1f80-3d4e-4a11-8f2c-7b5d6e1a4c33"), both canonical 36-character GUIDs; a bare `<service-instance-id>` is the valid transient form while the binding is still being created
+- Note: `subaccountGuid`, `planName`, `serviceInstanceName` and `serviceBindingName` are immutable once set (v1beta1); changing one strands the instance/binding pair, so delete and recreate instead. Once `subaccountGuid` is resolved, `subaccountRef`/`subaccountSelector` can no longer be repointed, though dropping them is allowed; a replace-style sync must still carry the resolved `subaccountGuid` and any non-default names.
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Services → Instances and Subscriptions → [Select the service manager instance] → the preview pane shows its ID; take the binding ID from the CLI
+  - CLI: `btp list services/instance --subaccount <subaccount-guid>` (field: id), then `btp list services/binding --subaccount <subaccount-guid>` (field: id) for the binding on that instance
+
 ### Subaccount
 
 - Follows Standard: yes
