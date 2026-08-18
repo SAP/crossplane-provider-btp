@@ -1,6 +1,6 @@
 module github.com/sap/crossplane-provider-btp
 
-go 1.26.0
+go 1.25.6
 
 tool golang.org/x/tools/cmd/goimports
 
