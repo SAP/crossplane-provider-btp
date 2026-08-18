@@ -5,6 +5,7 @@
     ":dependencyDashboard",
     "schedule:weekly"
   ],
+  "baseBranches": ["main", "release/v1_10_x"],
   "ignorePresets": ["group:goOpenapi"],
   "postUpdateOptions": [
     "gomodTidy"
@@ -13,6 +14,11 @@
   "prConcurrentLimit": 10,
   "prHourlyLimit": 0,
   "packageRules": [
+    {
+      "matchBaseBranches": ["release/v1_10_x"],
+      "matchUpdateTypes": ["major", "minor"],
+      "enabled": false
+    },
     {
       "groupName": "crossplane and upjet",
       "matchPackageNames": [
@@ -40,6 +46,10 @@
     {
       "groupName": "github actions",
       "matchManagers": ["github-actions"]
+    },
+    {
+      "matchBaseBranches": ["release/v1_10_x"],
+      "groupName": "other dependencies"
     }
   ],
   "customManagers": [
