@@ -59,6 +59,19 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: BTP Cockpit → Global Account → Account Explorer → [Select Directory] → Entitlements → Service Assignments > Service Technical Name and Plan
   - CLI: `btp list accounts/entitlement --directory <directory-id>` → `entitledServices[].name` and `entitledServices[].servicePlans[].name`
 
+### Entitlement
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<subaccount-guid>/<service-name>/<service-plan-name>`; append `/<service-plan-unique-identifier>` when `spec.forProvider.servicePlanUniqueIdentifier` is set
+- Note: Entitlement CRs can share one assignment; the first must carry the annotation, later ones join it. See docs/contribution-notes/external-name-handling.md
+- Note: every field in the key is immutable after creation, and `servicePlanUniqueIdentifier` can be neither added nor removed later. Changing any of them requires deleting and recreating the resource.
+- Note: deletion refuses to finalize when this resource carries no external-name annotation, no sibling resource proves the provider created the matching BTP assignment, and that assignment cannot be shown to have released this resource's share. The error explains both remediations: remove the finalizer to delete the resource without touching BTP, or set the annotation to the compound key so deletion removes the assignment.
+- Note: BTP `AutoAssigned` entitlements are never revoked by this provider. Deleting the resource finalizes without modifying BTP and emits an `AutoAssignedPreserved` event, because BTP reports these as always available and not removable by admin action.
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Entitlements → Service Assignments > Service Technical Name and Plan
+  - CLI: `btp list accounts/entitlement --subaccount <subaccount-guid>` → `entitledServices[].name`, `entitledServices[].servicePlans[].name`, and `entitledServices[].servicePlans[].uniqueIdentifier` when duplicate names exist
+
 ### GlobalaccountTrustConfiguration
 
 - Follows Standard: no (origin key, not a GUID)
@@ -127,6 +140,16 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 
   - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
   - CLI: btp list services/instance --subaccount `<subaccount-guid>` (field: id)
+
+### ServiceManager
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<service-instance-id>/<service-binding-id>` (e.g. "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f/9c2b1f80-3d4e-4a11-8f2c-7b5d6e1a4c33"), both canonical 36-character GUIDs; a bare `<service-instance-id>` is the valid transient form while the binding is still being created
+- Note: `subaccountGuid`, `planName`, `serviceInstanceName` and `serviceBindingName` are immutable once set (v1beta1); changing one strands the instance/binding pair, so delete and recreate instead. Once `subaccountGuid` is resolved, `subaccountRef`/`subaccountSelector` can no longer be repointed, though dropping them is allowed; a replace-style sync must still carry the resolved `subaccountGuid` and any non-default names.
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Services → Instances and Subscriptions → [Select the service manager instance] → the preview pane shows its ID; take the binding ID from the CLI
+  - CLI: `btp list services/instance --subaccount <subaccount-guid>` (field: id), then `btp list services/binding --subaccount <subaccount-guid>` (field: id) for the binding on that instance
 
 ### Subaccount
 

@@ -115,7 +115,10 @@ func TestConnectResources(t *testing.T) {
 		},
 		{
 			name: "SuccessExternalNamesSplitAndSet",
-			cr:   testSMCr("subaccountId", "planId", "instanceID/bindingID", "instanceID", "custom-name", "another-custom-name"),
+			// Real GUIDs: this case documents the ADR key format, so it must use a
+			// value ValidateExternalName accepts. Placeholders here would advertise
+			// a key that Observe() rejects.
+			cr: testSMCr("subaccountId", "planId", testInstanceUUID+"/"+testBindingUUID, testInstanceUUID, "custom-name", "another-custom-name"),
 			instanceConnectorMock: func() (managed.ExternalClient, error) {
 				return ExternalClientFake{}, nil
 			},
@@ -125,17 +128,19 @@ func TestConnectResources(t *testing.T) {
 			want: want{
 				subaccountId:         "subaccountId",
 				planId:               "planId",
-				instanceExternalName: "instanceID",
+				instanceExternalName: testInstanceUUID,
 				instanceSpec: v1alpha1.SubaccountServiceInstanceParameters{
 					Name:          internal.Ptr("custom-name"),
 					ServiceplanID: internal.Ptr("planId"),
 					SubaccountID:  internal.Ptr("subaccountId"),
 				},
-				bindingExternalName: "bindingID",
+				bindingExternalName: testBindingUUID,
 				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
-					SubaccountID:      internal.Ptr("subaccountId"),
-					Name:              internal.Ptr("another-custom-name"),
-					ServiceInstanceID: internal.Ptr("instanceID/bindingID"),
+					SubaccountID: internal.Ptr("subaccountId"),
+					Name:         internal.Ptr("another-custom-name"),
+					// The instance GUID deconstructed from the compound key, not the
+					// whole annotation, which BTP would reject as an instance ID.
+					ServiceInstanceID: internal.Ptr(testInstanceUUID),
 				},
 			},
 		},
