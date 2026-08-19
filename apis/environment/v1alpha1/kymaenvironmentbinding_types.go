@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 
 // KymaEnvironmentBindingParameters are the configurable fields of a KymaEnvironmentBinding.
@@ -14,14 +15,14 @@ type KymaEnvironmentBindingParameters struct {
 	// The interval at which the binding secret is rotated.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="1h"
-	RotationInterval metav1.Duration `json:"rotationInterval,omitempty"`
+	RotationInterval providerv1alpha1.Duration `json:"rotationInterval,omitempty"`
 
 	// The time to live of the binding secret. Should be greater than the rotation interval.
 	// The margin between the two values allows systems to settle down and pickup the new secret
 	// The binding secret will be deleted after this time.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="1h15m"
-	BindingTTl metav1.Duration `json:"ttl,omitempty"`
+	BindingTTl providerv1alpha1.Duration `json:"ttl,omitempty"`
 }
 
 type Binding struct {

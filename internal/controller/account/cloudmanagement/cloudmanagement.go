@@ -199,6 +199,21 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotCloudManagement)
 	}
 
+	// ADR(external-name) Observe Step 1 is intentionally omitted here: we do
+	// not short-circuit on an empty external-name because IsFallbackExternalName
+	// covers "" and the recovery path below must get a chance to run when
+	// ObserveResources returns !ResourceExists with a fallback name.
+
+	// ADR(external-name) Observe Step 2: skip on deletion so a malformed
+	// annotation can't strand the finalizer; ValidateExternalName handles
+	// fallbacks internally, so no separate IsFallbackExternalName guard needed.
+	extName := meta.GetExternalName(cr)
+	if !meta.WasDeleted(cr) {
+		if err := servicemanager.ValidateExternalName(cr.Name, extName); err != nil {
+			return managed.ExternalObservation{}, err
+		}
+	}
+
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
 
 	statusErr := c.setStatus(ctx, resStatus, cr)

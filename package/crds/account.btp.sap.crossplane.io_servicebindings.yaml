@@ -342,16 +342,13 @@ spec:
                   credential binding.
                 properties:
                   frequency:
-                    description: |-
-                      Frequency defines how often the active key should be rotated.
-                      Use the canonical Go duration form, including all units down to seconds:
-                      "720h0m0s", not "720h".
+                    description: Frequency defines how often the active key should
+                      be rotated.
                     type: string
                   ttl:
                     description: |-
                       TTL (Time-To-Live) defines the total time a credential is valid for before it is deleted.
                       Must be >= frequency
-                      Use the canonical Go duration form as well: "1080h0m0s", not "1080h".
                     type: string
                 required:
                 - frequency
