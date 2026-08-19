@@ -2,9 +2,9 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    ":dependencyDashboard",
-    "schedule:weekly"
+    ":dependencyDashboard"
   ],
+  "schedule": ["* * 1,15 * *"],
   "baseBranchPatterns": ["main", "release/v1_10_x"],
   "ignorePresets": ["group:goOpenapi"],
   "postUpdateOptions": [
