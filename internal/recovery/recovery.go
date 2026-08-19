@@ -19,6 +19,7 @@
 package recovery
 
 import (
+	"strings"
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
@@ -99,4 +100,24 @@ var ErrRequeueAfterRecovery = errors.New(
 // infinite loop where phase-2 never ran.
 func IsFallbackExternalName(metadataName, externalName string) bool {
 	return externalName == "" || externalName == metadataName
+}
+
+// IsTruncatedCompoundExternalName reports whether externalName is a compound
+// external-name ("instanceID/bindingID") truncated down to the bare instanceID
+// (binding-ID segment lost). Distinct from a fallback ("" or == metadata.name)
+// and from a healthy compound name (containing "/"). Only meaningful for the
+// two-phase resources (CloudManagement / ServiceManager).
+func IsTruncatedCompoundExternalName(metadataName, externalName string) bool {
+	return externalName != "" &&
+		externalName != metadataName &&
+		!strings.Contains(externalName, "/")
+}
+
+// IsOwnedByExternalNameInstanceID is the ownership proof for the
+// truncated-compound path: the instance UUID our own phase-1 Create wrote into
+// external-name equals the instance the spec-scoped lookup found. Used instead
+// of IsOwnedByCR here, whose time window can never pass while a Conflict retry
+// loop keeps rewriting external-create-pending. The fallback path is unaffected.
+func IsOwnedByExternalNameInstanceID(externalNameInstanceID, foundInstanceID string) bool {
+	return externalNameInstanceID != "" && externalNameInstanceID == foundInstanceID
 }
