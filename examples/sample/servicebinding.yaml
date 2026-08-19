@@ -10,12 +10,10 @@ spec:
       name: destination-instance
     subaccountRef:
       name: sa-serviceinstance
-  # Optional: Enable rotation. Durations use the canonical Go form, including all
-  # units down to seconds ("720h0m0s", not "720h"); shorthand values conflict
-  # with the provider when this manifest is re-applied server-side.
+  # Optional: Enable rotation.
   # rotation:
-  #   ttl: 1440h0m0s
-  #   frequency: 720h0m0s
+  #   ttl: 1440h # 60 days
+  #   frequency: 720h # 30 days
   writeConnectionSecretToRef:
     name: destination-binding
     namespace: default

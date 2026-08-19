@@ -41,6 +41,17 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
   - CLI: Use BTP ClI: `btp list accounts/environment-instance`
 
+### CloudManagement
+
+- Follows Standard: no (compound key: two UUIDs — instance ID and binding ID)
+- Format: `<serviceInstanceID>/<serviceBindingID>`
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Services → Service Instances → [instance] → ID
+and Service Bindings → [binding] → ID
+- CLI: `btp list services/instance --subaccount-id <guid> (field: id)`
+`btp list services/binding --subaccount-id <guid> (field: id)`
+
 ### Directory
 
 - Follows Standard: yes
