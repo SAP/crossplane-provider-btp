@@ -65,7 +65,7 @@ type ApiGetAllServicePlansRequest struct {
 	maxItems *int32
 }
 
-// Use this parameter to specify the environment for which you want to list service plans. Valid values: [btp, kubernetes, cloudfoundry]. &lt;br/&gt;If left empty, service plans associated with btp (Service Manager instances on a subaccount level) are returned.
+// Use this parameter to specify the environment for which you want to list service plans. Valid values: [sapbtp, kubernetes, cloudfoundry]. &lt;br/&gt;If left empty, service plans associated with sapbtp (Service Manager instances on a subaccount level) are returned.
 func (r ApiGetAllServicePlansRequest) Environment(environment string) ApiGetAllServicePlansRequest {
 	r.environment = &environment
 	return r

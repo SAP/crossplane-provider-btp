@@ -23,10 +23,12 @@ type UpdateServiceInstanceRequestPayload struct {
 	Labels []Label `json:"labels,omitempty"`
 	// The name of the service instance to update.
 	Name *string `json:"name,omitempty"`
-	// Some services support providing of additional configuration parameters during instance creation.<br>You can update these parameters.<br>For the list of supported configuration parameters, see the documentation of a particular service offering.<br>You can also use the *GET /v1/service_instances/{serviceInstanceID}/parameters* API later to view the parameters defined during this step.
-	Parameters *map[string]string `json:"parameters,omitempty"`
+	// Additional configuration parameters for the service instance, as arbitrary JSON. Some services support updating configuration parameters.
+	Parameters map[string]interface{} `json:"parameters,omitempty"`
 	// The ID of the service plan for the service instance to update.
 	ServicePlanId *string `json:"service_plan_id,omitempty"`
+	// share or un-share service instance.
+	Shared *bool `json:"shared,omitempty"`
 }
 
 // NewUpdateServiceInstanceRequestPayload instantiates a new UpdateServiceInstanceRequestPayload object
@@ -111,19 +113,19 @@ func (o *UpdateServiceInstanceRequestPayload) SetName(v string) {
 }
 
 // GetParameters returns the Parameters field value if set, zero value otherwise.
-func (o *UpdateServiceInstanceRequestPayload) GetParameters() map[string]string {
+func (o *UpdateServiceInstanceRequestPayload) GetParameters() map[string]interface{} {
 	if o == nil || IsNil(o.Parameters) {
-		var ret map[string]string
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Parameters
+	return o.Parameters
 }
 
 // GetParametersOk returns a tuple with the Parameters field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UpdateServiceInstanceRequestPayload) GetParametersOk() (*map[string]string, bool) {
+func (o *UpdateServiceInstanceRequestPayload) GetParametersOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Parameters) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Parameters, true
 }
@@ -137,9 +139,9 @@ func (o *UpdateServiceInstanceRequestPayload) HasParameters() bool {
 	return false
 }
 
-// SetParameters gets a reference to the given map[string]string and assigns it to the Parameters field.
-func (o *UpdateServiceInstanceRequestPayload) SetParameters(v map[string]string) {
-	o.Parameters = &v
+// SetParameters gets a reference to the given map[string]interface{} and assigns it to the Parameters field.
+func (o *UpdateServiceInstanceRequestPayload) SetParameters(v map[string]interface{}) {
+	o.Parameters = v
 }
 
 // GetServicePlanId returns the ServicePlanId field value if set, zero value otherwise.
@@ -174,6 +176,38 @@ func (o *UpdateServiceInstanceRequestPayload) SetServicePlanId(v string) {
 	o.ServicePlanId = &v
 }
 
+// GetShared returns the Shared field value if set, zero value otherwise.
+func (o *UpdateServiceInstanceRequestPayload) GetShared() bool {
+	if o == nil || IsNil(o.Shared) {
+		var ret bool
+		return ret
+	}
+	return *o.Shared
+}
+
+// GetSharedOk returns a tuple with the Shared field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *UpdateServiceInstanceRequestPayload) GetSharedOk() (*bool, bool) {
+	if o == nil || IsNil(o.Shared) {
+		return nil, false
+	}
+	return o.Shared, true
+}
+
+// HasShared returns a boolean if a field has been set.
+func (o *UpdateServiceInstanceRequestPayload) HasShared() bool {
+	if o != nil && !IsNil(o.Shared) {
+		return true
+	}
+
+	return false
+}
+
+// SetShared gets a reference to the given bool and assigns it to the Shared field.
+func (o *UpdateServiceInstanceRequestPayload) SetShared(v bool) {
+	o.Shared = &v
+}
+
 func (o UpdateServiceInstanceRequestPayload) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -195,6 +229,9 @@ func (o UpdateServiceInstanceRequestPayload) ToMap() (map[string]interface{}, er
 	}
 	if !IsNil(o.ServicePlanId) {
 		toSerialize["service_plan_id"] = o.ServicePlanId
+	}
+	if !IsNil(o.Shared) {
+		toSerialize["shared"] = o.Shared
 	}
 	return toSerialize, nil
 }

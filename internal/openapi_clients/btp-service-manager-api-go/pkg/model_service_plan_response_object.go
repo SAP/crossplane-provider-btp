@@ -300,7 +300,7 @@ func (o *ServicePlanResponseObject) GetMetadata() map[string]interface{} {
 // and a boolean to check if the value has been set.
 func (o *ServicePlanResponseObject) GetMetadataOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Metadata) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Metadata, true
 }

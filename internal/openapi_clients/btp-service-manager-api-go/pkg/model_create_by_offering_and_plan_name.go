@@ -25,8 +25,8 @@ type CreateByOfferingAndPlanName struct {
 	Labels *map[string][]string `json:"labels,omitempty"`
 	// The name of the new service instance.<br/> Can't be an empty object.
 	Name string `json:"name"`
-	// Some services support providing of additional configuration parameters during instance creation.<br>Pass these parameters as key-value pairs.<br> For the list of supported configuration parameters, see the documentation of a particular service offering.<br> You can also use the *GET /v1/service_instances/{serviceInstanceID}/parameters* API later to view the parameters defined during this step.
-	Parameters *map[string]string `json:"parameters,omitempty"`
+	// Additional configuration parameters for the service instance, as arbitrary JSON. Some services support providing configuration parameters during instance creation.
+	Parameters map[string]interface{} `json:"parameters,omitempty"`
 	// The name of the service offering to use for the service instance.
 	ServiceOfferingName string `json:"service_offering_name"`
 	// The name of the service plan to use for the service instance.
@@ -112,19 +112,19 @@ func (o *CreateByOfferingAndPlanName) SetName(v string) {
 }
 
 // GetParameters returns the Parameters field value if set, zero value otherwise.
-func (o *CreateByOfferingAndPlanName) GetParameters() map[string]string {
+func (o *CreateByOfferingAndPlanName) GetParameters() map[string]interface{} {
 	if o == nil || IsNil(o.Parameters) {
-		var ret map[string]string
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Parameters
+	return o.Parameters
 }
 
 // GetParametersOk returns a tuple with the Parameters field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CreateByOfferingAndPlanName) GetParametersOk() (*map[string]string, bool) {
+func (o *CreateByOfferingAndPlanName) GetParametersOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Parameters) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Parameters, true
 }
@@ -138,9 +138,9 @@ func (o *CreateByOfferingAndPlanName) HasParameters() bool {
 	return false
 }
 
-// SetParameters gets a reference to the given map[string]string and assigns it to the Parameters field.
-func (o *CreateByOfferingAndPlanName) SetParameters(v map[string]string) {
-	o.Parameters = &v
+// SetParameters gets a reference to the given map[string]interface{} and assigns it to the Parameters field.
+func (o *CreateByOfferingAndPlanName) SetParameters(v map[string]interface{}) {
+	o.Parameters = v
 }
 
 // GetServiceOfferingName returns the ServiceOfferingName field value

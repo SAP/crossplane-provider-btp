@@ -54,7 +54,7 @@ type ServiceInstancesAPI interface {
 	/*
 	GetAllServiceInstances Get all service instances
 
-	View the list of all service instances in the subaccount. <br/><br/> Required scopes: <xsappname>.subaccount.service_instance.read
+	View the list of all service instances in the subaccount. The list includes environment-specific instances, such as Cloud Foundry or Kubernetes instances, and environment-agnostic instances.<br/><br/> Required scopes: <xsappname>.subaccount.service_instance.read
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiGetAllServiceInstancesRequest
@@ -92,13 +92,13 @@ type ServiceInstancesAPI interface {
 	GetServiceInstanceParameters(ctx context.Context, serviceInstanceID string) ApiGetServiceInstanceParametersRequest
 
 	// GetServiceInstanceParametersExecute executes the request
-	//  @return map[string]string
-	GetServiceInstanceParametersExecute(r ApiGetServiceInstanceParametersRequest) (map[string]string, *http.Response, error)
+	//  @return map[string]interface{}
+	GetServiceInstanceParametersExecute(r ApiGetServiceInstanceParametersRequest) (map[string]interface{}, *http.Response, error)
 
 	/*
 	UpdateServiceInstance Update a service instance
 
-	Update details of a specified provisioned service instance. <br/><br/>Required scopes: <xsappname>.subaccount.service_instance.manage
+	Update details of a specified provisioned service instance.<br/>**Note**<br/>When sharing or unsharing an instance, you must pass the "shareable" boolean alone in the request body. Updating any other parameters together with the "shareable" parameter returns an error.<br/><br/>Required scopes: <xsappname>.subaccount.service_instance.manage
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param serviceInstanceID The ID of the provisioned service instance to update.
@@ -431,6 +431,17 @@ func (a *ServiceInstancesAPIService) DeleteServiceInstanceExecute(r ApiDeleteSer
 					newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v Error
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
 		if localVarHTTPResponse.StatusCode == 404 {
 			var v Error
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -540,7 +551,7 @@ func (r ApiGetAllServiceInstancesRequest) Execute() (*ServiceInstanceResponseLis
 /*
 GetAllServiceInstances Get all service instances
 
-View the list of all service instances in the subaccount. <br/><br/> Required scopes: <xsappname>.subaccount.service_instance.read
+View the list of all service instances in the subaccount. The list includes environment-specific instances, such as Cloud Foundry or Kubernetes instances, and environment-agnostic instances.<br/><br/> Required scopes: <xsappname>.subaccount.service_instance.read
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @return ApiGetAllServiceInstancesRequest
@@ -834,7 +845,7 @@ type ApiGetServiceInstanceParametersRequest struct {
 	serviceInstanceID string
 }
 
-func (r ApiGetServiceInstanceParametersRequest) Execute() (map[string]string, *http.Response, error) {
+func (r ApiGetServiceInstanceParametersRequest) Execute() (map[string]interface{}, *http.Response, error) {
 	return r.ApiService.GetServiceInstanceParametersExecute(r)
 }
 
@@ -856,13 +867,13 @@ func (a *ServiceInstancesAPIService) GetServiceInstanceParameters(ctx context.Co
 }
 
 // Execute executes the request
-//  @return map[string]string
-func (a *ServiceInstancesAPIService) GetServiceInstanceParametersExecute(r ApiGetServiceInstanceParametersRequest) (map[string]string, *http.Response, error) {
+//  @return map[string]interface{}
+func (a *ServiceInstancesAPIService) GetServiceInstanceParametersExecute(r ApiGetServiceInstanceParametersRequest) (map[string]interface{}, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  map[string]string
+		localVarReturnValue  map[string]interface{}
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ServiceInstancesAPIService.GetServiceInstanceParameters")
@@ -1023,7 +1034,7 @@ func (r ApiUpdateServiceInstanceRequest) Execute() (*UpdatedServiceInstanceRespo
 /*
 UpdateServiceInstance Update a service instance
 
-Update details of a specified provisioned service instance. <br/><br/>Required scopes: <xsappname>.subaccount.service_instance.manage
+Update details of a specified provisioned service instance.<br/>**Note**<br/>When sharing or unsharing an instance, you must pass the "shareable" boolean alone in the request body. Updating any other parameters together with the "shareable" parameter returns an error.<br/><br/>Required scopes: <xsappname>.subaccount.service_instance.manage
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param serviceInstanceID The ID of the provisioned service instance to update.
@@ -1118,6 +1129,17 @@ func (a *ServiceInstancesAPIService) UpdateServiceInstanceExecute(r ApiUpdateSer
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 401 {
+			var v Error
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
 			var v Error
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {

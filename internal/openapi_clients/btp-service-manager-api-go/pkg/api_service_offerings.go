@@ -200,7 +200,7 @@ type ApiGetServiceOfferingsRequest struct {
 	maxItems *int32
 }
 
-// Use this parameter to specify the environment for which you want to list service offerings. Valid values: [btp, kubernetes, cloudfoundry]. &lt;br/&gt;If left empty, service offerings associated with btp (Service Manager instances on a subaccount level) are returned.
+// Use this parameter to specify the environment for which you want to list service offerings. Valid values: [sapbtp, kubernetes, cloudfoundry]. &lt;br/&gt;If left empty, service offerings associated with sapbtp (Service Manager instances on a subaccount level) are returned.
 func (r ApiGetServiceOfferingsRequest) Environment(environment string) ApiGetServiceOfferingsRequest {
 	r.environment = &environment
 	return r

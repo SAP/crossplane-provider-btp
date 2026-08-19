@@ -45,9 +45,7 @@ tags:
     \ applications and services are hosted. <br/> With the SAP Service Manager, you\
     \ can now register your platform and enable it to consume the SAP BTP services\
     \ from your native environment. <br/> This registration results in a returned\
-    \ set of credentials that are needed to deploy the SAP Service Manager agent.<br/>\
-    \ For more information, visit our <a href=\"https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/20195bf3b6e64189966e08f669c275e1.html\"\
-    >SAP Help Portal</a>. <br/> "
+    \ set of credentials that are needed to deploy the SAP Service Manager agent.<br/>"
   name: Platforms
 - description: "Service Brokers<br/> Service brokers act as brokers between the SAP\
     \ Service Manager and a platform’s marketplace to advertise catalogues of service\
@@ -179,7 +177,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get all platforms
       tags:
       - Platforms
@@ -227,7 +237,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Register a platform
       tags:
       - Platforms
@@ -322,7 +344,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Unregister a platform
       tags:
       - Platforms
@@ -375,7 +409,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get platform details
       tags:
       - Platforms
@@ -448,7 +494,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Update a platform
       tags:
       - Platforms
@@ -531,7 +589,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 6,000 requests per hour or 600 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get all service bindings
       tags:
       - Service Bindings
@@ -615,7 +685,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 6,000 requests per hour or 600 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Create a service binding
       tags:
       - Service Bindings
@@ -670,6 +752,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Forbidden
         "404":
           content:
             application/json:
@@ -700,7 +788,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 6,000 requests per hour or 600 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Delete a service binding
       tags:
       - Service Bindings
@@ -747,7 +847,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 6,000 requests per hour or 600 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get service binding details
       tags:
       - Service Bindings
@@ -802,7 +914,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 6,000 requests per hour or 600 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
         "502":
           content:
             application/json:
@@ -891,7 +1015,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get all service brokers
       tags:
       - Service Brokers
@@ -939,14 +1075,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get service broker details.
       tags:
       - Service Brokers
   /v1/service_instances:
     get:
-      description: "View the list of all service instances in the subaccount. <br/><br/>\
-        \ Required scopes: <xsappname>.subaccount.service_instance.read"
+      description: "View the list of all service instances in the subaccount. The\
+        \ list includes environment-specific instances, such as Cloud Foundry or Kubernetes\
+        \ instances, and environment-agnostic instances.<br/><br/> Required scopes:\
+        \ <xsappname>.subaccount.service_instance.read"
       operationId: getAllServiceInstances
       parameters:
       - description: "Filters the response based on the field query. <br> If used,\
@@ -1022,7 +1172,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests allowed per hour or 1,000 requests per minute are\
+            \ allowed for the GET '/v1/service_instances' API.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get all service instances
       tags:
       - Service Instances
@@ -1049,12 +1211,36 @@ paths:
             examples:
               CreateByOfferingAndPlanName:
                 value:
+                  labels:
+                    label1:
+                    - value1
+                    - value2
+                    - value3
+                    label2:
+                    - value1
+                    - value2
+                    - value3
                   name: my-service-instance
+                  parameters:
+                    parameter1: value1
+                    parameter2: value2
                   service_offering_name: service-offering-name
                   service_plan_name: service-plan-name
               CreateByPlanID:
                 value:
+                  labels:
+                    label1:
+                    - value1
+                    - value2
+                    - value3
+                    label2:
+                    - value1
+                    - value2
+                    - value3
                   name: my-service-instance
+                  parameters:
+                    parameter1: value1
+                    parameter2: value2
                   service_plan_id: fd1fdfd8-4891-8d91-46334e04600d
             schema:
               $ref: '#/components/schemas/CreateServiceInstanceRequestPayload'
@@ -1126,7 +1312,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 50 requests per minute are allowed for the POST '/v1/service_instances'\
+            \ API.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Create a service instance
       tags:
       - Service Instances
@@ -1187,6 +1385,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Forbidden
         "404":
           content:
             application/json:
@@ -1217,7 +1421,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 6,000 requests allowed per hour or 600 requests per minute are allowed\
+            \ for the DELETE '/v1/service_instances' API.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Delete a service instance
       tags:
       - Service Instances
@@ -1270,13 +1486,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests allowed per hour or 1,000 requests per minute are\
+            \ allowed for the GET '/v1/service_instances' API.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get service instance details
       tags:
       - Service Instances
     patch:
-      description: "Update details of a specified provisioned service instance. <br/><br/>Required\
-        \ scopes: <xsappname>.subaccount.service_instance.manage"
+      description: "Update details of a specified provisioned service instance.<br/>**Note**<br/>When\
+        \ sharing or unsharing an instance, you must pass the \"shareable\" boolean\
+        \ alone in the request body. Updating any other parameters together with the\
+        \ \"shareable\" parameter returns an error.<br/><br/>Required scopes: <xsappname>.subaccount.service_instance.manage"
       operationId: updateServiceInstance
       parameters:
       - description: The ID of the provisioned service instance to update.
@@ -1299,6 +1529,22 @@ paths:
       requestBody:
         content:
           application/json:
+            examples:
+              UnShareInstance:
+                value:
+                  shared: "false"
+              shareInstance:
+                value:
+                  shared: "true"
+              updateServiceInstanceDetails:
+                value:
+                  name: newName
+                  service_plan_id: new_plan_id
+              updateServiceInstanceParameters:
+                value:
+                  parameters:
+                    parameter1: value1
+                    parameter2: value2
             schema:
               $ref: '#/components/schemas/UpdateServiceInstanceRequestPayload'
         description: Details of the service instance to update.
@@ -1337,6 +1583,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Unauthorized
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Forbidden
         "404":
           content:
             application/json:
@@ -1360,7 +1612,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 6,000 requests allowed per hour or 600 requests per minute are allowed\
+            \ for the PATCH '/v1/service_instances' API.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Update a service instance
       tags:
       - Service Instances
@@ -1390,13 +1654,8 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties:
-                  type: string
-                description: parameters
-                example:
-                  allowedConnections: 100
-                  billing-account: abcde12345
-                  supportExternalConnectivity: true
+                description: "The configuration parameters of the service instance,\
+                  \ as arbitrary JSON."
                 type: object
           description: Found the configuration parameters of the service instance
         "400":
@@ -1428,7 +1687,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
         "502":
           content:
             application/json:
@@ -1445,9 +1716,9 @@ paths:
       operationId: getServiceOfferings
       parameters:
       - description: "Use this parameter to specify the environment for which you\
-          \ want to list service offerings. Valid values: [btp, kubernetes, cloudfoundry].\
-          \ <br/>If left empty, service offerings associated with btp (Service Manager\
-          \ instances on a subaccount level) are returned."
+          \ want to list service offerings. Valid values: [sapbtp, kubernetes, cloudfoundry].\
+          \ <br/>If left empty, service offerings associated with sapbtp (Service\
+          \ Manager instances on a subaccount level) are returned."
         explode: true
         in: query
         name: environment
@@ -1528,7 +1799,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 1,000 requests per hour or 100 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get all service offerings
       tags:
       - Service Offerings
@@ -1570,7 +1853,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 1,000 requests per hour or 100 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get service offering details
       tags:
       - Service Offerings
@@ -1580,8 +1875,8 @@ paths:
       operationId: getAllServicePlans
       parameters:
       - description: "Use this parameter to specify the environment for which you\
-          \ want to list service plans. Valid values: [btp, kubernetes, cloudfoundry].\
-          \ <br/>If left empty, service plans associated with btp (Service Manager\
+          \ want to list service plans. Valid values: [sapbtp, kubernetes, cloudfoundry].\
+          \ <br/>If left empty, service plans associated with sapbtp (Service Manager\
           \ instances on a subaccount level) are returned."
         explode: true
         in: query
@@ -1669,7 +1964,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 1,000 requests per hour or 100 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get service plans
       tags:
       - Service Plans
@@ -1717,7 +2024,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 1,000 requests per hour or 100 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get service plan details
       tags:
       - Service Plans
@@ -1792,7 +2111,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Too Many Requests
+          description: "Too Many Requests<br>When the rate limit is exceeded, the\
+            \ client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total\
+            \ of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a\
+            \ href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\"\
+            \ target=\"_blank\">For more information, see Rate Limiting.</a>"
+          headers:
+            Retry-After:
+              description: The 'Retry-After' response header indicates how long a
+                service is expected to be unavailable. In the HTTP-Date format.
+              explode: false
+              schema:
+                type: string
+              style: simple
       summary: Get operation status
       tags:
       - Operations
@@ -1863,17 +2194,9 @@ components:
           example: my-service-instance
           type: string
         parameters:
-          additionalProperties:
-            type: string
-          description: "Some services support providing of additional configuration\
-            \ parameters during instance creation.<br>Pass these parameters as key-value\
-            \ pairs.<br> For the list of supported configuration parameters, see the\
-            \ documentation of a particular service offering.<br> You can also use\
-            \ the *GET /v1/service_instances/{serviceInstanceID}/parameters* API later\
-            \ to view the parameters defined during this step."
-          example:
-            parameter1: value1
-            parameter2: value2
+          description: "Additional configuration parameters for the service instance,\
+            \ as arbitrary JSON. Some services support providing configuration parameters\
+            \ during instance creation."
           type: object
         service_offering_name:
           description: The name of the service offering to use for the service instance.
@@ -1892,9 +2215,7 @@ components:
       example:
         name: my-service-instance
         service_plan_id: fd1fdfd8-4891-8d91-46334e04600d
-        parameters:
-          parameter1: value1
-          parameter2: value2
+        parameters: "{}"
         labels:
           label1:
           - value1
@@ -1928,17 +2249,9 @@ components:
           example: my-service-instance
           type: string
         parameters:
-          additionalProperties:
-            type: string
-          description: "Some services support providing of additional configuration\
-            \ parameters during instance creation.<br>Pass these parameters as key-value\
-            \ pairs.<br> For the list of supported configuration parameters, see the\
-            \ documentation of a particular service offering.<br> You can also use\
-            \ the *GET /v1/service_instances/{serviceInstanceID}/parameters* API later\
-            \ to view the parameters defined during this step."
-          example:
-            parameter1: value1
-            parameter2: value2
+          description: "Additional configuration parameters for the service instance,\
+            \ as arbitrary JSON. Some services support providing configuration parameters\
+            \ during instance creation."
           type: object
         service_plan_id:
           description: The ID of the service plan to use for the service instance.
@@ -2062,8 +2375,6 @@ components:
             space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
           type: object
         context:
-          additionalProperties:
-            type: string
           description: Contextual data for the resource.
           example:
             account: my-account
@@ -2141,8 +2452,6 @@ components:
         dashboard_url: http://my-service-dashboard.com
       properties:
         context:
-          additionalProperties:
-            type: string
           description: Contextual data for the resource.
           example:
             account: my-account
@@ -2213,7 +2522,7 @@ components:
           type: boolean
       type: object
     Credentials:
-      description: Credentials to  authenticate with the SAP Service Manager.
+      description: Credentials to authenticate with the SAP Service Manager.
       example:
         basic:
           password: password
@@ -2226,8 +2535,15 @@ components:
       description: A response object that contains details about the error.
       example:
         description: description
+        broker_error:
+          Description: Description
+          ResponseError: ResponseError
+          ErrorMessage: ErrorMessage
+          StatusCode: 0
         error: error
       properties:
+        broker_error:
+          $ref: '#/components/schemas/Error_broker_error'
         description:
           description: The description of the error.
           type: string
@@ -2357,12 +2673,14 @@ components:
         context:
           account: my-account
         name: my-service-binding
+        updated_by: updated_by
         created_at: 2000-01-23T04:56:07.000+00:00
         bind_resource:
           app_guid: 5e76c9bf-d5e3-46bf-9877-6d8dddfc8a45
           space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
         id: my-service-binding-123-id
         service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
+        created_by: created_by
         labels:
           label1:
           - value1
@@ -2382,8 +2700,6 @@ components:
             space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
           type: object
         context:
-          additionalProperties:
-            type: string
           description: Contextual data for the resource.
           example:
             account: my-account
@@ -2392,6 +2708,12 @@ components:
           description: The time the binding was created.<br/>In ISO 8601 format:</br>
             YYYY-MM-DDThh:mm:ssTZD
           format: date-time
+          type: string
+        created_by:
+          description: "The user that created this service binding.<br>If the binding\
+            \ was created programmatically (for example, by the SM API), this may\
+            \ be a client ID.<br>For Cloud Foundry or Kubernetes bindings, this is\
+            \ the user ID as defined by that environment's user management system."
           type: string
         credentials:
           description: Credentials to access the binding.
@@ -2431,6 +2753,12 @@ components:
         updated_at:
           description: The last time the binding was updated.<br/> In ISO 8601 format.
           format: date-time
+          type: string
+        updated_by:
+          description: "The user that last updated this service binding.<br>If the\
+            \ binding was created programmatically (for example, by the SM API), this\
+            \ may be a client ID.<br>For Cloud Foundry or Kubernetes bindings, this\
+            \ is the user ID as defined by that environment's user management system.<br/>"
           type: string
       type: object
     ListedServiceBrokerResponseObject:
@@ -2506,6 +2834,7 @@ components:
       example:
         shared: true
         created_at: 2000-01-23T04:56:07.000+00:00
+        created_by: created_by
         labels:
           label1:
           - value1
@@ -2527,12 +2856,11 @@ components:
         name: my-service-instance
         platform_id: platform_id
         service_plan_id: service_plan_id
+        updated_by: updated_by
         id: my-service-instance-123-id
         dashboard_url: http://my-service-dashboard.com
       properties:
         context:
-          additionalProperties:
-            type: string
           description: Contextual data for the resource.
           example:
             account: my-account
@@ -2541,6 +2869,12 @@ components:
           description: The time the service instance was created.<br/>In ISO 8601
             format:</br> YYYY-MM-DDThh:mm:ssTZD
           format: date-time
+          type: string
+        created_by:
+          description: "The user that created this service instance.<br>If the instance\
+            \ was created programmatically (for example, by the SM API), this may\
+            \ be a client ID.<br>For Cloud Foundry or Kubernetes instances, this is\
+            \ the user ID as defined by that environment's user management system."
           type: string
         dashboard_url:
           description: The URL of the web-based management UI for the service instance.
@@ -2599,6 +2933,13 @@ components:
             8601 format.
           format: date-time
           type: string
+        updated_by:
+          description: "The user that last updated this service instance.<br>If the\
+            \ instance or binding was created programmatically (for example, by the\
+            \ SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes\
+            \ instances, this is the user ID as defined by that environment's user\
+            \ management system.<br/>"
+          type: string
         usable:
           description: Whether the service instance can be used.
           type: boolean
@@ -2637,9 +2978,12 @@ components:
         id: dsdssd498da96-e5f3-4402-8
         state: in progress
         errors:
-        - description: description
-          error: error
-        - description: description
+          description: description
+          broker_error:
+            Description: Description
+            ResponseError: ResponseError
+            ErrorMessage: ErrorMessage
+            StatusCode: 0
           error: error
       properties:
         correlation_id:
@@ -2659,10 +3003,7 @@ components:
           description: Details about the operation for customer-facing UI.
           type: string
         errors:
-          description: The list of the errors if the operation has failed.
-          items:
-            $ref: '#/components/schemas/Error'
-          type: array
+          $ref: '#/components/schemas/OperationResponseObject_errors'
         id:
           description: The ID of the operation.
           example: dsdssd498da96-e5f3-4402-8
@@ -2829,9 +3170,12 @@ components:
           id: dsdssd498da96-e5f3-4402-8
           state: in progress
           errors:
-          - description: description
-            error: error
-          - description: description
+            description: description
+            broker_error:
+              Description: Description
+              ResponseError: ResponseError
+              ErrorMessage: ErrorMessage
+              StatusCode: 0
             error: error
         labels:
           label1:
@@ -3033,12 +3377,14 @@ components:
           context:
             account: my-account
           name: my-service-binding
+          updated_by: updated_by
           created_at: 2000-01-23T04:56:07.000+00:00
           bind_resource:
             app_guid: 5e76c9bf-d5e3-46bf-9877-6d8dddfc8a45
             space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
           id: my-service-binding-123-id
           service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
+          created_by: created_by
           labels:
             label1:
             - value1
@@ -3054,12 +3400,14 @@ components:
           context:
             account: my-account
           name: my-service-binding
+          updated_by: updated_by
           created_at: 2000-01-23T04:56:07.000+00:00
           bind_resource:
             app_guid: 5e76c9bf-d5e3-46bf-9877-6d8dddfc8a45
             space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
           id: my-service-binding-123-id
           service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
+          created_by: created_by
           labels:
             label1:
             - value1
@@ -3094,18 +3442,29 @@ components:
       type: object
     ServiceBindingResponseObject:
       example:
-        updated_at: 2000-01-23T04:56:07.000+00:00
         credentials: "{}"
+        created_at: 2000-01-23T04:56:07.000+00:00
+        service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
+        created_by: created_by
+        labels:
+          label1:
+          - value1
+          - value2
+          - value3
+          label2:
+          - value1
+          - value2
+          - value3
+        updated_at: 2000-01-23T04:56:07.000+00:00
         ready: true
         context:
           account: my-account
         name: my-service-binding
-        created_at: 2000-01-23T04:56:07.000+00:00
+        updated_by: updated_by
         bind_resource:
           app_guid: 5e76c9bf-d5e3-46bf-9877-6d8dddfc8a45
           space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
         id: my-service-binding-123-id
-        service_instance_id: asd124bc21-df28-4891-8d91-46334e04600d
         last_operation:
           resource_type: resource_type
           created_at: 2000-01-23T04:56:07.000+00:00
@@ -3139,19 +3498,13 @@ components:
           id: dsdssd498da96-e5f3-4402-8
           state: in progress
           errors:
-          - description: description
+            description: description
+            broker_error:
+              Description: Description
+              ResponseError: ResponseError
+              ErrorMessage: ErrorMessage
+              StatusCode: 0
             error: error
-          - description: description
-            error: error
-        labels:
-          label1:
-          - value1
-          - value2
-          - value3
-          label2:
-          - value1
-          - value2
-          - value3
       properties:
         bind_resource:
           additionalProperties:
@@ -3162,8 +3515,6 @@ components:
             space_guid: 15823972-c216-4ba5-9f3f-e75b0b891297
           type: object
         context:
-          additionalProperties:
-            type: string
           description: Contextual data for the resource.
           example:
             account: my-account
@@ -3172,6 +3523,12 @@ components:
           description: The time the binding was created.<br/>In ISO 8601 format:</br>
             YYYY-MM-DDThh:mm:ssTZD
           format: date-time
+          type: string
+        created_by:
+          description: "The user that created this service binding.<br>If the binding\
+            \ was created programmatically (for example, by the SM API), this may\
+            \ be a client ID.<br>For Cloud Foundry or Kubernetes bindings, this is\
+            \ the user ID as defined by that environment's user management system."
           type: string
         credentials:
           description: Credentials to access the binding.
@@ -3213,6 +3570,12 @@ components:
         updated_at:
           description: The last time the binding was updated.<br/> In ISO 8601 format.
           format: date-time
+          type: string
+        updated_by:
+          description: "The user that last updated this service binding.<br>If the\
+            \ binding was created programmatically (for example, by the SM API), this\
+            \ may be a client ID.<br>For Cloud Foundry or Kubernetes bindings, this\
+            \ is the user ID as defined by that environment's user management system.<br/>"
           type: string
       type: object
     ServiceBrokerResponseList:
@@ -3316,9 +3679,12 @@ components:
           id: dsdssd498da96-e5f3-4402-8
           state: in progress
           errors:
-          - description: description
-            error: error
-          - description: description
+            description: description
+            broker_error:
+              Description: Description
+              ResponseError: ResponseError
+              ErrorMessage: ErrorMessage
+              StatusCode: 0
             error: error
         labels:
           label1:
@@ -3388,6 +3754,7 @@ components:
         items:
         - shared: true
           created_at: 2000-01-23T04:56:07.000+00:00
+          created_by: created_by
           labels:
             label1:
             - value1
@@ -3409,10 +3776,12 @@ components:
           name: my-service-instance
           platform_id: platform_id
           service_plan_id: service_plan_id
+          updated_by: updated_by
           id: my-service-instance-123-id
           dashboard_url: http://my-service-dashboard.com
         - shared: true
           created_at: 2000-01-23T04:56:07.000+00:00
+          created_by: created_by
           labels:
             label1:
             - value1
@@ -3434,6 +3803,7 @@ components:
           name: my-service-instance
           platform_id: platform_id
           service_plan_id: service_plan_id
+          updated_by: updated_by
           id: my-service-instance-123-id
           dashboard_url: http://my-service-dashboard.com
         token: wcxdX
@@ -3463,6 +3833,7 @@ components:
       example:
         shared: true
         created_at: 2000-01-23T04:56:07.000+00:00
+        created_by: created_by
         labels:
           label1:
           - value1
@@ -3483,6 +3854,7 @@ components:
         name: my-service-instance
         platform_id: platform_id
         service_plan_id: service_plan_id
+        updated_by: updated_by
         id: my-service-instance-123-id
         dashboard_url: http://my-service-dashboard.com
         last_operation:
@@ -3518,14 +3890,15 @@ components:
           id: dsdssd498da96-e5f3-4402-8
           state: in progress
           errors:
-          - description: description
-            error: error
-          - description: description
+            description: description
+            broker_error:
+              Description: Description
+              ResponseError: ResponseError
+              ErrorMessage: ErrorMessage
+              StatusCode: 0
             error: error
       properties:
         context:
-          additionalProperties:
-            type: string
           description: Contextual data for the resource.
           example:
             account: my-account
@@ -3534,6 +3907,12 @@ components:
           description: The time the resource was created. <br/>In ISO 8601 format:</br>
             YYYY-MM-DDThh:mm:ssTZD
           format: date-time
+          type: string
+        created_by:
+          description: "The user that created this service instance.<br>If the instance\
+            \ was created programmatically (for example, by the SM API), this may\
+            \ be a client ID.<br>For Cloud Foundry or Kubernetes instances, this is\
+            \ the user ID as defined by that environment's user management system."
           type: string
         dashboard_url:
           description: "The URL of a web-based management user interface for the service\
@@ -3591,6 +3970,13 @@ components:
         updated_at:
           description: The last time the resource was updated. <br/> In ISO 8601 format.
           format: date-time
+          type: string
+        updated_by:
+          description: "The user that last updated this service instance.<br>If the\
+            \ instance was created programmatically (for example, by the SM API),\
+            \ this may be a client ID.<br>For Cloud Foundry or Kubernetes instances,\
+            \ this is the user ID as defined by that environment's user management\
+            \ system.<br/>"
           type: string
         usable:
           description: Wheher the resource can be used.
@@ -3729,10 +4115,11 @@ components:
             be retrieved.
           type: boolean
         broker_id:
-          description: The ID of the broker that provides the service plan.
+          description: The ID of the broker that provides the service offering.
           type: string
         catalog_id:
-          description: The ID of the service offering as provided by the catalog.
+          description: The ID of the offering as provided in the broker catalog. This
+            ID is used when Service Manager communicates with the service broker.
           type: string
         catalog_name:
           description: The catalog name of the service offering.
@@ -3746,7 +4133,10 @@ components:
           description: The description of the service offering.
           type: string
         id:
-          description: The ID of the service offering.
+          description: "The ID of the service offering, automatically generated by\
+            \ the Service Manager. This is the ID by which the offering is identified\
+            \ in the Service Manager database and which is used by the Service Manager\
+            \ API."
           example: my-service-offering-123-id
           type: string
         instances_retrievable:
@@ -3778,12 +4168,6 @@ components:
           type: string
       type: object
     ServicePlanMetadata:
-      example:
-        supportedMaxOSBVersion: "2.14"
-        supportedMinOSBVersion: "2.11"
-        supportedPlatforms:
-        - kubernetes
-        - kubernetes
       properties:
         supportedMaxOSBVersion:
           description: The latest supported OSB version.
@@ -3799,6 +4183,7 @@ components:
             enum:
             - kubernetes
             - cloudfoundry
+            - sapbtp
             type: string
           type: array
       type: object
@@ -3809,12 +4194,7 @@ components:
         - catalog_id: id1234
           bindable: true
           catalog_name: name1
-          metadata:
-            supportedMaxOSBVersion: "2.14"
-            supportedMinOSBVersion: "2.11"
-            supportedPlatforms:
-            - kubernetes
-            - kubernetes
+          metadata: "{}"
           updated_at: 2000-01-23T04:56:07.000+00:00
           ready: true
           name: my-service-plan
@@ -3826,12 +4206,7 @@ components:
         - catalog_id: id1234
           bindable: true
           catalog_name: name1
-          metadata:
-            supportedMaxOSBVersion: "2.14"
-            supportedMinOSBVersion: "2.11"
-            supportedPlatforms:
-            - kubernetes
-            - kubernetes
+          metadata: "{}"
           updated_at: 2000-01-23T04:56:07.000+00:00
           ready: true
           name: my-service-plan
@@ -3868,12 +4243,7 @@ components:
         catalog_id: id1234
         bindable: true
         catalog_name: name1
-        metadata:
-          supportedMaxOSBVersion: "2.14"
-          supportedMinOSBVersion: "2.11"
-          supportedPlatforms:
-          - kubernetes
-          - kubernetes
+        metadata: "{}"
         updated_at: 2000-01-23T04:56:07.000+00:00
         ready: true
         name: my-service-plan
@@ -3911,7 +4281,8 @@ components:
           example: my-service-plan-123-id
           type: string
         metadata:
-          $ref: '#/components/schemas/ServicePlanMetadata'
+          description: The metadata associated with the service plan.
+          type: object
         name:
           description: The name of the service plan.
           example: my-service-plan
@@ -4006,11 +4377,10 @@ components:
       type: object
     UpdateServiceInstanceRequestPayload:
       example:
+        shared: true
         name: my-service-instance
         service_plan_id: dsdsdsadsa98898890dasdsa
-        parameters:
-          parameter1: value1
-          parameter2: value2
+        parameters: "{}"
         labels:
         - op: add
           values:
@@ -4033,21 +4403,17 @@ components:
           example: my-service-instance
           type: string
         parameters:
-          additionalProperties:
-            type: string
-          description: "Some services support providing of additional configuration\
-            \ parameters during instance creation.<br>You can update these parameters.<br>For\
-            \ the list of supported configuration parameters, see the documentation\
-            \ of a particular service offering.<br>You can also use the *GET /v1/service_instances/{serviceInstanceID}/parameters*\
-            \ API later to view the parameters defined during this step."
-          example:
-            parameter1: value1
-            parameter2: value2
+          description: "Additional configuration parameters for the service instance,\
+            \ as arbitrary JSON. Some services support updating configuration parameters."
           type: object
         service_plan_id:
           description: The ID of the service plan for the service instance to update.
           example: dsdsdsadsa98898890dasdsa
           type: string
+        shared:
+          description: share or un-share service instance.
+          example: true
+          type: boolean
       type: object
     UpdatedPlatformResponseObject:
       example:
@@ -4145,8 +4511,6 @@ components:
         dashboard_url: http://my-service-dashboard.com
       properties:
         context:
-          additionalProperties:
-            type: string
           description: Contextual data for the resource.
           example:
             account: my-account
@@ -4224,6 +4588,38 @@ components:
         username:
           type: string
       type: object
+    Error_broker_error:
+      description: The broker error
+      example:
+        Description: Description
+        ResponseError: ResponseError
+        ErrorMessage: ErrorMessage
+        StatusCode: 0
+      properties:
+        Description:
+          description: A human-readable description of the error that may be returned
+            by the broker.
+          type: string
+        ErrorMessage:
+          description: A machine-readable error string that may be returned by the
+            broker.
+          type: string
+        ResponseError:
+          description: ResponseError is set to the error that occurred when unmarshalling
+            a response body from the broker.
+          type: string
+        StatusCode:
+          description: The broker status code.
+          type: integer
+      type: object
+    OperationResponseObject_errors:
+      anyOf:
+      - $ref: '#/components/schemas/Error'
+      - description: A JSON object that contains details about one or more errors
+          if the operation has failed.
+        items:
+          $ref: '#/components/schemas/Error'
+        type: array
   securitySchemes:
     oAuth2ClientCredentials:
       description: To run the api you need to get a token.

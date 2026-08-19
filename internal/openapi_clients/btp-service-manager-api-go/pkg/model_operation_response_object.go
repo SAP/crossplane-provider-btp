@@ -28,8 +28,7 @@ type OperationResponseObject struct {
 	DeletionScheduled *time.Time `json:"deletion_scheduled,omitempty"`
 	// Details about the operation for customer-facing UI.
 	Description *string `json:"description,omitempty"`
-	// The list of the errors if the operation has failed.
-	Errors []Error `json:"errors,omitempty"`
+	Errors *OperationResponseObjectErrors `json:"errors,omitempty"`
 	// The ID of the operation.
 	Id *string `json:"id,omitempty"`
 	// Additional data associated with the resource entity. <br><br>Can be an empty object.
@@ -199,17 +198,17 @@ func (o *OperationResponseObject) SetDescription(v string) {
 }
 
 // GetErrors returns the Errors field value if set, zero value otherwise.
-func (o *OperationResponseObject) GetErrors() []Error {
+func (o *OperationResponseObject) GetErrors() OperationResponseObjectErrors {
 	if o == nil || IsNil(o.Errors) {
-		var ret []Error
+		var ret OperationResponseObjectErrors
 		return ret
 	}
-	return o.Errors
+	return *o.Errors
 }
 
 // GetErrorsOk returns a tuple with the Errors field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OperationResponseObject) GetErrorsOk() ([]Error, bool) {
+func (o *OperationResponseObject) GetErrorsOk() (*OperationResponseObjectErrors, bool) {
 	if o == nil || IsNil(o.Errors) {
 		return nil, false
 	}
@@ -225,9 +224,9 @@ func (o *OperationResponseObject) HasErrors() bool {
 	return false
 }
 
-// SetErrors gets a reference to the given []Error and assigns it to the Errors field.
-func (o *OperationResponseObject) SetErrors(v []Error) {
-	o.Errors = v
+// SetErrors gets a reference to the given OperationResponseObjectErrors and assigns it to the Errors field.
+func (o *OperationResponseObject) SetErrors(v OperationResponseObjectErrors) {
+	o.Errors = &v
 }
 
 // GetId returns the Id field value if set, zero value otherwise.

@@ -17,7 +17,7 @@ import (
 // checks if the Credentials type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &Credentials{}
 
-// Credentials Credentials to  authenticate with the SAP Service Manager.
+// Credentials Credentials to authenticate with the SAP Service Manager.
 type Credentials struct {
 	Basic *CredentialsBasic `json:"basic,omitempty"`
 }

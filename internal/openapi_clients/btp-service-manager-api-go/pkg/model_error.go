@@ -19,6 +19,7 @@ var _ MappedNullable = &Error{}
 
 // Error A response object that contains details about the error.
 type Error struct {
+	BrokerError *ErrorBrokerError `json:"broker_error,omitempty"`
 	// The description of the error.
 	Description *string `json:"description,omitempty"`
 	// The name of the error.
@@ -40,6 +41,38 @@ func NewError() *Error {
 func NewErrorWithDefaults() *Error {
 	this := Error{}
 	return &this
+}
+
+// GetBrokerError returns the BrokerError field value if set, zero value otherwise.
+func (o *Error) GetBrokerError() ErrorBrokerError {
+	if o == nil || IsNil(o.BrokerError) {
+		var ret ErrorBrokerError
+		return ret
+	}
+	return *o.BrokerError
+}
+
+// GetBrokerErrorOk returns a tuple with the BrokerError field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *Error) GetBrokerErrorOk() (*ErrorBrokerError, bool) {
+	if o == nil || IsNil(o.BrokerError) {
+		return nil, false
+	}
+	return o.BrokerError, true
+}
+
+// HasBrokerError returns a boolean if a field has been set.
+func (o *Error) HasBrokerError() bool {
+	if o != nil && !IsNil(o.BrokerError) {
+		return true
+	}
+
+	return false
+}
+
+// SetBrokerError gets a reference to the given ErrorBrokerError and assigns it to the BrokerError field.
+func (o *Error) SetBrokerError(v ErrorBrokerError) {
+	o.BrokerError = &v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
@@ -116,6 +149,9 @@ func (o Error) MarshalJSON() ([]byte, error) {
 
 func (o Error) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.BrokerError) {
+		toSerialize["broker_error"] = o.BrokerError
+	}
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
 	}
