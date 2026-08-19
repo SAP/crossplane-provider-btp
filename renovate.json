@@ -1,10 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended",
+    "config:best-practices",
     ":dependencyDashboard"
   ],
   "schedule": ["* * 1,15 * *"],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
   "baseBranchPatterns": ["main", "release/v1_10_x"],
   "ignorePresets": ["group:goOpenapi"],
   "postUpdateOptions": [
@@ -52,6 +54,10 @@
     {
       "groupName": "github actions",
       "matchManagers": ["github-actions"]
+    },
+    {
+      "groupName": "docker images",
+      "matchManagers": ["dockerfile"]
     }
   ],
   "customManagers": [
