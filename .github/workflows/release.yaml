@@ -28,7 +28,7 @@ jobs:
         contents: read
 
     run-make-reviewable-and-check-diff:
-      uses: ./.github/workflows/reviewable_check_diff.yaml
+      uses: ./.github/workflows/check-reviewable-diff.lib.yaml
       permissions:
         contents: read
 

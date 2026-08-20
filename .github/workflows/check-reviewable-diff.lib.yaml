@@ -1,11 +1,18 @@
-# This workflow will run make reviewable and make check-diff as checks
-
-name: Reviewable&Check-Diff
+# Run make reviewable and make check-diff
+#
+# reviewable:
+#	  make generate
+#	  make lint
+#	  make test
+#
+# check-diff:
+#   runs make generate and check for uncommitted changes
+name: Check make reviewable and make check-diff
 permissions:
   contents: read
 
 on:
-  workflow_call: 
+  workflow_call:
 
 jobs:
   reviewable-checkdiff:
@@ -27,5 +34,6 @@ jobs:
       run: make reviewable
       env:
         RUNNING_IN_CI: 'true'
+
     - name: Make Check-Diff
       run: make check-diff
