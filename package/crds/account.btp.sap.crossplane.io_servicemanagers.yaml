@@ -372,7 +372,7 @@ spec:
                   instance/binding pair created for the old value, stranding it in BTP.
                 properties:
                   planName:
-                    default: service-operator-access
+                    default: subaccount-admin
                     description: Planname for service manager instance
                     enum:
                     - subaccount-admin
