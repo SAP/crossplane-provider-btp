@@ -91,7 +91,7 @@ jobs:
           GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
-          IDP_URL: ${{ secrets.SECOND_IDP_URL }} # Use a different IDP for the upgrade tests to avoid conflicts
+          IDP_URL: ${{ secrets.IDP_URL }} # Primary IDP: SECOND_IDP_URL is not a registered IAS host, so subaccount trust config creation 404s against it
           UPGRADE_TEST_FROM_TAG: ${{ github.event.inputs.source }}
           UPGRADE_TEST_TO_TAG: ${{ env.TARGET_IMAGE_VERSION }}
 
