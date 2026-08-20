@@ -72,10 +72,6 @@ type SubaccountApiCredentialObservation struct {
 
 	ID *string `json:"id,omitempty" tf:"id,omitempty"`
 
-	// (String) RSA key generated if the API credential is created with a certificate.
-	// RSA key generated if the API credential is created with a certificate.
-	Key *string `json:"key,omitempty" tf:"key,omitempty"`
-
 	// The name if left unset defaults to managedsubbaccountapicredential
 	// The name for the API credential.
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`

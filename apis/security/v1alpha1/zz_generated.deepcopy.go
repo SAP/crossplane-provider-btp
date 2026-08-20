@@ -699,11 +699,6 @@ func (in *SubaccountApiCredentialObservation) DeepCopyInto(out *SubaccountApiCre
 		*out = new(string)
 		**out = **in
 	}
-	if in.Key != nil {
-		in, out := &in.Key, &out.Key
-		*out = new(string)
-		**out = **in
-	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
 		*out = new(string)
