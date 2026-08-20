@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 
 	"github.com/pkg/errors"
@@ -85,6 +86,11 @@ type ServiceManagerClient struct {
 	servicemanager.ServicePlansAPI
 	servicemanager.ServiceInstancesAPI
 	servicemanager.ServiceBindingsAPI
+
+	// httpClient (OAuth-authenticated) and smBaseURL back the raw PATCH in
+	// UpdateInstanceParameters.
+	httpClient *http.Client
+	smBaseURL  *url.URL
 }
 
 func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*ServiceManagerClient, error) {
@@ -111,7 +117,8 @@ func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*S
 	apiClientConfig := servicemanager.NewConfiguration()
 	apiClientConfig.Host = smURL.Host
 	apiClientConfig.Scheme = smURL.Scheme
-	apiClientConfig.HTTPClient = config.Client(ctx)
+	httpClient := config.Client(ctx)
+	apiClientConfig.HTTPClient = httpClient
 
 	apiClient := servicemanager.NewAPIClient(apiClientConfig)
 
@@ -120,6 +127,8 @@ func NewServiceManagerClient(ctx context.Context, creds *BindingCredentials) (*S
 		apiClient.ServicePlansAPI,
 		apiClient.ServiceInstancesAPI,
 		apiClient.ServiceBindingsAPI,
+		httpClient,
+		smURL,
 	}, nil
 }
 
