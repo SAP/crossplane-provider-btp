@@ -36,6 +36,8 @@ func Configure(p *config.Provider) {
 		r.TerraformResource.Schema["client_id"].Sensitive = true
 		r.TerraformResource.Schema["token_url"].Sensitive = true
 		r.TerraformResource.Schema["api_url"].Sensitive = true
+		// key must not be stored in cluster-scoped CR status
+		r.TerraformResource.Schema["key"].Sensitive = true
 
 		r.ExternalName.SetIdentifierArgumentFn = func(base map[string]any, name string) {
 			if name == "" {
