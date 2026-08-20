@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   run-go-license-check:
-    uses: ./.github/workflows/check-go-licenses.yaml
+    uses: ./.github/workflows/check-go-licenses.lib.yaml
 
   run-reuse-license-check:
     uses: ./.github/workflows/reuse-scan.yaml
