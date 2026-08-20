@@ -9,17 +9,17 @@ require (
 	github.com/SAP/xp-clifford v0.0.0-20260528123824-27644fae68e8
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/blang/semver/v4 v4.0.0
-	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.21
+	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-beta.1
 	github.com/crossplane-contrib/xp-testing v1.10.0
 	github.com/crossplane/crossplane-runtime/v2 v2.2.3
 	github.com/crossplane/crossplane-tools v0.0.0-20260719180100-659f1dc036c5
 	github.com/crossplane/upjet/v2 v2.4.1
-	github.com/go-logr/logr v1.4.3
-	github.com/go-openapi/runtime v0.32.4
+	github.com/go-logr/logr v1.4.4
+	github.com/go-openapi/runtime v0.33.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/int128/kubelogin v1.31.0
+	github.com/int128/kubelogin v1.36.3
 	github.com/json-iterator/go v1.1.12
 	github.com/mitchellh/reflectwalk v1.0.2
 	github.com/muvaf/typewriter v0.0.0-20240614220100-70f9d4a54ea0
@@ -237,7 +237,7 @@ require (
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.48.0 // indirect
+	golang.org/x/tools v0.49.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260630182238-925bb5da69e7 // indirect
