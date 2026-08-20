@@ -18,7 +18,7 @@ jobs:
         contents: read
 
     run-reuse-license-check:
-      uses: ./.github/workflows/reuse-scan.yaml
+      uses: ./.github/workflows/check-reuse-scan.lib.yaml
       permissions:
         contents: read
 

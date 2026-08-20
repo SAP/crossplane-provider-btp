@@ -20,7 +20,7 @@ jobs:
     uses: ./.github/workflows/check-go-licenses.lib.yaml
 
   run-reuse-license-check:
-    uses: ./.github/workflows/reuse-scan.yaml
+    uses: ./.github/workflows/check-reuse-scan.lib.yaml
 
   run-unit-test:
     uses: ./.github/workflows/unit_test.yaml
