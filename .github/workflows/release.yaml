@@ -23,7 +23,7 @@ jobs:
         contents: read
 
     run-unit-test:
-      uses: ./.github/workflows/unit_test.yaml
+      uses: ./.github/workflows/check-unit-tests.lib.yaml
       permissions:
         contents: read
 

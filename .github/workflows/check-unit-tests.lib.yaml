@@ -1,10 +1,10 @@
-# This workflow will builds a golang project and runs unit-tests
+# Builds golang project and run unit-tests
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: Unit Tests
+name: Check Unit Tests
 
 on:
-  workflow_call: 
+  workflow_call:
 
 permissions:
   contents: read
@@ -14,8 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        submodules: true 
 
     - name: Set up Go
       uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
@@ -25,7 +23,5 @@ jobs:
     - name: Build
       run: go build -v ./...
 
-    - name: Unit-Test Init
-      run: make test.init
-    - name: Unit-Test Run
-      run: make test.run
+    - name: Run Unit Tests
+      run: go test -v ./...

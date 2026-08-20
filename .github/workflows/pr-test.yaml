@@ -23,7 +23,7 @@ jobs:
     uses: ./.github/workflows/check-reuse-scan.lib.yaml
 
   run-unit-test:
-    uses: ./.github/workflows/unit_test.yaml
+    uses: ./.github/workflows/check-unit-tests.lib.yaml
 
   run-make-reviewable-and-check-diff:
     uses: ./.github/workflows/reviewable_check_diff.yaml
