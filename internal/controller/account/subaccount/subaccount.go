@@ -22,6 +22,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
+	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	"github.com/sap/crossplane-provider-btp/internal/recovery"
@@ -46,6 +47,18 @@ const (
 	errUpdateExternalName   = "while updating external name"
 )
 
+// btpErrCodeActiveServiceInstances is BTP's error code for "You can't delete
+// subaccounts with active service instances". The API does not name the
+// instances, which leaves an operator with no way to find out what blocks the
+// teardown - especially when those instances have no managed resource of their
+// own.
+const btpErrCodeActiveServiceInstances = 70011
+
+// maxListedBlockers bounds how many blocking service instances are named in
+// the surfaced error, so a subaccount with hundreds of instances cannot
+// produce an unbounded condition message.
+const maxListedBlockers = 10
+
 // A connector is expected to produce an ExternalClient when its Connect method
 // is called.
 type connector struct {
@@ -55,8 +68,28 @@ type connector struct {
 
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
 
+	// newInstanceListerFn builds a read-only lister for the service instances
+	// in a subaccount from an already-connected BTP client, used to name what
+	// blocks a refused deletion. Overridable for tests; when nil, Connect
+	// installs the default accounts-service-backed implementation.
+	newInstanceListerFn func(btpClient *btp.Client) func(ctx context.Context, subaccountGuid string) (smClient.InstanceLister, error)
+
 	// recorder emits Kubernetes events for the heal path. May be nil.
 	recorder event.Recorder
+}
+
+// defaultInstanceListerFn builds the read-only service-instance lister from
+// the subaccount's EXISTING service-manager admin binding.
+//
+// It deliberately does not go through EnsureSemanticLookuper, which MINTS a
+// temporary admin binding when none exists: on the delete path that would add
+// another service instance to the very subaccount whose deletion is blocked by
+// service instances.
+func defaultInstanceListerFn(btpClient *btp.Client) func(ctx context.Context, subaccountGuid string) (smClient.InstanceLister, error) {
+	return func(ctx context.Context, subaccountGuid string) (smClient.InstanceLister, error) {
+		return smClient.NewServiceManagerInstanceProxyClient(btpClient.AccountsServiceClient).
+			InstanceLister(ctx, subaccountGuid)
+	}
 }
 
 // Connect typically produces an ExternalClient by:
@@ -75,12 +108,18 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errConnect)
 	}
 
+	newInstanceListerFn := c.newInstanceListerFn
+	if newInstanceListerFn == nil {
+		newInstanceListerFn = defaultInstanceListerFn
+	}
+
 	return &external{
-		Client:           c.kube,
-		btp:              *btpclient,
-		tracker:          c.resourcetracker,
-		accountsAccessor: &AccountsClient{btp: *btpclient},
-		recorder:         c.recorder,
+		Client:              c.kube,
+		btp:                 *btpclient,
+		tracker:             c.resourcetracker,
+		accountsAccessor:    &AccountsClient{btp: *btpclient},
+		newInstanceListerFn: newInstanceListerFn(btpclient),
+		recorder:            c.recorder,
 	}, nil
 }
 
@@ -94,6 +133,10 @@ type external struct {
 	tracker tracking.ReferenceResolverTracker
 
 	accountsAccessor AccountsApiAccessor
+
+	// newInstanceListerFn builds a read-only lister for the service instances
+	// in a subaccount, used to name what blocks a refused deletion. May be nil.
+	newInstanceListerFn func(ctx context.Context, subaccountGuid string) (smClient.InstanceLister, error)
 
 	// recorder emits Kubernetes events for the heal path. May be nil.
 	recorder event.Recorder
@@ -385,19 +428,18 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	subaccount := cr
 
-	return managed.ExternalDelete{}, errors.Wrap(deleteBTPSubaccount(ctx, subaccount, c.btp), errDelete)
+	return managed.ExternalDelete{}, errors.Wrap(c.deleteBTPSubaccount(ctx, subaccount), errDelete)
 }
 
-func deleteBTPSubaccount(
+func (c *external) deleteBTPSubaccount(
 	ctx context.Context,
 	subaccount *apisv1alpha1.Subaccount,
-	accountsServiceClient btp.Client,
 ) error {
 	subaccount.SetConditions(xpv1.Deleting())
 
 	subaccountId := meta.GetExternalName(subaccount)
 
-	_, raw, err := accountsServiceClient.AccountsServiceClient.SubaccountOperationsAPI.DeleteSubaccount(ctx, subaccountId).Execute()
+	_, raw, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.DeleteSubaccount(ctx, subaccountId).Execute()
 	// 404 not found means already deleted - not considered as error case
 	if raw != nil && raw.StatusCode == 404 {
 		ctrl.Log.Info("associated BTP subaccount not found, continue deletion")
@@ -405,10 +447,97 @@ func deleteBTPSubaccount(
 	}
 
 	if err != nil {
-		return errors.Wrap(specifyAPIError(err), "deletion of subaccount failed")
+		aErr := specifyAPIError(err)
+		if code, ok := apiErrorCode(aErr); ok && code == btpErrCodeActiveServiceInstances {
+			return errors.Wrap(c.describeDeletionBlockers(ctx, subaccountId, aErr), "deletion of subaccount failed")
+		}
+		return errors.Wrap(aErr, "deletion of subaccount failed")
 	}
 
 	return nil
+}
+
+// describeDeletionBlockers enriches a code-70011 rejection by naming the
+// service instances that block the deletion. BTP reports only that active
+// instances exist, which is a dead end when those instances have no managed
+// resource of their own.
+//
+// The lookup is read-only and best-effort. When it cannot be performed the
+// original error is returned carrying the subaccount GUID and a precise manual
+// next step instead — plus, whenever the provider actually has one, the reason
+// the enumeration did not succeed. Reporting every failure as "no admin binding
+// exists" would be an actively misleading diagnosis on a path whose entire
+// purpose is actionability: an expired binding, a denied scope and a transport
+// error each need a different response from the operator.
+func (c *external) describeDeletionBlockers(ctx context.Context, subaccountGuid string, cause error) error {
+	// No lister wired at all, or none obtainable: the normal case for
+	// subaccounts this provider never created a service-manager instance in.
+	noBinding := func(reason error) error {
+		why := "no service-manager admin binding is available in this subaccount"
+		if reason != nil {
+			why = fmt.Sprintf("no service-manager admin binding could be obtained: %v", reason)
+		}
+		return errors.New(deletionBlockerHint(cause, subaccountGuid, why))
+	}
+
+	if c.newInstanceListerFn == nil {
+		return noBinding(nil)
+	}
+	lister, lErr := c.newInstanceListerFn(ctx, subaccountGuid)
+	if lErr != nil {
+		return noBinding(lErr)
+	}
+	if lister == nil {
+		return noBinding(nil)
+	}
+
+	// The list call itself failed: the provider knows why (ListServiceInstances
+	// surfaces BTP's own description), so say so rather than blaming a missing
+	// binding that does exist.
+	instances, lErr := lister.ListServiceInstances(ctx)
+	if lErr != nil {
+		return errors.New(deletionBlockerHint(cause, subaccountGuid,
+			fmt.Sprintf("the provider could not enumerate them: %v", lErr)))
+	}
+	if len(instances) == 0 {
+		return errors.New(deletionBlockerHint(cause, subaccountGuid,
+			"the provider found none, so they are not visible to the service-manager binding it used"))
+	}
+
+	return errors.Errorf("%v; subaccount %s still has %d active service instance(s) blocking deletion: %s",
+		cause, subaccountGuid, len(instances), formatBlockers(instances, maxListedBlockers))
+}
+
+// deletionBlockerHint renders the fallback message for a code-70011 rejection
+// the provider could not resolve into a list of instances. why states what
+// actually went wrong so the operator is not sent after the wrong cause.
+func deletionBlockerHint(cause error, subaccountGuid, why string) string {
+	return fmt.Sprintf(
+		"%v; subaccount %s still has active service instances, but %s. "+
+			"List them with the Service Manager API: GET <sm_url>/v1/service_instances, "+
+			"or via the BTP cockpit under Services > Instances and Subscriptions.",
+		cause, subaccountGuid, why)
+}
+
+// formatBlockers renders at most max entries as `name (id)` and appends
+// "... and N more", so the surfaced message cannot grow with the instance
+// count.
+func formatBlockers(refs []smClient.ServiceInstanceRef, max int) string {
+	shown := refs
+	if len(shown) > max {
+		shown = shown[:max]
+	}
+
+	parts := make([]string, 0, len(shown))
+	for _, r := range shown {
+		parts = append(parts, fmt.Sprintf("%s (%s)", r.Name, r.ID))
+	}
+
+	out := strings.Join(parts, ", ")
+	if len(refs) > len(shown) {
+		out += fmt.Sprintf(", ... and %d more", len(refs)-len(shown))
+	}
+	return out
 }
 
 func (c *external) updateBTPSubaccount(
@@ -575,16 +704,41 @@ func emptyDirectoryRef(spec *apisv1alpha1.SubaccountParameters) bool {
 	return spec.DirectoryRef == nil && spec.DirectorySelector == nil && spec.DirectoryGuid == ""
 }
 
+// apiError carries the BTP error code alongside the message so callers can
+// branch on the code instead of matching on the rendered string. Error()
+// renders exactly as the previous string-only form did, so nothing that reads
+// the message changes.
+type apiError struct {
+	Code    int
+	Message string
+}
+
+func (e *apiError) Error() string {
+	return fmt.Sprintf("API Error: %v, Code %v", e.Message, e.Code)
+}
+
 func specifyAPIError(err error) error {
 	if genericErr, ok := err.(*accountclient.GenericOpenAPIError); ok {
 		if accountError, ok := genericErr.Model().(accountclient.ApiExceptionResponseObject); ok {
-			return errors.New(fmt.Sprintf("API Error: %v, Code %v", internal.Val(accountError.Error.Message), internal.Val(accountError.Error.Code)))
+			return &apiError{
+				Code:    int(internal.Val(accountError.Error.Code)),
+				Message: internal.Val(accountError.Error.Message),
+			}
 		}
 		if genericErr.Body() != nil {
 			return fmt.Errorf("API Error: %s", string(genericErr.Body()))
 		}
 	}
 	return err
+}
+
+// apiErrorCode reports the BTP error code carried by err, if any.
+func apiErrorCode(err error) (int, bool) {
+	var aErr *apiError
+	if errors.As(err, &aErr) {
+		return aErr.Code, true
+	}
+	return 0, false
 }
 
 func changedLabels(specLabels map[string]apisv1alpha1.SubaccountLabelValueList, statusLabels *map[string][]string) bool {

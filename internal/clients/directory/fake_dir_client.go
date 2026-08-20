@@ -21,6 +21,10 @@ type MockDirClient struct {
 	DeleteErr error
 
 	ResultStatusCode int
+
+	// GetNilResponse models a transport-level failure, where the generated client
+	// returns a nil *http.Response alongside the error instead of a real response.
+	GetNilResponse bool
 }
 
 var _ accountclient.DirectoryOperationsAPI = MockDirClient{}
@@ -46,6 +50,9 @@ func (m MockDirClient) GetDirectory(ctx context.Context, directoryGUID string) a
 }
 
 func (m MockDirClient) GetDirectoryExecute(r accountclient.ApiGetDirectoryRequest) (*accountclient.DirectoryResponseObject, *http.Response, error) {
+	if m.GetNilResponse {
+		return nil, nil, m.GetErr
+	}
 	return m.GetResult, &http.Response{StatusCode: m.ResultStatusCode}, m.GetErr
 }
 

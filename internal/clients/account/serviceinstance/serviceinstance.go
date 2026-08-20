@@ -10,16 +10,22 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// NewServiceInstanceConnector creates a connector for the service instance client using the generic TfProxyConnector
-func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsFn, kube client.Client) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
+// NewServiceInstanceConnector creates a connector for the service instance client using the generic TfProxyConnector.
+//
+// recorder may be nil; when set, the async callbacks raise a Warning event on
+// the ServiceInstance if an async result cannot be persisted.
+func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsFn, kube client.Client, recorder event.Recorder) tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
 	con := &ServiceInstanceConnector{
 		TfProxyConnector: tfclient.NewTfProxyConnector(
 			tfclient.NewInternalTfConnector(
@@ -30,6 +36,7 @@ func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsF
 				tfclient.NewAPICallbacks(
 					kube,
 					saveConditionsCallback,
+					tfclient.WithCallbackEventRecorder(recorder, newEventTarget),
 				),
 			),
 			&ServiceInstanceMapper{},
@@ -37,6 +44,18 @@ func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsF
 		),
 	}
 	return con
+}
+
+// newEventTarget builds the object a callback failure is reported against. The
+// managed resource could not be fetched at that point, so only the identity is
+// available. TypeMeta is set explicitly so building a reference to it needs no
+// scheme lookup and cannot fail.
+func newEventTarget(nn types.NamespacedName) resource.Managed {
+	si := &v1alpha1.ServiceInstance{}
+	si.SetGroupVersionKind(v1alpha1.ServiceInstanceGroupVersionKind)
+	si.SetName(nn.Name)
+	si.SetNamespace(nn.Namespace)
+	return si
 }
 
 type ServiceInstanceConnector struct {
@@ -64,10 +83,38 @@ func (s *ServiceInstanceMapper) TfResource(ctx context.Context, si *v1alpha1.Ser
 	}
 
 	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
-	condition := si.GetCondition(xpv1.TypeReady)
-	sInstance.SetConditions(condition)
+	sInstance.SetConditions(shadowReadyCondition(si))
 
 	return sInstance, nil
+}
+
+// shadowReadyCondition derives the Ready condition carried by the terraform
+// shadow resource from the native ServiceInstance.
+//
+// The shadow is rebuilt from the native resource on every Connect, so whatever
+// Ready condition is put on it here is what upjet sees for the whole reconcile.
+// upjet's Observe short-circuits before Workspace.Plan whenever the resource is
+// not marked Available: it sets Available in memory and returns
+// ResourceUpToDate=true without planning. Mirroring a Ready=False onto the
+// shadow therefore parks upjet in that arm on every single pass — terraform
+// never plans, no drift is ever reported and no Update is ever issued.
+//
+// Readiness that reflects external health (upstream issue #280) is a statement
+// about BTP, not about whether terraform still has work to do, and it lives on
+// the native resource only. Once the external resource is known to exist, the
+// shadow is always handed an Available condition so drift detection keeps
+// running and a spec change meant to repair an unhealthy instance is still
+// planned and applied.
+//
+// Before the external resource exists (no ID observed yet) the native condition
+// is mirrored unchanged: that is the create path, where upjet's
+// mark-available-first behaviour is the intended one.
+func shadowReadyCondition(si *v1alpha1.ServiceInstance) xpv1.Condition {
+	condition := si.GetCondition(xpv1.TypeReady)
+	if si.Status.AtProvider.ID != "" {
+		return xpv1.Available()
+	}
+	return condition
 }
 
 func BuildComplexParameterJson(ctx context.Context, kube client.Client, secretRefs []xpv1.SecretKeySelector, specParams []byte) ([]byte, error) {
@@ -98,8 +145,13 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// since terraform resources are not allowed to start with a number we ensure it by prefixing them with "TF-"
-			Name: "TF-" + si.Name,
+			// Since terraform resources are not allowed to start with a number
+			// we ensure it by prefixing them with tfclient.ShadowNamePrefix.
+			// The async callbacks strip this prefix again through
+			// tfclient.StripShadowPrefix to find the ServiceInstance this
+			// shadow belongs to — use the constant on both ends so they cannot
+			// drift apart.
+			Name: tfclient.ShadowNamePrefix + si.Name,
 			// make sure no naming conflicts are there for upjet tmp folder creation
 			UID:               si.UID + "-service-instance",
 			DeletionTimestamp: si.DeletionTimestamp,

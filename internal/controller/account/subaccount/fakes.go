@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-openapi/runtime"
+	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 )
 
@@ -262,3 +263,18 @@ func (m *MockSubaccountClient) SetTransport(transport runtime.ClientTransport) {
 	//TODO implement me
 	panic("implement me")
 }
+
+// MockInstanceLister is a test double for the read-only service-instance
+// lister used to name what blocks a refused subaccount deletion.
+type MockInstanceLister struct {
+	instances []smClient.ServiceInstanceRef
+	listErr   error
+	calls     int
+}
+
+func (m *MockInstanceLister) ListServiceInstances(ctx context.Context) ([]smClient.ServiceInstanceRef, error) {
+	m.calls++
+	return m.instances, m.listErr
+}
+
+var _ smClient.InstanceLister = &MockInstanceLister{}

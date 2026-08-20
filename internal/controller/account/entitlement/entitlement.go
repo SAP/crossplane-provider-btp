@@ -19,6 +19,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/btp"
 	entitlementclient "github.com/sap/crossplane-provider-btp/internal/clients/entitlement"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
+	"github.com/sap/crossplane-provider-btp/internal/mrstatus"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -399,6 +400,21 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return *obs, nil
 	}
 
+	// upstream issue #280: a rejected assignment must never look healthy.
+	//
+	// This lands on the resource for every path that leaves Observe reporting
+	// the external resource as existing. It does NOT survive the needsCreate
+	// path (amount == 0): there the managed reconciler goes on to mark
+	// Creating(), which replaces the Ready condition before the status is
+	// persisted. That path is a retry of the assignment, and the rejection
+	// reason resurfaces here as soon as BTP reports PROCESSING_FAILED again on
+	// an assignment that reserved a non-zero amount.
+	if entitlementProcessingFailed(cr) {
+		cr.Status.SetConditions(entitlementFailedCondition(cr))
+	}
+
+	// Needs create?
+	//
 	// needsCreate alone would misreport a deleting CR whose
 	// still-reserved assignFailedNoQuota-shape assignment (see
 	// deletingWithReservedQuota) as absent; this exclusion routes it to
@@ -461,16 +477,24 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	switch cr.Status.AtProvider.Assigned.EntityState { //nolint:exhaustive
 	case apisv1alpha1.EntitlementStatusOk:
 		cr.Status.SetConditions(xpv1.Available())
-	// PROCESSING_FAILED reflects the *last operation*, not whether
-	// something is assigned now: a still-assigned entitlement that failed
-	// on delete/update stays Available; the branch below is a defensive
-	// fallback for an assign-time failure already handled by needsCreate.
+	// PROCESSING_FAILED means BTP rejected or failed the last operation on
+	// this entitlement. It never reports Available, whatever amount is
+	// currently assigned, and the platform's own stateMessage is copied into
+	// the condition so the rejection reason is readable on the resource.
+	//
+	// This branch previously reported Available whenever an amount was still
+	// assigned, on the grounds that a still-in-use entitlement should not flap
+	// orchestration that depends on it. That trade is rejected: reporting a
+	// healthy state for an operation the platform refused is what let a whole
+	// class of failures look healthy at every observable layer, with the
+	// rejection message dropped on the floor. Dependents are better served by
+	// an honest NotReady they can act on.
+	//
+	// Only the condition changes here. assignFailedNoQuota() and needsCreate()
+	// keep their current semantics, so the assign-time failure with nothing
+	// reserved (amount == 0 / nil) still retries via Create.
 	case apisv1alpha1.EntitlementStatusProcessingFailed:
-		if assignFailedNoQuota(cr) {
-			cr.Status.SetConditions(xpv1.Unavailable())
-		} else {
-			cr.Status.SetConditions(xpv1.Available())
-		}
+		cr.Status.SetConditions(entitlementFailedCondition(cr))
 	case apisv1alpha1.EntitlementStatusProcessing:
 		cr.Status.SetConditions(xpv1.Creating())
 	case apisv1alpha1.EntitlementStatusStarted:
@@ -741,9 +765,39 @@ func (c *external) needsUpdate(cr *apisv1alpha1.Entitlement) bool {
 	return false
 }
 
+// entitlementProcessingFailed reports whether BTP rejected or failed the last
+// operation on this entitlement's service plan assignment.
+func entitlementProcessingFailed(cr *apisv1alpha1.Entitlement) bool {
+	return cr.Status.AtProvider != nil &&
+		cr.Status.AtProvider.Assigned != nil &&
+		cr.Status.AtProvider.Assigned.EntityState == apisv1alpha1.EntitlementStatusProcessingFailed
+}
+
+// entitlementFailedCondition builds the Ready=False condition for a
+// PROCESSING_FAILED assignment, carrying BTP's own stateMessage so the
+// rejection reason — for example a quota change below the currently consumed
+// amount — is readable on the resource instead of being discarded.
+func entitlementFailedCondition(cr *apisv1alpha1.Entitlement) xpv1.Condition {
+	msg := "BTP reports the entitlement assignment as PROCESSING_FAILED"
+	if cr.Status.AtProvider != nil && cr.Status.AtProvider.Assigned != nil {
+		if sm := cr.Status.AtProvider.Assigned.StateMessage; sm != "" {
+			msg += ": " + mrstatus.Truncate(sm, mrstatus.MaxMessageBytes)
+		}
+	}
+	return mrstatus.ExternalResourceFailed(msg, cr.Generation)
+}
+
 // assignFailedNoQuota returns true when BTP reports a PROCESSING_FAILED
-// assignment with a zero or unset amount; distinct from a positive
-// amount, which reflects a delete- or update-time failure while still assigned.
+// assignment for this entitlement and the reported amount is zero or unset,
+// i.e. nothing is actually reserved on the BTP side. This is distinct from
+// PROCESSING_FAILED with a non-zero amount, which typically reflects a
+// delete- or update-time failure on an entitlement that is still assigned:
+// that one keeps its assignment and is only re-observed, not re-created.
+//
+// Neither is reported as Available any more. Since upstream issue #280 every
+// PROCESSING_FAILED assignment carries Ready=False with BTP's own stateMessage
+// (see entitlementFailedCondition); this predicate decides only whether the
+// assignment has to be re-issued, not how it is reported.
 func assignFailedNoQuota(cr *apisv1alpha1.Entitlement) bool {
 	if cr.Status.AtProvider == nil || cr.Status.AtProvider.Assigned == nil {
 		return false

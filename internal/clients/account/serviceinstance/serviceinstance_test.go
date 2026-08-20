@@ -347,6 +347,94 @@ func TestTfResource(t *testing.T) {
 	}
 }
 
+// TestShadowReadyCondition pins which Ready condition the terraform shadow
+// carries, which decides whether terraform is allowed to plan at all.
+//
+// upjet's Observe short-circuits before Workspace.Plan whenever the resource is
+// not marked Available: it marks it Available in memory and returns
+// ResourceUpToDate=true without planning. The shadow is rebuilt from the native
+// resource on every Connect, so mirroring a Ready=False onto it would park
+// upjet in that arm forever - no plan, no drift, no Update. Readiness that
+// reports external health (upstream issue #280) stays a statement about BTP on
+// the native resource only, and must never disable drift detection: an
+// unhealthy instance is exactly the one an operator repairs with a spec change.
+func TestShadowReadyCondition(t *testing.T) {
+	observed := v1alpha1.ServiceInstanceObservation{ID: "some-instance-id"}
+
+	unhealthy := xpv1.Condition{
+		Type:    xpv1.TypeReady,
+		Status:  corev1.ConditionFalse,
+		Reason:  "ExternalResourceFailed",
+		Message: "BTP reports the service instance as unhealthy",
+	}
+
+	cases := map[string]struct {
+		reason string
+		si     *v1alpha1.ServiceInstance
+		want   xpv1.Condition
+	}{
+		"UnhealthyButExisting": {
+			reason: "an existing instance reported unhealthy must still hand the shadow an Available condition, otherwise terraform never plans again and a repairing spec change is never applied",
+			si: expectedServiceInstance(
+				withObservation(observed),
+				withCondition(unhealthy),
+			),
+			want: conditionAvailable,
+		},
+		"HealthyAndExisting": {
+			reason: "an existing healthy instance is unchanged",
+			si: expectedServiceInstance(
+				withObservation(observed),
+				withCondition(conditionAvailable),
+			),
+			want: conditionAvailable,
+		},
+		"NotYetObserved": {
+			reason: "before the external resource exists there is nothing to plan against, so the native condition is mirrored unchanged and upjet's mark-available-first create behaviour is kept",
+			si: expectedServiceInstance(
+				withCondition(conditionUnknown),
+			),
+			want: conditionUnknown,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := shadowReadyCondition(tc.si)
+			if got.Type != tc.want.Type || got.Status != tc.want.Status || got.Reason != tc.want.Reason {
+				t.Errorf("\n%s\nshadowReadyCondition() = %+v, want %+v", tc.reason, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestTfResourceMarksExistingUnhealthyShadowAvailable pins the same behaviour
+// through the exported mapper, which is what actually feeds upjet.
+func TestTfResourceMarksExistingUnhealthyShadowAvailable(t *testing.T) {
+	si := expectedServiceInstance(
+		withExternalName("123"),
+		withProviderConfigRef("default"),
+		withObservation(v1alpha1.ServiceInstanceObservation{ID: "some-instance-id"}),
+		withCondition(xpv1.Condition{
+			Type:    xpv1.TypeReady,
+			Status:  corev1.ConditionFalse,
+			Reason:  "ExternalResourceFailed",
+			Message: "BTP reports the service instance as unhealthy",
+		}),
+	)
+
+	sim := &ServiceInstanceMapper{}
+	tfResource, err := sim.TfResource(context.Background(), si, nil)
+	if err != nil {
+		t.Fatalf("TfResource() returned unexpected error: %v", err)
+	}
+
+	got := tfResource.GetCondition(xpv1.TypeReady)
+	if got.Status != corev1.ConditionTrue {
+		t.Errorf("terraform shadow must be marked Available so upjet keeps planning, got %+v", got)
+	}
+}
+
 // Helper function to build a complete ServiceInstance CR dynamically
 func expectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.ServiceInstance {
 	cr := &v1alpha1.ServiceInstance{}

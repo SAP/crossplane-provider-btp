@@ -171,6 +171,87 @@ func TestReconciler(t *testing.T) {
 				result: reconcile.Result{RequeueAfter: shortWait},
 			},
 		},
+		"StatusUpdateNotFoundIsTerminal": {
+			reason: "A ResourceUsage deleted while we were reconciling it leaves nothing to write, so the reconcile must end cleanly instead of being retried forever",
+			args: args{
+				m: &fake.Manager{
+					Client: &test.MockClient{
+						MockGet:          test.NewMockGetFn(nil, GetDeletedResourceUsageAndTarget),
+						MockStatusUpdate: test.NewMockSubResourceUpdateFn(kerrors.NewNotFound(schema.GroupResource{}, "fake")),
+					},
+					Scheme: fake.SchemeWith(&v1alpha1.ResourceUsage{}, &v1alpha1.ResourceUsageList{}),
+				},
+			},
+			want: want{
+				result: reconcile.Result{Requeue: false},
+				err:    nil,
+			},
+		},
+		"StatusUpdateOtherErrorIsRetried": {
+			reason: "Any other status update error is still surfaced, so the reconcile is retried",
+			args: args{
+				m: &fake.Manager{
+					Client: &test.MockClient{
+						MockGet:          test.NewMockGetFn(nil, GetDeletedResourceUsageAndTarget),
+						MockStatusUpdate: test.NewMockSubResourceUpdateFn(errBoom),
+					},
+					Scheme: fake.SchemeWith(&v1alpha1.ResourceUsage{}, &v1alpha1.ResourceUsageList{}),
+				},
+			},
+			want: want{
+				result: reconcile.Result{Requeue: false},
+				err:    errors.Wrap(errBoom, errUpdateStatus),
+			},
+		},
+		"UpdateNotFoundIsTerminal": {
+			reason: "Removing our finalizer from an object that is already gone needs no requeue",
+			args: args{
+				m: &fake.Manager{
+					Client: &test.MockClient{
+						MockGet:    test.NewMockGetFn(nil, GetDeletedResourceUsageAndNotExistingTarget),
+						MockUpdate: test.NewMockUpdateFn(kerrors.NewNotFound(schema.GroupResource{}, "fake")),
+					},
+					Scheme: fake.SchemeWith(&v1alpha1.ResourceUsage{}, &v1alpha1.ResourceUsageList{}),
+				},
+			},
+			want: want{
+				result: reconcile.Result{},
+				err:    nil,
+			},
+		},
+		"DeleteNotFoundIsTerminal": {
+			reason: "Deleting an object that is already gone needs no requeue",
+			args: args{
+				m: &fake.Manager{
+					Client: &test.MockClient{
+						MockGet:    test.NewMockGetFn(nil, GetDeletedResourceUsageAndNotExistingTarget),
+						MockUpdate: test.NewMockUpdateFn(nil),
+						MockDelete: test.NewMockDeleteFn(kerrors.NewNotFound(schema.GroupResource{}, "fake")),
+					},
+					Scheme: fake.SchemeWith(&v1alpha1.ResourceUsage{}, &v1alpha1.ResourceUsageList{}),
+				},
+			},
+			want: want{
+				result: reconcile.Result{},
+				err:    nil,
+			},
+		},
+		"AddFinalizerNotFoundIsTerminal": {
+			reason: "Adding our finalizer to an object that disappeared mid-reconcile needs no requeue",
+			args: args{
+				m: &fake.Manager{
+					Client: &test.MockClient{
+						MockGet:    test.NewMockGetFn(nil, GetResourceUsageAndTarget),
+						MockUpdate: test.NewMockUpdateFn(kerrors.NewNotFound(schema.GroupResource{}, "fake")),
+					},
+					Scheme: fake.SchemeWith(&v1alpha1.ResourceUsage{}, &v1alpha1.ResourceUsageList{}),
+				},
+			},
+			want: want{
+				result: reconcile.Result{},
+				err:    nil,
+			},
+		},
 		"FinalizerExists": {
 			reason: "We should not requeue if our finalizer exists",
 			args: args{

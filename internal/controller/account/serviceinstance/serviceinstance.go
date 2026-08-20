@@ -9,8 +9,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -30,6 +32,7 @@ import (
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/di"
+	"github.com/sap/crossplane-provider-btp/internal/mrstatus"
 	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -55,10 +58,16 @@ const (
 var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Dependency Injection
-var newClientCreatorFn = func(kube client.Client) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
+//
+// reader is the source the async callbacks re-read the ServiceInstance from
+// before writing an async result. Setup passes the manager's uncached API
+// reader so a retried write is rebased on the freshest object; nil falls back
+// to kube.
+var newClientCreatorFn = func(kube client.Client, reader client.Reader, recorder event.Recorder) tfClient.TfProxyConnectorI[*v1alpha1.ServiceInstance] {
 	return siClient.NewServiceInstanceConnector(
-		saveCallback,
-		kube)
+		newSaveCallback(reader),
+		kube,
+		recorder)
 }
 
 var newServicePlanInitializerFn = func() Initializer {
@@ -68,26 +77,66 @@ var newServicePlanInitializerFn = func() Initializer {
 	}
 }
 
-// SaveConditionsFn Callback for persisting conditions in the CR
-var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error {
+// newSaveCallback builds the callback that persists the result of an
+// asynchronous terraform operation on the ServiceInstance.
+//
+// name identifies the ServiceInstance itself: the terraform shadow identity
+// the callbacks receive is resolved back to it by tfclient before we are
+// called, so it can be used as the lookup key directly.
+//
+// The write is retried on conflict. Upjet invokes an async callback exactly
+// once and only logs a returned error, so a single lost write is a permanently
+// lost async result — the very failure this whole path exists to prevent: an
+// unrecorded create failure lets the resource go Available, an unrecorded
+// destroy failure wedges the deprovision into an unbounded blind-retry loop.
+// The ServiceInstance status is written on every reconcile, so a callback
+// landing between a reconcile's read and its status write races it routinely.
+//
+// reader is the source the object is (re-)read from. It should be an uncached
+// reader: rebasing a conflict retry on a stale informer cache would just
+// produce the same conflict. A nil reader falls back to kube, which keeps the
+// function usable with a plain fake client.
+func newSaveCallback(reader client.Reader) tfClient.SaveConditionsFn {
+	return func(ctx context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error {
+		read := reader
+		if read == nil {
+			read = kube
+		}
 
-	si := &v1alpha1.ServiceInstance{}
+		write := func() error {
+			si := &v1alpha1.ServiceInstance{}
 
-	nn := types.NamespacedName{Name: name}
-	if kErr := kube.Get(ctx, nn, si); kErr != nil {
-		return errors.Wrap(kErr, errGetInstance)
+			if kErr := read.Get(ctx, name, si); kErr != nil {
+				return errors.Wrap(kErr, errGetInstance)
+			}
+
+			// Store the CR's current generation on each condition so that Observe() can
+			// detect whether the spec has changed since the async operation was triggered.
+			for i := range conditions {
+				conditions[i].ObservedGeneration = si.Generation
+			}
+			si.SetConditions(conditions...)
+
+			if uErr := kube.Status().Update(ctx, si); uErr != nil {
+				// Returned unwrapped so RetryOnConflict still recognises it.
+				if kerrors.IsConflict(uErr) {
+					return uErr
+				}
+				return errors.Wrap(uErr, errSaveData)
+			}
+			return nil
+		}
+
+		if err := retry.RetryOnConflict(retry.DefaultRetry, write); err != nil {
+			if kerrors.IsConflict(err) {
+				// Retries exhausted; wrapped here rather than inside write so
+				// the conflict stays recognisable across the retry loop.
+				return errors.Wrap(err, errSaveData)
+			}
+			return err
+		}
+		return nil
 	}
-
-	// Store the CR's current generation on each condition so that Observe() can
-	// detect whether the spec has changed since the async operation was triggered.
-	for i := range conditions {
-		conditions[i].ObservedGeneration = si.Generation
-	}
-	si.SetConditions(conditions...)
-
-	uErr := kube.Status().Update(ctx, si)
-
-	return errors.Wrap(uErr, errSaveData)
 }
 
 type connector struct {
@@ -185,6 +234,17 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 
+	// A refused external deprovision used to be completely invisible: no
+	// event, no condition, no error - only an info-level line from upjet's
+	// workspace. Surface it on the MR, once per distinct failure.
+	if meta.WasDeleted(cr) {
+		if lastErr, failed := lastAsyncDeleteFailure(cr); failed {
+			mrstatus.RecordOnChange(e.recorder, cr,
+				mrstatus.DeleteFailed(*cr.GetDeletionTimestamp(), lastErr),
+				mrstatus.EventReasonDeleteFailed)
+		}
+	}
+
 	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, err
@@ -192,6 +252,16 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	//Check for failed async operations ONCE, before the switch
 	if e.checkAsyncOperationFailure(cr) {
+		// This early return skips the UpToDate branch where the external-
+		// health veto normally runs, so an instance parked in a failed-update
+		// retry loop would keep whatever Ready condition it last had. Evaluate
+		// the veto here too. Known limitation: atProvider is refreshed only in
+		// the UpToDate branch, so on this path the veto judges the last
+		// refreshed observation (the folded-in async failure message is
+		// current either way).
+		if cond, unhealthy := externalHealthCondition(cr); unhealthy && !isObserveOnly(cr) {
+			cr.SetConditions(cond)
+		}
 		return managed.ExternalObservation{
 			ResourceExists:   true,
 			ResourceUpToDate: false,
@@ -237,11 +307,22 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
 				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 			}
-			// Only set Available condition if ManagementPolicy is not only "Observe", since Available condition sets Ready to True
-			// and we don't want that for Observe-only resources
+		}
+
+		// upstream issue #280: readiness must reflect the health of the external
+		// resource, not merely the fact that terraform applied our spec. Only set
+		// conditions if ManagementPolicy is not only "Observe", since readiness is
+		// not ours to assert for Observe-only resources.
+		//
+		// No error is returned for an unhealthy instance: Synced stays truthful
+		// (the provider did apply the spec) and the reconciler is not driven into
+		// a retry loop for a condition no retry can fix.
+		if cond, unhealthy := externalHealthCondition(cr); unhealthy {
 			if !isObserveOnly(cr) {
-				cr.SetConditions(xpv1.Available())
+				cr.SetConditions(cond)
 			}
+		} else if data != nil && !isObserveOnly(cr) {
+			cr.SetConditions(xpv1.Available())
 		}
 
 		return managed.ExternalObservation{
@@ -425,6 +506,132 @@ func (e *external) checkAsyncOperationFailure(cr *v1alpha1.ServiceInstance) bool
 	}
 
 	return false
+}
+
+// lastAsyncDeleteFailure returns the message of the last failed async destroy,
+// if there was one.
+//
+// Upjet classifies destroy failures as DestroyFailure or AsyncDeleteFailure,
+// and for errors it cannot classify at all falls back to a condition of type
+// "Unknown" with reason "Unknown". ApplyFailure is accepted as well because
+// terraform also reports a refused deprovision that way.
+//
+// None of those reasons identify the verb: the create and update paths write
+// exactly the same ApplyFailure and "Unknown" conditions. A failure is
+// therefore only read as a DESTROY failure when it was recorded at or after the
+// deletion timestamp — before that timestamp the managed reconciler has not
+// called Delete() even once, so the failure necessarily belongs to an earlier
+// create or update. Without that gate the first Observe after a user deletes an
+// instance whose async create had failed would assert a delete failure that
+// never happened, and emit a Warning event for it.
+//
+// This is deliberately separate from checkAsyncOperationFailure, which matches
+// only ApplyFailure and drives the not-up-to-date path: reporting a destroy
+// failure there would make the reconciler call Update() on a resource that is
+// being deleted.
+func lastAsyncDeleteFailure(cr *v1alpha1.ServiceInstance) (string, bool) {
+	deletedAt := cr.GetDeletionTimestamp()
+	if deletedAt == nil {
+		return "", false
+	}
+
+	failureReasons := map[xpv1.ConditionReason]bool{
+		ujresource.ReasonDestroyFailure:     true,
+		ujresource.ReasonAsyncDeleteFailure: true,
+		ujresource.ReasonApplyFailure:       true,
+		// Upjet's LastAsyncOperationCondition default branch emits reason
+		// "Unknown" for errors it cannot classify; a BTP-side refusal relayed
+		// through the terraform provider frequently lands there.
+		unclassifiedFailureReason: true,
+	}
+
+	for _, t := range []xpv1.ConditionType{
+		xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+		unclassifiedFailureType,
+	} {
+		c := cr.GetCondition(t)
+		if c.Status != corev1.ConditionFalse || !failureReasons[c.Reason] {
+			continue
+		}
+		// Second-granularity timestamps on both sides, so the boundary second
+		// counts as "after": missing a real destroy failure is worse than
+		// reporting one a second early.
+		if c.LastTransitionTime.Before(deletedAt) {
+			continue
+		}
+		return c.Message, true
+	}
+	return "", false
+}
+
+const (
+	// unclassifiedFailureType and unclassifiedFailureReason are what upjet's
+	// LastAsyncOperationCondition falls back to for an error it cannot map onto
+	// one of its known failure classes.
+	unclassifiedFailureType   = xpv1.ConditionType("Unknown")
+	unclassifiedFailureReason = xpv1.ConditionReason("Unknown")
+)
+
+// siStateFailed is the state BTP reports for a service instance whose last
+// provisioning, update or deprovisioning operation failed.
+const siStateFailed = "failed"
+
+// externalHealthCondition reports whether BTP considers the service instance
+// unhealthy, and builds the Ready=False condition carrying the platform detail.
+//
+// It reads status.atProvider — which upjet repopulates from the terraform
+// state on every Observe — rather than the async-operation conditions, so it
+// still fires if the async callback path is broken. That is deliberate defence
+// in depth: the callback path being broken is exactly what let unhealthy
+// instances report Ready=True in the first place.
+//
+// state == "failed" counts unconditionally. ready=false / usable=false on
+// their own count only on a NON-deleting instance, because both legitimately
+// go false while a deprovision is in flight.
+func externalHealthCondition(cr *v1alpha1.ServiceInstance) (xpv1.Condition, bool) {
+	at := cr.Status.AtProvider
+
+	failed := strings.EqualFold(at.State, siStateFailed)
+	degraded := !meta.WasDeleted(cr) &&
+		((at.Ready != nil && !*at.Ready) || (at.Usable != nil && !*at.Usable))
+	if !failed && !degraded {
+		return xpv1.Condition{}, false
+	}
+
+	msg := fmt.Sprintf("BTP reports the service instance as unhealthy: state=%q ready=%s usable=%s",
+		at.State, boolPtrStr(at.Ready), boolPtrStr(at.Usable))
+	if detail := lastAsyncFailureMessage(cr); detail != "" {
+		msg += "; last terraform operation: " + mrstatus.Truncate(detail, mrstatus.MaxMessageBytes)
+	}
+	return mrstatus.ExternalResourceFailed(msg, cr.Generation), true
+}
+
+// lastAsyncFailureMessage returns the message of the last failed async
+// operation, if any. Upjet records recognised failures under
+// "LastAsyncOperation" but falls back to a condition of type "Unknown" for
+// errors it cannot classify, so both are inspected.
+func lastAsyncFailureMessage(cr *v1alpha1.ServiceInstance) string {
+	for _, t := range []xpv1.ConditionType{
+		xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+		unclassifiedFailureType,
+	} {
+		if c := cr.GetCondition(t); c.Status == corev1.ConditionFalse && c.Message != "" {
+			return c.Message
+		}
+	}
+	return ""
+}
+
+// boolPtrStr renders an optional BTP boolean for a condition message,
+// distinguishing "reported false" from "not reported at all".
+func boolPtrStr(b *bool) string {
+	if b == nil {
+		return "unknown"
+	}
+	if *b {
+		return "true"
+	}
+	return "false"
 }
 
 func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
