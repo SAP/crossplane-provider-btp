@@ -1,5 +1,5 @@
 # Check the licenses of Go dependencies agains a list of allowed licenses.
-name: Check Go Dependency Licenses
+name: check-go-licenses
 
 on:
   workflow_call:
@@ -14,8 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  license-check:
-    name: Check licenses of dependencies
+  check-go-licenses:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repo

@@ -3,7 +3,7 @@
 # - Is copyright and licensing information available for every single file?
 # - Do license texts exist for all found license identifiers?
 # - Are there any other problems with detecting copyright and licensing information?
-name: Check REUSE Compliance
+name: check-reuse-scan
 permissions:
   contents: read
 
@@ -11,9 +11,9 @@ on:
   workflow_call:
 
 jobs:
-  lint-reuse:
+  check-reuse-lint:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-    - name: REUSE Compliance Check
+    - name: REUSE compliance check
       uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6.0.0
