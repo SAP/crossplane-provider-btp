@@ -63,6 +63,16 @@ func (s *ServiceInstanceMapper) TfResource(ctx context.Context, si *v1alpha1.Ser
 		sInstance.Spec.ForProvider.ServiceplanID = &si.Status.AtProvider.ServiceplanID
 	}
 
+	timeout := "60m"
+	if si.Spec.ForProvider.OperationTimeout != nil {
+		timeout = *si.Spec.ForProvider.OperationTimeout
+	}
+	sInstance.Spec.ForProvider.Timeouts = &v1alpha1.TimeoutsParameters{
+		Create: &timeout,
+		Update: &timeout,
+		Delete: &timeout,
+	}
+
 	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
 	condition := si.GetCondition(xpv1.TypeReady)
 	sInstance.SetConditions(condition)
