@@ -157,13 +157,18 @@ func TestObserve_CloudManagementAdoption(t *testing.T) {
 		}
 	})
 
-	// Regression: single-UUID external-name is NOT a fallback, so adoption
-	// must NOT fire even though the compound scheme would benefit from it.
-	// See internal/recovery/recovery.go for background.
-	t.Run("single-UUID external-name does NOT trigger adoption (phase-1 output)", func(t *testing.T) {
+	// A healthy phase-1 (bare UUID, binding not yet created) must not heal or
+	// requeue: the lookup finds no binding (sbID == ""), so there is nothing to
+	// heal and the two-phase Create must run phase-2 on its own. The instance is
+	// freshly created (in the ownership time window), which is the normal path —
+	// healing here would rewrite external-name to the same bare UUID and requeue,
+	// starving phase-2.
+	t.Run("healthy phase-1 (bare UUID, no binding in BTP) does NOT heal", func(t *testing.T) {
 		cr := cmForAdoption("cis-5", "plan-5")
-		meta.SetExternalName(cr, "80540c06-2955-4bce-9c43-ad78fecc7f62") // real UUID, non-compound
-		lk := &cmLookuperFake{siID: "should-not-be-set", sbID: "should-not-be-set", found: true}
+		meta.SetExternalName(cr, "80540c06-2955-4bce-9c43-ad78fecc7f62") // real instance UUID, non-compound
+		// Lookup finds our instance but NO binding yet (phase-1). Instance is
+		// freshly created → within the ownership time window.
+		lk := &cmLookuperFake{siID: "80540c06-2955-4bce-9c43-ad78fecc7f62", sbID: "", siCreatedAt: createPendingAtCM.Add(2 * time.Second), found: true}
 		e := external{
 			kube: &test.MockClient{
 				MockUpdate:       test.NewMockUpdateFn(nil),
@@ -174,13 +179,10 @@ func TestObserve_CloudManagementAdoption(t *testing.T) {
 		}
 		_, err := e.Observe(context.TODO(), cr)
 		if err != nil {
-			t.Fatalf("expected nil error (adoption skipped), got %v", err)
+			t.Fatalf("expected nil error (recovery must not fire on healthy phase-1), got %v", err)
 		}
 		if got := meta.GetExternalName(cr); got != "80540c06-2955-4bce-9c43-ad78fecc7f62" {
-			t.Errorf("external-name must be unchanged (adoption must not run), got %q", got)
-		}
-		if lk.gotPlan != "" {
-			t.Errorf("lookup must NOT have been invoked, got planID=%q", lk.gotPlan)
+			t.Errorf("external-name must be unchanged (phase-1 not altered), got %q", got)
 		}
 	})
 
@@ -241,6 +243,99 @@ func TestObserve_CloudManagementAdoption(t *testing.T) {
 		}
 		if lk.gotPlan != "" {
 			t.Errorf("lookup must NOT be invoked when Create was never attempted, got planID=%q", lk.gotPlan)
+		}
+	})
+
+	// Truncated-compound state: bare instance UUID, binding still in BTP. Heals
+	// back to the compound name via the instance-ID match. The time window is
+	// broken (siCreatedAt before pending) to model the Conflict loop where
+	// IsOwnedByCR can never pass.
+	t.Run("truncated compound external-name heals via instance-ID match despite broken time window", func(t *testing.T) {
+		cr := cmForAdoption("cis-truncated", "plan-1")
+		meta.SetExternalName(cr, "11111111-1111-1111-1111-111111111111") // bare instance UUID, binding-ID lost
+		lk := &cmLookuperFake{
+			siID:        "11111111-1111-1111-1111-111111111111", // same instance we already hold
+			sbID:        "22222222-2222-2222-2222-222222222222",
+			siCreatedAt: createPendingAtCM.Add(-time.Hour), // window broken: brownfield by time
+			found:       true,
+		}
+		e := external{
+			kube: &test.MockClient{
+				MockUpdate:       test.NewMockUpdateFn(nil),
+				MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+			},
+			tfClient:           TfClientFake{observeFn: notExisting},
+			newAdminLookuperFn: cmFactory(lk),
+		}
+		_, err := e.Observe(context.TODO(), cr)
+		if !errors.Is(err, recovery.ErrRequeueAfterRecovery) {
+			t.Fatalf("expected ErrRequeueAfterRecovery, got %v", err)
+		}
+		if got := meta.GetExternalName(cr); got != "11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222" {
+			t.Errorf("external-name = %q, want the healed compound name", got)
+		}
+	})
+
+	// Safety: a truncated external-name whose instance UUID does not match the
+	// found instance is brownfield (time window also broken) — refuse, leave
+	// external-name untouched.
+	t.Run("truncated compound external-name with mismatched instance ID is refused brownfield", func(t *testing.T) {
+		cr := cmForAdoption("cis-mismatch", "plan-1")
+		meta.SetExternalName(cr, "11111111-1111-1111-1111-111111111111") // bare UUID we hold
+		lk := &cmLookuperFake{
+			siID:        "33333333-3333-3333-3333-333333333333", // DIFFERENT instance found by lookup
+			sbID:        "44444444-4444-4444-4444-444444444444",
+			siCreatedAt: createPendingAtCM.Add(-time.Hour), // window also broken
+			found:       true,
+		}
+		rec := &cmRecorderFake{}
+		e := external{
+			kube: &test.MockClient{
+				MockUpdate:       test.NewMockUpdateFn(nil),
+				MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+			},
+			tfClient:           TfClientFake{observeFn: notExisting},
+			newAdminLookuperFn: cmFactory(lk),
+			recorder:           rec,
+		}
+		_, err := e.Observe(context.TODO(), cr)
+		if err != nil {
+			t.Fatalf("expected nil error (recovery declined), got %v", err)
+		}
+		if got := meta.GetExternalName(cr); got != "11111111-1111-1111-1111-111111111111" {
+			t.Errorf("external-name must be unchanged, got %q", got)
+		}
+		if !rec.has(recovery.EventReasonRefusedBrownfield) {
+			t.Errorf("expected %q event, got %+v", recovery.EventReasonRefusedBrownfield, rec.events)
+		}
+	})
+
+	// A bare UUID with ResourceExists=true is a healthy phase-1 intermediate:
+	// the guard requires !ResourceExists, so the heal must not fire.
+	t.Run("bare-UUID external-name with ResourceExists=true does NOT trigger recovery", func(t *testing.T) {
+		existing := func() (cmclient.ResourcesStatus, error) {
+			return cmclient.ResourcesStatus{ExternalObservation: managed.ExternalObservation{ResourceExists: true}}, nil
+		}
+		cr := cmForAdoption("cis-phase1", "plan-1")
+		meta.SetExternalName(cr, "11111111-1111-1111-1111-111111111111")
+		lk := &cmLookuperFake{siID: "must-not-be-used", sbID: "must-not-be-used", found: true}
+		e := external{
+			kube: &test.MockClient{
+				MockUpdate:       test.NewMockUpdateFn(nil),
+				MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+			},
+			tfClient:           TfClientFake{observeFn: existing},
+			newAdminLookuperFn: cmFactory(lk),
+		}
+		_, err := e.Observe(context.TODO(), cr)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+		if got := meta.GetExternalName(cr); got != "11111111-1111-1111-1111-111111111111" {
+			t.Errorf("external-name must be unchanged, got %q", got)
+		}
+		if lk.gotPlan != "" {
+			t.Errorf("lookup must NOT be invoked while ResourceExists, got planID=%q", lk.gotPlan)
 		}
 	})
 }
