@@ -1,0 +1,32 @@
+# ──────────────────────────────────────────────────────────────────
+# account.btp.sap.crossplane.io — Subaccounts
+# ──────────────────────────────────────────────────────────────────
+# Tracks every Subaccount managed resource.
+# Default ManagedMetric convenience dimensions include:
+#   cluster, group, version, kind, ready, synced
+# Custom dimensions below add BTP-specific context.
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: ManagedMetric
+metadata:
+  name: btp-subaccounts
+spec:
+  name: btp_subaccount_count
+  description: "Count of SAP BTP Subaccount managed resources, labelled by ready/synced state and subaccount name"
+  kind: Subaccount
+  group: account.btp.sap.crossplane.io
+  version: v1alpha1
+  interval: "1m"
+  dimensions:
+    - name: name
+      fieldPath: "metadata.name"
+    - name: subaccount_id
+      fieldPath: "status.atProvider.subaccountId"
+    - name: region
+      fieldPath: "spec.forProvider.region"
+    - name: condition_ready
+      fieldPath: "status.conditions[?(@.type=='Ready')]"
+      type: slice
+    - name: condition_synced
+      fieldPath: "status.conditions[?(@.type=='Synced')]"
+      type: slice
+  # dataSinkRef omitted → uses DataSink named "default"
