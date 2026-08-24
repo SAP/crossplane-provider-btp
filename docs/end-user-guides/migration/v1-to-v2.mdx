@@ -62,6 +62,30 @@ While the v1.x controller still runs, so it clears finalizers cleanly:
 kubectl delete globalaccounts.account.btp.sap.crossplane.io --all
 ```
 
+### 4. Pin `planName` on ServiceManager if you rely on the default
+
+v2.0.0 changes the default `ServiceManager` `spec.forProvider.planName` from `service-operator-access` to
+`subaccount-admin`. `service-operator-access` is for the [SAP BTP Service Operator](https://github.com/SAP/sap-btp-service-operator/blob/main/README.md);
+`subaccount-admin` is the general-purpose plan for direct API access.
+
+Existing resources are safe: the default applies only at create time, then persists, and `planName` is
+immutable. The one risk is a fresh create or GitOps recreate that omits `planName` - it silently gets
+`subaccount-admin`, which can't be changed in place. List any `ServiceManager` that omits the field:
+
+```sh
+kubectl get servicemanagers.account.btp.sap.crossplane.io -A \
+  -o jsonpath='{range .items[?(!@.spec.forProvider.planName)]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}'
+```
+
+If any back the SAP BTP Service Operator, pin the plan - a no-op for running resources, and it makes GitOps
+re-creates deterministic:
+
+```yaml
+spec:
+  forProvider:
+    planName: service-operator-access
+```
+
 ## After you upgrade
 
 Upgrade succeeds either way and **no BTP-side data is lost**. If you skipped step 3, clean up now -
@@ -87,6 +111,9 @@ until the CRs are gone - just delete the CRs and it resolves.
   easy to miss. Highest impact.
 - **Refs (2)** - resources using `globalAccountRef` / `globalAccountSelector` fail to resolve.
 - **Cleanup (3)** - orphaned CRs and the `globalaccounts` CRD linger until removed manually.
+- **planName (4)** - existing ServiceManagers are unaffected. Only a fresh create or GitOps recreate that
+  omits `planName` adopts the new `subaccount-admin` default; if it backed the SAP BTP Service Operator,
+  fixing the plan needs a delete + recreate (immutable). Lowest impact of the four.
 
 ## Not covered
 
