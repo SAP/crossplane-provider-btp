@@ -185,21 +185,34 @@ func loadSaCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.Pro
 }
 
 // LoadDestinationCredentials reads the Destination Service binding secret
-// referenced by pc.Spec.DestinationServiceSecret. Returns the raw secret bytes
-// (JSON binding with clientid, clientsecret, tokenurl, uri) or an error if
-// the field is not configured.
+// referenced by pc.Spec.DestinationServiceSecret. Supports two formats:
+//
+// Format A — flat JSON (single key): SecretRef.Key is set.
+// The key's value must be a JSON object with clientid, clientsecret, tokenurl, uri.
+//
+// Format B — service binding flat keys: SecretRef.Key is empty.
+// The secret has individual keys clientid, clientsecret, tokenurl, uri
+// (as produced by SubaccountServiceBinding). These are assembled into a JSON object.
 func LoadDestinationCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig) ([]byte, error) {
 	if pc.Spec.DestinationServiceSecret == nil {
 		return nil, errors.New(errDestinationCredsNotSet)
 	}
 	cd := pc.Spec.DestinationServiceSecret
 
-	data, err := resource.CommonCredentialExtractor(
-		ctx,
-		cd.Source,
-		kube,
-		cd.CommonCredentialSelectors,
-	)
+	// Format B: no key set — read individual fields from the secret directly.
+	if cd.SecretRef != nil && cd.SecretRef.Key == "" {
+		var secret corev1.Secret
+		if err := kube.Get(ctx, types.NamespacedName{
+			Namespace: cd.SecretRef.Namespace,
+			Name:      cd.SecretRef.Name,
+		}, &secret); err != nil {
+			return nil, errors.Wrap(err, errGetDestinationCreds)
+		}
+		return assembleDestinationCredJSON(secret.Data)
+	}
+
+	// Format A: single key containing JSON.
+	data, err := resource.CommonCredentialExtractor(ctx, cd.Source, kube, cd.CommonCredentialSelectors)
 	if err != nil {
 		return nil, errors.Wrap(err, errGetDestinationCreds)
 	}
@@ -207,6 +220,21 @@ func LoadDestinationCredentials(ctx context.Context, kube client.Client, pc *v1a
 		return nil, fmt.Errorf(errSecretKeyNotFound, errGetDestinationCreds, cd.SecretRef.Key)
 	}
 	return data, nil
+}
+
+// assembleDestinationCredJSON builds a flat JSON object from the individual
+// keys written by SubaccountServiceBinding (Format B).
+func assembleDestinationCredJSON(data map[string][]byte) ([]byte, error) {
+	required := []string{"clientid", "clientsecret", "tokenurl", "uri"}
+	cred := make(map[string]string, len(required))
+	for _, k := range required {
+		v, ok := data[k]
+		if !ok {
+			return nil, errors.Errorf("%s: required key %q not found in secret", errGetDestinationCreds, k)
+		}
+		cred[k] = string(v)
+	}
+	return json.Marshal(cred)
 }
 
 // decodes btp service operator generated format from map of byte slices to stringified json
