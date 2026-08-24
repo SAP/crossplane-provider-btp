@@ -69,13 +69,8 @@ v2.0.0 changes the default `ServiceManager` `spec.forProvider.planName` from `se
 `subaccount-admin` is the general-purpose plan for direct API access.
 
 Existing resources are safe: the default applies only at create time, then persists, and `planName` is
-immutable. The one risk is a fresh create or GitOps recreate that omits `planName` - it silently gets
-`subaccount-admin`, which can't be changed in place. List any `ServiceManager` that omits the field:
-
-```sh
-kubectl get servicemanagers.account.btp.sap.crossplane.io -A \
-  -o jsonpath='{range .items[?(!@.spec.forProvider.planName)]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}'
-```
+immutable. The one risk is a fresh create or GitOps recreate that omits `planName` - the CRD default now
+fills it with `subaccount-admin`.
 
 If any back the SAP BTP Service Operator, pin the plan - a no-op for running resources, and it makes GitOps
 re-creates deterministic:
