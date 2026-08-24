@@ -1,6 +1,6 @@
 # The on.pull_request pipeline runs on changes to a pull request. With this trigger, the pipeline never receives secrets from gh and the GITHUB_TOKEN is read only.
 # Therefore, we can not run our e2e tests here, this needs to be done in an on.pull_request_target pipeline.
-name: PullRequest Tests and Pre-Checks
+name: PR Tests and Pre-Checks
 
 on:
   pull_request:
