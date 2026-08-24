@@ -1,0 +1,535 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: subaccountdestinations.account.btp.sap.crossplane.io
+spec:
+  group: account.btp.sap.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - account
+    kind: SubaccountDestination
+    listKind: SubaccountDestinationList
+    plural: subaccountdestinations
+    singular: subaccountdestination
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Synced')].status
+      name: SYNCED
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .metadata.annotations.crossplane\.io/external-name
+      name: EXTERNAL-NAME
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          SubaccountDestination manages a destination in a SAP BTP subaccount via
+          the Destination Service REST API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SubaccountDestinationSpec defines the desired state.
+            properties:
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what will happen to the underlying external
+                  when this managed resource is deleted - either "Delete" or "Orphan" the
+                  external resource.
+                  This field is planned to be deprecated in favor of the ManagementPolicies
+                  field in a future release. Currently, both could be set independently and
+                  non-default values would be honored if the feature flag is enabled.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                enum:
+                - Orphan
+                - Delete
+                type: string
+              forProvider:
+                description: |-
+                  SubaccountDestinationParameters are the configurable fields of a SubaccountDestination.
+
+                  External-Name Configuration:
+                    - Follow Standard: yes
+                    - Format: <subaccount-id>/<destination-name>
+                    - How to find:
+                      - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)
+                      - API: GET /v1/subaccountDestinations/{destination name} (fields: subaccount_id + Name)
+                properties:
+                  additionalConfigurationSecretRef:
+                    description: |-
+                      AdditionalConfigurationSecretRef points to a Kubernetes Secret whose
+                      value (a JSON object) is merged into the destination property bag.
+                      Use for sensitive properties that must not appear in the CR spec.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  additionalProperties:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      AdditionalProperties are merged on top of typed fields when building
+                      the destination property bag sent to the Destination Service API.
+                      Use for authentication-specific fields such as User, Password,
+                      ClientId, ClientSecret, TokenServiceURL, etc.
+                    type: object
+                  authentication:
+                    description: Authentication type. e.g. NoAuthentication, BasicAuthentication,
+                      OAuth2ClientCredentials.
+                    type: string
+                  description:
+                    description: Description of the destination.
+                    type: string
+                  name:
+                    description: |-
+                      Name of the destination. Immutable after creation.
+                      Used as the second segment of the external-name annotation.
+                    type: string
+                  proxyType:
+                    description: ProxyType. e.g. Internet, OnPremise, PrivateLink.
+                    type: string
+                  serviceInstanceId:
+                    description: |-
+                      ServiceInstanceID scopes this destination to a service instance.
+                      Not yet implemented — setting this field returns an error.
+                    type: string
+                  subaccountId:
+                    description: SubaccountID is the GUID of the subaccount that owns
+                      this destination.
+                    type: string
+                  subaccountRef:
+                    description: Reference to a Subaccount to populate subaccountId.
+                    properties:
+                      name:
+                        description: Name of the referenced object.
+                        type: string
+                      policy:
+                        description: Policies for referencing.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  subaccountSelector:
+                    description: Selector for a Subaccount to populate subaccountId.
+                    properties:
+                      matchControllerRef:
+                        description: |-
+                          MatchControllerRef ensures an object with the same controller reference
+                          as the selecting object is selected.
+                        type: boolean
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels ensures an object with matching labels
+                          is selected.
+                        type: object
+                      policy:
+                        description: Policies for selection.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    type: object
+                  type:
+                    description: Type of the destination. e.g. HTTP, LDAP, RFC, MAIL.
+                    type: string
+                  url:
+                    description: URL of the destination.
+                    type: string
+                required:
+                - name
+                - type
+                type: object
+              initProvider:
+                description: |-
+                  SubaccountDestinationInitParameters holds the reference fields needed by
+                  the crossplane reference resolver generator. Mirrors the reference fields
+                  in SubaccountDestinationParameters.
+                properties:
+                  additionalConfigurationSecretRef:
+                    description: AdditionalConfigurationSecretRef for sensitive destination
+                      properties.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  additionalProperties:
+                    additionalProperties:
+                      type: string
+                    description: AdditionalProperties merged into the destination
+                      property bag.
+                    type: object
+                  authentication:
+                    description: Authentication type.
+                    type: string
+                  description:
+                    description: Description of the destination.
+                    type: string
+                  name:
+                    description: Name of the destination. Immutable after creation.
+                    type: string
+                  proxyType:
+                    description: ProxyType.
+                    type: string
+                  serviceInstanceId:
+                    description: ServiceInstanceID scopes this destination to a service
+                      instance.
+                    type: string
+                  subaccountId:
+                    description: SubaccountID is the GUID of the subaccount that owns
+                      this destination.
+                    type: string
+                  subaccountRef:
+                    description: Reference to a Subaccount to populate subaccountId.
+                    properties:
+                      name:
+                        description: Name of the referenced object.
+                        type: string
+                      policy:
+                        description: Policies for referencing.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  subaccountSelector:
+                    description: Selector for a Subaccount to populate subaccountId.
+                    properties:
+                      matchControllerRef:
+                        description: |-
+                          MatchControllerRef ensures an object with the same controller reference
+                          as the selecting object is selected.
+                        type: boolean
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels ensures an object with matching labels
+                          is selected.
+                        type: object
+                      policy:
+                        description: Policies for selection.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    type: object
+                  type:
+                    description: Type of the destination. e.g. HTTP, LDAP, RFC, MAIL.
+                    type: string
+                  url:
+                    description: URL of the destination.
+                    type: string
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  THIS IS A BETA FIELD. It is on by default but can be opted out
+                  through a Crossplane feature flag.
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                  This field is planned to replace the DeletionPolicy field in a future
+                  release. Currently, both could be set independently and non-default
+                  values would be honored if the feature flag is enabled. If both are
+                  custom, the DeletionPolicy field will be ignored.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  name: default
+                description: |-
+                  ProviderConfigReference specifies how the provider that will be used to
+                  create, observe, update, and delete this managed resource should be
+                  configured.
+                properties:
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                  policy:
+                    description: Policies for referencing.
+                    properties:
+                      resolution:
+                        default: Required
+                        description: |-
+                          Resolution specifies whether resolution of this reference is required.
+                          The default is 'Required', which means the reconcile will fail if the
+                          reference cannot be resolved. 'Optional' means this reference will be
+                          a no-op if it cannot be resolved.
+                        enum:
+                        - Required
+                        - Optional
+                        type: string
+                      resolve:
+                        description: |-
+                          Resolve specifies when this reference should be resolved. The default
+                          is 'IfNotPresent', which will attempt to resolve the reference only when
+                          the corresponding field is not present. Use 'Always' to resolve the
+                          reference on every reconcile.
+                        enum:
+                        - Always
+                        - IfNotPresent
+                        type: string
+                    type: object
+                required:
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the namespace and name of a
+                  Secret to which any connection details for this managed resource should
+                  be written. Connection details frequently include the endpoint, username,
+                  and password required to connect to the managed resource.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                  namespace:
+                    description: Namespace of the secret.
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            description: SubaccountDestinationStatus defines the observed state.
+            properties:
+              atProvider:
+                description: SubaccountDestinationObservation holds the fields observed
+                  from the Destination Service API.
+                properties:
+                  authentication:
+                    description: Authentication type as reported by the API.
+                    type: string
+                  creationTime:
+                    description: CreationTime metadata from the API.
+                    type: string
+                  description:
+                    description: Description as reported by the API.
+                    type: string
+                  etag:
+                    description: ETag for optimistic concurrency on updates.
+                    type: string
+                  modificationTime:
+                    description: ModificationTime metadata from the API.
+                    type: string
+                  name:
+                    description: Name of the destination as reported by the API.
+                    type: string
+                  proxyType:
+                    description: ProxyType as reported by the API.
+                    type: string
+                  rawProperties:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      RawProperties is the full property bag as returned by the Destination Service API.
+                      Used internally to determine whether an update is needed.
+                    type: object
+                  subaccountId:
+                    description: SubaccountID as reported by the API.
+                    type: string
+                  url:
+                    description: URL as reported by the API.
+                    type: string
+                type: object
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
