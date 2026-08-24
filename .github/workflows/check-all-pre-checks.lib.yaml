@@ -1,0 +1,34 @@
+# Bundles all pre-checks: go licenses, REUSE compliance, unit tests, reviewable diff.
+name: check-all-pre-checks
+
+on:
+  workflow_call:
+    inputs:
+      allowed_licenses:
+        description: 'Comma-separated list of allowed SPDX license identifiers'
+        required: false
+        type: string
+        default: 'Apache-2.0,BSD-3-Clause,MIT,MPL-2.0,ISC,BSD-2-Clause,Unicode-DFS-2016,BSD-0-Clause'
+
+jobs:
+  run-go-license-check:
+    uses: ./.github/workflows/check-go-licenses.lib.yaml
+    permissions:
+      contents: read
+    with:
+      allowed_licenses: ${{ inputs.allowed_licenses }}
+
+  run-reuse-license-check:
+    uses: ./.github/workflows/check-reuse-scan.lib.yaml
+    permissions:
+      contents: read
+
+  run-unit-test:
+    uses: ./.github/workflows/check-unit-tests.lib.yaml
+    permissions:
+      contents: read
+
+  run-make-reviewable-and-check-diff:
+    uses: ./.github/workflows/check-reviewable-diff.lib.yaml
+    permissions:
+      contents: read

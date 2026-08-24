@@ -16,14 +16,5 @@ permissions:
   contents: read
 
 jobs:
-  run-go-license-check:
-    uses: ./.github/workflows/check-go-licenses.lib.yaml
-
-  run-reuse-license-check:
-    uses: ./.github/workflows/check-reuse-scan.lib.yaml
-
-  run-unit-test:
-    uses: ./.github/workflows/check-unit-tests.lib.yaml
-
-  run-make-reviewable-and-check-diff:
-    uses: ./.github/workflows/check-reviewable-diff.lib.yaml
+  run-pre-checks:
+    uses: ./.github/workflows/check-all-pre-checks.lib.yaml

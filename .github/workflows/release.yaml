@@ -12,33 +12,15 @@ on:
           required: true
 
 jobs:
-    run-go-license-check:
-      uses: ./.github/workflows/check-go-licenses.lib.yaml
-      permissions:
-        contents: read
-
-    run-reuse-license-check:
-      uses: ./.github/workflows/check-reuse-scan.lib.yaml
-      permissions:
-        contents: read
-
-    run-unit-test:
-      uses: ./.github/workflows/check-unit-tests.lib.yaml
-      permissions:
-        contents: read
-
-    run-make-reviewable-and-check-diff:
-      uses: ./.github/workflows/check-reviewable-diff.lib.yaml
+    run-pre-checks:
+      uses: ./.github/workflows/check-all-pre-checks.lib.yaml
       permissions:
         contents: read
 
     run-e2e-test:
       uses: ./.github/workflows/e2e_test.yaml
       needs:
-      - run-go-license-check
-      - run-reuse-license-check
-      - run-unit-test
-      - run-make-reviewable-and-check-diff
+      - run-pre-checks
       with:
         environment: pr-e2e-no-approval
       secrets: inherit
@@ -48,9 +30,7 @@ jobs:
     release:
       runs-on: ubuntu-latest
       needs:
-      - run-go-license-check
-      - run-unit-test
-      - run-make-reviewable-and-check-diff
+      - run-pre-checks
       - run-e2e-test
       # Releases need permissions to read and write the repository contents.
       # GitHub considers creating releases and uploading assets as writing contents.
@@ -78,7 +58,6 @@ jobs:
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
         with:
           version: v0.36.0
-          install: true
 
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
