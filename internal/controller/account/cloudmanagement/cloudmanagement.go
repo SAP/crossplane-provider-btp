@@ -224,7 +224,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	// Recovery: BTP has a matching resource but our external-name is a fallback
 	// or a truncated compound (bare instance UUID). Fires only when
 	// ResourceExists is false, so a healthy phase-1→phase-2 create is untouched.
-	extName := meta.GetExternalName(cr)
 	if err == nil && !resStatus.ResourceExists &&
 		(recovery.IsFallbackExternalName(cr.Name, extName) ||
 			recovery.IsTruncatedCompoundExternalName(cr.Name, extName)) {
