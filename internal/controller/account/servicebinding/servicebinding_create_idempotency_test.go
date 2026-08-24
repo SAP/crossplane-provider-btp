@@ -154,11 +154,16 @@ func TestCreate_Idempotency(t *testing.T) {
 		}
 	})
 
-	t.Run("brownfield match is refused, so a fresh binding is created", func(t *testing.T) {
+	t.Run("committed-name match is adopted even outside the IsOwnedByCR window", func(t *testing.T) {
 		cr := sbRotating("sb-5", "si-5", "test-binding")
 		meta.AddAnnotations(cr, map[string]string{servicebindingclient.PendingBindingNameKey: "test-binding-prior"})
 
-		// createdAt far outside the ownership window -> IsOwnedByCR false.
+		// createdAt far outside the ownership window: on the heal path this would
+		// be refused as brownfield, but the committed pending name carries a
+		// random suffix we generated and persisted, so a match under it is
+		// necessarily our own prior attempt. Adopt it rather than duplicate-create
+		// (crossplane-runtime refreshes external-create-pending before each retry,
+		// which would otherwise push the prior binding below the window).
 		lk := &sbLookuperFake{guid: adoptGUID, createdAt: createPendingAtSB.Add(-time.Hour), found: true}
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
@@ -171,12 +176,12 @@ func TestCreate_Idempotency(t *testing.T) {
 		if _, err := e.Create(context.Background(), cr); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		// Not adopted: a normal create ran under the committed name.
-		if len(factory.CreateClientCalls) != 1 {
-			t.Fatalf("want 1 CreateClient call, got %d", len(factory.CreateClientCalls))
+		// Adopted: no create ran, external-name is the adopted GUID.
+		if len(factory.CreateClientCalls) != 0 {
+			t.Fatalf("must NOT create when adopting, got %d CreateClient calls", len(factory.CreateClientCalls))
 		}
-		if got := meta.GetExternalName(cr); got != createdGUID {
-			t.Errorf("external-name = %q, want freshly created %q", got, createdGUID)
+		if got := meta.GetExternalName(cr); got != adoptGUID {
+			t.Errorf("external-name = %q, want adopted %q", got, adoptGUID)
 		}
 	})
 

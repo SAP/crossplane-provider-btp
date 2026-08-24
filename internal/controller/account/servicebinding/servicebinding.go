@@ -323,7 +323,16 @@ func (e *external) resolveCreateName(ctx context.Context, cr *v1alpha1.ServiceBi
 		}
 	}
 
-	guid, found, err := e.lookupOwnedBinding(ctx, cr, name)
+	// The committed pending name carries a random suffix we generated and
+	// persisted (step 2) before any external call, so a binding found under it
+	// is necessarily one of our own prior Create attempts — the name itself is
+	// the ownership proof. Pass nameIsOwnershipProof=true so adoption does not
+	// hinge on IsOwnedByCR's time window: crossplane-runtime refreshes
+	// external-create-pending before every Create, and a retry landing more than
+	// ownershipClockSkew after the crashed attempt would push that attempt's own
+	// binding below the refreshed window, causing a duplicate create under the
+	// committed name.
+	guid, found, err := e.lookupOwnedBinding(ctx, cr, name, true)
 	if err != nil {
 		return "", false, err
 	}
@@ -414,7 +423,7 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBin
 		name = cr.Status.AtProvider.Name
 	}
 
-	guid, found, err := e.lookupOwnedBinding(ctx, cr, name)
+	guid, found, err := e.lookupOwnedBinding(ctx, cr, name, false)
 	if err != nil {
 		// Best-effort: lookupOwnedBinding already logged and emitted an event.
 		// Do not block Observe; the next reconcile retries.
@@ -437,14 +446,24 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBin
 
 // lookupOwnedBinding runs the subaccount-admin semantic lookup for a binding
 // named `name` under the CR's resolved parent service instance and returns its
-// GUID only if it passes the ownership check — i.e. it was plausibly created by
-// our own Create() attempt for this CR (recovery.IsOwnedByCR).
+// GUID only if it passes the ownership check.
+//
+// Ownership is established one of two ways:
+//   - nameIsOwnershipProof=false (heal/brownfield path): the match must fall
+//     inside recovery.IsOwnedByCR's create-attempt time window. This keeps the
+//     Observe-time recovery a strict bug-fix rather than a brownfield import.
+//   - nameIsOwnershipProof=true (committed-pending-name adoption path): the
+//     caller looked up a name carrying a random suffix it generated and
+//     persisted before any external call, so a match IS necessarily our own
+//     prior attempt. The IsOwnedByCR time window is skipped — it would reject
+//     the prior attempt's own binding once external-create-pending is refreshed
+//     on retry (>ownershipClockSkew later), causing a duplicate create.
 //
 // found is true only for an owned match. A (false, nil) return means "no owned
 // binding; the caller may safely create one". Lookup/config errors are logged,
 // evented, and returned so each caller can decide: heal swallows them
 // (best-effort), Create propagates them (retry rather than risk a duplicate).
-func (e *external) lookupOwnedBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, name string) (string, bool, error) {
+func (e *external) lookupOwnedBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, name string, nameIsOwnershipProof bool) (string, bool, error) {
 	if e.newAdminLookuperFn == nil {
 		return "", false, nil
 	}
@@ -471,7 +490,7 @@ func (e *external) lookupOwnedBinding(ctx context.Context, cr *v1alpha1.ServiceB
 		return "", false, nil
 	}
 
-	if !recovery.IsOwnedByCR(cr, createdAt) {
+	if !nameIsOwnershipProof && !recovery.IsOwnedByCR(cr, createdAt) {
 		log.FromContext(ctx).Info("external-name recovery refused: BTP service binding is outside our Create-attempt window (brownfield)",
 			"serviceInstanceID", serviceInstanceID, "name", name, "guid", guid,
 			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", createdAt)
