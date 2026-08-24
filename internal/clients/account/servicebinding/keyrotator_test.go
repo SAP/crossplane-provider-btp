@@ -475,10 +475,12 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 
 func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 	tests := []struct {
-		name        string
-		cr          *v1alpha1.ServiceBinding
-		mockDeleter BindingDeleter
-		wantErr     bool
+		name           string
+		cr             *v1alpha1.ServiceBinding
+		mockDeleter    BindingDeleter
+		wantErr        bool
+		wantAttempts   int32
+		wantLastErrSet bool
 	}{
 		{
 			name: "DeleteAllRetiredKeysSuccessfully",
@@ -517,6 +519,13 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 							RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
 							DeletionDate: nil,
 						},
+						{
+							ID:           "key2",
+							Name:         "name2",
+							CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+							RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
+							DeletionDate: nil,
+						},
 					},
 				},
 			},
@@ -524,6 +533,34 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 				err: errMockInstanceDelete,
 			},
 			wantErr: true,
+			// A stuck key must not hide the others: every key is attempted and
+			// each failure records the attempt/error so the leak is alertable.
+			wantAttempts:   1,
+			wantLastErrSet: true,
+		},
+		{
+			name: "DeleteRetiredKeysWithTransientVerifyError",
+			cr: &v1alpha1.ServiceBinding{
+				Status: v1alpha1.ServiceBindingStatus{
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "key1",
+							Name:         "name1",
+							CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+							RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
+							DeletionDate: nil,
+						},
+					},
+				},
+			},
+			mockDeleter: &MockInstanceDeleter{
+				err: fmt.Errorf("read-back failed: %w", ErrVerifyTransient),
+			},
+			wantErr: true,
+			// A transient verification failure is not a proven leak: retry
+			// without recording failure bookkeeping.
+			wantAttempts:   0,
+			wantLastErrSet: false,
 		},
 		{
 			name: "NoRetiredKeys",
@@ -553,6 +590,17 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 
 			expectedCallCount := len(tt.cr.Status.RetiredKeys)
 			assert.Equal(t, expectedCallCount, mockDeleter.deleteCallCount)
+
+			// Bookkeeping is consistent with DeleteExpiredKeys: a proven delete
+			// failure records the attempt/error, a transient verify failure does not.
+			for _, key := range tt.cr.Status.RetiredKeys {
+				assert.Equal(t, tt.wantAttempts, key.DeletionAttempts)
+				if tt.wantLastErrSet {
+					assert.NotEmpty(t, key.LastDeletionError)
+				} else {
+					assert.Empty(t, key.LastDeletionError)
+				}
+			}
 		})
 	}
 }

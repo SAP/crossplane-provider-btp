@@ -274,10 +274,23 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 }
 
 func (r *SBKeyRotator) DeleteRetiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
+	var errs []error
+
 	for _, retiredKey := range cr.Status.RetiredKeys {
 		if err := r.bindingDeleter.DeleteBinding(ctx, cr, retiredKey.Name, retiredKey.ID); err != nil {
-			return fmt.Errorf("%s %s: %w", errDeleteRetiredKey, retiredKey.ID, err)
+			// A transient failure of the verification read-back does not prove
+			// the binding still exists, retry
+			if errors.Is(err, ErrVerifyTransient) {
+				errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteRetiredKey, retiredKey.ID, err))
+				continue
+			}
+			// Record the failure so the leak is visible and alertable, and keep
+			// going so a single stuck key does not hide the state of the others.
+			retiredKey.DeletionAttempts++
+			retiredKey.LastDeletionError = err.Error()
+			errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteRetiredKey, retiredKey.ID, err))
 		}
 	}
-	return nil
+
+	return errors.Join(errs...)
 }
