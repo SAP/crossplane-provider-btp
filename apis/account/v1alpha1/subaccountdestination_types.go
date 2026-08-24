@@ -186,8 +186,8 @@ type SubaccountDestinationSpec struct {
 
 // SubaccountDestinationStatus defines the observed state.
 type SubaccountDestinationStatus struct {
-	xpv1.ConditionedStatus `json:",inline"`
-	AtProvider             SubaccountDestinationObservation `json:"atProvider,omitempty"`
+	xpv1.ResourceStatus `json:",inline"`
+	AtProvider          SubaccountDestinationObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true
