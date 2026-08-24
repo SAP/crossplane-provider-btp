@@ -220,7 +220,7 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.Service
 		return nil
 	}
 
-	externalNameInstanceID, existingBID, _ := strings.Cut(meta.GetExternalName(cr), "/")
+	externalNameInstanceID, _, _ := strings.Cut(meta.GetExternalName(cr), "/")
 
 	// Truncated external-name (bare instance UUID) with no binding found in BTP
 	// is a healthy phase-1: the instance UUID is already correct and there is no
@@ -231,15 +231,20 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.Service
 		return nil
 	}
 
-	// Ownership proof, either of:
-	//  - the time window vs external-create-pending (IsOwnedByCR); or
-	//  - the truncated-compound match: external-name is truncated (existingBID
-	//    == ""), the lookup found a real binding (sbID != ""), and the instance
-	//    UUID we hold equals the found instance.
-	ownedByTime := recovery.IsOwnedByCR(cr, instanceCreatedAt)
-	ownedByTruncatedMatch := existingBID == "" && sbID != "" &&
-		recovery.IsOwnedByExternalNameInstanceID(externalNameInstanceID, siID)
-	if !ownedByTime && !ownedByTruncatedMatch {
+	// Ownership proof depends on which state we're in:
+	//  - truncated: external-name holds our phase-1 instance UUID; ownership is
+	//    proven by matching that UUID against the found instance (stronger than
+	//    the time window, which cannot pass while a Conflict retry loop keeps
+	//    rewriting external-create-pending).
+	//  - fallback (external-name == "" or metadata.name): we have no UUID to
+	//    match, so fall back to the time window.
+	var owned bool
+	if truncated {
+		owned = sbID != "" && recovery.IsOwnedByExternalNameInstanceID(externalNameInstanceID, siID)
+	} else {
+		owned = recovery.IsOwnedByCR(cr, instanceCreatedAt)
+	}
+	if !owned {
 		log.FromContext(ctx).Info("external-name recovery refused: BTP service manager is outside our Create-attempt window (brownfield)",
 			"serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID,
 			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", instanceCreatedAt)
