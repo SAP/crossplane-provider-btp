@@ -35,6 +35,13 @@ type ProviderConfigSpec struct {
 
 	// GlobalAccount is the Global Account Subdomain.
 	GlobalAccount string `json:"globalAccount,omitempty"`
+
+	// DestinationServiceSecret holds credentials for the SAP Destination Service.
+	// Required only when SubaccountDestination resources are used.
+	// Obtain by creating a Destination service instance (plan: lite) and a service binding.
+	// The binding JSON must contain: clientid, clientsecret, tokenurl, uri.
+	// +optional
+	DestinationServiceSecret *ProviderCredentials `json:"destinationCredentials,omitempty"`
 }
 
 // ProviderCredentials required to authenticate.

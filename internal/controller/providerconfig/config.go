@@ -22,16 +22,18 @@ import (
 )
 
 const (
-	errGetPC              = "cannot get ProviderConfig"
-	errGetCISCreds        = "cannot get CIS credentials"
-	errGetSACreds         = "cannot get Service Account credentials"
-	errTrackRUsage        = "cannot track ResourceUsage"
-	errTrackPCUsage       = "cannot track ProviderConfig usage"
-	errNewClient          = "cannot create new Service"
-	errCisSecretEmpty     = "CIS Secret is empty or nil, please check config & secrets referenced in provider config"
-	errSaSecretEmpty      = "Service Account Secret is empty or nil, please check config & secrets referenced in provider config"
-	errSecretKeyNotFound  = "%s: %v key not found in secret data"
-	errCisSecretCorrupted = "CIS Secret does not match expected format"
+	errGetPC                   = "cannot get ProviderConfig"
+	errGetCISCreds             = "cannot get CIS credentials"
+	errGetSACreds              = "cannot get Service Account credentials"
+	errGetDestinationCreds     = "cannot get Destination Service credentials"
+	errTrackRUsage             = "cannot track ResourceUsage"
+	errTrackPCUsage            = "cannot track ProviderConfig usage"
+	errNewClient               = "cannot create new Service"
+	errCisSecretEmpty          = "CIS Secret is empty or nil, please check config & secrets referenced in provider config"
+	errSaSecretEmpty           = "Service Account Secret is empty or nil, please check config & secrets referenced in provider config"
+	errDestinationCredsNotSet  = "destinationCredentials not set in ProviderConfig — required for SubaccountDestination resources"
+	errSecretKeyNotFound       = "%s: %v key not found in secret data"
+	errCisSecretCorrupted      = "CIS Secret does not match expected format"
 )
 
 // Setup adds a controller that reconciles ProviderConfigs by accounting for
@@ -180,6 +182,31 @@ func loadSaCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.Pro
 	}
 
 	return ServiceAccountSecretData, nil
+}
+
+// LoadDestinationCredentials reads the Destination Service binding secret
+// referenced by pc.Spec.DestinationServiceSecret. Returns the raw secret bytes
+// (JSON binding with clientid, clientsecret, tokenurl, uri) or an error if
+// the field is not configured.
+func LoadDestinationCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig) ([]byte, error) {
+	if pc.Spec.DestinationServiceSecret == nil {
+		return nil, errors.New(errDestinationCredsNotSet)
+	}
+	cd := pc.Spec.DestinationServiceSecret
+
+	data, err := resource.CommonCredentialExtractor(
+		ctx,
+		cd.Source,
+		kube,
+		cd.CommonCredentialSelectors,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, errGetDestinationCreds)
+	}
+	if data == nil {
+		return nil, fmt.Errorf(errSecretKeyNotFound, errGetDestinationCreds, cd.SecretRef.Key)
+	}
+	return data, nil
 }
 
 // decodes btp service operator generated format from map of byte slices to stringified json
