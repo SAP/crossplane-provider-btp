@@ -84,20 +84,28 @@ spec:
 ## After you upgrade
 
 Upgrade succeeds either way and **no BTP-side data is lost**. If you skipped step 3, clean up now -
-Crossplane does **not** GC the removed CRD (the inactive old `ProviderRevision` keeps it). Order:
-**CRs first, then CRD.**
+Crossplane does **not** GC the removed CRD. The steps differ by Crossplane core version.
+
+### Core v1
 
 ```sh
 kubectl delete globalaccounts.account.btp.sap.crossplane.io --all
-
-# Any stuck in Terminating:
-kubectl patch globalaccount <name> --type=merge -p '{"metadata":{"finalizers":[]}}'
-
 kubectl delete crd globalaccounts.account.btp.sap.crossplane.io
 ```
 
-Delete the CRD before the CRs and the `customresourcecleanup` finalizer holds it in `Terminating`
-until the CRs are gone - just delete the CRs and it resolves.
+Delete the CRs first - the CRD's `customresourcecleanup` finalizer holds it in `Terminating` until
+they are gone.
+
+### Core v2
+
+The CRD is owned by a `ManagedResourceDefinition` (MRD) that re-creates it on every reconcile, so
+`kubectl delete crd` alone is a no-op. Delete the MRD first:
+
+```sh
+kubectl delete globalaccounts.account.btp.sap.crossplane.io --all
+kubectl delete managedresourcedefinition.apiextensions.crossplane.io globalaccounts.account.btp.sap.crossplane.io
+kubectl delete crd globalaccounts.account.btp.sap.crossplane.io
+```
 
 ## If you skip the steps
 
@@ -105,7 +113,8 @@ until the CRs are gone - just delete the CRs and it resolves.
   other resources, GitOps) get stale or missing credentials. No error is raised, so the break is
   easy to miss. Highest impact.
 - **Refs (2)** - resources using `globalAccountRef` / `globalAccountSelector` fail to resolve.
-- **Cleanup (3)** - orphaned CRs and the `globalaccounts` CRD linger until removed manually.
+- **Cleanup (3)** - orphaned CRs and the `globalaccounts` CRD linger until removed manually (on core
+  v2 also the `ManagedResourceDefinition`).
 - **planName (4)** - existing ServiceManagers are unaffected. Only a fresh create or GitOps recreate that
   omits `planName` adopts the new `subaccount-admin` default; if it backed the SAP BTP Service Operator,
   fixing the plan needs a delete + recreate (immutable). Lowest impact of the four.
