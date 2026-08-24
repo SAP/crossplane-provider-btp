@@ -31,6 +31,14 @@ const (
 	errDeleteRetiredKey = "cannot delete retired key"
 )
 
+// ErrVerifyTransient signals that a retired binding's deletion could not be
+// verified because the verification read-back itself failed with a transient
+// API error, as opposed to the binding provably still existing. Callers
+// retry the deletion without recording it as a delete failure: the binding may
+// in fact already be gone, so bumping DeletionAttempts / LastDeletionError would
+// raise a spurious "overdue leak" alert for a resource that is deleted.
+var ErrVerifyTransient = errors.New("servicebinding deletion verification could not be completed")
+
 // Condition types for ServiceBinding
 const (
 	TypeRotationStatus xpv1.ConditionType = "RotationStatus"
@@ -243,6 +251,15 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 		}
 
 		if err := r.bindingDeleter.DeleteBinding(ctx, cr, key.Name, key.ID); err != nil {
+			// A transient failure of the verification read-back does not prove
+			// the binding still exists: it may already be deleted. Keep the key
+			// so we retry, but skip the failure bookkeeping so we don't raise a
+			// spurious leak alert for a resource that is (likely) gone.
+			if errors.Is(err, ErrVerifyTransient) {
+				newRetiredKeys = append(newRetiredKeys, key)
+				errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteExpiredKey, key.ID, err))
+				continue
+			}
 			// If we cannot delete the key (or deletion could not be verified),
 			// keep it in the list and record the failure so the leak is visible
 			// and alertable.

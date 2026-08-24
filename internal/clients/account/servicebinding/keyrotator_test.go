@@ -3,6 +3,7 @@ package servicebindingclient
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -381,6 +382,34 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 			wantDeleteCallCount: 1,
 		},
 		{
+			name: "DeleteExpiredKeysWithTransientVerifyError",
+			cr: &v1alpha1.ServiceBinding{
+				Spec: v1alpha1.ServiceBindingSpec{
+					Rotation: &v1alpha1.RotationParameters{
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour},
+						Frequency: &providerv1alpha1.Duration{Duration: 30 * time.Minute},
+					},
+				},
+				Status: v1alpha1.ServiceBindingStatus{
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "expired-key",
+							Name:         "expired-name",
+							CreatedDate:  metav1.Time{Time: expiredTime},
+							RetiredDate:  metav1.Time{Time: expiredTime},
+							DeletionDate: &metav1.Time{Time: expiredTime.Add(30 * time.Minute)},
+						},
+					},
+				},
+			},
+			mockDeleter: &MockInstanceDeleter{
+				err: fmt.Errorf("read-back failed: %w", ErrVerifyTransient),
+			},
+			wantNewKeysCount:    1, // Key kept for retry
+			wantErr:             true,
+			wantDeleteCallCount: 1,
+		},
+		{
 			name: "NoExpiredKeys",
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
@@ -430,6 +459,15 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 				assert.Len(t, gotKeys, 1)
 				assert.Equal(t, int32(1), gotKeys[0].DeletionAttempts)
 				assert.NotEmpty(t, gotKeys[0].LastDeletionError)
+			}
+
+			// A transient verification failure is not a proven leak: the key is
+			// kept for retry but must NOT record failure bookkeeping, otherwise
+			// a binding that is already gone raises a spurious leak alert.
+			if tt.name == "DeleteExpiredKeysWithTransientVerifyError" {
+				assert.Len(t, gotKeys, 1)
+				assert.Equal(t, int32(0), gotKeys[0].DeletionAttempts)
+				assert.Empty(t, gotKeys[0].LastDeletionError)
 			}
 		})
 	}

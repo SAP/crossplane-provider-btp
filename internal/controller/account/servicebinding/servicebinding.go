@@ -535,7 +535,12 @@ func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBindin
 	}
 	observation, _, err := verifyClient.Observe(ctx)
 	if err != nil {
-		return errors.Wrap(err, errVerifyBinding)
+		// The read-back itself failed transiently; this does not prove the
+		// binding still exists, so retry
+		return errors.Wrap(
+			fmt.Errorf("%s: %w", err.Error(), servicebindingclient.ErrVerifyTransient),
+			errVerifyBinding,
+		)
 	}
 	if observation.ResourceExists {
 		return errors.Errorf("%s: binding %s still exists after destroy", errVerifyBinding, targetExternalName)
