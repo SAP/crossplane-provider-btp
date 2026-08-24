@@ -32,15 +32,15 @@ metadata:
   name: (...)
 spec:
   rotation:
-    ttl: 336h0m0s # 14 days
-    frequency: 228h0m0s # 12 days
+    ttl: 336h # 14 days
+    frequency: 228h # 12 days
   forProvider:
     name: my-sample
 ```
 
 `ttl` describes how long one instance is valid. `frequency` means the duration after what livetime of the current instance a new instance should be created. This means that if e.g. an instance "A" is valid for 14 days, and the frequency  is set to 12 days, then 12 days after its creation, the current instance "A" gets retired and a new instance "B" gets created. This newly created instance "B" becomes the "current instance", but the other, now retired, instance "A", will still be valid for another 2 days. This period can now be used by depending applications to now use the new current instance. After these 2 days passed, instance "B" lived now for 14 days and will be deleted. At this point of time, instance "B" is already 2 days old, meaning it will now only take another 10 days for another instance "C" to be created.
 
-Both fields are `metav1.Duration`, which marshals through `time.Duration.String()`. Whenever the provider writes the resource — persisting the external name after `Create()`, or adding the finalizer — the whole object is re-serialized, so `336h` is stored as `336h0m0s` and the provider becomes the field manager of `.spec.rotation.ttl` and `.spec.rotation.frequency`. Users who apply shorthand durations server-side therefore get a field conflict on every subsequent apply, which is why the examples here spell out every unit down to seconds. Tracked in [issue #841](https://github.com/SAP/crossplane-provider-btp/issues/841).
+Both fields use the provider's `v1alpha1.Duration` type, which preserves the literal from the manifest rather than rewriting `336h` to `336h0m0s` ([issue #892](https://github.com/SAP/crossplane-provider-btp/issues/892)).
 
 ### Status
 
@@ -54,8 +54,8 @@ metadata:
   name: (...)
 spec:
   rotation:
-    ttl: 336h0m0s # 14 days
-    frequency: 228h0m0s # 12 days
+    ttl: 336h # 14 days
+    frequency: 228h # 12 days
   forProvider: 
     name: my-sample
 status:

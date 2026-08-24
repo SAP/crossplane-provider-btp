@@ -59,7 +59,7 @@ The credentials are stored in a `Secret` you specify via `spec.writeConnectionSe
 
 ### Why does re-applying my `ServiceBinding` fail with a conflict on `spec.rotation`?
 
-If you enable credential rotation via `spec.rotation` with shorthand durations, applying the very same manifest a second time fails:
+If your binding was created before the provider preserved duration literals, applying the very same manifest a second time fails:
 
 ```text
 Apply failed with 2 conflicts: conflicts with "crossplane-provider-btp" using account.btp.sap.crossplane.io/v1alpha1:
@@ -67,15 +67,12 @@ Apply failed with 2 conflicts: conflicts with "crossplane-provider-btp" using ac
 - .spec.rotation.ttl
 ```
 
-The provider rewrites duration values into the canonical Go form that spells out every unit down to seconds — `720h` becomes `720h0m0s` — and becomes the field manager of those fields while doing so. Your next server-side apply (`kubectl apply --server-side`, Helm, Flux, Argo CD) still sends `720h`, so the API server sees a competing value and reports a conflict. Any other duration field in a resource spec, such as a `KymaEnvironmentBinding`'s `spec.forProvider.rotationInterval` and `spec.forProvider.ttl`, can be rewritten the same way.
+The stored spec holds `720h0m0s` where your manifest says `720h`: the provider rewrote the value into canonical Go form and became the field manager of `.spec.rotation.frequency` and `.spec.rotation.ttl`, so the API server sees a competing value. The same rewrite affected other duration fields, such as a `KymaEnvironmentBinding`'s `spec.forProvider.rotationInterval` and `spec.forProvider.ttl`.
 
-Write durations in canonical form from the start:
+Clear it once, either by force-applying the manifest or by writing the stored canonical value into it:
 
-```yaml title="hana-binding.yaml"
-spec:
-  rotation:
-    frequency: 720h0m0s # 30 days
-    ttl: 1080h0m0s # 45 days
+```sh title="Run in terminal"
+kubectl apply --server-side --force-conflicts -f hana-binding.yaml
 ```
 
-If you already hit the conflict, changing the manifest to the canonical form resolves it — no need to force-apply or delete the resource.
+With a provider version that preserves duration literals, the form you write survives and the conflict does not recur. On an earlier version the rewrite comes back with the provider's next write, so upgrade before clearing the conflict.
