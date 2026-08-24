@@ -423,6 +423,14 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 
 			assert.Equal(t, tt.wantNewKeysCount, len(gotKeys))
 			assert.Equal(t, tt.wantDeleteCallCount, mockDeleter.deleteCallCount)
+
+			// On a failed deletion the kept key must record the attempt and the
+			// error so the leak is visible/alertable.
+			if tt.name == "DeleteExpiredKeysWithError" {
+				assert.Len(t, gotKeys, 1)
+				assert.Equal(t, int32(1), gotKeys[0].DeletionAttempts)
+				assert.NotEmpty(t, gotKeys[0].LastDeletionError)
+			}
 		})
 	}
 }

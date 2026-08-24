@@ -16,6 +16,16 @@ import (
 
 const ForceRotationKey = "servicebinding.account.btp.crossplane.io/force-rotation"
 
+// PendingBindingNameKey holds the BTP binding name that the current Create
+// generation committed to BEFORE calling Service Manager. It makes Create
+// idempotent per rotation generation: a retried Create reuses this name instead
+// of minting a fresh random one, so a create attempt that lost its result
+// (crash/requeue between the SM create and the external-name persist) can find
+// and adopt the binding it already made rather than leaking it and creating
+// another. It is cleared, atomically with setting external-name, once
+// the create result is durably recorded.
+const PendingBindingNameKey = "servicebinding.account.btp.crossplane.io/pending-binding-name"
+
 const (
 	errDeleteExpiredKey = "cannot delete expired key"
 	errDeleteRetiredKey = "cannot delete retired key"
@@ -92,12 +102,6 @@ func (r *SBKeyRotator) NeedRetirement(cr *v1alpha1.ServiceBinding) bool {
 		return false
 	}
 
-	// If the binding is already retired, do not retire it again.
-	for _, retiredKey := range cr.Status.RetiredKeys {
-		if retiredKey.ID == cr.Status.AtProvider.ID {
-			return true
-		}
-	}
 	return true
 }
 
@@ -239,7 +243,11 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 		}
 
 		if err := r.bindingDeleter.DeleteBinding(ctx, cr, key.Name, key.ID); err != nil {
-			// If we cannot delete the key, keep it in the list
+			// If we cannot delete the key (or deletion could not be verified),
+			// keep it in the list and record the failure so the leak is visible
+			// and alertable.
+			key.DeletionAttempts++
+			key.LastDeletionError = err.Error()
 			newRetiredKeys = append(newRetiredKeys, key)
 			errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteExpiredKey, key.ID, err))
 		}

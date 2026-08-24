@@ -36,6 +36,9 @@ const (
 	errDeleteRetiredKeys    = "cannot delete retired keys"
 	errDeleteServiceBinding = "cannot delete servicebinding"
 	errFlattenSecret        = "cannot flatten secret"
+	errSeedBinding          = "cannot initialize servicebinding state for deletion"
+	errVerifyBinding        = "cannot verify servicebinding deletion"
+	errCommitName           = "cannot persist pending servicebinding name"
 )
 
 const iso8601Date = "2006-01-02T15:04:05Z0700"
@@ -52,7 +55,7 @@ var newTfConnectorFn = func(kube kubeclient.Client) servicebindingclient.TfConne
 
 // ServiceBindingClientFactory creates ServiceBindingClient instances
 type ServiceBindingClientFactory interface {
-	CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (servicebindingclient.ServiceBindingClientInterface, error)
+	CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string, markForDeletion bool) (servicebindingclient.ServiceBindingClientInterface, error)
 }
 
 // DefaultServiceBindingClientFactory is the production implementation
@@ -61,8 +64,8 @@ type DefaultServiceBindingClientFactory struct {
 	tfConnector servicebindingclient.TfConnector
 }
 
-func (f *DefaultServiceBindingClientFactory) CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (servicebindingclient.ServiceBindingClientInterface, error) {
-	client, err := servicebindingclient.NewServiceBindingClient(ctx, f.kube, f.tfConnector, cr, targetName, targetExternalName)
+func (f *DefaultServiceBindingClientFactory) CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string, markForDeletion bool) (servicebindingclient.ServiceBindingClientInterface, error) {
+	client, err := servicebindingclient.NewServiceBindingClient(ctx, f.kube, f.tfConnector, cr, targetName, targetExternalName, markForDeletion)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +115,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		targetName = cr.Spec.ForProvider.Name
 	}
 
-	client, err := c.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
+	client, err := c.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr), false)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create client")
 	}
@@ -123,6 +126,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		tracker:       c.resourcetracker,
 		client:        client,
 		recorder:      c.recorder,
+		nameGenerator: servicebindingclient.GenerateRandomName,
 	}
 
 	ext.keyRotator = c.newSBKeyRotatorFn(ext)
@@ -142,6 +146,10 @@ type external struct {
 	newAdminLookuperFn func(ctx context.Context, cr *v1alpha1.ServiceBinding) (smClient.SemanticLookuper, func(), error)
 	// recorder emits Kubernetes events for the heal path. May be nil.
 	recorder event.Recorder
+	// nameGenerator produces the BTP binding name for a fresh rotation
+	// generation. Injected so tests can make the suffix deterministic; defaults
+	// to servicebindingclient.GenerateRandomName in Connect.
+	nameGenerator func(base string) string
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -228,10 +236,20 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.SetConditions(xpv1.Creating())
 
-	// Generate name based on rotation settings (pure, testable business logic)
-	name := e.generateName(cr)
+	// Resolve the BTP binding name for this Create attempt. resolveCreateName also performs the
+	// lookup-before-create: if a binding under the committed name already exists
+	// and is ours, it is adopted and adopted=true is returned so we skip the
+	// create entirely.
+	name, adopted, err := e.resolveCreateName(ctx, cr)
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
+	}
+	if adopted {
+		// external-name is set and persisted; nothing was created this turn.
+		return managed.ExternalCreation{}, nil
+	}
 
-	client, err := e.clientFactory.CreateClient(ctx, cr, name, name)
+	client, err := e.clientFactory.CreateClient(ctx, cr, name, name, false)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
@@ -244,9 +262,12 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	meta.SetExternalName(cr, externalName)
-	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey)
+	// Clear the pending-name and force-rotation markers atomically with
+	// persisting external-name: once external-name is durable the create result
+	// is recorded, so the next reconcile must NOT regenerate a name.
+	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey, servicebindingclient.PendingBindingNameKey)
 
-	// Call the kube client to update the external-name and force-rotation annotations
+	// Call the kube client to update the external-name and clear the annotations
 	if err := e.kube.Update(ctx, cr); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
@@ -266,10 +287,62 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	return creation, nil
 }
 
-// Update() does not make a real update of the service binding, because service
-// bindings are immutable anyway. This behaviour is also disabled in the
-// underlying terraform provider.
-// Instead, Update() is only used to delete expired keys.
+// resolveCreateName decides the BTP binding name for the current Create attempt
+// and makes that decision durable and idempotent across retries.
+//
+// It returns (name, adopted, err):
+//   - adopted=true means an existing binding under the committed name was found
+//     to be ours and its GUID has been set as external-name and persisted; the
+//     caller must NOT create anything.
+//   - adopted=false means the caller should create a binding named `name`.
+//
+// Flow:
+//  1. Non-rotated bindings use the stable spec name directly — no random suffix,
+//     nothing to persist, and no lookup needed (a name collision there is the
+//     user's own doing, not a rotation artifact).
+//  2. Rotated bindings reuse the name previously committed to the
+//     PendingBindingNameKey annotation if present; otherwise a fresh name is
+//     generated and persisted BEFORE any external call. Persisting first guarantees a
+//     retried Create reuses the same name.
+//  3. With a committed name in hand, a lookup-before-create adopts an existing
+//     owned binding of that name (the previous attempt succeeded but lost its
+//     result). Lookup errors are propagated so we retry rather than risk a
+//     duplicate create.
+func (e *external) resolveCreateName(ctx context.Context, cr *v1alpha1.ServiceBinding) (string, bool, error) {
+	if !e.isRotationEnabled(cr) {
+		return cr.Spec.ForProvider.Name, false, nil
+	}
+
+	name := cr.GetAnnotations()[servicebindingclient.PendingBindingNameKey]
+	if name == "" {
+		name = e.generateName(cr)
+		meta.AddAnnotations(cr, map[string]string{servicebindingclient.PendingBindingNameKey: name})
+		// Persist the committed name before creating anything in external system. Failing can return error since no leak happen.
+		if err := e.kube.Update(ctx, cr); err != nil {
+			return "", false, errors.Wrap(err, errCommitName)
+		}
+	}
+
+	guid, found, err := e.lookupOwnedBinding(ctx, cr, name)
+	if err != nil {
+		return "", false, err
+	}
+	if !found {
+		return name, false, nil
+	}
+
+	// Adopt the binding a prior attempt already created under this name.
+	meta.SetExternalName(cr, guid)
+	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey, servicebindingclient.PendingBindingNameKey)
+	if err := e.kube.Update(ctx, cr); err != nil {
+		return "", false, errors.Wrap(err, errCreateBinding)
+	}
+	log.FromContext(ctx).Info("adopted service binding created by a prior lost Create attempt", "guid", guid, "name", name)
+	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
+		fmt.Sprintf("Adopted service binding %s created by a prior Create attempt (name=%s)", guid, name)))
+	return name, true, nil
+}
+
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	cr, ok := mg.(*v1alpha1.ServiceBinding)
 	if !ok {
@@ -314,12 +387,17 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteRetiredKeys)
 	}
 
-	deletion, err := e.client.Delete(ctx)
-	if err != nil {
+	var targetName string
+	if cr.Status.AtProvider.Name != "" {
+		targetName = cr.Status.AtProvider.Name
+	} else {
+		targetName = cr.Spec.ForProvider.Name
+	}
+	if err := e.DeleteBinding(ctx, cr, targetName, meta.GetExternalName(cr)); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteServiceBinding)
 	}
 
-	return deletion, nil
+	return managed.ExternalDelete{}, nil
 }
 
 // healExternalName performs the recovery for a ServiceBinding. The
@@ -328,26 +406,58 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 // lookup finds nothing and the next reconcile (after the parent recovers)
 // succeeds.
 func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
-	if e.newAdminLookuperFn == nil {
-		return nil
-	}
 	if !recovery.HasCreateBeenAttempted(cr) {
 		return nil
 	}
-	serviceInstanceID := internal.Val(cr.Spec.ForProvider.ServiceInstanceID)
 	name := cr.Spec.ForProvider.Name
 	if cr.Status.AtProvider.Name != "" {
 		name = cr.Status.AtProvider.Name
 	}
-	if serviceInstanceID == "" {
+
+	guid, found, err := e.lookupOwnedBinding(ctx, cr, name)
+	if err != nil {
+		// Best-effort: lookupOwnedBinding already logged and emitted an event.
+		// Do not block Observe; the next reconcile retries.
 		return nil
+	}
+	if !found {
+		return nil
+	}
+
+	meta.SetExternalName(cr, guid)
+	if uErr := e.kube.Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, "cannot persist recovered external-name")
+	}
+
+	log.FromContext(ctx).Info("recovered existing BTP service binding by external-name", "guid", guid, "serviceInstanceID", internal.Val(cr.Spec.ForProvider.ServiceInstanceID), "name", name)
+	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
+		fmt.Sprintf("Recovered existing BTP service binding %s (semantic key: serviceInstanceID=%s name=%s)", guid, internal.Val(cr.Spec.ForProvider.ServiceInstanceID), name)))
+	return recovery.ErrRequeueAfterRecovery
+}
+
+// lookupOwnedBinding runs the subaccount-admin semantic lookup for a binding
+// named `name` under the CR's resolved parent service instance and returns its
+// GUID only if it passes the ownership check — i.e. it was plausibly created by
+// our own Create() attempt for this CR (recovery.IsOwnedByCR).
+//
+// found is true only for an owned match. A (false, nil) return means "no owned
+// binding; the caller may safely create one". Lookup/config errors are logged,
+// evented, and returned so each caller can decide: heal swallows them
+// (best-effort), Create propagates them (retry rather than risk a duplicate).
+func (e *external) lookupOwnedBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, name string) (string, bool, error) {
+	if e.newAdminLookuperFn == nil {
+		return "", false, nil
+	}
+	serviceInstanceID := internal.Val(cr.Spec.ForProvider.ServiceInstanceID)
+	if serviceInstanceID == "" {
+		return "", false, nil
 	}
 
 	lookuper, cleanup, err := e.newAdminLookuperFn(ctx, cr)
 	if err != nil {
 		log.FromContext(ctx).Info("external-name recovery: cannot obtain admin lookup client", "error", err.Error())
 		e.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
-		return nil
+		return "", false, err
 	}
 	defer cleanup()
 
@@ -355,10 +465,10 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBin
 	if err != nil {
 		log.FromContext(ctx).Info("external-name recovery lookup failed", "serviceInstanceID", serviceInstanceID, "name", name, "error", err.Error())
 		e.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
-		return nil
+		return "", false, err
 	}
 	if !found {
-		return nil
+		return "", false, nil
 	}
 
 	if !recovery.IsOwnedByCR(cr, createdAt) {
@@ -370,18 +480,10 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBin
 			errors.Errorf(
 				"refusing to recover existing BTP service binding %s: created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
 				guid, createdAt.Format(time.RFC3339))))
-		return nil
+		return "", false, nil
 	}
 
-	meta.SetExternalName(cr, guid)
-	if uErr := e.kube.Update(ctx, cr); uErr != nil {
-		return errors.Wrap(uErr, "cannot persist recovered external-name")
-	}
-
-	log.FromContext(ctx).Info("recovered existing BTP service binding by external-name", "guid", guid, "serviceInstanceID", serviceInstanceID, "name", name)
-	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
-		fmt.Sprintf("Recovered existing BTP service binding %s (semantic key: serviceInstanceID=%s name=%s, created_at=%s)", guid, serviceInstanceID, name, createdAt.Format(time.RFC3339))))
-	return recovery.ErrRequeueAfterRecovery
+	return guid, true, nil
 }
 
 // emit records a Kubernetes event when a recorder is configured.
@@ -391,21 +493,55 @@ func (e *external) emit(cr resource.Managed, ev event.Event) {
 	}
 }
 
-// DeleteBinding implements the BindingDeleter interface for the key rotator
+// DeleteBinding implements the BindingDeleter interface for the key rotator.
+//
+// It performs a three-phase terraform-based deletion that is robust to the
+// cold-workspace condition (setting delete on tf resource would not run a refresh, pjet detects the resource is missing and report successfully deleted, but the resource is still there in BTP) --> leaked service binding):
+//
+//	Phase 1 (seed):   Connect with markForDeletion=false. upjet's EnsureTFState
+//	                  seeds terraform.tfstate with {id: <externalName>} because
+//	                  WasDeleted is false. Without this, a container that never
+//	                  observed this GUID while it was current has an empty state,
+//	                  so destroy would run against nothing, destroy 0 and exit 0
+//	                  (a silent no-op). This happens on a pod restart.
+//	Phase 2 (destroy): Connect again with markForDeletion=true (same UID → same
+//	                  workspace dir, so the seeded state persists). WasDeleted is
+//	                  now true, so BuildMainTF sets prevent_destroy=false and the
+//	                  destroy runs against the seeded state and actually deletes.
+//	Phase 3 (verify): Connect once more with markForDeletion=false and Observe.
+//	                  If the binding still exists, destroy silently no-op'd and we
+//	                  return an error so the caller keeps the key.
 func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
-	// The deletion timestamp must be set before the Connect() function is called on the external client. This fixes (#425).
-	// Otherwise it could in some cases end in an error stating that `prevent_destroy` is set to `true` on the resource.
-	cr = cr.DeepCopy()
-	cr.SetDeletionTimestamp(internal.Ptr(metav1.Now()))
-	cr.SetConditions(xpv1.Deleting())
+	// Phase 1: seed the workspace state without marking for deletion.
+	if _, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName, false); err != nil {
+		return errors.Wrap(err, errSeedBinding)
+	}
 
-	// Create a client for the specific binding to delete
-	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName)
+	// Phase 2: connect with the deletion mark set so prevent_destroy is off, then destroy.
+	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName, true)
 	if err != nil {
 		return err
 	}
-	_, err = client.Delete(ctx)
-	return err
+	if _, err = client.Delete(ctx); err != nil {
+		return err
+	}
+
+	// Phase 3: verify the external resource is actually gone before the caller
+	// prunes any bookkeeping. A terraform destroy that no-op'd against an empty
+	// state exits 0; only a positive read-back proves the binding was deleted.
+	verifyClient, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName, false)
+	if err != nil {
+		return errors.Wrap(err, errVerifyBinding)
+	}
+	observation, _, err := verifyClient.Observe(ctx)
+	if err != nil {
+		return errors.Wrap(err, errVerifyBinding)
+	}
+	if observation.ResourceExists {
+		return errors.Errorf("%s: binding %s still exists after destroy", errVerifyBinding, targetExternalName)
+	}
+
+	return nil
 }
 
 // isRotationEnabled checks if rotation is currently enabled for the service binding
@@ -424,7 +560,11 @@ func (e *external) isRotationEnabled(cr *v1alpha1.ServiceBinding) bool {
 // generateName generates the target name for the service binding based on rotation settings
 func (e *external) generateName(cr *v1alpha1.ServiceBinding) string {
 	if e.isRotationEnabled(cr) {
-		return servicebindingclient.GenerateRandomName(cr.Spec.ForProvider.Name)
+		gen := e.nameGenerator
+		if gen == nil {
+			gen = servicebindingclient.GenerateRandomName
+		}
+		return gen(cr.Spec.ForProvider.Name)
 	}
 	return cr.Spec.ForProvider.Name
 }
