@@ -1,6 +1,6 @@
 # Runs e2e tests, potentially requiring approval based on the `environment` input.
 #
-# Enviroment variables/secrets that are needed
+# Environment variables/secrets that are needed
 # CLI_SERVER_URL contains the CLI server URL
 # GLOBAL_ACCOUNT contains the subdomain of the global account
 # IDP_URL contains the URL of an IDP that can be connected to the global account
@@ -10,7 +10,7 @@
 # TECHNICAL_USER_EMAIL contains the email of the BTP_TECHNICAL_USER
 # More information in the README.md
 
-name: E2E Test
+name: E2E Tests
 
 on:
   workflow_call:
@@ -83,8 +83,8 @@ jobs:
 
   # Pull and verify the Crossplane chart in a dedicated job so that an upstream
   # CDN blip (charts.crossplane.io 403) does not waste the provider build setup
-  # and runs in parallel with `build` for faster wall-clock.
-  fetch-chart:
+  # and runs in parallel with `prepare-build` for faster wall-clock.
+  prepare-helm-chart:
     runs-on: ubuntu-latest
     needs: prepare-matrix
     steps:
@@ -130,7 +130,7 @@ jobs:
             --destination .cache/charts
           ls -la .cache/charts
 
-      # Defense-in-depth against artifact poisoning (CodeQL alert #64). The `build`
+      # Defense-in-depth against artifact poisoning (CodeQL alert #64). The `prepare-build`
       # job's `helm pull` step is workflow-mutable; a malicious PR could rewrite
       # it to upload a poisoned chart for matrix legs to install. Pinning the
       # expected SHA256 (sourced from upstream charts.crossplane.io/stable
@@ -167,9 +167,9 @@ jobs:
 
   # Build image + xpkg + CLI tools once; the matrix consumes them as artifacts.
   # NOTE: after the artifact retention window expires (retention-days below),
-  # "Re-run failed jobs" fails — build won't re-run, so its artifacts are gone.
+  # "Re-run failed jobs" fails — prepare-build won't re-run, so its artifacts are gone.
   # Use "Re-run all jobs" to rebuild them.
-  build:
+  prepare-build:
     runs-on: ubuntu-latest
     needs: prepare-matrix
     steps:
@@ -263,7 +263,7 @@ jobs:
 
   e2e-test:
     runs-on: ubuntu-latest
-    needs: [prepare-matrix, fetch-chart, build] # fetch-chart provides crossplane-chart artifact; build provides image/xpkg/tools artifacts
+    needs: [prepare-matrix, prepare-helm-chart, prepare-build] # prepare-helm-chart provides crossplane-chart artifact; prepare-build provides image/xpkg/tools artifacts
     environment: pr-e2e-no-approval  # approval is on the preceding prepare-matrix job
     strategy:
       fail-fast: false
@@ -424,12 +424,12 @@ jobs:
           GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
 
   # required for test matrix status reporting. Ignores cleanup-e2e job failure/success.
-  e2e-tests:
+  e2e-status:
     runs-on: ubuntu-latest
     needs:
       - prepare-matrix
-      - fetch-chart
-      - build
+      - prepare-helm-chart
+      - prepare-build
       - e2e-test
     timeout-minutes: 1
     if: always()
@@ -439,15 +439,15 @@ jobs:
           needs.prepare-matrix.result == 'failure' ||
           needs.prepare-matrix.result == 'cancelled'
         run: exit 1
-      - name: Fail for failed fetch-chart job
+      - name: Fail for failed prepare-helm-chart job
         if: |
-          needs.fetch-chart.result == 'failure' ||
-          needs.fetch-chart.result == 'cancelled'
+          needs.prepare-helm-chart.result == 'failure' ||
+          needs.prepare-helm-chart.result == 'cancelled'
         run: exit 1
-      - name: Fail for failed build job
+      - name: Fail for failed prepare-build job
         if: |
-          needs.build.result == 'failure' ||
-          needs.build.result == 'cancelled'
+          needs.prepare-build.result == 'failure' ||
+          needs.prepare-build.result == 'cancelled'
         run: exit 1
       - name: Fail for failed matrix jobs
         if: |
