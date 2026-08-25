@@ -2,6 +2,8 @@
 #
 # This workflow blocks merging pull request when labels are set or missing.
 #
+# Note: This workflow does not use an aggregator job, so that the message to the user is clearer.
+#
 # Required:
 #   - release-notes/*
 # Forbidden:
