@@ -1,0 +1,21 @@
+# CodeQL is a semantic code analysis engine that can be used to identify security vulnerabilities and errors in code.
+# This workflow uses the CodeQL Action to analyze your code for vulnerabilities.
+name: "CodeQL Advanced"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '15 21 * * 2'
+
+permissions:
+  security-events: write
+  packages: read
+  actions: read
+  contents: read
+
+jobs:
+  run-codeql:
+    uses: ./.github/workflows/check-codeql.lib.yaml
