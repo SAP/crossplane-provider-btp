@@ -9,34 +9,89 @@ v2.0.0 lifts the provider to the Crossplane v2 runtime and removes two legacy co
 
 **No.** v2.0.0 runs on both Crossplane core **v1 and v2** control planes. The provider's runtime bump to v2 is independent of the Crossplane core version - you can adopt v2.0.0 without upgrading core, and upgrade core on its own schedule.
 
-## Before you upgrade
+## Step 1: run the pre-upgrade check
 
-Do these while the **v1.x provider is still running**.
-
-### 1. Move off External Secret Stores (ESS)
-
-v2.0.0 removes the ESS code path. If any resource publishes connection details via `publishConnectionDetailsTo`, publishing stops the moment you install v2.0.0 - on any core version, with no error. Check whether you use it:
+Run this while the **v1.x provider is still installed**. It is read-only - it detects the four migration conditions and prints which of the steps below apply to you. It mutates nothing.
 
 ```sh
-kubectl get storeconfigs.secrets.crossplane.io -A
-kubectl get storeconfigs.btp.sap.crossplane.io -A
-kubectl get managed -A -o yaml | grep -i publishConnectionDetailsTo
+#!/usr/bin/env bash
+# crossplane-provider-btp v1.x -> v2.0.0 pre-upgrade check. Read-only.
+set -uo pipefail
+
+btp_ga=globalaccounts.account.btp.sap.crossplane.io
+btp_sc=storeconfigs.btp.sap.crossplane.io
+found=0
+note() { printf '\n[FOUND] %s\n' "$1"; found=1; }
+ok()   { printf '[ok]    %s\n' "$1"; }
+
+echo "== crossplane-provider-btp v2.0.0 pre-upgrade check =="
+
+# 1. External Secret Stores (ESS)
+ess=$( { kubectl get storeconfigs.secrets.crossplane.io -A -o name 2>/dev/null; \
+         kubectl get "$btp_sc" -A -o name 2>/dev/null; } | sort -u )
+pub=$(kubectl get managed -A -o yaml 2>/dev/null | grep -c 'publishConnectionDetailsTo')
+if [ -n "$ess" ] || [ "$pub" -gt 0 ]; then
+  note "ESS in use -> do step 2. Publishing stops silently on v2.0.0 (highest impact)."
+  [ -n "$ess" ] && printf '  StoreConfigs:\n%s\n' "$ess"
+  [ "$pub" -gt 0 ] && echo "  $pub resource(s) set publishConnectionDetailsTo."
+else
+  ok "No ESS StoreConfigs or publishConnectionDetailsTo usage."
+fi
+
+# 2. GlobalAccount CRs / refs
+ga=$(kubectl get "$btp_ga" -A -o name 2>/dev/null)
+refs=$(kubectl get subaccounts.account.btp.sap.crossplane.io -A -o yaml 2>/dev/null \
+       | grep -iE 'globalAccountRef|globalAccountSelector')
+if [ -n "$ga" ] || [ -n "$refs" ]; then
+  note "GlobalAccount CRs or refs present -> do step 3. CR is removed in v2.0.0."
+  [ -n "$ga" ] && printf '  GlobalAccount CRs:\n%s\n' "$ga"
+  [ -n "$refs" ] && echo "  Subaccount(s) still carry globalAccountRef/Selector (cosmetic, unread)."
+else
+  ok "No GlobalAccount CRs or refs."
+fi
+
+# 3. ServiceManager planName default flip
+sm=$(kubectl get servicemanagers.account.btp.sap.crossplane.io -A \
+      -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\t"}{.spec.forProvider.planName}{"\n"}{end}' 2>/dev/null)
+soa=$(printf '%s\n' "$sm" | grep -w 'service-operator-access')
+if [ -n "$soa" ]; then
+  note "ServiceManager(s) on service-operator-access -> do step 4. Default flips to subaccount-admin."
+  printf '%s\n' "$soa"
+else
+  ok "No ServiceManager relies on service-operator-access."
+fi
+
+echo
+if [ "$found" -eq 0 ]; then
+  echo "== Clear. Nothing btp-specific blocks the v2.0.0 upgrade. =="
+else
+  echo "== Action needed: run the flagged steps below, then upgrade. =="
+fi
 ```
 
-The provider also removes its own `StoreConfig` CRD (`storeconfigs.btp.sap.crossplane.io`). Any `StoreConfig` you created for the provider is orphaned after the upgrade - see step 3 and "After you upgrade" for cleanup.
+Each `[FOUND]` line names the step to run. If every line is `[ok]`, skip to [After you upgrade](#after-you-upgrade). Do the flagged steps while the **v1.x provider is still running**.
 
-Any hits: switch those resources to a native connection secret via `spec.writeConnectionSecretToRef`, or use the [External Secrets Operator](https://external-secrets.io/), before upgrading. Upstream detail: [Crossplane upgrade-to-v2, External Secret Stores](https://docs.crossplane.io/latest/guides/upgrade-to-crossplane-v2/#external-secret-stores).
+## Step 2: move off External Secret Stores (ESS)
 
-### 2. Set the global account in `ProviderConfig`, drop `GlobalAccount` refs
+Do this if the check reported **ESS in use**.
 
-The `GlobalAccount` managed resource is removed. Check whether you use it:
+v2.0.0 removes the ESS code path. Publishing via `publishConnectionDetailsTo` stops the moment you install v2.0.0 - on any core version, with no error.
+
+Switch each flagged resource to a native connection secret via `spec.writeConnectionSecretToRef`, or use the [External Secrets Operator](https://external-secrets.io/), before upgrading. Upstream detail: [Crossplane upgrade-to-v2, External Secret Stores](https://docs.crossplane.io/latest/guides/upgrade-to-crossplane-v2/#external-secret-stores).
+
+The provider also removes its own `StoreConfig` CRD (`storeconfigs.btp.sap.crossplane.io`). Delete any provider `StoreConfig` while the v1.x controller still runs:
 
 ```sh
-kubectl get globalaccounts.account.btp.sap.crossplane.io -A
-kubectl get subaccounts.account.btp.sap.crossplane.io -A -o yaml | grep -iE 'globalAccountRef|globalAccountSelector'
+kubectl delete storeconfigs.btp.sap.crossplane.io --all
 ```
 
-If `ProviderConfig.spec.globalAccount` is not set yet, set it to your global account subdomain (see [Configure the provider](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp)):
+Any `StoreConfig` left behind is orphaned after the upgrade - see [After you upgrade](#after-you-upgrade) for CRD cleanup.
+
+## Step 3: set the global account in `ProviderConfig`, drop `GlobalAccount` refs
+
+Do this if the check reported **GlobalAccount CRs or refs present**.
+
+The `GlobalAccount` managed resource is removed. If `ProviderConfig.spec.globalAccount` is not set yet, set it to your global account subdomain (see [Configure the provider](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp)):
 
 ```yaml
 apiVersion: btp.sap.crossplane.io/v1alpha1
@@ -47,24 +102,23 @@ spec:
   globalAccount: <your-global-account-subdomain>
 ```
 
-Then remove `spec.forProvider.globalAccountRef` / `globalAccountSelector` from any `Subaccount` (or similar) that used them - they reference the removed CR. This is cosmetic: the ref only ever wrote `globalAccountGuid`, which no controller reads. The global account for these resources comes from the SAP Cloud Management service binding (`cisCredentials`), so removing the ref changes no behaviour.
+Then remove `spec.forProvider.globalAccountRef` / `globalAccountSelector` from the flagged `Subaccount`s - they reference the removed CR. This is cosmetic: the ref only ever wrote `globalAccountGuid`, which no controller reads. The global account comes from the SAP Cloud Management service binding (`cisCredentials`), so removing the ref changes no behaviour.
 
-### 3. Delete the removed CRs
-
-While the v1.x controller still runs, so it clears finalizers cleanly, delete the `GlobalAccount` CRs and any provider `StoreConfig`:
+Delete the `GlobalAccount` CRs while the v1.x controller still runs, so it clears finalizers cleanly:
 
 ```sh
 kubectl delete globalaccounts.account.btp.sap.crossplane.io --all
-kubectl delete storeconfigs.btp.sap.crossplane.io --all
 ```
 
-### 4. Pin `planName` on ServiceManager if you rely on the default
+## Step 4: pin `planName` on ServiceManager
+
+Do this if the check reported **ServiceManager(s) on service-operator-access**.
 
 v2.0.0 changes the default `ServiceManager` `spec.forProvider.planName` from `service-operator-access` to `subaccount-admin`. `service-operator-access` is for the [SAP BTP Service Operator](https://github.com/SAP/sap-btp-service-operator/blob/main/README.md); `subaccount-admin` is the general-purpose plan for direct API access.
 
 Existing resources are safe: the default applies only at create time, then persists, and `planName` is immutable. The one risk is a fresh create or GitOps recreate that omits `planName` - the CRD default now fills it with `subaccount-admin`.
 
-If any back the SAP BTP Service Operator, pin the plan - a no-op for running resources, and it makes GitOps re-creates deterministic:
+Pin the plan on the flagged resources - a no-op for running ones, and it makes GitOps re-creates deterministic:
 
 ```yaml
 spec:
@@ -74,7 +128,7 @@ spec:
 
 ## After you upgrade
 
-Upgrade succeeds either way and **no BTP-side data is lost**. If you skipped step 3, clean up now - Crossplane does **not** GC the removed CRDs (`globalaccounts` and, if you used it, `storeconfigs.btp.sap.crossplane.io`). The steps differ by Crossplane core version; repeat them for each removed CRD.
+Upgrade succeeds either way and **no BTP-side data is lost**. If the check flagged step 2 or step 3, clean up the removed CRDs now - Crossplane does **not** GC them (`globalaccounts` and, if you used ESS, `storeconfigs.btp.sap.crossplane.io`). The steps differ by Crossplane core version; repeat them for each removed CRD.
 
 ### Core v1
 
@@ -102,10 +156,10 @@ kubectl delete crd storeconfigs.btp.sap.crossplane.io
 
 ## If you skip the steps
 
-- **ESS (1)** - connection details stop being published. Consumers reading that secret (workloads, other resources, GitOps) get stale or missing credentials. No error is raised, so the break is easy to miss. Highest impact.
-- **Refs (2)** - cosmetic only. A leftover `globalAccountRef` / `globalAccountSelector` is an unknown field on the v2 CRD; it is not read, so nothing breaks.
-- **Cleanup (3)** - orphaned CRs and the removed CRDs (`globalaccounts`, `storeconfigs.btp.sap.crossplane.io`) linger until removed manually (on core v2 also their `ManagedResourceDefinition`).
+- **ESS (2)** - connection details stop being published. Consumers reading that secret (workloads, other resources, GitOps) get stale or missing credentials. No error is raised, so the break is easy to miss. Highest impact.
+- **Refs (3)** - cosmetic only. A leftover `globalAccountRef` / `globalAccountSelector` is an unknown field on the v2 CRD; it is not read, so nothing breaks.
 - **planName (4)** - existing ServiceManagers are unaffected. Only a fresh create or GitOps recreate that omits `planName` adopts the new `subaccount-admin` default; if it backed the SAP BTP Service Operator, fixing the plan needs a delete + recreate (immutable). Lowest impact of the four.
+- **Cleanup (after upgrade)** - orphaned CRs and the removed CRDs (`globalaccounts`, `storeconfigs.btp.sap.crossplane.io`) linger until removed manually (on core v2 also their `ManagedResourceDefinition`).
 
 ## Not covered
 
