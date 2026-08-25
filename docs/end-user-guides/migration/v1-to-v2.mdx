@@ -3,14 +3,11 @@ sidebar_position: 0
 ---
 # Migrate from v1.x to v2.0.0
 
-v2.0.0 lifts the provider to the Crossplane v2 runtime and removes two legacy concepts. Managed
-resources stay cluster-scoped, so most manifests are unchanged.
+v2.0.0 lifts the provider to the Crossplane v2 runtime and removes two legacy concepts. Managed resources stay cluster-scoped, so most manifests are unchanged.
 
 ## Do I need to upgrade Crossplane core?
 
-**No.** v2.0.0 runs on both Crossplane core **v1 and v2** control planes. The provider's runtime bump
-to v2 is independent of the Crossplane core version - you can adopt v2.0.0 without upgrading core, and
-upgrade core on its own schedule.
+**No.** v2.0.0 runs on both Crossplane core **v1 and v2** control planes. The provider's runtime bump to v2 is independent of the Crossplane core version - you can adopt v2.0.0 without upgrading core, and upgrade core on its own schedule.
 
 ## Before you upgrade
 
@@ -18,18 +15,14 @@ Do these while the **v1.x provider is still running**.
 
 ### 1. Move off External Secret Stores (ESS)
 
-v2.0.0 removes the ESS code path. If any resource publishes connection details via
-`publishConnectionDetailsTo`, publishing stops the moment you install v2.0.0 - on any core version,
-with no error. Check whether you use it:
+v2.0.0 removes the ESS code path. If any resource publishes connection details via `publishConnectionDetailsTo`, publishing stops the moment you install v2.0.0 - on any core version, with no error. Check whether you use it:
 
 ```sh
 kubectl get storeconfigs.secrets.crossplane.io -A
 kubectl get managed -A -o yaml | grep -i publishConnectionDetailsTo
 ```
 
-Any hits: switch those resources to a native connection secret via `spec.writeConnectionSecretToRef`,
-or use the [External Secrets Operator](https://external-secrets.io/), before upgrading. Upstream detail:
-[Crossplane upgrade-to-v2, External Secret Stores](https://docs.crossplane.io/latest/guides/upgrade-to-crossplane-v2/#external-secret-stores).
+Any hits: switch those resources to a native connection secret via `spec.writeConnectionSecretToRef`, or use the [External Secrets Operator](https://external-secrets.io/), before upgrading. Upstream detail: [Crossplane upgrade-to-v2, External Secret Stores](https://docs.crossplane.io/latest/guides/upgrade-to-crossplane-v2/#external-secret-stores).
 
 ### 2. Set the global account in `ProviderConfig`, drop `GlobalAccount` refs
 
@@ -40,7 +33,7 @@ kubectl get globalaccounts.account.btp.sap.crossplane.io -A
 kubectl get subaccounts.account.btp.sap.crossplane.io -A -o yaml | grep -iE 'globalAccountRef|globalAccountSelector'
 ```
 
-Set the global account in `ProviderConfig` instead:
+If `ProviderConfig.spec.globalAccount` is not set yet, set it to your global account subdomain (see [Configure the provider](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp)):
 
 ```yaml
 apiVersion: btp.sap.crossplane.io/v1alpha1
@@ -51,8 +44,7 @@ spec:
   globalAccount: <your-global-account-subdomain>
 ```
 
-Then remove `spec.forProvider.globalAccountRef` / `globalAccountSelector` from any `Subaccount` (or
-similar) that used them - they reference the removed CR.
+Then remove `spec.forProvider.globalAccountRef` / `globalAccountSelector` from any `Subaccount` (or similar) that used them - they reference the removed CR. This is cosmetic: the ref only ever wrote `globalAccountGuid`, which no controller reads. The global account for these resources comes from the SAP Cloud Management service binding (`cisCredentials`), so removing the ref changes no behaviour.
 
 ### 3. Delete the `GlobalAccount` CRs
 
@@ -64,16 +56,11 @@ kubectl delete globalaccounts.account.btp.sap.crossplane.io --all
 
 ### 4. Pin `planName` on ServiceManager if you rely on the default
 
-v2.0.0 changes the default `ServiceManager` `spec.forProvider.planName` from `service-operator-access` to
-`subaccount-admin`. `service-operator-access` is for the [SAP BTP Service Operator](https://github.com/SAP/sap-btp-service-operator/blob/main/README.md);
-`subaccount-admin` is the general-purpose plan for direct API access.
+v2.0.0 changes the default `ServiceManager` `spec.forProvider.planName` from `service-operator-access` to `subaccount-admin`. `service-operator-access` is for the [SAP BTP Service Operator](https://github.com/SAP/sap-btp-service-operator/blob/main/README.md); `subaccount-admin` is the general-purpose plan for direct API access.
 
-Existing resources are safe: the default applies only at create time, then persists, and `planName` is
-immutable. The one risk is a fresh create or GitOps recreate that omits `planName` - the CRD default now
-fills it with `subaccount-admin`.
+Existing resources are safe: the default applies only at create time, then persists, and `planName` is immutable. The one risk is a fresh create or GitOps recreate that omits `planName` - the CRD default now fills it with `subaccount-admin`.
 
-If any back the SAP BTP Service Operator, pin the plan - a no-op for running resources, and it makes GitOps
-re-creates deterministic:
+If any back the SAP BTP Service Operator, pin the plan - a no-op for running resources, and it makes GitOps re-creates deterministic:
 
 ```yaml
 spec:
@@ -83,8 +70,7 @@ spec:
 
 ## After you upgrade
 
-Upgrade succeeds either way and **no BTP-side data is lost**. If you skipped step 3, clean up now -
-Crossplane does **not** GC the removed CRD. The steps differ by Crossplane core version.
+Upgrade succeeds either way and **no BTP-side data is lost**. If you skipped step 3, clean up now - Crossplane does **not** GC the removed CRD. The steps differ by Crossplane core version.
 
 ### Core v1
 
@@ -93,13 +79,11 @@ kubectl delete globalaccounts.account.btp.sap.crossplane.io --all
 kubectl delete crd globalaccounts.account.btp.sap.crossplane.io
 ```
 
-Delete the CRs first - the CRD's `customresourcecleanup` finalizer holds it in `Terminating` until
-they are gone.
+Delete the CRs first - the CRD's `customresourcecleanup` finalizer holds it in `Terminating` until they are gone.
 
 ### Core v2
 
-The CRD is owned by a `ManagedResourceDefinition` (MRD) that re-creates it on every reconcile, so
-`kubectl delete crd` alone is a no-op. Delete the MRD first:
+The CRD is owned by a `ManagedResourceDefinition` (MRD) that re-creates it on every reconcile, so `kubectl delete crd` alone is a no-op. Delete the MRD first:
 
 ```sh
 kubectl delete globalaccounts.account.btp.sap.crossplane.io --all
@@ -109,18 +93,11 @@ kubectl delete crd globalaccounts.account.btp.sap.crossplane.io
 
 ## If you skip the steps
 
-- **ESS (1)** - connection details stop being published. Consumers reading that secret (workloads,
-  other resources, GitOps) get stale or missing credentials. No error is raised, so the break is
-  easy to miss. Highest impact.
-- **Refs (2)** - resources using `globalAccountRef` / `globalAccountSelector` fail to resolve.
-- **Cleanup (3)** - orphaned CRs and the `globalaccounts` CRD linger until removed manually (on core
-  v2 also the `ManagedResourceDefinition`).
-- **planName (4)** - existing ServiceManagers are unaffected. Only a fresh create or GitOps recreate that
-  omits `planName` adopts the new `subaccount-admin` default; if it backed the SAP BTP Service Operator,
-  fixing the plan needs a delete + recreate (immutable). Lowest impact of the four.
+- **ESS (1)** - connection details stop being published. Consumers reading that secret (workloads, other resources, GitOps) get stale or missing credentials. No error is raised, so the break is easy to miss. Highest impact.
+- **Refs (2)** - cosmetic only. A leftover `globalAccountRef` / `globalAccountSelector` is an unknown field on the v2 CRD; it is not read, so nothing breaks.
+- **Cleanup (3)** - orphaned CRs and the `globalaccounts` CRD linger until removed manually (on core v2 also the `ManagedResourceDefinition`).
+- **planName (4)** - existing ServiceManagers are unaffected. Only a fresh create or GitOps recreate that omits `planName` adopts the new `subaccount-admin` default; if it backed the SAP BTP Service Operator, fixing the plan needs a delete + recreate (immutable). Lowest impact of the four.
 
 ## Not covered
 
-General Crossplane v1 → v2 core migration (Compositions, functions, namespaced XRs) - see the
-[upstream guide](https://docs.crossplane.io/latest/guides/upgrade-to-crossplane-v2/). This page is
-the btp-specific delta only.
+General Crossplane v1 → v2 core migration (Compositions, functions, namespaced XRs) - see the [upstream guide](https://docs.crossplane.io/latest/guides/upgrade-to-crossplane-v2/). This page is the btp-specific delta only.
