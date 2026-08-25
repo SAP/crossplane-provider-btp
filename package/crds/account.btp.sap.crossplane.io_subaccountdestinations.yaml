@@ -37,6 +37,13 @@ spec:
         description: |-
           SubaccountDestination manages a destination in a SAP BTP subaccount via
           the Destination Service REST API.
+
+          External-Name Configuration:
+            - Follows Standard: no (compound key, not a single GUID)
+            - Format: `<subaccount-id>/<destination-name>`
+            - How to find:
+              - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)
+              - API: GET /v1/subaccountDestinations/\{destination name\} (fields: subaccount_id + Name)
         properties:
           apiVersion:
             description: |-
@@ -73,15 +80,8 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: |-
-                  SubaccountDestinationParameters are the configurable fields of a SubaccountDestination.
-
-                  External-Name Configuration:
-                    - Follow Standard: yes
-                    - Format: <subaccount-id>/<destination-name>
-                    - How to find:
-                      - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)
-                      - API: GET /v1/subaccountDestinations/{destination name} (fields: subaccount_id + Name)
+                description: SubaccountDestinationParameters are the configurable
+                  fields of a SubaccountDestination.
                 properties:
                   additionalConfigurationSecretRef:
                     description: |-

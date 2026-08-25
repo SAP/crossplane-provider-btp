@@ -181,10 +181,10 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Client Name]
   - CLI: `btp list security/app --subaccount <subaccount-id>` → `name`
 
-### SubaccountDestinationObservation
+### SubaccountDestination
 
-- Follow Standard: yes
-- Format: <subaccount-id>/<destination-name>
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<subaccount-id>/<destination-name>`
 - How to find:
 
   - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)

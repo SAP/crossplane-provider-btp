@@ -65,13 +65,6 @@ type SubaccountDestinationInitParameters struct {
 }
 
 // SubaccountDestinationParameters are the configurable fields of a SubaccountDestination.
-//
-// External-Name Configuration:
-//   - Follow Standard: yes
-//   - Format: <subaccount-id>/<destination-name>
-//   - How to find:
-//     - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)
-//     - API: GET /v1/subaccountDestinations/{destination name} (fields: subaccount_id + Name)
 type SubaccountDestinationParameters struct {
 	// Name of the destination. Immutable after creation.
 	// Used as the second segment of the external-name annotation.
@@ -192,15 +185,25 @@ type SubaccountDestinationStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+
+// SubaccountDestination manages a destination in a SAP BTP subaccount via
+// the Destination Service REST API.
+//
+// External-Name Configuration:
+//   - Follows Standard: no (compound key, not a single GUID)
+//   - Format: `<subaccount-id>/<destination-name>`
+//   - How to find:
+//     - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)
+//     - API: GET /v1/subaccountDestinations/\{destination name\} (fields: subaccount_id + Name)
+//
 // +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:resource:scope=Cluster,categories={crossplane,managed,account}
-
-// SubaccountDestination manages a destination in a SAP BTP subaccount via
-// the Destination Service REST API.
+// +kubebuilder:subresource:status
 type SubaccountDestination struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
