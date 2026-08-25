@@ -16,6 +16,8 @@ Run this while the **v1.x provider is still installed**. It is read-only - it de
 ```sh
 #!/usr/bin/env bash
 # crossplane-provider-btp v1.x -> v2.0.0 pre-upgrade check. Read-only.
+# Usage: ./btp-v2-preflight.sh
+# Requires: kubectl pointed at the cluster running the v1.x provider (via KUBECONFIG or current context).
 set -uo pipefail
 
 btp_ga=globalaccounts.account.btp.sap.crossplane.io
