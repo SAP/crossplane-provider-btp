@@ -98,7 +98,7 @@ func (c *destinationClient) Get(ctx context.Context, name string) (map[string]st
 	if err != nil {
 		return nil, "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode == http.StatusNotFound {
@@ -135,7 +135,7 @@ func (c *destinationClient) Create(ctx context.Context, props map[string]any) er
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	respBody, _ := io.ReadAll(resp.Body)
 
 	switch resp.StatusCode {
@@ -167,7 +167,7 @@ func (c *destinationClient) Update(ctx context.Context, props map[string]any, et
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
@@ -186,7 +186,7 @@ func (c *destinationClient) Delete(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		return nil // already deleted — not an error
 	}
