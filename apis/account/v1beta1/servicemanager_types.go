@@ -26,7 +26,7 @@ const (
 	ResourceCredentialsXsappname         = "xsappname"
 	ResourceCredentialsXsuaaUrlSufix     = "tokenurlsuffix"
 
-	DefaultPlanName = "service-operator-access"
+	DefaultPlanName = "subaccount-admin"
 
 	DefaultServiceInstanceName = "managed-service-manager"
 	DefaultServiceBindingName  = "managed-service-manager-binding"
@@ -72,7 +72,7 @@ type ServiceManagerParameters struct {
 	// Planname for service manager instance
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Enum=subaccount-admin;service-operator-access;container;subaccount-audit
-	// +kubebuilder:default:=service-operator-access
+	// +kubebuilder:default:=subaccount-admin
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="planName can't be updated once set"
 	PlanName string `json:"planName,omitempty"`
 

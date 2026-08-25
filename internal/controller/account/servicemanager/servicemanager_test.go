@@ -737,3 +737,30 @@ func (t *TfClientFake) DeleteResources(ctx context.Context, cr *apisv1beta1.Serv
 	t.DeleteCalled = true
 	return t.deleteFn()
 }
+
+func TestServicePlanName(t *testing.T) {
+	c := &connector{}
+	cases := map[string]struct {
+		planName string
+		want     string
+	}{
+		"EmptyPlanNameDefaultsToSubaccountAdmin": {
+			planName: "",
+			want:     apisv1beta1.DefaultPlanName,
+		},
+		"ExplicitPlanNamePassthrough": {
+			planName: "service-operator-access",
+			want:     "service-operator-access",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := NewServiceManager("test")
+			cr.Spec.ForProvider.PlanName = tc.planName
+			got := c.ServicePlanName(cr)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("ServicePlanName() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
