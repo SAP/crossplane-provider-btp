@@ -2,6 +2,7 @@ package providerconfig
 
 import (
 	"context"
+	"maps"
 	"testing"
 
 	cp_xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -214,4 +215,28 @@ func TestLoadDestinationCredentials_MissingKey(t *testing.T) {
 
 	_, err := LoadDestinationCredentials(context.Background(), kube, pc)
 	assert.Error(t, err)
+}
+
+func TestAssembleDestinationCredJSON_MissingRequiredKeys(t *testing.T) {
+	requiredKeys := []string{"clientid", "clientsecret", "tokenurl", "uri"}
+	base := map[string][]byte{
+		"clientid":     []byte("id"),
+		"clientsecret": []byte("secret"),
+		"tokenurl":     []byte("https://token.example.com"),
+		"uri":          []byte("https://api.example.com"),
+	}
+	for _, missing := range requiredKeys {
+		t.Run("missing_"+missing, func(t *testing.T) {
+			data := make(map[string][]byte, len(base))
+			maps.Copy(data, base)
+			delete(data, missing)
+
+			kube := fakeKubeClientWithSecret("dest-secret", "default", data)
+			pc := makeDestProviderConfig("dest-secret", "") // empty key = Format B
+
+			_, err := LoadDestinationCredentials(context.Background(), kube, pc)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), missing)
+		})
+	}
 }

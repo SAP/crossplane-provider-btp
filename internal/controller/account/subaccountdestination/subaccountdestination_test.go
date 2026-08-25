@@ -2,6 +2,7 @@ package subaccountdestination
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -297,6 +298,90 @@ func TestBuildPropertyBag_AdditionalOverridesTyped(t *testing.T) {
 	}
 	if props["URL"] != "https://override.com" {
 		t.Errorf("URL = %q, want override value", props["URL"])
+	}
+}
+
+// --- Update ---
+
+func TestUpdate_Success(t *testing.T) {
+	etag := "etag-42"
+	url := "https://updated.example.com"
+	subID := "sub-id"
+	cr := newCR("sub-id/dest", v1alpha1.SubaccountDestinationParameters{
+		Name: "dest", Type: "HTTP", URL: &url, SubaccountID: &subID,
+	})
+	cr.Status.AtProvider.ETag = &etag
+
+	var capturedEtag string
+	var capturedProps map[string]any
+	mock := &capturingUpdateClient{
+		onUpdate: func(props map[string]any, e string) error {
+			capturedProps = props
+			capturedEtag = e
+			return nil
+		},
+	}
+	e := &external{client: mock}
+
+	_, err := e.Update(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedEtag != etag {
+		t.Errorf("Update called with etag %q, want %q", capturedEtag, etag)
+	}
+	if capturedProps["URL"] != url {
+		t.Errorf("Update props URL = %q, want %q", capturedProps["URL"], url)
+	}
+}
+
+func TestUpdate_PropagatesError(t *testing.T) {
+	subID := "sub-id"
+	cr := newCR("sub-id/dest", v1alpha1.SubaccountDestinationParameters{
+		Name: "dest", Type: "HTTP", SubaccountID: &subID,
+	})
+	e := &external{client: &mockDestClient{updateErr: fmt.Errorf("server error")}}
+
+	_, err := e.Update(context.Background(), cr)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// capturingUpdateClient captures Update arguments for assertion.
+type capturingUpdateClient struct {
+	mockDestClient
+	onUpdate func(props map[string]any, etag string) error
+}
+
+func (c *capturingUpdateClient) Update(_ context.Context, props map[string]any, etag string) error {
+	return c.onUpdate(props, etag)
+}
+
+// --- Delete with malformed external-name ---
+
+func TestDelete_MalformedExternalName(t *testing.T) {
+	cr := newCR("nodash", v1alpha1.SubaccountDestinationParameters{Name: "dest", Type: "HTTP"})
+	e := &external{client: &mockDestClient{}}
+
+	_, err := e.Delete(context.Background(), cr)
+	if err == nil {
+		t.Fatal("expected error for malformed external-name, got nil")
+	}
+}
+
+// --- Create with nil SubaccountID ---
+
+func TestCreate_NilSubaccountIDReturnsError(t *testing.T) {
+	cr := newCR("", v1alpha1.SubaccountDestinationParameters{
+		Name: "dest", Type: "HTTP",
+		// SubaccountID deliberately nil (ref not yet resolved)
+	})
+	e := &external{client: &mockDestClient{}}
+
+	_, err := e.Create(context.Background(), cr)
+	if err == nil {
+		t.Fatal("expected error when SubaccountID is nil, got nil")
 	}
 }
 

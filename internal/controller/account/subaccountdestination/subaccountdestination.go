@@ -179,11 +179,10 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 
-	subID := ""
-	if cr.Spec.ForProvider.SubaccountID != nil {
-		subID = *cr.Spec.ForProvider.SubaccountID
+	if cr.Spec.ForProvider.SubaccountID == nil || *cr.Spec.ForProvider.SubaccountID == "" {
+		return managed.ExternalCreation{}, errors.New("subaccountId must be resolved before creating a destination")
 	}
-	meta.SetExternalName(cr, subID+"/"+cr.Spec.ForProvider.Name)
+	meta.SetExternalName(cr, *cr.Spec.ForProvider.SubaccountID+"/"+cr.Spec.ForProvider.Name)
 
 	return managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}}, nil
 }
@@ -220,6 +219,9 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	extName := meta.GetExternalName(cr)
 	if extName == "" {
 		return managed.ExternalDelete{}, nil
+	}
+	if err := validateExternalName(extName); err != nil {
+		return managed.ExternalDelete{}, err
 	}
 	destName := strings.SplitN(extName, "/", 2)[1]
 	if err := e.client.Delete(ctx, destName); err != nil {
@@ -289,6 +291,8 @@ func buildPropertyBag(ctx context.Context, kube client.Client, cr *v1alpha1.Suba
 }
 
 // isUpToDate returns true if every key in desired exists in observed with the same value.
+// Intentionally one-sided: keys present in observed but absent from desired are ignored
+// because the API injects read-only fields (CreationTime, User, etc.) that we never set.
 func isUpToDate(desired map[string]any, observed map[string]string) bool {
 	for k, dv := range desired {
 		ov, exists := observed[k]
