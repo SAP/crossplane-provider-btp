@@ -224,16 +224,28 @@ func LoadDestinationCredentials(ctx context.Context, kube client.Client, pc *v1a
 
 // assembleDestinationCredJSON builds a flat JSON object from the individual
 // keys written by SubaccountServiceBinding (Format B).
+// Supports both "tokenurl" (ServiceManager binding format) and
+// "token_url" (Destination Service binding format) for the token URL.
 func assembleDestinationCredJSON(data map[string][]byte) ([]byte, error) {
-	required := []string{"clientid", "clientsecret", "tokenurl", "uri"}
-	cred := make(map[string]string, len(required))
-	for _, k := range required {
+	cred := make(map[string]string, 4)
+
+	for _, k := range []string{"clientid", "clientsecret", "uri"} {
 		v, ok := data[k]
 		if !ok {
 			return nil, errors.Errorf("%s: required key %q not found in secret", errGetDestinationCreds, k)
 		}
 		cred[k] = string(v)
 	}
+
+	// Accept both "tokenurl" and "token_url" — always marshal as "tokenurl".
+	if v, ok := data["tokenurl"]; ok {
+		cred["tokenurl"] = string(v)
+	} else if v, ok := data["token_url"]; ok {
+		cred["tokenurl"] = string(v)
+	} else {
+		return nil, errors.Errorf("%s: required key %q not found in secret", errGetDestinationCreds, "tokenurl")
+	}
+
 	return json.Marshal(cred)
 }
 

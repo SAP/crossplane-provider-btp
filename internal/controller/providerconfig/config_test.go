@@ -217,12 +217,30 @@ func TestLoadDestinationCredentials_MissingKey(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestLoadDestinationCredentials_FlatKeys_TokenUrl(t *testing.T) {
+	// Format B with token_url key (Destination Service binding format).
+	secretData := map[string][]byte{
+		"clientid":     []byte("id3"),
+		"clientsecret": []byte("secret3"),
+		"token_url":    []byte("https://token.example.com"),
+		"uri":          []byte("https://api.example.com"),
+	}
+	kube := fakeKubeClientWithSecret("dest-binding-secret", "default", secretData)
+	pc := makeDestProviderConfig("dest-binding-secret", "")
+
+	raw, err := LoadDestinationCredentials(context.Background(), kube, pc)
+	assert.NoError(t, err)
+	assert.Contains(t, string(raw), "tokenurl")
+	assert.Contains(t, string(raw), "id3")
+}
+
 func TestAssembleDestinationCredJSON_MissingRequiredKeys(t *testing.T) {
-	requiredKeys := []string{"clientid", "clientsecret", "tokenurl", "uri"}
+	// Base uses token_url (Destination Service format) to verify both key variants.
+	requiredKeys := []string{"clientid", "clientsecret", "token_url", "uri"}
 	base := map[string][]byte{
 		"clientid":     []byte("id"),
 		"clientsecret": []byte("secret"),
-		"tokenurl":     []byte("https://token.example.com"),
+		"token_url":    []byte("https://token.example.com"),
 		"uri":          []byte("https://api.example.com"),
 	}
 	for _, missing := range requiredKeys {
@@ -236,7 +254,12 @@ func TestAssembleDestinationCredJSON_MissingRequiredKeys(t *testing.T) {
 
 			_, err := LoadDestinationCredentials(context.Background(), kube, pc)
 			assert.Error(t, err)
-			assert.Contains(t, err.Error(), missing)
+			// token_url and tokenurl are normalized — error always says "tokenurl"
+			expectedKey := missing
+			if missing == "token_url" {
+				expectedKey = "tokenurl"
+			}
+			assert.Contains(t, err.Error(), expectedKey)
 		})
 	}
 }
