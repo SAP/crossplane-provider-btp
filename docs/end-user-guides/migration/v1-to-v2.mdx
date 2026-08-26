@@ -1,13 +1,13 @@
 ---
 sidebar_position: 0
 ---
-# Migrate from v1.x to v2.0.0
+# Migrate the BTP provider from v1.x to v2.0.0
 
-v2.0.0 lifts the provider to the Crossplane v2 runtime and removes two legacy concepts ([External Secret Stores](#step-2-move-off-external-secret-stores-ess) and [`GlobalAccount`](#step-3-set-the-global-account-in-providerconfig-drop-globalaccount-refs)). Managed resources stay cluster-scoped, so most manifests are unchanged.
+Provider v2.0.0 removes two legacy concepts ([External Secret Stores](#step-2-move-off-external-secret-stores-ess) and [`GlobalAccount`](#step-3-set-the-global-account-in-providerconfig-drop-globalaccount-refs)) and moves to the Crossplane v2 runtime. Managed resources stay cluster-scoped, so most manifests are unchanged.
 
 ## Do I need to upgrade Crossplane core?
 
-**No.** v2.0.0 runs on both Crossplane core **v1 and v2** control planes. The provider's runtime bump to v2 is independent of the Crossplane core version - you can adopt v2.0.0 without upgrading core, and upgrade core on its own schedule.
+**No.** Provider v2.0.0 runs on both Crossplane [v1](https://docs.crossplane.io/v1.20/) and [v2](https://docs.crossplane.io/v2.4/) control planes. Adopting it is independent of your Crossplane version - you can install it without upgrading Crossplane, and upgrade Crossplane on its own schedule.
 
 ## Step 1: run the pre-upgrade check
 
@@ -16,7 +16,7 @@ Run this while the **v1.x provider is still installed**. It is read-only - it de
 ```sh
 #!/usr/bin/env bash
 # crossplane-provider-btp v1.x -> v2.0.0 pre-upgrade check. Read-only.
-# Usage: ./btp-v2-preflight.sh
+# Usage: ./btp-v2-preupgrade-check.sh
 # Requires: kubectl pointed at the cluster running the v1.x provider (via KUBECONFIG or current context).
 set -uo pipefail
 
@@ -130,9 +130,9 @@ spec:
 
 ## After you upgrade
 
-Upgrade succeeds either way and **no BTP-side data is lost**. If the check flagged step 2 or step 3, clean up the removed CRDs now - Crossplane does **not** GC them (`globalaccounts` and, if you used ESS, `storeconfigs.btp.sap.crossplane.io`). The steps differ by Crossplane core version; repeat them for each removed CRD.
+Upgrade succeeds either way and **no BTP-side data is lost**. If the check flagged step 2 or step 3, clean up the removed CRDs now - Crossplane does **not** GC them (`globalaccounts` and, if you used ESS, `storeconfigs.btp.sap.crossplane.io`). The steps differ by Crossplane version; repeat them for each removed CRD.
 
-### Core v1
+### Crossplane v1
 
 ```sh
 kubectl delete globalaccounts.account.btp.sap.crossplane.io --all
@@ -143,7 +143,7 @@ kubectl delete crd storeconfigs.btp.sap.crossplane.io
 
 Delete the CRs first - the CRD's `customresourcecleanup` finalizer holds it in `Terminating` until they are gone.
 
-### Core v2
+### Crossplane v2
 
 The CRD is owned by a `ManagedResourceDefinition` (MRD) that re-creates it on every reconcile, so `kubectl delete crd` alone is a no-op. Delete the MRD first:
 
