@@ -4,6 +4,7 @@ metadata:
   name: e2e-destination-binding
   namespace: default
 spec:
+  secretKey: credentials
   writeConnectionSecretToRef:
     name: e2e-destination-binding-secret
     namespace: crossplane-system

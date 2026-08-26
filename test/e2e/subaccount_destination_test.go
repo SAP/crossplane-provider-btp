@@ -109,7 +109,7 @@ func TestSubaccountDestination_CreationFlow(t *testing.T) {
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				// Remove destinationCredentials from ProviderConfig to leave it clean.
 				_ = testutil.PatchProviderConfigDestinationCredentials(ctx, cfg, "", "")
-				DeleteResourcesIgnoreMissing(ctx, t, cfg, "SubaccountDestination", wait.WithTimeout(5*time.Minute))
+				DeleteResourcesIgnoreMissing(ctx, t, cfg, crsPath("SubaccountDestination"), wait.WithTimeout(5*time.Minute))
 				return ctx
 			},
 		).Feature()

@@ -705,7 +705,7 @@ func PatchProviderConfigDestinationCredentials(ctx context.Context, cfg *envconf
 						Name:      secretName,
 						Namespace: secretNamespace,
 					},
-					Key: "", // empty = Format B (flat keys from ServiceBinding)
+					Key: "credentials", // Format A: ServiceBinding writes full JSON under this key
 				},
 			},
 		}
