@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   providerConfigRef:
-    name: e2e-provider-config
+    name: default
   forProvider:
     displayName: $BUILD_ID-e2e-dest-subaccount
     region: eu12

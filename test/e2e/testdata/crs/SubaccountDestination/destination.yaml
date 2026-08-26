@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   providerConfigRef:
-    name: e2e-provider-config
+    name: default
   forProvider:
     name: e2e-dest-$BUILD_ID
     type: HTTP
