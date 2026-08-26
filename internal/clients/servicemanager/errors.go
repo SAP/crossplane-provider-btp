@@ -7,6 +7,13 @@ import (
 	smclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-service-manager-api-go/pkg"
 )
 
+// SpecifyAPIError is the exported form of specifyAPIError, for reuse by clients
+// outside this package (e.g. the native ServiceInstance client) that need to
+// surface the BTP-side error body from a *smclient.GenericOpenAPIError.
+func SpecifyAPIError(err error) error {
+	return specifyAPIError(err)
+}
+
 // specifyAPIError unwraps a *smclient.GenericOpenAPIError so the BTP-side message
 // (structured smclient.Error model when present, raw body otherwise) is surfaced
 // in the returned error. Non-OpenAPI errors are returned unchanged.

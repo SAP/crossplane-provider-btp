@@ -118,6 +118,9 @@ type ServiceInstanceObservation struct {
 
 	// The platform ID of the service instance.
 	PlatformID string `json:"platformId,omitempty"`
+
+	// Whether the service instance is shared, as observed from the Service Manager API.
+	Shared *bool `json:"shared,omitempty"`
 }
 
 // A ServiceInstanceSpec defines the desired state of a ServiceInstance.

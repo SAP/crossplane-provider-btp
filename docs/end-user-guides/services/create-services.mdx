@@ -59,6 +59,10 @@ To entitle the SAP HANA Cloud service to your subaccount, apply the `Entitlement
 
 Once the SAP HANA Cloud service is entitled, you can create your first managed service instance. The steps below show how to create a SAP HANA Cloud service instance using our `ServiceInstance` custom resource.
 
+:::warning ServiceManager plan requirement
+The `ServiceManager` referenced by a `ServiceInstance` (via `serviceManagerRef`/`serviceManagerSelector`) **must be provisioned with plan `subaccount-admin`**, not the default `service-operator-access`. The `ServiceInstance` controller reconciles natively against the Service Manager `ServiceInstances` API and requires the `subaccount.service_instance.manage` and `subaccount.service_instance.read` scopes, which only the `subaccount-admin` plan grants. Set `spec.forProvider.planName: subaccount-admin` on the `ServiceManager` resource. Using another plan surfaces a `403`/insufficient-scope error during reconciliation.
+:::
+
 1. Save the following YAML content to `hana-cloud-instance.yaml`:
 
     <Tabs groupId="service-instance">

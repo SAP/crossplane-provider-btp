@@ -431,6 +431,10 @@ spec:
                   serviceplanId:
                     description: The ID of the service plan as resolved by the ServiceManager
                     type: string
+                  shared:
+                    description: Whether the service instance is shared, as observed
+                      from the Service Manager API.
+                    type: boolean
                   state:
                     description: The current state of the service instance.
                     type: string

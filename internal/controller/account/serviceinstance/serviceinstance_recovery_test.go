@@ -2,24 +2,18 @@ package serviceinstance
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
-	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeobj "k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
-	tfclient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
 	"github.com/sap/crossplane-provider-btp/internal/recovery"
 )
 
@@ -80,7 +74,9 @@ var (
 	createPendingAt = crCreatedAt.Add(5 * time.Second)
 )
 
-func siWithConflict(name string) *v1alpha1.ServiceInstance {
+// siFallback builds a CR with a fallback external-name (== metadata.name) and a
+// recorded Create attempt, simulating a lost-ID Create that recovery must heal.
+func siFallback(name string) *v1alpha1.ServiceInstance {
 	cr := &v1alpha1.ServiceInstance{}
 	cr.SetName(name)
 	cr.SetCreationTimestamp(metav1.NewTime(crCreatedAt))
@@ -91,34 +87,27 @@ func siWithConflict(name string) *v1alpha1.ServiceInstance {
 	cr.Generation = 2
 	cr.Spec.ForProvider.Name = name
 	meta.SetExternalName(cr, name) // fallback external-name == metadata.name
-	cr.SetConditions(xpv1.Condition{
-		Type:               xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
-		Status:             corev1.ConditionFalse,
-		Reason:             "ApplyFailure",
-		Message:            "apply failed: API Error Creating Resource Service Instance (Subaccount): Conflict",
-		ObservedGeneration: 2,
-	})
 	return cr
 }
 
-// siWithConflictNoPending mirrors siWithConflict but leaves off the
-// external-create-pending annotation — no Create() has ever been attempted
-// for this CR. The heal must refuse to recover anything.
-func siWithConflictNoPending(name string) *v1alpha1.ServiceInstance {
-	cr := siWithConflict(name)
+// siFallbackNoPending mirrors siFallback but leaves off the
+// external-create-pending annotation — no Create() has ever been attempted for
+// this CR. The heal must refuse to recover anything.
+func siFallbackNoPending(name string) *v1alpha1.ServiceInstance {
+	cr := siFallback(name)
 	delete(cr.GetAnnotations(), "crossplane.io/external-create-pending")
 	return cr
 }
 
-func TestObserve_RecoveryConflictBranch(t *testing.T) {
+func TestObserve_Recovery(t *testing.T) {
 	const guid = "80540c06-2955-4bce-9c43-ad78fecc7f62"
 
 	t.Run("match recovers external-name and requeues", func(t *testing.T) {
-		cr := siWithConflict("cls-1")
+		cr := siFallback("cls-1")
 		lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(2 * time.Second), siFound: true}
 		rec := &recorderFake{}
 		e := external{
-			tfClient: &TfProxyMock{status: tfclient.NotExisting},
+			client: &nativeClientMock{},
 			kube: &test.MockClient{
 				MockUpdate:       test.NewMockUpdateFn(nil),
 				MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
@@ -136,13 +125,6 @@ func TestObserve_RecoveryConflictBranch(t *testing.T) {
 		if lk.gotName != "cls-1" {
 			t.Errorf("lookup name = %q, want cls-1", lk.gotName)
 		}
-		// the stale LastAsyncOperation=ApplyFailure must be cleared so the next
-		// reconcile does not re-enter the Conflict branch.
-		cond := cr.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation))
-		if cond.Reason == "ApplyFailure" {
-			t.Errorf("stale ApplyFailure condition was not cleared")
-		}
-		// a real ID was resolved -> an ExternalNameRecovered event must be logged.
 		if !rec.has(recovery.EventReasonRecovered) {
 			t.Errorf("expected an %q event to be recorded, got %+v", recovery.EventReasonRecovered, rec.events)
 		}
@@ -150,15 +132,12 @@ func TestObserve_RecoveryConflictBranch(t *testing.T) {
 
 	// Regression: ownership check refuses to recover a BTP resource whose
 	// created_at falls outside the window around our recorded Create attempt.
-	// That is the brownfield case — the user must adopt it explicitly by
-	// setting crossplane.io/external-name (per the external-name ADR).
 	t.Run("brownfield (BTP created outside pending window): refuses recovery, emits Warning", func(t *testing.T) {
-		cr := siWithConflict("cls-brown")
-		// BTP instance is 1h OLDER than our pending annotation -> outside window -> refuse.
+		cr := siFallback("cls-brown")
 		lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(-time.Hour), siFound: true}
 		rec := &recorderFake{}
 		e := external{
-			tfClient: &TfProxyMock{status: tfclient.NotExisting},
+			client: &nativeClientMock{},
 			kube: &test.MockClient{
 				MockUpdate:       test.NewMockUpdateFn(nil),
 				MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
@@ -166,11 +145,13 @@ func TestObserve_RecoveryConflictBranch(t *testing.T) {
 			newAdminLookuperFn: mkFactory(lk),
 			recorder:           rec,
 		}
-		_, err := e.Observe(context.TODO(), cr)
-		// The Conflict-branch fall-through still returns the "already exists"
-		// error (recovery declined, so the original error is preserved).
-		if err == nil || errors.Is(err, recovery.ErrRequeueAfterRecovery) {
-			t.Fatalf("expected the original conflict error (recovery refused), got %v", err)
+		obs, err := e.Observe(context.TODO(), cr)
+		// Recovery refused -> no error, resource reported not-existing.
+		if err != nil {
+			t.Fatalf("expected nil error (recovery refused silently), got %v", err)
+		}
+		if obs.ResourceExists {
+			t.Errorf("expected ResourceExists=false")
 		}
 		if meta.GetExternalName(cr) != "cls-brown" {
 			t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
@@ -183,17 +164,17 @@ func TestObserve_RecoveryConflictBranch(t *testing.T) {
 		}
 	})
 
-	t.Run("no match returns the original conflict error and does not patch", func(t *testing.T) {
-		cr := siWithConflict("cls-2")
+	t.Run("no match returns not-existing and does not patch", func(t *testing.T) {
+		cr := siFallback("cls-2")
 		lk := &lookuperFake{siFound: false}
 		e := external{
-			tfClient:           &TfProxyMock{status: tfclient.NotExisting},
+			client:             &nativeClientMock{},
 			kube:               &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
 			newAdminLookuperFn: mkFactory(lk),
 		}
 		obs, err := e.Observe(context.TODO(), cr)
-		if err == nil || errors.Is(err, recovery.ErrRequeueAfterRecovery) {
-			t.Fatalf("expected the original conflict error, got %v", err)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
 		}
 		if obs.ResourceExists {
 			t.Errorf("expected ResourceExists=false")
@@ -203,24 +184,23 @@ func TestObserve_RecoveryConflictBranch(t *testing.T) {
 		}
 	})
 
-	t.Run("lookup error falls through to original error without patching", func(t *testing.T) {
-		cr := siWithConflict("cls-3")
+	t.Run("lookup error falls through without patching", func(t *testing.T) {
+		cr := siFallback("cls-3")
 		lk := &lookuperFake{siErr: errors.New("boom")}
 		rec := &recorderFake{}
 		e := external{
-			tfClient:           &TfProxyMock{status: tfclient.NotExisting},
+			client:             &nativeClientMock{},
 			kube:               &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
 			newAdminLookuperFn: mkFactory(lk),
 			recorder:           rec,
 		}
 		_, err := e.Observe(context.TODO(), cr)
-		if err == nil || errors.Is(err, recovery.ErrRequeueAfterRecovery) {
-			t.Fatalf("expected the original conflict error, got %v", err)
+		if err != nil {
+			t.Fatalf("expected nil error (lookup failure logged, not fatal), got %v", err)
 		}
 		if meta.GetExternalName(cr) != "cls-3" {
 			t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
 		}
-		// a lookup failure logs a Warning, never a recovery.
 		if !rec.has(recovery.EventReasonLookupFailed) {
 			t.Errorf("expected an %q event, got %+v", recovery.EventReasonLookupFailed, rec.events)
 		}
@@ -229,23 +209,20 @@ func TestObserve_RecoveryConflictBranch(t *testing.T) {
 		}
 	})
 
-	// New: no external-create-pending annotation means this controller never
-	// invoked Create() for this CR, so the heal must short-circuit BEFORE
-	// running the expensive semantic lookup. Guards the safety property that
-	// motivated dropping the creationTimestamp fallback.
+	// No external-create-pending annotation means this controller never invoked
+	// Create() for this CR, so the heal must short-circuit BEFORE running the
+	// expensive semantic lookup.
 	t.Run("no create-pending annotation: short-circuits, does not lookup", func(t *testing.T) {
-		cr := siWithConflictNoPending("cls-nopending")
+		cr := siFallbackNoPending("cls-nopending")
 		lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(2 * time.Second), siFound: true}
 		e := external{
-			tfClient:           &TfProxyMock{status: tfclient.NotExisting},
+			client:             &nativeClientMock{},
 			kube:               &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
 			newAdminLookuperFn: mkFactory(lk),
 		}
 		_, err := e.Observe(context.TODO(), cr)
-		// The Conflict-branch fall-through still returns the "already exists"
-		// error; but recovery is refused up-front so the lookup must not run.
-		if err == nil || errors.Is(err, recovery.ErrRequeueAfterRecovery) {
-			t.Fatalf("expected the original conflict error (recovery refused), got %v", err)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
 		}
 		if meta.GetExternalName(cr) != "cls-nopending" {
 			t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
@@ -255,161 +232,3 @@ func TestObserve_RecoveryConflictBranch(t *testing.T) {
 		}
 	})
 }
-
-// TestObserve_RecoveryNotExistingBranch covers the plain not-found path (no
-// Conflict condition) which also serves the delete leg.
-func TestObserve_RecoveryNotExistingBranch(t *testing.T) {
-	const guid = "aaaaaaaa-2955-4bce-9c43-ad78fecc7f62"
-
-	cr := &v1alpha1.ServiceInstance{}
-	cr.SetName("cls-x")
-	cr.SetCreationTimestamp(metav1.NewTime(crCreatedAt))
-	meta.SetExternalCreatePending(cr, createPendingAt)
-	cr.Spec.ForProvider.Name = "cls-x"
-	meta.SetExternalName(cr, "cls-x")
-	lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(2 * time.Second), siFound: true}
-	e := external{
-		tfClient: &TfProxyMock{status: tfclient.NotExisting},
-		kube: &test.MockClient{
-			MockUpdate:       test.NewMockUpdateFn(nil),
-			MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-		},
-		newAdminLookuperFn: mkFactory(lk),
-	}
-	_, err := e.Observe(context.TODO(), cr)
-	if !errors.Is(err, recovery.ErrRequeueAfterRecovery) {
-		t.Fatalf("expected ErrRequeueAfterRecovery, got %v", err)
-	}
-	if meta.GetExternalName(cr) != guid {
-		t.Errorf("external-name = %q, want %q", meta.GetExternalName(cr), guid)
-	}
-}
-
-// TestObserve_RecoveryBrownfieldNotExistingBranch: same as above but a
-// brownfield resource — recovery must be refused and external-name unchanged.
-func TestObserve_RecoveryBrownfieldNotExistingBranch(t *testing.T) {
-	const guid = "aaaaaaaa-2955-4bce-9c43-ad78fecc7f62"
-
-	cr := &v1alpha1.ServiceInstance{}
-	cr.SetName("cls-brown-x")
-	cr.SetCreationTimestamp(metav1.NewTime(crCreatedAt))
-	meta.SetExternalCreatePending(cr, createPendingAt)
-	cr.Spec.ForProvider.Name = "cls-brown-x"
-	meta.SetExternalName(cr, "cls-brown-x")
-	lk := &lookuperFake{siGUID: guid, siCreatedAt: createPendingAt.Add(-time.Hour), siFound: true}
-	rec := &recorderFake{}
-	e := external{
-		tfClient: &TfProxyMock{status: tfclient.NotExisting},
-		kube: &test.MockClient{
-			MockUpdate:       test.NewMockUpdateFn(nil),
-			MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-		},
-		newAdminLookuperFn: mkFactory(lk),
-		recorder:           rec,
-	}
-	obs, err := e.Observe(context.TODO(), cr)
-	if err != nil {
-		t.Fatalf("expected nil error (recovery refused silently on not-existing branch), got %v", err)
-	}
-	if obs.ResourceExists {
-		t.Errorf("expected ResourceExists=false")
-	}
-	if meta.GetExternalName(cr) != "cls-brown-x" {
-		t.Errorf("external-name must be unchanged, got %q", meta.GetExternalName(cr))
-	}
-	if !rec.has(recovery.EventReasonRefusedBrownfield) {
-		t.Errorf("expected a %q event, got %+v", recovery.EventReasonRefusedBrownfield, rec.events)
-	}
-}
-
-// TestObserve_RecoversIdentityFromTfState covers the identity upjet learns
-// without the async completion gate opening: a create that fails after BTP
-// created the instance leaves the GUID in the partial Terraform state, which
-// upjet stamps onto the mapped resource while QueryAsyncData reports nothing.
-func TestObserve_RecoversIdentityFromTfState(t *testing.T) {
-	const guid = "3f1c2d0e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
-	const adopted = "11111111-2222-3333-4444-555555555555"
-
-	newCR := func(externalName string) *v1alpha1.ServiceInstance {
-		cr := &v1alpha1.ServiceInstance{}
-		cr.SetName("cls-tfstate")
-		cr.Spec.ForProvider.Name = "cls-tfstate"
-		if externalName != "" {
-			meta.SetExternalName(cr, externalName)
-		}
-		return cr
-	}
-	mapped := func(externalName string) *v1alpha1.SubaccountServiceInstance {
-		tf := &v1alpha1.SubaccountServiceInstance{}
-		meta.SetExternalName(tf, externalName)
-		return tf
-	}
-
-	t.Run("fallback external-name adopts the recovered GUID and requeues", func(t *testing.T) {
-		cr := newCR("")
-		rec := &recorderFake{}
-		e := external{
-			tfClient: &TfProxyMock{status: tfclient.UpToDate, tfResource: mapped(guid)},
-			kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
-			recorder: rec,
-		}
-		_, err := e.Observe(context.TODO(), cr)
-		if !errors.Is(err, recovery.ErrRequeueAfterRecovery) {
-			t.Fatalf("expected ErrRequeueAfterRecovery, got %v", err)
-		}
-		if meta.GetExternalName(cr) != guid {
-			t.Errorf("external-name = %q, want %q", meta.GetExternalName(cr), guid)
-		}
-		if !rec.has(recovery.EventReasonRecovered) {
-			t.Errorf("expected an %q event, got %+v", recovery.EventReasonRecovered, rec.events)
-		}
-	})
-
-	t.Run("an adopted external-name is never overwritten from tf state", func(t *testing.T) {
-		cr := newCR(adopted)
-		e := external{
-			tfClient: &TfProxyMock{status: tfclient.UpToDate, tfResource: mapped(guid)},
-			kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
-		}
-		obs, err := e.Observe(context.TODO(), cr)
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-		if !obs.ResourceExists || !obs.ResourceUpToDate {
-			t.Errorf("expected an up-to-date observation, got %+v", obs)
-		}
-		if meta.GetExternalName(cr) != adopted {
-			t.Errorf("external-name = %q, want the adopted %q", meta.GetExternalName(cr), adopted)
-		}
-	})
-
-	t.Run("the placeholder identifier is refused", func(t *testing.T) {
-		cr := newCR("")
-		e := external{
-			tfClient: &TfProxyMock{status: tfclient.UpToDate, tfResource: mapped("NOT_EMPTY_GUID")},
-			kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
-		}
-		if _, err := e.Observe(context.TODO(), cr); err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-		if got := meta.GetExternalName(cr); got != "" {
-			t.Errorf("external-name = %q, want it left empty", got)
-		}
-	})
-
-	t.Run("a failed write surfaces instead of being silently dropped", func(t *testing.T) {
-		cr := newCR("")
-		e := external{
-			tfClient: &TfProxyMock{status: tfclient.UpToDate, tfResource: mapped(guid)},
-			kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(errKube)},
-		}
-		_, err := e.Observe(context.TODO(), cr)
-		if err == nil || !strings.Contains(err.Error(), errRecoverExternalName) {
-			t.Fatalf("expected the persist failure to surface, got %v", err)
-		}
-	})
-}
-
-// silence unused import in some builds
-var _ = strings.Contains
-var _ = managed.ExternalConnector(nil)
