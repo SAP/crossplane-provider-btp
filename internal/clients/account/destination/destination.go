@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"golang.org/x/oauth2/clientcredentials"
 )
@@ -49,6 +50,12 @@ func ParseCredential(raw []byte) (DestinationCredential, error) {
 		if c.TokenURL == "" {
 			c.TokenURL = c.UAA.URL
 		}
+	}
+	// If TokenURL is still absent, derive it from the UAA base URL (url field).
+	// Some BTP landscapes write a bare UAA base URL under "url" rather than a
+	// full token endpoint under "tokenurl".
+	if c.TokenURL == "" && c.URL != "" {
+		c.TokenURL = strings.TrimRight(c.URL, "/") + "/oauth/token"
 	}
 	return c, nil
 }

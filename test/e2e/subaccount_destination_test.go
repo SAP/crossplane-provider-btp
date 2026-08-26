@@ -10,6 +10,7 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
@@ -87,6 +88,17 @@ func TestSubaccountDestination_CreationFlow(t *testing.T) {
 				updated := dest.DeepCopy()
 				updated.Spec.ForProvider.URL = &updatedURL
 				resources.AwaitResourceUpdateOrError(ctx, t, cfg, updated)
+
+				// Wait for the controller to reconcile the update to BTP and reflect
+				// the new URL in atProvider.
+				resources.AwaitResourceUpdateFor(
+					ctx, t, cfg, updated,
+					func(obj k8s.Object) bool {
+						d, ok := obj.(*v1alpha1.SubaccountDestination)
+						return ok && d.Status.AtProvider.URL != nil && *d.Status.AtProvider.URL == updatedURL
+					},
+					wait.WithTimeout(3*time.Minute),
+				)
 
 				after := &v1alpha1.SubaccountDestination{}
 				MustGetResource(t, cfg, destCreateName, nil, after)
