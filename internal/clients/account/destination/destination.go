@@ -18,12 +18,21 @@ type DestinationCredential struct {
 	ClientSecret string `json:"clientsecret"`
 	TokenURL     string `json:"tokenurl"`
 	URI          string `json:"uri"`
+	// URL is an alias for URI used by some BTP landscapes.
+	URL string `json:"url,omitempty"`
 }
 
 // ParseCredential unmarshals a Destination Service binding JSON blob.
 func ParseCredential(raw []byte) (DestinationCredential, error) {
 	var c DestinationCredential
-	return c, json.Unmarshal(raw, &c)
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return c, err
+	}
+	// Normalize: if URI is empty but URL is set, use URL.
+	if c.URI == "" && c.URL != "" {
+		c.URI = c.URL
+	}
+	return c, nil
 }
 
 // DestinationClientI is the interface the controller uses — isolates HTTP concerns.
