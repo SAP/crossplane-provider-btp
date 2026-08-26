@@ -26,49 +26,71 @@ found=0
 note() { printf '\n[FOUND] %s\n' "$1"; found=1; }
 ok()   { printf '[ok]    %s\n' "$1"; }
 
-echo "== crossplane-provider-btp v2.0.0 pre-upgrade check =="
-
 # 1. External Secret Stores (ESS)
-ess=$( { kubectl get storeconfigs.secrets.crossplane.io -A -o name 2>/dev/null; \
-         kubectl get "$btp_sc" -A -o name 2>/dev/null; } | sort -u )
-pub=$(kubectl get managed -A -o yaml 2>/dev/null | grep -c 'publishConnectionDetailsTo')
-if [ -n "$ess" ] || [ "$pub" -gt 0 ]; then
-  note "ESS in use -> do step 2. Publishing stops silently on v2.0.0 (highest impact)."
-  [ -n "$ess" ] && printf '  StoreConfigs:\n%s\n' "$ess"
-  [ "$pub" -gt 0 ] && echo "  $pub resource(s) set publishConnectionDetailsTo."
-else
-  ok "No ESS StoreConfigs or publishConnectionDetailsTo usage."
-fi
+check_ess() {
+  local ess pub
+  ess=$( { kubectl get storeconfigs.secrets.crossplane.io -A -o name 2>/dev/null; \
+           kubectl get "$btp_sc" -A -o name 2>/dev/null; } | sort -u )
+  # MRs that publish connection details: print kind/name<TAB>target, keep rows with a target set.
+  pub=$(kubectl get managed -A \
+        -o jsonpath='{range .items[*]}{.kind}/{.metadata.name}{"\t"}{.spec.publishConnectionDetailsTo.name}{"\n"}{end}' 2>/dev/null \
+        | awk -F'\t' 'NF==2 && $2!=""')
+  if [[ -n $ess || -n $pub ]]; then
+    note "ESS in use -> do step 2. Publishing stops silently on v2.0.0 (highest impact)."
+    [[ -n $ess ]] && printf '  StoreConfigs:\n%s\n' "$ess"
+    [[ -n $pub ]] && printf '  Resources publishing connection details (resource -> target):\n%s\n' "$pub"
+  else
+    ok "No ESS StoreConfigs or publishConnectionDetailsTo usage."
+  fi
+}
 
 # 2. GlobalAccount CRs / refs
-ga=$(kubectl get "$btp_ga" -A -o name 2>/dev/null)
-refs=$(kubectl get subaccounts.account.btp.sap.crossplane.io -A -o yaml 2>/dev/null \
-       | grep -iE 'globalAccountRef|globalAccountSelector')
-if [ -n "$ga" ] || [ -n "$refs" ]; then
-  note "GlobalAccount CRs or refs present -> do step 3. CR is removed in v2.0.0."
-  [ -n "$ga" ] && printf '  GlobalAccount CRs:\n%s\n' "$ga"
-  [ -n "$refs" ] && echo "  Subaccount(s) still carry globalAccountRef/Selector (cosmetic, unread)."
-else
-  ok "No GlobalAccount CRs or refs."
-fi
+check_globalaccount() {
+  local ga refs
+  ga=$(kubectl get "$btp_ga" -A -o name 2>/dev/null)
+  # Subaccounts still carrying a ref/selector: print name<TAB>ref<TAB>selector, keep rows with either set.
+  # Subaccount is cluster-scoped, so there is no namespace to print.
+  refs=$(kubectl get subaccounts.account.btp.sap.crossplane.io \
+         -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.forProvider.globalAccountRef}{"\t"}{.spec.forProvider.globalAccountSelector}{"\n"}{end}' 2>/dev/null \
+         | awk -F'\t' 'NF==3 && ($2!="" || $3!="") {print $1}')
+  if [[ -n $ga || -n $refs ]]; then
+    note "GlobalAccount CRs or refs present -> do step 3. CR is removed in v2.0.0."
+    [[ -n $ga ]] && printf '  GlobalAccount CRs:\n%s\n' "$ga"
+    [[ -n $refs ]] && printf '  Subaccount(s) still carrying globalAccountRef/Selector (cosmetic, unread):\n%s\n' "$refs"
+  else
+    ok "No GlobalAccount CRs or refs."
+  fi
+}
 
 # 3. ServiceManager planName default flip
-sm=$(kubectl get servicemanagers.account.btp.sap.crossplane.io -A \
-      -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\t"}{.spec.forProvider.planName}{"\n"}{end}' 2>/dev/null)
-soa=$(printf '%s\n' "$sm" | grep -w 'service-operator-access')
-if [ -n "$soa" ]; then
-  note "ServiceManager(s) on service-operator-access -> do step 4. Default flips to subaccount-admin."
-  printf '%s\n' "$soa"
-else
-  ok "No ServiceManager relies on service-operator-access."
-fi
+check_servicemanager() {
+  local sm soa
+  # ServiceManager is cluster-scoped, so there is no namespace to print.
+  sm=$(kubectl get servicemanagers.account.btp.sap.crossplane.io \
+        -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.forProvider.planName}{"\n"}{end}' 2>/dev/null)
+  soa=$(printf '%s\n' "$sm" | grep -w 'service-operator-access')
+  if [[ -n $soa ]]; then
+    note "ServiceManager(s) on service-operator-access -> do step 4. Default flips to subaccount-admin."
+    printf '%s\n' "$soa"
+  else
+    ok "No ServiceManager relies on service-operator-access."
+  fi
+}
 
-echo
-if [ "$found" -eq 0 ]; then
-  echo "== Clear. Nothing btp-specific blocks the v2.0.0 upgrade. =="
-else
-  echo "== Action needed: run the flagged steps below, then upgrade. =="
-fi
+summary() {
+  echo
+  if [[ $found -eq 0 ]]; then
+    echo "== Clear. Nothing btp-specific blocks the v2.0.0 upgrade. =="
+  else
+    echo "== Action needed: run the flagged steps below, then upgrade. =="
+  fi
+}
+
+echo "== crossplane-provider-btp v2.0.0 pre-upgrade check =="
+check_ess
+check_globalaccount
+check_servicemanager
+summary
 ```
 
 Each `[FOUND]` line names the step to run. If every line is `[ok]`, skip to [After you upgrade](#after-you-upgrade). Do the flagged steps while the **v1.x provider is still running**.
