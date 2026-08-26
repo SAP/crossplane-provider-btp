@@ -368,6 +368,14 @@ func (c *external) setStatus(ctx context.Context, status sm.ResourcesStatus, cr 
 	}
 	cr.Status.AtProvider.ServiceInstanceID = status.InstanceID
 	cr.Status.AtProvider.ServiceBindingID = status.BindingID
+
+	// Workaround for #941: self-heal a stale plan ID in status. An upgraded
+	// v1alpha1 SM lost dataSourceLookup and re-resolved the flipped default plan
+	// (#925) into status. Overwrite it with the observed live plan. For v1beta1
+	// these already match, so this is a no-op.
+	if cr.Status.AtProvider.DataSourceLookup != nil && status.ObservedPlanID != "" {
+		cr.Status.AtProvider.DataSourceLookup.ServiceManagerPlanID = status.ObservedPlanID
+	}
 	// Unfortunately we need to update the CR status manually here, because the reconciler will drop the change otherwise
 	// (I guess because we are attempting to save something while ResourceExists remains false for another cycle)
 	if err := c.kube.Status().Update(ctx, cr); err != nil {

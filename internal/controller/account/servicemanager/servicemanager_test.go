@@ -379,9 +379,45 @@ func TestObserve(t *testing.T) {
 			},
 		},
 		{
-			// Regression: while the CR is being deleted and the underlying
-			// instance still exists (binding may or may not — the tf-client
-			// keys ResourceExists off the instance during delete), setStatus
+			// OPTION A (status self-heal): an upgraded v1alpha1 SM re-resolved the
+			// flipped default plan into dataSourceLookup (stalePlan). ObserveResources
+			// returns the live instance's plan as ObservedPlanID (livePlan). setStatus
+			// must overwrite the stale persisted plan ID with the live one so status
+			// displays the instance's real plan.
+			name: "SelfHealsStalePlanID",
+			args: args{
+				cr: NewServiceManager("test",
+					WithStatus(apisv1beta1.ServiceManagerObservation{
+						DataSourceLookup: &apisv1beta1.DataSourceLookup{ServiceManagerPlanID: "stalePlan"},
+					})),
+				tfClient: &TfClientFake{
+					observeFn: func() (sm.ResourcesStatus, error) {
+						return sm.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{
+								ResourceExists:   true,
+								ResourceUpToDate: true,
+							},
+							InstanceID:     "someID",
+							BindingID:      "anotherID",
+							ObservedPlanID: "livePlan",
+						}, nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+				cr: NewServiceManager("test",
+					WithStatus(apisv1beta1.ServiceManagerObservation{
+						Status:            apisv1beta1.ServiceManagerBound,
+						ServiceInstanceID: "someID",
+						ServiceBindingID:  "anotherID",
+						DataSourceLookup:  &apisv1beta1.DataSourceLookup{ServiceManagerPlanID: "livePlan"},
+					}),
+					WithConditions(xpv1.Available())),
+			},
+		},
+		{
 			// must report Deleting()/Unbound, not Available()/Bound. Under the
 			// pre-fix code the delete-aware ObserveResources returned
 			// ResourceExists:true which then flipped the CR back to Available
