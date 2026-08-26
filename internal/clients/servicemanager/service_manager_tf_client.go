@@ -300,11 +300,7 @@ func (tf *TfClient) resourcesUpToDate(ctx context.Context) bool {
 	// desired == observed and this is a no-op.
 	desiredPlan := internal.Val(tf.sInstance.Spec.ForProvider.ServiceplanID)
 	observedPlan := internal.Val(tf.sInstance.Status.AtProvider.ServiceplanID)
-	if desiredPlan != observedPlan {
-		return true
-	}
-
-	return false
+	return desiredPlan != observedPlan
 }
 
 func (tf *TfClient) createInstance(ctx context.Context) (string, error) {
