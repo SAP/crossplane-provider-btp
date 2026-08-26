@@ -20,6 +20,12 @@ type DestinationCredential struct {
 	URI          string `json:"uri"`
 	// URL is an alias for URI used by some BTP landscapes.
 	URL string `json:"url,omitempty"`
+	// UAA holds nested credentials written by some BTP landscapes.
+	UAA *struct {
+		ClientID     string `json:"clientid"`
+		ClientSecret string `json:"clientsecret"`
+		URL          string `json:"url"`
+	} `json:"uaa,omitempty"`
 }
 
 // ParseCredential unmarshals a Destination Service binding JSON blob.
@@ -28,9 +34,21 @@ func ParseCredential(raw []byte) (DestinationCredential, error) {
 	if err := json.Unmarshal(raw, &c); err != nil {
 		return c, err
 	}
-	// Normalize: if URI is empty but URL is set, use URL.
+	// Normalize URI: if empty, fall back to url.
 	if c.URI == "" && c.URL != "" {
 		c.URI = c.URL
+	}
+	// Normalize from nested uaa structure when flat fields are absent.
+	if c.UAA != nil {
+		if c.ClientID == "" {
+			c.ClientID = c.UAA.ClientID
+		}
+		if c.ClientSecret == "" {
+			c.ClientSecret = c.UAA.ClientSecret
+		}
+		if c.TokenURL == "" {
+			c.TokenURL = c.UAA.URL
+		}
 	}
 	return c, nil
 }
