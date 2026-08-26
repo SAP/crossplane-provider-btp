@@ -20,7 +20,6 @@ import (
 )
 
 var (
-	destCreateName      = "e2e-dest-" + BUILD_ID
 	destBindingSecret   = "e2e-destination-binding-secret"
 	destBindingSecretNS = "crossplane-system"
 	destServiceBinding  = "e2e-destination-binding"
@@ -32,6 +31,7 @@ var (
 // ServiceBinding for the Destination Service, then patches the ProviderConfig
 // with destinationCredentials before creating the destination resource.
 func TestSubaccountDestination_CreationFlow(t *testing.T) {
+	destCreateName := "e2e-dest-" + BUILD_ID
 	crudFeatureSuite := features.New("SubaccountDestination Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
