@@ -379,11 +379,10 @@ func TestObserve(t *testing.T) {
 			},
 		},
 		{
-			// OPTION A (status self-heal): an upgraded v1alpha1 SM re-resolved the
-			// flipped default plan into dataSourceLookup (stalePlan). ObserveResources
-			// returns the live instance's plan as ObservedPlanID (livePlan). setStatus
-			// must overwrite the stale persisted plan ID with the live one so status
-			// displays the instance's real plan.
+			// status holds a stale plan ID in dataSourceLookup (stalePlan) that no
+			// longer matches the live instance. ObserveResources returns the live
+			// instance's plan as ObservedPlanID (livePlan); setStatus must overwrite
+			// the stale ID with the live one so status shows the instance's real plan.
 			name: "SelfHealsStalePlanID",
 			args: args{
 				cr: NewServiceManager("test",

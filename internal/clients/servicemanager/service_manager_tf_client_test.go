@@ -324,13 +324,11 @@ func TestObserveResources(t *testing.T) {
 			},
 		},
 		{
-			// FIX (3) GUARD: the second instance Observe reports NotUpToDate, but the
-			// only difference is the immutable serviceplan_id (desired != observed live
-			// plan). This is the upgraded-v1alpha1 wedge: the resolver re-ran and put
-			// the flipped default plan into desired forProvider. We must report
-			// ResourceUpToDate:true so no in-place update fires (BTP rejects a plan
-			// change with "update_instance is not supported"). ObservedPlanID carries
-			// the live plan back so the controller can self-heal status.
+			// The second instance Observe reports NotUpToDate, but the only difference
+			// is the immutable serviceplan_id (desired != observed live plan). We must
+			// report ResourceUpToDate:true so no in-place update fires - BTP rejects a
+			// plan change with "update_instance is not supported". ObservedPlanID
+			// carries the live plan back so the controller can heal status (#941).
 			name: "InstancePlanDiffTreatedUpToDate",
 			args: args{
 				cr: testSMCr("subaccountId", "wrongPlan", "someID/anotherID", "", "", ""),
@@ -372,10 +370,9 @@ func TestObserveResources(t *testing.T) {
 			},
 		},
 		{
-			// V1BETA1 CONTROL: desired plan == live plan (the CRD pins planName), and
-			// the second Observe reports NotUpToDate for a real (non-plan) reason. The
-			// guard must NOT fire here: ResourceUpToDate stays false so a legitimate
-			// update still runs. Proves fix (3) is a no-op when plans agree.
+			// desired plan == live plan (the CRD pins planName), and the second Observe
+			// reports NotUpToDate for a real, non-plan reason. The plan check must not
+			// short-circuit here: ResourceUpToDate stays false so the update still runs.
 			name: "InstanceNonPlanDiffStillNeedsUpdate",
 			args: args{
 				cr: testSMCr("subaccountId", "samePlan", "someID/anotherID", "", "", ""),
