@@ -16,20 +16,21 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	testutil "github.com/sap/crossplane-provider-btp/test"
 )
 
 var (
-	destCreateName = "e2e-dest-" + BUILD_ID
+	destCreateName      = "e2e-dest-" + BUILD_ID
+	destBindingSecret   = "e2e-destination-binding-secret"
+	destBindingSecretNS = "crossplane-system"
+	destServiceBinding  = "e2e-destination-binding"
 )
 
 // TestSubaccountDestination_CreationFlow tests create, update, and delete of a
-// SubaccountDestination resource against a real BTP subaccount.
-//
-// Prerequisites:
-//   - ProviderConfig named "e2e-provider-config" with destinationCredentials
-//     referencing a Kubernetes Secret containing Destination Service binding
-//     credentials (clientid, clientsecret, tokenurl, uri).
-//   - The secret must be pre-created in the cluster before running this test.
+// SubaccountDestination resource. It is fully self-contained: it provisions a
+// fresh subaccount, entitlement, ServiceManager, ServiceInstance, and
+// ServiceBinding for the Destination Service, then patches the ProviderConfig
+// with destinationCredentials before creating the destination resource.
 func TestSubaccountDestination_CreationFlow(t *testing.T) {
 	crudFeatureSuite := features.New("SubaccountDestination Creation Flow").
 		Setup(
@@ -38,6 +39,23 @@ func TestSubaccountDestination_CreationFlow(t *testing.T) {
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
+				// Wait for ServiceBinding — slowest step, creates the destination credentials secret.
+				sb := v1alpha1.ServiceBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: destServiceBinding, Namespace: cfg.Namespace()},
+				}
+				waitForResource(&sb, cfg, t, wait.WithTimeout(15*time.Minute))
+
+				// Patch the ProviderConfig to add destinationCredentials pointing
+				// at the connection secret written by the ServiceBinding.
+				if err := testutil.PatchProviderConfigDestinationCredentials(
+					ctx, cfg,
+					destBindingSecret,
+					destBindingSecretNS,
+				); err != nil {
+					t.Fatalf("failed to patch ProviderConfig with destinationCredentials: %v", err)
+				}
+
+				// Now wait for the SubaccountDestination to become Available.
 				dest := v1alpha1.SubaccountDestination{
 					ObjectMeta: metav1.ObjectMeta{Name: destCreateName, Namespace: cfg.Namespace()},
 				}
@@ -70,7 +88,6 @@ func TestSubaccountDestination_CreationFlow(t *testing.T) {
 				updated.Spec.ForProvider.URL = &updatedURL
 				resources.AwaitResourceUpdateOrError(ctx, t, cfg, updated)
 
-				// Verify atProvider reflects the update
 				after := &v1alpha1.SubaccountDestination{}
 				MustGetResource(t, cfg, destCreateName, nil, after)
 				if after.Status.AtProvider.URL == nil || *after.Status.AtProvider.URL != updatedURL {
@@ -90,6 +107,8 @@ func TestSubaccountDestination_CreationFlow(t *testing.T) {
 		).
 		Teardown(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				// Remove destinationCredentials from ProviderConfig to leave it clean.
+				_ = testutil.PatchProviderConfigDestinationCredentials(ctx, cfg, "", "")
 				DeleteResourcesIgnoreMissing(ctx, t, cfg, "SubaccountDestination", wait.WithTimeout(5*time.Minute))
 				return ctx
 			},
