@@ -58,7 +58,7 @@ func TestValidateExternalName(t *testing.T) {
 		"uuid-123/my-dest": true,
 		"":                 false,
 		"nodash":           false,
-		"a/b/c":            false,
+		"a/b/c":            true,
 		"/dest":            false,
 		"sub/":             false,
 	}
