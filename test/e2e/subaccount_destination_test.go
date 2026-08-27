@@ -44,7 +44,7 @@ func TestSubaccountDestination_CreationFlow(t *testing.T) {
 				sb := v1alpha1.ServiceBinding{
 					ObjectMeta: metav1.ObjectMeta{Name: destServiceBinding, Namespace: cfg.Namespace()},
 				}
-				waitForResource(&sb, cfg, t, wait.WithTimeout(30*time.Minute))
+				waitForResource(&sb, cfg, t, wait.WithTimeout(15*time.Minute))
 
 				// Patch the ProviderConfig to add destinationCredentials pointing
 				// at the connection secret written by the ServiceBinding.
