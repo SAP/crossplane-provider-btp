@@ -217,7 +217,11 @@ func LoadDestinationCredentials(ctx context.Context, kube client.Client, pc *v1a
 		return nil, errors.Wrap(err, errGetDestinationCreds)
 	}
 	if data == nil {
-		return nil, fmt.Errorf(errSecretKeyNotFound, errGetDestinationCreds, cd.SecretRef.Key)
+		key := ""
+		if cd.SecretRef != nil {
+			key = cd.SecretRef.Key
+		}
+		return nil, fmt.Errorf(errSecretKeyNotFound, errGetDestinationCreds, key)
 	}
 	return data, nil
 }

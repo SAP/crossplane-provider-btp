@@ -16,7 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal/clients/account/destination"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -39,7 +38,6 @@ const (
 type connector struct {
 	kube            client.Client
 	usage           providerconfig.LegacyTracker
-	newServiceFn    func(cis, sa []byte) (*btp.Client, error)
 	resourcetracker tracking.ReferenceResolverTracker
 }
 
@@ -166,6 +164,13 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		}
 	}
 
+	// Validate SubaccountID before calling the API to avoid orphaning a
+	// destination that was created in BTP but whose external-name could not
+	// be set (which would cause a duplicate-create on the next reconcile).
+	if cr.Spec.ForProvider.SubaccountID == nil || *cr.Spec.ForProvider.SubaccountID == "" {
+		return managed.ExternalCreation{}, errors.New("subaccountId must be resolved before creating a destination")
+	}
+
 	cr.SetConditions(xpv1.Creating())
 
 	props, err := buildPropertyBag(ctx, e.kube, cr)
@@ -179,9 +184,6 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 
-	if cr.Spec.ForProvider.SubaccountID == nil || *cr.Spec.ForProvider.SubaccountID == "" {
-		return managed.ExternalCreation{}, errors.New("subaccountId must be resolved before creating a destination")
-	}
 	meta.SetExternalName(cr, *cr.Spec.ForProvider.SubaccountID+"/"+cr.Spec.ForProvider.Name)
 
 	return managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}}, nil
@@ -235,7 +237,7 @@ func validateExternalName(extName string) error {
 	if extName == "" {
 		return errors.New(errInvalidExternalName + ": empty string")
 	}
-	parts := strings.SplitN(extName, "/", 3)
+	parts := strings.SplitN(extName, "/", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return errors.Errorf("%s: got %q", errInvalidExternalName, extName)
 	}

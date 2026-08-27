@@ -166,6 +166,10 @@ type SubaccountDestinationObservation struct {
 
 	// RawProperties is the full property bag as returned by the Destination Service API.
 	// Used internally to determine whether an update is needed.
+	// WARNING: For destinations using BasicAuthentication or OAuth, the API response may
+	// include sensitive fields (e.g. Password, ClientSecret). These are stored verbatim
+	// in this Kubernetes object. Restrict access to SubaccountDestination resources via
+	// RBAC to prevent unauthorized exposure of credentials.
 	// +optional
 	RawProperties map[string]string `json:"rawProperties,omitempty"`
 }
@@ -183,8 +187,6 @@ type SubaccountDestinationStatus struct {
 	AtProvider          SubaccountDestinationObservation `json:"atProvider,omitempty"`
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
 // +kubebuilder:object:root=true
 
 // SubaccountDestination manages a destination in a SAP BTP subaccount via
