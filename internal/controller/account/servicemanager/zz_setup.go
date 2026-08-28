@@ -21,7 +21,10 @@ import (
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	controllerName := managed.ControllerName(apisv1beta1.ServiceManagerKind)
 	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(controllerName)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
-	return providerconfig.DefaultSetup(
+	// ADR(external-name): the default initializer must not run. It would stamp
+	// metadata.name into crossplane.io/external-name before the first Observe(),
+	// destroying the signal to adopt an existing service manager.
+	return providerconfig.DefaultSetupWithoutDefaultInitializer(
 		mgr,
 		o,
 		&apisv1beta1.ServiceManager{},

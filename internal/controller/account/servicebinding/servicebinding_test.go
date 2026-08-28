@@ -1303,7 +1303,7 @@ func TestCreate(t *testing.T) {
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.ForProvider.Name = "test-binding"
 						cr.Spec.Rotation = &v1alpha1.RotationParameters{
-							Frequency: &metav1.Duration{Duration: time.Hour * 24},
+							Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 24},
 						}
 						// Simulate existing status from previous binding (before rotation)
 						cr.Status.AtProvider.ID = "old-binding-id"
@@ -1321,7 +1321,7 @@ func TestCreate(t *testing.T) {
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.ForProvider.Name = "test-binding"
 						cr.Spec.Rotation = &v1alpha1.RotationParameters{
-							Frequency: &metav1.Duration{Duration: time.Hour * 24},
+							Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 24},
 						}
 						// Status should be preserved when create fails
 						cr.Status.AtProvider.ID = "old-binding-id"
