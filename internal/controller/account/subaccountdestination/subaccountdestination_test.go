@@ -219,21 +219,6 @@ func TestCreate_ImportScenario(t *testing.T) {
 	}
 }
 
-func TestCreate_ServiceInstanceIDReturnsError(t *testing.T) {
-	subID := "sub-id"
-	svcID := "svc-id"
-	cr := newCR("", v1alpha1.SubaccountDestinationParameters{
-		Name: "dest", Type: "HTTP", SubaccountID: &subID,
-		ServiceInstanceID: &svcID,
-	})
-	e := &external{client: &mockDestClient{}}
-
-	_, err := e.Create(context.Background(), cr)
-	if err == nil {
-		t.Fatal("expected error for serviceInstanceId, got nil")
-	}
-}
-
 // --- Delete ---
 
 func TestDelete_Success(t *testing.T) {

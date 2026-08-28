@@ -29,6 +29,7 @@ type SubaccountDestinationInitParameters struct {
 
 	// Name of the destination. Immutable after creation.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name can't be updated once set"
 	Name string `json:"name,omitempty"`
 
 	// Type of the destination. e.g. HTTP, LDAP, RFC, MAIL.
@@ -51,17 +52,17 @@ type SubaccountDestinationInitParameters struct {
 	// +optional
 	Description *string `json:"description,omitempty"`
 
-	// ServiceInstanceID scopes this destination to a service instance.
-	// +optional
-	ServiceInstanceID *string `json:"serviceInstanceId,omitempty"`
-
 	// AdditionalProperties merged into the destination property bag.
+	// For the full list of supported properties see the SAP Destination Service REST API documentation:
+	// https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150
 	// +optional
 	AdditionalProperties map[string]string `json:"additionalProperties,omitempty"`
 
-	// AdditionalConfigurationSecretRef for sensitive destination properties.
+	// AdditionalConfigurationSecretRefs points to Kubernetes Secrets whose
+	// values (JSON objects) are merged into the destination property bag.
+	// Use for sensitive properties that must not appear in the CR spec.
 	// +optional
-	AdditionalConfigurationSecretRef *xpv1.SecretKeySelector `json:"additionalConfigurationSecretRef,omitempty"`
+	AdditionalConfigurationSecretRefs []xpv1.SecretKeySelector `json:"additionalConfigurationSecretRefs,omitempty"`
 }
 
 // SubaccountDestinationParameters are the configurable fields of a SubaccountDestination.
@@ -107,23 +108,20 @@ type SubaccountDestinationParameters struct {
 	// +optional
 	Description *string `json:"description,omitempty"`
 
-	// ServiceInstanceID scopes this destination to a service instance.
-	// Not yet implemented — setting this field returns an error.
-	// +optional
-	ServiceInstanceID *string `json:"serviceInstanceId,omitempty"`
-
 	// AdditionalProperties are merged on top of typed fields when building
 	// the destination property bag sent to the Destination Service API.
-	// Use for authentication-specific fields such as User, Password,
-	// ClientId, ClientSecret, TokenServiceURL, etc.
+	// Use for any destination-specific fields (e.g. User, Password, ClientId,
+	// TokenServiceURL). For the full list of supported properties see the SAP
+	// Destination Service REST API documentation:
+	// https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150
 	// +optional
 	AdditionalProperties map[string]string `json:"additionalProperties,omitempty"`
 
-	// AdditionalConfigurationSecretRef points to a Kubernetes Secret whose
-	// value (a JSON object) is merged into the destination property bag.
+	// AdditionalConfigurationSecretRefs points to Kubernetes Secrets whose
+	// values (JSON objects) are merged into the destination property bag.
 	// Use for sensitive properties that must not appear in the CR spec.
 	// +optional
-	AdditionalConfigurationSecretRef *xpv1.SecretKeySelector `json:"additionalConfigurationSecretRef,omitempty"`
+	AdditionalConfigurationSecretRefs []xpv1.SecretKeySelector `json:"additionalConfigurationSecretRefs,omitempty"`
 }
 
 // SubaccountDestinationObservation holds the fields observed from the Destination Service API.
@@ -164,14 +162,7 @@ type SubaccountDestinationObservation struct {
 	// +optional
 	ETag *string `json:"etag,omitempty"`
 
-	// RawProperties is the full property bag as returned by the Destination Service API.
-	// Used internally to determine whether an update is needed.
-	// WARNING: For destinations using BasicAuthentication or OAuth, the API response may
-	// include sensitive fields (e.g. Password, ClientSecret). These are stored verbatim
-	// in this Kubernetes object. Restrict access to SubaccountDestination resources via
-	// RBAC to prevent unauthorized exposure of credentials.
-	// +optional
-	RawProperties map[string]string `json:"rawProperties,omitempty"`
+
 }
 
 // SubaccountDestinationSpec defines the desired state.

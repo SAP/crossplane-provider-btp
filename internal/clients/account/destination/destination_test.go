@@ -2,11 +2,12 @@ package destination
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	destclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-destination-service-api-go/pkg"
 )
 
 // testServer creates a fake HTTP server returning the given status, body and ETag.
@@ -16,6 +17,7 @@ func testServer(t *testing.T, statusCode int, body string, etag string) *httptes
 		if etag != "" {
 			w.Header().Set("ETag", etag)
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
 		_, _ = io.WriteString(w, body)
 	}))
@@ -23,7 +25,13 @@ func testServer(t *testing.T, statusCode int, body string, etag string) *httptes
 
 func newTestClient(t *testing.T, srv *httptest.Server) *destinationClient {
 	t.Helper()
-	return &destinationClient{httpClient: srv.Client(), baseURL: srv.URL}
+	cfg := destclient.NewConfiguration()
+	cfg.HTTPClient = srv.Client()
+	cfg.Servers = destclient.ServerConfigurations{{URL: srv.URL}}
+	apiClient := destclient.NewAPIClient(cfg)
+	return &destinationClient{
+		api: apiClient.DestinationsOnSubaccountLevelAPI,
+	}
 }
 
 func TestParseCredential(t *testing.T) {
@@ -155,6 +163,3 @@ func TestDelete_NotFoundIsIgnored(t *testing.T) {
 		t.Fatalf("expected nil on 404 delete, got: %v", err)
 	}
 }
-
-// Silence unused import during TDD red phase.
-var _ = json.Marshal

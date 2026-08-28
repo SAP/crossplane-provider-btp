@@ -1776,11 +1776,18 @@ type ApiV1SubaccountDestinationsPutRequest struct {
 	ctx context.Context
 	ApiService DestinationsOnSubaccountLevelAPI
 	destination *V1SubaccountDestinationsPutRequest
+	ifMatch *string
 }
 
 // Destination properties (as a JSON object) / Destinations properties (as a JSON array)
 func (r ApiV1SubaccountDestinationsPutRequest) Destination(destination V1SubaccountDestinationsPutRequest) ApiV1SubaccountDestinationsPutRequest {
 	r.destination = &destination
+	return r
+}
+
+// ETag value for optimistic concurrency control.
+func (r ApiV1SubaccountDestinationsPutRequest) IfMatch(ifMatch string) ApiV1SubaccountDestinationsPutRequest {
+	r.ifMatch = &ifMatch
 	return r
 }
 
@@ -1843,6 +1850,9 @@ func (a *DestinationsOnSubaccountLevelAPIService) V1SubaccountDestinationsPutExe
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	if r.ifMatch != nil {
+		parameterAddToHeaderOrQuery(localVarHeaderParams, "If-Match", r.ifMatch, "simple", "")
 	}
 	// body params
 	localVarPostBody = r.destination

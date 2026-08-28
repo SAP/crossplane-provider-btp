@@ -1,15 +1,15 @@
 package destination
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
 	"golang.org/x/oauth2/clientcredentials"
+
+	destclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-destination-service-api-go/pkg"
 )
 
 // DestinationCredential holds the OAuth2 binding fields from a
@@ -36,6 +36,7 @@ func ParseCredential(raw []byte) (DestinationCredential, error) {
 		return c, err
 	}
 	// Normalize URI: if empty, fall back to url.
+	// If adding a new alias here, update assembleDestinationCredJSON in internal/controller/providerconfig/config.go too.
 	if c.URI == "" && c.URL != "" {
 		c.URI = c.URL
 	}
@@ -105,45 +106,40 @@ func NewConflictError() error {
 }
 
 type destinationClient struct {
-	httpClient *http.Client
-	baseURL    string
+	api destclient.DestinationsOnSubaccountLevelAPI
 }
 
 // NewDestinationClient creates a client authenticating via OAuth2 client credentials.
 func NewDestinationClient(cred DestinationCredential) (DestinationClientI, error) {
-	cfg := &clientcredentials.Config{
+	oauthHTTP := (&clientcredentials.Config{
 		ClientID:     cred.ClientID,
 		ClientSecret: cred.ClientSecret,
 		TokenURL:     cred.TokenURL,
+	}).Client(context.Background())
+
+	cfg := destclient.NewConfiguration()
+	cfg.HTTPClient = oauthHTTP
+	cfg.Servers = destclient.ServerConfigurations{
+		{URL: strings.TrimRight(cred.URI, "/") + "/destination-configuration"},
 	}
+
+	apiClient := destclient.NewAPIClient(cfg)
 	return &destinationClient{
-		httpClient: cfg.Client(context.Background()),
-		baseURL:    cred.URI,
+		api: apiClient.DestinationsOnSubaccountLevelAPI,
 	}, nil
 }
 
 func (c *destinationClient) Get(ctx context.Context, name string) (map[string]string, string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		c.baseURL+"/destination-configuration/v1/subaccountDestinations/"+name, nil)
+	dest, resp, err := c.api.V1SubaccountDestinationsDestinationNameGet(ctx, name).Execute()
 	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return nil, "", &destError{code: http.StatusNotFound, message: err.Error()}
+		}
 		return nil, "", err
 	}
-	resp, err := c.httpClient.Do(req)
+
+	raw, err := dest.ToMap()
 	if err != nil {
-		return nil, "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	body, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, "", &destError{code: http.StatusNotFound, message: string(body)}
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", &destError{code: resp.StatusCode, message: string(body)}
-	}
-
-	var raw map[string]any
-	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, "", err
 	}
 	props := make(map[string]string, len(raw))
@@ -154,79 +150,58 @@ func (c *destinationClient) Get(ctx context.Context, name string) (map[string]st
 }
 
 func (c *destinationClient) Create(ctx context.Context, props map[string]any) error {
-	body, err := json.Marshal(props)
+	dest := propsToDestination(props)
+	req := destclient.DestinationAsV1SubaccountDestinationsPutRequest(&dest)
+	_, resp, err := c.api.V1SubaccountDestinationsPost(ctx).Destination(req).Execute()
 	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusConflict {
+			return &destError{code: http.StatusConflict, message: err.Error()}
+		}
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		c.baseURL+"/destination-configuration/v1/subaccountDestinations",
-		bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	respBody, _ := io.ReadAll(resp.Body)
-
-	switch resp.StatusCode {
-	case http.StatusConflict:
-		return &destError{code: http.StatusConflict, message: string(respBody)}
-	case http.StatusCreated, http.StatusOK:
-		return nil
-	default:
-		return &destError{code: resp.StatusCode, message: string(respBody)}
-	}
+	return nil
 }
 
 func (c *destinationClient) Update(ctx context.Context, props map[string]any, etag string) error {
-	body, err := json.Marshal(props)
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut,
-		c.baseURL+"/destination-configuration/v1/subaccountDestinations",
-		bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
+	dest := propsToDestination(props)
+	req := destclient.DestinationAsV1SubaccountDestinationsPutRequest(&dest)
+	call := c.api.V1SubaccountDestinationsPut(ctx).Destination(req)
 	if etag != "" {
-		req.Header.Set("If-Match", etag)
+		call = call.IfMatch(etag)
 	}
-	resp, err := c.httpClient.Do(req)
+	_, resp, err := call.Execute()
 	if err != nil {
+		if resp != nil {
+			return &destError{code: resp.StatusCode, message: err.Error()}
+		}
 		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	respBody, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return &destError{code: resp.StatusCode, message: string(respBody)}
 	}
 	return nil
 }
 
 func (c *destinationClient) Delete(ctx context.Context, name string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete,
-		c.baseURL+"/destination-configuration/v1/subaccountDestinations/"+name, nil)
+	_, resp, err := c.api.V1SubaccountDestinationsDestinationNameDelete(ctx, name).Execute()
 	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return nil // already deleted — not an error
+		}
 		return err
-	}
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode == http.StatusNotFound {
-		return nil // already deleted — not an error
-	}
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		body, _ := io.ReadAll(resp.Body)
-		return &destError{code: resp.StatusCode, message: string(body)}
 	}
 	return nil
+}
+
+// propsToDestination converts a flat property map into the generated Destination type.
+// Name and Type are required fields; all other keys go into AdditionalProperties.
+func propsToDestination(props map[string]any) destclient.Destination {
+	name, _ := props["Name"].(string)
+	typ, _ := props["Type"].(string)
+	dest := destclient.NewDestination(name, typ)
+	dest.AdditionalProperties = make(map[string]interface{}, len(props))
+	for k, v := range props {
+		if k == "Name" || k == "Type" {
+			continue
+		}
+		dest.AdditionalProperties[k] = v
+	}
+	return *dest
 }

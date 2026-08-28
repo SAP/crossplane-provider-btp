@@ -83,34 +83,40 @@ spec:
                 description: SubaccountDestinationParameters are the configurable
                   fields of a SubaccountDestination.
                 properties:
-                  additionalConfigurationSecretRef:
+                  additionalConfigurationSecretRefs:
                     description: |-
-                      AdditionalConfigurationSecretRef points to a Kubernetes Secret whose
-                      value (a JSON object) is merged into the destination property bag.
+                      AdditionalConfigurationSecretRefs points to Kubernetes Secrets whose
+                      values (JSON objects) are merged into the destination property bag.
                       Use for sensitive properties that must not appear in the CR spec.
-                    properties:
-                      key:
-                        description: The key to select.
-                        type: string
-                      name:
-                        description: Name of the secret.
-                        type: string
-                      namespace:
-                        description: Namespace of the secret.
-                        type: string
-                    required:
-                    - key
-                    - name
-                    - namespace
-                    type: object
+                    items:
+                      description: A SecretKeySelector is a reference to a secret
+                        key in an arbitrary namespace.
+                      properties:
+                        key:
+                          description: The key to select.
+                          type: string
+                        name:
+                          description: Name of the secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the secret.
+                          type: string
+                      required:
+                      - key
+                      - name
+                      - namespace
+                      type: object
+                    type: array
                   additionalProperties:
                     additionalProperties:
                       type: string
                     description: |-
                       AdditionalProperties are merged on top of typed fields when building
                       the destination property bag sent to the Destination Service API.
-                      Use for authentication-specific fields such as User, Password,
-                      ClientId, ClientSecret, TokenServiceURL, etc.
+                      Use for any destination-specific fields (e.g. User, Password, ClientId,
+                      TokenServiceURL). For the full list of supported properties see the SAP
+                      Destination Service REST API documentation:
+                      https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150
                     type: object
                   authentication:
                     description: Authentication type. e.g. NoAuthentication, BasicAuthentication,
@@ -126,11 +132,6 @@ spec:
                     type: string
                   proxyType:
                     description: ProxyType. e.g. Internet, OnPremise, PrivateLink.
-                    type: string
-                  serviceInstanceId:
-                    description: |-
-                      ServiceInstanceID scopes this destination to a service instance.
-                      Not yet implemented — setting this field returns an error.
                     type: string
                   subaccountId:
                     description: SubaccountID is the GUID of the subaccount that owns
@@ -226,29 +227,37 @@ spec:
                   the crossplane reference resolver generator. Mirrors the reference fields
                   in SubaccountDestinationParameters.
                 properties:
-                  additionalConfigurationSecretRef:
-                    description: AdditionalConfigurationSecretRef for sensitive destination
-                      properties.
-                    properties:
-                      key:
-                        description: The key to select.
-                        type: string
-                      name:
-                        description: Name of the secret.
-                        type: string
-                      namespace:
-                        description: Namespace of the secret.
-                        type: string
-                    required:
-                    - key
-                    - name
-                    - namespace
-                    type: object
+                  additionalConfigurationSecretRefs:
+                    description: |-
+                      AdditionalConfigurationSecretRefs points to Kubernetes Secrets whose
+                      values (JSON objects) are merged into the destination property bag.
+                      Use for sensitive properties that must not appear in the CR spec.
+                    items:
+                      description: A SecretKeySelector is a reference to a secret
+                        key in an arbitrary namespace.
+                      properties:
+                        key:
+                          description: The key to select.
+                          type: string
+                        name:
+                          description: Name of the secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the secret.
+                          type: string
+                      required:
+                      - key
+                      - name
+                      - namespace
+                      type: object
+                    type: array
                   additionalProperties:
                     additionalProperties:
                       type: string
-                    description: AdditionalProperties merged into the destination
-                      property bag.
+                    description: |-
+                      AdditionalProperties merged into the destination property bag.
+                      For the full list of supported properties see the SAP Destination Service REST API documentation:
+                      https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150
                     type: object
                   authentication:
                     description: Authentication type.
@@ -259,12 +268,11 @@ spec:
                   name:
                     description: Name of the destination. Immutable after creation.
                     type: string
+                    x-kubernetes-validations:
+                    - message: name can't be updated once set
+                      rule: self == oldSelf
                   proxyType:
                     description: ProxyType.
-                    type: string
-                  serviceInstanceId:
-                    description: ServiceInstanceID scopes this destination to a service
-                      instance.
                     type: string
                   subaccountId:
                     description: SubaccountID is the GUID of the subaccount that owns
@@ -465,17 +473,6 @@ spec:
                   proxyType:
                     description: ProxyType as reported by the API.
                     type: string
-                  rawProperties:
-                    additionalProperties:
-                      type: string
-                    description: |-
-                      RawProperties is the full property bag as returned by the Destination Service API.
-                      Used internally to determine whether an update is needed.
-                      WARNING: For destinations using BasicAuthentication or OAuth, the API response may
-                      include sensitive fields (e.g. Password, ClientSecret). These are stored verbatim
-                      in this Kubernetes object. Restrict access to SubaccountDestination resources via
-                      RBAC to prevent unauthorized exposure of credentials.
-                    type: object
                   subaccountId:
                     description: SubaccountID as reported by the API.
                     type: string

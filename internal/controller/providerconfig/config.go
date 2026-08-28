@@ -242,6 +242,7 @@ func assembleDestinationCredJSON(data map[string][]byte) ([]byte, error) {
 	}
 
 	// Accept both "tokenurl" and "token_url" — always marshal as "tokenurl".
+	// If adding a new alias here, update ParseCredential in internal/clients/account/destination/destination.go too.
 	if v, ok := data["tokenurl"]; ok {
 		cred["tokenurl"] = string(v)
 	} else if v, ok := data["token_url"]; ok {

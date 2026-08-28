@@ -2,7 +2,6 @@ package subaccountdestination
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -11,11 +10,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/account/destination"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -25,7 +23,6 @@ const (
 	errNotSubaccountDestination = "managed resource is not a SubaccountDestination"
 	errConnect                  = "while connecting to provider"
 	errInvalidExternalName      = "invalid external-name: expected <subaccount-id>/<name>"
-	errServiceInstanceNotImpl   = "serviceInstanceId is not yet supported for SubaccountDestination"
 	errBuildProps               = "cannot build destination property bag"
 	errObserve                  = "while observing destination"
 	errCreate                   = "while creating destination"
@@ -106,7 +103,6 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Sync observed state into status.
 	cr.Status.AtProvider.ETag = &etag
-	cr.Status.AtProvider.RawProperties = props
 	if v, ok := props["Name"]; ok {
 		cr.Status.AtProvider.Name = &v
 	}
@@ -141,10 +137,6 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	cr, ok := mg.(*v1alpha1.SubaccountDestination)
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotSubaccountDestination)
-	}
-
-	if cr.Spec.ForProvider.ServiceInstanceID != nil {
-		return managed.ExternalCreation{}, errors.New(errServiceInstanceNotImpl)
 	}
 
 	// Import scenario: external-name already set by the user before creation.
@@ -246,7 +238,7 @@ func validateExternalName(extName string) error {
 
 // buildPropertyBag builds the map[string]any sent to the Destination Service API.
 // Typed fields are set first; additionalProperties overrides them;
-// additionalConfigurationSecretRef contents are merged last.
+// additionalConfigurationSecretRefs contents are merged last.
 func buildPropertyBag(ctx context.Context, kube client.Client, cr *v1alpha1.SubaccountDestination) (map[string]any, error) {
 	p := cr.Spec.ForProvider
 	props := map[string]any{
@@ -268,25 +260,13 @@ func buildPropertyBag(ctx context.Context, kube client.Client, cr *v1alpha1.Suba
 	for k, v := range p.AdditionalProperties {
 		props[k] = v
 	}
-	if p.AdditionalConfigurationSecretRef != nil && kube != nil {
-		ref := p.AdditionalConfigurationSecretRef
-		var secret corev1.Secret
-		if err := kube.Get(ctx, types.NamespacedName{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		}, &secret); err != nil {
+	if len(p.AdditionalConfigurationSecretRefs) > 0 && kube != nil {
+		extra, err := internal.LookupSecrets(ctx, kube, p.AdditionalConfigurationSecretRefs)
+		if err != nil {
 			return nil, errors.Wrap(err, errBuildProps)
 		}
-		data, ok := secret.Data[ref.Key]
-		if !ok {
-			return nil, errors.Errorf("%s: key %q not found in secret %s/%s", errBuildProps, ref.Key, ref.Namespace, ref.Name)
-		}
-		var extra map[string]any
-		if err := json.Unmarshal(data, &extra); err != nil {
-			return nil, errors.Wrap(err, errBuildProps+": cannot unmarshal secret value")
-		}
 		for k, v := range extra {
-			props[k] = v
+			props[k] = fmt.Sprintf("%v", v)
 		}
 	}
 	return props, nil

@@ -1947,6 +1947,15 @@ paths:
         \ a new destination (as a JSON object) or with new destinations (as a JSON\
         \ array), posted on subaccount level. Subaccount is determined by the passed\
         \ OAuth access token."
+      parameters:
+      - description: ETag value for optimistic concurrency control.
+        explode: false
+        in: header
+        name: If-Match
+        required: false
+        schema:
+          type: string
+        style: simple
       requestBody:
         content:
           application/json:
