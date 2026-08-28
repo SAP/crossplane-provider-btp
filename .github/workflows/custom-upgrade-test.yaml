@@ -58,7 +58,7 @@ jobs:
         testName: ${{ fromJson(needs.prepare-matrix.outputs.test-names) }}
     env:
       # hardcoded BTP CLI version
-      btp_cli_version: 2.90.2
+      btp_cli_version: 2.116.2
     steps:
       - name: checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -123,7 +123,7 @@ jobs:
 
       - name: Install BTP CLI
         env:
-          btp_cli_version: 2.90.2
+          btp_cli_version: 2.116.2
         run: |
           curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
           tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
