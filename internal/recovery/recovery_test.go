@@ -133,10 +133,10 @@ func TestIsTruncatedCompoundExternalName(t *testing.T) {
 		externalName string
 		want         bool
 	}{
-		{name: "bare instance UUID (truncated compound) is truncated", metadataName: "cis-abc", externalName: "11111111-1111-1111-1111-111111111111", want: true},
-		{name: "healthy compound instanceID/bindingID is not truncated", metadataName: "cis-abc", externalName: "11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222", want: false},
-		{name: "empty external-name is not truncated (it is a fallback)", metadataName: "cis-abc", externalName: "", want: false},
-		{name: "external-name equal to metadata.name is not truncated (it is a fallback)", metadataName: "cis-abc", externalName: "cis-abc", want: false},
+		{name: "bare instance UUID (truncated compound) is truncated", metadataName: "sm-abc", externalName: "11111111-1111-1111-1111-111111111111", want: true},
+		{name: "healthy compound instanceID/bindingID is not truncated", metadataName: "sm-abc", externalName: "11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222", want: false},
+		{name: "empty external-name is not truncated (it is a fallback)", metadataName: "sm-abc", externalName: "", want: false},
+		{name: "external-name equal to metadata.name is not truncated (it is a fallback)", metadataName: "sm-abc", externalName: "sm-abc", want: false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
