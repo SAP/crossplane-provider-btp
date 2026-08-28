@@ -32,6 +32,16 @@ func NewKymaEnvironments(btp btp.Client) *KymaEnvironments {
 	}
 }
 
+// NewKymaEnvironmentsWithCache builds a client whose schema fetcher reuses the
+// given long-lived cache, so parsed updateSchemas survive across reconciles.
+// The BTP client is bound only for this reconcile and consulted on cache miss.
+func NewKymaEnvironmentsWithCache(btp btp.Client, cache *SchemaCache) *KymaEnvironments {
+	return &KymaEnvironments{
+		btp:           btp,
+		schemaFetcher: NewSchemaFetcherWithCache(cache, btp),
+	}
+}
+
 // SchemaFetcher returns the fetcher the client is bound to. Exposed so the
 // controller can reuse the same in-memory schema cache for drift detection.
 func (c *KymaEnvironments) SchemaFetcher() SchemaFetcher {

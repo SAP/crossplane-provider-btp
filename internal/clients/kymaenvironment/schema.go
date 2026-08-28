@@ -2,6 +2,8 @@ package environments
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"sync"
 	"time"
@@ -66,8 +68,12 @@ type cachedSchema struct {
 	fetchedAt time.Time
 }
 
-type schemaFetcher struct {
-	btp btp.Client
+// SchemaCache is the long-lived, client-independent schema cache. It holds only
+// parsed schemas keyed by (environmentType, planName); it has no dependency on
+// any BTP client, so a single instance can be shared across reconciles (and
+// across ProviderConfigs). The BTP client used for a cache-miss fetch is
+// supplied per call. Safe for concurrent use.
+type SchemaCache struct {
 	ttl time.Duration
 	now func() time.Time // injectable for tests
 
@@ -75,35 +81,86 @@ type schemaFetcher struct {
 	cache map[string]cachedSchema // key: environmentType + "|" + planName
 }
 
-// NewSchemaFetcher returns a SchemaFetcher backed by the given BTP client.
-// Cache is process-local; each controller pod maintains its own.
-func NewSchemaFetcher(client btp.Client) SchemaFetcher {
-	return &schemaFetcher{
-		btp:   client,
+// NewSchemaCache returns an empty schema cache with the default TTL. Share one
+// instance across reconciles so cached schemas survive; the cache is
+// process-local, so each controller pod maintains its own.
+func NewSchemaCache() *SchemaCache {
+	return &SchemaCache{
 		ttl:   defaultTTL,
 		now:   time.Now,
 		cache: map[string]cachedSchema{},
 	}
 }
 
+// schemaFetcher pairs the shared cache with a single reconcile's BTP client. It
+// satisfies SchemaFetcher; the client is consulted only on a cache miss, so it
+// is never held longer than the reconcile that created it.
+type schemaFetcher struct {
+	cache *SchemaCache
+	btp   btp.Client
+}
+
+// NewSchemaFetcher returns a SchemaFetcher backed by its own private cache.
+// Retained for callers that don't share a cache; prefer
+// NewSchemaFetcherWithCache to persist schemas across reconciles.
+func NewSchemaFetcher(client btp.Client) SchemaFetcher {
+	return &schemaFetcher{cache: NewSchemaCache(), btp: client}
+}
+
+// NewSchemaFetcherWithCache pairs a shared, long-lived cache with the current
+// reconcile's BTP client. A nil cache is tolerated (a private cache is used),
+// so the returned fetcher never panics on GetUpdateSchema.
+func NewSchemaFetcherWithCache(cache *SchemaCache, client btp.Client) SchemaFetcher {
+	if cache == nil {
+		cache = NewSchemaCache()
+	}
+	return &schemaFetcher{cache: cache, btp: client}
+}
+
 func cacheKey(environmentType, planName string) string {
 	return environmentType + "|" + planName
 }
 
+// clientScope returns a stable, opaque per-region discriminator for the cache
+// key. availableEnvironments is fetched with the CIS credentials from each CR's
+// Cloud Management secret; the updateSchema structure is constant across
+// subaccounts within a region (a regional-catalog blueprint) but is tied to the
+// region. A single provider reconciles CRs across regions, so we scope the
+// cache by the provisioning endpoint to avoid serving one region's schema for
+// another. The endpoint URL is not secret (it's a public service URL); we hash
+// it only to keep the key opaque and fixed-length. Returns "" when no endpoint
+// is available (e.g. in tests), which degrades to a plan-global key.
+func clientScope(client btp.Client) string {
+	if client.Credential != nil && client.Credential.CISCredential != nil {
+		if url := client.Credential.CISCredential.Endpoints.ProvisioningServiceUrl; url != "" {
+			sum := sha256.Sum256([]byte(url))
+			return hex.EncodeToString(sum[:8])
+		}
+	}
+	return ""
+}
+
 func (f *schemaFetcher) GetUpdateSchema(ctx context.Context, environmentType, planName string) (*Schema, error) {
-	key := cacheKey(environmentType, planName)
+	return f.cache.get(ctx, f.btp, environmentType, planName)
+}
+
+// get returns the cached schema for the given key, fetching via the supplied
+// client on a cold or stale entry. See SchemaFetcher.GetUpdateSchema for the
+// caching/fail-closed contract.
+func (c *SchemaCache) get(ctx context.Context, client btp.Client, environmentType, planName string) (*Schema, error) {
+	key := clientScope(client) + "#" + cacheKey(environmentType, planName)
 
 	// Fast path: fresh cache entry.
-	f.mu.RLock()
-	entry, hit := f.cache[key]
-	f.mu.RUnlock()
-	if hit && f.now().Sub(entry.fetchedAt) < f.ttl {
+	c.mu.RLock()
+	entry, hit := c.cache[key]
+	c.mu.RUnlock()
+	if hit && c.now().Sub(entry.fetchedAt) < c.ttl {
 		return entry.schema, nil
 	}
 
 	// Cold or stale — refetch. Keep the previous entry available as a
 	// fallback if the fetch fails.
-	fresh, err := f.fetch(ctx, environmentType, planName)
+	fresh, err := fetch(ctx, client, environmentType, planName)
 	if err != nil {
 		if hit {
 			// Warm cache override: transient BTP failure shouldn't take
@@ -113,18 +170,18 @@ func (f *schemaFetcher) GetUpdateSchema(ctx context.Context, environmentType, pl
 		return nil, err
 	}
 
-	f.mu.Lock()
-	f.cache[key] = cachedSchema{schema: fresh, fetchedAt: f.now()}
-	f.mu.Unlock()
+	c.mu.Lock()
+	c.cache[key] = cachedSchema{schema: fresh, fetchedAt: c.now()}
+	c.mu.Unlock()
 
 	return fresh, nil
 }
 
 // fetch pulls the matching availableEnvironments entry and parses its
 // updateSchema JSON string into our internal Schema type.
-func (f *schemaFetcher) fetch(ctx context.Context, environmentType, planName string) (*Schema, error) {
-	req := f.btp.ProvisioningServiceClient.GetAvailableEnvironments(ctx)
-	resp, _, err := f.btp.ProvisioningServiceClient.GetAvailableEnvironmentsExecute(req)
+func fetch(ctx context.Context, client btp.Client, environmentType, planName string) (*Schema, error) {
+	req := client.ProvisioningServiceClient.GetAvailableEnvironments(ctx)
+	resp, _, err := client.ProvisioningServiceClient.GetAvailableEnvironmentsExecute(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "fetching availableEnvironments from BTP")
 	}

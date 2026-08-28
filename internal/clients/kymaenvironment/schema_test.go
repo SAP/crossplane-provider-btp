@@ -94,10 +94,12 @@ func kymaAzureEntry(schema string) provisioningclient.AvailableEnvironmentRespon
 func newFetcherWithFake(t *testing.T, api *fakeEnvironmentsAPI) *schemaFetcher {
 	t.Helper()
 	return &schemaFetcher{
-		btp:   btp.Client{ProvisioningServiceClient: api},
-		ttl:   defaultTTL,
-		now:   time.Now,
-		cache: map[string]cachedSchema{},
+		cache: &SchemaCache{
+			ttl:   defaultTTL,
+			now:   time.Now,
+			cache: map[string]cachedSchema{},
+		},
+		btp: btp.Client{ProvisioningServiceClient: api},
 	}
 }
 
@@ -208,7 +210,7 @@ func TestSchemaFetcher_FetchFailure_WarmCacheOverrides(t *testing.T) {
 	}
 	f := newFetcherWithFake(t, fake)
 	// Shrink the TTL so the second call is a stale-cache path.
-	f.ttl = time.Nanosecond
+	f.cache.ttl = time.Nanosecond
 
 	if _, err := f.GetUpdateSchema(context.Background(), "kyma", "azure"); err != nil {
 		t.Fatalf("prime call: %v", err)
@@ -217,7 +219,7 @@ func TestSchemaFetcher_FetchFailure_WarmCacheOverrides(t *testing.T) {
 	// Force the next fetch to fail.
 	fake.err = errors.New("btp is on fire")
 	// Advance time past the TTL.
-	f.now = func() time.Time { return time.Now().Add(time.Hour) }
+	f.cache.now = func() time.Time { return time.Now().Add(time.Hour) }
 
 	got, err := f.GetUpdateSchema(context.Background(), "kyma", "azure")
 	if err != nil {

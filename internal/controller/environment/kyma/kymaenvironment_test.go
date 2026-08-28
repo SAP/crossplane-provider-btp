@@ -399,10 +399,9 @@ func TestObserve(t *testing.T) {
 				})),
 			},
 			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists:   true,
-					ResourceUpToDate: true,
-				},
+				// Drift check errored: Observe returns no observation and the
+				// wrapped error so the reconciler requeues (fail closed).
+				o: managed.ExternalObservation{},
 				err: errors.Wrap(
 					errors.Wrap(
 						errors.New("ReadString: expects \" or n, but found a, error found in #2 byte of ...|{asd:y}|..., bigger context ...|{asd:y}|..."),
@@ -428,10 +427,9 @@ func TestObserve(t *testing.T) {
 				})),
 			},
 			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists:   true,
-					ResourceUpToDate: true,
-				},
+				// Drift check errored: Observe returns no observation and the
+				// wrapped error so the reconciler requeues (fail closed).
+				o: managed.ExternalObservation{},
 				err: errors.Wrap(
 					errors.Wrap(
 						errors.New("error unmarshaling JSON: while decoding JSON: json: cannot unmarshal string into Go value of type map[string]interface {}"),
@@ -457,10 +455,9 @@ func TestObserve(t *testing.T) {
 				})),
 			},
 			want: want{
-				o: managed.ExternalObservation{
-					ResourceExists:   true,
-					ResourceUpToDate: true,
-				},
+				// Drift check errored: Observe returns no observation and the
+				// wrapped error so the reconciler requeues (fail closed).
+				o: managed.ExternalObservation{},
 				err: errors.Wrap(
 					errors.Wrap(
 						errors.New("error unmarshaling JSON: while decoding JSON: json: cannot unmarshal string into Go value of type map[string]interface {}"),

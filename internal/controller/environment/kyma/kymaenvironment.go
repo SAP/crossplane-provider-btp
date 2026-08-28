@@ -59,6 +59,11 @@ type connector struct {
 	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
 
+	// schemaCache is shared across reconciles so fetched BTP updateSchemas
+	// survive; it holds no client, so the per-reconcile client is bound to it
+	// at Connect time (see zz_connect.go).
+	schemaCache *kymaenv.SchemaCache
+
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
 	log          logr.Logger
 	record       event.Recorder
@@ -184,11 +189,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	needsUpdate, diff, err := c.needsUpdateWithDiff(ctx, cr)
 	if err != nil {
-		return managed.ExternalObservation{
-			ResourceExists:    true,
-			ResourceUpToDate:  !needsUpdate,
-			ConnectionDetails: details,
-		}, errors.Wrap(err, errCheckUpdate)
+		// Fail closed: on an inconclusive drift check (e.g. schema fetch
+		// failure) return no observation and let the reconciler requeue,
+		// rather than reporting a possibly-wrong ResourceUpToDate.
+		return managed.ExternalObservation{}, errors.Wrap(err, errCheckUpdate)
 	}
 	if needsUpdate {
 		if readErr != nil {

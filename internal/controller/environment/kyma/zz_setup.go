@@ -8,6 +8,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	kymaenv "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
 	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -25,6 +26,7 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 			record:          recorder,
 			newServiceFn:    btp.NewBTPClient,
 			resourcetracker: resourcetracker,
+			schemaCache:     kymaenv.NewSchemaCache(),
 		}
 	})
 }
