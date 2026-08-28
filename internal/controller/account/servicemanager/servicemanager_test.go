@@ -379,9 +379,44 @@ func TestObserve(t *testing.T) {
 			},
 		},
 		{
-			// Regression: while the CR is being deleted and the underlying
-			// instance still exists (binding may or may not — the tf-client
-			// keys ResourceExists off the instance during delete), setStatus
+			// status holds a stale plan ID in dataSourceLookup (stalePlan) that no
+			// longer matches the live instance. ObserveResources returns the live
+			// instance's plan as ObservedPlanID (livePlan); setStatus must overwrite
+			// the stale ID with the live one so status shows the instance's real plan.
+			name: "SelfHealsStalePlanID",
+			args: args{
+				cr: NewServiceManager("test",
+					WithStatus(apisv1beta1.ServiceManagerObservation{
+						DataSourceLookup: &apisv1beta1.DataSourceLookup{ServiceManagerPlanID: "stalePlan"},
+					})),
+				tfClient: &TfClientFake{
+					observeFn: func() (sm.ResourcesStatus, error) {
+						return sm.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{
+								ResourceExists:   true,
+								ResourceUpToDate: true,
+							},
+							InstanceID:     "someID",
+							BindingID:      "anotherID",
+							ObservedPlanID: "livePlan",
+						}, nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+				cr: NewServiceManager("test",
+					WithStatus(apisv1beta1.ServiceManagerObservation{
+						Status:            apisv1beta1.ServiceManagerBound,
+						ServiceInstanceID: "someID",
+						ServiceBindingID:  "anotherID",
+						DataSourceLookup:  &apisv1beta1.DataSourceLookup{ServiceManagerPlanID: "livePlan"},
+					}),
+					WithConditions(xpv1.Available())),
+			},
+		},
+		{
 			// must report Deleting()/Unbound, not Available()/Bound. Under the
 			// pre-fix code the delete-aware ObserveResources returned
 			// ResourceExists:true which then flipped the CR back to Available
@@ -736,4 +771,31 @@ func (t *TfClientFake) UpdateResources(ctx context.Context, cr *apisv1beta1.Serv
 func (t *TfClientFake) DeleteResources(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
 	t.DeleteCalled = true
 	return t.deleteFn()
+}
+
+func TestServicePlanName(t *testing.T) {
+	c := &connector{}
+	cases := map[string]struct {
+		planName string
+		want     string
+	}{
+		"EmptyPlanNameDefaultsToSubaccountAdmin": {
+			planName: "",
+			want:     apisv1beta1.DefaultPlanName,
+		},
+		"ExplicitPlanNamePassthrough": {
+			planName: "service-operator-access",
+			want:     "service-operator-access",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := NewServiceManager("test")
+			cr.Spec.ForProvider.PlanName = tc.planName
+			got := c.ServicePlanName(cr)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("ServicePlanName() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
 }

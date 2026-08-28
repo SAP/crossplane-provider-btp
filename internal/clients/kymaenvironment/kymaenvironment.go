@@ -79,6 +79,7 @@ func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEn
 		parameters,
 		string(cr.UID),
 		c.btp.Credential.UserCredential.Email,
+		cr.Spec.ForProvider.LandscapeLabel,
 	)
 	if err != nil {
 		return "", errors.Wrap(err, errKymaInstanceCreateFailed)

@@ -22,7 +22,7 @@ package v1alpha1
 
 import (
 	"github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -1204,12 +1204,12 @@ func (in *RotationParameters) DeepCopyInto(out *RotationParameters) {
 	*out = *in
 	if in.Frequency != nil {
 		in, out := &in.Frequency, &out.Frequency
-		*out = new(metav1.Duration)
+		*out = new(apisv1alpha1.Duration)
 		**out = **in
 	}
 	if in.TTL != nil {
 		in, out := &in.TTL, &out.TTL
-		*out = new(metav1.Duration)
+		*out = new(apisv1alpha1.Duration)
 		**out = **in
 	}
 }

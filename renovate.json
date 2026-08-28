@@ -1,18 +1,36 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended",
-    ":dependencyDashboard",
-    "schedule:weekly"
+    "config:best-practices",
+    ":dependencyDashboard"
   ],
+  "schedule": ["* * 1,15 * *"],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "baseBranchPatterns": ["main", "release/v1_10_x"],
   "ignorePresets": ["group:goOpenapi"],
   "postUpdateOptions": [
     "gomodTidy"
   ],
   "labels": ["release-notes/dependencies"],
-  "prConcurrentLimit": 10,
+  "prConcurrentLimit": 20,
   "prHourlyLimit": 0,
   "packageRules": [
+    {
+      "matchBaseBranches": ["release/v1_10_x"],
+      "matchUpdateTypes": ["major", "minor", "pin", "replacement", "rollback", "bump"],
+      "enabled": false
+    },
+    {
+      "matchBaseBranches": ["release/v1_10_x"],
+      "matchUpdateTypes": ["patch", "digest"],
+      "groupName": "release/v1_10_x dependencies"
+    },
+    {
+      "groupName": "other dependencies",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin"]
+    },
     {
       "groupName": "crossplane and upjet",
       "matchPackageNames": [
@@ -34,12 +52,12 @@
       ]
     },
     {
-      "groupName": "golang.org/x",
-      "matchPackageNames": ["golang.org/x/**"]
-    },
-    {
       "groupName": "github actions",
       "matchManagers": ["github-actions"]
+    },
+    {
+      "groupName": "docker images",
+      "matchManagers": ["dockerfile"]
     }
   ],
   "customManagers": [
