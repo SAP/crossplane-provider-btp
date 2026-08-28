@@ -26,7 +26,7 @@ type APICallbacks struct {
 }
 
 // Create makes sure the error is saved in async operation condition.
-func (ac *APICallbacks) Create(name types.NamespacedName) terraform.CallbackFn {
+func (ac *APICallbacks) Create(name types.NamespacedName, _ bool) terraform.CallbackFn {
 	return func(err error, ctx context.Context) error {
 		uErr := ac.saveCallbackFn(ctx, ac.kube, name.String(), ujresource.LastAsyncOperationCondition(err), ujresource.AsyncOperationFinishedCondition())
 		return errors.Wrapf(uErr, errUpdateStatusFmt, name, "create")
@@ -34,7 +34,7 @@ func (ac *APICallbacks) Create(name types.NamespacedName) terraform.CallbackFn {
 }
 
 // Update makes sure the error is saved in async operation condition.
-func (ac *APICallbacks) Update(name types.NamespacedName) terraform.CallbackFn {
+func (ac *APICallbacks) Update(name types.NamespacedName, _ bool) terraform.CallbackFn {
 	return func(err error, ctx context.Context) error {
 		uErr := ac.saveCallbackFn(ctx, ac.kube, name.String(), ujresource.LastAsyncOperationCondition(err), ujresource.AsyncOperationFinishedCondition())
 		return errors.Wrapf(uErr, errUpdateStatusFmt, name, "update")
@@ -42,7 +42,7 @@ func (ac *APICallbacks) Update(name types.NamespacedName) terraform.CallbackFn {
 }
 
 // Destroy makes sure the error is saved in async operation condition.
-func (ac *APICallbacks) Destroy(name types.NamespacedName) terraform.CallbackFn {
+func (ac *APICallbacks) Destroy(name types.NamespacedName, _ bool) terraform.CallbackFn {
 	return func(err error, ctx context.Context) error {
 		uErr := ac.saveCallbackFn(ctx, ac.kube, name.String(), ujresource.LastAsyncOperationCondition(err), ujresource.AsyncOperationFinishedCondition())
 		return errors.Wrapf(uErr, errUpdateStatusFmt, name, "destroy")

@@ -35,8 +35,8 @@ func TestServiceBinding_SecretFormatSAPKubernetes(t *testing.T) {
 	feature := features.New("ServiceBinding sap-kubernetes secret format").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/secretformat-env")
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicebinding/secretformat")
+				resources.ImportResources(ctx, t, cfg, crsPath("servicebinding/secretformat-env"))
+				resources.ImportResources(ctx, t, cfg, crsPath("servicebinding/secretformat"))
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 

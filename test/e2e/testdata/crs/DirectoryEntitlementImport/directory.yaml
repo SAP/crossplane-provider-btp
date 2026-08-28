@@ -1,0 +1,17 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Directory
+metadata:
+  namespace: default
+  name: dir-entitlement-import-test
+spec:
+  forProvider:
+    displayName: $BUILD_ID-e2e-dir-entitlement-import
+    directoryFeatures:
+      - DEFAULT
+      - ENTITLEMENTS
+    directoryAdmins:
+      - $SECOND_DIRECTORY_ADMIN_EMAIL
+      - $TECHNICAL_USER_EMAIL
+    labels:
+      safe-to-delete: [ "yes" ]
+      BUILD_ID: [ "$BUILD_ID" ]

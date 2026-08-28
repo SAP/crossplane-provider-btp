@@ -53,7 +53,7 @@ func TestRoleCollectionAssignmentImportFlow(t *testing.T) {
 		rcaImportK8sResName,
 		WithWaitCreateTimeout[*v1alpha1.RoleCollectionAssignment](wait.WithTimeout(5*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.RoleCollectionAssignment](wait.WithTimeout(3*time.Minute)),
-		WithDependentResourceDirectory[*v1alpha1.RoleCollectionAssignment]("./testdata/crs/rolecollectionassignment_import"),
+		WithDependentResourceDirectory[*v1alpha1.RoleCollectionAssignment](crsPath("rolecollectionassignment_import")),
 		WithWaitDependentResourceTimeout[*v1alpha1.RoleCollectionAssignment](wait.WithTimeout(15*time.Minute)),
 	)
 

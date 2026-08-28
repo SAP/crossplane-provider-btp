@@ -27,8 +27,6 @@ const (
 
 	localTagName = "local"
 
-	resourceDirectoryRoot = "./testdata/baseCRs"
-
 	cisSecretName         = "cis-provider-secret"
 	serviceUserSecretName = "sa-provider-secret"
 
@@ -52,6 +50,35 @@ const (
 	defaultVerifyTimeoutMins = 30
 	defaultWaitForPauseMins  = 1
 )
+
+// upgradeCRsGeneratedPathEnv names the env var that points at the rendered
+// upgrade-test fixture tree (envsubst-substituted). `make generate-upgrade-test-crs`
+// renders templates from UPGRADE_TEST_CRS_PATH into this directory; the var
+// is exported at the top of the Makefile, so it is already in the test
+// binary's environment when invoked via `make upgrade-test`. Falls back to
+// the in-tree templates dir so raw `go test -tags=upgrade` keeps working
+// for inspection (values won't be substituted in that case).
+const upgradeCRsGeneratedPathEnv = "UPGRADE_TEST_CRS_GENERATED_PATH"
+
+// upgradeCRsPath resolves a fixture path relative to the upgrade-test CRs
+// directory. Pass the relative path you would have hard-coded under
+// `./testdata/`, e.g.
+//
+//	upgradeCRsPath("baseCRs")                       -> "<generated>/baseCRs"
+//	upgradeCRsPath("customCRs/directoryExternalName") -> "<generated>/customCRs/directoryExternalName"
+func upgradeCRsPath(rel string) string {
+	base := os.Getenv(upgradeCRsGeneratedPathEnv)
+	if base == "" {
+		base = "./testdata"
+	}
+	return base + "/" + rel
+}
+
+// resourceDirectoryRoot returns the rendered baseCRs directory. Defined as a
+// function (not a const) because the rendered root depends on the
+// UPGRADE_TEST_CRS_GENERATED_PATH env var, which is only set when the test
+// runs under `make upgrade-test`.
+func resourceDirectoryRoot() string { return upgradeCRsPath("baseCRs") }
 
 var (
 	globalVerifyTimeout time.Duration
@@ -106,7 +133,7 @@ func TestMain(m *testing.M) {
 		true,
 	)
 
-	setupClusterWithCrossplane(fromProviderPackage, fromControllerPackage)
+	setupClusterWithCrossplane(fromTag, fromProviderPackage, fromControllerPackage)
 
 	os.Exit(testenv.Run(m))
 }
@@ -114,8 +141,8 @@ func TestMain(m *testing.M) {
 // setupClusterWithCrossplane sets up a kind cluster with Crossplane and the specified provider version.
 // It does not create a ProviderConfig, as this is done in the individual tests.
 // Setting up the provider is technically not necessary for upgrade tests, but that's what xp-testing's setup does.
-func setupClusterWithCrossplane(providerPackage, controllerPackage string) {
-	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName)
+func setupClusterWithCrossplane(fromTag, providerPackage, controllerPackage string) {
+	deploymentRuntimeConfig := test.DeploymentRuntimeConfig(providerName, fromTag)
 
 	cfg := setup.ClusterSetup{
 		ProviderName: providerName,

@@ -22,7 +22,7 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 			usage:           usage,
 			newServiceFn:    btp.NewBTPClient,
 			resourcetracker: resourcetracker,
-			record:          event.NewAPIRecorder(mgr.GetEventRecorderFor(name)),
+			record:          event.NewAPIRecorder(mgr.GetEventRecorderFor(name)), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		}
 	})
 }

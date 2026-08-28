@@ -115,7 +115,10 @@ func TestConnectResources(t *testing.T) {
 		},
 		{
 			name: "SuccessExternalNamesSplitAndSet",
-			cr:   testSMCr("subaccountId", "planId", "instanceID/bindingID", "instanceID", "custom-name", "another-custom-name"),
+			// Real GUIDs: this case documents the ADR key format, so it must use a
+			// value ValidateExternalName accepts. Placeholders here would advertise
+			// a key that Observe() rejects.
+			cr: testSMCr("subaccountId", "planId", testInstanceUUID+"/"+testBindingUUID, testInstanceUUID, "custom-name", "another-custom-name"),
 			instanceConnectorMock: func() (managed.ExternalClient, error) {
 				return ExternalClientFake{}, nil
 			},
@@ -125,17 +128,19 @@ func TestConnectResources(t *testing.T) {
 			want: want{
 				subaccountId:         "subaccountId",
 				planId:               "planId",
-				instanceExternalName: "instanceID",
+				instanceExternalName: testInstanceUUID,
 				instanceSpec: v1alpha1.SubaccountServiceInstanceParameters{
 					Name:          internal.Ptr("custom-name"),
 					ServiceplanID: internal.Ptr("planId"),
 					SubaccountID:  internal.Ptr("subaccountId"),
 				},
-				bindingExternalName: "bindingID",
+				bindingExternalName: testBindingUUID,
 				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
-					SubaccountID:      internal.Ptr("subaccountId"),
-					Name:              internal.Ptr("another-custom-name"),
-					ServiceInstanceID: internal.Ptr("instanceID/bindingID"),
+					SubaccountID: internal.Ptr("subaccountId"),
+					Name:         internal.Ptr("another-custom-name"),
+					// The instance GUID deconstructed from the compound key, not the
+					// whole annotation, which BTP would reject as an instance ID.
+					ServiceInstanceID: internal.Ptr(testInstanceUUID),
 				},
 			},
 		},
@@ -319,6 +324,96 @@ func TestObserveResources(t *testing.T) {
 			},
 		},
 		{
+			// The second instance Observe reports NotUpToDate, but the only difference
+			// is the immutable serviceplan_id (desired != observed live plan). We must
+			// report ResourceUpToDate:true so no in-place update fires - BTP rejects a
+			// plan change with "update_instance is not supported". ObservedPlanID
+			// carries the live plan back so the controller can heal status (#941).
+			name: "InstancePlanDiffTreatedUpToDate",
+			args: args{
+				cr: testSMCr("subaccountId", "wrongPlan", "someID/anotherID", "", "", ""),
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true,
+							ConnectionDetails: map[string][]byte{"attribute.credentials": []byte(`{"clientid":"someClientID","clientsecret":"someSecret","sm_url":"https://service-manager.cfapps.eu12.hana.ondemand.com","url":"https://subdomain.authentication.eu12.hana.ondemand.com","xsappname":"someAppName"}`)}}, nil
+					},
+				},
+				// desired plan (wrongPlan, from re-resolution) != live plan (livePlan).
+				sInstance: instanceWithPlan("someID", "wrongPlan", "livePlan"),
+				sBinding:  testServiceBinding("anotherID"),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{
+						ResourceExists:   true,
+						ResourceUpToDate: true,
+						ConnectionDetails: map[string][]byte{
+							v1beta1.ResourceCredentialsClientSecret:      []byte("someSecret"),
+							v1beta1.ResourceCredentialsClientId:          []byte("someClientID"),
+							v1beta1.ResourceCredentialsServiceManagerUrl: []byte("https://service-manager.cfapps.eu12.hana.ondemand.com"),
+							v1beta1.ResourceCredentialsXsuaaUrl:          []byte("https://subdomain.authentication.eu12.hana.ondemand.com"),
+							v1beta1.ResourceCredentialsXsappname:         []byte("someAppName"),
+							v1beta1.ResourceCredentialsXsuaaUrlSufix:     []byte("/oauth/token"),
+							providerv1alpha1.RawBindingKey:               []byte(`{"clientid":"someClientID","clientsecret":"someSecret","sm_url":"https://service-manager.cfapps.eu12.hana.ondemand.com","url":"https://subdomain.authentication.eu12.hana.ondemand.com","xsappname":"someAppName"}`),
+						},
+					},
+					InstanceID:     "someID",
+					BindingID:      "anotherID",
+					ObservedPlanID: "livePlan",
+				},
+				err: nil,
+			},
+		},
+		{
+			// desired plan == live plan (the CRD pins planName), and the second Observe
+			// reports NotUpToDate for a real, non-plan reason. The plan check must not
+			// short-circuit here: ResourceUpToDate stays false so the update still runs.
+			name: "InstanceNonPlanDiffStillNeedsUpdate",
+			args: args{
+				cr: testSMCr("subaccountId", "samePlan", "someID/anotherID", "", "", ""),
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true,
+							ConnectionDetails: map[string][]byte{"attribute.credentials": []byte(`{"clientid":"someClientID","clientsecret":"someSecret","sm_url":"https://service-manager.cfapps.eu12.hana.ondemand.com","url":"https://subdomain.authentication.eu12.hana.ondemand.com","xsappname":"someAppName"}`)}}, nil
+					},
+				},
+				// desired plan == live plan: guard is a no-op, update proceeds.
+				sInstance: instanceWithPlan("someID", "samePlan", "samePlan"),
+				sBinding:  testServiceBinding("anotherID"),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{
+						ResourceExists:   true,
+						ResourceUpToDate: false,
+						ConnectionDetails: map[string][]byte{
+							v1beta1.ResourceCredentialsClientSecret:      []byte("someSecret"),
+							v1beta1.ResourceCredentialsClientId:          []byte("someClientID"),
+							v1beta1.ResourceCredentialsServiceManagerUrl: []byte("https://service-manager.cfapps.eu12.hana.ondemand.com"),
+							v1beta1.ResourceCredentialsXsuaaUrl:          []byte("https://subdomain.authentication.eu12.hana.ondemand.com"),
+							v1beta1.ResourceCredentialsXsappname:         []byte("someAppName"),
+							v1beta1.ResourceCredentialsXsuaaUrlSufix:     []byte("/oauth/token"),
+							providerv1alpha1.RawBindingKey:               []byte(`{"clientid":"someClientID","clientsecret":"someSecret","sm_url":"https://service-manager.cfapps.eu12.hana.ondemand.com","url":"https://subdomain.authentication.eu12.hana.ondemand.com","xsappname":"someAppName"}`),
+						},
+					},
+					InstanceID:     "someID",
+					BindingID:      "anotherID",
+					ObservedPlanID: "samePlan",
+				},
+				err: nil,
+			},
+		},
+		{
 			// in case of missing binding and changed instance we expect to first create the binding and later update the instance in a second reconcilation loop
 			name: "CreationPrecedesUpdate",
 			args: args{
@@ -401,6 +496,71 @@ func TestObserveResources(t *testing.T) {
 						}},
 					InstanceID: "someID",
 					BindingID:  "anotherID",
+				},
+				err: nil,
+			},
+		},
+		{
+			// REGRESSION GUARD (orphan bug): CR is being deleted, the instance
+			// still exists in BTP but the binding is already gone (binding delete
+			// landed and the instance delete then errored/lagged, or the binding
+			// was removed out-of-band). The OLD code reported ResourceExists:false
+			// here ("binding needs creation"), which under a deletion timestamp
+			// made the managed reconciler skip Delete(), strip the finalizer and
+			// ORPHAN the instance in BTP. We must report ResourceExists:true so
+			// Delete() keeps firing until the instance is actually gone.
+			//
+			// The binding is intentionally NOT observed on the delete path (BTP
+			// invariant: an instance cannot be deleted while a binding references
+			// it, so instance-gone implies binding-gone). Its observeFn returns an
+			// error to prove it is never consulted while deleting.
+			name: "DeletingInstanceExistsBindingGone",
+			args: args{
+				cr: deletingSMCr("subaccountId", "planId", "someID/anotherID", "", "", ""),
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{}, errors.New("binding must not be observed on the delete path")
+					},
+				},
+				sInstance: testServiceInstance("someID"),
+				sBinding:  testServiceBinding("anotherID"),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+					InstanceID:          "someID",
+				},
+				err: nil,
+			},
+		},
+		{
+			// CR being deleted and the instance is gone from BTP. The binding is
+			// necessarily gone too (BTP invariant), so nothing remains: report
+			// ResourceExists:false and let the reconciler finalize the CR.
+			name: "DeletingInstanceGoneFinalizes",
+			args: args{
+				cr: deletingSMCr("subaccountId", "planId", "someID/anotherID", "", "", ""),
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: false}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{}, errors.New("binding must not be observed on the delete path")
+					},
+				},
+				sInstance: testServiceInstance("someID"),
+				sBinding:  testServiceBinding("anotherID"),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{ResourceExists: false, ResourceUpToDate: true},
 				},
 				err: nil,
 			},
@@ -724,6 +884,15 @@ func testSMCr(saId, planId, extName, statusInstanceID, serviceInstanceName, serv
 	return sm
 }
 
+// deletingSMCr returns a ServiceManager CR that is mid-deletion (has a
+// DeletionTimestamp), which drives the delete-path branch in ObserveResources.
+func deletingSMCr(saId, planId, extName, statusInstanceID, serviceInstanceName, serviceBindingName string) *v1beta1.ServiceManager {
+	cr := testSMCr(saId, planId, extName, statusInstanceID, serviceInstanceName, serviceBindingName)
+	now := metav1.Now()
+	cr.SetDeletionTimestamp(&now)
+	return cr
+}
+
 func testServiceInstance(extName string) *v1alpha1.SubaccountServiceInstance {
 
 	instance := &v1alpha1.SubaccountServiceInstance{
@@ -735,6 +904,16 @@ func testServiceInstance(extName string) *v1alpha1.SubaccountServiceInstance {
 		Status: v1alpha1.SubaccountServiceInstanceStatus{},
 	}
 	meta.SetExternalName(instance, extName)
+	return instance
+}
+
+// instanceWithPlan builds a SubaccountServiceInstance whose desired
+// (spec.forProvider) and observed (status.atProvider) serviceplan_id can differ,
+// to drive the immutable-plan guard in resourcesUpToDate.
+func instanceWithPlan(extName, desiredPlan, observedPlan string) *v1alpha1.SubaccountServiceInstance {
+	instance := testServiceInstance(extName)
+	instance.Spec.ForProvider.ServiceplanID = internal.Ptr(desiredPlan)
+	instance.Status.AtProvider.ServiceplanID = internal.Ptr(observedPlan)
 	return instance
 }
 
@@ -751,7 +930,7 @@ func testServiceBinding(extName string) *v1alpha1.SubaccountServiceBinding {
 
 // Fakes
 // Fake connectors from the embedded instance and binding resources / using whole tf roundtrip here would require external connection
-var _ managed.ExternalConnecter = &ExternalConnectorFake{}
+var _ managed.ExternalConnector = &ExternalConnectorFake{}
 
 type ExternalConnectorFake struct {
 	connectFn func() (managed.ExternalClient, error)

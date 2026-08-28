@@ -17,9 +17,15 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
+// LegacyManaged aliases the legacy Crossplane managed resource interface used by the
+// provider's existing cluster-scoped APIs.
+//
+//nolint:staticcheck // Existing cluster-scoped APIs still use legacy ProviderConfig references.
+type LegacyManaged = resource.LegacyManaged
+
 // LegacyTracker tracks usage of a ProviderConfig by a LegacyManaged resource.
 type LegacyTracker interface {
-	Track(ctx context.Context, mg resource.LegacyManaged) error
+	Track(ctx context.Context, mg LegacyManaged) error
 }
 
 type ConnectorFn func(
@@ -47,7 +53,7 @@ func DefaultSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions, object cli
 		resource.ManagedKind(gvk),
 		managed.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		managed.WithPollInterval(o.PollInterval),
 		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
 	)
@@ -78,7 +84,7 @@ func DefaultSetupWithoutDefaultInitializer(mgr ctrl.Manager, o internalopts.Cros
 		resource.ManagedKind(gvk),
 		managed.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithInitializers(), // No default initializer
 		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),

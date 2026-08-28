@@ -13,7 +13,6 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -734,7 +733,7 @@ type tracker struct {
 	err error
 }
 
-func (t *tracker) Track(ctx context.Context, mg resource.LegacyManaged) error {
+func (t *tracker) Track(ctx context.Context, mg providerconfig.LegacyManaged) error {
 	return t.err
 }
 

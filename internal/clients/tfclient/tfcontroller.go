@@ -73,11 +73,11 @@ type TfMapper[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] interfac
 
 type TfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] struct {
 	tfMapper  TfMapper[NATIVE, UPJETTED]
-	connector managed.ExternalConnecter
+	connector managed.ExternalConnector
 	kube      client.Client
 }
 
-func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed](tfConnector managed.ExternalConnecter, tfMapper TfMapper[NATIVE, UPJETTED], kube client.Client) TfProxyConnector[NATIVE, UPJETTED] {
+func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed](tfConnector managed.ExternalConnector, tfMapper TfMapper[NATIVE, UPJETTED], kube client.Client) TfProxyConnector[NATIVE, UPJETTED] {
 	return TfProxyConnector[NATIVE, UPJETTED]{
 		connector: tfConnector,
 		tfMapper:  tfMapper,

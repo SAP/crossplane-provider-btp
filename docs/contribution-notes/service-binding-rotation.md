@@ -40,6 +40,8 @@ spec:
 
 `ttl` describes how long one instance is valid. `frequency` means the duration after what livetime of the current instance a new instance should be created. This means that if e.g. an instance "A" is valid for 14 days, and the frequency  is set to 12 days, then 12 days after its creation, the current instance "A" gets retired and a new instance "B" gets created. This newly created instance "B" becomes the "current instance", but the other, now retired, instance "A", will still be valid for another 2 days. This period can now be used by depending applications to now use the new current instance. After these 2 days passed, instance "B" lived now for 14 days and will be deleted. At this point of time, instance "B" is already 2 days old, meaning it will now only take another 10 days for another instance "C" to be created.
 
+Both fields use the provider's `v1alpha1.Duration` type, which preserves the literal from the manifest rather than rewriting `336h` to `336h0m0s` ([issue #892](https://github.com/SAP/crossplane-provider-btp/issues/892)).
+
 ### Status
 
 The `.status.retiredKeys` field of the resource is the only place where information about retired instances  are stored (information about the current instance is located in `.status.atProvider`). `.status.retiredInstances` is an array, where every entry represents one retired instance. The order of this array is not important. Example status:

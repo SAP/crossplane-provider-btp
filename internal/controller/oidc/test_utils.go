@@ -3,7 +3,6 @@ package oidc
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -20,7 +19,7 @@ type TrackerMock struct {
 	wasCalled bool
 }
 
-func (t *TrackerMock) Track(ctx context.Context, mg resource.LegacyManaged) error {
+func (t *TrackerMock) Track(ctx context.Context, mg providerconfig.LegacyManaged) error {
 	t.wasCalled = true
 	return nil
 }

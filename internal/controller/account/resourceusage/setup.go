@@ -28,7 +28,7 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	r := NewReconciler(
 		mgr,
 		WithLogger(o.Logger.WithValues("controller", name)),
-		WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 	)
 
 	return ctrl.NewControllerManagedBy(mgr).

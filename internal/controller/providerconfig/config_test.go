@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	cp_xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
 	test2 "github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -131,4 +130,4 @@ func fakeProviderConfig(pc *v1alpha1.ProviderConfig) *v1alpha1.ProviderConfig {
 
 type tracker struct{}
 
-func (tr *tracker) Track(ctx context.Context, mg resource.LegacyManaged) error { return nil }
+func (tr *tracker) Track(ctx context.Context, mg LegacyManaged) error { return nil }

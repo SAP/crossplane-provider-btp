@@ -16,9 +16,9 @@ var (
 	rcaFromCustomTag             = "v1.9.0"
 	rcaToCustomTag               = "local"
 	rcaCustomResourceDirectories = []string{
-		"./testdata/customCRs/subaccountExternalName",
-		"./testdata/customCRs/subaccountApiCredentialExternalName",
-		"./testdata/customCRs/rolecollectionAssignmentExternalName",
+		upgradeCRsPath("customCRs/subaccountExternalName"),
+		upgradeCRsPath("customCRs/subaccountApiCredentialExternalName"),
+		upgradeCRsPath("customCRs/rolecollectionAssignmentExternalName"),
 	}
 )
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"slices"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -151,6 +150,68 @@ func TestCloudFoundryOrganization_LegacyFormatHandling(t *testing.T) {
 	}
 }
 
+func TestNewOrganizationClient_Validation(t *testing.T) {
+	tests := []struct {
+		name    string
+		orgName string
+		url     string
+		orgId   string
+		user    string
+		pass    string
+		origin  string
+		wantErr bool
+	}{
+		{
+			name:    "missing org name returns error",
+			orgName: "",
+			url:     "https://api.cf.example.com",
+			orgId:   "org-guid",
+			user:    "user",
+			pass:    "pass",
+			origin:  "",
+			wantErr: true,
+		},
+		{
+			name:    "missing orgGuid returns error",
+			orgName: "my-org",
+			url:     "https://api.cf.example.com",
+			orgId:   "",
+			user:    "user",
+			pass:    "pass",
+			origin:  "",
+			wantErr: true,
+		},
+		{
+			name:    "empty origin is accepted",
+			orgName: "my-org",
+			url:     "https://api.cf.example.com",
+			orgId:   "org-guid",
+			user:    "user",
+			pass:    "pass",
+			origin:  "",
+			wantErr: true, // will fail on CF API connect, but not on validation
+		},
+		{
+			name:    "non-empty origin is accepted",
+			orgName: "my-org",
+			url:     "https://api.cf.example.com",
+			orgId:   "org-guid",
+			user:    "user",
+			pass:    "pass",
+			origin:  "custom-idp",
+			wantErr: true, // will fail on CF API connect, but not on validation
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newOrganizationClient(tt.orgName, tt.url, tt.orgId, tt.user, tt.pass, tt.origin)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("newOrganizationClient() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestFilterOutUser(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -186,8 +247,28 @@ func TestFilterOutUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := filterOutUser(tt.users, tt.exclude)
-			if !slices.Equal(got, tt.want) {
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("filterOutUser() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseManagerString(t *testing.T) {
+	tests := []struct {
+		input          string
+		wantUsername   string
+		wantOrigin     string
+	}{
+		{"user@example.com", "user@example.com", defaultOrigin},
+		{"user@example.com|custom.idp", "user@example.com", "custom.idp"},
+		{"user@example.com|sap.ids", "user@example.com", "sap.ids"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			gotUsername, gotOrigin := parseManagerString(tt.input)
+			if gotUsername != tt.wantUsername || gotOrigin != tt.wantOrigin {
+				t.Errorf("parseManagerString(%q) = (%q, %q), want (%q, %q)", tt.input, gotUsername, gotOrigin, tt.wantUsername, tt.wantOrigin)
 			}
 		})
 	}

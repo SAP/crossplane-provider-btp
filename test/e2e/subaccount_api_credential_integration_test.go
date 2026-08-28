@@ -20,7 +20,7 @@ import (
 )
 
 func TestSubaccountApiCredentialsIntegration(t *testing.T) {
-	var manifestDir = "testdata/crs/SubaccountApiCredentialsIntegration"
+	var manifestDir = crsPath("SubaccountApiCredentialsIntegration")
 	crudFeature := features.New("SubaccountApiCredentials Integration Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {

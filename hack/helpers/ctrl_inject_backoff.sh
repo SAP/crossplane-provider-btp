@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # This script injects using custom backoff settings into upjet based controllers
 # since the controller generation is part of upjet we can't do that while generating,
 # so we amend this code afterwards

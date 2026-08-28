@@ -1,0 +1,8 @@
+apiVersion: security.btp.sap.crossplane.io/v1alpha1
+kind: GlobalaccountTrustConfiguration
+metadata:
+  name: upgrade-test-extn-ga-trust
+  namespace: default
+spec:
+  forProvider:
+    identityProvider: "$IDP_URL"

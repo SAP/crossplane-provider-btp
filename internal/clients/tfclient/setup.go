@@ -57,7 +57,7 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 			},
 		}
 
-		lm, ok := mg.(resource.LegacyManaged)
+		lm, ok := mg.(providerconfig.LegacyManaged)
 		if !ok {
 			return ps, errors.New(errNoProviderConfig)
 		}
@@ -125,7 +125,7 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 			},
 		}
 
-		lm, ok := mg.(resource.LegacyManaged)
+		lm, ok := mg.(providerconfig.LegacyManaged)
 		if !ok {
 			return ps, errors.New(errNoProviderConfig)
 		}

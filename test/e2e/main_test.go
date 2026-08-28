@@ -8,12 +8,10 @@ import (
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
-	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
+	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/test"
 	testutil "github.com/sap/crossplane-provider-btp/test"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
@@ -50,9 +48,6 @@ const (
 	// switches to the chart-tarball path. The fallback also lets local
 	// developers run e2e tests without pre-staging the chart.
 	crossplaneChartPathEnv = "CROSSPLANE_CHART_PATH"
-	// crossplaneVersion is the Crossplane chart version. Must match the
-	// version that was pulled into the tarball at CROSSPLANE_CHART_PATH.
-	crossplaneVersion = "2.1.3"
 
 	// reuseClusterEnv mirrors xp-testing's E2E_REUSE_CLUSTER semantics: when
 	// set, the cluster, Crossplane, and provider are reused across runs and
@@ -69,6 +64,18 @@ const (
 var (
 	testenv  env.Environment
 	BUILD_ID string
+
+	// crossplaneVersion is the Crossplane chart version to install. It reads the
+	// workflow's CROSSPLANE_CHART_VERSION env so CI and the chart tarball at
+	// CROSSPLANE_CHART_PATH share a single source of truth (the workflow pin);
+	// falls back to the current pinned version for local dev without the env set.
+	// Keep the fallback in sync with CROSSPLANE_CHART_VERSION in e2e_test.yaml.
+	crossplaneVersion = func() string {
+		if v := os.Getenv("CROSSPLANE_CHART_VERSION"); v != "" {
+			return v
+		}
+		return "2.1.8"
+	}()
 )
 
 func TestMain(m *testing.M) {
@@ -98,29 +105,6 @@ func SetupClusterWithCrossplane(namespace string) {
 
 	// Setup uses pre-defined funcs to create kind cluster
 	// and create a namespace for the environment
-
-	deploymentRuntimeConfig := vendored.DeploymentRuntimeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "btp-provider-runtime-config",
-		},
-		Spec: vendored.DeploymentRuntimeConfigSpec{
-			DeploymentTemplate: &vendored.DeploymentTemplate{
-				Spec: &appsv1.DeploymentSpec{
-					Selector: &metav1.LabelSelector{},
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name: "package-runtime",
-									Args: []string{"--debug", "--sync=10s"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
 
 	// Replicate the slice of setup.ClusterSetup.Configure that we need, swapping
 	// xp-testing's bundled InstallCrossplane (which goes through
@@ -174,7 +158,7 @@ func SetupClusterWithCrossplane(namespace string) {
 						Name:                    "btp-account",
 						Package:                 uutConfig,
 						ControllerImage:         &uutController,
-						DeploymentRuntimeConfig: &deploymentRuntimeConfig,
+						DeploymentRuntimeConfig: internal.Ptr(test.DeploymentRuntimeConfig("btp-provider", "local")),
 					}),
 			), !reuseCluster),
 		xpenvfuncs.ApplyProviderConfigFromDir("./provider"),

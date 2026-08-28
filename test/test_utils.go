@@ -51,6 +51,10 @@ const (
 	// firstSingleImageVersion is the first release that uses the single-image build
 	// (controller embedded in the package). Versions before this have a separate controller image.
 	firstSingleImageVersion = "1.10.0"
+
+	// firstBackoffFlagsVersion is the first release that accepts the
+	// `--backoff-base` / `--backoff-max` flags on the provider binary
+	firstBackoffFlagsVersion = "1.8.0"
 )
 
 type mockList struct {
@@ -570,6 +574,21 @@ func isSingleImageVersion(tag string) bool {
 	return v.GE(threshold)
 }
 
+// supportsBackoffFlags reports whether the provider binary of the given tag
+// accepts the `--backoff-base` / `--backoff-max` flags.
+func supportsBackoffFlags(tag string) bool {
+	threshold, err := semver.Parse(firstBackoffFlagsVersion)
+	if err != nil {
+		return false
+	}
+	v, err := semver.Parse(strings.TrimPrefix(tag, "v"))
+	if err != nil {
+		// Non-semver tags (e.g. commit hashes) are assumed to be from main/latest and single-image
+		return true
+	}
+	return v.GE(threshold)
+}
+
 func mustPullImage(image string) {
 	klog.V(4).Info("Pulling ", image)
 	runner := gexe.New()
@@ -580,7 +599,16 @@ func mustPullImage(image string) {
 	klog.V(4).Info("Pulled ", image)
 }
 
-func DeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeConfig {
+// DeploymentRuntimeConfig builds the shared DeploymentRuntimeConfig used to run
+// the provider under test. `tag` is the image tag of the provider that will run
+// with this config; it gates the `--backoff-base` / `--backoff-max` flags, which
+// were introduced in v1.8.0 (see [supportsBackoffFlags]). Passing them to an
+// older binary makes it exit with `unknown long flag`.
+func DeploymentRuntimeConfig(namePrefix, tag string) vendored.DeploymentRuntimeConfig {
+	args := []string{"--debug", "--sync=10s", "--poll=10s"}
+	if supportsBackoffFlags(tag) {
+		args = append(args, "--backoff-base=1s", "--backoff-max=10s")
+	}
 	return vendored.DeploymentRuntimeConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namePrefix + "-runtime-config",
@@ -594,7 +622,7 @@ func DeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeConfig
 							Containers: []corev1.Container{
 								{
 									Name: "package-runtime",
-									Args: []string{"--debug", "--sync=10s"},
+									Args: args,
 								},
 							},
 						},

@@ -5,16 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
+	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -54,6 +58,12 @@ type connector struct {
 	newPlanIdResolverFn func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error)
 
 	newClientInitalizerFn func() cmclient.ITfClientInitializer
+
+	// newAdminLookuperFn builds a SemanticLookuper backed by the subaccount-admin
+	// SM binding (via the accounts-service), returning a cleanup func.
+	newAdminLookuperFn func(ctx context.Context, cr *apisv1beta1.CloudManagement) (servicemanager.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -63,7 +73,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotCloudManagement)
 	}
 
-	if err := c.usage.Track(ctx, mg.(resource.LegacyManaged)); err != nil {
+	if err := c.usage.Track(ctx, mg.(providerconfig.LegacyManaged)); err != nil {
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
@@ -100,11 +110,15 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errConnectResources)
 	}
 
-	return &external{
-		kube:     c.kube,
-		tracker:  c.resourcetracker,
-		tfClient: tfClient,
-	}, nil
+	ext := &external{
+		kube:               c.kube,
+		tracker:            c.resourcetracker,
+		tfClient:           tfClient,
+		recorder:           c.recorder,
+		newAdminLookuperFn: c.newAdminLookuperFn,
+	}
+
+	return ext, nil
 }
 
 func (c *connector) ensureCompatibility(ctx context.Context, cr *apisv1beta1.CloudManagement) error {
@@ -166,6 +180,11 @@ type external struct {
 	tracker tracking.ReferenceResolverTracker
 
 	tfClient cmclient.ITfClient
+
+	// newAdminLookuperFn builds the subaccount-admin-backed SemanticLookuper.
+	newAdminLookuperFn func(ctx context.Context, cr *apisv1beta1.CloudManagement) (servicemanager.SemanticLookuper, func(), error)
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -180,6 +199,21 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotCloudManagement)
 	}
 
+	// ADR(external-name) Observe Step 1 is intentionally omitted here: we do
+	// not short-circuit on an empty external-name because IsFallbackExternalName
+	// covers "" and the recovery path below must get a chance to run when
+	// ObserveResources returns !ResourceExists with a fallback name.
+
+	// ADR(external-name) Observe Step 2: skip on deletion so a malformed
+	// annotation can't strand the finalizer; ValidateExternalName handles
+	// fallbacks internally, so no separate IsFallbackExternalName guard needed.
+	extName := meta.GetExternalName(cr)
+	if !meta.WasDeleted(cr) {
+		if err := servicemanager.ValidateExternalName(cr.Name, extName); err != nil {
+			return managed.ExternalObservation{}, err
+		}
+	}
+
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
@@ -187,7 +221,123 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
 
+	// Recovery: BTP has a matching resource but our external-name is a fallback
+	// or a truncated compound (bare instance UUID). Fires only when
+	// ResourceExists is false, so a healthy phase-1→phase-2 create is untouched.
+	if err == nil && !resStatus.ResourceExists &&
+		(recovery.IsFallbackExternalName(cr.Name, extName) ||
+			recovery.IsTruncatedCompoundExternalName(cr.Name, extName)) {
+		if healErr := c.healExternalName(ctx, cr); healErr != nil {
+			return managed.ExternalObservation{}, healErr
+		}
+	}
+
 	return resStatus.ExternalObservation, errors.Wrap(err, errObserve)
+}
+
+func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudManagement) error {
+	if c.newAdminLookuperFn == nil {
+		return nil
+	}
+	if !recovery.HasCreateBeenAttempted(cr) {
+		return nil
+	}
+	if cr.Status.AtProvider.DataSourceLookup == nil {
+		return nil
+	}
+	planID := cr.Status.AtProvider.DataSourceLookup.CloudManagementPlanID
+	if planID == "" {
+		return nil
+	}
+
+	lookuper, cleanup, err := c.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		log.FromContext(ctx).Info("external-name recovery: cannot obtain admin lookup client", "error", err.Error())
+		c.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
+		return nil
+	}
+	defer cleanup()
+
+	siID, sbID, instanceCreatedAt, found, err := lookuper.LookupInstanceAndBinding(ctx, planID, cmInstanceName(cr), cmBindingName(cr))
+	if err != nil {
+		log.FromContext(ctx).Info("external-name recovery lookup failed", "planID", planID, "error", err.Error())
+		c.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
+		return nil
+	}
+	if !found {
+		return nil
+	}
+
+	externalNameInstanceID, _ := splitExternalName(meta.GetExternalName(cr))
+
+	// Truncated external-name (bare instance UUID) with no binding found in BTP
+	// is a healthy phase-1: the instance UUID is already correct and there is no
+	// binding to heal. Do nothing so the two-phase Create runs phase-2 — healing
+	// here would rewrite the same bare UUID and requeue, starving phase-2.
+	truncated := recovery.IsTruncatedCompoundExternalName(cr.Name, meta.GetExternalName(cr))
+	if truncated && sbID == "" {
+		return nil
+	}
+
+	// Ownership proof depends on which state we're in:
+	//  - truncated: external-name holds our phase-1 instance UUID; ownership is
+	//    proven by matching that UUID against the found instance (stronger than
+	//    the time window, which cannot pass while a Conflict retry loop keeps
+	//    rewriting external-create-pending).
+	//  - fallback (external-name == "" or metadata.name): we have no UUID to
+	//    match, so fall back to the time window.
+	var owned bool
+	if truncated {
+		owned = sbID != "" && recovery.IsOwnedByExternalNameInstanceID(externalNameInstanceID, siID)
+	} else {
+		owned = recovery.IsOwnedByCR(cr, instanceCreatedAt)
+	}
+	if !owned {
+		log.FromContext(ctx).Info("external-name recovery refused: BTP cloud management is outside our Create-attempt window (brownfield)",
+			"serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID,
+			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", instanceCreatedAt)
+		c.emit(cr, event.Warning(
+			event.Reason(recovery.EventReasonRefusedBrownfield),
+			errors.Errorf(
+				"refusing to recover existing BTP cloud management %s/%s: instance created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				siID, sbID, instanceCreatedAt.Format(time.RFC3339))))
+		return nil
+	}
+
+	meta.SetExternalName(cr, formExternalName(siID, sbID))
+	if uErr := c.kube.Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, "cannot persist recovered external-name")
+	}
+
+	log.FromContext(ctx).Info("recovered existing BTP cloud management by external-name", "serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID)
+	c.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
+		fmt.Sprintf("Recovered existing BTP cloud management %s/%s (semantic key: planID=%s, instance created_at=%s)", siID, sbID, planID, instanceCreatedAt.Format(time.RFC3339))))
+	return recovery.ErrRequeueAfterRecovery
+}
+
+// emit records a Kubernetes event when a recorder is configured.
+func (c *external) emit(cr resource.Managed, ev event.Event) {
+	if c.recorder != nil {
+		c.recorder.Event(cr, ev)
+	}
+}
+
+// cmInstanceName returns the managed cloud-management instance name used to
+// disambiguate the cis/local plan.
+func cmInstanceName(cr *apisv1beta1.CloudManagement) string {
+	if cr.Spec.ForProvider.ServiceInstanceName != "" {
+		return cr.Spec.ForProvider.ServiceInstanceName
+	}
+	return apisv1beta1.DefaultCloudManagementInstanceName
+}
+
+// cmBindingName returns the managed cloud-management binding name so a transient
+// admin binding is never selected.
+func cmBindingName(cr *apisv1beta1.CloudManagement) string {
+	if cr.Spec.ForProvider.ServiceBindingName != "" {
+		return cr.Spec.ForProvider.ServiceBindingName
+	}
+	return apisv1beta1.DefaultCloudManagementBindingName
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
@@ -201,6 +351,16 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	sID, bID, err := c.tfClient.CreateResources(ctx, cr)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
+	}
+	// Keep an already-complete instanceID/bindingID external-name intact when a
+	// re-entered Create returns an empty binding ID; only a real binding ID
+	// overwrites it (#289).
+	existingSID, existingBID := splitExternalName(meta.GetExternalName(cr))
+	if sID == "" {
+		sID = existingSID
+	}
+	if bID == "" {
+		bID = existingBID
 	}
 	meta.SetExternalName(cr, formExternalName(sID, bID))
 
@@ -239,10 +399,20 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) setStatus(ctx context.Context, status cmclient.ResourcesStatus, cr *apisv1beta1.CloudManagement) error {
-	if status.ResourceExists {
+	switch {
+	case meta.WasDeleted(cr) && status.ResourceExists:
+		// Mid-deletion, external instance still present. Status-only cosmetic:
+		// finalization is gated on ExternalObservation.ResourceExists, not on
+		// this condition. But without this branch the CR flips back to
+		// Available/Bound between the Delete() call (which set Deleting()) and
+		// the reconcile that finally observes the instance gone, which is
+		// misleading in kubectl output and dashboards.
+		cr.Status.SetConditions(xpv1.Deleting())
+		cr.Status.AtProvider.Status = apisv1beta1.CisStatusUnbound
+	case status.ResourceExists:
 		cr.Status.SetConditions(xpv1.Available())
 		cr.Status.AtProvider.Status = apisv1beta1.CisStatusBound
-	} else {
+	default:
 		cr.Status.SetConditions(xpv1.Unavailable())
 		cr.Status.AtProvider.Status = apisv1beta1.CisStatusUnbound
 	}
@@ -267,6 +437,18 @@ func formExternalName(serviceInstanceID, serviceBindingID string) string {
 		return serviceInstanceID
 	}
 	return serviceInstanceID + "/" + serviceBindingID
+}
+
+// splitExternalName is the inverse of formExternalName: it splits an
+// external-name of the form "serviceInstanceID/serviceBindingID" back into its
+// two segments. A bare "serviceInstanceID" (no separator) yields an empty
+// binding ID.
+func splitExternalName(externalName string) (serviceInstanceID, serviceBindingID string) {
+	instanceID, bindingID, found := strings.Cut(externalName, "/")
+	if !found {
+		return externalName, ""
+	}
+	return instanceID, bindingID
 }
 
 func mapToInstance(src *apisv1alpha1.SubaccountServiceInstanceObservation) *apisv1beta1.Instance {

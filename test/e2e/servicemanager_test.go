@@ -5,11 +5,13 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpmeta "github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
@@ -21,6 +23,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	sm "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 )
 
 var (
@@ -32,7 +35,7 @@ func TestServiceManagerCreationFlow(t *testing.T) {
 	crudFeatureSuite := features.New("ServiceManager Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicemanager/create_flow")
+				resources.ImportResources(ctx, t, cfg, crsPath("servicemanager/create_flow"))
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
@@ -68,7 +71,7 @@ func TestServiceManagerCreationFlow(t *testing.T) {
 		},
 	).Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "servicemanager/create_flow", wait.WithTimeout(time.Minute*5))
+			DeleteResourcesIgnoreMissing(ctx, t, cfg, crsPath("servicemanager/create_flow"), wait.WithTimeout(time.Minute*5))
 			return ctx
 		},
 	).Feature()
@@ -76,128 +79,97 @@ func TestServiceManagerCreationFlow(t *testing.T) {
 	testenv.Test(t, crudFeatureSuite)
 }
 
-func TestServiceManagerImport(t *testing.T) {
-	importFeatureSuite := features.New("ServiceManager Import Flow").
-		Setup(
+// TestServiceManagerImportFlow drives the ADR import contract through the shared
+// ImportTester harness: create the external resource, drop the CR without deleting
+// it in BTP, then re-adopt it from crossplane.io/external-name alone. Beyond "it
+// went Ready" it asserts the compound key's shape, that status mirrors both
+// halves, and that adoption did not fall through to a second Create.
+//
+// No writeConnectionSecretToRef here: the harness fixes the CR name at
+// construction time, while the target namespace only exists inside a running
+// feature. TestServiceManagerCreationFlow covers the credentials secret.
+func TestServiceManagerImportFlow(t *testing.T) {
+	importTester := NewImportTester(
+		&v1beta1.ServiceManager{
+			Spec: v1beta1.ServiceManagerSpec{
+				ForProvider: v1beta1.ServiceManagerParameters{
+					SubaccountRef: &xpv1.Reference{Name: "sm-import-sa-test"},
+				},
+			},
+		},
+		smImportName,
+		WithWaitDependentResourceTimeout[*v1beta1.ServiceManager](wait.WithTimeout(15*time.Minute)),
+		WithWaitCreateTimeout[*v1beta1.ServiceManager](wait.WithTimeout(10*time.Minute)),
+		// Also bounds the dependent Subaccount teardown, which is the slowest of
+		// the three waits this option feeds. Matches TestServiceInstanceImportFlow.
+		WithWaitDeletionTimeout[*v1beta1.ServiceManager](wait.WithTimeout(20*time.Minute)),
+		WithDependentResourceDirectory[*v1beta1.ServiceManager](crsPath("servicemanager/import/environment")),
+	)
+
+	testenv.Test(t, importTester.BuildTestFeature("ServiceManager Import Flow").
+		Assess(
+			"Imported ServiceManager adopts the compound external-name",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, "testdata/crs/servicemanager/import/environment")
-				r, _ := res.New(cfg.Client().RESTConfig())
-				_ = apis.AddToScheme(r.GetScheme())
+				imported := &v1beta1.ServiceManager{}
+				MustGetResource(t, cfg, importTester.GetPrefixedName(), nil, imported)
 
-				// Wait for the subaccount to be ready before creating ServiceManager
-				waitForResource(&v1alpha1.Subaccount{
-					ObjectMeta: metav1.ObjectMeta{Name: "sm-import-sa-test", Namespace: cfg.Namespace()},
-				}, cfg, t, wait.WithTimeout(15*time.Minute))
-
-				// This will create the external resource but not delete it when we remove the k8s resource
-				sm := &v1beta1.ServiceManager{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      smImportName + "-create",
-						Namespace: cfg.Namespace(),
-					},
-					Spec: v1beta1.ServiceManagerSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ManagementPolicies: []xpv1.ManagementAction{
-								xpv1.ManagementActionObserve,
-								xpv1.ManagementActionCreate,
-								xpv1.ManagementActionUpdate,
-								xpv1.ManagementActionLateInitialize,
-							},
-							WriteConnectionSecretToReference: &xpv1.SecretReference{
-								Name:      smImportName + "-create",
-								Namespace: cfg.Namespace(),
-							},
-						},
-						ForProvider: v1beta1.ServiceManagerParameters{
-							SubaccountRef: &xpv1.Reference{Name: "sm-import-sa-test"},
-						},
-					},
+				externalName := xpmeta.GetExternalName(imported)
+				// Shape alone would pass on a CR that adopted some other
+				// instance/binding pair. This is the key captured before the CR was
+				// dropped, so it pins adoption of the surviving resource itself.
+				if want := ctx.Value(importFeatureContextKey).(string); externalName != want {
+					t.Fatalf("imported external-name = %q, want the key captured before the CR was dropped (%q)", externalName, want)
+				}
+				// The provider's own predicate, not a looser hand-rolled one:
+				// internal.IsValidUUID alone admits the braced, urn:uuid: and
+				// unhyphenated spellings that Observe() rejects.
+				if err := sm.ValidateExternalName(imported.GetName(), externalName); err != nil {
+					t.Fatalf("imported external-name %q violates the ADR key format: %v", externalName, err)
+				}
+				// ValidateExternalName also accepts the phase-1 one-segment
+				// transient; an imported resource must be past that.
+				parts := strings.Split(externalName, "/")
+				if len(parts) != 2 {
+					t.Fatalf(
+						"imported external-name %q is not the compound key \"<serviceInstanceID>/<serviceBindingID>\" (%d segments)",
+						externalName, len(parts),
+					)
 				}
 
-				err := cfg.Client().Resources().Create(ctx, sm)
-				if err != nil {
-					t.Errorf("Failed to create ServiceManager for import preparation: %v", err)
+				if imported.Status.AtProvider.Status != v1beta1.ServiceManagerBound {
+					t.Errorf("imported ServiceManager status = %q, want %q", imported.Status.AtProvider.Status, v1beta1.ServiceManagerBound)
+				}
+				if imported.Status.AtProvider.ServiceInstanceID != parts[0] {
+					t.Errorf(
+						"status.atProvider.serviceInstanceID = %q, want the first key segment %q",
+						imported.Status.AtProvider.ServiceInstanceID, parts[0],
+					)
+				}
+				if imported.Status.AtProvider.ServiceBindingID != parts[1] {
+					t.Errorf(
+						"status.atProvider.serviceBindingID = %q, want the second key segment %q",
+						imported.Status.AtProvider.ServiceBindingID, parts[1],
+					)
 				}
 
-				waitForResource(sm, cfg, t, wait.WithTimeout(7*time.Minute))
-
-				createdSM := &v1beta1.ServiceManager{}
-
-				MustGetResource(t, cfg, smImportName+"-create", nil, createdSM)
-
-				actualExternalName := createdSM.GetAnnotations()["crossplane.io/external-name"]
-				t.Logf("Using external name for import: %s", actualExternalName)
-
-				AwaitResourceDeletionOrFail(ctx, t, cfg, createdSM, wait.WithTimeout(time.Minute*2))
-
-				ctx = context.WithValue(ctx, "actualExternalName", actualExternalName)
-
+				// crossplane-runtime writes these three only around its own Create.
+				// Any of them on an imported CR means Observe failed to match the
+				// surviving BTP resource and provisioned a duplicate pair instead.
+				annotations := imported.GetAnnotations()
+				pending := annotations[xpmeta.AnnotationKeyExternalCreatePending]
+				succeeded := annotations[xpmeta.AnnotationKeyExternalCreateSucceeded]
+				failed := annotations[xpmeta.AnnotationKeyExternalCreateFailed]
+				if pending != "" || succeeded != "" || failed != "" {
+					t.Fatalf(
+						"imported ServiceManager carries an external-create annotation (pending=%q succeeded=%q failed=%q): "+
+							"the provider created a new service manager instead of adopting the existing one via its external-name",
+						pending, succeeded, failed,
+					)
+				}
 				return ctx
 			},
 		).
-		Assess(
-			"Check Imported ServiceManager gets healthy", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				actualExternalName := ctx.Value("actualExternalName").(string)
-
-				sm := &v1beta1.ServiceManager{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      smImportName,
-						Namespace: cfg.Namespace(),
-						Annotations: map[string]string{
-							"crossplane.io/external-name": actualExternalName,
-						},
-					},
-					Spec: v1beta1.ServiceManagerSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve},
-							WriteConnectionSecretToReference: &xpv1.SecretReference{
-								Name:      smImportName,
-								Namespace: cfg.Namespace(),
-							},
-						},
-						ForProvider: v1beta1.ServiceManagerParameters{
-							SubaccountRef: &xpv1.Reference{Name: "sm-import-sa-test"},
-						},
-					},
-				}
-
-				err := cfg.Client().Resources().Create(ctx, sm)
-				if err != nil {
-					t.Errorf("Failed to create import ServiceManager: %v", err)
-				}
-
-				waitForResource(sm, cfg, t)
-
-				importedSM := &v1beta1.ServiceManager{}
-				MustGetResource(t, cfg, smImportName, nil, importedSM)
-
-				if importedSM.Status.AtProvider.Status != v1beta1.ServiceManagerBound {
-					t.Error("ServiceManager Status not as expected")
-				}
-
-				assertServiceManagerSecret(t, ctx, cfg, importedSM)
-
-				return ctx
-			},
-		).Teardown(
-		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			sm := &v1beta1.ServiceManager{}
-			MustGetResource(t, cfg, smImportName, nil, sm)
-
-			// Allow resource to be deleted for teardown
-			sm.Spec.ResourceSpec.ManagementPolicies = []xpv1.ManagementAction{xpv1.ManagementActionDelete, xpv1.ManagementActionObserve}
-			if err := cfg.Client().Resources().Update(ctx, sm); err != nil {
-				t.Errorf("Failed to update ServiceManager deletion policy: %v", err)
-			}
-
-			AwaitResourceDeletionOrFail(ctx, t, cfg, sm, wait.WithTimeout(time.Minute*5))
-
-			DeleteResourcesIgnoreMissing(ctx, t, cfg, "servicemanager/import/environment", wait.WithTimeout(time.Minute*15))
-			return ctx
-		},
-	).Feature()
-
-	testenv.Test(t, importFeatureSuite)
+		Feature())
 }
 
 func assertServiceManagerSecret(t *testing.T, ctx context.Context, cfg *envconf.Config, cm *v1beta1.ServiceManager) {
