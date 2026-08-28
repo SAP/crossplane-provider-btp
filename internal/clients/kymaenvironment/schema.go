@@ -94,17 +94,20 @@ func NewSchemaCache() *SchemaCache {
 
 // schemaFetcher pairs the shared cache with a single reconcile's BTP client. It
 // satisfies SchemaFetcher; the client is consulted only on a cache miss, so it
-// is never held longer than the reconcile that created it.
+// is never held longer than the reconcile that created it. scope is the
+// per-region cache-key discriminator, computed once from the client at
+// construction rather than on every GetUpdateSchema call (see clientScope).
 type schemaFetcher struct {
 	cache *SchemaCache
 	btp   btp.Client
+	scope string
 }
 
 // NewSchemaFetcher returns a SchemaFetcher backed by its own private cache.
 // Retained for callers that don't share a cache; prefer
 // NewSchemaFetcherWithCache to persist schemas across reconciles.
 func NewSchemaFetcher(client btp.Client) SchemaFetcher {
-	return &schemaFetcher{cache: NewSchemaCache(), btp: client}
+	return &schemaFetcher{cache: NewSchemaCache(), btp: client, scope: clientScope(client)}
 }
 
 // NewSchemaFetcherWithCache pairs a shared, long-lived cache with the current
@@ -114,7 +117,7 @@ func NewSchemaFetcherWithCache(cache *SchemaCache, client btp.Client) SchemaFetc
 	if cache == nil {
 		cache = NewSchemaCache()
 	}
-	return &schemaFetcher{cache: cache, btp: client}
+	return &schemaFetcher{cache: cache, btp: client, scope: clientScope(client)}
 }
 
 func cacheKey(environmentType, planName string) string {
@@ -128,27 +131,29 @@ func cacheKey(environmentType, planName string) string {
 // region. A single provider reconciles CRs across regions, so we scope the
 // cache by the provisioning endpoint to avoid serving one region's schema for
 // another. The endpoint URL is not secret (it's a public service URL); we hash
-// it only to keep the key opaque and fixed-length. Returns "" when no endpoint
-// is available (e.g. in tests), which degrades to a plan-global key.
+// it only to keep the key opaque and fixed-length. Computed once per fetcher,
+// so the full digest is used (no truncation). Returns "" when no endpoint is
+// available (e.g. in tests), which degrades to a plan-global key.
 func clientScope(client btp.Client) string {
 	if client.Credential != nil && client.Credential.CISCredential != nil {
 		if url := client.Credential.CISCredential.Endpoints.ProvisioningServiceUrl; url != "" {
 			sum := sha256.Sum256([]byte(url))
-			return hex.EncodeToString(sum[:8])
+			return hex.EncodeToString(sum[:])
 		}
 	}
 	return ""
 }
 
 func (f *schemaFetcher) GetUpdateSchema(ctx context.Context, environmentType, planName string) (*Schema, error) {
-	return f.cache.get(ctx, f.btp, environmentType, planName)
+	return f.cache.get(ctx, f.btp, f.scope, environmentType, planName)
 }
 
 // get returns the cached schema for the given key, fetching via the supplied
-// client on a cold or stale entry. See SchemaFetcher.GetUpdateSchema for the
+// client on a cold or stale entry. scope is the precomputed per-region
+// discriminator (see clientScope). See SchemaFetcher.GetUpdateSchema for the
 // caching/fail-closed contract.
-func (c *SchemaCache) get(ctx context.Context, client btp.Client, environmentType, planName string) (*Schema, error) {
-	key := clientScope(client) + "#" + cacheKey(environmentType, planName)
+func (c *SchemaCache) get(ctx context.Context, client btp.Client, scope, environmentType, planName string) (*Schema, error) {
+	key := scope + "#" + cacheKey(environmentType, planName)
 
 	// Fast path: fresh cache entry.
 	c.mu.RLock()
