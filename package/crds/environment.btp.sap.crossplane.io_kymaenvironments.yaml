@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.1
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: kymaenvironments.environment.btp.sap.crossplane.io
 spec:
   group: environment.btp.sap.crossplane.io
@@ -162,6 +162,17 @@ spec:
                 description: KymaEnvironmentParameters are the configurable fields
                   of a KymaEnvironment.
                 properties:
+                  landscapeLabel:
+                    description: |-
+                      LandscapeLabel is the name of the landscape within the logged-in region on which the
+                      environment instance is created. Only required when the region has more than one landscape;
+                      single-landscape regions default it server-side. Set at create only - landscape is fixed
+                      once the environment exists.
+                    minLength: 1
+                    type: string
+                    x-kubernetes-validations:
+                    - message: landscapeLabel is immutable after creation
+                      rule: self == oldSelf
                   name:
                     description: |-
                       Can be provided, if empty the client will use metadata.name as the default value.

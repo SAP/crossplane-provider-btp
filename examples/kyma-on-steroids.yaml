@@ -99,23 +99,11 @@ metadata:
   name: test-stephan
 spec:
   forProvider:
-    globalAccountRef:
-      name:  co-ga-canary
     displayName: test-max-kyma-oidc
     region: eu10
     subdomain: test-max-kyma-oidc
     subaccountAdmins:
       - <EMAIL>
-  providerConfigRef:
-    name: default
----
-apiVersion: account.btp.sap.crossplane.io/v1alpha1
-kind: GlobalAccount
-metadata:
-  annotations:
-    crossplane.io/external-name: SAP Cloud Orchestration Canary
-  name: co-ga-canary
-spec:
   providerConfigRef:
     name: default
 ---

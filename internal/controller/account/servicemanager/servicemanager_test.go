@@ -282,6 +282,10 @@ func TestDelete_DeletionBlocking(t *testing.T) {
 }
 
 func TestObserve(t *testing.T) {
+	// deletionTime is captured once at test-setup so cases that read/write
+	// DeletionTimestamp share the exact same value (otherwise two separate
+	// metav1.Now() calls in args vs want disagree at microsecond precision).
+	deletionTime := metav1.Now()
 	type want struct {
 		err error
 		obs managed.ExternalObservation
@@ -372,6 +376,74 @@ func TestObserve(t *testing.T) {
 						ServiceBindingID:  "anotherID",
 					}),
 					WithConditions(xpv1.Available())),
+			},
+		},
+		{
+			// status holds a stale plan ID in dataSourceLookup (stalePlan) that no
+			// longer matches the live instance. ObserveResources returns the live
+			// instance's plan as ObservedPlanID (livePlan); setStatus must overwrite
+			// the stale ID with the live one so status shows the instance's real plan.
+			name: "SelfHealsStalePlanID",
+			args: args{
+				cr: NewServiceManager("test",
+					WithStatus(apisv1beta1.ServiceManagerObservation{
+						DataSourceLookup: &apisv1beta1.DataSourceLookup{ServiceManagerPlanID: "stalePlan"},
+					})),
+				tfClient: &TfClientFake{
+					observeFn: func() (sm.ResourcesStatus, error) {
+						return sm.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{
+								ResourceExists:   true,
+								ResourceUpToDate: true,
+							},
+							InstanceID:     "someID",
+							BindingID:      "anotherID",
+							ObservedPlanID: "livePlan",
+						}, nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+				cr: NewServiceManager("test",
+					WithStatus(apisv1beta1.ServiceManagerObservation{
+						Status:            apisv1beta1.ServiceManagerBound,
+						ServiceInstanceID: "someID",
+						ServiceBindingID:  "anotherID",
+						DataSourceLookup:  &apisv1beta1.DataSourceLookup{ServiceManagerPlanID: "livePlan"},
+					}),
+					WithConditions(xpv1.Available())),
+			},
+		},
+		{
+			// must report Deleting()/Unbound, not Available()/Bound. Under the
+			// pre-fix code the delete-aware ObserveResources returned
+			// ResourceExists:true which then flipped the CR back to Available
+			// on every reconcile between Delete() and the final finalize —
+			// misleading in kubectl output and dashboards.
+			name: "DeletingInstanceStillExists",
+			args: args{
+				cr: NewServiceManager("test", WithDeletionTimestamp(deletionTime)),
+				tfClient: &TfClientFake{
+					observeFn: func() (sm.ResourcesStatus, error) {
+						return sm.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+							InstanceID:          "someID",
+						}, nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+				cr: NewServiceManager("test",
+					WithDeletionTimestamp(deletionTime),
+					WithStatus(apisv1beta1.ServiceManagerObservation{
+						Status:            apisv1beta1.ServiceManagerUnbound,
+						ServiceInstanceID: "someID",
+					}),
+					WithConditions(xpv1.Deleting())),
 			},
 		},
 	}
@@ -667,6 +739,12 @@ func WithExternalName(externalName string) ServiceManagerModifier {
 	}
 }
 
+func WithDeletionTimestamp(t metav1.Time) ServiceManagerModifier {
+	return func(r *apisv1beta1.ServiceManager) {
+		r.SetDeletionTimestamp(&t)
+	}
+}
+
 // Fakes
 var _ sm.ITfClient = &TfClientFake{}
 
@@ -693,4 +771,31 @@ func (t *TfClientFake) UpdateResources(ctx context.Context, cr *apisv1beta1.Serv
 func (t *TfClientFake) DeleteResources(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
 	t.DeleteCalled = true
 	return t.deleteFn()
+}
+
+func TestServicePlanName(t *testing.T) {
+	c := &connector{}
+	cases := map[string]struct {
+		planName string
+		want     string
+	}{
+		"EmptyPlanNameDefaultsToSubaccountAdmin": {
+			planName: "",
+			want:     apisv1beta1.DefaultPlanName,
+		},
+		"ExplicitPlanNamePassthrough": {
+			planName: "service-operator-access",
+			want:     "service-operator-access",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := NewServiceManager("test")
+			cr.Spec.ForProvider.PlanName = tc.planName
+			got := c.ServicePlanName(cr)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("ServicePlanName() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
