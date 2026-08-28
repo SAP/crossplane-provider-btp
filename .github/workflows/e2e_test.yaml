@@ -47,11 +47,14 @@ env:
   E2E_BUILD_REGISTRY: index.docker.io/e2e
   E2E_PROVIDER_IMAGE: index.docker.io/e2e/provider-btp-amd64
   CROSSPLANE_CLI_VERSION: v2.0.2
-  # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable
-  CROSSPLANE_CHART_VERSION: '2.3.4'
-  # SHA256 of crossplane-2.3.4.tgz downloaded from charts.crossplane.io/stable
+  # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable versioning=semver allowedVersions=<2.2.0
+  # Pinned to last 2.1.x: 2.2.0+ (crossplane/crossplane#6981) resolves spec.package
+  # against a real registry before the cache, breaking the local :latest install path.
+  # Hold below 2.2.0 until the digest-pinned side-load fix lands.
+  CROSSPLANE_CHART_VERSION: '2.1.8'
+  # SHA256 of crossplane-2.1.8.tgz downloaded from charts.crossplane.io/stable
   # Compute with: curl -sL https://charts.crossplane.io/stable/crossplane-<version>.tgz | sha256sum
-  CROSSPLANE_CHART_SHA256: '72c349c911a7ba521208538caf9ea48b31974403a64534bc00dae750e2f95b30'
+  CROSSPLANE_CHART_SHA256: '958f331eeab96d4f1c1153c9c0ed36cc91659b79b0779f52e4fc0ffe230863ed'
 
 jobs:
   prepare-matrix:
@@ -59,12 +62,25 @@ jobs:
     environment: ${{ inputs.environment }}  # approval here for the entire workflow, later jobs use no approval environment
     outputs:
       test-names: ${{ steps.set-matrix.outputs.test-names }}
+      # Resolve the checkout ref to a fixed commit SHA once, inside the gated job. Downstream jobs
+      # consume this output instead of inputs.checkout-ref, so every checkout provably uses the same
+      # commit the maintainer reviewed at approval - no time-of-check/time-of-use gap (CodeQL #67).
+      checkout-sha: ${{ steps.pin-sha.outputs.sha }}
     steps:
       - name: checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
+          # Opt in to checking out fork PR code under pull_request_target. actions/checkout v7 refuses this by default.
+          # Safe here: the pr-e2e-approval environment (required_reviewers) gates this job, so a maintainer inspects the fork diff before it runs with secrets.
+          allow-unsafe-pr-checkout: true
+
+      - name: Pin resolved checkout SHA
+        id: pin-sha
+        # git rev-parse HEAD is the exact commit checked out above. Emitting it as an output freezes
+        # a single source of truth for all later checkouts.
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set matrix with test names
         id: set-matrix
@@ -85,7 +101,10 @@ jobs:
       - name: checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.checkout-ref }}
+          # Use the SHA pinned by the gated prepare-matrix job, not inputs.checkout-ref, so this
+          # checkout provably matches the reviewed commit. See prepare-matrix.checkout-sha.
+          ref: ${{ needs.prepare-matrix.outputs.checkout-sha }}
+          allow-unsafe-pr-checkout: true
 
       - name: Install Helm
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
@@ -168,8 +187,10 @@ jobs:
       - name: checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.checkout-ref }}
+          # Use the SHA pinned by the gated prepare-matrix job. See prepare-matrix.checkout-sha.
+          ref: ${{ needs.prepare-matrix.outputs.checkout-sha }}
           submodules: true
+          allow-unsafe-pr-checkout: true
 
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
@@ -263,9 +284,22 @@ jobs:
       - name: checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
-          ref: ${{ inputs.checkout-ref }}
+          # Use the SHA pinned by the gated prepare-matrix job, not inputs.checkout-ref. This job
+          # holds the secrets; pinning to the reviewed commit closes any time-of-check/time-of-use
+          # gap (CodeQL #67). See prepare-matrix.checkout-sha.
+          ref: ${{ needs.prepare-matrix.outputs.checkout-sha }}
           submodules: true
+          allow-unsafe-pr-checkout: true
+
+      - name: Assert checked-out commit matches the reviewed SHA
+        # Belt-and-suspenders: fail before any secret is used if the checkout ever differs from the
+        # commit prepare-matrix pinned at approval.
+        run: |
+          expected='${{ needs.prepare-matrix.outputs.checkout-sha }}'
+          actual="$(git rev-parse HEAD)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::checked-out $actual != approved $expected"; exit 1
+          fi
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:

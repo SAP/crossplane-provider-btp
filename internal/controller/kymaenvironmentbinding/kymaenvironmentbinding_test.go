@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironmentbinding"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -62,7 +63,7 @@ func Test_external_validateBindings(t *testing.T) {
 				cr: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 1},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -90,7 +91,7 @@ func Test_external_validateBindings(t *testing.T) {
 				cr: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 2},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -118,7 +119,7 @@ func Test_external_validateBindings(t *testing.T) {
 				cr: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 2},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -253,7 +254,7 @@ func Test_external_validateBindings(t *testing.T) {
 				cr: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 1},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -281,7 +282,7 @@ func Test_external_validateBindings(t *testing.T) {
 				cr: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 1},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -315,7 +316,7 @@ func Test_external_validateBindings(t *testing.T) {
 				cr: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 1},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -461,7 +462,7 @@ func Test_external_Observe(t *testing.T) {
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 2},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -511,7 +512,7 @@ func Test_external_Observe(t *testing.T) {
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 1},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -561,7 +562,7 @@ func Test_external_Observe(t *testing.T) {
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 1},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -612,7 +613,7 @@ func Test_external_Observe(t *testing.T) {
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 2},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -671,7 +672,7 @@ func Test_external_Observe(t *testing.T) {
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 2},
 						},
 						ResourceSpec: xpv1.ResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
@@ -722,7 +723,7 @@ func Test_external_Observe(t *testing.T) {
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 2},
 						},
 						ResourceSpec: xpv1.ResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
@@ -1064,7 +1065,7 @@ func Test_external_Create(t *testing.T) {
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						KymaEnvironmentId: "test-instance",
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 1},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -1110,7 +1111,7 @@ func Test_external_Create(t *testing.T) {
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						KymaEnvironmentId: "test-instance",
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 2},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 2},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -1156,7 +1157,7 @@ func Test_external_Create(t *testing.T) {
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						KymaEnvironmentId: "error-instance",
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 1},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
@@ -1182,7 +1183,7 @@ func Test_external_Create(t *testing.T) {
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
 						KymaEnvironmentId: "invalid-instance",
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
-							RotationInterval: metav1.Duration{Duration: time.Hour * 1},
+							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 1},
 						},
 					},
 					Status: v1alpha1.KymaEnvironmentBindingStatus{
