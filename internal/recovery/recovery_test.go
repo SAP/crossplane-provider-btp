@@ -123,6 +123,54 @@ func TestIsOwnedByCR_PendingWindow(t *testing.T) {
 	}
 }
 
+// TestIsTruncatedCompoundExternalName: a compound external-name
+// (instanceID/bindingID) truncated to the bare instanceID, distinguished from a
+// fallback and from a healthy compound name.
+func TestIsTruncatedCompoundExternalName(t *testing.T) {
+	tests := []struct {
+		name         string
+		metadataName string
+		externalName string
+		want         bool
+	}{
+		{name: "bare instance UUID (truncated compound) is truncated", metadataName: "sm-abc", externalName: "11111111-1111-1111-1111-111111111111", want: true},
+		{name: "healthy compound instanceID/bindingID is not truncated", metadataName: "sm-abc", externalName: "11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222", want: false},
+		{name: "empty external-name is not truncated (it is a fallback)", metadataName: "sm-abc", externalName: "", want: false},
+		{name: "external-name equal to metadata.name is not truncated (it is a fallback)", metadataName: "sm-abc", externalName: "sm-abc", want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsTruncatedCompoundExternalName(tc.metadataName, tc.externalName); got != tc.want {
+				t.Errorf("IsTruncatedCompoundExternalName(%q,%q) = %v, want %v", tc.metadataName, tc.externalName, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestIsOwnedByExternalNameInstanceID: the instance UUID our phase-1 Create
+// wrote into external-name must equal the instance the lookup found. Used
+// instead of the time window on the truncated-compound path.
+func TestIsOwnedByExternalNameInstanceID(t *testing.T) {
+	tests := []struct {
+		name                 string
+		externalNameInstance string
+		foundInstance        string
+		want                 bool
+	}{
+		{name: "matching non-empty instance IDs: owned", externalNameInstance: "11111111-1111-1111-1111-111111111111", foundInstance: "11111111-1111-1111-1111-111111111111", want: true},
+		{name: "different instance IDs: not owned", externalNameInstance: "11111111-1111-1111-1111-111111111111", foundInstance: "33333333-3333-3333-3333-333333333333", want: false},
+		{name: "empty external-name instance ID: not owned", externalNameInstance: "", foundInstance: "11111111-1111-1111-1111-111111111111", want: false},
+		{name: "both empty: not owned", externalNameInstance: "", foundInstance: "", want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsOwnedByExternalNameInstanceID(tc.externalNameInstance, tc.foundInstance); got != tc.want {
+				t.Errorf("IsOwnedByExternalNameInstanceID(%q,%q) = %v, want %v", tc.externalNameInstance, tc.foundInstance, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestHasCreateBeenAttempted is a thin wrapper around
 // meta.GetExternalCreatePending; it exists so callers can name-check the
 // intent (short-circuit before running a semantic lookup) rather than

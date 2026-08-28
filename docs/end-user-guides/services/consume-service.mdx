@@ -57,4 +57,22 @@ The credentials are stored in a `Secret` you specify via `spec.writeConnectionSe
 
 ## ⁉ FAQs
 
-No FAQs yet. Got a question? Reach out to us and help us build this section.
+### Why does re-applying my `ServiceBinding` fail with a conflict on `spec.rotation`?
+
+If your binding was created before the provider preserved duration literals, applying the very same manifest a second time fails:
+
+```text
+Apply failed with 2 conflicts: conflicts with "crossplane-provider-btp" using account.btp.sap.crossplane.io/v1alpha1:
+- .spec.rotation.frequency
+- .spec.rotation.ttl
+```
+
+The stored spec holds `720h0m0s` where your manifest says `720h`: the provider rewrote the value into canonical Go form and became the field manager of `.spec.rotation.frequency` and `.spec.rotation.ttl`, so the API server sees a competing value. The same rewrite affected other duration fields, such as a `KymaEnvironmentBinding`'s `spec.forProvider.rotationInterval` and `spec.forProvider.ttl`.
+
+Clear it once, either by force-applying the manifest or by writing the stored canonical value into it:
+
+```sh title="Run in terminal"
+kubectl apply --server-side --force-conflicts -f hana-binding.yaml
+```
+
+With a provider version that preserves duration literals, the form you write survives and the conflict does not recur. On an earlier version the rewrite comes back with the provider's next write, so upgrade before clearing the conflict.
