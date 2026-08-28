@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -72,12 +73,12 @@ type ServiceBindingParameters struct {
 type RotationParameters struct {
 	// Frequency defines how often the active key should be rotated.
 	// +kubebuilder:validation:Required
-	Frequency *metav1.Duration `json:"frequency"`
+	Frequency *providerv1alpha1.Duration `json:"frequency"`
 
 	// TTL (Time-To-Live) defines the total time a credential is valid for before it is deleted.
 	// Must be >= frequency
 	// +kubebuilder:validation:Optional
-	TTL *metav1.Duration `json:"ttl,omitempty"`
+	TTL *providerv1alpha1.Duration `json:"ttl,omitempty"`
 }
 
 // ServiceBindingObservation are the observable fields of a ServiceBinding.

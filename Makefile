@@ -14,7 +14,7 @@ export TERRAFORM_VERSION ?= 1.12.3
 
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
-export TERRAFORM_PROVIDER_VERSION ?= 1.23.1
+export TERRAFORM_PROVIDER_VERSION ?= 1.25.0
 export TERRAFORM_PROVIDER_DOWNLOAD_NAME ?= terraform-provider-btp
 export TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX ?= https://releases.hashicorp.com/$(TERRAFORM_PROVIDER_DOWNLOAD_NAME)/$(TERRAFORM_PROVIDER_VERSION)
 export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.23.1_x5
@@ -342,7 +342,7 @@ generate-test-crs:
 	@# envsubst with an explicit allowlist — any other $VAR-shaped string in the
 	@# YAML (e.g. unrelated provider-config references) is preserved verbatim.
 	@for template in $$(find "$(TEST_CRS_GENERATED_PATH)" -type f -name "*.yaml"); do \
-		envsubst '$$BUILD_ID $$IDP_URL $$SECOND_DIRECTORY_ADMIN_EMAIL $$TECHNICAL_USER_EMAIL' < $$template > $$template.tmp && mv $$template.tmp $$template; \
+		envsubst '$$BUILD_ID $$IDP_URL $$SECOND_DIRECTORY_ADMIN_EMAIL $$TECHNICAL_USER_EMAIL $$SERVICE_BROKER_URL $$SERVICE_BROKER_USERNAME' < $$template > $$template.tmp && mv $$template.tmp $$template; \
 	done
 	@$(OK) CRS rendered
 

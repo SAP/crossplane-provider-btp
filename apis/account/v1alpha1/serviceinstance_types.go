@@ -79,6 +79,16 @@ type ServiceInstanceParameters struct {
 	// Selector for a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
 	SubaccountSelector *xpv1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+
+	// Arbitrary labels to attach to the service instance in BTP Service Manager.
+	// Each key maps to a list of string values. Labels are propagated to the SM API on create and update.
+	// +kubebuilder:validation:Optional
+	Labels map[string][]*string `json:"labels,omitempty"`
+
+	// Timeout for create, update, and delete operations, e.g. "60m".
+	// Applied to all three operations. If unset, defaults to 60m.
+	// +kubebuilder:validation:Optional
+	OperationTimeout *string `json:"operationTimeout,omitempty"`
 }
 
 // ServiceInstanceObservation are the observable fields of a ServiceInstance.

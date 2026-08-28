@@ -56,6 +56,112 @@ Upjet resources are an exception as we dont control how the external-name is def
 
 In general, all exceptions should be noted in the appropriate location: for user in the docs and for developer in the appropriate code location (Observe/Create/Update/Delete functions or API definition).
 
+### Orphaned external-name recovery (always-on bug-fix)
+
+`Subaccount`, `ServiceInstance`, `ServiceBinding`, `ServiceManager`, and
+`CloudManagement` implement a narrow always-on recovery path for the provider's
+own lost-ID `Create()` attempts. This is **not** an import mechanism: brownfield
+resources are refused and still require the documented user-driven import flow.
+
+During `Observe()`, if the underlying client reports the resource as
+non-existent (or, for ServiceInstance, a same-generation `Conflict` from a
+failed Create) and the external-name is a fallback (`""` or `metadata.name`),
+the controller may run a semantic lookup:
+
+| Resource | Semantic key (subaccount enforced by credential scope) | Credentials |
+|----------|--------------------------------------------------------|-------------|
+| Subaccount | `subdomain` (unique within global account) | provider config (accounts-service) |
+| ServiceInstance | `name` | `spec.forProvider.serviceManagerSecret` |
+| ServiceBinding | `(serviceInstanceID, name)` | parent ServiceInstance's `serviceManagerSecret` |
+| ServiceManager | `servicePlanID` (subaccount-admin plan) → `sID/bID` | subaccount admin binding via accounts-service |
+| CloudManagement | `servicePlanID` (cis/local plan) → `sID/bID` | subaccount admin binding via accounts-service |
+
+The lookup is only attempted when the CR has
+`crossplane.io/external-create-pending`. That annotation is written by
+crossplane-runtime immediately before Create(), so it proves this controller
+attempted a Create for this CR. A missing annotation means recovery is skipped.
+
+A semantic match must also pass the ownership check in `internal/recovery`:
+`created_at` must fall inside the bounded window around the pending timestamp
+(currently `pending - 60s` to `pending + 1h`). Matches outside that window emit
+`Warning:RecoveryRefusedBrownfield` and leave the external-name unchanged.
+
+On success, the controller patches `crossplane.io/external-name`, emits
+`Normal:ExternalNameRecovered`, and returns `recovery.ErrRequeueAfterRecovery`.
+The requeue is required because controllers build their external clients from
+the external-name at Connect() time; continuing the same reconcile would still
+act on the stale fallback name.
+
+Trigger is strictly fallback external-name. In particular, a single-UUID
+external-name is not recoverable: it is the normal phase-1 output of SM/CM's
+two-phase Create and must be allowed to proceed to phase-2.
+
+Implementation: `internal/recovery`,
+`internal/clients/servicemanager/recovery.go` (`SemanticLookuper` returns
+`created_at` alongside the ID), and `healExternalName` on each controller.
+
+### Entitlement aggregate ownership
+
+`Entitlement` maps N managed resources onto one BTP external assignment identified by
+the compound key `<subaccount-guid>/<service-name>/<service-plan-name>` (plus an
+optional fourth `<service-plan-unique-identifier>` segment). The key is deliberately
+**not unique per managed resource**: multiple `Entitlement` CRs intentionally
+contribute to one external assignment, so several CRs legitimately share
+one key.
+
+This aggregate shape needs four exceptions to the plain per-CR model described above:
+
+1. **Aggregate-scoped adoption intent.** The external-name annotation is required
+   once per external assignment, not once per CR: an unannotated CR may join the
+   aggregate when a non-deleting same-key sibling already carries the compound key,
+   without the joining CR itself being annotated.
+2. **Legacy-sentinel sibling proof.** During migration, a non-deleting sibling whose
+   external-name equals its own `metadata.name` (the pre-migration default) also
+   proves the assignment is provider-managed. That legacy annotation is not
+   byte-equal to the compound key, so exception 1 above ("later same-key CRs join")
+   does not cover it on its own.
+3. **Own-sentinel self-migration.** A CR carrying its own legacy sentinel migrates
+   itself to the compound key with no sibling involved: the adoption guard covers only
+   a genuinely empty annotation, so a legacy-annotated CR resolves its assignment and
+   is rewritten in place. The sentinel is the pre-migration default rather than a
+   deliberate user annotation, so exception 1's "once per assignment" intent is
+   satisfied by the runtime's own prior write here, not by an explicit one. Bounded to
+   migration: it applies only while a sentinel-shaped annotation exists, and the
+   rewrite makes the CR indistinguishable from a natively created one.
+4. **`AutoAssigned` self-adoption.** BTP `AutoAssigned` assignments self-adopt without
+   any annotation, because BTP reports them as always available and unremovable by
+   admin action, and because the controller's Create, Update, and Delete paths are
+   hard no-ops for them — no write is ever issued that adoption could put at risk.
+
+A blank segment (e.g. `sa//plan`) is rejected, matching `RoleCollectionAssignment`'s
+`ErrEmptyExternalNameSegment`: a blank segment identifies nothing. The ADR's
+Compound-Key External Name Format section above governs only leading/trailing
+whitespace and the 512-character length cap.
+
+#### Reserved/absent predicates
+
+Five predicates in `internal/controller/account/entitlement/entitlement.go` answer
+"does this assignment reserve anything, or is it absent?" at different scopes:
+
+| Predicate | Returns true when | Callers |
+| --- | --- | --- |
+| `assignFailedNoQuota` | `status.atProvider.assigned` reports `PROCESSING_FAILED` with `Amount` nil or `<= 0`. No deletion check; false when the status is absent. | `needsCreate`, `Observe`'s readiness condition switch, `observeExternalName`, `adoptionGuardApplies` |
+| `deletingWithReservedQuota` | The CR is deleting and `UnlimitedAmountAssigned` is set. This is the reservation `assignFailedNoQuota` cannot see, since an enable-based assignment reserves without a positive `Amount`. | `observeExternalName`, `Observe`'s `needsCreate` gate, `adoptionGuardApplies` |
+| `deletingAutoAssigned` | The CR is deleting and the assignment is `AutoAssigned`, so it finalizes with no BTP write and only a `reasonAutoAssignedPreserved` event. | `observeExternalName`, `Observe` |
+| `assignmentStillReserved` | The assignment reserves anything: `UnlimitedAmountAssigned`, or `Amount` nil or `> 0`. No deletion check; true when the status is absent. | `resolveUnjoinedDeletion`, zero-remaining-sibling branch only |
+| `adoptionGuardApplies` | The annotation is empty rather than legacy, BTP returned an assignment, that assignment is not `AutoAssigned`, and either `assignFailedNoQuota` is false or `deletingWithReservedQuota` holds. Sibling proof via `mayAdopt` is then required. | `observeExternalName`, `Create` |
+
+`deletingWithReservedQuota` and `assignmentStillReserved` are the pair worth reading twice.
+Both sound like "still reserved", but the first is narrow (deleting, and only the
+`UnlimitedAmountAssigned` flag) while the second is broad (any reservation, any lifecycle
+phase). They also disagree when `status.atProvider.assigned` is absent:
+`deletingWithReservedQuota` returns false, which lets `observeExternalName` and `Observe`
+report the resource as absent, whereas `assignmentStillReserved` returns true, which makes
+`resolveUnjoinedDeletion` refuse to finalize with `errUnownedAssignmentBlocksFinalize`.
+
+`assignFailedNoQuota` and `assignmentStillReserved` are not negations of each other either:
+a `PROCESSING_FAILED` assignment with a nil `Amount` satisfies both.
+
 ### Implementation guideline
 
 #### Observe()
@@ -78,6 +184,8 @@ If the request is sucessful, set the external-name with the necessary GUID or co
 It might be possible that the API works asynchronous and the final external-name is not available after the request. This is a possible szenario but out of scope here.
 
 If the response is `creation failed – resource already exist`, we treat it as an error. We do NOT set the external-name. In the next reconcile Observe(), the resource will be shown as resourceExist: False since the external name is not set and we intend to stay in an error loop. The error documents that the resource could not be created because it already exists. To resume, the user needs to set the external-name properly.
+
+For the narrow lost-ID recovery exception, see "Orphaned external-name recovery" above.
 
 If the request fails for any other reason, we will return the error and dont set the external-name.
 
