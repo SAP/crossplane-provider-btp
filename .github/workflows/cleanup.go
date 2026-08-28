@@ -31,9 +31,9 @@ type Subaccount struct {
 	StateMessage                  string           `json:"stateMessage"`
 	ContentAutomationState        interface{}      `json:"contentAutomationState"`
 	ContentAutomationStateDetails interface{}      `json:"contentAutomationStateDetails"`
-	CreatedDate                   int64            `json:"createdDate"`
+	CreatedDate                   string           `json:"createdDate"`
 	CreatedBy                     string           `json:"createdBy"`
-	ModifiedDate                  int64            `json:"modifiedDate"`
+	ModifiedDate                  string           `json:"modifiedDate"`
 	CustomProperties              CustomProperties `json:"customProperties,omitempty"`
 	Labels                        Labels           `json:"labels,omitempty"`
 }
@@ -116,9 +116,9 @@ type DirectoryResponse struct {
 	ParentType        string           `json:"parentType"`
 	GlobalAccountGUID string           `json:"globalAccountGUID"`
 	DisplayName       string           `json:"displayName"`
-	CreatedDate       int64            `json:"createdDate"`
+	CreatedDate       string           `json:"createdDate"`
 	CreatedBy         string           `json:"createdBy"`
-	ModifiedDate      int64            `json:"modifiedDate"`
+	ModifiedDate      string           `json:"modifiedDate"`
 	EntityState       string           `json:"entityState"`
 	StateMessage      string           `json:"stateMessage"`
 	DirectoryType     string           `json:"directoryType"`

@@ -43,7 +43,7 @@ permissions:
 
 env:
   # hardcoded BTP CLI version
-  btp_cli_version: 2.90.2
+  btp_cli_version: 2.116.2
   E2E_BUILD_REGISTRY: index.docker.io/e2e
   E2E_PROVIDER_IMAGE: index.docker.io/e2e/provider-btp-amd64
   CROSSPLANE_CLI_VERSION: v2.0.2
