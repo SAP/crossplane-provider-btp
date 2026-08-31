@@ -95,7 +95,7 @@ To learn how to set up the SAP Cloud Management service, choose your preferred t
 
         Replace `<subaccount-id>` with the ID of your newly created subaccount.
 
-    4. From the output of the previous commands, copy the binding credentials to your clipboard. You'll need the credentials to create a Kubernetes secret.
+    5. From the output of the previous commands, copy the binding credentials to your clipboard. You'll need the credentials to create a Kubernetes secret.
   </TabItem>
   <TabItem value="btp-cockpit" label="Using the SAP BTP cockpit">
 
@@ -359,7 +359,7 @@ In the `ProviderConfig`, you'll reference the Kubernetes secrets created in [Cre
             source: Secret
     ```
 
-    Replace `<global-account-subdomain>` with the subdomain of your BTP global account.
+    Replace `<global-account-subdomain>` with the subdomain of your BTP global account. It must be the same global account whose subaccount holds the Cloud Management service binding referenced in `cisCredentials`.
 
 2. Apply the configuration:
 
