@@ -182,8 +182,9 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	// terraform.tfstate, satisfying plugin-framework's post-Read identity
 	// check (issue #521). The earlier afero.Fs middleware approach was
 	// inert — upjet's WithFs doesn't propagate to FileProducer, see
-	// identity_injector.go header. Remove the wrap when no-fork (PR #680 /
-	// issue #207) lands.
+	// identity_injector.go header. Still needed: the class-2 hybrids
+	// (ServiceInstance, ServiceBinding) keep running through this fork/CLI
+	// connector. Remove only once they migrate to no-fork too (issue #207).
 	ws := terraform.NewWorkspaceStore(log)
 	store := NewIdentityInjectingStore(ws, log)
 	provider := config.GetProvider()
