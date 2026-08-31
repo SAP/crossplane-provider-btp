@@ -32,29 +32,16 @@ type SubaccountDestinationInitParameters struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name can't be updated once set"
 	Name string `json:"name,omitempty"`
 
-	// Type of the destination. e.g. HTTP, LDAP, RFC, MAIL.
+	// Type of the destination.
 	// +optional
+	// +kubebuilder:validation:Enum=HTTP;RFC;MAIL;LDAP
 	Type string `json:"type,omitempty"`
 
-	// URL of the destination.
-	// +optional
-	URL *string `json:"url,omitempty"`
-
-	// Authentication type.
-	// +optional
-	Authentication *string `json:"authentication,omitempty"`
-
-	// ProxyType.
-	// +optional
-	ProxyType *string `json:"proxyType,omitempty"`
-
-	// Description of the destination.
-	// +optional
-	Description *string `json:"description,omitempty"`
-
-	// AdditionalProperties merged into the destination property bag.
-	// For the full list of supported properties see the SAP Destination Service REST API documentation:
+	// AdditionalProperties are sent as-is to the Destination Service API property bag.
+	// Use for all destination-specific fields (e.g. URL, Authentication, ProxyType,
+	// TokenServiceURL). For the full list of supported properties see:
 	// https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150
+	// Note: keys "Name" and "Type" override the typed fields above if present.
 	// +optional
 	AdditionalProperties map[string]string `json:"additionalProperties,omitempty"`
 
@@ -88,32 +75,16 @@ type SubaccountDestinationParameters struct {
 	// +optional
 	SubaccountSelector *xpv1.Selector `json:"subaccountSelector,omitempty"`
 
-	// Type of the destination. e.g. HTTP, LDAP, RFC, MAIL.
+	// Type of the destination.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=HTTP;RFC;MAIL;LDAP
 	Type string `json:"type"`
 
-	// URL of the destination.
-	// +optional
-	URL *string `json:"url,omitempty"`
-
-	// Authentication type. e.g. NoAuthentication, BasicAuthentication, OAuth2ClientCredentials.
-	// +optional
-	Authentication *string `json:"authentication,omitempty"`
-
-	// ProxyType. e.g. Internet, OnPremise, PrivateLink.
-	// +optional
-	ProxyType *string `json:"proxyType,omitempty"`
-
-	// Description of the destination.
-	// +optional
-	Description *string `json:"description,omitempty"`
-
-	// AdditionalProperties are merged on top of typed fields when building
-	// the destination property bag sent to the Destination Service API.
-	// Use for any destination-specific fields (e.g. User, Password, ClientId,
-	// TokenServiceURL). For the full list of supported properties see the SAP
-	// Destination Service REST API documentation:
+	// AdditionalProperties are sent as-is to the Destination Service API property bag.
+	// Use for all destination-specific fields (e.g. URL, Authentication, ProxyType,
+	// TokenServiceURL). For the full list of supported properties see:
 	// https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150
+	// Note: keys "Name" and "Type" override the typed fields above if present.
 	// +optional
 	AdditionalProperties map[string]string `json:"additionalProperties,omitempty"`
 
@@ -130,39 +101,9 @@ type SubaccountDestinationObservation struct {
 	// +optional
 	Name *string `json:"name,omitempty"`
 
-	// SubaccountID as reported by the API.
-	// +optional
-	SubaccountID *string `json:"subaccountId,omitempty"`
-
-	// Authentication type as reported by the API.
-	// +optional
-	Authentication *string `json:"authentication,omitempty"`
-
-	// ProxyType as reported by the API.
-	// +optional
-	ProxyType *string `json:"proxyType,omitempty"`
-
-	// Description as reported by the API.
-	// +optional
-	Description *string `json:"description,omitempty"`
-
-	// URL as reported by the API.
-	// +optional
-	URL *string `json:"url,omitempty"`
-
-	// CreationTime metadata from the API.
-	// +optional
-	CreationTime *string `json:"creationTime,omitempty"`
-
-	// ModificationTime metadata from the API.
-	// +optional
-	ModificationTime *string `json:"modificationTime,omitempty"`
-
 	// ETag for optimistic concurrency on updates.
 	// +optional
 	ETag *string `json:"etag,omitempty"`
-
-
 }
 
 // SubaccountDestinationSpec defines the desired state.

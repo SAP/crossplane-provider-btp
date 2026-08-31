@@ -84,27 +84,30 @@ func TestSubaccountDestination_CreationFlow(t *testing.T) {
 				dest := &v1alpha1.SubaccountDestination{}
 				MustGetResource(t, cfg, destCreateName, nil, dest)
 
+				prevETag := ""
+				if dest.Status.AtProvider.ETag != nil {
+					prevETag = *dest.Status.AtProvider.ETag
+				}
+
 				updatedURL := "https://updated.example.com"
 				updated := dest.DeepCopy()
-				updated.Spec.ForProvider.URL = &updatedURL
+				if updated.Spec.ForProvider.AdditionalProperties == nil {
+					updated.Spec.ForProvider.AdditionalProperties = map[string]string{}
+				}
+				updated.Spec.ForProvider.AdditionalProperties["URL"] = updatedURL
 				resources.AwaitResourceUpdateOrError(ctx, t, cfg, updated)
 
-				// Wait for the controller to reconcile the update to BTP and reflect
-				// the new URL in atProvider.
+				// Wait for ETag to change — BTP issues a new ETag on every successful PUT,
+				// so this confirms the update was actually accepted by BTP.
 				resources.AwaitResourceUpdateFor(
 					ctx, t, cfg, updated,
 					func(obj k8s.Object) bool {
 						d, ok := obj.(*v1alpha1.SubaccountDestination)
-						return ok && d.Status.AtProvider.URL != nil && *d.Status.AtProvider.URL == updatedURL
+						return ok && d.Status.AtProvider.ETag != nil &&
+							*d.Status.AtProvider.ETag != prevETag
 					},
 					wait.WithTimeout(3*time.Minute),
 				)
-
-				after := &v1alpha1.SubaccountDestination{}
-				MustGetResource(t, cfg, destCreateName, nil, after)
-				if after.Status.AtProvider.URL == nil || *after.Status.AtProvider.URL != updatedURL {
-					t.Errorf("atProvider.url = %v, want %q", after.Status.AtProvider.URL, updatedURL)
-				}
 
 				return ctx
 			},

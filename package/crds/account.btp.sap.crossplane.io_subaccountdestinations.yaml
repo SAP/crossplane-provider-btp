@@ -111,27 +111,16 @@ spec:
                     additionalProperties:
                       type: string
                     description: |-
-                      AdditionalProperties are merged on top of typed fields when building
-                      the destination property bag sent to the Destination Service API.
-                      Use for any destination-specific fields (e.g. User, Password, ClientId,
-                      TokenServiceURL). For the full list of supported properties see the SAP
-                      Destination Service REST API documentation:
+                      AdditionalProperties are sent as-is to the Destination Service API property bag.
+                      Use for all destination-specific fields (e.g. URL, Authentication, ProxyType,
+                      TokenServiceURL). For the full list of supported properties see:
                       https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150
+                      Note: keys "Name" and "Type" override the typed fields above if present.
                     type: object
-                  authentication:
-                    description: Authentication type. e.g. NoAuthentication, BasicAuthentication,
-                      OAuth2ClientCredentials.
-                    type: string
-                  description:
-                    description: Description of the destination.
-                    type: string
                   name:
                     description: |-
                       Name of the destination. Immutable after creation.
                       Used as the second segment of the external-name annotation.
-                    type: string
-                  proxyType:
-                    description: ProxyType. e.g. Internet, OnPremise, PrivateLink.
                     type: string
                   subaccountId:
                     description: SubaccountID is the GUID of the subaccount that owns
@@ -212,10 +201,12 @@ spec:
                         type: object
                     type: object
                   type:
-                    description: Type of the destination. e.g. HTTP, LDAP, RFC, MAIL.
-                    type: string
-                  url:
-                    description: URL of the destination.
+                    description: Type of the destination.
+                    enum:
+                    - HTTP
+                    - RFC
+                    - MAIL
+                    - LDAP
                     type: string
                 required:
                 - name
@@ -255,25 +246,18 @@ spec:
                     additionalProperties:
                       type: string
                     description: |-
-                      AdditionalProperties merged into the destination property bag.
-                      For the full list of supported properties see the SAP Destination Service REST API documentation:
+                      AdditionalProperties are sent as-is to the Destination Service API property bag.
+                      Use for all destination-specific fields (e.g. URL, Authentication, ProxyType,
+                      TokenServiceURL). For the full list of supported properties see:
                       https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150
+                      Note: keys "Name" and "Type" override the typed fields above if present.
                     type: object
-                  authentication:
-                    description: Authentication type.
-                    type: string
-                  description:
-                    description: Description of the destination.
-                    type: string
                   name:
                     description: Name of the destination. Immutable after creation.
                     type: string
                     x-kubernetes-validations:
                     - message: name can't be updated once set
                       rule: self == oldSelf
-                  proxyType:
-                    description: ProxyType.
-                    type: string
                   subaccountId:
                     description: SubaccountID is the GUID of the subaccount that owns
                       this destination.
@@ -353,10 +337,12 @@ spec:
                         type: object
                     type: object
                   type:
-                    description: Type of the destination. e.g. HTTP, LDAP, RFC, MAIL.
-                    type: string
-                  url:
-                    description: URL of the destination.
+                    description: Type of the destination.
+                    enum:
+                    - HTTP
+                    - RFC
+                    - MAIL
+                    - LDAP
                     type: string
                 type: object
               managementPolicies:
@@ -452,32 +438,11 @@ spec:
                 description: SubaccountDestinationObservation holds the fields observed
                   from the Destination Service API.
                 properties:
-                  authentication:
-                    description: Authentication type as reported by the API.
-                    type: string
-                  creationTime:
-                    description: CreationTime metadata from the API.
-                    type: string
-                  description:
-                    description: Description as reported by the API.
-                    type: string
                   etag:
                     description: ETag for optimistic concurrency on updates.
                     type: string
-                  modificationTime:
-                    description: ModificationTime metadata from the API.
-                    type: string
                   name:
                     description: Name of the destination as reported by the API.
-                    type: string
-                  proxyType:
-                    description: ProxyType as reported by the API.
-                    type: string
-                  subaccountId:
-                    description: SubaccountID as reported by the API.
-                    type: string
-                  url:
-                    description: URL as reported by the API.
                     type: string
                 type: object
               conditions:

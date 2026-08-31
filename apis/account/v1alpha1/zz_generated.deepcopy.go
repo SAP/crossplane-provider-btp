@@ -1836,26 +1836,6 @@ func (in *SubaccountDestinationInitParameters) DeepCopyInto(out *SubaccountDesti
 		*out = new(v1.Selector)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.URL != nil {
-		in, out := &in.URL, &out.URL
-		*out = new(string)
-		**out = **in
-	}
-	if in.Authentication != nil {
-		in, out := &in.Authentication, &out.Authentication
-		*out = new(string)
-		**out = **in
-	}
-	if in.ProxyType != nil {
-		in, out := &in.ProxyType, &out.ProxyType
-		*out = new(string)
-		**out = **in
-	}
-	if in.Description != nil {
-		in, out := &in.Description, &out.Description
-		*out = new(string)
-		**out = **in
-	}
 	if in.AdditionalProperties != nil {
 		in, out := &in.AdditionalProperties, &out.AdditionalProperties
 		*out = make(map[string]string, len(*in))
@@ -1920,41 +1900,6 @@ func (in *SubaccountDestinationObservation) DeepCopyInto(out *SubaccountDestinat
 		*out = new(string)
 		**out = **in
 	}
-	if in.SubaccountID != nil {
-		in, out := &in.SubaccountID, &out.SubaccountID
-		*out = new(string)
-		**out = **in
-	}
-	if in.Authentication != nil {
-		in, out := &in.Authentication, &out.Authentication
-		*out = new(string)
-		**out = **in
-	}
-	if in.ProxyType != nil {
-		in, out := &in.ProxyType, &out.ProxyType
-		*out = new(string)
-		**out = **in
-	}
-	if in.Description != nil {
-		in, out := &in.Description, &out.Description
-		*out = new(string)
-		**out = **in
-	}
-	if in.URL != nil {
-		in, out := &in.URL, &out.URL
-		*out = new(string)
-		**out = **in
-	}
-	if in.CreationTime != nil {
-		in, out := &in.CreationTime, &out.CreationTime
-		*out = new(string)
-		**out = **in
-	}
-	if in.ModificationTime != nil {
-		in, out := &in.ModificationTime, &out.ModificationTime
-		*out = new(string)
-		**out = **in
-	}
 	if in.ETag != nil {
 		in, out := &in.ETag, &out.ETag
 		*out = new(string)
@@ -1989,26 +1934,6 @@ func (in *SubaccountDestinationParameters) DeepCopyInto(out *SubaccountDestinati
 		in, out := &in.SubaccountSelector, &out.SubaccountSelector
 		*out = new(v1.Selector)
 		(*in).DeepCopyInto(*out)
-	}
-	if in.URL != nil {
-		in, out := &in.URL, &out.URL
-		*out = new(string)
-		**out = **in
-	}
-	if in.Authentication != nil {
-		in, out := &in.Authentication, &out.Authentication
-		*out = new(string)
-		**out = **in
-	}
-	if in.ProxyType != nil {
-		in, out := &in.ProxyType, &out.ProxyType
-		*out = new(string)
-		**out = **in
-	}
-	if in.Description != nil {
-		in, out := &in.Description, &out.Description
-		*out = new(string)
-		**out = **in
 	}
 	if in.AdditionalProperties != nil {
 		in, out := &in.AdditionalProperties, &out.AdditionalProperties

@@ -9,8 +9,9 @@ spec:
   forProvider:
     name: e2e-dest-$BUILD_ID
     type: HTTP
-    authentication: NoAuthentication
-    url: https://example.com
-    proxyType: Internet
+    additionalProperties:
+      Authentication: NoAuthentication
+      URL: https://example.com
+      ProxyType: Internet
     subaccountRef:
       name: e2e-dest-subaccount

@@ -106,18 +106,6 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if v, ok := props["Name"]; ok {
 		cr.Status.AtProvider.Name = &v
 	}
-	if v, ok := props["URL"]; ok {
-		cr.Status.AtProvider.URL = &v
-	}
-	if v, ok := props["Authentication"]; ok {
-		cr.Status.AtProvider.Authentication = &v
-	}
-	if v, ok := props["ProxyType"]; ok {
-		cr.Status.AtProvider.ProxyType = &v
-	}
-	if v, ok := props["Description"]; ok {
-		cr.Status.AtProvider.Description = &v
-	}
 
 	cr.SetConditions(xpv1.Available())
 
@@ -237,25 +225,14 @@ func validateExternalName(extName string) error {
 }
 
 // buildPropertyBag builds the map[string]any sent to the Destination Service API.
-// Typed fields are set first; additionalProperties overrides them;
-// additionalConfigurationSecretRefs contents are merged last.
+// Name and Type are seeded first; additionalProperties is merged next (and can
+// override Name/Type if those keys appear); additionalConfigurationSecretRefs
+// contents are merged last.
 func buildPropertyBag(ctx context.Context, kube client.Client, cr *v1alpha1.SubaccountDestination) (map[string]any, error) {
 	p := cr.Spec.ForProvider
 	props := map[string]any{
 		"Name": p.Name,
 		"Type": p.Type,
-	}
-	if p.URL != nil {
-		props["URL"] = *p.URL
-	}
-	if p.Authentication != nil {
-		props["Authentication"] = *p.Authentication
-	}
-	if p.ProxyType != nil {
-		props["ProxyType"] = *p.ProxyType
-	}
-	if p.Description != nil {
-		props["Description"] = *p.Description
 	}
 	for k, v := range p.AdditionalProperties {
 		props[k] = v
@@ -272,9 +249,15 @@ func buildPropertyBag(ctx context.Context, kube client.Client, cr *v1alpha1.Suba
 	return props, nil
 }
 
-// isUpToDate returns true if every key in desired exists in observed with the same value.
-// Intentionally one-sided: keys present in observed but absent from desired are ignored
-// because the API injects read-only fields (CreationTime, User, etc.) that we never set.
+// isUpToDate returns true when desired and observed are in sync.
+// observed is the raw property map returned by the Destination Service GET.
+// Checks both directions:
+//   - every key in desired must exist in observed with the same value
+//   - every key in observed must exist in desired (ensures removed additionalProperties
+//     keys trigger an update that removes them from BTP via full-replace PUT)
+//
+// This is safe because the BTP Destination Service GET returns only user-set
+// properties — it does not inject server-managed fields into the property bag.
 func isUpToDate(desired map[string]any, observed map[string]string) bool {
 	for k, dv := range desired {
 		ov, exists := observed[k]
@@ -282,6 +265,11 @@ func isUpToDate(desired map[string]any, observed map[string]string) bool {
 			return false
 		}
 		if ov != fmt.Sprintf("%v", dv) {
+			return false
+		}
+	}
+	for k := range observed {
+		if _, exists := desired[k]; !exists {
 			return false
 		}
 	}

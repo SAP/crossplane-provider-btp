@@ -99,6 +99,16 @@ func TestIsUpToDate_DifferentValue(t *testing.T) {
 	}
 }
 
+func TestIsUpToDate_ObservedHasExtraKey(t *testing.T) {
+	// URL was removed from additionalProperties — observed still has it from BTP.
+	// Must trigger an update so the full-replace PUT removes it.
+	desired := map[string]any{"Name": "d", "Type": "HTTP"}
+	observed := map[string]string{"Name": "d", "Type": "HTTP", "URL": "https://x.com"}
+	if isUpToDate(desired, observed) {
+		t.Error("isUpToDate = true, want false (URL removed from desired but still in observed)")
+	}
+}
+
 // --- Observe ---
 
 func TestObserve_EmptyExternalName(t *testing.T) {
@@ -152,9 +162,9 @@ func TestObserve_UpToDate(t *testing.T) {
 }
 
 func TestObserve_NotUpToDate(t *testing.T) {
-	url := "https://new.com"
 	cr := newCR("sub-id/dest", v1alpha1.SubaccountDestinationParameters{
-		Name: "dest", Type: "HTTP", URL: &url,
+		Name: "dest", Type: "HTTP",
+		AdditionalProperties: map[string]string{"URL": "https://new.com"},
 	})
 	props := map[string]string{"Name": "dest", "Type": "HTTP", "URL": "https://old.com"}
 	e := &external{client: &mockDestClient{getProps: props}}
@@ -243,13 +253,15 @@ func TestDelete_EmptyExternalName(t *testing.T) {
 
 // --- buildPropertyBag ---
 
-func TestBuildPropertyBag_TypedFields(t *testing.T) {
-	url := "https://example.com"
-	auth := "NoAuthentication"
+func TestBuildPropertyBag_AdditionalProperties(t *testing.T) {
 	subID := "sub-id"
 	cr := newCR("sub-id/dest", v1alpha1.SubaccountDestinationParameters{
-		Name: "dest", Type: "HTTP", URL: &url, Authentication: &auth, SubaccountID: &subID,
-		AdditionalProperties: map[string]string{"ProxyType": "Internet"},
+		Name: "dest", Type: "HTTP", SubaccountID: &subID,
+		AdditionalProperties: map[string]string{
+			"URL":            "https://example.com",
+			"Authentication": "NoAuthentication",
+			"ProxyType":      "Internet",
+		},
 	})
 
 	props, err := buildPropertyBag(context.Background(), nil, cr)
@@ -270,19 +282,28 @@ func TestBuildPropertyBag_TypedFields(t *testing.T) {
 	}
 }
 
-func TestBuildPropertyBag_AdditionalOverridesTyped(t *testing.T) {
-	url := "https://original.com"
+func TestBuildPropertyBag_AdditionalPropertiesOverrideNameType(t *testing.T) {
 	cr := newCR("sub-id/dest", v1alpha1.SubaccountDestinationParameters{
-		Name: "dest", Type: "HTTP", URL: &url,
-		AdditionalProperties: map[string]string{"URL": "https://override.com"},
+		Name: "dest", Type: "HTTP",
+		AdditionalProperties: map[string]string{
+			"Name": "overridden-name",
+			"Type": "RFC",
+			"URL":  "https://override.com",
+		},
 	})
 
 	props, err := buildPropertyBag(context.Background(), nil, cr)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if props["Name"] != "overridden-name" {
+		t.Errorf("Name = %q, want overridden-name", props["Name"])
+	}
+	if props["Type"] != "RFC" {
+		t.Errorf("Type = %q, want RFC", props["Type"])
+	}
 	if props["URL"] != "https://override.com" {
-		t.Errorf("URL = %q, want override value", props["URL"])
+		t.Errorf("URL = %q, want https://override.com", props["URL"])
 	}
 }
 
@@ -293,7 +314,8 @@ func TestUpdate_Success(t *testing.T) {
 	url := "https://updated.example.com"
 	subID := "sub-id"
 	cr := newCR("sub-id/dest", v1alpha1.SubaccountDestinationParameters{
-		Name: "dest", Type: "HTTP", URL: &url, SubaccountID: &subID,
+		Name: "dest", Type: "HTTP", SubaccountID: &subID,
+		AdditionalProperties: map[string]string{"URL": url},
 	})
 	cr.Status.AtProvider.ETag = &etag
 
