@@ -55,6 +55,7 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 				Source:  providerSource,
 				Version: providerVersion,
 			},
+			FrameworkProvider: config.GetProvider().TerraformPluginFrameworkProvider,
 		}
 
 		lm, ok := mg.(providerconfig.LegacyManaged)
@@ -123,6 +124,7 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 				Source:  providerSource,
 				Version: providerVersion,
 			},
+			FrameworkProvider: config.GetProvider().TerraformPluginFrameworkProvider,
 		}
 
 		lm, ok := mg.(providerconfig.LegacyManaged)
