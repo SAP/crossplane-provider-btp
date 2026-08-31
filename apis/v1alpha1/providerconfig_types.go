@@ -15,7 +15,7 @@ type ProviderConfigSpec struct {
 	// Reference to a secret containing the CIS Accounts service credentials.
 	// The Cloud Management (CIS) instance must be of plan `central`.
 	// The Service Binding should be created with the following parameters `{"grantType": "clientCredentials"}`
-	// See [Setup](https://pages.github.tools.sap/cloud-orchestration/docs/sap-services/btp-services/account-managment/provider) for more details
+	// See [Setup](https://sap.github.io/crossplane-provider-docs/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp) for more details
 	CISSecret ProviderCredentials `json:"cisCredentials"`
 
 	// A user available in BTP.
@@ -33,7 +33,8 @@ type ProviderConfigSpec struct {
 
 	CliServerUrl string `json:"cliServerUrl,omitempty"`
 
-	// GlobalAccount is the Global Account Subdomain.
+	// GlobalAccount is the Global Account Subdomain. It must be the subdomain
+	// of the same global account that the cisCredentials binding points at.
 	GlobalAccount string `json:"globalAccount,omitempty"`
 }
 
@@ -82,7 +83,3 @@ var (
 	ProviderConfigKindAPIVersion   = ProviderConfigKind + "." + SchemeGroupVersion.String()
 	ProviderConfigGroupVersionKind = SchemeGroupVersion.WithKind(ProviderConfigKind)
 )
-
-func init() {
-	SchemeBuilder.Register(&ProviderConfig{}, &ProviderConfigList{})
-}

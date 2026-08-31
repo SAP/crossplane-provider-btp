@@ -324,23 +324,6 @@ func (mg *Subaccount) ResolveReferences(ctx context.Context, c client.Reader) er
 	var err error
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.ForProvider.GlobalAccountGuid,
-		Extract:      GlobalAccountUuid(),
-		Namespace:    mg.GetNamespace(),
-		Reference:    mg.Spec.ForProvider.GlobalAccountRef,
-		Selector:     mg.Spec.ForProvider.GlobalAccountSelector,
-		To: reference.To{
-			List:    &GlobalAccountList{},
-			Managed: &GlobalAccount{},
-		},
-	})
-	if err != nil {
-		return errors.Wrap(err, "mg.Spec.ForProvider.GlobalAccountGuid")
-	}
-	mg.Spec.ForProvider.GlobalAccountGuid = rsp.ResolvedValue
-	mg.Spec.ForProvider.GlobalAccountRef = rsp.ResolvedReference
-
-	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.DirectoryGuid,
 		Extract:      DirectoryUuid(),
 		Namespace:    mg.GetNamespace(),

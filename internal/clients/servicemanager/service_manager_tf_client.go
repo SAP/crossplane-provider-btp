@@ -14,6 +14,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,6 +24,9 @@ type ResourcesStatus struct {
 	managed.ExternalObservation
 	InstanceID string
 	BindingID  string
+	// ObservedPlanID is the live instance's serviceplan_id, used to self-heal a
+	// stale plan ID in status. Workaround for #941; empty when not observed.
+	ObservedPlanID string
 }
 
 // ITfClientInitializer will produce the ITfClient used by external
@@ -125,6 +129,7 @@ func (tfI *TfClientInitializer) serviceBindingCr(sm *apisv1beta1.ServiceManager)
 	if name == "" {
 		name = tfI.defaults.BindingName
 	}
+	sInstanceID, sBindingID := splitExternalName(meta.GetExternalName(sm))
 
 	sBinding := &apisv1alpha1.SubaccountServiceBinding{
 		TypeMeta: metav1.TypeMeta{
@@ -144,15 +149,17 @@ func (tfI *TfClientInitializer) serviceBindingCr(sm *apisv1beta1.ServiceManager)
 				ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionAll},
 			},
 			ForProvider: apisv1alpha1.SubaccountServiceBindingParameters{
-				Name:              &name,
-				ServiceInstanceID: internal.Ptr(meta.GetExternalName(sm)),
+				Name: &name,
+				// ADR(external-name): service_instance_id is the instance GUID alone.
+				// The whole "<sID>/<bID>" annotation sends a bogus instance ID when
+				// createBinding() re-creates a binding deleted out-of-band.
+				ServiceInstanceID: internal.Ptr(sInstanceID),
 				SubaccountID:      internal.Ptr(sm.Spec.ForProvider.SubaccountGuid),
 			},
 		},
 		Status: apisv1alpha1.SubaccountServiceBindingStatus{},
 	}
-	_, sBindingId := splitExternalName(meta.GetExternalName(sm))
-	meta.SetExternalName(sBinding, sBindingId)
+	meta.SetExternalName(sBinding, sBindingID)
 	return sBinding
 }
 
@@ -268,15 +275,32 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 			ResourceUpToDate:  resourceUpToDate,
 			ConnectionDetails: conDetails,
 		},
-		InstanceID: meta.GetExternalName(tf.sInstance),
-		BindingID:  meta.GetExternalName(tf.sBinding),
+		InstanceID:     meta.GetExternalName(tf.sInstance),
+		BindingID:      meta.GetExternalName(tf.sBinding),
+		ObservedPlanID: internal.Val(tf.sInstance.Status.AtProvider.ServiceplanID),
 	}, nil
 }
 
-// ResourcesUpToDate runs another observe on instance and returns whether they are up to date, currently updates on bindings are not supported
+// resourcesUpToDate runs another observe on the instance and returns whether it
+// is up to date. Binding updates are not supported.
 func (tf *TfClient) resourcesUpToDate(ctx context.Context) bool {
 	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
-	return err != nil || siObs.ResourceUpToDate
+	if err != nil {
+		return true
+	}
+	if siObs.ResourceUpToDate {
+		return true
+	}
+
+	// Workaround for #941: the service plan is immutable in BTP, so an in-place
+	// update on a plan-only diff calls update_instance, which BTP rejects. That
+	// diff only arises for an upgraded v1alpha1 SM whose status lost
+	// dataSourceLookup and re-resolved the flipped default plan (#925). Report
+	// up-to-date so no Update fires. For v1beta1 the plan is pinned by the CRD, so
+	// desired == observed and this is a no-op.
+	desiredPlan := internal.Val(tf.sInstance.Spec.ForProvider.ServiceplanID)
+	observedPlan := internal.Val(tf.sInstance.Status.AtProvider.ServiceplanID)
+	return desiredPlan != observedPlan
 }
 
 func (tf *TfClient) createInstance(ctx context.Context) (string, error) {
@@ -301,6 +325,40 @@ func splitExternalName(externalName string) (string, string) {
 		return fragments[0], fragments[1]
 	}
 	return fragments[0], ""
+}
+
+// canonicalUUIDLength is the length of the hyphenated 8-4-4-4-12 GUID form.
+const canonicalUUIDLength = 36
+
+// ErrInvalidExternalName is returned by ValidateExternalName when the annotation
+// is neither a fallback nor a well-formed ServiceManager key.
+var ErrInvalidExternalName = errors.New("invalid external-name")
+
+// ValidateExternalName enforces the ADR external-name format: a fallback ("" or
+// metadata.name) owned by the recovery path, the phase-1 "<serviceInstanceID>"
+// transient, or "<serviceInstanceID>/<serviceBindingID>". Segments must be
+// canonical 36-char GUIDs; uuid.Validate alone also accepts braced, urn:uuid:
+// and unhyphenated spellings. Rejecting beats degrading: splitExternalName maps
+// 3 segments to instance-only, so the next Create() would duplicate the binding.
+func ValidateExternalName(metadataName, externalName string) error {
+	if recovery.IsFallbackExternalName(metadataName, externalName) {
+		return nil
+	}
+
+	fragments := strings.Split(externalName, "/")
+	if len(fragments) > 2 {
+		return errors.Wrapf(ErrInvalidExternalName,
+			"%q has %d segments, expected \"<serviceInstanceID>\" or \"<serviceInstanceID>/<serviceBindingID>\"",
+			externalName, len(fragments))
+	}
+	for i, fragment := range fragments {
+		if len(fragment) == canonicalUUIDLength && internal.IsValidUUID(fragment) {
+			continue
+		}
+		return errors.Wrapf(ErrInvalidExternalName,
+			"segment %d (%q) of %q is not a canonical BTP GUID", i+1, fragment, externalName)
+	}
+	return nil
 }
 
 // mapTfConnectionDetails maps the connection details from the terraform output to the connection details of the CR as expected by the crossplane provider

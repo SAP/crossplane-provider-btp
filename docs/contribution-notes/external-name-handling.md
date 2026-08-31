@@ -100,6 +100,68 @@ Implementation: `internal/recovery`,
 `internal/clients/servicemanager/recovery.go` (`SemanticLookuper` returns
 `created_at` alongside the ID), and `healExternalName` on each controller.
 
+### Entitlement aggregate ownership
+
+`Entitlement` maps N managed resources onto one BTP external assignment identified by
+the compound key `<subaccount-guid>/<service-name>/<service-plan-name>` (plus an
+optional fourth `<service-plan-unique-identifier>` segment). The key is deliberately
+**not unique per managed resource**: multiple `Entitlement` CRs intentionally
+contribute to one external assignment, so several CRs legitimately share
+one key.
+
+This aggregate shape needs four exceptions to the plain per-CR model described above:
+
+1. **Aggregate-scoped adoption intent.** The external-name annotation is required
+   once per external assignment, not once per CR: an unannotated CR may join the
+   aggregate when a non-deleting same-key sibling already carries the compound key,
+   without the joining CR itself being annotated.
+2. **Legacy-sentinel sibling proof.** During migration, a non-deleting sibling whose
+   external-name equals its own `metadata.name` (the pre-migration default) also
+   proves the assignment is provider-managed. That legacy annotation is not
+   byte-equal to the compound key, so exception 1 above ("later same-key CRs join")
+   does not cover it on its own.
+3. **Own-sentinel self-migration.** A CR carrying its own legacy sentinel migrates
+   itself to the compound key with no sibling involved: the adoption guard covers only
+   a genuinely empty annotation, so a legacy-annotated CR resolves its assignment and
+   is rewritten in place. The sentinel is the pre-migration default rather than a
+   deliberate user annotation, so exception 1's "once per assignment" intent is
+   satisfied by the runtime's own prior write here, not by an explicit one. Bounded to
+   migration: it applies only while a sentinel-shaped annotation exists, and the
+   rewrite makes the CR indistinguishable from a natively created one.
+4. **`AutoAssigned` self-adoption.** BTP `AutoAssigned` assignments self-adopt without
+   any annotation, because BTP reports them as always available and unremovable by
+   admin action, and because the controller's Create, Update, and Delete paths are
+   hard no-ops for them — no write is ever issued that adoption could put at risk.
+
+A blank segment (e.g. `sa//plan`) is rejected, matching `RoleCollectionAssignment`'s
+`ErrEmptyExternalNameSegment`: a blank segment identifies nothing. The ADR's
+Compound-Key External Name Format section above governs only leading/trailing
+whitespace and the 512-character length cap.
+
+#### Reserved/absent predicates
+
+Five predicates in `internal/controller/account/entitlement/entitlement.go` answer
+"does this assignment reserve anything, or is it absent?" at different scopes:
+
+| Predicate | Returns true when | Callers |
+| --- | --- | --- |
+| `assignFailedNoQuota` | `status.atProvider.assigned` reports `PROCESSING_FAILED` with `Amount` nil or `<= 0`. No deletion check; false when the status is absent. | `needsCreate`, `Observe`'s readiness condition switch, `observeExternalName`, `adoptionGuardApplies` |
+| `deletingWithReservedQuota` | The CR is deleting and `UnlimitedAmountAssigned` is set. This is the reservation `assignFailedNoQuota` cannot see, since an enable-based assignment reserves without a positive `Amount`. | `observeExternalName`, `Observe`'s `needsCreate` gate, `adoptionGuardApplies` |
+| `deletingAutoAssigned` | The CR is deleting and the assignment is `AutoAssigned`, so it finalizes with no BTP write and only a `reasonAutoAssignedPreserved` event. | `observeExternalName`, `Observe` |
+| `assignmentStillReserved` | The assignment reserves anything: `UnlimitedAmountAssigned`, or `Amount` nil or `> 0`. No deletion check; true when the status is absent. | `resolveUnjoinedDeletion`, zero-remaining-sibling branch only |
+| `adoptionGuardApplies` | The annotation is empty rather than legacy, BTP returned an assignment, that assignment is not `AutoAssigned`, and either `assignFailedNoQuota` is false or `deletingWithReservedQuota` holds. Sibling proof via `mayAdopt` is then required. | `observeExternalName`, `Create` |
+
+`deletingWithReservedQuota` and `assignmentStillReserved` are the pair worth reading twice.
+Both sound like "still reserved", but the first is narrow (deleting, and only the
+`UnlimitedAmountAssigned` flag) while the second is broad (any reservation, any lifecycle
+phase). They also disagree when `status.atProvider.assigned` is absent:
+`deletingWithReservedQuota` returns false, which lets `observeExternalName` and `Observe`
+report the resource as absent, whereas `assignmentStillReserved` returns true, which makes
+`resolveUnjoinedDeletion` refuse to finalize with `errUnownedAssignmentBlocksFinalize`.
+
+`assignFailedNoQuota` and `assignmentStillReserved` are not negations of each other either:
+a `PROCESSING_FAILED` assignment with a nil `Amount` satisfies both.
+
 ### Implementation guideline
 
 #### Observe()
@@ -151,7 +213,7 @@ Else, if we have an error in our request, return with error.
 
 Comments in this format should be on top of the CRDs which will support external name.
 Script (see below) will use it for the docs generation.
-And append the file [docs/end-user-guides/import-landscape/external-name.md](/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/external-name)
+And append the file [docs/end-user-guides/import-landscape/external-name.md](../end-user-guides/import-landscape/external-name.md)
 
 ```go
 //

@@ -10,9 +10,6 @@
 
 name: Custom Upgrade Test Workflow
 
-env:
-  GO_VERSION: '1.25'
-
 permissions:
   contents: read
   packages: write
@@ -32,7 +29,7 @@ jobs:
       test-names: ${{ steps.set-matrix.outputs.test-names }}
     steps:
       - name: checkout repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
 
@@ -61,16 +58,16 @@ jobs:
         testName: ${{ fromJson(needs.prepare-matrix.outputs.test-names) }}
     env:
       # hardcoded BTP CLI version
-      btp_cli_version: 2.90.2
+      btp_cli_version: 2.116.2
     steps:
       - name: checkout repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - run: go version
 
       - name: Install Helm
@@ -116,17 +113,17 @@ jobs:
     if: always() && needs.prepare-matrix.result == 'success'
     steps:
       - name: checkout repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
 
       - name: Install BTP CLI
         env:
-          btp_cli_version: 2.90.2
+          btp_cli_version: 2.116.2
         run: |
           curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
           tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
