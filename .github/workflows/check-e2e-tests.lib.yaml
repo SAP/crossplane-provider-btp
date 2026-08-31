@@ -275,7 +275,9 @@ jobs:
   e2e-test:
     runs-on: ubuntu-latest
     needs: [prepare-matrix, prepare-helm-chart, prepare-build] # prepare-helm-chart provides crossplane-chart artifact; prepare-build provides image/xpkg/tools artifacts
-    environment: pr-e2e-no-approval  # approval is on the preceding prepare-matrix job
+    environment:
+      name: pr-e2e-no-approval  # approval is on the preceding prepare-matrix job
+      deployment: false
     strategy:
       fail-fast: false
       matrix:
