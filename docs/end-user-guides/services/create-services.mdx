@@ -207,6 +207,12 @@ btp target # target your subaccount
 btp --format=json list accounts/entitlement | jq '.quotas[] | {service, plan, uniqueIdentifier, quota, unlimited}'
 ```
 
+### An entitlement exists in the BTP cockpit/CLI but the provider can't find the service plan
+
+The BTP CLI queries entitlements via the global account path, while the provider uses the subaccount-scoped Service Manager API — these two can get out of sync. As a result, a plan may be visible via `btp list accounts/entitlement` but return zero results when the provider looks it up.
+
+**Fix:** Remove and re-add the entitlement for the affected service on the subaccount. This triggers a re-sync of the Service Manager catalog and makes the plan visible to the provider again.
+
 ### What's the difference between Crossplane BTP Provider and BTP Service Operator
 
 #### Service Instance Feature Comparison Matrix

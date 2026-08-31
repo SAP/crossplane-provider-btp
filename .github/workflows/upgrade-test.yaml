@@ -33,7 +33,7 @@ jobs:
     environment: pr-e2e-approval
     env:
       # hardcoded BTP CLI version
-      btp_cli_version: 2.90.2
+      btp_cli_version: 2.116.2
     steps:
       - name: Set TARGET_IMAGE_VERSION
         run: |

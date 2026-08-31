@@ -20,6 +20,13 @@ on:
 permissions:
   contents: read
 
+# A new push to the PR head starts a new run needing fresh approval; cancel any
+# prior (possibly already-approved) run for the same PR so stale approved code
+# cannot keep running against secrets.
+concurrency:
+  group: pr-e2e-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   run-e2e-test:
     uses: ./.github/workflows/check-e2e-tests.lib.yaml
