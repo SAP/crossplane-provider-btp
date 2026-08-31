@@ -16,24 +16,24 @@ permissions:
   packages: write
 
 jobs:
-    compute-version:
-      runs-on: ubuntu-latest
-      outputs:
-        version: ${{ steps.version.outputs.version }}
-      steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          submodules: true
-      - name: Set Version
-        id: version
-        run: echo "version=v0.0.0-$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-    build-and-publish:
-      needs:
-      - compute-version
-      uses: ./.github/workflows/release-build-publish.lib.yaml
+  compute-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
-        version: ${{ needs.compute-version.outputs.version }}
-        release_type: release_candidate
-      secrets: inherit
+        submodules: true
+    - name: Set Version
+      id: version
+      run: echo "version=v0.0.0-$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-and-publish:
+    needs:
+    - compute-version
+    uses: ./.github/workflows/release-build-publish.lib.yaml
+    with:
+      version: ${{ needs.compute-version.outputs.version }}
+      release_type: release_candidate
+    secrets: inherit
