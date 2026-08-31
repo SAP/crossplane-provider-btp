@@ -5,39 +5,42 @@
 name: Release
 
 on:
-    workflow_dispatch:
-      inputs:
-        nextVersion:
-          description: 'specify the release version in the semver format v[major].[minor].[patch] e.g. v0.0.0'
-          required: true
+  workflow_dispatch:
+    inputs:
+      nextVersion:
+        description: 'specify the release version in the semver format v[major].[minor].[patch] e.g. v0.0.0'
+        required: true
+
+# Releases need permissions to read and write the repository contents.
+# GitHub considers creating releases and uploading assets as writing contents.
+# Permissions need to be added here at the top level, since permissions
+# to called workflows can only be reduced.
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-    run-pre-checks:
-      uses: ./.github/workflows/check-all-pre-checks.lib.yaml
-      permissions:
-        contents: read
+  run-pre-checks:
+    uses: ./.github/workflows/check-all-pre-checks.lib.yaml
+    permissions:
+      contents: read
 
-    run-e2e-test:
-      uses: ./.github/workflows/check-e2e-tests.lib.yaml
-      needs:
-      - run-pre-checks
-      with:
-        environment: pr-e2e-no-approval
-      secrets: inherit
-      permissions:
-        contents: read
+  run-e2e-test:
+    uses: ./.github/workflows/check-e2e-tests.lib.yaml
+    needs:
+    - run-pre-checks
+    with:
+      environment: pr-e2e-no-approval
+    secrets: inherit
+    permissions:
+      contents: read
 
-    build-and-publish:
-      needs:
-      - run-pre-checks
-      - run-e2e-test
-      uses: ./.github/workflows/release-build-publish.lib.yaml
-      with:
-        version: ${{ github.event.inputs.nextVersion }}
-        release_type: release
-      secrets: inherit
-      # Releases need permissions to read and write the repository contents.
-      # GitHub considers creating releases and uploading assets as writing contents.
-      permissions:
-        contents: write
-        packages: write
+  build-and-publish:
+    needs:
+    - run-pre-checks
+    - run-e2e-test
+    uses: ./.github/workflows/release-build-publish.lib.yaml
+    with:
+      version: ${{ github.event.inputs.nextVersion }}
+      release_type: release
+    secrets: inherit

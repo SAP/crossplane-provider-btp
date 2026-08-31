@@ -1,9 +1,9 @@
 # Run make reviewable and make check-diff
 #
 # reviewable:
-#	  make generate
-#	  make lint
-#	  make test
+#   make generate
+#   make lint
+#   make test
 #
 # check-diff:
 #   runs make generate and check for uncommitted changes
