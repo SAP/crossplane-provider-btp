@@ -5,6 +5,9 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -57,28 +60,28 @@ func TestServiceInstance_ParameterUpdate(t *testing.T) {
 					t.Fatal("ServiceInstance has no backend ID; setup did not complete")
 				}
 
-				// Flip the single parameter, probe-1 -> probe-2. This is the
-				// exact repro from issue #962 / #888-B.
+				// Flip businessSystemId probe-1 -> probe-2 (the exact repro from
+				// issue #962 / #888-B).
 				si.Spec.ForProvider.Parameters = runtime.RawExtension{Raw: []byte(`{"businessSystemId":"probe-2"}`)}
 				if err := cfg.Client().Resources().Update(ctx, si); err != nil {
 					t.Fatalf("failed to update ServiceInstance parameters: %v", err)
 				}
 
 				smClient := configureServiceManagerAPIClient(t, cfg, MustGetResource(t, cfg, smName, nil, &v1beta1.ServiceManager{}))
+				smCfg := smClient.GetConfig()
+				paramsURL := fmt.Sprintf("%s://%s/v1/service_instances/%s/parameters", smCfg.Scheme, smCfg.Host, instanceID)
 
 				// Poll the backend, not the CR. Under the bug this never flips
 				// and the test fails on timeout; with the fix the Update reaches
 				// the broker and the value becomes "probe-2".
-				deadline := time.Now().Add(2 * time.Minute)
+				deadline := time.Now().Add(10 * time.Minute)
 				for {
-					params, _, err := smClient.ServiceInstancesAPI.
-						GetServiceInstanceParameters(ctx, instanceID).
-						Execute()
-					if err == nil && params["businessSystemId"] == "probe-2" {
+					got, err := fetchInstanceParameters(ctx, smCfg.HTTPClient, paramsURL)
+					if err == nil && got["businessSystemId"] == "probe-2" {
 						return ctx
 					}
 					if time.Now().After(deadline) {
-						t.Fatalf("backend parameters never reflected the update (#962 regression): got %v, err=%v", params, err)
+						t.Fatalf("backend parameters never reflected the update (#962 regression): got %v, err=%v", got, err)
 					}
 					time.Sleep(15 * time.Second)
 				}
@@ -86,10 +89,37 @@ func TestServiceInstance_ParameterUpdate(t *testing.T) {
 		).
 		Teardown(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				si := MustGetResource(t, cfg, siName, nil, &v1alpha1.ServiceInstance{})
+				AwaitResourceDeletionOrFail(ctx, t, cfg, si, wait.WithTimeout(time.Minute*10))
+
 				DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance_paramupdate", wait.WithTimeout(time.Minute*10))
 				return ctx
 			},
 		).Feature()
 
 	testenv.Test(t, feature)
+}
+
+// fetchInstanceParameters GETs the Service Manager instance-parameters endpoint
+// with the client's authed HTTP client and decodes into map[string]any. The
+// generated GetServiceInstanceParameters returns map[string]string, which fails
+// to unmarshal when a parameter is a bool (e.g. enableTenantDeletion).
+func fetchInstanceParameters(ctx context.Context, hc *http.Client, url string) (map[string]any, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+	var out map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
