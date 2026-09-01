@@ -61,8 +61,9 @@ func TestServiceInstance_ParameterUpdate(t *testing.T) {
 				}
 
 				// Flip businessSystemId probe-1 -> probe-2 (the exact repro from
-				// issue #962 / #888-B).
-				si.Spec.ForProvider.Parameters = runtime.RawExtension{Raw: []byte(`{"businessSystemId":"probe-2"}`)}
+				// issue #962 / #888-B). Keep enableTenantDeletion so teardown can
+				// still delete the one-mds instance afterwards.
+				si.Spec.ForProvider.Parameters = runtime.RawExtension{Raw: []byte(`{"businessSystemId":"probe-2","enableTenantDeletion":true}`)}
 				if err := cfg.Client().Resources().Update(ctx, si); err != nil {
 					t.Fatalf("failed to update ServiceInstance parameters: %v", err)
 				}
