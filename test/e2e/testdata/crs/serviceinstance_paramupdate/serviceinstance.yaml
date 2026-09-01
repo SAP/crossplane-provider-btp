@@ -10,6 +10,7 @@ spec:
     planName: sap-integration
     parameters:
       businessSystemId: probe-1
+      enableTenantDeletion: true
     serviceManagerRef:
       name: e2e-sm-si-paramupdate
     subaccountRef:
