@@ -46,10 +46,16 @@ type SubaccountDestinationInitParameters struct {
 	AdditionalProperties map[string]string `json:"additionalProperties,omitempty"`
 
 	// AdditionalConfigurationSecretRefs points to Kubernetes Secrets whose
-	// values (JSON objects) are merged into the destination property bag.
-	// Use for sensitive properties that must not appear in the CR spec.
+	// values are JSON objects merged into the destination property bag.
+	// All values are coerced to strings (BTP Destination Service expects string-only
+	// property values). Use for sensitive properties that must not appear in the CR spec.
 	// +optional
 	AdditionalConfigurationSecretRefs []xpv1.SecretKeySelector `json:"additionalConfigurationSecretRefs,omitempty"`
+
+	// DestinationServiceBindingSecretRef points to a Kubernetes Secret containing
+	// Destination Service OAuth2 credentials.
+	// +optional
+	DestinationServiceBindingSecretRef *xpv1.SecretKeySelector `json:"destinationServiceBindingSecretRef,omitempty"`
 }
 
 // SubaccountDestinationParameters are the configurable fields of a SubaccountDestination.
@@ -89,10 +95,26 @@ type SubaccountDestinationParameters struct {
 	AdditionalProperties map[string]string `json:"additionalProperties,omitempty"`
 
 	// AdditionalConfigurationSecretRefs points to Kubernetes Secrets whose
-	// values (JSON objects) are merged into the destination property bag.
-	// Use for sensitive properties that must not appear in the CR spec.
+	// values are JSON objects merged into the destination property bag.
+	// All values are coerced to strings (BTP Destination Service expects string-only
+	// property values). Use for sensitive properties that must not appear in the CR spec.
 	// +optional
 	AdditionalConfigurationSecretRefs []xpv1.SecretKeySelector `json:"additionalConfigurationSecretRefs,omitempty"`
+
+	// DestinationServiceBindingSecretRef points to a Kubernetes Secret containing
+	// Destination Service OAuth2 credentials. The secret can be created by a
+	// ServiceBinding CR (recommended) or manually.
+	//
+	// Two secret formats are accepted:
+	//   - Flat keys (leave key empty): the secret has individual keys clientid,
+	//     clientsecret, tokenurl/token_url, uri/url — the format written by
+	//     SubaccountServiceBinding when secretKey is not set.
+	//   - Single JSON key (set key): the named key holds a JSON object with
+	//     clientid, clientsecret, tokenurl, uri — the format written by
+	//     SubaccountServiceBinding when secretKey is set (e.g. secretKey: credentials).
+	//
+	// +optional
+	DestinationServiceBindingSecretRef *xpv1.SecretKeySelector `json:"destinationServiceBindingSecretRef,omitempty"`
 }
 
 // SubaccountDestinationObservation holds the fields observed from the Destination Service API.

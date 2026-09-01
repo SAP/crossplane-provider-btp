@@ -17,20 +17,13 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	testutil "github.com/sap/crossplane-provider-btp/test"
-)
-
-var (
-	destBindingSecret   = "e2e-destination-binding-secret"
-	destBindingSecretNS = "crossplane-system"
-	destServiceBinding  = "e2e-destination-binding"
 )
 
 // TestSubaccountDestination_CreationFlow tests create, update, and delete of a
 // SubaccountDestination resource. It is fully self-contained: it provisions a
 // fresh subaccount, entitlement, ServiceManager, ServiceInstance, and
-// ServiceBinding for the Destination Service, then patches the ProviderConfig
-// with destinationCredentials before creating the destination resource.
+// ServiceBinding for the Destination Service, then creates the destination
+// resource once the binding secret is available.
 func TestSubaccountDestination_CreationFlow(t *testing.T) {
 	destCreateName := "e2e-dest-" + BUILD_ID
 	crudFeatureSuite := features.New("SubaccountDestination Creation Flow").
@@ -42,19 +35,9 @@ func TestSubaccountDestination_CreationFlow(t *testing.T) {
 
 				// Wait for ServiceBinding — slowest step, creates the destination credentials secret.
 				sb := v1alpha1.ServiceBinding{
-					ObjectMeta: metav1.ObjectMeta{Name: destServiceBinding, Namespace: cfg.Namespace()},
+					ObjectMeta: metav1.ObjectMeta{Name: "e2e-destination-binding", Namespace: cfg.Namespace()},
 				}
 				waitForResource(&sb, cfg, t, wait.WithTimeout(15*time.Minute))
-
-				// Patch the ProviderConfig to add destinationCredentials pointing
-				// at the connection secret written by the ServiceBinding.
-				if err := testutil.PatchProviderConfigDestinationCredentials(
-					ctx, cfg,
-					destBindingSecret,
-					destBindingSecretNS,
-				); err != nil {
-					t.Fatalf("failed to patch ProviderConfig with destinationCredentials: %v", err)
-				}
 
 				// Now wait for the SubaccountDestination to become Available.
 				dest := v1alpha1.SubaccountDestination{
@@ -122,8 +105,6 @@ func TestSubaccountDestination_CreationFlow(t *testing.T) {
 		).
 		Teardown(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				// Remove destinationCredentials from ProviderConfig to leave it clean.
-				_ = testutil.PatchProviderConfigDestinationCredentials(ctx, cfg, "", "")
 				DeleteResourcesIgnoreMissing(ctx, t, cfg, crsPath("SubaccountDestination"), wait.WithTimeout(5*time.Minute))
 				return ctx
 			},

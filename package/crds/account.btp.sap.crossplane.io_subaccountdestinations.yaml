@@ -86,8 +86,9 @@ spec:
                   additionalConfigurationSecretRefs:
                     description: |-
                       AdditionalConfigurationSecretRefs points to Kubernetes Secrets whose
-                      values (JSON objects) are merged into the destination property bag.
-                      Use for sensitive properties that must not appear in the CR spec.
+                      values are JSON objects merged into the destination property bag.
+                      All values are coerced to strings (BTP Destination Service expects string-only
+                      property values). Use for sensitive properties that must not appear in the CR spec.
                     items:
                       description: A SecretKeySelector is a reference to a secret
                         key in an arbitrary namespace.
@@ -116,6 +117,34 @@ spec:
                       TokenServiceURL). For the full list of supported properties see:
                       https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150
                       Note: keys "Name" and "Type" override the typed fields above if present.
+                    type: object
+                  destinationServiceBindingSecretRef:
+                    description: |-
+                      DestinationServiceBindingSecretRef points to a Kubernetes Secret containing
+                      Destination Service OAuth2 credentials. The secret can be created by a
+                      ServiceBinding CR (recommended) or manually.
+
+                      Two secret formats are accepted:
+                        - Flat keys (leave key empty): the secret has individual keys clientid,
+                          clientsecret, tokenurl/token_url, uri/url — the format written by
+                          SubaccountServiceBinding when secretKey is not set.
+                        - Single JSON key (set key): the named key holds a JSON object with
+                          clientid, clientsecret, tokenurl, uri — the format written by
+                          SubaccountServiceBinding when secretKey is set (e.g. secretKey: credentials).
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
                     type: object
                   name:
                     description: |-
@@ -221,8 +250,9 @@ spec:
                   additionalConfigurationSecretRefs:
                     description: |-
                       AdditionalConfigurationSecretRefs points to Kubernetes Secrets whose
-                      values (JSON objects) are merged into the destination property bag.
-                      Use for sensitive properties that must not appear in the CR spec.
+                      values are JSON objects merged into the destination property bag.
+                      All values are coerced to strings (BTP Destination Service expects string-only
+                      property values). Use for sensitive properties that must not appear in the CR spec.
                     items:
                       description: A SecretKeySelector is a reference to a secret
                         key in an arbitrary namespace.
@@ -251,6 +281,25 @@ spec:
                       TokenServiceURL). For the full list of supported properties see:
                       https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150
                       Note: keys "Name" and "Type" override the typed fields above if present.
+                    type: object
+                  destinationServiceBindingSecretRef:
+                    description: |-
+                      DestinationServiceBindingSecretRef points to a Kubernetes Secret containing
+                      Destination Service OAuth2 credentials.
+                    properties:
+                      key:
+                        description: The key to select.
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                      namespace:
+                        description: Namespace of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
                     type: object
                   name:
                     description: Name of the destination. Immutable after creation.

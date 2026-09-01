@@ -25,13 +25,11 @@ const (
 	errGetPC                   = "cannot get ProviderConfig"
 	errGetCISCreds             = "cannot get CIS credentials"
 	errGetSACreds              = "cannot get Service Account credentials"
-	errGetDestinationCreds     = "cannot get Destination Service credentials"
 	errTrackRUsage             = "cannot track ResourceUsage"
 	errTrackPCUsage            = "cannot track ProviderConfig usage"
 	errNewClient               = "cannot create new Service"
 	errCisSecretEmpty          = "CIS Secret is empty or nil, please check config & secrets referenced in provider config"
 	errSaSecretEmpty           = "Service Account Secret is empty or nil, please check config & secrets referenced in provider config"
-	errDestinationCredsNotSet  = "destinationCredentials not set in ProviderConfig — required for SubaccountDestination resources"
 	errSecretKeyNotFound       = "%s: %v key not found in secret data"
 	errCisSecretCorrupted      = "CIS Secret does not match expected format"
 )
@@ -182,76 +180,6 @@ func loadSaCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.Pro
 	}
 
 	return ServiceAccountSecretData, nil
-}
-
-// LoadDestinationCredentials reads the Destination Service binding secret
-// referenced by pc.Spec.DestinationServiceSecret. Supports two formats:
-//
-// Format A — flat JSON (single key): SecretRef.Key is set.
-// The key's value must be a JSON object with clientid, clientsecret, tokenurl, uri.
-//
-// Format B — service binding flat keys: SecretRef.Key is empty.
-// The secret has individual keys clientid, clientsecret, tokenurl, uri
-// (as produced by SubaccountServiceBinding). These are assembled into a JSON object.
-func LoadDestinationCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig) ([]byte, error) {
-	if pc.Spec.DestinationServiceSecret == nil {
-		return nil, errors.New(errDestinationCredsNotSet)
-	}
-	cd := pc.Spec.DestinationServiceSecret
-
-	// Format B: no key set — read individual fields from the secret directly.
-	if cd.SecretRef != nil && cd.SecretRef.Key == "" {
-		var secret corev1.Secret
-		if err := kube.Get(ctx, types.NamespacedName{
-			Namespace: cd.SecretRef.Namespace,
-			Name:      cd.SecretRef.Name,
-		}, &secret); err != nil {
-			return nil, errors.Wrap(err, errGetDestinationCreds)
-		}
-		return assembleDestinationCredJSON(secret.Data)
-	}
-
-	// Format A: single key containing JSON.
-	data, err := resource.CommonCredentialExtractor(ctx, cd.Source, kube, cd.CommonCredentialSelectors)
-	if err != nil {
-		return nil, errors.Wrap(err, errGetDestinationCreds)
-	}
-	if data == nil {
-		key := ""
-		if cd.SecretRef != nil {
-			key = cd.SecretRef.Key
-		}
-		return nil, fmt.Errorf(errSecretKeyNotFound, errGetDestinationCreds, key)
-	}
-	return data, nil
-}
-
-// assembleDestinationCredJSON builds a flat JSON object from the individual
-// keys written by SubaccountServiceBinding (Format B).
-// Supports both "tokenurl" (ServiceManager binding format) and
-// "token_url" (Destination Service binding format) for the token URL.
-func assembleDestinationCredJSON(data map[string][]byte) ([]byte, error) {
-	cred := make(map[string]string, 4)
-
-	for _, k := range []string{"clientid", "clientsecret", "uri"} {
-		v, ok := data[k]
-		if !ok {
-			return nil, errors.Errorf("%s: required key %q not found in secret", errGetDestinationCreds, k)
-		}
-		cred[k] = string(v)
-	}
-
-	// Accept both "tokenurl" and "token_url" — always marshal as "tokenurl".
-	// If adding a new alias here, update ParseCredential in internal/clients/account/destination/destination.go too.
-	if v, ok := data["tokenurl"]; ok {
-		cred["tokenurl"] = string(v)
-	} else if v, ok := data["token_url"]; ok {
-		cred["tokenurl"] = string(v)
-	} else {
-		return nil, errors.Errorf("%s: required key %q not found in secret", errGetDestinationCreds, "tokenurl")
-	}
-
-	return json.Marshal(cred)
 }
 
 // decodes btp service operator generated format from map of byte slices to stringified json

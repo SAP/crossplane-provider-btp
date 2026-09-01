@@ -15,3 +15,7 @@ spec:
       ProxyType: Internet
     subaccountRef:
       name: e2e-dest-subaccount
+    destinationServiceBindingSecretRef:
+      name: e2e-destination-binding-secret
+      namespace: crossplane-system
+      key: credentials

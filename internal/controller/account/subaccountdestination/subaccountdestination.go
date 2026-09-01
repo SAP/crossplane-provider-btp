@@ -44,18 +44,17 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNotSubaccountDestination)
 	}
 
-	pc, err := providerconfig.ResolveProviderConfig(ctx, cr, c.kube)
-	if err != nil {
+	if err := c.usage.Track(ctx, cr); err != nil {
 		return nil, errors.Wrap(err, errConnect)
 	}
-	if err = c.usage.Track(ctx, cr); err != nil {
-		return nil, errors.Wrap(err, errConnect)
-	}
-	if err = c.resourcetracker.Track(ctx, mg); err != nil {
+	if err := c.resourcetracker.Track(ctx, mg); err != nil {
 		return nil, errors.Wrap(err, errConnect)
 	}
 
-	rawCred, err := providerconfig.LoadDestinationCredentials(ctx, c.kube, pc)
+	if cr.Spec.ForProvider.DestinationServiceBindingSecretRef == nil {
+		return nil, errors.Wrap(errors.New("destinationServiceBindingSecretRef must be set"), errConnect)
+	}
+	rawCred, err := destination.LoadFromSecret(ctx, c.kube, *cr.Spec.ForProvider.DestinationServiceBindingSecretRef)
 	if err != nil {
 		return nil, errors.Wrap(err, errConnect)
 	}
@@ -243,6 +242,9 @@ func buildPropertyBag(ctx context.Context, kube client.Client, cr *v1alpha1.Suba
 			return nil, errors.Wrap(err, errBuildProps)
 		}
 		for k, v := range extra {
+			// BTP Destination Service expects all property values as strings
+			// (the API spec defines PropertyName as type:string). fmt.Sprintf
+			// normalizes any JSON-parsed booleans or numbers to their string form.
 			props[k] = fmt.Sprintf("%v", v)
 		}
 	}
