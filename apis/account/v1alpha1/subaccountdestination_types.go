@@ -113,8 +113,8 @@ type SubaccountDestinationParameters struct {
 	//     clientid, clientsecret, tokenurl, uri — the format written by
 	//     SubaccountServiceBinding when secretKey is set (e.g. secretKey: credentials).
 	//
-	// +optional
-	DestinationServiceBindingSecretRef *xpv1.SecretKeySelector `json:"destinationServiceBindingSecretRef,omitempty"`
+	// +kubebuilder:validation:Required
+	DestinationServiceBindingSecretRef *xpv1.SecretKeySelector `json:"destinationServiceBindingSecretRef"`
 }
 
 // SubaccountDestinationObservation holds the fields observed from the Destination Service API.
@@ -126,6 +126,12 @@ type SubaccountDestinationObservation struct {
 	// ETag for optimistic concurrency on updates.
 	// +optional
 	ETag *string `json:"etag,omitempty"`
+
+	// ManagedKeys lists the property keys last written to BTP by this controller.
+	// Used to detect removals: a key present here but absent from the current
+	// desired state triggers an update even if observed still carries it.
+	// +optional
+	ManagedKeys []string `json:"managedKeys,omitempty"`
 }
 
 // SubaccountDestinationSpec defines the desired state.

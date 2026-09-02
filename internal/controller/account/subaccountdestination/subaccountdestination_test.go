@@ -78,7 +78,8 @@ func TestValidateExternalName(t *testing.T) {
 func TestIsUpToDate_Equal(t *testing.T) {
 	desired := map[string]any{"Name": "d", "Type": "HTTP", "URL": "https://x.com"}
 	observed := map[string]string{"Name": "d", "Type": "HTTP", "URL": "https://x.com"}
-	if !isUpToDate(desired, observed) {
+	managed := []string{"Name", "Type", "URL"}
+	if !isUpToDate(desired, observed, managed) {
 		t.Error("isUpToDate = false, want true")
 	}
 }
@@ -86,7 +87,8 @@ func TestIsUpToDate_Equal(t *testing.T) {
 func TestIsUpToDate_MissingKey(t *testing.T) {
 	desired := map[string]any{"Name": "d", "Type": "HTTP", "URL": "https://x.com"}
 	observed := map[string]string{"Name": "d", "Type": "HTTP"}
-	if isUpToDate(desired, observed) {
+	managed := []string{"Name", "Type", "URL"}
+	if isUpToDate(desired, observed, managed) {
 		t.Error("isUpToDate = true, want false (missing URL)")
 	}
 }
@@ -94,18 +96,41 @@ func TestIsUpToDate_MissingKey(t *testing.T) {
 func TestIsUpToDate_DifferentValue(t *testing.T) {
 	desired := map[string]any{"Name": "d", "Type": "HTTP", "URL": "https://new.com"}
 	observed := map[string]string{"Name": "d", "Type": "HTTP", "URL": "https://old.com"}
-	if isUpToDate(desired, observed) {
+	managed := []string{"Name", "Type", "URL"}
+	if isUpToDate(desired, observed, managed) {
 		t.Error("isUpToDate = true, want false (different URL)")
 	}
 }
 
 func TestIsUpToDate_ObservedHasExtraKey(t *testing.T) {
-	// URL was removed from additionalProperties — observed still has it from BTP.
-	// Must trigger an update so the full-replace PUT removes it.
+	// URL was removed from additionalProperties — managed keys still track it.
+	// Must trigger an update so the full-replace PUT removes it from BTP.
 	desired := map[string]any{"Name": "d", "Type": "HTTP"}
 	observed := map[string]string{"Name": "d", "Type": "HTTP", "URL": "https://x.com"}
-	if isUpToDate(desired, observed) {
-		t.Error("isUpToDate = true, want false (URL removed from desired but still in observed)")
+	managed := []string{"Name", "Type", "URL"}
+	if isUpToDate(desired, observed, managed) {
+		t.Error("isUpToDate = true, want false (URL removed from desired but still in managedKeys)")
+	}
+}
+
+func TestIsUpToDate_ServerInjectedKeyIgnored(t *testing.T) {
+	// BTP injects a server-side field that the controller never wrote.
+	// managedKeys does not include it, so it must be ignored.
+	desired := map[string]any{"Name": "d", "Type": "HTTP"}
+	observed := map[string]string{"Name": "d", "Type": "HTTP", "ServerField": "injected"}
+	managed := []string{"Name", "Type"}
+	if !isUpToDate(desired, observed, managed) {
+		t.Error("isUpToDate = false, want true (server-injected key should be ignored)")
+	}
+}
+
+func TestIsUpToDate_EmptyManagedKeys(t *testing.T) {
+	// First Observe after Create: managedKeys not yet populated.
+	// Only desired→observed direction is checked.
+	desired := map[string]any{"Name": "d", "Type": "HTTP"}
+	observed := map[string]string{"Name": "d", "Type": "HTTP", "ServerField": "injected"}
+	if !isUpToDate(desired, observed, nil) {
+		t.Error("isUpToDate = false, want true (no managed keys yet, server fields ignored)")
 	}
 }
 
@@ -143,6 +168,7 @@ func TestObserve_UpToDate(t *testing.T) {
 	cr := newCR("sub-id/dest", v1alpha1.SubaccountDestinationParameters{
 		Name: "dest", Type: "HTTP", SubaccountID: &subID,
 	})
+	cr.Status.AtProvider.ManagedKeys = []string{"Name", "Type"}
 	props := map[string]string{"Name": "dest", "Type": "HTTP"}
 	e := &external{client: &mockDestClient{getProps: props, getEtag: "etag1"}}
 
@@ -196,6 +222,32 @@ func TestCreate_SetsExternalName(t *testing.T) {
 	}
 	if got := meta.GetExternalName(cr); got != "sub-id/dest" {
 		t.Errorf("external-name = %q, want %q", got, "sub-id/dest")
+	}
+}
+
+func TestCreate_SetsManagedKeys(t *testing.T) {
+	subID := "sub-id"
+	cr := newCR("", v1alpha1.SubaccountDestinationParameters{
+		Name: "dest", Type: "HTTP", SubaccountID: &subID,
+		AdditionalProperties: map[string]string{"URL": "https://example.com"},
+	})
+	e := &external{client: &mockDestClient{}}
+
+	_, err := e.Create(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cr.Status.AtProvider.ManagedKeys) == 0 {
+		t.Error("ManagedKeys not set after Create")
+	}
+	keySet := make(map[string]bool)
+	for _, k := range cr.Status.AtProvider.ManagedKeys {
+		keySet[k] = true
+	}
+	for _, expected := range []string{"Name", "Type", "URL"} {
+		if !keySet[expected] {
+			t.Errorf("ManagedKeys missing %q", expected)
+		}
 	}
 }
 

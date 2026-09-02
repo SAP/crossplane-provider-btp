@@ -115,7 +115,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  isUpToDate(desired, props),
+		ResourceUpToDate:  isUpToDate(desired, props, cr.Status.AtProvider.ManagedKeys),
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
@@ -164,6 +164,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	meta.SetExternalName(cr, *cr.Spec.ForProvider.SubaccountID+"/"+cr.Spec.ForProvider.Name)
+	cr.Status.AtProvider.ManagedKeys = keysOf(props)
 
 	return managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}}, nil
 }
@@ -186,6 +187,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err := e.client.Update(ctx, props, etag); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 	}
+	cr.Status.AtProvider.ManagedKeys = keysOf(props)
 	return managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{}}, nil
 }
 
@@ -251,16 +253,20 @@ func buildPropertyBag(ctx context.Context, kube client.Client, cr *v1alpha1.Suba
 	return props, nil
 }
 
-// isUpToDate returns true when desired and observed are in sync.
-// observed is the raw property map returned by the Destination Service GET.
-// Checks both directions:
-//   - every key in desired must exist in observed with the same value
-//   - every key in observed must exist in desired (ensures removed additionalProperties
-//     keys trigger an update that removes them from BTP via full-replace PUT)
+// isUpToDate returns true when desired and observed are in sync for the keys
+// this controller manages. managedKeys is the set of property keys last written
+// to BTP (stored in status.atProvider.managedKeys after each Create/Update).
 //
-// This is safe because the BTP Destination Service GET returns only user-set
-// properties — it does not inject server-managed fields into the property bag.
-func isUpToDate(desired map[string]any, observed map[string]string) bool {
+// Two checks:
+//   - every key in desired must exist in observed with the same value
+//   - every key in managedKeys must still be in desired (catches removals — a
+//     removed key triggers a full-replace PUT that removes it from BTP)
+//
+// Observed keys that are neither in desired nor in managedKeys are ignored;
+// those are server-injected fields that the controller never wrote.
+// When managedKeys is empty (first Observe after Create), only the desired→observed
+// direction is checked — removal detection begins after the first successful write.
+func isUpToDate(desired map[string]any, observed map[string]string, managedKeys []string) bool {
 	for k, dv := range desired {
 		ov, exists := observed[k]
 		if !exists {
@@ -270,10 +276,19 @@ func isUpToDate(desired map[string]any, observed map[string]string) bool {
 			return false
 		}
 	}
-	for k := range observed {
+	for _, k := range managedKeys {
 		if _, exists := desired[k]; !exists {
 			return false
 		}
 	}
 	return true
+}
+
+// keysOf returns the keys of a map[string]any as a sorted slice.
+func keysOf(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }

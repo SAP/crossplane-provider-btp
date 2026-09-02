@@ -238,6 +238,7 @@ spec:
                     - LDAP
                     type: string
                 required:
+                - destinationServiceBindingSecretRef
                 - name
                 - type
                 type: object
@@ -490,6 +491,14 @@ spec:
                   etag:
                     description: ETag for optimistic concurrency on updates.
                     type: string
+                  managedKeys:
+                    description: |-
+                      ManagedKeys lists the property keys last written to BTP by this controller.
+                      Used to detect removals: a key present here but absent from the current
+                      desired state triggers an update even if observed still carries it.
+                    items:
+                      type: string
+                    type: array
                   name:
                     description: Name of the destination as reported by the API.
                     type: string
