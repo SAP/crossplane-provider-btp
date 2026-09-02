@@ -14,12 +14,12 @@ jobs:
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@0717577d45739eb3c851188b29f50ed6c0b2194e # v2
 
       # ✅ Step 1: Fetch Project IDs
       - name: Get Project IDs
         id: get_project_ids
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           github-token: ${{ secrets.GH_READ_TOKEN }}
           script: |
@@ -68,7 +68,7 @@ jobs:
       # ✅ Step 2: Fetch Column IDs
       - name: Get Column IDs
         id: get_columns
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           PROJECT_IDS: ${{ steps.get_project_ids.outputs.project_ids }}
         with:
