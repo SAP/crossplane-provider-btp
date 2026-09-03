@@ -21,5 +21,10 @@ func Configure(p *config.Provider) {
 		}
 		// note: can be overwritten during initialization
 		r.UseAsync = true
+
+		// issue #962: avoid late initialization trigger. parameters is
+		// Optional+Computed, so late-init would rewrite the spec and short-circuit
+		// Observe before Plan on a parameters-only update.
+		r.LateInitializer.IgnoredFields = []string{"parameters"}
 	})
 }
