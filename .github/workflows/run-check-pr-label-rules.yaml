@@ -1,0 +1,14 @@
+# Check the rules for PR labels
+name: "Label Rules"
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, opened, synchronize]
+
+permissions: {}
+
+jobs:
+  check-pr-label-rules:
+    uses: ./.github/workflows/check-pr-label-rules.lib.yaml
+    with:
+      labels: ${{ toJSON(github.event.pull_request.labels.*.name) }}
