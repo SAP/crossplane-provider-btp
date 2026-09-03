@@ -63,7 +63,7 @@ const (
 	// kindNodeImageTagEnv is the image tag used for the Kind node image. The
 	// Makefile exports this value so local and CI E2E runs use the same image.
 	kindNodeImageTagEnv     = "KIND_NODE_IMAGE_TAG"
-	defaultKindNodeImageTag = "v1.30.2"
+	defaultKindNodeImageTag = "v1.37.0"
 )
 
 var (
