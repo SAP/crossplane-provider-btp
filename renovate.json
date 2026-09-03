@@ -78,6 +78,19 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
+        "/(^|/)Makefile$/",
+        "/^test/e2e/main_test\\.go$/"
+      ],
+      "matchStrings": [
+        "(KIND_NODE_IMAGE_TAG\\s*\\?=\\s*|defaultKindNodeImageTag\\s*=\\s*\\\")(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "kindest/node",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
         "/^\\.github/workflows/e2e_test\\.yaml$/"
       ],
       "matchStrings": [
