@@ -1,0 +1,15 @@
+[
+  {
+    "op": "add",
+    "path": "/paths/~1v1~1subaccountDestinations/put/parameters",
+    "value": [
+      {
+        "name": "If-Match",
+        "in": "header",
+        "required": false,
+        "schema": { "type": "string" },
+        "description": "ETag value for optimistic concurrency control."
+      }
+    ]
+  }
+]
