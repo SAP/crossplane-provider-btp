@@ -31,6 +31,8 @@ const (
 	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
 )
 
+var frameworkProvider = config.GetProvider().TerraformPluginFrameworkProvider
+
 var (
 	// TF_VERSION_CALLBACK is a function callback to allow retrieval of Terraform env versions, its suppose to be set in
 	// the main method to the params being passed when starting the controller
@@ -55,7 +57,7 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 				Source:  providerSource,
 				Version: providerVersion,
 			},
-			FrameworkProvider: config.GetProvider().TerraformPluginFrameworkProvider,
+			FrameworkProvider: frameworkProvider,
 		}
 
 		lm, ok := mg.(providerconfig.LegacyManaged)
@@ -124,7 +126,7 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 				Source:  providerSource,
 				Version: providerVersion,
 			},
-			FrameworkProvider: config.GetProvider().TerraformPluginFrameworkProvider,
+			FrameworkProvider: frameworkProvider,
 		}
 
 		lm, ok := mg.(providerconfig.LegacyManaged)
