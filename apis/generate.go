@@ -36,6 +36,11 @@ limitations under the License.
 // Run Upjet generator
 //go:generate go run ../cmd/generator/main.go ..
 
+// Patch the generated SubaccountApiCredential controller to validate its
+// connection Secret after external observation. Upjet has no public
+// controller-template override hook.
+//go:generate go run ../cmd/zz-inject-connection-secret-validation -root ../internal/controller
+
 // Patch upjet-generated zz_controller.go files to wrap o.WorkspaceStore in
 // tfclient.NewIdentityInjectingStore at the NewConnector call site. Workaround
 // for issue #521 — upjet's controller template has no public override hook, and

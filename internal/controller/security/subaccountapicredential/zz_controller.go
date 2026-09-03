@@ -67,7 +67,10 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	}
 	eventHandler := handler.NewEventHandler(handler.WithLogger(o.Logger.WithValues("gvk", v1alpha1.SubaccountApiCredential_GroupVersionKind)))
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnecter(tjcontroller.NewConnector(mgr.GetClient(), tfclient.NewIdentityInjectingStore(o.WorkspaceStore, o.Logger), o.SetupFn, o.Provider.Resources["btp_subaccount_api_credential"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler))),
+		managed.WithExternalConnecter(NewConnectionSecretValidatingConnector(
+			tjcontroller.NewConnector(mgr.GetClient(), tfclient.NewIdentityInjectingStore(o.WorkspaceStore, o.Logger), o.SetupFn, o.Provider.Resources["btp_subaccount_api_credential"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler)),
+			mgr.GetClient(),
+		)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 		managed.WithFinalizer(terraform.NewWorkspaceFinalizer(o.WorkspaceStore, xpresource.NewAPIFinalizer(mgr.GetClient(), managed.FinalizerName))),
