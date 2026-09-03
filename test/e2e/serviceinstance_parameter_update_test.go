@@ -41,7 +41,7 @@ func TestServiceInstance_ParameterUpdate(t *testing.T) {
 	feature := features.New("ServiceInstance parameter-only update reaches backend (#962)").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.ImportResources(ctx, t, cfg, crsPath("serviceinstance_paramupdate"))
+				resources.ImportResources(ctx, t, cfg, "testdata/crs/serviceinstance_paramupdate")
 				r, _ := res.New(cfg.Client().RESTConfig())
 				_ = apis.AddToScheme(r.GetScheme())
 
