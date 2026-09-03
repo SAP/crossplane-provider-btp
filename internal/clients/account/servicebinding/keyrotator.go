@@ -16,10 +16,28 @@ import (
 
 const ForceRotationKey = "servicebinding.account.btp.crossplane.io/force-rotation"
 
+// PendingBindingNameKey holds the BTP binding name that the current Create
+// generation committed to BEFORE calling Service Manager. It makes Create
+// idempotent per rotation generation: a retried Create reuses this name instead
+// of minting a fresh random one, so a create attempt that lost its result
+// (crash/requeue between the SM create and the external-name persist) can find
+// and adopt the binding it already made rather than leaking it and creating
+// another. It is cleared, atomically with setting external-name, once
+// the create result is durably recorded.
+const PendingBindingNameKey = "servicebinding.account.btp.crossplane.io/pending-binding-name"
+
 const (
 	errDeleteExpiredKey = "cannot delete expired key"
 	errDeleteRetiredKey = "cannot delete retired key"
 )
+
+// ErrVerifyTransient signals that a retired binding's deletion could not be
+// verified because the verification read-back itself failed with a transient
+// API error, as opposed to the binding provably still existing. Callers
+// retry the deletion without recording it as a delete failure: the binding may
+// in fact already be gone, so bumping DeletionAttempts / LastDeletionError would
+// raise a spurious "overdue leak" alert for a resource that is deleted.
+var ErrVerifyTransient = errors.New("servicebinding deletion verification could not be completed")
 
 // Condition types for ServiceBinding
 const (
@@ -92,12 +110,6 @@ func (r *SBKeyRotator) NeedRetirement(cr *v1alpha1.ServiceBinding) bool {
 		return false
 	}
 
-	// If the binding is already retired, do not retire it again.
-	for _, retiredKey := range cr.Status.RetiredKeys {
-		if retiredKey.ID == cr.Status.AtProvider.ID {
-			return true
-		}
-	}
 	return true
 }
 
@@ -239,7 +251,20 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 		}
 
 		if err := r.bindingDeleter.DeleteBinding(ctx, cr, key.Name, key.ID); err != nil {
-			// If we cannot delete the key, keep it in the list
+			// A transient failure of the verification read-back does not prove
+			// the binding still exists: it may already be deleted. Keep the key
+			// so we retry, but skip the failure bookkeeping so we don't raise a
+			// spurious leak alert for a resource that is (likely) gone.
+			if errors.Is(err, ErrVerifyTransient) {
+				newRetiredKeys = append(newRetiredKeys, key)
+				errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteExpiredKey, key.ID, err))
+				continue
+			}
+			// If we cannot delete the key (or deletion could not be verified),
+			// keep it in the list and record the failure so the leak is visible
+			// and alertable.
+			key.DeletionAttempts++
+			key.LastDeletionError = err.Error()
 			newRetiredKeys = append(newRetiredKeys, key)
 			errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteExpiredKey, key.ID, err))
 		}
@@ -249,10 +274,23 @@ func (r *SBKeyRotator) DeleteExpiredKeys(ctx context.Context, cr *v1alpha1.Servi
 }
 
 func (r *SBKeyRotator) DeleteRetiredKeys(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
+	var errs []error
+
 	for _, retiredKey := range cr.Status.RetiredKeys {
 		if err := r.bindingDeleter.DeleteBinding(ctx, cr, retiredKey.Name, retiredKey.ID); err != nil {
-			return fmt.Errorf("%s %s: %w", errDeleteRetiredKey, retiredKey.ID, err)
+			// A transient failure of the verification read-back does not prove
+			// the binding still exists, retry
+			if errors.Is(err, ErrVerifyTransient) {
+				errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteRetiredKey, retiredKey.ID, err))
+				continue
+			}
+			// Record the failure so the leak is visible and alertable, and keep
+			// going so a single stuck key does not hide the state of the others.
+			retiredKey.DeletionAttempts++
+			retiredKey.LastDeletionError = err.Error()
+			errs = append(errs, fmt.Errorf("%s %s: %w", errDeleteRetiredKey, retiredKey.ID, err))
 		}
 	}
-	return nil
+
+	return errors.Join(errs...)
 }

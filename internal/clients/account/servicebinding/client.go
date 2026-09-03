@@ -48,8 +48,8 @@ type ServiceBindingClient struct {
 	ssb      *v1alpha1.SubaccountServiceBinding
 }
 
-func NewServiceBindingClient(ctx context.Context, kube client.Client, tfConnector TfConnector, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (*ServiceBindingClient, error) {
-	subaccountServiceBinding, err := buildSubaccountServiceBinding(ctx, kube, cr, targetName, targetExternalName)
+func NewServiceBindingClient(ctx context.Context, kube client.Client, tfConnector TfConnector, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string, markForDeletion bool) (*ServiceBindingClient, error) {
+	subaccountServiceBinding, err := buildSubaccountServiceBinding(ctx, kube, cr, targetName, targetExternalName, markForDeletion)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +109,13 @@ func (m *ServiceBindingClient) Observe(ctx context.Context) (managed.ExternalObs
 	return observation, m.ssb, nil
 }
 
-// buildSubaccountServiceBinding creates a SubaccountServiceBinding resource from a ServiceBinding
-func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *v1alpha1.ServiceBinding, name string, externalName string) (*v1alpha1.SubaccountServiceBinding, error) {
+// buildSubaccountServiceBinding creates a SubaccountServiceBinding resource from a ServiceBinding.
+//
+// markForDeletion controls whether the built resource carries a DeletionTimestamp
+// (i.e. whether meta.WasDeleted reports true when upjet materialises the
+// workspace). It must NOT be inherited from the public CR's own
+// DeletionTimestamp: Upjet doesnt refresh the workspace for this resource if meta.WasDeleted is true. Resoluting in a leaked external service binding if the TF workspace was not refreshed otherwise before (like during the create).
+func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *v1alpha1.ServiceBinding, name string, externalName string, markForDeletion bool) (*v1alpha1.SubaccountServiceBinding, error) {
 
 	parameterJson, err := instanceClient.BuildComplexParameterJson(ctx, kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters.Raw)
 	if err != nil {
@@ -118,6 +123,11 @@ func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *
 	}
 
 	targetUID := GenerateInstanceUID(sb.UID, externalName)
+
+	var deletionTimestamp *metav1.Time
+	if markForDeletion {
+		deletionTimestamp = internal.Ptr(metav1.Now())
+	}
 
 	sBinding := &v1alpha1.SubaccountServiceBinding{
 		TypeMeta: metav1.TypeMeta{
@@ -127,7 +137,7 @@ func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			UID:               targetUID,
-			DeletionTimestamp: sb.DeletionTimestamp,
+			DeletionTimestamp: deletionTimestamp,
 		},
 		Spec: v1alpha1.SubaccountServiceBindingSpec{
 			ResourceSpec: xpv1.ResourceSpec{

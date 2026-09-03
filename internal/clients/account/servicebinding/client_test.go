@@ -131,7 +131,7 @@ func TestServiceBindingClient_CreateInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, clientErr := NewServiceBindingClient(tt.args.ctx, mockClient, tt.fields.sbConnector, tt.args.publicCR, tt.args.btpName, tt.args.btpName)
+			m, clientErr := NewServiceBindingClient(tt.args.ctx, mockClient, tt.fields.sbConnector, tt.args.publicCR, tt.args.btpName, tt.args.btpName, false)
 			if clientErr != nil {
 				// Handle client creation error
 				assert.Error(t, clientErr)
@@ -264,7 +264,7 @@ func TestServiceBindingClient_DeleteInstance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, clientErr := NewServiceBindingClient(tt.args.ctx, mockClient, tt.fields.sbConnector, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
+			m, clientErr := NewServiceBindingClient(tt.args.ctx, mockClient, tt.fields.sbConnector, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName, false)
 			if clientErr != nil {
 				// Handle client creation error
 				assert.Error(t, clientErr)
@@ -401,7 +401,7 @@ func TestServiceBindingClient_ObserveInstance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			originalCR := publicCR.DeepCopy()
-			m, clientErr := NewServiceBindingClient(tt.args.ctx, mockClient, tt.fields.sbConnector, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName)
+			m, clientErr := NewServiceBindingClient(tt.args.ctx, mockClient, tt.fields.sbConnector, tt.args.publicCR, tt.args.targetName, tt.args.targetExternalName, false)
 			if clientErr != nil {
 				// Handle client creation error
 				assert.Error(t, clientErr)
@@ -479,7 +479,7 @@ func TestServiceBindingClient_buildSubaccountServiceBinding(t *testing.T) {
 	name := "test-name"
 	externalName := "external-123"
 
-	result, err := buildSubaccountServiceBinding(context.Background(), mockClient, publicCR, name, externalName)
+	result, err := buildSubaccountServiceBinding(context.Background(), mockClient, publicCR, name, externalName, false)
 	assert.NoError(t, err)
 
 	// Verify basic structure
@@ -487,7 +487,7 @@ func TestServiceBindingClient_buildSubaccountServiceBinding(t *testing.T) {
 	assert.Equal(t, v1alpha1.CRDGroupVersion.String(), result.APIVersion)
 	assert.Equal(t, name, result.Name)
 	assert.Equal(t, GenerateInstanceUID(publicCR.UID, externalName), result.UID)
-	assert.Equal(t, publicCR.DeletionTimestamp, result.DeletionTimestamp)
+	assert.Nil(t, result.DeletionTimestamp)
 
 	// Verify spec
 	assert.Equal(t, "test-provider-config", result.Spec.ProviderConfigReference.Name)
@@ -497,8 +497,14 @@ func TestServiceBindingClient_buildSubaccountServiceBinding(t *testing.T) {
 	// Verify external name
 	assert.Equal(t, externalName, meta.GetExternalName(result))
 
+	// markForDeletion=true: the built resource carries a deletion timestamp so
+	// upjet reports WasDeleted (prevent_destroy off) for the destroy phase.
+	resultDeleting, err := buildSubaccountServiceBinding(context.Background(), mockClient, publicCR, name, externalName, true)
+	assert.NoError(t, err)
+	assert.NotNil(t, resultDeleting.DeletionTimestamp)
+
 	// Test without external name
-	resultNoExt, err := buildSubaccountServiceBinding(context.Background(), mockClient, publicCR, name, "")
+	resultNoExt, err := buildSubaccountServiceBinding(context.Background(), mockClient, publicCR, name, "", false)
 	assert.NoError(t, err)
 	assert.Equal(t, "", meta.GetExternalName(resultNoExt))
 }

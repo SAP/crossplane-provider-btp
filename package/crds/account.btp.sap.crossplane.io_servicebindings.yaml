@@ -496,6 +496,15 @@ spec:
                       description: The date and time when the resource was created
                       format: date-time
                       type: string
+                    deletionAttempts:
+                      description: |-
+                        DeletionAttempts counts how many times deletion of this retired binding
+                        has been attempted and did not verifiably remove it from Service Manager.
+                        It stays at 0 while deletion is not yet due; a non-zero value means the
+                        binding is overdue and repeatedly failing to delete, so it is safe to
+                        alert on.
+                      format: int32
+                      type: integer
                     deletionDate:
                       description: |-
                         The date and time when the resource will be deleted.
@@ -504,6 +513,12 @@ spec:
                       type: string
                     id:
                       description: The ID of the service binding resource
+                      type: string
+                    lastDeletionError:
+                      description: |-
+                        LastDeletionError records the error from the most recent failed deletion
+                        attempt, for operator visibility. Empty when the last attempt succeeded
+                        or none has been made yet.
                       type: string
                     name:
                       description: The name of the service binding resource
