@@ -65,7 +65,7 @@ GO_LINT_ARGS = --output.checkstyle.path=$(GO_LINT_OUTPUT)/checkstyle.xml --outpu
 
 # kind-related versions
 KIND_VERSION ?= v0.23.0
-KIND_NODE_IMAGE_TAG ?= v1.30.2
+KIND_NODE_IMAGE_TAG ?= v1.37.0
 export KIND_NODE_IMAGE_TAG
 
 # Setup Kubernetes tools
