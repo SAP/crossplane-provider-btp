@@ -13,7 +13,11 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
+	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
@@ -21,6 +25,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal/mrstatus"
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
 )
 
@@ -948,7 +953,7 @@ func TestCalculateDiff(t *testing.T) {
 func TestSaveCallback(t *testing.T) {
 	type args struct {
 		kube       client.Client
-		name       string
+		name       types.NamespacedName
 		conditions []xpv1.Condition
 	}
 
@@ -965,7 +970,7 @@ func TestSaveCallback(t *testing.T) {
 			reason: "should return an error if the ServiceInstance cannot be retrieved",
 			args: args{
 				kube: &test.MockClient{MockGet: test.NewMockGetFn(errKube)},
-				name: "test-instance",
+				name: types.NamespacedName{Name: "test-instance"},
 			},
 			want: want{
 				err: errKube,
@@ -978,7 +983,7 @@ func TestSaveCallback(t *testing.T) {
 					MockGet:          test.NewMockGetFn(nil),
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(errKube),
 				},
-				name:       "test-instance",
+				name:       types.NamespacedName{Name: "test-instance"},
 				conditions: []xpv1.Condition{ujresource.AsyncOperationFinishedCondition()},
 			},
 			want: want{
@@ -992,7 +997,7 @@ func TestSaveCallback(t *testing.T) {
 					MockGet:          test.NewMockGetFn(nil),
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
-				name:       "test-instance",
+				name:       types.NamespacedName{Name: "test-instance"},
 				conditions: []xpv1.Condition{ujresource.AsyncOperationFinishedCondition()},
 			},
 			want: want{
@@ -1003,9 +1008,101 @@ func TestSaveCallback(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := saveCallback(context.Background(), tc.args.kube, tc.args.name, tc.args.conditions...)
+			err := newSaveCallback(nil)(context.Background(), tc.args.kube, tc.args.name, tc.args.conditions...)
 			expectedErrorBehaviour(t, tc.want.err, err)
 		})
+	}
+}
+
+// TestSaveCallback_LooksUpTheNativeResource pins the identity the callback
+// resolves to. Before the shadow identity was resolved, the lookup key was the
+// stringified NamespacedName of the terraform shadow ("/TF-test-instance"),
+// which never matched an object and made every async result vanish.
+func TestSaveCallback_LooksUpTheNativeResource(t *testing.T) {
+	var gotKey types.NamespacedName
+	kube := &test.MockClient{
+		MockGet: func(_ context.Context, key client.ObjectKey, _ client.Object) error {
+			gotKey = key
+			return nil
+		},
+		MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+	}
+
+	want := types.NamespacedName{Name: "test-instance"}
+	if err := newSaveCallback(nil)(context.Background(), kube, want, ujresource.AsyncOperationFinishedCondition()); err != nil {
+		t.Fatalf("saveCallback returned unexpected error: %v", err)
+	}
+	if diff := cmp.Diff(want, gotKey); diff != "" {
+		t.Errorf("lookup key mismatch (-want, +got):\n%s", diff)
+	}
+}
+
+// TestSaveCallback_RetriesOnConflict pins that a conflicting status write is
+// retried instead of dropping the async result.
+//
+// Upjet calls an async callback exactly once and only logs whatever error it
+// returns, so a single lost write is a permanently lost async result: an
+// unrecorded create failure lets the instance report Available, an unrecorded
+// destroy failure leaves the deprovision retrying blind with nothing recorded
+// anywhere. The callback races the reconciler's own status writes (the
+// ServiceInstance status is written on every poll), so a conflict is routine.
+func TestSaveCallback_RetriesOnConflict(t *testing.T) {
+	gets, updates := 0, 0
+	kube := &test.MockClient{
+		MockGet: func(_ context.Context, _ client.ObjectKey, _ client.Object) error {
+			gets++
+			return nil
+		},
+		MockStatusUpdate: func(_ context.Context, _ client.Object, _ ...client.SubResourceUpdateOption) error {
+			updates++
+			if updates == 1 {
+				return kerrors.NewConflict(
+					schema.GroupResource{Group: v1alpha1.CRDGroup, Resource: "serviceinstances"},
+					"test-instance", errors.New("object has been modified"))
+			}
+			return nil
+		},
+	}
+
+	err := newSaveCallback(nil)(context.Background(), kube,
+		types.NamespacedName{Name: "test-instance"},
+		ujresource.LastAsyncOperationCondition(errors.New("destroy failed")))
+	if err != nil {
+		t.Fatalf("expected the conflicting write to be retried, got error: %v", err)
+	}
+	if updates != 2 {
+		t.Errorf("expected a second status update after the conflict, got %d update(s)", updates)
+	}
+	// The retry has to be rebased on a re-read object, otherwise it just
+	// resubmits the same stale resourceVersion and conflicts again.
+	if gets != 2 {
+		t.Errorf("expected the object to be re-read before the retry, got %d get(s)", gets)
+	}
+}
+
+// TestSaveCallback_ReadsThroughTheGivenReader pins that the (uncached) reader
+// Setup hands in is what the object is read from: rebasing a conflict retry on
+// a stale informer cache would only reproduce the conflict.
+func TestSaveCallback_ReadsThroughTheGivenReader(t *testing.T) {
+	readerUsed := false
+	reader := &test.MockClient{
+		MockGet: func(_ context.Context, _ client.ObjectKey, _ client.Object) error {
+			readerUsed = true
+			return nil
+		},
+	}
+	kube := &test.MockClient{
+		MockGet:          test.NewMockGetFn(errKube),
+		MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+	}
+
+	if err := newSaveCallback(reader)(context.Background(), kube,
+		types.NamespacedName{Name: "test-instance"},
+		ujresource.AsyncOperationFinishedCondition()); err != nil {
+		t.Fatalf("saveCallback returned unexpected error: %v", err)
+	}
+	if !readerUsed {
+		t.Error("expected the supplied reader to be used for the lookup")
 	}
 }
 
@@ -1296,6 +1393,523 @@ func TestSaveInstanceData(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want, tc.cr); diff != "" {
 				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
+
+// ====================================================================================
+// External health readiness (upstream issue #280)
+// ====================================================================================
+
+// TestObserve_ExternalHealth pins that readiness follows the health BTP
+// reports for the instance, not merely the fact that terraform applied the
+// spec. Before this, the up-to-date branch set Available unconditionally, so
+// instances the platform reported as failed still showed Ready=True.
+func TestObserve_ExternalHealth(t *testing.T) {
+	// Deliberately not an ApplyFailure and free of the "Conflict" marker: both
+	// are short-circuited earlier in Observe by the create-conflict handling.
+	tfDetail := "destroy failed: the service instance is in state failed and cannot be deprovisioned"
+
+	cases := map[string]struct {
+		reason string
+		data   *tfclient.ObservationData
+		mutate func(*v1alpha1.ServiceInstance)
+
+		wantReadyStatus  corev1.ConditionStatus
+		wantReason       xpv1.ConditionReason
+		wantMsgContains  []string
+		wantNoReadyCond  bool
+		wantMsgMaxLength int
+	}{
+		"Failed_MaskedCohort": {
+			reason: "state=failed must not report Available even when BTP still claims ready and usable",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "failed", Ready: internal.Ptr(true), Usable: internal.Ptr(true),
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+			wantMsgContains: []string{`state="failed"`, "ready=true", "usable=true"},
+		},
+		"Failed_NotReadyNotUsable": {
+			reason: "state=failed with ready=false/usable=false must report Ready=False",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "failed", Ready: internal.Ptr(false), Usable: internal.Ptr(false),
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+			wantMsgContains: []string{"ready=false", "usable=false"},
+		},
+		"Healthy": {
+			reason: "a succeeded, ready and usable instance must report Available",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "succeeded", Ready: internal.Ptr(true), Usable: internal.Ptr(true),
+			},
+			wantReadyStatus: corev1.ConditionTrue,
+			wantReason:      xpv1.ReasonAvailable,
+		},
+		"NotReadyOnNonDeleting": {
+			reason: "ready=false on a non-deleting instance is unhealthy even without state=failed",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "in progress", Ready: internal.Ptr(false),
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+			wantMsgContains: []string{"usable=unknown"},
+		},
+		"NotReadyWhileDeleting": {
+			reason: "ready=false while a deprovision is in flight is expected, not a failure",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "in progress", Ready: internal.Ptr(false), Usable: internal.Ptr(false),
+			},
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				ts := metav1.Now()
+				cr.SetDeletionTimestamp(&ts)
+			},
+			wantReadyStatus: corev1.ConditionTrue,
+			wantReason:      xpv1.ReasonAvailable,
+		},
+		"FailedWhileDeleting": {
+			reason: "state=failed counts unconditionally, including during a deprovision",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "failed", Ready: internal.Ptr(false), Usable: internal.Ptr(false),
+			},
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				ts := metav1.Now()
+				cr.SetDeletionTimestamp(&ts)
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+		},
+		"ObserveOnlyPolicy": {
+			reason: "readiness is not ours to assert for Observe-only resources",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "failed", Ready: internal.Ptr(false), Usable: internal.Ptr(false),
+			},
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.Spec.ManagementPolicies = xpv1.ManagementPolicies{xpv1.ManagementActionObserve}
+			},
+			wantNoReadyCond: true,
+		},
+		"MessageCarriesTfDetail": {
+			reason: "the terraform failure detail must be readable on the managed resource",
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id",
+				State: "failed", Ready: internal.Ptr(false), Usable: internal.Ptr(false),
+			},
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.SetConditions(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonDestroyFailure,
+					Message: tfDetail,
+				})
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+			wantMsgContains: []string{tfDetail},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := &v1alpha1.ServiceInstance{}
+			if tc.mutate != nil {
+				tc.mutate(cr)
+			}
+
+			e := external{
+				tfClient: &TfProxyMock{status: tfclient.UpToDate, data: tc.data, details: map[string][]byte{}},
+				kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			}
+
+			got, err := e.Observe(context.Background(), cr)
+			if err != nil {
+				// Synced must stay truthful: an unhealthy external resource is
+				// not a reconcile error, so no retry loop is triggered.
+				t.Fatalf("\n%s\nObserve must not return an error for an unhealthy instance: %v", tc.reason, err)
+			}
+			if !got.ResourceExists || !got.ResourceUpToDate {
+				t.Errorf("\n%s\nexpected the instance to stay reported as existing and up to date, got %+v", tc.reason, got)
+			}
+			assertReadyCondition(t, cr, tc.reason, tc.wantNoReadyCond, tc.wantReadyStatus, tc.wantReason, tc.wantMsgContains)
+		})
+	}
+}
+
+// TestObserve_ExternalHealthOnAsyncFailurePath pins the veto on the
+// failed-async-operation early return: an instance parked in a failed-update
+// retry loop skips the UpToDate branch, and the veto must still be evaluated
+// there so the last refreshed observation is judged instead of keeping a stale
+// Ready=Available.
+func TestObserve_ExternalHealthOnAsyncFailurePath(t *testing.T) {
+	applyFailed := xpv1.Condition{
+		Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+		Status:  corev1.ConditionFalse,
+		Reason:  "ApplyFailure",
+		Message: "apply failed: platform rejected the update",
+	}
+
+	cases := map[string]struct {
+		reason string
+		mutate func(*v1alpha1.ServiceInstance)
+
+		wantReadyStatus corev1.ConditionStatus
+		wantReason      xpv1.ConditionReason
+		wantMsgContains []string
+		wantNoReadyCond bool
+	}{
+		"FailedStateIsVetoed": {
+			reason: "a failed instance on the async-failure path must not keep a healthy Ready condition",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.SetConditions(applyFailed)
+				cr.Status.AtProvider.State = "failed"
+			},
+			wantReadyStatus: corev1.ConditionFalse,
+			wantReason:      mrstatus.ReasonExternalResourceFailed,
+			wantMsgContains: []string{`state="failed"`, "apply failed: platform rejected the update"},
+		},
+		"HealthyObservationLeavesConditionAlone": {
+			reason: "an async failure over a healthy last observation must not invent an unhealthy condition",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.SetConditions(applyFailed)
+				cr.Status.AtProvider.State = "succeeded"
+				cr.Status.AtProvider.Ready = internal.Ptr(true)
+				cr.Status.AtProvider.Usable = internal.Ptr(true)
+			},
+			wantNoReadyCond: true,
+		},
+		"ObserveOnlyPolicyIsRespected": {
+			reason: "readiness is not ours to assert for Observe-only resources, on this path either",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.SetConditions(applyFailed)
+				cr.Status.AtProvider.State = "failed"
+				cr.Spec.ManagementPolicies = xpv1.ManagementPolicies{xpv1.ManagementActionObserve}
+			},
+			wantNoReadyCond: true,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := &v1alpha1.ServiceInstance{}
+			tc.mutate(cr)
+
+			e := external{
+				tfClient: &TfProxyMock{status: tfclient.UpToDate, details: map[string][]byte{}},
+				kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			}
+
+			got, err := e.Observe(context.Background(), cr)
+			if err != nil {
+				t.Fatalf("\n%s\nObserve returned an unexpected error: %v", tc.reason, err)
+			}
+			if !got.ResourceExists || got.ResourceUpToDate {
+				t.Errorf("\n%s\nexpected the async-failure path (exists, not up to date), got %+v", tc.reason, got)
+			}
+			assertReadyCondition(t, cr, tc.reason, tc.wantNoReadyCond, tc.wantReadyStatus, tc.wantReason, tc.wantMsgContains)
+		})
+	}
+}
+
+// assertReadyCondition is the shared Ready-condition assertion of the
+// external-health specs.
+func assertReadyCondition(
+	t *testing.T, cr *v1alpha1.ServiceInstance, reason string,
+	wantNoReadyCond bool, wantReadyStatus corev1.ConditionStatus,
+	wantReason xpv1.ConditionReason, wantMsgContains []string,
+) {
+	t.Helper()
+
+	ready := cr.GetCondition(xpv1.TypeReady)
+	if wantNoReadyCond {
+		// GetCondition renders an absent condition as Unknown with no reason.
+		if ready.Status != corev1.ConditionUnknown || ready.Reason != "" {
+			t.Errorf("\n%s\nexpected no Ready condition to be set, got %+v", reason, ready)
+		}
+		return
+	}
+	if ready.Status != wantReadyStatus {
+		t.Errorf("\n%s\nexpected Ready=%s, got %s (reason %q, message %q)",
+			reason, wantReadyStatus, ready.Status, ready.Reason, ready.Message)
+	}
+	if ready.Reason != wantReason {
+		t.Errorf("\n%s\nexpected reason %q, got %q", reason, wantReason, ready.Reason)
+	}
+	for _, substr := range wantMsgContains {
+		if !strings.Contains(ready.Message, substr) {
+			t.Errorf("\n%s\nexpected the condition message to contain %q, got: %s", reason, substr, ready.Message)
+		}
+	}
+}
+
+// TestObserve_ExternalHealthMessageIsBounded pins that a huge terraform error
+// cannot bloat the status of a failing managed resource.
+func TestObserve_ExternalHealthMessageIsBounded(t *testing.T) {
+	cr := &v1alpha1.ServiceInstance{}
+	cr.SetConditions(xpv1.Condition{
+		Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+		Status:  corev1.ConditionFalse,
+		Reason:  ujresource.ReasonDestroyFailure,
+		Message: strings.Repeat("z", 16*1024),
+	})
+
+	e := external{
+		tfClient: &TfProxyMock{
+			status:  tfclient.UpToDate,
+			details: map[string][]byte{},
+			data: &tfclient.ObservationData{
+				ExternalName: "some-ext-name", ID: "some-id", State: "failed",
+			},
+		},
+		kube: &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+	}
+
+	if _, err := e.Observe(context.Background(), cr); err != nil {
+		t.Fatalf("Observe returned unexpected error: %v", err)
+	}
+
+	msg := cr.GetCondition(xpv1.TypeReady).Message
+	if len(msg) > 2*mrstatus.MaxMessageBytes {
+		t.Errorf("expected the condition message to be bounded, got %d bytes", len(msg))
+	}
+	if !strings.Contains(msg, "truncated") {
+		t.Errorf("expected a truncation marker in the bounded message, got: %s", msg)
+	}
+}
+
+// TestObserve_DeleteFailureVisible pins that a refused external deprovision is
+// visible on the managed resource. Before this, a BTP-side refusal produced no
+// event, no condition and no error - the only artifact of the whole failure
+// class was an info-level line from upjet's terraform workspace, so a blocked
+// teardown looked healthy at every observable layer.
+func TestObserve_DeleteFailureVisible(t *testing.T) {
+	const destroyErr = "cannot destroy: BTP refused the deprovision"
+
+	deletedAt := metav1.NewTime(time.Now().Add(-time.Hour).Truncate(time.Second))
+
+	deleting := func(cr *v1alpha1.ServiceInstance) {
+		ts := deletedAt
+		cr.SetDeletionTimestamp(&ts)
+	}
+
+	// afterDeletion / beforeDeletion stamp a condition on either side of the
+	// deletion timestamp. The verb is not recoverable from the condition
+	// itself - the create and update paths write the very same ApplyFailure
+	// and "Unknown" conditions - so only a failure recorded at or after the
+	// deletion timestamp can be a destroy failure.
+	afterDeletion := func(c xpv1.Condition) xpv1.Condition {
+		c.LastTransitionTime = metav1.NewTime(deletedAt.Add(time.Minute))
+		return c
+	}
+	beforeDeletion := func(c xpv1.Condition) xpv1.Condition {
+		c.LastTransitionTime = metav1.NewTime(deletedAt.Add(-time.Minute))
+		return c
+	}
+
+	cases := map[string]struct {
+		reason string
+		mutate func(*v1alpha1.ServiceInstance)
+
+		wantCondition bool
+		wantMessage   string
+	}{
+		"DestroyFailure": {
+			reason: "a failed async destroy must surface as an ExternalDeletion condition",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(afterDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonDestroyFailure,
+					Message: destroyErr,
+				}))
+			},
+			wantCondition: true,
+			wantMessage:   destroyErr,
+		},
+		"AsyncDeleteFailure": {
+			reason: "upjet's AsyncDeleteFailure classification must be recognised too",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(afterDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonAsyncDeleteFailure,
+					Message: destroyErr,
+				}))
+			},
+			wantCondition: true,
+			wantMessage:   destroyErr,
+		},
+		"ApplyFailureAfterDeletion": {
+			reason: "terraform also reports a refused deprovision as an ApplyFailure; recorded after the deletion timestamp it can only be a destroy",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(afterDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonApplyFailure,
+					Message: destroyErr,
+				}))
+			},
+			wantCondition: true,
+			wantMessage:   destroyErr,
+		},
+		"UnknownTypeFallback": {
+			reason: "upjet emits a condition of type \"Unknown\" for errors it cannot classify; a BTP refusal relayed through terraform frequently lands there",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(afterDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType("Unknown"),
+					Status:  corev1.ConditionFalse,
+					Reason:  "Unknown",
+					Message: destroyErr,
+				}))
+			},
+			wantCondition: true,
+			wantMessage:   destroyErr,
+		},
+		"StaleApplyFailureFromBeforeDeletion": {
+			reason: "an async CREATE that failed before the user deleted the instance is not a delete failure: Delete() had not been called even once when it was recorded, so reporting one would assert something that never happened",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(beforeDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:  corev1.ConditionFalse,
+					Reason:  ujresource.ReasonApplyFailure,
+					Message: "apply failed: cannot create service instance",
+				}))
+			},
+			wantCondition: false,
+		},
+		"StaleUnclassifiedFailureFromBeforeDeletion": {
+			reason: "the \"Unknown\" fallback is written by the create and update paths too, so a stale one is not a delete failure either",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(beforeDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType("Unknown"),
+					Status:  corev1.ConditionFalse,
+					Reason:  "Unknown",
+					Message: "apply failed: cannot create service instance",
+				}))
+			},
+			wantCondition: false,
+		},
+		"UnknownTypeWithUnrelatedReason": {
+			reason: "a condition of type \"Unknown\" that is not upjet's unclassified-failure fallback must not be read as a destroy failure on its type alone",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(afterDeletion(xpv1.Condition{
+					Type:    xpv1.ConditionType("Unknown"),
+					Status:  corev1.ConditionFalse,
+					Reason:  "SomethingElse",
+					Message: "not a destroy failure",
+				}))
+			},
+			wantCondition: false,
+		},
+		"SuccessfulDestroy": {
+			reason: "a deleting instance whose last async operation succeeded must not be reported as a delete failure",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				deleting(cr)
+				cr.SetConditions(afterDeletion(xpv1.Condition{
+					Type:   xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status: corev1.ConditionTrue,
+					Reason: ujresource.ReasonSuccess,
+				}))
+			},
+			wantCondition: false,
+		},
+		"NotDeleting": {
+			reason: "a failed apply on a live instance is not a delete failure",
+			mutate: func(cr *v1alpha1.ServiceInstance) {
+				cr.SetConditions(xpv1.Condition{
+					Type:               xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+					Status:             corev1.ConditionFalse,
+					LastTransitionTime: metav1.Now(),
+					Reason:             ujresource.ReasonDestroyFailure,
+					Message:            destroyErr,
+				})
+			},
+			wantCondition: false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := &v1alpha1.ServiceInstance{}
+			tc.mutate(cr)
+			rec := &recorderFake{}
+
+			e := external{
+				tfClient: &TfProxyMock{
+					status:  tfclient.UpToDate,
+					details: map[string][]byte{},
+					data: &tfclient.ObservationData{
+						// A valid UUID: Observe persists it as the
+						// external-name, and the second pass re-validates it.
+						ExternalName: "123e4567-e89b-12d3-a456-426614174000", ID: "some-id",
+						State: "succeeded", Ready: internal.Ptr(true), Usable: internal.Ptr(true),
+					},
+				},
+				kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+				recorder: rec,
+			}
+
+			got, err := e.Observe(context.Background(), cr)
+			if err != nil {
+				t.Fatalf("\n%s\nObserve returned unexpected error: %v", tc.reason, err)
+			}
+			// Observe must keep reporting the resource as existing so the
+			// reconciler re-issues Delete - which is what eventually succeeds
+			// once the BTP-side blocker clears.
+			if !got.ResourceExists {
+				t.Errorf("\n%s\nexpected ResourceExists to stay true so Delete is re-issued, got %+v", tc.reason, got)
+			}
+
+			cond := cr.GetCondition(mrstatus.TypeExternalDeletion)
+			if !tc.wantCondition {
+				if cond.Reason == mrstatus.ReasonDeleteFailed {
+					t.Errorf("\n%s\nexpected no ExternalDeletion condition, got %+v", tc.reason, cond)
+				}
+				if len(rec.events) != 0 {
+					t.Errorf("\n%s\nexpected no event, got %v", tc.reason, rec.events)
+				}
+				return
+			}
+
+			if cond.Status != corev1.ConditionFalse || cond.Reason != mrstatus.ReasonDeleteFailed {
+				t.Errorf("\n%s\nexpected an ExternalDeletion=False/DeleteFailed condition, got %+v", tc.reason, cond)
+			}
+			if !strings.Contains(cond.Message, tc.wantMessage) {
+				t.Errorf("\n%s\nexpected the last destroy error in the message, got %q", tc.reason, cond.Message)
+			}
+			if !strings.Contains(cond.Message, deletedAt.UTC().Format(time.RFC3339)) {
+				t.Errorf("\n%s\nexpected the attempt context (failing since) in the message, got %q", tc.reason, cond.Message)
+			}
+			if !rec.has(string(mrstatus.EventReasonDeleteFailed)) {
+				t.Errorf("\n%s\nexpected a Warning event, got %v", tc.reason, rec.events)
+			}
+			if len(rec.events) != 1 {
+				t.Fatalf("\n%s\nexpected exactly 1 event, got %d", tc.reason, len(rec.events))
+			}
+
+			// A second pass over the SAME failure must not emit another event:
+			// the deprovision is retried every reconcile, and a per-pass event
+			// would be exactly the spam this replaces.
+			if _, err := e.Observe(context.Background(), cr); err != nil {
+				t.Fatalf("\n%s\nsecond Observe returned unexpected error: %v", tc.reason, err)
+			}
+			if len(rec.events) != 1 {
+				t.Errorf("\n%s\nexpected the event to be edge-triggered, got %d events", tc.reason, len(rec.events))
 			}
 		})
 	}

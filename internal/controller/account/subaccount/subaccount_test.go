@@ -2,6 +2,7 @@ package subaccount
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
+	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -1504,9 +1506,20 @@ func TestDelete(t *testing.T) {
 		cr         resource.Managed
 		mockClient *MockSubaccountClient
 		tracker    tracking.ReferenceResolverTracker
+
+		// newInstanceListerFn is left nil by every pre-existing case, which is
+		// also the production shape for a subaccount without a service-manager
+		// admin binding.
+		newInstanceListerFn func(ctx context.Context, subaccountGuid string) (smClient.InstanceLister, error)
 	}
 	type want struct {
 		err error
+		// msgContains are substrings the surfaced error must carry. Used where
+		// the point of the case is what an operator can read off the resource.
+		msgContains []string
+		// msgOmits are substrings the surfaced error must NOT carry, so a
+		// diagnosis is not asserted on a path where it does not hold.
+		msgOmits []string
 	}
 	tests := map[string]struct {
 		reason string
@@ -1654,6 +1667,192 @@ func TestDelete(t *testing.T) {
 				err: errors.New("deletion of subaccount failed"),
 			},
 		},
+		"Delete70011EnumeratesBlockers": {
+			reason: "BTP refuses the deletion with code 70011 without naming a single instance; the provider must name them so an operator has something to act on",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: mockDelete70011(),
+				newInstanceListerFn: staticLister(&MockInstanceLister{
+					instances: []smClient.ServiceInstanceRef{
+						{ID: "id-1", Name: "objectstore-a"},
+						{ID: "id-2", Name: "objectstore-b"},
+					},
+				}),
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				msgContains: []string{
+					"deletion of subaccount failed",
+					"2 active service instance(s)",
+					"objectstore-a (id-1)",
+					"objectstore-b (id-2)",
+				},
+			},
+		},
+		"Delete70011NoListerFallsBackToHint": {
+			reason: "without a service-manager admin binding the provider cannot enumerate the instances; the error must still name the subaccount and the exact manual next step",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient:          mockDelete70011(),
+				newInstanceListerFn: nil,
+				tracker:             trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				msgContains: []string{
+					"deletion of subaccount failed",
+					SAMPLE_GUID,
+					"/v1/service_instances",
+					"Code 70011",
+				},
+			},
+		},
+		"Delete70011ListErrorNamesTheRealCause": {
+			reason: "an enumeration that fails for a reason the provider knows (denied scope, expired binding, transport error) must report that reason: the whole point of this path is actionability, and blaming a missing admin binding that does exist sends the operator after the wrong thing",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: mockDelete70011(),
+				newInstanceListerFn: staticLister(&MockInstanceLister{
+					listErr: errors.New("API Error: insufficient scope for this resource, Code 403"),
+				}),
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				msgContains: []string{
+					SAMPLE_GUID,
+					"/v1/service_instances",
+					"could not enumerate them",
+					"insufficient scope for this resource",
+				},
+				msgOmits: []string{"no service-manager admin binding is available"},
+			},
+		},
+		"Delete70011ListerFactoryErrorNamesTheRealCause": {
+			reason: "a binding that exists but cannot be used must not be reported as a binding that does not exist",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: mockDelete70011(),
+				newInstanceListerFn: func(ctx context.Context, subaccountGuid string) (smClient.InstanceLister, error) {
+					return nil, errors.New("service manager credentials expired")
+				},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				msgContains: []string{
+					SAMPLE_GUID,
+					"/v1/service_instances",
+					"service manager credentials expired",
+				},
+				msgOmits: []string{"no service-manager admin binding is available"},
+			},
+		},
+		"Delete70011ListerFactoryErrorsFallsBackToHint": {
+			reason: "a subaccount with no admin binding at all yields (nil, nil) from the factory; that must degrade to the hint rather than dereference a nil lister",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: mockDelete70011(),
+				newInstanceListerFn: func(ctx context.Context, subaccountGuid string) (smClient.InstanceLister, error) {
+					return nil, nil
+				},
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				msgContains: []string{
+					SAMPLE_GUID,
+					"/v1/service_instances",
+					"no service-manager admin binding is available",
+				},
+			},
+		},
+		"Delete70011EmptyListIsNotReportedAsAMissingBinding": {
+			reason: "BTP says there are instances and the binding could see none of them: that is a visibility gap, not a missing binding, and the message must say which",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient:          mockDelete70011(),
+				newInstanceListerFn: staticLister(&MockInstanceLister{}),
+				tracker:             trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				msgContains: []string{SAMPLE_GUID, "/v1/service_instances", "found none"},
+				msgOmits:    []string{"no service-manager admin binding is available"},
+			},
+		},
+		"Delete70011TruncatesLongBlockerList": {
+			reason: "a subaccount with many instances must not produce an unbounded error message",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient:          mockDelete70011(),
+				newInstanceListerFn: staticLister(&MockInstanceLister{instances: manyInstances(25)}),
+				tracker:             trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				msgContains: []string{
+					"25 active service instance(s)",
+					"si-0 (id-0)",
+					"si-9 (id-9)",
+					"and 15 more",
+				},
+			},
+		},
+		"DeleteOtherCodeUnchanged": {
+			reason: "regression: an error code other than 70011 must keep producing today's message, with no enumeration attempted",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName(SAMPLE_GUID),
+					WithStatus(v1alpha1.SubaccountObservation{
+						SubaccountGuid: internal.Ptr(SAMPLE_GUID),
+						Status:         internal.Ptr(subaccountStateOk),
+					})),
+				mockClient: &MockSubaccountClient{
+					returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
+					mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+						return &accountclient.SubaccountResponseObject{}, &http.Response{StatusCode: 409},
+							testutils.NewAccountAPIError(409, "subaccount has child resources", "409 Conflict")
+					},
+				},
+				newInstanceListerFn: staticLister(&MockInstanceLister{
+					instances: []smClient.ServiceInstanceRef{{ID: "id-1", Name: "must-not-be-listed"}},
+				}),
+				tracker: trackingtest.NoOpReferenceResolverTracker{},
+			},
+			want: want{
+				msgContains: []string{"API Error: subaccount has child resources, Code 409"},
+			},
+		},
 		"DeleteAPI5xxWrappedWithSpecifyAPIError": {
 			reason: "5xx errors must produce a wrapped error containing 'API Error:' prefix from specifyAPIError when the error is a GenericOpenAPIError",
 			args: args{
@@ -1685,11 +1884,24 @@ func TestDelete(t *testing.T) {
 						SubaccountOperationsAPI: tc.args.mockClient,
 					},
 				},
-				tracker: tc.args.tracker,
+				tracker:             tc.args.tracker,
+				newInstanceListerFn: tc.args.newInstanceListerFn,
 			}
 			_, err := ctrl.Delete(context.Background(), tc.args.cr)
-			if contained := testutils.ContainsError(err, tc.want.err); !contained {
-				t.Errorf("\n%s\ne.Delete(...): error \"%v\" not part of \"%v\"", tc.reason, err, tc.want.err)
+			if tc.want.err != nil || len(tc.want.msgContains) == 0 {
+				if contained := testutils.ContainsError(err, tc.want.err); !contained {
+					t.Errorf("\n%s\ne.Delete(...): error \"%v\" not part of \"%v\"", tc.reason, err, tc.want.err)
+				}
+			}
+			for _, substr := range tc.want.msgContains {
+				if err == nil || !strings.Contains(err.Error(), substr) {
+					t.Errorf("\n%s\ne.Delete(...): expected the error to contain %q, got: %v", tc.reason, substr, err)
+				}
+			}
+			for _, substr := range tc.want.msgOmits {
+				if err != nil && strings.Contains(err.Error(), substr) {
+					t.Errorf("\n%s\ne.Delete(...): expected the error NOT to contain %q, got: %v", tc.reason, substr, err)
+				}
 			}
 		})
 	}
@@ -1997,5 +2209,78 @@ func WithConditions(c ...xpv1.Condition) SubaccountModifier {
 func WithExternalName(externalName string) SubaccountModifier {
 	return func(r *v1alpha1.Subaccount) {
 		meta.SetExternalName(r, externalName)
+	}
+}
+
+// mockDelete70011 returns a subaccount API mock whose DeleteSubaccount is
+// refused the way BTP refuses a subaccount that still holds service
+// instances: error code 70011 and a message that names none of them.
+func mockDelete70011() *MockSubaccountClient {
+	return &MockSubaccountClient{
+		returnSubaccount: &accountclient.SubaccountResponseObject{Guid: SAMPLE_GUID},
+		mockDeleteSubaccountExecute: func(r accountclient.ApiDeleteSubaccountRequest) (*accountclient.SubaccountResponseObject, *http.Response, error) {
+			return &accountclient.SubaccountResponseObject{}, &http.Response{StatusCode: 400},
+				testutils.NewAccountAPIError(btpErrCodeActiveServiceInstances,
+					"You can't delete subaccounts with active service instances", "400 Bad Request")
+		},
+	}
+}
+
+func staticLister(l smClient.InstanceLister) func(ctx context.Context, subaccountGuid string) (smClient.InstanceLister, error) {
+	return func(ctx context.Context, subaccountGuid string) (smClient.InstanceLister, error) {
+		return l, nil
+	}
+}
+
+func manyInstances(n int) []smClient.ServiceInstanceRef {
+	refs := make([]smClient.ServiceInstanceRef, 0, n)
+	for i := 0; i < n; i++ {
+		refs = append(refs, smClient.ServiceInstanceRef{
+			ID:   fmt.Sprintf("id-%d", i),
+			Name: fmt.Sprintf("si-%d", i),
+		})
+	}
+	return refs
+}
+
+// TestSpecifyAPIErrorCarriesCode pins that the BTP code survives the
+// *float32 the generated model uses, so callers can branch on 70011 instead
+// of matching on the rendered message.
+func TestSpecifyAPIErrorCarriesCode(t *testing.T) {
+	err := specifyAPIError(testutils.NewAccountAPIError(btpErrCodeActiveServiceInstances,
+		"You can't delete subaccounts with active service instances", "400 Bad Request"))
+
+	code, ok := apiErrorCode(err)
+	if !ok {
+		t.Fatalf("expected a typed API error, got %T", err)
+	}
+	if code != 70011 {
+		t.Errorf("expected code 70011 to survive the float32 model, got %d", code)
+	}
+	// The rendering must stay byte-identical to the previous string-only form.
+	want := "API Error: You can't delete subaccounts with active service instances, Code 70011"
+	if err.Error() != want {
+		t.Errorf("rendering changed:\n got: %s\nwant: %s", err.Error(), want)
+	}
+}
+
+func TestFormatBlockers(t *testing.T) {
+	cases := map[string]struct {
+		refs []smClient.ServiceInstanceRef
+		max  int
+		want string
+	}{
+		"Empty":      {refs: nil, max: 10, want: ""},
+		"Single":     {refs: manyInstances(1), max: 10, want: "si-0 (id-0)"},
+		"UnderMax":   {refs: manyInstances(3), max: 10, want: "si-0 (id-0), si-1 (id-1), si-2 (id-2)"},
+		"ExactlyMax": {refs: manyInstances(2), max: 2, want: "si-0 (id-0), si-1 (id-1)"},
+		"OverMax":    {refs: manyInstances(4), max: 2, want: "si-0 (id-0), si-1 (id-1), ... and 2 more"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := formatBlockers(tc.refs, tc.max); got != tc.want {
+				t.Errorf("formatBlockers() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
