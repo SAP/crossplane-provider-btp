@@ -19,7 +19,7 @@ Once the provider is set up, you can orchestrate other subaccounts in code, such
 ##  🚧 Prerequisites
 
 - Your organization has a global account on SAP BTP.
-- You've [installed the BTP provider on your control plane](/docs/crossplane-provider-btp/docs/end-user-guides/setup/install-provider-btp).
+- You've [installed the BTP provider on your control plane](./install-provider-btp.mdx).
 - You're connected to your control plane.
 
 ## Set up the SAP Cloud Management service
@@ -95,7 +95,7 @@ To learn how to set up the SAP Cloud Management service, choose your preferred t
 
         Replace `<subaccount-id>` with the ID of your newly created subaccount.
 
-    4. From the output of the previous commands, copy the binding credentials to your clipboard. You'll need the credentials to create a Kubernetes secret.
+    5. From the output of the previous commands, copy the binding credentials to your clipboard. You'll need the credentials to create a Kubernetes secret.
   </TabItem>
   <TabItem value="btp-cockpit" label="Using the SAP BTP cockpit">
 
@@ -359,7 +359,7 @@ In the `ProviderConfig`, you'll reference the Kubernetes secrets created in [Cre
             source: Secret
     ```
 
-    Replace `<global-account-subdomain>` with the subdomain of your BTP global account.
+    Replace `<global-account-subdomain>` with the subdomain of your BTP global account. It must be the same global account whose subaccount holds the Cloud Management service binding referenced in `cisCredentials`.
 
 2. Apply the configuration:
 
@@ -370,7 +370,7 @@ In the `ProviderConfig`, you'll reference the Kubernetes secrets created in [Cre
 To learn more about the BTP provider or to extend its functionality, go to [the GitHub repo for the BTP provider](https://github.com/SAP/crossplane-provider-btp).
 
 ## Next steps
-- [Create a subaccount in code](/docs/crossplane-provider-btp/docs/end-user-guides/account/subaccount).
+- [Create a subaccount in code](../account/subaccount.mdx).
 
 ## ⁉ FAQs
 
