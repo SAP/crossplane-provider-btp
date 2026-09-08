@@ -9,7 +9,7 @@
 # 1) pr-e2e-approval environment configured to require approval before running
 # 2) pr-e2e-no-approval environment configured that does not require approval.
 
-name: PullRequest E2E Test
+name: PR E2E Tests
 
 on:
   pull_request_target:
