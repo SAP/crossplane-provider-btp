@@ -13,6 +13,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/resourceusage"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/subaccount"
+	subaccountdestination "github.com/sap/crossplane-provider-btp/internal/controller/account/subaccountdestination"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/cloudfoundry"
 
@@ -45,6 +46,7 @@ func CustomSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 		servicebinding.Setup,
 		kymaenvironmentbinding.Setup,
 		kymamodule.Setup,
+		subaccountdestination.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err

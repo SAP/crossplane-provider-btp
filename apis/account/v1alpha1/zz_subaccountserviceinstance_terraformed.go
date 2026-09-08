@@ -130,6 +130,10 @@ func (tr *SubaccountServiceInstance) LateInitialize(attrs []byte) (bool, error) 
 		return false, errors.Wrap(err, "failed to unmarshal Terraform state parameters for late-initialization")
 	}
 	opts := []resource.GenericLateInitializerOption{resource.WithZeroValueJSONOmitEmptyFilter(resource.CNameWildcard)}
+	opts = append(opts, resource.WithNameFilter("Parameters"))
+	opts = append(opts, resource.WithNameFilter("ServiceOfferingName"))
+	opts = append(opts, resource.WithNameFilter("ServiceplanID"))
+	opts = append(opts, resource.WithNameFilter("ServiceplanName"))
 
 	li := resource.NewGenericLateInitializer(opts...)
 	return li.LateInitialize(&tr.Spec.ForProvider, params)
