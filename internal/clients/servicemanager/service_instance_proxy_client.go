@@ -106,6 +106,22 @@ func (t ServiceManagerInstanceProxyClient) SemanticLookuper(ctx context.Context,
 	return NewServiceManagerClient(ctx, binding)
 }
 
+// InstanceLister returns a read-only lister backed by the subaccount's
+// EXISTING service-manager admin binding. It returns (nil, nil) when no
+// admin binding exists; unlike EnsureSemanticLookuper it never mints one,
+// which matters on the delete path - creating a binding would add another
+// service instance to the subaccount we are trying to delete.
+func (t ServiceManagerInstanceProxyClient) InstanceLister(ctx context.Context, subaccountGuid string) (InstanceLister, error) {
+	binding, err := t.describeAdminBinding(ctx, subaccountGuid)
+	if err != nil {
+		return nil, err
+	}
+	if binding == nil {
+		return nil, nil
+	}
+	return NewServiceManagerClient(ctx, binding)
+}
+
 // EnsureSemanticLookuper returns a SemanticLookuper with full subaccount
 // visibility, backed by the subaccount-admin service-manager binding. Unlike
 // SemanticLookuper it MINTS a temporary admin binding via the accounts-service

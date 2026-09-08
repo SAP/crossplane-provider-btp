@@ -12,6 +12,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -43,7 +44,15 @@ type TfProxyControllerI interface {
 	GetTfResource() resource.Managed
 }
 
-type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
+// SaveConditionsFn persists conditions on the *native* managed resource
+// identified by name.
+//
+// name is the identity of the native managed resource, already resolved from
+// the terraform shadow identity by the caller — it is never a stringified
+// NamespacedName. Taking a typed key removes the String()/parse round-trip
+// that used to inject a leading "/" for cluster-scoped resources, which made
+// every lookup inside implementations of this function fail with NotFound.
+type SaveConditionsFn func(ctx context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error
 
 // ObservationData is the bridge struct that carries data from the Terraform resource to the Crossplane CR.
 // It is filled by QueryAsyncData() and then saved to the CR status by saveInstanceData().

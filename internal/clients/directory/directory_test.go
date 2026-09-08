@@ -54,6 +54,20 @@ func TestNeedsCreation(t *testing.T) {
 					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
 			},
 		},
+		"TransportErrorNilResponse": {
+			reason: "A transport level failure yields a nil http response next to the error; deriving not-found from it must not panic",
+			args: args{
+				mockClient: MockDirClient{GetErr: errors.New("dial tcp: connection reset by peer"), GetNilResponse: true},
+				cr: testutils.NewDirectory("unittest-client",
+					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
+			},
+			want: want{
+				o:   true,
+				err: errors.New("dial tcp: connection reset by peer"),
+				cr: testutils.NewDirectory("unittest-client",
+					testutils.WithExternalName("aaaaaaaa-bbbb-cccc-eeee-ffffffffffff")),
+			},
+		},
 		"NotExistingAnymore": {
 			reason: "In case of failing lookup we expect to require a creation",
 			args: args{

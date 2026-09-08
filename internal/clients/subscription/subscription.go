@@ -138,7 +138,7 @@ func (s *SubscriptionApiHandler) GetSubscription(ctx context.Context, externalNa
 	}
 
 	// for any reason right now the api actually returns 429 as not found, will
-	if raw.StatusCode == 404 || raw.StatusCode == 429 {
+	if raw != nil && (raw.StatusCode == 404 || raw.StatusCode == 429) {
 		return nil, nil
 	}
 

@@ -120,6 +120,14 @@ func NewReconciler(m manager.Manager, o ...ReconcilerOption) *Reconciler {
 	return r
 }
 
+// terminal reports whether an error on a write to the ResourceUsage we are
+// reconciling means the object is simply gone. There is nothing left to write
+// and nothing a retry could achieve, so the reconcile must end cleanly instead
+// of being requeued with backoff forever.
+func terminal(err error) bool {
+	return kerrors.IsNotFound(err)
+}
+
 // Reconcile a ResourceUsage by accounting for the managed resources that are
 // using it, and ensuring it cannot be deleted until it is no longer in use.
 func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
@@ -152,10 +160,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 	if kerrors.IsNotFound(err) && target == nil {
 		meta.RemoveFinalizer(ru, v1alpha1.Finalizer)
 		if err := r.client.Update(ctx, ru); err != nil {
+			if terminal(err) {
+				return reconcile.Result{}, nil
+			}
 			r.log.Debug(errUpdate, "error", err)
 			return reconcile.Result{RequeueAfter: shortWait}, nil
 		}
 		if err := r.client.Delete(ctx, ru); err != nil {
+			if terminal(err) {
+				return reconcile.Result{}, nil
+			}
 			r.log.Debug(errDeletePU, "error", err)
 			return reconcile.Result{RequeueAfter: shortWait}, nil
 		}
@@ -170,7 +184,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 			r.record.Event(ru, event.Warning(reasonAccount, errors.New(msg)))
 
 			// We're watching our usages, so we'll be requeued when they go.
-			return reconcile.Result{Requeue: false}, errors.Wrap(r.client.Status().Update(ctx, ru), errUpdateStatus)
+			// A NotFound here means the ResourceUsage was removed while this
+			// reconcile was in flight; there is no status left to write.
+			return reconcile.Result{Requeue: false}, errors.Wrap(resource.IgnoreNotFound(r.client.Status().Update(ctx, ru)), errUpdateStatus)
 		}
 		// Deletion and removal of finalizer must happen before
 		return reconcile.Result{Requeue: true}, errors.New("inconsistent state, do requeue")
@@ -178,6 +194,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 	if !meta.FinalizerExists(ru, v1alpha1.Finalizer) {
 		meta.AddFinalizer(ru, v1alpha1.Finalizer)
 		if err := r.client.Update(ctx, ru); err != nil {
+			if terminal(err) {
+				return reconcile.Result{}, nil
+			}
 			r.log.Debug(errUpdate, "error", err)
 			return reconcile.Result{RequeueAfter: shortWait}, nil
 		}
