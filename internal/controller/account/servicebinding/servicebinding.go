@@ -37,6 +37,7 @@ const (
 	errDeleteServiceBinding = "cannot delete servicebinding"
 	errFlattenSecret        = "cannot flatten secret"
 	errSeedBinding          = "cannot initialize servicebinding state for deletion"
+	errDestroyBinding       = "cannot destroy servicebinding"
 	errVerifyBinding        = "cannot verify servicebinding deletion"
 	errCommitName           = "cannot persist pending servicebinding name"
 )
@@ -539,10 +540,10 @@ func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBindin
 	// Phase 2: connect with the deletion mark set so prevent_destroy is off, then destroy.
 	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName, true)
 	if err != nil {
-		return err
+		return errors.Wrap(err, errDestroyBinding)
 	}
 	if _, err = client.Delete(ctx); err != nil {
-		return err
+		return errors.Wrap(err, errDestroyBinding)
 	}
 
 	// Phase 3: verify the external resource is actually gone before the caller
