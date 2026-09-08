@@ -1,0 +1,21 @@
+# v1beta1 ServiceManager with an explicit planName. The v1beta1 CRD pins planName
+# immutable (self == oldSelf), so it persists across the upgrade and is never
+# re-resolved. This SM must stay Synced+Ready and keep its plan through the
+# v1.13.0 -> v2 upgrade.
+#
+# planName is service-operator-access (v1.13.0's default), not the v2 default
+# (subaccount-admin, #925), so a regression that re-resolved planName on v1beta1
+# would flip its plan to subaccount-admin and fail this check.
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: ServiceManager
+metadata:
+  name: upgrade-test-planflip-sm-v1beta1
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: upgrade-test-planflip-sm-v1beta1
+    namespace: default
+  forProvider:
+    planName: service-operator-access
+    subaccountRef:
+      name: upgrade-test-planflip-sm-v1beta1-sa

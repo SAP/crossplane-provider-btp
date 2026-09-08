@@ -107,9 +107,14 @@ func filterBySelectedInstances(ctx context.Context, btpClient *btpcli.BtpCli, ca
 		return nil
 	}
 
+	// Build set of selected regular instance IDs, excluding ServiceManager and
+	// CloudManagement instances whose bindings are managed internally by those CRs.
 	selectedInstanceIDs := make(map[string]bool, siCache.Len())
 	for _, id := range siCache.AllIDs() {
-		selectedInstanceIDs[id] = true
+		si := siCache.Get(id)
+		if si != nil && !si.IsServiceManager() && !si.IsCloudManagement() {
+			selectedInstanceIDs[id] = true
+		}
 	}
 
 	var bindingsToKeep []string

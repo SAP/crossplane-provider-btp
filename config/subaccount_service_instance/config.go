@@ -12,7 +12,7 @@ func Configure(p *config.Provider) {
 		r.ShortGroup = "account"
 		r.Kind = "SubaccountServiceInstance"
 
-		r.ExternalName.OmittedFields = []string{"timeouts"}
+		r.ExternalName.OmittedFields = []string{}
 		r.ExternalName.GetIDFn = func(_ context.Context, externalName string, _ map[string]any, _ map[string]any) (string, error) {
 			// When using "" as ID the API endpoint call will fail, so we need to use anything else that
 			// won't yield a result
@@ -29,5 +29,12 @@ func Configure(p *config.Provider) {
 
 		// ADR: disable external-name initialization
 		r.ExternalName.DisableNameInitializer = true
+
+		// issue #962: avoid late initialization trigger. Optional+Computed fields
+		// cause late-init to rewrite the spec and short-circuit Observe before
+		// Plan on a parameters-only update.
+		r.LateInitializer.IgnoredFields = []string{
+			"service_offering_name", "serviceplan_name", "serviceplan_id", "parameters",
+		}
 	})
 }

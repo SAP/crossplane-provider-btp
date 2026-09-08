@@ -21,7 +21,7 @@ import (
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	name := managed.ControllerName(v1alpha1.ServiceBindingGroupKind)
 	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(name)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
-	return providerconfig.DefaultSetup(mgr, o, &v1alpha1.ServiceBinding{}, v1alpha1.ServiceBindingGroupKind, v1alpha1.ServiceBindingGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
+	return providerconfig.DefaultSetupWithoutDefaultInitializer(mgr, o, &v1alpha1.ServiceBinding{}, v1alpha1.ServiceBindingGroupKind, v1alpha1.ServiceBindingGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 		tfConnector := newTfConnectorFn(kube)
 		return &connector{
 			kube:              kube,

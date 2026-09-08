@@ -14,7 +14,7 @@ Crossplane supports this through the `crossplane.io/external-name` annotation, w
 
 ## Automated: BTP Resource Exporter (recommended for large environments)
 
-The [BTP Resource Exporter](/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/exporter-user-guide) is a CLI tool that connects to your BTP global account via the [BTP CLI](https://help.sap.com/docs/btp/btp-cli-command-reference/btp-cli-command-reference), discovers existing resources such as subaccounts, entitlements, and service instances, and generates ready-to-apply Crossplane manifests in YAML format. You can then review the output and gradually transition resources to full Crossplane management at your own pace. The approach is based on the [Import Existing Resources](https://docs.crossplane.io/v2.2/guides/import-existing-resources/) Crossplane documentation.
+The [BTP Resource Exporter](./exporter-user-guide.md) is a CLI tool that connects to your BTP global account via the [BTP CLI](https://help.sap.com/docs/btp/btp-cli-command-reference/btp-cli-command-reference), discovers existing resources such as subaccounts, entitlements, and service instances, and generates ready-to-apply Crossplane manifests in YAML format. You can then review the output and gradually transition resources to full Crossplane management at your own pace. The approach is based on the [Import Existing Resources](https://docs.crossplane.io/v2.2/guides/import-existing-resources/) Crossplane documentation.
 
 **Key capabilities:**
 - Interactive and non-interactive modes
@@ -26,7 +26,7 @@ Use this when:
 - You want a consistent, repeatable export process
 - You need to bootstrap a new control plane from an existing BTP landscape
 
-For installation instructions, command reference, and usage examples, see the [BTP Resource Exporter User Guide](/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/exporter-user-guide).
+For installation instructions, command reference, and usage examples, see the [BTP Resource Exporter User Guide](./exporter-user-guide.md).
 
 ## Manual: External Name Annotation
 
@@ -45,4 +45,4 @@ Use this when:
 
 ## Reference: External Name per Resource Type
 
-Not sure which identifier to use for a given resource type? The [External Name Reference](/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/external-name) lists the expected format and where to find the identifier for each supported BTP resource — both in the BTP Cockpit UI and via the BTP CLI.
+Not sure which identifier to use for a given resource type? The [External Name Reference](./external-name.md) lists the expected format and where to find the identifier for each supported BTP resource — both in the BTP Cockpit UI and via the BTP CLI.

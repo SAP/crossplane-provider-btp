@@ -66,6 +66,7 @@ func TestTfResource(t *testing.T) {
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
 					withTfCondition(conditionUnknown),
+					withTfTimeouts("60m"),
 				),
 				hasErr: false,
 			},
@@ -87,6 +88,7 @@ func TestTfResource(t *testing.T) {
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
 					withTfCondition(conditionUnknown),
+					withTfTimeouts("60m"),
 				),
 				hasErr: false,
 			},
@@ -108,6 +110,7 @@ func TestTfResource(t *testing.T) {
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
 					withTfCondition(conditionUnknown),
+					withTfTimeouts("60m"),
 				),
 				hasErr: false,
 			},
@@ -132,6 +135,7 @@ func TestTfResource(t *testing.T) {
 					withTfManagementPolicies(),
 					withTfServicePlanID("resolved-plan-id"),
 					withTfCondition(conditionUnknown),
+					withTfTimeouts("60m"),
 				),
 				hasErr: false,
 			},
@@ -215,6 +219,7 @@ func TestTfResource(t *testing.T) {
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
 					withTfCondition(conditionUnknown),
+					withTfTimeouts("60m"),
 				),
 			},
 		},
@@ -254,6 +259,7 @@ func TestTfResource(t *testing.T) {
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
 					withTfCondition(conditionUnknown),
+					withTfTimeouts("60m"),
 				),
 			},
 		},
@@ -275,6 +281,7 @@ func TestTfResource(t *testing.T) {
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
 					withTfCondition(conditionAvailable),
+					withTfTimeouts("60m"),
 				),
 			},
 		},
@@ -299,6 +306,7 @@ func TestTfResource(t *testing.T) {
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
 					withTfCondition(conditionUnknown),
+					withTfTimeouts("60m"),
 					withTfLabels(map[string][]*string{
 						"env":  {internal.Ptr("dev"), internal.Ptr("test")},
 						"team": {internal.Ptr("platform")},
@@ -322,6 +330,50 @@ func TestTfResource(t *testing.T) {
 					withTfProviderConfigRef("default"),
 					withTfManagementPolicies(),
 					withTfCondition(conditionUnknown),
+					withTfTimeouts("60m"),
+				),
+			},
+		},
+		"OperationTimeout wired to Timeouts on TfResource": {
+			reason: "operationTimeout field should be wired to Timeouts.Create/Update/Delete on the tf resource so upjet writes a timeouts block into main.tf.json",
+			args: args{
+				si: expectedServiceInstance(
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+					withOperationTimeout("30m"),
+				),
+			},
+			want: want{
+				hasErr: false,
+				tfResource: expectedTfSerivceInstance(
+					withTfExternalName("123"),
+					withTfParameters(`{}`),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+					withTfTimeouts("30m"),
+				),
+			},
+		},
+		"DefaultTimeout of 60m applied when operationTimeout not set": {
+			reason: "when operationTimeout is not set, Timeouts.Create/Update/Delete should default to 60m",
+			args: args{
+				si: expectedServiceInstance(
+					withExternalName("123"),
+					withProviderConfigRef("default"),
+					withManagementPolicies(),
+				),
+			},
+			want: want{
+				hasErr: false,
+				tfResource: expectedTfSerivceInstance(
+					withTfExternalName("123"),
+					withTfParameters(`{}`),
+					withTfProviderConfigRef("default"),
+					withTfManagementPolicies(),
+					withTfCondition(conditionUnknown),
+					withTfTimeouts("60m"),
 				),
 			},
 		},
@@ -484,5 +536,22 @@ func withLabels(labels map[string][]*string) func(*v1alpha1.ServiceInstance) {
 func withTfLabels(labels map[string][]*string) func(*v1alpha1.SubaccountServiceInstance) {
 	return func(cr *v1alpha1.SubaccountServiceInstance) {
 		cr.Spec.ForProvider.Labels = labels
+	}
+}
+
+func withOperationTimeout(timeout string) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Spec.ForProvider.OperationTimeout = &timeout
+	}
+}
+
+func withTfTimeouts(timeout string) func(*v1alpha1.SubaccountServiceInstance) {
+	return func(cr *v1alpha1.SubaccountServiceInstance) {
+		t := timeout
+		cr.Spec.ForProvider.Timeouts = &v1alpha1.TimeoutsParameters{
+			Create: &t,
+			Update: &t,
+			Delete: &t,
+		}
 	}
 }

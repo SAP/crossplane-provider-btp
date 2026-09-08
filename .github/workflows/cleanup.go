@@ -31,9 +31,9 @@ type Subaccount struct {
 	StateMessage                  string           `json:"stateMessage"`
 	ContentAutomationState        interface{}      `json:"contentAutomationState"`
 	ContentAutomationStateDetails interface{}      `json:"contentAutomationStateDetails"`
-	CreatedDate                   int64            `json:"createdDate"`
+	CreatedDate                   string           `json:"createdDate"`
 	CreatedBy                     string           `json:"createdBy"`
-	ModifiedDate                  int64            `json:"modifiedDate"`
+	ModifiedDate                  string           `json:"modifiedDate"`
 	CustomProperties              CustomProperties `json:"customProperties,omitempty"`
 	Labels                        Labels           `json:"labels,omitempty"`
 }
@@ -116,9 +116,9 @@ type DirectoryResponse struct {
 	ParentType        string           `json:"parentType"`
 	GlobalAccountGUID string           `json:"globalAccountGUID"`
 	DisplayName       string           `json:"displayName"`
-	CreatedDate       int64            `json:"createdDate"`
+	CreatedDate       string           `json:"createdDate"`
 	CreatedBy         string           `json:"createdBy"`
-	ModifiedDate      int64            `json:"modifiedDate"`
+	ModifiedDate      string           `json:"modifiedDate"`
 	EntityState       string           `json:"entityState"`
 	StateMessage      string           `json:"stateMessage"`
 	DirectoryType     string           `json:"directoryType"`
@@ -218,42 +218,6 @@ type GlobalaccountHiararchy struct {
 	ContractStatus string `json:"contractStatus"`
 }
 
-// GetUaaAuth uses the CIS binding to get a uaa token.
-// It returns a struct with the token (UaaAuth)
-func GetUaaAuth(cisBinding CisBinding) (*UaaAuth, error) {
-	//configure parameters etc. for api call
-	params := url.Values{}
-	params.Add("grant_type", "client_credentials")
-	auth := cisBinding.Uaa.Clientid + ":" + cisBinding.Uaa.Clientsecret
-	authHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
-	baseURL := cisBinding.Uaa.Url + "/oauth/token"
-
-	req, err := http.NewRequest("GET", baseURL+"?"+params.Encode(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-	req.Header.Add("Authorization", authHeader)
-
-	//make api call to get uaa token
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	//parse response
-	var uaaAuth UaaAuth
-	if resp.StatusCode == http.StatusOK {
-		if err := json.NewDecoder(resp.Body).Decode(&uaaAuth); err != nil {
-			return nil, fmt.Errorf("error decoding JSON response: %w", err)
-		}
-	} else {
-		return nil, fmt.Errorf("request failed with status code: %d\n", resp.StatusCode)
-	}
-	return &uaaAuth, nil
-}
-
 // GetUaaAuthForTrustConfiguration uses the BTP CLI to get a uaa token.
 // It returns a struct with the token (UaaAuth)
 func GetUaaAuthForTrustConfiguration(secret BtpSecuritySecret) (*UaaAuth, error) {
@@ -291,35 +255,23 @@ func GetUaaAuthForTrustConfiguration(secret BtpSecuritySecret) (*UaaAuth, error)
 	return &uaaAuth, nil
 }
 
-// GetSubaccounts uses the uaa token and cis binding to get subaccounts of a globalaccount.
+// GetSubaccounts uses the BTP CLI to get subaccounts of a globalaccount.
 // Returns the Subaccounts struct
-func GetSubaccounts(uaaAuth *UaaAuth, cisBinding CisBinding) (*Subaccounts, error) {
-	//configure parameters etc. for api call
-	baseURL := cisBinding.Endpoints.AccountsServiceUrl + "/accounts/v1/subaccounts"
-	req, err := http.NewRequest("GET", baseURL, nil)
+func GetSubaccounts() (*Subaccounts, error) {
+	// Execute the BTP CLI command to list all subaccounts
+	cmd := exec.Command("btp", "--format", "json", "list", "accounts/subaccount")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err := cmd.Run()
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf("command execution failed: %s, output: %s", err, out.String())
 	}
-	req.Header.Add("Authorization", "Bearer "+uaaAuth.AccessToken)
-	req.Header.Add("Accept", "application/json")
-
-	//make api call to get subaccounts
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
 
 	//parse response
 	var subaccounts Subaccounts
-	if resp.StatusCode == http.StatusOK {
-		if err := json.NewDecoder(resp.Body).Decode(&subaccounts); err != nil {
-			return nil, fmt.Errorf("error decoding JSON response: %w", err)
-		}
-
-	} else {
-		return nil, fmt.Errorf("request failed with status code: %d\n", resp.StatusCode)
+	if err := json.Unmarshal(out.Bytes(), &subaccounts); err != nil {
+		return nil, fmt.Errorf("error decoding JSON response: %w", err)
 	}
 
 	// Filter out subaccounts that are already pending deletion
@@ -334,41 +286,30 @@ func GetSubaccounts(uaaAuth *UaaAuth, cisBinding CisBinding) (*Subaccounts, erro
 	return &subaccounts, nil
 }
 
-// DeleteSubaccount uses the guid, cis binding and uaa token to delete a subaccount.
+// DeleteSubaccount uses the guid and the BTP CLI to delete a subaccount.
 // Returns an error if it fails
-func DeleteSubaccount(guid string, cisBinding CisBinding, uaaAuth *UaaAuth) error {
+func DeleteSubaccount(guid string) error {
 	fmt.Println("try to delete subaccount with guid: ", guid)
-	//configure parameters etc. for api call
-	baseURL := cisBinding.Endpoints.AccountsServiceUrl + "/accounts/v1/subaccounts/" + guid
-	params := url.Values{}
-	params.Add("forceDelete", "true")
-
-	req, err := http.NewRequest("DELETE", baseURL+"?"+params.Encode(), nil)
+	cmd := exec.Command("btp", "delete", "accounts/subaccount", guid, "--force-delete", "--confirm")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
+		return fmt.Errorf("failed deleting subaccount with guid %s: command execution failed: %s, output: %s", guid, err, out.String())
 	}
-	req.Header.Add("Authorization", "Bearer "+uaaAuth.AccessToken)
-	req.Header.Add("Accept", "application/json")
-
-	//make api call to delete an subaccount
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
 	return nil
 }
 
-// CleanUpSubaccounts takes UaaAuth, CisBinding and Subaccounts to delete subaccounts.
-func CleanUpSubaccounts(uaaAuth *UaaAuth, cisBinding CisBinding, subaccounts *Subaccounts) {
+// CleanUpSubaccounts takes Subaccounts to delete subaccounts.
+func CleanUpSubaccounts(subaccounts *Subaccounts) {
 	//slice into single subaccounts
 	for _, subaccount := range subaccounts.Value {
 		buildId := os.Getenv("BUILD_ID")
 		// check if the subaccounts is from the current build
 		if len(subaccount.Labels.BuildId) > 0 && subaccount.Labels.BuildId[0] == buildId {
 			//delete subaccount
-			err := DeleteSubaccount(subaccount.Guid, cisBinding, uaaAuth)
+			err := DeleteSubaccount(subaccount.Guid)
 			if err != nil {
 				fmt.Printf("error deleting subaccount %s: %s", subaccount.DisplayName, err)
 				return
@@ -411,37 +352,26 @@ func btpLogout() error {
 	return nil
 }
 
-// GetDirectoriesOfBuild uses an array of directory guids, CisBinding and UaaAuth to get directories of the current build.
+// GetDirectoriesOfBuild uses an array of directory guids and the BTP CLI to get directories of the current build.
 // Returns array of DirectoryResponse and an error if it fails
-func GetDirectoriesOfBuild(directoriesGuids []string, cisBinding CisBinding, uaaAuth UaaAuth) ([]DirectoryResponse, error) {
+func GetDirectoriesOfBuild(directoriesGuids []string) ([]DirectoryResponse, error) {
 	var DirectoriesFromRun []DirectoryResponse
 	// slice in to single directory's
 	for _, directoryguid := range directoriesGuids {
-		//configure parameters etc. for api call
-		baseURL := cisBinding.Endpoints.AccountsServiceUrl + "/accounts/v1/directories/" + directoryguid
-		req, err := http.NewRequest("GET", baseURL, nil)
+		// Execute the BTP CLI command to get the directory
+		cmd := exec.Command("btp", "--format", "json", "get", "accounts/directory", directoryguid)
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &out
+		err := cmd.Run()
 		if err != nil {
-			return nil, fmt.Errorf("error creating request: %w", err)
+			return nil, fmt.Errorf("command execution failed: %s, output: %s", err, out.String())
 		}
-		req.Header.Add("Authorization", "Bearer "+uaaAuth.AccessToken)
-		req.Header.Add("Accept", "application/json")
-
-		//make api call to get data of the directory
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("error making request: %w", err)
-		}
-		defer resp.Body.Close()
 
 		//parse response
 		var directory DirectoryResponse
-		if resp.StatusCode == http.StatusOK {
-			if err := json.NewDecoder(resp.Body).Decode(&directory); err != nil {
-				return nil, fmt.Errorf("error decoding JSON response: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("request failed with status code: %d\n", resp.StatusCode)
+		if err := json.Unmarshal(out.Bytes(), &directory); err != nil {
+			return nil, fmt.Errorf("error decoding JSON response: %w", err)
 		}
 		buildID := os.Getenv("BUILD_ID")
 		// check if directory is from current build
@@ -452,9 +382,9 @@ func GetDirectoriesOfBuild(directoriesGuids []string, cisBinding CisBinding, uaa
 	return DirectoriesFromRun, nil
 }
 
-// DeleteDirectories uses UaaAuth and CisBinding to delete the directories of current build.
+// DeleteDirectories uses the BTP CLI to delete the directories of current build.
 // Returns error if it fails
-func DeleteDirectories(uaaAuth *UaaAuth, cisBinding CisBinding) error {
+func DeleteDirectories() error {
 	//get directories
 	directoriesGuids, err := fetchAndPrintDirectoryGUIDs()
 	if err != nil {
@@ -462,7 +392,7 @@ func DeleteDirectories(uaaAuth *UaaAuth, cisBinding CisBinding) error {
 	}
 
 	//check if directories are from current run/build
-	elementsToDelete, err := GetDirectoriesOfBuild(directoriesGuids, cisBinding, *uaaAuth)
+	elementsToDelete, err := GetDirectoriesOfBuild(directoriesGuids)
 	if err != nil {
 		return err
 	}
@@ -470,25 +400,14 @@ func DeleteDirectories(uaaAuth *UaaAuth, cisBinding CisBinding) error {
 	//Delete directories from this Build
 	for _, resource := range elementsToDelete {
 		fmt.Printf("try to delete directory: %s\n", resource.DisplayName)
-		//configure parameters etc. for api call
-		baseURL := cisBinding.Endpoints.AccountsServiceUrl + "/accounts/v1/directories/" + resource.Guid
-		params := url.Values{}
-		params.Add("forceDelete", "true")
-
-		req, err := http.NewRequest("DELETE", baseURL+"?"+params.Encode(), nil)
+		cmd := exec.Command("btp", "delete", "accounts/directory", resource.Guid, "--force-delete", "--confirm")
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &out
+		err := cmd.Run()
 		if err != nil {
-			return fmt.Errorf("error creating request: %w", err)
+			return fmt.Errorf("failed deleting directory with guid %s: command execution failed: %s, output: %s", resource.Guid, err, out.String())
 		}
-		req.Header.Add("Authorization", "Bearer "+uaaAuth.AccessToken)
-		req.Header.Add("Accept", "application/json")
-
-		//make api call to delete directory
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			return fmt.Errorf("error making request: %w", err)
-		}
-		defer resp.Body.Close()
 		fmt.Printf("deleted directory: %s\n", resource.DisplayName)
 	}
 	return nil
@@ -612,16 +531,16 @@ func deleteTrustConfigurations(trustConfigurationsList []TrustConfiguration) err
 	return nil
 }
 
-// checkIfAccountIsClean takes CisBinding and *UaaAuth to check if the globalaccount is cleaned.
+// checkIfAccountIsClean uses the BTP CLI to check if the globalaccount is cleaned.
 // Returns true if its clean.
-func checkIfAccountIsClean(cisBinding CisBinding, uaaAuth *UaaAuth) bool {
+func checkIfAccountIsClean() bool {
 	directoriesGuids, err := fetchAndPrintDirectoryGUIDs()
 	if err != nil {
 		fmt.Printf("error while fetching directories guids: %s\n", err)
 	}
 
 	//check if directories are from current run/build
-	elementsToDelete, err := GetDirectoriesOfBuild(directoriesGuids, cisBinding, *uaaAuth)
+	elementsToDelete, err := GetDirectoriesOfBuild(directoriesGuids)
 	if err != nil {
 		fmt.Println("Error while get Directories of build")
 	}
@@ -630,7 +549,7 @@ func checkIfAccountIsClean(cisBinding CisBinding, uaaAuth *UaaAuth) bool {
 		return false
 	}
 
-	subaccounts, err := GetSubaccounts(uaaAuth, cisBinding)
+	subaccounts, err := GetSubaccounts()
 	if err != nil {
 		fmt.Println("error while getting subaccounts: ", err)
 		return false
@@ -657,15 +576,6 @@ func cleanup() (errs error) {
 	}
 	fmt.Println("Successfully got cis binding")
 
-	//get uaa from envs
-	fmt.Println("Get uaa auth from cis binding...")
-	uaaAuth, err := GetUaaAuth(cisBinding)
-	if err != nil {
-		errs = errors.Join(errs, fmt.Errorf("error getting uaa auth: %w", err))
-		return errs
-	}
-	fmt.Println("Successfully got uaa auth for cis binding")
-
 	fmt.Println("Get btp technical user from env...")
 	technicalUserEnv := os.Getenv("BTP_TECHNICAL_USER")
 	var technicalUser TechnicalUser
@@ -679,7 +589,7 @@ func cleanup() (errs error) {
 	btpCliUrlEnv := os.Getenv("CLI_SERVER_URL")
 
 	fmt.Println("Logging in to BTP CLI with technical user credentials...")
-	err = btpLogin(technicalUser.Email, technicalUser.Password, cisBinding.Uaa.Identityzoneid, btpCliUrlEnv)
+	err := btpLogin(technicalUser.Email, technicalUser.Password, cisBinding.Uaa.Identityzoneid, btpCliUrlEnv)
 	if err != nil {
 		errs = errors.Join(errs, fmt.Errorf("error logging into BTP CLI: %w", err))
 		return errs
@@ -713,19 +623,20 @@ func cleanup() (errs error) {
 		fmt.Println("Trying to delete subaccounts and directories of current build... Attempt:", i+1)
 
 		//delete directories for the current build
-		err = DeleteDirectories(uaaAuth, cisBinding)
+		err = DeleteDirectories()
 		if err != nil {
 			fmt.Println("error while deleting Directory: ", err)
 		}
 		//delete subaccounts for the current build
-		subaccounts, err := GetSubaccounts(uaaAuth, cisBinding)
-		CleanUpSubaccounts(uaaAuth, cisBinding, subaccounts)
+		subaccounts, err := GetSubaccounts()
 		if err != nil {
-			fmt.Println("error while deleting directories: ", err)
+			fmt.Println("error while getting subaccounts: ", err)
+		} else {
+			CleanUpSubaccounts(subaccounts)
 		}
 		//wait so child subaccounts or directories getting deleted
 		time.Sleep(45 * time.Second)
-		if checkIfAccountIsClean(cisBinding, uaaAuth) {
+		if checkIfAccountIsClean() {
 			fmt.Println("Globalaccount has been cleaned")
 			return errs
 		}

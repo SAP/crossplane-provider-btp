@@ -1,0 +1,12 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: e2e-si-paramupdate-mds
+  namespace: default
+spec:
+  forProvider:
+    serviceName: one-mds
+    servicePlanName: sap-integration
+    amount: 1
+    subaccountRef:
+      name: e2e-test-si-paramupdate
