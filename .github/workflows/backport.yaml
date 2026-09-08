@@ -1,0 +1,88 @@
+name: Backport
+
+on:
+  # Label present at merge time -> backport fires on merge.
+  # pull_request_target gives GITHUB_TOKEN write access for fork PRs.
+  pull_request_target:
+    types: [closed, labeled]
+  # "/backport <branch>" comment -> backport now (merged) or defer (open).
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  # Label-driven backport. Fires when a PR merges with a "backport <branch>"
+  # label, or when such a label is added to an already-merged PR. The action
+  # reads the label off the PR via its default label_pattern.
+  on-label:
+    if: >
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.merged &&
+      (
+        (github.event.action == 'closed' &&
+         contains(toJSON(github.event.pull_request.labels.*.name), '"backport ')) ||
+        (github.event.action == 'labeled' &&
+         startsWith(github.event.label.name, 'backport '))
+      )
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: korthout/backport-action@2e830a1d0b8269505846ddd407a70876913ad1f8 # v4.6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_workspace: ${{ github.workspace }}
+
+  # "/backport <branch>" comment. Run now if merged, else add the label so the
+  # on-label job picks it up at merge. Comments back either way - no silent no-op.
+  on-comment:
+    if: >
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/backport ') &&
+      contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NUM: ${{ github.event.issue.number }}
+      REPO: ${{ github.repository }}
+      BODY: ${{ github.event.comment.body }}
+    steps:
+      # First line after "/backport ": target branch(es). Body via env to avoid
+      # injection; heredoc write is newline-safe.
+      - id: parse
+        run: |
+          {
+            echo "branch=$(printf '%s' "$BODY" | head -n1 | sed 's|^/backport ||')"
+            echo "merged=$(gh pr view "$NUM" --repo "$REPO" --json merged -q .merged)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Defer until merge
+        if: steps.parse.outputs.merged == 'false'
+        env:
+          BRANCH: ${{ steps.parse.outputs.branch }}
+        run: |
+          gh pr edit "$NUM" --repo "$REPO" --add-label "backport $BRANCH"
+          gh pr comment "$NUM" --repo "$REPO" --body "PR not merged yet. Added label \`backport $BRANCH\` - the backport runs when this PR merges."
+
+      - name: Checkout
+        if: steps.parse.outputs.merged == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Backport now
+        if: steps.parse.outputs.merged == 'true'
+        uses: korthout/backport-action@2e830a1d0b8269505846ddd407a70876913ad1f8 # v4.6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_workspace: ${{ github.workspace }}
+          target_branches: ${{ steps.parse.outputs.branch }}
