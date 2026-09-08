@@ -28,8 +28,8 @@ on:
         required: false
         type: boolean
       concurrency-group:
-        description: 'concurrency group for the workflow run (defaults to the workflow run number, for parallel runs)'
-        default: ${{ github.run_number }}
+        description: 'concurrency group for the workflow run (defaults to using the workflow run number, for parallel runs)'
+        default: ''
         required: false
         type: string
   workflow_dispatch:
@@ -46,7 +46,7 @@ on:
         type: boolean
       concurrency-group:
         description: 'concurrency group for the workflow run (defaults to the workflow run number, for parallel runs)'
-        default: ${{ github.run_number }}
+        default: ''
         required: false
         type: string
 
@@ -54,7 +54,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ inputs.concurrency-group }}
+  group: ${{ inputs.concurrency-group != '' && inputs.concurrency-group || github.run_number }}
   cancel-in-progress: false
 
 env:
