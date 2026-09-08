@@ -13,8 +13,6 @@ name: PullRequest E2E Test
 
 on:
   pull_request_target:
-    paths-ignore:
-    - '*.md'
 
 # on pull_request_target, the GITHUB_TOKEN has read/write access to the repository content by default, so restrict it to read only
 permissions:
@@ -34,7 +32,7 @@ jobs:
   # Approval job detects user's author association and bypasses the manual approval step for certain users.
   approve:
     needs: [detect-only-doc-changes]
-    if : ${{ needs.detect-only-doc-changes.outputs.has-only-doc-changes != 'true' }}
+    if: always() && needs.detect-only-doc-changes.outputs.has-only-doc-changes != 'true'
     runs-on: ubuntu-latest
     environment:
       name: ${{ (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR') && 'pr-e2e-no-approval' || 'pr-e2e-approval' }}

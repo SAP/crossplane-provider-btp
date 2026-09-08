@@ -400,10 +400,6 @@ jobs:
           cd linux-amd64
           mv btp /usr/local/bin
 
-      - name: Set BUILD_ID
-        run: |
-          echo "BUILD_ID=${{github.run_number}}-${{github.run_attempt}}" >> $GITHUB_ENV
-
       - name: Run e2e test
         timeout-minutes: 120
         run: |
@@ -418,7 +414,6 @@ jobs:
           done
           exit "$rc"
         env:
-          BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
@@ -453,14 +448,10 @@ jobs:
           cd linux-amd64
           mv btp /usr/local/bin
 
-      - name: Set BUILD_ID
-        run: echo "BUILD_ID=${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_ENV
-
       - name: clean up cluster
         run: |
           go run .github/workflows/cleanup.go
         env:
-          BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
