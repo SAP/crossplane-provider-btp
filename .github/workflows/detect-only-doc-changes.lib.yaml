@@ -1,0 +1,33 @@
+name: Detect Only-Doc Changes
+
+on:
+  workflow_call:
+    outputs:
+      has-only-doc-changes:
+        description: "'true' if the PR contains only md/mdx changes"
+        value: ${{ jobs.detect-only-doc-changes.outputs.has-only-doc-changes }}
+
+permissions:
+  contents: read
+
+jobs:
+  detect-only-doc-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has-only-doc-changes: ${{ steps.check.outputs.has-only-doc-changes }}
+
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FILES=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files --paginate --jq '.[].filename')
+          echo "Changed files:"
+          echo "$FILES"
+          if echo "$FILES" | grep -qvE '\.(md|mdx)$'; then
+            echo "has-only-doc-changes=false" >> "$GITHUB_OUTPUT"
+            echo "PR contains non-doc changes — running full checks"
+          else
+            echo "has-only-doc-changes=true" >> "$GITHUB_OUTPUT"
+            echo "PR contains only doc changes (md/mdx) — skipping non-doc checks"
+          fi
