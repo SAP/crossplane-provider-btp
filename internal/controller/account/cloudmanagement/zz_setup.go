@@ -9,7 +9,6 @@ import (
 	cmClient "github.com/sap/crossplane-provider-btp/internal/clients/cis"
 	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
-	"github.com/sap/crossplane-provider-btp/internal/di"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -27,10 +26,9 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(name)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 	return providerconfig.DefaultSetupWithoutDefaultInitializer(mgr, o, &apisv1beta1.CloudManagement{}, apisv1beta1.CloudManagementKind, apisv1beta1.CloudManagementGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 		return &connector{
-			kube:                kube,
-			usage:               usage,
-			resourcetracker:     resourcetracker,
-			newPlanIdResolverFn: di.NewPlanIdResolverFn,
+			kube:            kube,
+			usage:           usage,
+			resourcetracker: resourcetracker,
 
 			newClientInitalizerFn: func() cmClient.ITfClientInitializer {
 				return cmClient.NewTfClient(
