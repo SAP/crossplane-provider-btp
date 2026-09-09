@@ -58,7 +58,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+  BUILD_ID: ${{ github.run_number }}-${{ github.run_attempt }} # using shorter run number for BTP character limits
   # hardcoded BTP CLI version
   btp_cli_version: 2.116.2
   E2E_BUILD_REGISTRY: index.docker.io/e2e
