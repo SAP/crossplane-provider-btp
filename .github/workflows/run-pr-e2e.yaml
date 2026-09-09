@@ -23,7 +23,6 @@ on:
 # on pull_request_target, the GITHUB_TOKEN has read/write access to the repository content by default, so restrict it to read only
 permissions:
   contents: read
-  pull-requests: read
 
 # A new push to the PR head starts a new run needing fresh approval; cancel any
 # prior (possibly already-approved) run for the same PR so stale approved code
