@@ -29,7 +29,6 @@ func TestConnect(t *testing.T) {
 	type args struct {
 		cr                  *v1beta1.CloudManagement
 		kube                test.MockClient
-		planIdResolverFn    func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error)
 		clientInitializerFn func() cmclient.ITfClientInitializer
 	}
 	tests := []struct {
@@ -72,124 +71,6 @@ func TestConnect(t *testing.T) {
 			},
 		},
 		{
-			name: "PlanIdResolverInitError",
-			args: args{
-				kube: test.MockClient{
-					MockGet:          test.NewMockGetFn(nil),
-					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-				},
-				cr: NewCloudManagement("test",
-					WithData(v1beta1.CloudManagementParameters{
-						ServiceManagerSecretNamespace: "someNamespace",
-						ServiceManagerSecret:          "someSecret",
-					}),
-				),
-				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
-					return nil, errors.New("ResolverInitError")
-				},
-			},
-			want: want{
-				err: errors.Wrap(errors.Wrap(errors.New("ResolverInitError"), "while getting plan ID"), "while initializing service plan ID"),
-				cr: NewCloudManagement("test",
-					WithData(v1beta1.CloudManagementParameters{
-						ServiceManagerSecretNamespace: "someNamespace",
-						ServiceManagerSecret:          "someSecret",
-					}),
-				),
-			},
-		},
-		{
-			name: "IntializeEmptyResource",
-			args: args{
-				kube: test.MockClient{
-					MockGet:          test.NewMockGetFn(nil),
-					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-				},
-				cr: NewCloudManagement("test",
-					WithData(v1beta1.CloudManagementParameters{
-						ServiceManagerSecretNamespace: "someNamespace",
-						ServiceManagerSecret:          "someSecret",
-					}),
-				),
-				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
-					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
-							return "planID", nil
-						},
-					}, nil
-				},
-				clientInitializerFn: func() cmclient.ITfClientInitializer {
-					return &ClientInitializerFake{
-						ConnectResourcesFn: func(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ITfClient, error) {
-							return &TfClientFake{}, nil
-						},
-					}
-				},
-			},
-			want: want{
-				err: nil,
-				cr: NewCloudManagement("test",
-					WithData(v1beta1.CloudManagementParameters{
-						ServiceManagerSecretNamespace: "someNamespace",
-						ServiceManagerSecret:          "someSecret",
-					}),
-					WithStatus(v1beta1.CloudManagementObservation{
-						DataSourceLookup: &v1beta1.CloudManagementDataSourceLookup{
-							CloudManagementPlanID: "planID",
-						},
-					}),
-				),
-			},
-		},
-		{
-			name: "AlreadyInitialized",
-			args: args{
-				kube: test.MockClient{
-					MockGet:          test.NewMockGetFn(nil),
-					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-				},
-				cr: NewCloudManagement("test",
-					WithData(v1beta1.CloudManagementParameters{
-						ServiceManagerSecretNamespace: "someNamespace",
-						ServiceManagerSecret:          "someSecret",
-					}),
-					WithStatus(v1beta1.CloudManagementObservation{
-						DataSourceLookup: &v1beta1.CloudManagementDataSourceLookup{
-							CloudManagementPlanID: "planID",
-						},
-					}),
-				),
-				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
-					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
-							return "planID", nil
-						},
-					}, nil
-				},
-				clientInitializerFn: func() cmclient.ITfClientInitializer {
-					return &ClientInitializerFake{
-						ConnectResourcesFn: func(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ITfClient, error) {
-							return &TfClientFake{}, nil
-						},
-					}
-				},
-			},
-			want: want{
-				err: nil,
-				cr: NewCloudManagement("test",
-					WithData(v1beta1.CloudManagementParameters{
-						ServiceManagerSecretNamespace: "someNamespace",
-						ServiceManagerSecret:          "someSecret",
-					}),
-					WithStatus(v1beta1.CloudManagementObservation{
-						DataSourceLookup: &v1beta1.CloudManagementDataSourceLookup{
-							CloudManagementPlanID: "planID",
-						},
-					}),
-				),
-			},
-		},
-		{
 			// we changed the approach from using the API to using tf resources internally, we have to ensure some smooth migration
 			name: "MigrateFromPreviousVersion",
 			args: args{
@@ -213,13 +94,6 @@ func TestConnect(t *testing.T) {
 						},
 					}),
 				),
-				planIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
-					return PlanIDFake{
-						func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
-							return "planID", nil
-						},
-					}, nil
-				},
 				clientInitializerFn: func() cmclient.ITfClientInitializer {
 					return &ClientInitializerFake{
 						ConnectResourcesFn: func(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ITfClient, error) {
@@ -237,9 +111,6 @@ func TestConnect(t *testing.T) {
 						ServiceManagerSecret:          "someSecret",
 					}),
 					WithStatus(v1beta1.CloudManagementObservation{
-						DataSourceLookup: &v1beta1.CloudManagementDataSourceLookup{
-							CloudManagementPlanID: "planID",
-						},
 						Instance: &v1beta1.Instance{
 							Id: internal.Ptr("someID"),
 						},
@@ -258,7 +129,6 @@ func TestConnect(t *testing.T) {
 				usage:                 test2.NoOpLegacyTracker{},
 				resourcetracker:       test2.NoOpReferenceResolverTracker{},
 				newClientInitalizerFn: tc.args.clientInitializerFn,
-				newPlanIdResolverFn:   tc.args.planIdResolverFn,
 			}
 			_, err := uua.Connect(context.TODO(), tc.args.cr)
 			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
@@ -359,7 +229,7 @@ func TestObserve(t *testing.T) {
 						// Doesn't matter what observe is returned exactly, as long as its passed through and IDs are persisted
 						return cmclient.ResourcesStatus{
 							ExternalObservation: managed.ExternalObservation{ResourceExists: false},
-							Instance:            v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr("someID")},
+							Instance:            v1alpha1.SubaccountServiceInstanceObservation{ID: internal.Ptr("someID"), ServiceplanID: internal.Ptr("planID")},
 						}, nil
 					},
 				},
@@ -372,7 +242,8 @@ func TestObserve(t *testing.T) {
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status:            v1alpha1.CisStatusUnbound,
 						ServiceInstanceID: "someID",
-						Instance:          &v1beta1.Instance{Id: internal.Ptr("someID")},
+						Instance:          &v1beta1.Instance{Id: internal.Ptr("someID"), ServicePlanId: internal.Ptr("planID")},
+						DataSourceLookup:  &v1beta1.CloudManagementDataSourceLookup{CloudManagementPlanID: "planID"},
 					}),
 					WithConditions(xpv1.Unavailable()),
 				),

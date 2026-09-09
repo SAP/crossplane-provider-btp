@@ -37,7 +37,6 @@ const (
 	errGetCredentialsSecret = "Could not Get Secret"
 	errTrackRUsage          = "cannot track ResourceUsage"
 	errTrackPCUsage         = "cannot track ProviderConfig usage"
-	errInitServicePlanId    = "while initializing service plan ID"
 	errEnsureCompatibility  = "while ensuring compatibility"
 	errConnectResources     = "while connecting resources"
 	errObserve              = "while observing resources"
@@ -45,17 +44,14 @@ const (
 	errCreate               = "while creating resources"
 	errUpdate               = "while updating resources"
 	errDelete               = "while deleting resources"
-	errSaveId               = "while saving ID"
-	errGetPlanId            = "while getting plan ID"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
 // is called.
 type connector struct {
-	kube                client.Client
-	usage               providerconfig.LegacyTracker
-	resourcetracker     tracking.ReferenceResolverTracker
-	newPlanIdResolverFn func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error)
+	kube            client.Client
+	usage           providerconfig.LegacyTracker
+	resourcetracker tracking.ReferenceResolverTracker
 
 	newClientInitalizerFn func() cmclient.ITfClientInitializer
 
@@ -94,12 +90,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errGetCredentialsSecret)
 	}
 
-	err := c.InitializeServicePlanId(ctx, cr, secret)
-	if err != nil {
-		return nil, errors.Wrap(err, errInitServicePlanId)
-	}
-
-	err = c.ensureCompatibility(ctx, cr)
+	err := c.ensureCompatibility(ctx, cr)
 	if err != nil {
 		return nil, errors.Wrap(err, errEnsureCompatibility)
 	}
@@ -141,36 +132,6 @@ func (c *connector) migrationNeeded(cr *apisv1beta1.CloudManagement) bool {
 	binding := cr.Status.AtProvider.Binding
 
 	return !strings.Contains(extName, "/") && instance != nil && binding != nil
-}
-
-func (c *connector) IsInitialized(cr *apisv1beta1.CloudManagement) bool {
-	return cr.Status.AtProvider.DataSourceLookup != nil
-}
-
-// InitializeServicePlanId ensures the service plan id for cis local is cached in status
-func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1beta1.CloudManagement, secret *corev1.Secret) error {
-	if c.IsInitialized(cr) {
-		return nil
-	}
-
-	sm, err := c.newPlanIdResolverFn(ctx, secret.Data)
-	if err != nil {
-		return errors.Wrap(err, errGetPlanId)
-	}
-
-	id, err := sm.PlanIDByName(ctx, "cis", "local", "")
-	if err != nil {
-		return errors.Wrap(err, errGetPlanId)
-	}
-
-	return errors.Wrap(c.saveId(ctx, cr, id), errSaveId)
-}
-
-func (c *connector) saveId(ctx context.Context, cr *apisv1beta1.CloudManagement, id string) error {
-	cr.Status.AtProvider.DataSourceLookup = &apisv1beta1.CloudManagementDataSourceLookup{
-		CloudManagementPlanID: id,
-	}
-	return c.kube.Status().Update(ctx, cr)
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
@@ -420,6 +381,15 @@ func (c *external) setStatus(ctx context.Context, status cmclient.ResourcesStatu
 	if status.Instance.ID != nil {
 		cr.Status.AtProvider.Instance = mapToInstance(&status.Instance)
 		cr.Status.AtProvider.ServiceInstanceID = *status.Instance.ID
+	}
+
+	// Record the live plan ID so healExternalName can filter on it. TF now
+	// resolves the plan from cis/local by name, so this is the only source.
+	if status.Instance.ServiceplanID != nil && *status.Instance.ServiceplanID != "" {
+		if cr.Status.AtProvider.DataSourceLookup == nil {
+			cr.Status.AtProvider.DataSourceLookup = &apisv1beta1.CloudManagementDataSourceLookup{}
+		}
+		cr.Status.AtProvider.DataSourceLookup.CloudManagementPlanID = *status.Instance.ServiceplanID
 	}
 
 	if status.Binding.ID != nil {
