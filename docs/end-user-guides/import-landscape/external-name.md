@@ -190,6 +190,15 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)
   - API: GET /v1/subaccountDestinations/\{destination name\} (fields: subaccount_id + Name)
 
+### SubaccountDestinationCertificate
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<subaccount-id>/<certificate-name>`
+- How to find:
+
+  - UI: SAP BTP Cockpit → Subaccount → Connectivity → Certificates (field: Name)
+  - API: GET /v1/subaccountCertificates/\{certificate name\} (fields: subaccount_id + Name)
+
 ### SubaccountServiceBroker
 
 - Follows Standard: no (compound key, not a single GUID)
