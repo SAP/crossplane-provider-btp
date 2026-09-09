@@ -93,6 +93,11 @@ func (tfI *TfClientInitializer) serviceInstanceCr(sm *apisv1beta1.ServiceManager
 		name = tfI.defaults.InstanceName
 	}
 
+	// Let the upstream instance resolve the plan from name; serviceplan_name and
+	// serviceplan_id are mutually exclusive, so we set no ID.
+	planName := PlanNameOrDefault(sm)
+	offeringName := ServiceManagerOfferingName
+
 	sInstance := &apisv1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       apisv1alpha1.SubaccountServiceInstance_Kind,
@@ -111,9 +116,10 @@ func (tfI *TfClientInitializer) serviceInstanceCr(sm *apisv1beta1.ServiceManager
 				ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionAll},
 			},
 			ForProvider: apisv1alpha1.SubaccountServiceInstanceParameters{
-				Name:          &name,
-				ServiceplanID: &sm.Status.AtProvider.DataSourceLookup.ServiceManagerPlanID,
-				SubaccountID:  internal.Ptr(sm.Spec.ForProvider.SubaccountGuid),
+				Name:                &name,
+				ServiceplanName:     &planName,
+				ServiceOfferingName: &offeringName,
+				SubaccountID:        internal.Ptr(sm.Spec.ForProvider.SubaccountGuid),
 			},
 			InitProvider: apisv1alpha1.SubaccountServiceInstanceInitParameters{},
 		},
@@ -122,6 +128,14 @@ func (tfI *TfClientInitializer) serviceInstanceCr(sm *apisv1beta1.ServiceManager
 	sInstanceId, _ := splitExternalName(meta.GetExternalName(sm))
 	meta.SetExternalName(sInstance, sInstanceId)
 	return sInstance
+}
+
+// PlanNameOrDefault returns the SM's configured plan name, or the CRD default.
+func PlanNameOrDefault(sm *apisv1beta1.ServiceManager) string {
+	if sm.Spec.ForProvider.PlanName != "" {
+		return sm.Spec.ForProvider.PlanName
+	}
+	return apisv1beta1.DefaultPlanName
 }
 
 func (tfI *TfClientInitializer) serviceBindingCr(sm *apisv1beta1.ServiceManager) *apisv1alpha1.SubaccountServiceBinding {
@@ -288,19 +302,7 @@ func (tf *TfClient) resourcesUpToDate(ctx context.Context) bool {
 	if err != nil {
 		return true
 	}
-	if siObs.ResourceUpToDate {
-		return true
-	}
-
-	// Workaround for #941: the service plan is immutable in BTP, so an in-place
-	// update on a plan-only diff calls update_instance, which BTP rejects. That
-	// diff only arises for an upgraded v1alpha1 SM whose status lost
-	// dataSourceLookup and re-resolved the flipped default plan (#925). Report
-	// up-to-date so no Update fires. For v1beta1 the plan is pinned by the CRD, so
-	// desired == observed and this is a no-op.
-	desiredPlan := internal.Val(tf.sInstance.Spec.ForProvider.ServiceplanID)
-	observedPlan := internal.Val(tf.sInstance.Status.AtProvider.ServiceplanID)
-	return desiredPlan != observedPlan
+	return siObs.ResourceUpToDate
 }
 
 func (tf *TfClient) createInstance(ctx context.Context) (string, error) {

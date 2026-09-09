@@ -38,16 +38,6 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 				newServiceFn:    btp.NewBTPClient,
 				resourcetracker: resourcetracker,
 
-				newPlanIdInitializerFn: func(ctx context.Context, cr *apisv1beta1.ServiceManager) (ServiceManagerPlanIdInitializer, error) {
-					btpclient, err := providerconfig.CreateClient(ctx, cr, mgr.GetClient(), usage, btp.NewBTPClient, resourcetracker)
-					if err != nil {
-						return nil, err
-					}
-
-					smInstanceClient := servicemanager.NewServiceManagerInstanceProxyClient(btpclient.AccountsServiceClient)
-					return smInstanceClient, nil
-				},
-
 				newClientInitalizerFn: func() servicemanager.ITfClientInitializer {
 					return servicemanager.NewServiceManagerTfClient(
 						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil),

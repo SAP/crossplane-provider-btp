@@ -74,6 +74,11 @@ func Test_ServiceManager_PlanName_Upgrade(t *testing.T) {
 				}
 				assertServiceManagerV1beta1Healthy(t, smb, "before")
 
+				// Stash both pre-upgrade plan IDs; the post-upgrade hook asserts they
+				// are unchanged (the BTP service plan is immutable).
+				ctx = context.WithValue(ctx, preUpgradePlanIDKey(serviceManagerName), planIDOf(ctx, t, cfg, serviceManagerName))
+				ctx = context.WithValue(ctx, preUpgradePlanIDKey(serviceManagerV1beta1Name), planIDOf(ctx, t, cfg, serviceManagerV1beta1Name))
+
 				klog.V(4).Infof("Pre-upgrade ServiceManagers %q and %q are Synced and Ready", serviceManagerName, serviceManagerV1beta1Name)
 				return ctx
 			},
@@ -96,6 +101,7 @@ func Test_ServiceManager_PlanName_Upgrade(t *testing.T) {
 				// status.dataSourceLookup must hold the live instance plan. Read as
 				// v1beta1 (storage version) to see the full observation.
 				assertPlanMatchesLiveInstance(ctx, t, cfg, serviceManagerName)
+				assertPlanUnchanged(ctx, t, cfg, serviceManagerName)
 
 				// The v1beta1 SM must stay Synced+Ready and keep its explicit plan.
 				smb := &accountv1beta1.ServiceManager{}
@@ -104,6 +110,7 @@ func Test_ServiceManager_PlanName_Upgrade(t *testing.T) {
 				}
 				waitSyncedAndReady(ctx, t, cfg, smb, serviceManagerV1beta1Name, "v1beta1")
 				assertPlanMatchesLiveInstance(ctx, t, cfg, serviceManagerV1beta1Name)
+				assertPlanUnchanged(ctx, t, cfg, serviceManagerV1beta1Name)
 
 				klog.V(4).Infof("Post-upgrade: v1alpha1 %q and v1beta1 %q stayed Synced and Ready", serviceManagerName, serviceManagerV1beta1Name)
 				return ctx
@@ -159,6 +166,36 @@ func assertPlanMatchesLiveInstance(ctx context.Context, t *testing.T, cfg *envco
 	if sm.Status.AtProvider.Status != accountv1beta1.ServiceManagerBound {
 		t.Errorf("ServiceManager %q: status.atProvider.status = %q, want %q (should stay bound to its live instance)",
 			name, sm.Status.AtProvider.Status, accountv1beta1.ServiceManagerBound)
+	}
+}
+
+func preUpgradePlanIDKey(name string) string { return "preUpgradePlanID/" + name }
+
+// planIDOf returns the SM's persisted dataSourceLookup.serviceManagerPlanID, read
+// as v1beta1 (storage version). Fatal if absent.
+func planIDOf(ctx context.Context, t *testing.T, cfg *envconf.Config, name string) string {
+	t.Helper()
+	sm := &accountv1beta1.ServiceManager{}
+	if err := cfg.Client().Resources().Get(ctx, name, cfg.Namespace(), sm); err != nil {
+		t.Fatalf("Failed to read ServiceManager %q for plan-ID baseline: %v", name, err)
+	}
+	if sm.Status.AtProvider.DataSourceLookup == nil || sm.Status.AtProvider.DataSourceLookup.ServiceManagerPlanID == "" {
+		t.Fatalf("ServiceManager %q: no dataSourceLookup.serviceManagerPlanID before upgrade to baseline against", name)
+	}
+	return sm.Status.AtProvider.DataSourceLookup.ServiceManagerPlanID
+}
+
+// assertPlanUnchanged checks the plan ID survived the upgrade unchanged; the BTP
+// service plan is immutable, so a mismatch means the provider re-resolved and wrote
+// a different plan (#941 regression).
+func assertPlanUnchanged(ctx context.Context, t *testing.T, cfg *envconf.Config, name string) {
+	t.Helper()
+	before, ok := ctx.Value(preUpgradePlanIDKey(name)).(string)
+	if !ok || before == "" {
+		t.Fatalf("ServiceManager %q: no pre-upgrade plan ID stashed in ctx", name)
+	}
+	if after := planIDOf(ctx, t, cfg, name); after != before {
+		t.Errorf("ServiceManager %q: plan ID changed across upgrade (before %q, after %q)", name, before, after)
 	}
 }
 

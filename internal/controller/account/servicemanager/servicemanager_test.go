@@ -30,9 +30,8 @@ var (
 
 func TestConnect_ResourceTracking(t *testing.T) {
 	type fields struct {
-		newPlanIdInitializerFn func(ctx context.Context, cr *apisv1beta1.ServiceManager) (ServiceManagerPlanIdInitializer, error)
-		newClientInitalizerFn  func() sm.ITfClientInitializer
-		resourcetracker        *testutils.ResourceTrackerMock
+		newClientInitalizerFn func() sm.ITfClientInitializer
+		resourcetracker       *testutils.ResourceTrackerMock
 	}
 	type args struct {
 		mg resource.Managed
@@ -53,9 +52,6 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			reason: "should return an error if tracking fails",
 			fields: fields{
 				resourcetracker: testutils.NewResourceTrackerMockWithError(errTracking),
-				newPlanIdInitializerFn: func(ctx context.Context, cr *apisv1beta1.ServiceManager) (ServiceManagerPlanIdInitializer, error) {
-					return &PlanIdInitializerMock{}, nil
-				},
 				newClientInitalizerFn: func() sm.ITfClientInitializer {
 					return &TfClientInitializerMock{}
 				},
@@ -85,9 +81,6 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			reason: "should call Track before initializer runs",
 			fields: fields{
 				resourcetracker: testutils.NewResourceTrackerMock(),
-				newPlanIdInitializerFn: func(ctx context.Context, cr *apisv1beta1.ServiceManager) (ServiceManagerPlanIdInitializer, error) {
-					return &PlanIdInitializerMock{}, nil
-				},
 				newClientInitalizerFn: func() sm.ITfClientInitializer {
 					return &TfClientInitializerMock{}
 				},
@@ -118,10 +111,9 @@ func TestConnect_ResourceTracking(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			c := connector{
-				kube:                   &test.MockClient{},
-				resourcetracker:        tc.fields.resourcetracker,
-				newPlanIdInitializerFn: tc.fields.newPlanIdInitializerFn,
-				newClientInitalizerFn:  tc.fields.newClientInitalizerFn,
+				kube:                  &test.MockClient{},
+				resourcetracker:       tc.fields.resourcetracker,
+				newClientInitalizerFn: tc.fields.newClientInitalizerFn,
 			}
 
 			_, err := c.Connect(context.Background(), tc.args.mg)
@@ -682,23 +674,6 @@ func (t *TfClientInitializerMock) ConnectResources(ctx context.Context, cr *apis
 	return &TfClientFake{}, nil
 }
 
-var _ ServiceManagerPlanIdInitializer = &PlanIdInitializerMock{}
-
-type PlanIdInitializerMock struct {
-	planID string
-	err    error
-}
-
-func (p *PlanIdInitializerMock) ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string) (string, error) {
-	if p.err != nil {
-		return "", p.err
-	}
-	if p.planID != "" {
-		return p.planID, nil
-	}
-	return "default-plan-id", nil
-}
-
 // ====================================================================================
 // Test Utilities
 // ====================================================================================
@@ -774,7 +749,6 @@ func (t *TfClientFake) DeleteResources(ctx context.Context, cr *apisv1beta1.Serv
 }
 
 func TestServicePlanName(t *testing.T) {
-	c := &connector{}
 	cases := map[string]struct {
 		planName string
 		want     string
@@ -792,9 +766,9 @@ func TestServicePlanName(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cr := NewServiceManager("test")
 			cr.Spec.ForProvider.PlanName = tc.planName
-			got := c.ServicePlanName(cr)
+			got := sm.PlanNameOrDefault(cr)
 			if diff := cmp.Diff(tc.want, got); diff != "" {
-				t.Errorf("ServicePlanName() mismatch (-want +got):\n%s", diff)
+				t.Errorf("PlanNameOrDefault() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

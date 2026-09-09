@@ -26,23 +26,15 @@ import (
 const (
 	errNotServiceManager = "managed resource is not a ServiceManager custom resource"
 	errTrack             = "cannot track resource usage"
-	errInitialize        = "while initializing service plan ID"
 	errConnect           = "while connecting resources"
-	errGetPlanID         = "while getting plan ID initializer"
 	errUpdateStatus      = "while updating service manager status"
 	errCreate            = "while creating resources"
 	errUpdate            = "while updating resources"
 	errDelete            = "while deleting resources"
 	errSetStatus         = "while setting status"
-	errGetServicePlan    = "while getting service manager plan ID by name"
 
 	errExternalNameFormat = "crossplane.io/external-name is malformed; fix the annotation to resume reconciliation"
 )
-
-// ServiceManagerPlanIdInitializer is will provide implementation of service plan id lookup by name
-type ServiceManagerPlanIdInitializer interface {
-	ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string) (string, error)
-}
 
 // A connector is expected to produce an ExternalClient when its Connect method
 // is called.
@@ -51,8 +43,7 @@ type connector struct {
 	resourcetracker tracking.ReferenceResolverTracker
 	newServiceFn    func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
 
-	newPlanIdInitializerFn func(ctx context.Context, cr *apisv1beta1.ServiceManager) (ServiceManagerPlanIdInitializer, error)
-	newClientInitalizerFn  func() sm.ITfClientInitializer
+	newClientInitalizerFn func() sm.ITfClientInitializer
 
 	// newAdminLookuperFn builds a SemanticLookuper backed by the subaccount-admin
 	// SM binding (minted via the accounts-service), returning a cleanup func.
@@ -70,10 +61,6 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrack)
 	}
 
-	if err := c.InitializeServicePlanId(ctx, cr); err != nil {
-		return nil, errors.Wrap(err, errInitialize)
-	}
-
 	tfClientInit := c.newClientInitalizerFn()
 
 	tfClient, err := tfClientInit.ConnectResources(ctx, cr)
@@ -89,45 +76,6 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		recorder:           c.recorder,
 		newAdminLookuperFn: c.newAdminLookuperFn,
 	}, nil
-}
-
-func (c *connector) IsInitialized(cr *apisv1beta1.ServiceManager) bool {
-	return cr.Spec.ForProvider.SubaccountGuid != "" && cr.Status.AtProvider.DataSourceLookup != nil
-}
-
-func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
-	if c.IsInitialized(cr) {
-		return nil
-	}
-
-	planIdInitializer, err := c.newPlanIdInitializerFn(ctx, cr)
-	if err != nil {
-		return errors.Wrap(err, errGetPlanID)
-	}
-
-	id, err := planIdInitializer.ServiceManagerPlanIDByName(ctx, cr.Spec.ForProvider.SubaccountGuid, c.ServicePlanName(cr))
-	if err != nil {
-		return errors.Wrap(err, errGetServicePlan)
-	}
-
-	return c.saveId(ctx, cr, id)
-}
-
-func (c *connector) ServicePlanName(cr *apisv1beta1.ServiceManager) string {
-	if cr.Spec.ForProvider.PlanName != "" {
-		return cr.Spec.ForProvider.PlanName
-	}
-	return apisv1beta1.DefaultPlanName
-}
-
-func (c *connector) saveId(ctx context.Context, cr *apisv1beta1.ServiceManager, id string) error {
-	cr.Status.AtProvider.DataSourceLookup = &apisv1beta1.DataSourceLookup{
-		ServiceManagerPlanID: id,
-	}
-	if err := c.kube.Status().Update(ctx, cr); err != nil {
-		return errors.Wrap(err, errUpdateStatus)
-	}
-	return nil
 }
 
 type external struct {
@@ -369,11 +317,11 @@ func (c *external) setStatus(ctx context.Context, status sm.ResourcesStatus, cr 
 	cr.Status.AtProvider.ServiceInstanceID = status.InstanceID
 	cr.Status.AtProvider.ServiceBindingID = status.BindingID
 
-	// Workaround for #941: self-heal a stale plan ID in status. An upgraded
-	// v1alpha1 SM lost dataSourceLookup and re-resolved the flipped default plan
-	// (#925) into status. Overwrite it with the observed live plan. For v1beta1
-	// these already match, so this is a no-op.
-	if cr.Status.AtProvider.DataSourceLookup != nil && status.ObservedPlanID != "" {
+	// Record the live plan ID so healExternalName can filter on it.
+	if status.ObservedPlanID != "" {
+		if cr.Status.AtProvider.DataSourceLookup == nil {
+			cr.Status.AtProvider.DataSourceLookup = &apisv1beta1.DataSourceLookup{}
+		}
 		cr.Status.AtProvider.DataSourceLookup.ServiceManagerPlanID = status.ObservedPlanID
 	}
 	// Unfortunately we need to update the CR status manually here, because the reconciler will drop the change otherwise
