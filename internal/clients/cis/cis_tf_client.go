@@ -93,10 +93,13 @@ func (tfI *TfClientInitializer) serviceInstanceCr(cm *apisv1beta1.CloudManagemen
 				ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionAll},
 			},
 			ForProvider: apisv1alpha1.SubaccountServiceInstanceParameters{
-				Name:          getServiceInstanceName(cm),
-				ServiceplanID: &cm.Status.AtProvider.DataSourceLookup.CloudManagementPlanID,
-				SubaccountID:  internal.Ptr(cm.Spec.ForProvider.SubaccountGuid),
-				Parameters:    internal.Ptr(`{"grantType":"clientCredentials"}`),
+				Name: getServiceInstanceName(cm),
+				// Let the upstream instance resolve the plan from name;
+				// serviceplan_name and serviceplan_id are mutually exclusive.
+				ServiceOfferingName: internal.Ptr("cis"),
+				ServiceplanName:     internal.Ptr("local"),
+				SubaccountID:        internal.Ptr(cm.Spec.ForProvider.SubaccountGuid),
+				Parameters:          internal.Ptr(`{"grantType":"clientCredentials"}`),
 			},
 			InitProvider: apisv1alpha1.SubaccountServiceInstanceInitParameters{},
 		},

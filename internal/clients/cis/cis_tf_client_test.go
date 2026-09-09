@@ -49,10 +49,11 @@ func TestConnectResources(t *testing.T) {
 
 	getExpectedInstanceSpec := func(name string) v1alpha1.SubaccountServiceInstanceParameters {
 		return v1alpha1.SubaccountServiceInstanceParameters{
-			Name:          internal.Ptr(name),
-			ServiceplanID: internal.Ptr(defaultPlanId),
-			SubaccountID:  internal.Ptr(defaultSaId),
-			Parameters:    internal.Ptr(`{"grantType":"clientCredentials"}`),
+			Name:                internal.Ptr(name),
+			ServiceOfferingName: internal.Ptr("cis"),
+			ServiceplanName:     internal.Ptr("local"),
+			SubaccountID:        internal.Ptr(defaultSaId),
+			Parameters:          internal.Ptr(`{"grantType":"clientCredentials"}`),
 		}
 	}
 
