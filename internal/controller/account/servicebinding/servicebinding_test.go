@@ -1256,7 +1256,7 @@ func TestCreate(t *testing.T) {
 				},
 				keyRotator: &MockKeyRotator{},
 				kube: &test.MockClient{
-					MockUpdate: test.NewMockUpdateFn(nil),
+					MockPatch: test.NewMockPatchFn(nil),
 				},
 			},
 			args: args{
@@ -1331,6 +1331,64 @@ func TestCreate(t *testing.T) {
 						// Other fields remain as they were
 						cr.Status.AtProvider.CreatedDate = nil
 						cr.Status.AtProvider.LastModified = nil
+					},
+				),
+			},
+		},
+		"SuccessRemovesForceRotationAnnotation": {
+			// Regression test for the rotation create-deadlock: the metadata persist
+			// must set external-name and remove the force-rotation annotation.
+			reason: "should set external-name and remove the force-rotation annotation via patch",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						creation: managed.ExternalCreation{
+							ConnectionDetails: managed.ConnectionDetails{
+								"test-key": []byte("test-value"),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{},
+				kube: &test.MockClient{
+					// The removal must serialize as an explicit null; a marshalled
+					// Update would drop the key and leave the annotation set.
+					MockPatch: func(_ context.Context, obj kubeclient.Object, p kubeclient.Patch, _ ...kubeclient.PatchOption) error {
+						data, err := p.Data(obj)
+						if err != nil {
+							t.Fatalf("patch data: %v", err)
+						}
+						if !strings.Contains(string(data), `"`+servicebindingclient.ForceRotationKey+`":null`) {
+							t.Errorf("patch must delete %q via null, got: %s", servicebindingclient.ForceRotationKey, data)
+						}
+						return nil
+					},
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("", map[string]string{servicebindingclient.ForceRotationKey: "true"}),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.Name = "test-binding"
+						cr.Spec.Rotation = &v1alpha1.RotationParameters{
+							Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 24},
+						}
+					},
+				),
+			},
+			want: want{
+				err: nil,
+				cr: expectedServiceBinding(
+					withMetadata("12345678-1234-5678-9abc-123456789012", map[string]string{
+						"crossplane.io/external-name": "12345678-1234-5678-9abc-123456789012",
+						// ForceRotationKey must be gone after the patch.
+					}),
+					withConditions(xpv1.Creating()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.Name = "test-binding"
+						cr.Spec.Rotation = &v1alpha1.RotationParameters{
+							Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 24},
+						}
 					},
 				),
 			},
