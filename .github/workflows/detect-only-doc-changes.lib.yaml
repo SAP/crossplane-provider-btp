@@ -8,7 +8,7 @@ on:
         value: ${{ jobs.detect-only-doc-changes.outputs.has-only-doc-changes }}
 
 permissions:
-  contents: read
+  contents: read  # contents read also allows PR access
 
 jobs:
   detect-only-doc-changes:
