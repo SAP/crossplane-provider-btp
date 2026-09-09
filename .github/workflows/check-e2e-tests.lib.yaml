@@ -54,7 +54,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ inputs.concurrency-group != '' && inputs.concurrency-group || github.run_number }}
+  group: ${{ inputs.concurrency-group != '' && inputs.concurrency-group || github.run_id }}
   cancel-in-progress: false
 
 env:
