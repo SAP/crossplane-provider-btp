@@ -14,70 +14,15 @@ const ServiceManagerOfferingName = "service-manager"
 func NewServiceManagerInstanceProxyClient(apiClient *accountsserviceclient.APIClient) ServiceManagerInstanceProxyClient {
 	return ServiceManagerInstanceProxyClient{
 		SubaccountOperationsAPI: apiClient.SubaccountOperationsAPI,
-		smServiceFn: func(ctx context.Context, credentials *BindingCredentials) (PlanIdResolver, error) {
-			return NewServiceManagerClient(ctx, credentials)
-		},
 	}
 }
 
-// ServiceManagerInstanceProxyClient is a throw-away implementation, which retrieves a servicePlanID by
-// - creating an intermediate subaccount-admin servicemanager instance via the accountsapi
-// - looksup the servicePLanID via those created credentials binding
-// - deletes this intermediate servicemanager instance
-// -> THIS NEEDS TO BE REPLACED VIA TF DATASOURCES AS SOON AS THOSE ARE AVAILABLE IN UPJET
+// ServiceManagerInstanceProxyClient backs the orphaned-external-name adoption
+// heal for SM/SI/SB/CM: it hands out a SemanticLookuper with full subaccount
+// visibility, minting a temporary subaccount-admin service-manager binding via
+// the accounts-service when none exists yet.
 type ServiceManagerInstanceProxyClient struct {
 	accountsserviceclient.SubaccountOperationsAPI
-
-	// serviceManager API Client needs to be configured with a secret thats not known during initialization
-	smServiceFn func(ctx context.Context, credentials *BindingCredentials) (PlanIdResolver, error)
-}
-
-func (t ServiceManagerInstanceProxyClient) ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string) (string, error) {
-	// if binding exists we use it to resolve serviceplan
-	binding, err := t.describeAdminBinding(ctx, subaccountId)
-	if err != nil {
-		return "", err
-	}
-	if binding != nil {
-		return t.resolveServicePlan(ctx, servicePlanName)(binding)
-	}
-	// otherwise we dynamically create and delete an instance and resolve the serviceplan using its credentials
-	return t.dynamicServiceInstance(ctx, subaccountId, t.resolveServicePlan(ctx, servicePlanName))
-}
-
-func (t ServiceManagerInstanceProxyClient) dynamicServiceInstance(ctx context.Context, subaccountId string, resolvalFn func(binding *BindingCredentials) (string, error)) (string, error) {
-	binding, err := t.createAdminBinding(ctx, subaccountId)
-	if err != nil {
-		return "", err
-	}
-
-	id, err := resolvalFn(binding)
-	if err != nil {
-		return "", err
-	}
-
-	err = t.deleteAdminBinding(ctx, subaccountId)
-	if err != nil {
-		return "", err
-	}
-
-	return id, nil
-}
-
-func (t ServiceManagerInstanceProxyClient) resolveServicePlan(ctx context.Context, servicePlanName string) func(binding *BindingCredentials) (string, error) {
-	return func(binding *BindingCredentials) (string, error) {
-		resolver, err := t.smServiceFn(ctx, binding)
-
-		if err != nil {
-			return "", err
-		}
-
-		id, err := resolver.PlanIDByName(ctx, ServiceManagerOfferingName, servicePlanName, "")
-		if err != nil {
-			return "", err
-		}
-		return id, err
-	}
 }
 
 func (t ServiceManagerInstanceProxyClient) describeAdminBinding(ctx context.Context, subaccountGuid string) (*BindingCredentials, error) {
