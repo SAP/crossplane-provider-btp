@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -17,11 +18,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/e2e-framework/klient/k8s"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 
 	meta "github.com/sap/crossplane-provider-btp/apis"
 
 	"sigs.k8s.io/e2e-framework/klient/wait"
+	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 )
@@ -32,6 +35,11 @@ var (
 
 func TestSubaccountApiCredentialsStandalone(t *testing.T) {
 	var manifestDir = crsPath("SubaccountApiCredentialsStandalone")
+	var baselineSecretData map[string][]byte
+	var baselineSecretType corev1.SecretType
+	var baselineSecretOwnerReferences []metav1.OwnerReference
+	reconcileNonce := 0
+
 	crudFeature := features.New("SubaccountApiCredentials Creation Flow").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
@@ -51,9 +59,135 @@ func TestSubaccountApiCredentialsStandalone(t *testing.T) {
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				sac := &v1alpha1.SubaccountApiCredential{}
 				MustGetResource(t, cfg, sacCreateName, nil, sac)
+				waitForApiCredentialSynced(t, ctx, cfg, sacCreateName, corev1.ConditionTrue, "")
 
+				secret := getApiCredentialSecret(t, ctx, cfg, sac)
+				baselineSecretData = copySecretData(secret.Data)
+				baselineSecretType = secret.Type
+				baselineSecretOwnerReferences = append([]metav1.OwnerReference(nil), secret.OwnerReferences...)
 				assertApiCredentialSecret(t, ctx, cfg, sac)
 
+				return ctx
+			},
+		).
+		Assess(
+			"Issue #863: malformed connection Secrets are unhealthy and recover",
+			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				if len(baselineSecretData) == 0 {
+					t.Fatal("baseline connection Secret was not captured")
+				}
+
+				sac := &v1alpha1.SubaccountApiCredential{}
+				MustGetResource(t, cfg, sacCreateName, nil, sac)
+				secretRef := sac.GetWriteConnectionSecretToReference()
+				if secretRef == nil {
+					t.Fatal("SubaccountApiCredential has no connection Secret reference")
+				}
+
+				cases := []struct {
+					name             string
+					deleteSecret     bool
+					data             func() map[string][]byte
+					expectedKeys     []string
+					messageSubstring string
+				}{
+					{
+						name:             "missing destination Secret",
+						deleteSecret:     true,
+						messageSubstring: "connection secret",
+					},
+					{
+						name: "empty Secret",
+						data: func() map[string][]byte {
+							return map[string][]byte{}
+						},
+						expectedKeys:     []string{},
+						messageSubstring: "attribute.api_url",
+					},
+					{
+						name: "client-ID-only Secret",
+						data: func() map[string][]byte {
+							return copySecretFields(baselineSecretData, "attribute.client_id")
+						},
+						expectedKeys:     []string{"attribute.client_id"},
+						messageSubstring: "attribute.api_url",
+					},
+					{
+						name: "client-ID-and-secret-only Secret",
+						data: func() map[string][]byte {
+							return copySecretFields(baselineSecretData, "attribute.client_id", "attribute.client_secret")
+						},
+						expectedKeys:     []string{"attribute.client_id", "attribute.client_secret"},
+						messageSubstring: "attribute.api_url",
+					},
+					{
+						name: "unrelated-data-only Secret",
+						data: func() map[string][]byte {
+							return map[string][]byte{"issue863.unrelated": []byte("fixture")}
+						},
+						expectedKeys:     []string{"issue863.unrelated"},
+						messageSubstring: "attribute.api_url",
+					},
+					{
+						name: "missing-client-secret Secret",
+						data: func() map[string][]byte {
+							return copySecretFields(baselineSecretData, "attribute.api_url", "attribute.client_id", "attribute.token_url")
+						},
+						expectedKeys:     []string{"attribute.api_url", "attribute.client_id", "attribute.token_url"},
+						messageSubstring: "attribute.client_secret",
+					},
+				}
+
+				for _, tc := range cases {
+					tc := tc
+					if ok := t.Run(tc.name, func(t *testing.T) {
+						if tc.deleteSecret {
+							secret := getApiCredentialSecret(t, ctx, cfg, sac)
+							AwaitResourceDeletionOrFail(ctx, t, cfg, secret, wait.WithTimeout(time.Minute*2))
+						} else {
+							secret := getApiCredentialSecret(t, ctx, cfg, sac)
+							secret.Data = tc.data()
+							if err := cfg.Client().Resources().Update(ctx, secret); err != nil {
+								t.Fatalf("failed to apply malformed connection Secret: %v", err)
+							}
+						}
+						requestApiCredentialReconciliation(t, ctx, cfg, sacCreateName, &reconcileNonce)
+
+						waitForApiCredentialSynced(t, ctx, cfg, sacCreateName, corev1.ConditionFalse, tc.messageSubstring)
+						if tc.expectedKeys != nil {
+							assertApiCredentialSecretKeys(t, ctx, cfg, secretRef, tc.expectedKeys)
+						}
+
+						secret := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:            secretRef.Name,
+								Namespace:       secretRef.Namespace,
+								OwnerReferences: append([]metav1.OwnerReference(nil), baselineSecretOwnerReferences...),
+							},
+							Type: baselineSecretType,
+							Data: copySecretData(baselineSecretData),
+						}
+						if tc.deleteSecret {
+							if err := cfg.Client().Resources().Create(ctx, secret); err != nil {
+								t.Fatalf("failed to restore connection Secret: %v", err)
+							}
+						} else {
+							current := getApiCredentialSecret(t, ctx, cfg, sac)
+							current.Data = secret.Data
+							if err := cfg.Client().Resources().Update(ctx, current); err != nil {
+								t.Fatalf("failed to restore connection Secret: %v", err)
+							}
+						}
+						requestApiCredentialReconciliation(t, ctx, cfg, sacCreateName, &reconcileNonce)
+						waitForApiCredentialSynced(t, ctx, cfg, sacCreateName, corev1.ConditionTrue, "")
+						assertApiCredentialSecret(t, ctx, cfg, sac)
+					}); !ok {
+						// A failed subtest may leave an invalid Secret behind. The feature
+						// teardown can still delete the managed resource, but do not run
+						// more mutations against an unknown state.
+						return ctx
+					}
+				}
 				return ctx
 			},
 		).
@@ -78,16 +212,102 @@ func TestSubaccountApiCredentialsStandalone(t *testing.T) {
 }
 
 func assertApiCredentialSecret(t *testing.T, ctx context.Context, cfg *envconf.Config, sac *v1alpha1.SubaccountApiCredential) {
-	secretName := sac.GetWriteConnectionSecretToReference().Name
-	secretNS := sac.GetWriteConnectionSecretToReference().Namespace
-	secret := &corev1.Secret{}
-	err := cfg.Client().Resources().Get(ctx, secretName, secretNS, secret)
-	if err != nil {
-		t.Error("Error while loading expected secret from Ref")
+	t.Helper()
+	secret := getApiCredentialSecret(t, ctx, cfg, sac)
+	for _, key := range []string{
+		"attribute.api_url",
+		"attribute.client_id",
+		"attribute.client_secret",
+		"attribute.token_url",
+	} {
+		if len(secret.Data[key]) == 0 {
+			t.Errorf("connection Secret is missing a non-empty %s field", key)
+		}
 	}
-	// secret contains correct structure
-	if _, ok := secret.Data["attribute.client_secret"]; !ok {
-		t.Error("Secret not in proper format")
+}
+
+func getApiCredentialSecret(t *testing.T, ctx context.Context, cfg *envconf.Config, sac *v1alpha1.SubaccountApiCredential) *corev1.Secret {
+	t.Helper()
+	secretRef := sac.GetWriteConnectionSecretToReference()
+	if secretRef == nil {
+		t.Fatal("SubaccountApiCredential has no connection Secret reference")
+	}
+	secret := &corev1.Secret{}
+	if err := cfg.Client().Resources().Get(ctx, secretRef.Name, secretRef.Namespace, secret); err != nil {
+		t.Fatalf("failed to load connection Secret: %v", err)
+	}
+	return secret
+}
+
+func copySecretData(data map[string][]byte) map[string][]byte {
+	copied := make(map[string][]byte, len(data))
+	for key, value := range data {
+		copied[key] = append([]byte(nil), value...)
+	}
+	return copied
+}
+
+func copySecretFields(data map[string][]byte, fields ...string) map[string][]byte {
+	result := make(map[string][]byte, len(fields))
+	for _, field := range fields {
+		result[field] = append([]byte(nil), data[field]...)
+	}
+	return result
+}
+
+func assertApiCredentialSecretKeys(t *testing.T, ctx context.Context, cfg *envconf.Config, ref *xpv1.SecretReference, expected []string) {
+	t.Helper()
+	secret := &corev1.Secret{}
+	if err := cfg.Client().Resources().Get(ctx, ref.Name, ref.Namespace, secret); err != nil {
+		t.Fatalf("failed to load malformed connection Secret: %v", err)
+	}
+	if len(secret.Data) != len(expected) {
+		t.Fatalf("connection Secret has %d keys, expected %d", len(secret.Data), len(expected))
+	}
+	for _, key := range expected {
+		if _, ok := secret.Data[key]; !ok {
+			t.Errorf("connection Secret is missing expected key %s", key)
+		}
+	}
+}
+
+// Secret updates are not required to enqueue a managed resource. Explicitly
+// changing a harmless annotation makes each assertion exercise the next
+// reconciliation rather than depending on the controller's poll/backoff.
+func requestApiCredentialReconciliation(t *testing.T, ctx context.Context, cfg *envconf.Config, name string, nonce *int) {
+	t.Helper()
+	credential := &v1alpha1.SubaccountApiCredential{}
+	if err := cfg.Client().Resources().Get(ctx, name, "", credential); err != nil {
+		t.Fatalf("failed to load SubaccountApiCredential for reconciliation request: %v", err)
+	}
+	annotations := credential.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	*nonce = *nonce + 1
+	annotations["issue863.e2e/reconcile"] = fmt.Sprintf("%d", *nonce)
+	credential.SetAnnotations(annotations)
+	if err := cfg.Client().Resources().Update(ctx, credential); err != nil {
+		t.Fatalf("failed to request SubaccountApiCredential reconciliation: %v", err)
+	}
+}
+
+func waitForApiCredentialSynced(t *testing.T, ctx context.Context, cfg *envconf.Config, name string, expected corev1.ConditionStatus, messageSubstring string) {
+	t.Helper()
+	object := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	match := conditions.New(cfg.Client().Resources()).ResourceMatch(object, func(object k8s.Object) bool {
+		credential, ok := object.(*v1alpha1.SubaccountApiCredential)
+		if !ok {
+			return false
+		}
+		condition := credential.GetCondition(xpv1.TypeSynced)
+		if condition.Status != expected {
+			return false
+		}
+		return messageSubstring == "" || strings.Contains(strings.ToLower(condition.Message), strings.ToLower(messageSubstring))
+	})
+	if err := wait.For(match, wait.WithTimeout(time.Minute*7)); err != nil {
+		t.Fatalf("timed out waiting for Synced=%s: %v", expected, err)
 	}
 }
 
