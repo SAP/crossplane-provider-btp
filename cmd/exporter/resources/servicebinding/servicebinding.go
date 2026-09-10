@@ -19,14 +19,14 @@ const (
 
 var (
 	selectedCache resources.ResourceCache[*servicebindingbase.ServiceBinding]
+	registry      = resources.NewRegistry()
 
 	bindingParam = configparam.StringSlice(KindName, "Service binding ID or regex expression for name.").
-		WithFlagName(KindName)
+			WithFlagName(KindName)
 )
 
 func init() {
 	resources.RegisterKind(exporter{})
-	export.AddConfigParams(bindingParam)
 }
 
 type exporter struct{}
@@ -34,15 +34,15 @@ type exporter struct{}
 var _ resources.Kind = exporter{}
 
 func (e exporter) Param() configparam.ConfigParam {
-	return nil
+	return bindingParam
 }
 
 func (e exporter) KindName() string {
 	return KindName
 }
 
-func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, resolveReferences bool) error {
-	cache, err := Get(ctx, btpClient)
+func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, options resources.Options) error {
+	cache, err := Get(ctx, btpClient, options)
 	if err != nil {
 		return fmt.Errorf("failed to get cache with service bindings: %w", err)
 	}
@@ -52,14 +52,14 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 		eventHandler.Warn(fmt.Errorf("no service bindings found"))
 	} else {
 		for _, e := range cache.All() {
-			convert(ctx, btpClient, e, eventHandler, resolveReferences)
+			convert(ctx, btpClient, e, eventHandler, options.ResolveReferences)
 		}
 	}
 
 	return nil
 }
 
-func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*servicebindingbase.ServiceBinding], error) {
+func Get(ctx context.Context, btpClient *btpcli.BtpCli, options resources.Options) (resources.ResourceCache[*servicebindingbase.ServiceBinding], error) {
 	if selectedCache != nil {
 		return selectedCache, nil
 	}
@@ -75,31 +75,20 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	cache := fc.Copy()
 
 	// If the user has already selected service instances, restrict bindings to those instances only.
-	if err := filterBySelectedInstances(ctx, btpClient, cache); err != nil {
+	if err := filterBySelectedInstances(ctx, btpClient, cache, options); err != nil {
 		return nil, fmt.Errorf("failed to filter service bindings: %w", err)
 	}
 
-	// Let the user select service bindings to export.
-	widgetValues := cache.ValuesForSelection()
-	bindingParam.WithPossibleValuesFn(func() ([]string, error) {
-		return widgetValues.Values(), nil
-	})
-
-	selectedBindings, err := bindingParam.ValueOrAsk(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get parameter value: %s, %w", bindingParam.GetName(), err)
+	if err := resources.SelectCache(ctx, cache, bindingParam, options); err != nil {
+		return nil, err
 	}
-	slog.DebugContext(ctx, "Selected service bindings", "bindings", selectedBindings)
-
-	// Keep only selected bindings in the cache.
-	cache.KeepSelectedOnly(selectedBindings)
 	selectedCache = cache
 
 	return selectedCache, nil
 }
 
-func filterBySelectedInstances(ctx context.Context, btpClient *btpcli.BtpCli, cache resources.ResourceCache[*servicebindingbase.ServiceBinding]) error {
-	siCache, err := serviceinstance.Get(ctx, btpClient)
+func filterBySelectedInstances(ctx context.Context, btpClient *btpcli.BtpCli, cache resources.ResourceCache[*servicebindingbase.ServiceBinding], options resources.Options) error {
+	siCache, err := serviceinstance.Get(ctx, btpClient, options)
 	if err != nil {
 		return fmt.Errorf("failed to get service instance cache: %w", err)
 	}
@@ -131,8 +120,20 @@ func filterBySelectedInstances(ctx context.Context, btpClient *btpcli.BtpCli, ca
 }
 
 func convert(ctx context.Context, btpClient *btpcli.BtpCli, sb *servicebindingbase.ServiceBinding, eventHandler export.EventHandler, resolveReferences bool) {
+	if !register(ctx, sb) {
+		return
+	}
+
 	exportPrerequisiteResources(ctx, btpClient, sb, eventHandler, resolveReferences)
 	eventHandler.Resource(convertServiceBindingResource(ctx, btpClient, sb, eventHandler, resolveReferences))
+}
+
+func register(ctx context.Context, sb *servicebindingbase.ServiceBinding) bool {
+	success := registry.Register(sb.GetID())
+	if !success {
+		slog.DebugContext(ctx, "Service binding already exported", "id", sb.GetID())
+	}
+	return success
 }
 
 func exportPrerequisiteResources(ctx context.Context, btpClient *btpcli.BtpCli, sb *servicebindingbase.ServiceBinding, eventHandler export.EventHandler, resolveReferences bool) {

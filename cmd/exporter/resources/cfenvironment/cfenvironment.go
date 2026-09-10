@@ -22,7 +22,7 @@ const (
 var (
 	cfEnvCache resources.ResourceCache[*CloudFoundryEnvironment]
 	cfEnvParam = configparam.StringSlice(KindName, "CF environment ID or regex expression for name.").
-		WithFlagName(KindName)
+			WithFlagName(KindName)
 )
 
 func init() {
@@ -41,8 +41,8 @@ func (e exporter) KindName() string {
 	return KindName
 }
 
-func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, resolveReferences bool) error {
-	cache, err := Get(ctx, btpClient)
+func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, options resources.Options) error {
+	cache, err := Get(ctx, btpClient, options)
 	if err != nil {
 		return fmt.Errorf("failed to get cache with CF environment instances: %w", err)
 	}
@@ -51,13 +51,13 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 	if cache.Len() == 0 {
 		eventHandler.Warn(fmt.Errorf("no CF environment instances found"))
 	} else {
-		convert(ctx, btpClient, eventHandler, resolveReferences)
+		convert(ctx, btpClient, eventHandler, options)
 	}
 
 	return nil
 }
 
-func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*CloudFoundryEnvironment], error) {
+func Get(ctx context.Context, btpClient *btpcli.BtpCli, options resources.Options) (resources.ResourceCache[*CloudFoundryEnvironment], error) {
 	if cfEnvCache != nil {
 		return cfEnvCache, nil
 	}
@@ -97,20 +97,9 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	cache := resources.NewResourceCache[*CloudFoundryEnvironment]()
 	cache.Store(instances...)
 
-	// Let the user select CF environments to export.
-	widgetValues := cache.ValuesForSelection()
-	cfEnvParam.WithPossibleValuesFn(func() ([]string, error) {
-		return widgetValues.Values(), nil
-	})
-
-	selectedEnvironments, err := cfEnvParam.ValueOrAsk(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get parameter value: %s, %w", cfEnvParam.GetName(), err)
+	if err := resources.SelectCache(ctx, cache, cfEnvParam, options); err != nil {
+		return nil, err
 	}
-	slog.DebugContext(ctx, "Selected CF environments", "environments", selectedEnvironments)
-
-	// Keep only selected CF environments in the cache.
-	cache.KeepSelectedOnly(selectedEnvironments)
 	cfEnvCache = cache
 
 	return cfEnvCache, nil
@@ -120,16 +109,16 @@ func isCloudFoundryEnvironment(instance *btpcli.EnvironmentInstance) bool {
 	return instance.EnvironmentType == CfServiceName
 }
 
-func convert(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, resolveReferences bool) {
-	cache, err := Get(ctx, btpClient)
+func convert(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, options resources.Options) {
+	cache, err := Get(ctx, btpClient, options)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to get cache with cloud foundry environments", "error", err)
 		return
 	}
 
 	for _, e := range cache.All() {
-		exportPrerequisiteResources(ctx, btpClient, e, eventHandler, resolveReferences)
-		eventHandler.Resource(convertCloudFoundryEnvResource(ctx, btpClient, e, eventHandler, resolveReferences))
+		exportPrerequisiteResources(ctx, btpClient, e, eventHandler, options.ResolveReferences)
+		eventHandler.Resource(convertCloudFoundryEnvResource(ctx, btpClient, e, eventHandler, options.ResolveReferences))
 	}
 }
 

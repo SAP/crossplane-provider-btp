@@ -25,15 +25,14 @@ var (
 	registry      = resources.NewRegistry()
 
 	entitlementParam = configparam.StringSlice(KindName, "Service plan name (or name fragment) to export. If specified, it must be a valid regex expression.").
-		WithFlagName(KindName).
-		WithExample("--entitlement '.*\\bcis\\b.*'")
+				WithFlagName(KindName).
+				WithExample("--entitlement '.*\\bcis\\b.*'")
 	autoAssignedParam = configparam.Bool(paramNameAutoAssigned, "Include service plans that are automatically assigned to all subaccounts.\nUsed in combination with '--kind "+KindName+"'").
-		WithFlagName(paramNameAutoAssigned)
+				WithFlagName(paramNameAutoAssigned)
 )
 
 func init() {
 	resources.RegisterKind(exporter{})
-	export.AddConfigParams(entitlementParam)
 	export.AddConfigParams(autoAssignedParam)
 }
 
@@ -42,17 +41,17 @@ type exporter struct{}
 var _ resources.Kind = exporter{}
 
 func (e exporter) Param() configparam.ConfigParam {
-	return nil
+	return entitlementParam
 }
 
 func (e exporter) KindName() string {
 	return KindName
 }
 
-func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, resolveReferences bool) error {
+func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, options resources.Options) error {
 	slog.DebugContext(ctx, "Export auto-assigned entitlements", "auto-assigned", autoAssignedParam.Value())
 
-	cache, err := Get(ctx, btpClient)
+	cache, err := Get(ctx, btpClient, options)
 	if err != nil {
 		return fmt.Errorf("failed to get cache with entitlements: %w", err)
 	}
@@ -62,14 +61,14 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 		eventHandler.Warn(fmt.Errorf("no entitlements found"))
 	} else {
 		for _, e := range cache.All() {
-			convert(ctx, btpClient, e, eventHandler, resolveReferences)
+			convert(ctx, btpClient, e, eventHandler, options.ResolveReferences)
 		}
 	}
 
 	return nil
 }
 
-func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*entitlement], error) {
+func Get(ctx context.Context, btpClient *btpcli.BtpCli, options resources.Options) (resources.ResourceCache[*entitlement], error) {
 	if selectedCache != nil {
 		return selectedCache, nil
 	}
@@ -84,20 +83,9 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 	// so that the full cache remains unchanged for other resources that might need it during their export.
 	cache := fc.Copy()
 
-	// Let the user select entitlements to export.
-	widgetValues := cache.ValuesForSelection()
-	entitlementParam.WithPossibleValuesFn(func() ([]string, error) {
-		return widgetValues.Values(), nil
-	})
-
-	selectedEntitlements, err := entitlementParam.ValueOrAsk(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get parameter value: %s, %w", entitlementParam.GetName(), err)
+	if err := resources.SelectCache(ctx, cache, entitlementParam, options); err != nil {
+		return nil, err
 	}
-	slog.DebugContext(ctx, "Selected entitlements", "entitlements", selectedEntitlements)
-
-	// Keep only selected entitlements in the cache.
-	cache.KeepSelectedOnly(selectedEntitlements)
 	selectedCache = cache
 
 	return selectedCache, nil
@@ -127,7 +115,7 @@ func getFullCache(ctx context.Context, btpClient *btpcli.BtpCli) (resources.Reso
 	slog.DebugContext(ctx, "Service assignments retrieved by BTP CLI", "count", len(svcs))
 
 	// Wrap service assignments for internal processing and caching.
-	entitlements := serviceToEntitlement(svcs)
+	entitlements := serviceToEntitlement(svcs, autoAssignedParam.Value())
 	slog.DebugContext(ctx, "Total entitlements", "count", len(entitlements))
 
 	// Create cache and store all entitlements.
@@ -137,12 +125,12 @@ func getFullCache(ctx context.Context, btpClient *btpcli.BtpCli) (resources.Reso
 	return fullCache, nil
 }
 
-func serviceToEntitlement(assignments []btpcli.AssignedService) []*entitlement {
+func serviceToEntitlement(assignments []btpcli.AssignedService, includeAutoAssigned bool) []*entitlement {
 	var entitlements []*entitlement
 	for _, svc := range assignments {
 		for _, plan := range svc.ServicePlans {
 			for _, assignInfo := range plan.AssignmentInfo {
-				if !autoAssignedParam.Value() && assignInfo.AutoAssigned {
+				if !includeAutoAssigned && assignInfo.AutoAssigned {
 					continue
 				}
 				ent := &entitlement{

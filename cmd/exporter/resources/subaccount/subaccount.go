@@ -18,7 +18,7 @@ const KindName = "subaccount"
 var (
 	subaccountCache resources.ResourceCache[*subaccount]
 	subaccountParam = configparam.StringSlice(KindName, "BTP subaccount ID or regex expression for name.").
-		WithFlagName(KindName)
+			WithFlagName(KindName)
 )
 
 func init() {
@@ -37,7 +37,7 @@ func (e exporter) KindName() string {
 	return subaccountParam.GetName()
 }
 
-func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, _ bool) error {
+func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, _ resources.Options) error {
 	cache, err := Get(ctx, btpClient)
 	if err != nil {
 		return fmt.Errorf("failed to get cache with subaccounts: %w", err)
