@@ -27,6 +27,10 @@
       "groupName": "release/v1_10_x dependencies"
     },
     {
+      "groupName": "terraform-provider-btp",
+      "matchPackageNames": ["SAP/btp", "github.com/SAP/terraform-provider-btp"]
+    },
+    {
       "groupName": "other dependencies",
       "matchManagers": ["gomod"],
       "matchUpdateTypes": ["minor", "patch", "digest", "pin"]
@@ -69,7 +73,8 @@
         "/(^|/)config.yml$/"
       ],
       "matchStrings": [
-        "(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+        "(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)",
+        "TERRAFORM_NATIVE_PROVIDER_BINARY *\\?= *terraform-provider-btp_v(?<currentValue>\\d+\\.\\d+\\.\\d+)_x5"
       ],
       "datasourceTemplate": "terraform-provider",
       "versioningTemplate": "hashicorp",

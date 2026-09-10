@@ -31,6 +31,8 @@ const (
 	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
 )
 
+var frameworkProvider = config.GetProvider().TerraformPluginFrameworkProvider
+
 var (
 	// TF_VERSION_CALLBACK is a function callback to allow retrieval of Terraform env versions, its suppose to be set in
 	// the main method to the params being passed when starting the controller
@@ -55,6 +57,7 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 				Source:  providerSource,
 				Version: providerVersion,
 			},
+			FrameworkProvider: frameworkProvider,
 		}
 
 		lm, ok := mg.(providerconfig.LegacyManaged)
@@ -123,6 +126,7 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 				Source:  providerSource,
 				Version: providerVersion,
 			},
+			FrameworkProvider: frameworkProvider,
 		}
 
 		lm, ok := mg.(providerconfig.LegacyManaged)
@@ -180,8 +184,9 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	// terraform.tfstate, satisfying plugin-framework's post-Read identity
 	// check (issue #521). The earlier afero.Fs middleware approach was
 	// inert — upjet's WithFs doesn't propagate to FileProducer, see
-	// identity_injector.go header. Remove the wrap when no-fork (PR #680 /
-	// issue #207) lands.
+	// identity_injector.go header. Still needed: the class-2 hybrids
+	// (ServiceInstance, ServiceBinding) keep running through this fork/CLI
+	// connector. Remove only once they migrate to no-fork too (issue #691 and #692).
 	ws := terraform.NewWorkspaceStore(log)
 	store := NewIdentityInjectingStore(ws, log)
 	provider := config.GetProvider()
