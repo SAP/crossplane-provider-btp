@@ -115,12 +115,20 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotSubaccountDestinationCertificate)
 	}
 
+	if cr.Spec.ForProvider.SubaccountID == nil || *cr.Spec.ForProvider.SubaccountID == "" {
+		return managed.ExternalCreation{}, errors.New("subaccountId must be resolved before creating a certificate")
+	}
+
+	// certName is the name that will be used both when calling the API and when
+	// setting the external-name annotation. If the user pre-set external-name to
+	// <subaccount>/<name>, honour that name instead of spec.forProvider.name.
+	certName := cr.Spec.ForProvider.Name
 	extName := meta.GetExternalName(cr)
 	if extName != "" && extName != cr.Name {
 		if err := validateExternalName(extName); err != nil {
 			return managed.ExternalCreation{}, err
 		}
-		certName := strings.SplitN(extName, "/", 2)[1]
+		certName = strings.SplitN(extName, "/", 2)[1]
 		existing, err := e.client.Get(ctx, certName)
 		if err != nil && !destination.IsNotFound(err) {
 			return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
@@ -130,13 +138,9 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		}
 	}
 
-	if cr.Spec.ForProvider.SubaccountID == nil || *cr.Spec.ForProvider.SubaccountID == "" {
-		return managed.ExternalCreation{}, errors.New("subaccountId must be resolved before creating a certificate")
-	}
-
 	cr.SetConditions(xpv1.Creating())
 
-	cert := buildCertificate(cr)
+	cert := buildCertificateWithName(cr, certName)
 	if err := e.client.Create(ctx, cert); err != nil {
 		if destination.IsConflict(err) {
 			return managed.ExternalCreation{}, errors.New(errAlreadyExists)
@@ -144,7 +148,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 
-	meta.SetExternalName(cr, *cr.Spec.ForProvider.SubaccountID+"/"+cr.Spec.ForProvider.Name)
+	meta.SetExternalName(cr, *cr.Spec.ForProvider.SubaccountID+"/"+certName)
 	return managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{}}, nil
 }
 
@@ -195,7 +199,11 @@ func validateExternalName(extName string) error {
 }
 
 func buildCertificate(cr *v1alpha1.SubaccountDestinationCertificate) destclient.Certificate {
-	cert := destclient.NewCertificate(cr.Spec.ForProvider.Name, cr.Spec.ForProvider.Content)
+	return buildCertificateWithName(cr, cr.Spec.ForProvider.Name)
+}
+
+func buildCertificateWithName(cr *v1alpha1.SubaccountDestinationCertificate, name string) destclient.Certificate {
+	cert := destclient.NewCertificate(name, cr.Spec.ForProvider.Content)
 	if cr.Spec.ForProvider.Type != "" {
 		cert.Type = &cr.Spec.ForProvider.Type
 	}
@@ -203,9 +211,9 @@ func buildCertificate(cr *v1alpha1.SubaccountDestinationCertificate) destclient.
 }
 
 func isUpToDate(cr *v1alpha1.SubaccountDestinationCertificate, observed *destclient.Certificate) bool {
-	if cr.Spec.ForProvider.Content != observed.GetContent() {
-		return false
-	}
+	// BTP's Destination API does not return certificate content in GET responses,
+	// so observed.GetContent() is always "". Comparing content would always return
+	// false and cause an infinite Update loop — skip it.
 	observedType := ""
 	if observed.Type != nil {
 		observedType = observed.GetType()
