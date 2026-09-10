@@ -29,5 +29,12 @@ func Configure(p *config.Provider) {
 
 		// ADR: disable external-name initialization
 		r.ExternalName.DisableNameInitializer = true
+
+		// issue #962: avoid late initialization trigger. Optional+Computed fields
+		// cause late-init to rewrite the spec and short-circuit Observe before
+		// Plan on a parameters-only update.
+		r.LateInitializer.IgnoredFields = []string{
+			"service_offering_name", "serviceplan_name", "serviceplan_id", "parameters",
+		}
 	})
 }
