@@ -1,0 +1,33 @@
+# Check the licenses of Go dependencies agains a list of allowed licenses.
+name: check-go-licenses
+
+on:
+  workflow_call:
+    inputs:
+      allowed_licenses:
+        description: 'Comma-separated list of allowed SPDX license identifiers'
+        required: false
+        type: string
+        default: 'Apache-2.0,BSD-3-Clause,MIT,MPL-2.0,ISC,BSD-2-Clause,Unicode-DFS-2016,BSD-0-Clause'
+
+permissions:
+  contents: read
+
+jobs:
+  check-go-licenses:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install go-licenses
+        run: |
+          go install github.com/google/go-licenses/v2@latest
+
+      - name: check licenses
+        run: |
+          go-licenses check --allowed_licenses="${{ inputs.allowed_licenses }}" ./...
