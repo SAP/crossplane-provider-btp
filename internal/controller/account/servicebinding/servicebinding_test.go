@@ -158,9 +158,6 @@ type MockServiceBindingClientFactory struct {
 	Client servicebindingclient.ServiceBindingClientInterface
 	Error  error
 
-	// RequireDeletionTimestamp enforces that CR must have deletion timestamp before CreateClient is called
-	RequireDeletionTimestamp bool
-
 	// Capture calls for verification
 	CreateClientCalls []CreateClientCall
 }
@@ -169,25 +166,33 @@ type CreateClientCall struct {
 	CR                 *v1alpha1.ServiceBinding
 	TargetName         string
 	TargetExternalName string
+	MarkForDeletion    bool
 }
 
-func (f *MockServiceBindingClientFactory) CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (servicebindingclient.ServiceBindingClientInterface, error) {
-	// Enforce deletion timestamp requirement if configured
-	if f.RequireDeletionTimestamp && cr.GetDeletionTimestamp() == nil {
-		return nil, errors.New("CreateClient called without deletion timestamp - DeleteBinding must set deletion timestamp before calling CreateClient")
-	}
-
+func (f *MockServiceBindingClientFactory) CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string, markForDeletion bool) (servicebindingclient.ServiceBindingClientInterface, error) {
 	// Capture the call for verification
 	f.CreateClientCalls = append(f.CreateClientCalls, CreateClientCall{
 		CR:                 cr,
 		TargetName:         targetName,
 		TargetExternalName: targetExternalName,
+		MarkForDeletion:    markForDeletion,
 	})
 
 	if f.Error != nil {
 		return nil, f.Error
 	}
 	return f.Client, nil
+}
+
+// MarkedForDeletion reports whether any captured CreateClient call requested
+// the destroy phase (markForDeletion=true).
+func (f *MockServiceBindingClientFactory) MarkedForDeletion() bool {
+	for _, c := range f.CreateClientCalls {
+		if c.MarkForDeletion {
+			return true
+		}
+	}
+	return false
 }
 
 // Reset clears the captured calls
@@ -1316,7 +1321,10 @@ func TestCreate(t *testing.T) {
 			want: want{
 				err: errors.New("mock: client creation not supported in current test architecture"),
 				cr: expectedServiceBinding(
-					withMetadata("old-external-name-uuid", map[string]string{servicebindingclient.ForceRotationKey: "true"}),
+					withMetadata("old-external-name-uuid", map[string]string{
+						servicebindingclient.ForceRotationKey:      "true",
+						servicebindingclient.PendingBindingNameKey: "test-binding-fixed1",
+					}),
 					withConditions(xpv1.Creating()),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.ForProvider.Name = "test-binding"
@@ -1343,6 +1351,8 @@ func TestCreate(t *testing.T) {
 				kube:          tc.fields.kube,
 				clientFactory: tc.fields.clientFactory,
 				keyRotator:    tc.fields.keyRotator,
+				// Deterministic suffix so rotation cases have a stable pending name.
+				nameGenerator: func(base string) string { return base + "-fixed1" },
 			}
 
 			got, err := e.Create(context.Background(), tc.args.mg)
@@ -1714,6 +1724,42 @@ func TestDelete(t *testing.T) {
 				),
 			},
 		},
+		"DeleteVerificationFails": {
+			reason: "should return error when the binding still exists after destroy (silent no-op destroy)",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						// Destroy reports success, but read-back still sees the resource.
+						deletion:    managed.ExternalDelete{},
+						observation: managed.ExternalObservation{ResourceExists: true},
+					},
+				},
+				keyRotator: &MockKeyRotator{},
+				tracker: &MockTracker{
+					deleteBlocked: false,
+				},
+				kube: &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				err: errors.New(errVerifyBinding),
+				d:   managed.ExternalDelete{},
+				cr: expectedServiceBinding(
+					withMetadata("test-external-name", nil),
+					withConditions(xpv1.Deleting()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+		},
 		"SuccessfulDelete": {
 			reason: "should delete successfully",
 			fields: fields{
@@ -1814,10 +1860,10 @@ func TestDeleteBinding(t *testing.T) {
 	}
 
 	type want struct {
-		err                    error
-		crHasDeletionTimestamp bool
-		crHasDeletingCondition bool
-		originalCrModified     bool // Verify original CR is not modified (deep copy)
+		err                error
+		createClientCalls  int  // number of CreateClient calls (3 = seed+destroy+verify)
+		markedForDeletion  bool // at least one call requested the destroy phase
+		originalCrModified bool // Verify original CR is not modified
 	}
 
 	cases := map[string]struct {
@@ -1826,14 +1872,15 @@ func TestDeleteBinding(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"DeletionTimestampSetBeforeClientCreation": {
-			reason: "should set deletion timestamp and deleting condition before creating client",
+		"SuccessfulThreePhaseDelete": {
+			reason: "should seed, destroy, then verify the binding is gone",
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
 					Client: &MockServiceBindingClient{
 						deletion: managed.ExternalDelete{},
+						// verify read-back reports the binding is gone
+						observation: managed.ExternalObservation{ResourceExists: false},
 					},
-					RequireDeletionTimestamp: true,
 				},
 			},
 			args: args{
@@ -1847,18 +1894,17 @@ func TestDeleteBinding(t *testing.T) {
 				targetExternalName: "retired-id-1",
 			},
 			want: want{
-				err:                    nil,
-				crHasDeletionTimestamp: true,
-				crHasDeletingCondition: true,
-				originalCrModified:     false,
+				err:                nil,
+				createClientCalls:  3,
+				markedForDeletion:  true,
+				originalCrModified: false,
 			},
 		},
-		"ClientCreationError": {
-			reason: "should return error when client creation fails",
+		"SeedClientCreationError": {
+			reason: "should return error when the seed-phase client creation fails",
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
-					Error:                    errors.New("client creation error"),
-					RequireDeletionTimestamp: true,
+					Error: errors.New("client creation error"),
 				},
 			},
 			args: args{
@@ -1872,20 +1918,19 @@ func TestDeleteBinding(t *testing.T) {
 				targetExternalName: "retired-id-1",
 			},
 			want: want{
-				err:                    errors.New("client creation error"),
-				crHasDeletionTimestamp: true, // Should still be set even on error
-				crHasDeletingCondition: true,
-				originalCrModified:     false,
+				err:                errors.New(errSeedBinding),
+				createClientCalls:  1,
+				markedForDeletion:  false,
+				originalCrModified: false,
 			},
 		},
 		"DeleteError": {
-			reason: "should return error when delete operation fails",
+			reason: "should return error when the destroy operation fails",
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
 					Client: &MockServiceBindingClient{
 						deleteErr: errors.New("delete error"),
 					},
-					RequireDeletionTimestamp: true,
 				},
 			},
 			args: args{
@@ -1899,10 +1944,37 @@ func TestDeleteBinding(t *testing.T) {
 				targetExternalName: "retired-id-1",
 			},
 			want: want{
-				err:                    errors.New("delete error"),
-				crHasDeletionTimestamp: true,
-				crHasDeletingCondition: true,
-				originalCrModified:     false,
+				err:                errors.New("delete error"),
+				createClientCalls:  2, // seed + destroy; verify not reached
+				markedForDeletion:  true,
+				originalCrModified: false,
+			},
+		},
+		"VerificationStillExists": {
+			reason: "should return error when read-back shows the binding still exists (silent no-op destroy)",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						deletion:    managed.ExternalDelete{},
+						observation: managed.ExternalObservation{ResourceExists: true},
+					},
+				},
+			},
+			args: args{
+				cr: expectedServiceBinding(
+					withMetadata("test-binding", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+				targetName:         "retired-binding-1",
+				targetExternalName: "retired-id-1",
+			},
+			want: want{
+				err:                errors.New(errVerifyBinding),
+				createClientCalls:  3,
+				markedForDeletion:  true,
+				originalCrModified: false,
 			},
 		},
 	}
@@ -1922,41 +1994,24 @@ func TestDeleteBinding(t *testing.T) {
 			if tc.want.err != nil {
 				if err == nil {
 					t.Errorf("\n%s\ne.DeleteBinding(...): expected error, got nil\n", tc.reason)
-				} else if err.Error() != tc.want.err.Error() {
-					t.Errorf("\n%s\ne.DeleteBinding(...): expected error %q, got %q\n", tc.reason, tc.want.err.Error(), err.Error())
+				} else if !containsError(err.Error(), tc.want.err.Error()) {
+					t.Errorf("\n%s\ne.DeleteBinding(...): expected error containing %q, got %q\n", tc.reason, tc.want.err.Error(), err.Error())
 				}
 			} else if err != nil {
 				t.Errorf("\n%s\ne.DeleteBinding(...): expected no error, got %v\n", tc.reason, err)
 			}
 
-			// Verify that the client factory was called and received a CR with deletion timestamp
 			if mockFactory, ok := tc.fields.clientFactory.(*MockServiceBindingClientFactory); ok {
-				if len(mockFactory.CreateClientCalls) != 1 {
-					t.Errorf("\n%s\nExpected 1 CreateClient call, got %d\n", tc.reason, len(mockFactory.CreateClientCalls))
-				} else {
-					capturedCR := mockFactory.CreateClientCalls[0].CR
+				if len(mockFactory.CreateClientCalls) != tc.want.createClientCalls {
+					t.Errorf("\n%s\nExpected %d CreateClient calls, got %d\n", tc.reason, tc.want.createClientCalls, len(mockFactory.CreateClientCalls))
+				}
 
-					// Verify deletion timestamp
-					hasDeletionTimestamp := capturedCR.GetDeletionTimestamp() != nil
-					if hasDeletionTimestamp != tc.want.crHasDeletionTimestamp {
-						t.Errorf("\n%s\nCR passed to CreateClient: expected deletion timestamp set=%v, got=%v\n",
-							tc.reason, tc.want.crHasDeletionTimestamp, hasDeletionTimestamp)
-					}
+				if mockFactory.MarkedForDeletion() != tc.want.markedForDeletion {
+					t.Errorf("\n%s\nExpected markedForDeletion=%v, got=%v\n", tc.reason, tc.want.markedForDeletion, mockFactory.MarkedForDeletion())
+				}
 
-					// Verify deleting condition
-					hasDeletingCondition := false
-					for _, condition := range capturedCR.Status.Conditions {
-						if condition.Type == xpv1.TypeReady && condition.Status == "False" && condition.Reason == xpv1.ReasonDeleting {
-							hasDeletingCondition = true
-							break
-						}
-					}
-					if hasDeletingCondition != tc.want.crHasDeletingCondition {
-						t.Errorf("\n%s\nCR passed to CreateClient: expected deleting condition set=%v, got=%v\n",
-							tc.reason, tc.want.crHasDeletingCondition, hasDeletingCondition)
-					}
-
-					// Verify target names
+				// Verify target names on the first (seed) call.
+				if len(mockFactory.CreateClientCalls) > 0 {
 					if mockFactory.CreateClientCalls[0].TargetName != tc.args.targetName {
 						t.Errorf("\n%s\nExpected targetName %q, got %q\n",
 							tc.reason, tc.args.targetName, mockFactory.CreateClientCalls[0].TargetName)
@@ -1965,10 +2020,14 @@ func TestDeleteBinding(t *testing.T) {
 						t.Errorf("\n%s\nExpected targetExternalName %q, got %q\n",
 							tc.reason, tc.args.targetExternalName, mockFactory.CreateClientCalls[0].TargetExternalName)
 					}
+					// The seed phase must NOT be marked for deletion.
+					if mockFactory.CreateClientCalls[0].MarkForDeletion {
+						t.Errorf("\n%s\nSeed-phase CreateClient should have markForDeletion=false\n", tc.reason)
+					}
 				}
 			}
 
-			// Verify original CR was not modified (deep copy was used)
+			// Verify original CR was not modified.
 			originalHasDeletionTimestamp := originalCR.GetDeletionTimestamp() != nil
 			currentHasDeletionTimestamp := tc.args.cr.GetDeletionTimestamp() != nil
 
