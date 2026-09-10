@@ -90,7 +90,8 @@ jobs:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
           # Opt in to checking out fork PR code under pull_request_target. actions/checkout v7 refuses this by default.
-          # Safe here: the pr-e2e-approval environment (required_reviewers) gates this job, so a maintainer inspects the fork diff before it runs with secrets.
+# Opt in to checking out fork PR code under pull_request_target. actions/checkout v7 refuses this by default.
+# Safe here: the caller's `approve` job (pr-e2e-approval, required_reviewers) must succeed before this workflow's jobs run, so a maintainer inspects the fork diff before it runs with secrets.
           allow-unsafe-pr-checkout: true
 
       - name: Pin resolved checkout SHA
