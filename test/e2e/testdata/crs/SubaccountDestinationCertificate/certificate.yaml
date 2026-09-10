@@ -9,8 +9,7 @@ spec:
   forProvider:
     # BTP requires a file extension in the name to determine the certificate format.
     name: e2e-cert-$BUILD_ID.pem
-    # Self-signed EC P-256 certificate, PEM format base64-encoded (valid 10 years, CN=e2e-test).
-    # BTP Destination Service Content field expects base64(PEM text) when name ends in .pem.
+    # Self-signed EC P-256 certificate (valid 10 years, CN=e2e-test), base64-encoded PEM.
     content: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJlekNDQVNHZ0F3SUJBZ0lVRWdoOWEvanptSnhGanBwek1ScCt1UTkrckI0d0NnWUlLb1pJemowRUF3SXcKRXpFUk1BOEdBMVVFQXd3SVpUSmxMWFJsYzNRd0hoY05Nall3T1RBNU1UTXlOVEl3V2hjTk16WXdPVEEyTVRNeQpOVEl3V2pBVE1SRXdEd1lEVlFRRERBaGxNbVV0ZEdWemREQlpNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VICkEwSUFCQnJHblppYlhnNGhKZVQ1RHpPc0hBcVp6b2QxUmZIc2Z1SXc2SmE3akdVcTFDbVdBcHcyZWdVQ2t4RU0KdWxYZ3grUnNsYk1RWXdCdC8ra3IxZURFRDAralV6QlJNQjBHQTFVZERnUVdCQlFzTEVoYXZKeUFNdnUwNEYzYgo5ZnBVaXRoY3lEQWZCZ05WSFNNRUdEQVdnQlFzTEVoYXZKeUFNdnUwNEYzYjlmcFVpdGhjeURBUEJnTlZIUk1CCkFmOEVCVEFEQVFIL01Bb0dDQ3FHU000OUJBTUNBMGdBTUVVQ0lDN3hpZkZPRUxpTDFvb1U4VkFGZ0NjeW5wZTAKMmt0a05rUGxIOHJTMzlVSUFpRUEweDJ5R2h5WldXRUtUR2tDZEdmVzBqd1VFV3RlaE16Z0hvK0h3aEpUK1h3PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
     subaccountRef:
       name: e2e-dest-cert-subaccount

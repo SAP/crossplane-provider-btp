@@ -54,7 +54,7 @@ func (c *certificateClient) Get(ctx context.Context, name string) (*destclient.C
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, &destError{code: http.StatusNotFound, message: err.Error()}
 		}
-		return nil, err
+		return nil, enrichErr(err)
 	}
 	return cert, nil
 }
@@ -93,9 +93,9 @@ func (c *certificateClient) Update(ctx context.Context, cert destclient.Certific
 	_, resp, err := c.api.V1SubaccountCertificatesPut(ctx).Certificate(req).Execute()
 	if err != nil {
 		if resp != nil {
-			return &destError{code: resp.StatusCode, message: err.Error()}
+			return &destError{code: resp.StatusCode, message: enrichErr(err).Error()}
 		}
-		return err
+		return enrichErr(err)
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func (c *certificateClient) Delete(ctx context.Context, name string) error {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil
 		}
-		return err
+		return enrichErr(err)
 	}
 	return nil
 }
