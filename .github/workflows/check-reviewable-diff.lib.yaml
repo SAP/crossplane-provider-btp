@@ -1,14 +1,21 @@
-# This workflow will run make reviewable and make check-diff as checks
-
-name: Reviewable&Check-Diff
+# Run make reviewable and make check-diff
+#
+# reviewable:
+#   make generate
+#   make lint
+#   make test
+#
+# check-diff:
+#   runs make generate and check for uncommitted changes
+name: check-reviewable-diff
 permissions:
   contents: read
 
 on:
-  workflow_call: 
+  workflow_call:
 
 jobs:
-  reviewable-checkdiff:
+  check-reviewable-diff:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -23,9 +30,10 @@ jobs:
     - name: Install Go tools
       run: go install tool
 
-    - name: Make Reviewable
+    - name: make reviewable
       run: make reviewable
       env:
         RUNNING_IN_CI: 'true'
-    - name: Make Check-Diff
+
+    - name: make check-diff
       run: make check-diff

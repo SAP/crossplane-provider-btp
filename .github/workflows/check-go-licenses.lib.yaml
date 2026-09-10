@@ -1,14 +1,20 @@
-name: Check Go Dependency Licenses
+# Check the licenses of Go dependencies agains a list of allowed licenses.
+name: check-go-licenses
 
 on:
   workflow_call:
+    inputs:
+      allowed_licenses:
+        description: 'Comma-separated list of allowed SPDX license identifiers'
+        required: false
+        type: string
+        default: 'Apache-2.0,BSD-3-Clause,MIT,MPL-2.0,ISC,BSD-2-Clause,Unicode-DFS-2016,BSD-0-Clause'
 
 permissions:
   contents: read
 
 jobs:
-  license-check:
-    name: Check licenses of dependencies
+  check-go-licenses:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repo
@@ -24,4 +30,4 @@ jobs:
 
       - name: check licenses
         run: |
-          go-licenses check --allowed_licenses="Apache-2.0,BSD-3-Clause,MIT,MPL-2.0,ISC,BSD-2-Clause,Unicode-DFS-2016,BSD-0-Clause" ./...
+          go-licenses check --allowed_licenses="${{ inputs.allowed_licenses }}" ./...
