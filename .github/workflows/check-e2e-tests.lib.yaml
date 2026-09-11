@@ -1,4 +1,6 @@
-# Runs e2e tests, potentially requiring approval based on the `environment` input.
+# Runs e2e tests.
+#
+# Approval is handled in the calling job.
 #
 # Environment variables/secrets that are needed
 # CLI_SERVER_URL contains the CLI server URL
@@ -20,9 +22,14 @@ on:
         default: ''
         required: false
         type: string
-      environment:
-        description: 'the environment to run in'
-        default: 'pr-e2e-approval'
+      skip:
+        description: 'skip all jobs (e.g. for doc-only changes); workflow still runs to satisfy branch protection'
+        default: false
+        required: false
+        type: boolean
+      concurrency-group:
+        description: 'concurrency group for the workflow run (defaults to using the workflow run number, for parallel runs)'
+        default: ''
         required: false
         type: string
   workflow_dispatch:
@@ -32,16 +39,26 @@ on:
         default: ''
         required: false
         type: string
-      environment:
-        description: 'the environment to run in'
-        default: 'pr-e2e-approval'
+      skip:
+        description: 'skip all jobs (e.g. for doc-only changes); workflow jobs still runs to satisfy branch protection'
+        default: false
+        required: false
+        type: boolean
+      concurrency-group:
+        description: 'concurrency group for the workflow run (defaults to the workflow run number, for parallel execution)'
+        default: ''
         required: false
         type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ inputs.concurrency-group != '' && inputs.concurrency-group || github.run_id }}
+  cancel-in-progress: false
+
 env:
+  BUILD_ID: ${{ github.run_number }}-${{ github.run_attempt }} # using shorter run number for BTP character limits
   # hardcoded BTP CLI version
   btp_cli_version: 2.116.2
   E2E_BUILD_REGISTRY: index.docker.io/e2e
@@ -58,10 +75,8 @@ env:
 
 jobs:
   prepare-matrix:
+    if: ${{ !inputs.skip }}
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment }}  # approval here for the entire workflow, later jobs use no approval environment
-      deployment: false
     outputs:
       test-names: ${{ steps.set-matrix.outputs.test-names }}
       # Resolve the checkout ref to a fixed commit SHA once, inside the gated job. Downstream jobs
@@ -75,7 +90,8 @@ jobs:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
           # Opt in to checking out fork PR code under pull_request_target. actions/checkout v7 refuses this by default.
-          # Safe here: the pr-e2e-approval environment (required_reviewers) gates this job, so a maintainer inspects the fork diff before it runs with secrets.
+# Opt in to checking out fork PR code under pull_request_target. actions/checkout v7 refuses this by default.
+# Safe here: the caller's `approve` job (pr-e2e-approval, required_reviewers) must succeed before this workflow's jobs run, so a maintainer inspects the fork diff before it runs with secrets.
           allow-unsafe-pr-checkout: true
 
       - name: Pin resolved checkout SHA
@@ -278,7 +294,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [prepare-matrix, prepare-helm-chart, prepare-build] # prepare-helm-chart provides crossplane-chart artifact; prepare-build provides image/xpkg/tools artifacts
     environment:
-      name: pr-e2e-no-approval  # approval is on the preceding prepare-matrix job
+      name: pr-e2e-no-approval  # approval is on the preceding approval job
       deployment: false
     strategy:
       fail-fast: false
@@ -385,10 +401,6 @@ jobs:
           cd linux-amd64
           mv btp /usr/local/bin
 
-      - name: Set BUILD_ID
-        run: |
-          echo "BUILD_ID=${{github.run_number}}-${{github.run_attempt}}" >> $GITHUB_ENV
-
       - name: Run e2e test
         timeout-minutes: 120
         run: |
@@ -403,7 +415,6 @@ jobs:
           done
           exit "$rc"
         env:
-          BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
@@ -418,7 +429,7 @@ jobs:
     environment:
       name: pr-e2e-no-approval
       deployment: false
-    if: always() && needs.prepare-matrix.result == 'success'  # only run if prepare-matrix was successful (requires manual approval) and then always run after e2e-test
+    if: always() && !inputs.skip && needs.prepare-matrix.result == 'success' # intentional: workflow cancellation skips cleanup; resources will persist until the next run
     steps:
       - name: checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -438,14 +449,10 @@ jobs:
           cd linux-amd64
           mv btp /usr/local/bin
 
-      - name: Set BUILD_ID
-        run: echo "BUILD_ID=${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_ENV
-
       - name: clean up cluster
         run: |
           go run .github/workflows/cleanup.go
         env:
-          BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
@@ -460,7 +467,7 @@ jobs:
       - prepare-build
       - e2e-test
     timeout-minutes: 1
-    if: always()
+    if: always() && !inputs.skip
     steps:
       - name: Fail for failed prepare-matrix job
         if: |
