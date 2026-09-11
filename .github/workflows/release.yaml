@@ -29,8 +29,6 @@ jobs:
     uses: ./.github/workflows/check-e2e-tests.lib.yaml
     needs:
     - run-pre-checks
-    with:
-      environment: pr-e2e-no-approval
     secrets: inherit
     permissions:
       contents: read
