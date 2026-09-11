@@ -42,12 +42,20 @@ type nativeClientMock struct {
 	observeRes siClient.ObserveResult
 	observeErr error
 
-	createID  string
-	createErr error
+	createID    string
+	createOpID  string
+	createErr   error
 
-	updateErr error
+	updateOpID string
+	updateErr  error
 
 	deleteErr error
+
+	getParamsRes map[string]interface{}
+	getParamsErr error
+
+	retrievableRes bool
+	retrievableErr error
 
 	// captured call args
 	createCalled bool
@@ -62,22 +70,30 @@ func (m *nativeClientMock) Observe(ctx context.Context, externalName string) (si
 	return m.observeRes, m.observeErr
 }
 
-func (m *nativeClientMock) Create(ctx context.Context, cr *v1alpha1.ServiceInstance, params map[string]interface{}) (string, error) {
+func (m *nativeClientMock) Create(ctx context.Context, cr *v1alpha1.ServiceInstance, params map[string]interface{}) (string, string, error) {
 	m.createCalled = true
-	return m.createID, m.createErr
+	return m.createID, m.createOpID, m.createErr
 }
 
 func (m *nativeClientMock) Update(ctx context.Context, externalName string, cr *v1alpha1.ServiceInstance,
-	params map[string]interface{}, observed *smopenapi.ServiceInstanceResponseObject) error {
+	params map[string]interface{}, observed *smopenapi.ServiceInstanceResponseObject) (string, error) {
 	m.updateCalled = true
 	m.updatePayloadCR = cr
 	m.updateObserved = observed
-	return m.updateErr
+	return m.updateOpID, m.updateErr
 }
 
 func (m *nativeClientMock) Delete(ctx context.Context, externalName string) error {
 	m.deleteCalled = true
 	return m.deleteErr
+}
+
+func (m *nativeClientMock) GetParameters(ctx context.Context, instanceID string) (map[string]interface{}, error) {
+	return m.getParamsRes, m.getParamsErr
+}
+
+func (m *nativeClientMock) InstancesRetrievable(ctx context.Context, planID string) (bool, error) {
+	return m.retrievableRes, m.retrievableErr
 }
 
 // ====================================================================================
@@ -763,7 +779,11 @@ func TestCalculateDiff_IgnoresReservedLabels(t *testing.T) {
 		},
 	}
 
-	if diff := e.calculateDiff(cr, instance); diff != "" {
+	diff, err := e.calculateDiff(context.Background(), cr, instance)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff != "" {
 		t.Errorf("expected no drift when only reserved labels differ, got: %s", diff)
 	}
 }

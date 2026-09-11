@@ -51,6 +51,10 @@ const (
 	opStateInProgress = "in progress"
 	opStateSucceeded  = "succeeded"
 	opStateFailed     = "failed"
+
+	// eventReasonParamDriftNotRetrievable is emitted when parameter drift
+	// detection is requested but the service offering does not support it.
+	eventReasonParamDriftNotRetrievable = "ParameterDriftNotRetrievable"
 )
 
 var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -193,6 +197,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 		return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 	case opStateFailed:
+		// If the failed op is the one we were tracking, discard the pending
+		// snapshot so we never record parameters that were rejected.
+		if pendingOpID := cr.Status.AtProvider.PendingOperationID; pendingOpID != "" {
+			if lastOperationID(instance) == pendingOpID {
+				cr.Status.AtProvider.PendingOperationID = ""
+				cr.Status.AtProvider.PendingParameters = ""
+			}
+		}
 		cr.SetConditions(xpv1.Condition{
 			Type:               xpv1.TypeReady,
 			Status:             corev1.ConditionFalse,
@@ -203,7 +215,10 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
 	}
 
-	// succeeded / Ready -> map status and compute drift.
+	// succeeded / Ready -> promote pending snapshot if our op succeeded.
+	e.reconcilePendingOp(cr, instance)
+
+	// Map status and compute drift.
 	if err := e.saveInstanceData(ctx, cr, instance); err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 	}
@@ -212,7 +227,10 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		cr.SetConditions(xpv1.Available())
 	}
 
-	diff := e.calculateDiff(cr, instance)
+	diff, err := e.calculateDiff(ctx, cr, instance)
+	if err != nil {
+		return managed.ExternalObservation{}, err
+	}
 	if diff != "" {
 		cr.SetConditions(xpv1.Condition{
 			Type:               xpv1.TypeReady,
@@ -236,6 +254,26 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
+// reconcilePendingOp checks whether a pending async operation has completed and
+// promotes or discards the pending parameter snapshot accordingly. It is called
+// once the last_operation.state is no longer "in progress" (i.e. succeeded).
+func (e *external) reconcilePendingOp(cr *v1alpha1.ServiceInstance, instance *smopenapi.ServiceInstanceResponseObject) {
+	pendingOpID := cr.Status.AtProvider.PendingOperationID
+	if pendingOpID == "" {
+		return
+	}
+	if lastOperationID(instance) != pendingOpID {
+		// The instance's current last_operation is a different op (e.g. an
+		// SM-side auto-heal). Leave the pending snapshot untouched; we'll
+		// re-evaluate it on the next reconcile.
+		return
+	}
+	// Our pending op succeeded: promote the snapshot.
+	cr.Status.AtProvider.LastAppliedParameters = cr.Status.AtProvider.PendingParameters
+	cr.Status.AtProvider.PendingOperationID = ""
+	cr.Status.AtProvider.PendingParameters = ""
+}
+
 func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr, ok := mg.(*v1alpha1.ServiceInstance)
 	if !ok {
@@ -249,7 +287,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errBuildParameters)
 	}
 
-	id, err := e.client.Create(ctx, cr, params)
+	id, opID, err := e.client.Create(ctx, cr, params)
 	if err != nil {
 		// ADR(external-name): on Create error, leave external-name as fallback so
 		// recovery can adopt a phantom-success instance on the next Observe.
@@ -259,6 +297,13 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	// Async create returned the new GUID: persist it as external-name (the
 	// crossplane reconciler won't update spec and status in one loop).
 	meta.SetExternalName(cr, id)
+
+	// Record the pending operation so Observe can promote the snapshot once it
+	// succeeds (and discard if it fails).
+	if err := e.recordPendingOp(cr, opID, params); err != nil {
+		log.FromContext(ctx).Error(err, "failed to record pending create op; snapshot will be absent until next update")
+	}
+
 	if err := e.kube.Update(ctx, cr); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateInstance)
 	}
@@ -273,6 +318,13 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	externalName := meta.GetExternalName(cr)
+
+	// Belt-and-suspenders: if a pending op is still in flight, do not fire
+	// another PATCH. Observe already suppresses Update via ResourceUpToDate=true
+	// for the opStateInProgress case, but a forced reconcile could bypass that.
+	if cr.Status.AtProvider.PendingOperationID != "" {
+		return managed.ExternalUpdate{}, nil
+	}
 
 	params, err := siClient.BuildComplexParameterMap(ctx, e.kube, cr.Spec.ForProvider.ParameterSecretRefs, cr.Spec.ForProvider.Parameters.Raw)
 	if err != nil {
@@ -289,11 +341,36 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		observed = res.Instance
 	}
 
-	if err := e.client.Update(ctx, externalName, cr, params, observed); err != nil {
+	opID, err := e.client.Update(ctx, externalName, cr, params, observed)
+	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateInstance)
 	}
 
+	// opID is "" for the shared-only sync PATCH (which carries no parameters).
+	// Only record a pending op for the general async PATCH.
+	if opID != "" {
+		if err := e.recordPendingOp(cr, opID, params); err != nil {
+			log.FromContext(ctx).Error(err, "failed to record pending update op; snapshot will be absent until next update")
+		}
+	}
+
 	return managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{}}, nil
+}
+
+// recordPendingOp serializes the given params map and stores it together with
+// the operation id as pending fields on the CR status. Safe to call with an
+// empty opID (no-ops in that case).
+func (e *external) recordPendingOp(cr *v1alpha1.ServiceInstance, opID string, params map[string]interface{}) error {
+	if opID == "" {
+		return nil
+	}
+	canonical, err := siClient.CanonicalParameterJSON(params)
+	if err != nil {
+		return err
+	}
+	cr.Status.AtProvider.PendingOperationID = opID
+	cr.Status.AtProvider.PendingParameters = canonical
+	return nil
 }
 
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
@@ -394,11 +471,18 @@ func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
 	return len(policies) == 1 && policies[0] == xpv1.ManagementActionObserve
 }
 
+// paramDriftEnabled reports whether the parameter drift detection annotation is
+// set to "true" on the CR.
+func paramDriftEnabled(cr *v1alpha1.ServiceInstance) bool {
+	return metav1.HasAnnotation(cr.ObjectMeta, v1alpha1.AnnotationParameterDriftDetection) &&
+		cr.GetAnnotations()[v1alpha1.AnnotationParameterDriftDetection] == "true"
+}
+
 // calculateDiff compares the desired spec against the observed Service Manager
-// instance (GET-only). parameters and subaccount_id are intentionally excluded:
-// the SM GET does not return parameters, and subaccount_id is immutable and not
-// present on the instance GET. Returns "" when there is no drift.
-func (e *external) calculateDiff(cr *v1alpha1.ServiceInstance, instance *smopenapi.ServiceInstanceResponseObject) string {
+// instance. When parameter drift detection is enabled and the offering supports
+// it, it also compares spec.parameters against the SM /parameters endpoint using
+// the three-way comparator. Returns "" when there is no drift.
+func (e *external) calculateDiff(ctx context.Context, cr *v1alpha1.ServiceInstance, instance *smopenapi.ServiceInstanceResponseObject) (string, error) {
 	desired := map[string]any{
 		"name":            cr.Spec.ForProvider.Name,
 		"service_plan_id": cr.Status.AtProvider.ServiceplanID,
@@ -416,7 +500,55 @@ func (e *external) calculateDiff(cr *v1alpha1.ServiceInstance, instance *smopena
 		observed["shared"] = instance.GetShared()
 	}
 
-	return cmp.Diff(desired, observed)
+	if diff := cmp.Diff(desired, observed); diff != "" {
+		return diff, nil
+	}
+
+	// Parameter drift detection (opt-in via annotation + capability gate).
+	if !paramDriftEnabled(cr) {
+		return "", nil
+	}
+
+	planID := cr.Status.AtProvider.ServiceplanID
+	if planID == "" {
+		return "", nil
+	}
+
+	retrievable, err := e.client.InstancesRetrievable(ctx, planID)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "cannot check instances_retrievable; skipping parameter drift")
+		return "", nil
+	}
+	if !retrievable {
+		e.emit(cr, event.Warning(
+			event.Reason(eventReasonParamDriftNotRetrievable),
+			errors.New("parameter drift detection requested but service offering does not support instances_retrievable; skipping")))
+		return "", nil
+	}
+
+	observedParams, err := e.client.GetParameters(ctx, instance.GetId())
+	if err != nil {
+		log.FromContext(ctx).Error(err, "cannot fetch instance parameters; skipping parameter drift")
+		return "", nil
+	}
+
+	desiredParams, err := siClient.BuildComplexParameterMap(ctx, e.kube, cr.Spec.ForProvider.ParameterSecretRefs, cr.Spec.ForProvider.Parameters.Raw)
+	if err != nil {
+		return "", errors.Wrap(err, errBuildParameters)
+	}
+
+	lastApplied, err := siClient.DecodeParameterJSON(cr.Status.AtProvider.LastAppliedParameters)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "cannot decode last-applied parameters; falling back to two-way compare")
+		lastApplied = nil
+	}
+
+	drift, paramDiff := siClient.ParameterDrift(desiredParams, lastApplied, observedParams)
+	if drift {
+		return "parameters: " + paramDiff, nil
+	}
+
+	return "", nil
 }
 
 // observedSpecLabels converts the observed instance labels back into the
@@ -455,6 +587,13 @@ func lastOperationState(instance *smopenapi.ServiceInstanceResponseObject) strin
 		return ""
 	}
 	return instance.LastOperation.GetState()
+}
+
+func lastOperationID(instance *smopenapi.ServiceInstanceResponseObject) string {
+	if instance == nil || instance.LastOperation == nil {
+		return ""
+	}
+	return instance.LastOperation.GetId()
 }
 
 func lastOperationMessage(instance *smopenapi.ServiceInstanceResponseObject) string {

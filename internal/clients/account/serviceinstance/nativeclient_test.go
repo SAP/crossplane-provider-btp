@@ -77,7 +77,7 @@ func TestNativeCreate(t *testing.T) {
 				},
 			}
 
-			id, err := c.Create(context.Background(), tc.cr, tc.params)
+			id, _, err := c.Create(context.Background(), tc.cr, tc.params)
 			if tc.want.err {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
@@ -192,7 +192,7 @@ func TestNativeUpdate(t *testing.T) {
 		},
 	}
 
-	if err := c.Update(context.Background(), guid, cr, params, observed); err != nil {
+	if _, err := c.Update(context.Background(), guid, cr, params, observed); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -254,7 +254,7 @@ func TestNativeUpdate_General(t *testing.T) {
 		},
 	}
 
-	if err := c.Update(context.Background(), guid, cr, params, observed); err != nil {
+	if _, err := c.Update(context.Background(), guid, cr, params, observed); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if calls != 1 {
@@ -305,7 +305,7 @@ func TestNativeUpdate_SharedUnmanaged(t *testing.T) {
 			return &smopenapi.UpdatedServiceInstanceResponseObject{}, httpResp(202), nil
 		},
 	}
-	if err := c.Update(context.Background(), "id", cr, nil, nil); err != nil {
+	if _, err := c.Update(context.Background(), "id", cr, nil, nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got.Shared != nil {
@@ -331,7 +331,7 @@ func TestNativeUpdate_SharedNoDrift(t *testing.T) {
 			return &smopenapi.UpdatedServiceInstanceResponseObject{}, httpResp(202), nil
 		},
 	}
-	if err := c.Update(context.Background(), "id", cr, nil, observed); err != nil {
+	if _, err := c.Update(context.Background(), "id", cr, nil, observed); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if calls != 1 {

@@ -3,7 +3,9 @@ package serviceinstanceclient
 import (
 	"context"
 	"net/http"
+	"path"
 	"sort"
+	"sync"
 	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -59,10 +61,19 @@ func FilterReservedLabels(in map[string][]*string) map[string][]*string {
 // by the ServiceInstance controller.
 type ServiceInstanceClientI interface {
 	Observe(ctx context.Context, externalName string) (ObserveResult, error)
-	Create(ctx context.Context, cr *v1alpha1.ServiceInstance, params map[string]interface{}) (id string, err error)
+	// Create provisions a new service instance and returns (id, operationID, error).
+	// operationID is the async SM operation id (may be empty for sync creates).
+	Create(ctx context.Context, cr *v1alpha1.ServiceInstance, params map[string]interface{}) (id string, operationID string, err error)
+	// Update applies at most one PATCH per call. It returns the SM operation id
+	// for the general async PATCH, or "" for the shared-only sync PATCH.
 	Update(ctx context.Context, externalName string, cr *v1alpha1.ServiceInstance,
-		params map[string]interface{}, observed *smopenapi.ServiceInstanceResponseObject) error
+		params map[string]interface{}, observed *smopenapi.ServiceInstanceResponseObject) (operationID string, err error)
 	Delete(ctx context.Context, externalName string) error
+	// GetParameters fetches the current parameters of a service instance from SM.
+	GetParameters(ctx context.Context, instanceID string) (map[string]interface{}, error)
+	// InstancesRetrievable resolves whether the service offering associated with
+	// the given service plan id supports the /parameters endpoint.
+	InstancesRetrievable(ctx context.Context, planID string) (bool, error)
 }
 
 // ObserveResult is the outcome of an Observe call against the Service Manager API.
@@ -75,10 +86,18 @@ type ObserveResult struct {
 // (defaulting to the real SM call) so table-driven tests can substitute mocks
 // without fighting the generated request-builder chain.
 type ServiceInstanceClient struct {
-	createFn func(ctx context.Context, payload smopenapi.CreateServiceInstanceRequestPayload, async bool) (*smopenapi.CreatedServiceInstanceResponseObject, *http.Response, error)
-	getFn    func(ctx context.Context, id string) (*smopenapi.ServiceInstanceResponseObject, *http.Response, error)
-	updateFn func(ctx context.Context, id string, payload smopenapi.UpdateServiceInstanceRequestPayload, async bool) (*smopenapi.UpdatedServiceInstanceResponseObject, *http.Response, error)
-	deleteFn func(ctx context.Context, id string, async bool) (map[string]interface{}, *http.Response, error)
+	createFn       func(ctx context.Context, payload smopenapi.CreateServiceInstanceRequestPayload, async bool) (*smopenapi.CreatedServiceInstanceResponseObject, *http.Response, error)
+	getFn          func(ctx context.Context, id string) (*smopenapi.ServiceInstanceResponseObject, *http.Response, error)
+	updateFn       func(ctx context.Context, id string, payload smopenapi.UpdateServiceInstanceRequestPayload, async bool) (*smopenapi.UpdatedServiceInstanceResponseObject, *http.Response, error)
+	deleteFn       func(ctx context.Context, id string, async bool) (map[string]interface{}, *http.Response, error)
+	getParamsFn    func(ctx context.Context, id string) (map[string]interface{}, *http.Response, error)
+	getPlanFn      func(ctx context.Context, planID string) (*smopenapi.ServicePlanResponseObject, *http.Response, error)
+	getOfferingFn  func(ctx context.Context, offeringID string) (*smopenapi.ServiceOfferingResponseObject, *http.Response, error)
+
+	// retrievableCache maps offering id -> instances_retrievable, populated on
+	// first lookup. Safe for concurrent read/write via mu.
+	mu              sync.RWMutex
+	retrievableCache map[string]bool
 }
 
 var _ ServiceInstanceClientI = &ServiceInstanceClient{}
@@ -100,6 +119,16 @@ func NewServiceInstanceClient(smc *smClient.ServiceManagerClient) *ServiceInstan
 		deleteFn: func(ctx context.Context, id string, async bool) (map[string]interface{}, *http.Response, error) {
 			return smc.DeleteServiceInstance(ctx, id).Async(async).Execute()
 		},
+		getParamsFn: func(ctx context.Context, id string) (map[string]interface{}, *http.Response, error) {
+			return smc.GetServiceInstanceParameters(ctx, id).Execute()
+		},
+		getPlanFn: func(ctx context.Context, planID string) (*smopenapi.ServicePlanResponseObject, *http.Response, error) {
+			return smc.GetServicePlansByServiceId(ctx, planID).Execute()
+		},
+		getOfferingFn: func(ctx context.Context, offeringID string) (*smopenapi.ServiceOfferingResponseObject, *http.Response, error) {
+			return smc.GetServiceOfferingById(ctx, offeringID).Execute()
+		},
+		retrievableCache: make(map[string]bool),
 	}
 }
 
@@ -118,8 +147,9 @@ func (c *ServiceInstanceClient) Observe(ctx context.Context, externalName string
 
 // Create provisions a service instance by plan ID. `shared` is deliberately NOT
 // sent at create (the create payloads have no such field); it is reconciled by a
-// later Update once the instance is Ready. Returns the new instance GUID.
-func (c *ServiceInstanceClient) Create(ctx context.Context, cr *v1alpha1.ServiceInstance, params map[string]interface{}) (string, error) {
+// later Update once the instance is Ready. Returns the new instance GUID and the
+// SM async operation id (from the Location header of the 202 response).
+func (c *ServiceInstanceClient) Create(ctx context.Context, cr *v1alpha1.ServiceInstance, params map[string]interface{}) (string, string, error) {
 	byPlan := smopenapi.NewCreateByPlanID(cr.Spec.ForProvider.Name, cr.Status.AtProvider.ServiceplanID)
 	if len(params) > 0 {
 		byPlan.SetParameters(params)
@@ -129,14 +159,14 @@ func (c *ServiceInstanceClient) Create(ctx context.Context, cr *v1alpha1.Service
 	}
 	payload := smopenapi.CreateByPlanIDAsCreateServiceInstanceRequestPayload(byPlan)
 
-	resp, _, err := c.createFn(ctx, payload, true)
+	resp, httpRes, err := c.createFn(ctx, payload, true)
 	if err != nil {
-		return "", smClient.SpecifyAPIError(err)
+		return "", "", smClient.SpecifyAPIError(err)
 	}
 	if resp == nil {
-		return "", errors.New("service manager returned no service instance on create")
+		return "", "", errors.New("service manager returned no service instance on create")
 	}
-	return resp.GetId(), nil
+	return resp.GetId(), operationIDFromResponse(httpRes), nil
 }
 
 // Update applies at most ONE PATCH per call. The Service Manager `shared`
@@ -147,17 +177,21 @@ func (c *ServiceInstanceClient) Create(ctx context.Context, cr *v1alpha1.Service
 // shared drifts we issue only the synchronous shared-only PATCH and let the
 // controller's next reconcile handle any remaining (general) drift. When shared
 // does not drift, we issue the general async PATCH (name, plan, params, labels).
+//
+// Returns the SM operation id from the async PATCH's Location header, or "" for
+// the shared-only sync PATCH (which carries no parameters).
 func (c *ServiceInstanceClient) Update(ctx context.Context, externalName string, cr *v1alpha1.ServiceInstance,
-	params map[string]interface{}, observed *smopenapi.ServiceInstanceResponseObject) error {
+	params map[string]interface{}, observed *smopenapi.ServiceInstanceResponseObject) (string, error) {
 	// Shared drift takes priority and is applied on its own, synchronously.
 	// The controller requeues afterwards, so remaining drift is reconciled next loop.
 	if sharedNeedsUpdate(cr, observed) {
 		sharedPayload := smopenapi.NewUpdateServiceInstanceRequestPayload()
 		sharedPayload.Shared = cr.Spec.ForProvider.Shared
 		if _, _, err := c.updateFn(ctx, externalName, *sharedPayload, false); err != nil {
-			return smClient.SpecifyAPIError(err)
+			return "", smClient.SpecifyAPIError(err)
 		}
-		return nil
+		// shared-only sync PATCH: no operation id to track.
+		return "", nil
 	}
 
 	payload := smopenapi.NewUpdateServiceInstanceRequestPayload()
@@ -172,10 +206,11 @@ func (c *ServiceInstanceClient) Update(ctx context.Context, externalName string,
 		payload.Labels = labels
 	}
 
-	if _, _, err := c.updateFn(ctx, externalName, *payload, true); err != nil {
-		return smClient.SpecifyAPIError(err)
+	_, httpRes, err := c.updateFn(ctx, externalName, *payload, true)
+	if err != nil {
+		return "", smClient.SpecifyAPIError(err)
 	}
-	return nil
+	return operationIDFromResponse(httpRes), nil
 }
 
 // sharedNeedsUpdate reports whether the managed `shared` value differs from the
@@ -204,7 +239,66 @@ func (c *ServiceInstanceClient) Delete(ctx context.Context, externalName string)
 	return nil
 }
 
-// BuildComplexParameterMap resolves parameter secret references and merges them
+// GetParameters fetches the current parameters of a service instance from SM.
+// A non-2xx response is returned as an error via smClient.SpecifyAPIError.
+func (c *ServiceInstanceClient) GetParameters(ctx context.Context, instanceID string) (map[string]interface{}, error) {
+	params, _, err := c.getParamsFn(ctx, instanceID)
+	if err != nil {
+		return nil, smClient.SpecifyAPIError(err)
+	}
+	return params, nil
+}
+
+// InstancesRetrievable resolves whether the service offering for the given plan
+// id exposes /parameters (instances_retrievable == true). The result is cached
+// per offering id (it is stable — an offering's retrievable flag never changes).
+func (c *ServiceInstanceClient) InstancesRetrievable(ctx context.Context, planID string) (bool, error) {
+	// 1. Fetch the plan to get its offering id.
+	plan, _, err := c.getPlanFn(ctx, planID)
+	if err != nil {
+		return false, smClient.SpecifyAPIError(err)
+	}
+	offeringID := plan.GetServiceOfferingId()
+
+	// 2. Check the cache.
+	c.mu.RLock()
+	if v, ok := c.retrievableCache[offeringID]; ok {
+		c.mu.RUnlock()
+		return v, nil
+	}
+	c.mu.RUnlock()
+
+	// 3. Fetch the offering.
+	offering, _, err := c.getOfferingFn(ctx, offeringID)
+	if err != nil {
+		return false, smClient.SpecifyAPIError(err)
+	}
+	retrievable := offering.GetInstancesRetrievable()
+
+	// 4. Store in cache.
+	c.mu.Lock()
+	c.retrievableCache[offeringID] = retrievable
+	c.mu.Unlock()
+
+	return retrievable, nil
+}
+
+// operationIDFromResponse extracts the SM async operation id from the Location
+// header of a 202 response. The header value is a path of the form
+// /v1/service_instances/{id}/operations/{opId}; we return the last path segment.
+// Returns "" when the header is absent or the response is nil.
+func operationIDFromResponse(res *http.Response) string {
+	if res == nil {
+		return ""
+	}
+	loc := res.Header.Get("Location")
+	if loc == "" {
+		return ""
+	}
+	return path.Base(loc)
+}
+
+
 // with the spec parameters, returning the combined map. It is the map-returning
 // sibling of BuildComplexParameterJson (which is kept untouched for the
 // servicebinding consumer).
