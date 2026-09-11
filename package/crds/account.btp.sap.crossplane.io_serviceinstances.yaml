@@ -418,6 +418,12 @@ spec:
                     type: string
                   id:
                     type: string
+                  instancesRetrievable:
+                    description: |-
+                      InstancesRetrievable reflects the instances_retrievable flag of the
+                      service offering, cached from the Service Manager API. nil means the
+                      flag has not been fetched yet; true/false is the cached value.
+                    type: boolean
                   lastAppliedParameters:
                     description: |-
                       LastAppliedParameters is the canonical JSON of the parameter map most
@@ -430,6 +436,12 @@ spec:
                   lastModified:
                     description: The date and time when the resource was last modified.
                     format: date-time
+                    type: string
+                  offeringId:
+                    description: |-
+                      OfferingID is the service offering ID resolved from the service plan.
+                      Stored here so the controller can look up offering properties (e.g.
+                      InstancesRetrievable) without an extra API call on every reconcile.
                     type: string
                   pendingOperationID:
                     description: |-

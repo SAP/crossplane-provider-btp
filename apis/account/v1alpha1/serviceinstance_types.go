@@ -132,6 +132,18 @@ type ServiceInstanceObservation struct {
 	// Whether the service instance is shared, as observed from the Service Manager API.
 	Shared *bool `json:"shared,omitempty"`
 
+	// OfferingID is the service offering ID resolved from the service plan.
+	// Stored here so the controller can look up offering properties (e.g.
+	// InstancesRetrievable) without an extra API call on every reconcile.
+	// +kubebuilder:validation:Optional
+	OfferingID string `json:"offeringId,omitempty"`
+
+	// InstancesRetrievable reflects the instances_retrievable flag of the
+	// service offering, cached from the Service Manager API. nil means the
+	// flag has not been fetched yet; true/false is the cached value.
+	// +kubebuilder:validation:Optional
+	InstancesRetrievable *bool `json:"instancesRetrievable,omitempty"`
+
 	// LastAppliedParameters is the canonical JSON of the parameter map most
 	// recently applied to the Service Manager by a successful Create/Update.
 	// It is provider bookkeeping (not user intent) and is the "last-applied"

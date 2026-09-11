@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"path"
 	"sort"
-	"sync"
 	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -72,8 +71,9 @@ type ServiceInstanceClientI interface {
 	// GetParameters fetches the current parameters of a service instance from SM.
 	GetParameters(ctx context.Context, instanceID string) (map[string]interface{}, error)
 	// InstancesRetrievable resolves whether the service offering associated with
-	// the given service plan id supports the /parameters endpoint.
-	InstancesRetrievable(ctx context.Context, planID string) (bool, error)
+	// the given service plan id supports the /parameters endpoint. Also returns
+	// the offering id so the caller can persist it in the CR status.
+	InstancesRetrievable(ctx context.Context, planID string) (retrievable bool, offeringID string, err error)
 }
 
 // ObserveResult is the outcome of an Observe call against the Service Manager API.
@@ -86,18 +86,13 @@ type ObserveResult struct {
 // (defaulting to the real SM call) so table-driven tests can substitute mocks
 // without fighting the generated request-builder chain.
 type ServiceInstanceClient struct {
-	createFn       func(ctx context.Context, payload smopenapi.CreateServiceInstanceRequestPayload, async bool) (*smopenapi.CreatedServiceInstanceResponseObject, *http.Response, error)
-	getFn          func(ctx context.Context, id string) (*smopenapi.ServiceInstanceResponseObject, *http.Response, error)
-	updateFn       func(ctx context.Context, id string, payload smopenapi.UpdateServiceInstanceRequestPayload, async bool) (*smopenapi.UpdatedServiceInstanceResponseObject, *http.Response, error)
-	deleteFn       func(ctx context.Context, id string, async bool) (map[string]interface{}, *http.Response, error)
-	getParamsFn    func(ctx context.Context, id string) (map[string]interface{}, *http.Response, error)
-	getPlanFn      func(ctx context.Context, planID string) (*smopenapi.ServicePlanResponseObject, *http.Response, error)
-	getOfferingFn  func(ctx context.Context, offeringID string) (*smopenapi.ServiceOfferingResponseObject, *http.Response, error)
-
-	// retrievableCache maps offering id -> instances_retrievable, populated on
-	// first lookup. Safe for concurrent read/write via mu.
-	mu              sync.RWMutex
-	retrievableCache map[string]bool
+	createFn      func(ctx context.Context, payload smopenapi.CreateServiceInstanceRequestPayload, async bool) (*smopenapi.CreatedServiceInstanceResponseObject, *http.Response, error)
+	getFn         func(ctx context.Context, id string) (*smopenapi.ServiceInstanceResponseObject, *http.Response, error)
+	updateFn      func(ctx context.Context, id string, payload smopenapi.UpdateServiceInstanceRequestPayload, async bool) (*smopenapi.UpdatedServiceInstanceResponseObject, *http.Response, error)
+	deleteFn      func(ctx context.Context, id string, async bool) (map[string]interface{}, *http.Response, error)
+	getParamsFn   func(ctx context.Context, id string) (map[string]interface{}, *http.Response, error)
+	getPlanFn     func(ctx context.Context, planID string) (*smopenapi.ServicePlanResponseObject, *http.Response, error)
+	getOfferingFn func(ctx context.Context, offeringID string) (*smopenapi.ServiceOfferingResponseObject, *http.Response, error)
 }
 
 var _ ServiceInstanceClientI = &ServiceInstanceClient{}
@@ -128,7 +123,6 @@ func NewServiceInstanceClient(smc *smClient.ServiceManagerClient) *ServiceInstan
 		getOfferingFn: func(ctx context.Context, offeringID string) (*smopenapi.ServiceOfferingResponseObject, *http.Response, error) {
 			return smc.GetServiceOfferingById(ctx, offeringID).Execute()
 		},
-		retrievableCache: make(map[string]bool),
 	}
 }
 
@@ -250,37 +244,21 @@ func (c *ServiceInstanceClient) GetParameters(ctx context.Context, instanceID st
 }
 
 // InstancesRetrievable resolves whether the service offering for the given plan
-// id exposes /parameters (instances_retrievable == true). The result is cached
-// per offering id (it is stable — an offering's retrievable flag never changes).
-func (c *ServiceInstanceClient) InstancesRetrievable(ctx context.Context, planID string) (bool, error) {
-	// 1. Fetch the plan to get its offering id.
+// id exposes /parameters (instances_retrievable == true). It also returns the
+// offering id so the caller can cache the result in the CR status. Two API
+// calls are made (plan → offering); caching is the caller's responsibility.
+func (c *ServiceInstanceClient) InstancesRetrievable(ctx context.Context, planID string) (retrievable bool, offeringID string, err error) {
 	plan, _, err := c.getPlanFn(ctx, planID)
 	if err != nil {
-		return false, smClient.SpecifyAPIError(err)
+		return false, "", smClient.SpecifyAPIError(err)
 	}
-	offeringID := plan.GetServiceOfferingId()
+	offeringID = plan.GetServiceOfferingId()
 
-	// 2. Check the cache.
-	c.mu.RLock()
-	if v, ok := c.retrievableCache[offeringID]; ok {
-		c.mu.RUnlock()
-		return v, nil
-	}
-	c.mu.RUnlock()
-
-	// 3. Fetch the offering.
 	offering, _, err := c.getOfferingFn(ctx, offeringID)
 	if err != nil {
-		return false, smClient.SpecifyAPIError(err)
+		return false, offeringID, smClient.SpecifyAPIError(err)
 	}
-	retrievable := offering.GetInstancesRetrievable()
-
-	// 4. Store in cache.
-	c.mu.Lock()
-	c.retrievableCache[offeringID] = retrievable
-	c.mu.Unlock()
-
-	return retrievable, nil
+	return offering.GetInstancesRetrievable(), offeringID, nil
 }
 
 // operationIDFromResponse extracts the SM async operation id from the Location
@@ -299,6 +277,7 @@ func operationIDFromResponse(res *http.Response) string {
 }
 
 
+// BuildComplexParameterMap resolves parameter secret references and merges them
 // with the spec parameters, returning the combined map. It is the map-returning
 // sibling of BuildComplexParameterJson (which is kept untouched for the
 // servicebinding consumer).

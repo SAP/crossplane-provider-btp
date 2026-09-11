@@ -471,6 +471,27 @@ func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
 	return len(policies) == 1 && policies[0] == xpv1.ManagementActionObserve
 }
 
+// instancesRetrievable returns whether the service offering for this instance
+// supports the /parameters endpoint. The result is cached in the CR status
+// (InstancesRetrievable + OfferingID) so subsequent reconciles do not need to
+// call the SM API again.
+func (e *external) instancesRetrievable(ctx context.Context, cr *v1alpha1.ServiceInstance) (bool, error) {
+	if cr.Status.AtProvider.InstancesRetrievable != nil {
+		return *cr.Status.AtProvider.InstancesRetrievable, nil
+	}
+	planID := cr.Status.AtProvider.ServiceplanID
+	if planID == "" {
+		return false, nil
+	}
+	retrievable, offeringID, err := e.client.InstancesRetrievable(ctx, planID)
+	if err != nil {
+		return false, err
+	}
+	cr.Status.AtProvider.InstancesRetrievable = &retrievable
+	cr.Status.AtProvider.OfferingID = offeringID
+	return retrievable, nil
+}
+
 // paramDriftEnabled reports whether the parameter drift detection annotation is
 // set to "true" on the CR.
 func paramDriftEnabled(cr *v1alpha1.ServiceInstance) bool {
@@ -514,7 +535,7 @@ func (e *external) calculateDiff(ctx context.Context, cr *v1alpha1.ServiceInstan
 		return "", nil
 	}
 
-	retrievable, err := e.client.InstancesRetrievable(ctx, planID)
+	retrievable, err := e.instancesRetrievable(ctx, cr)
 	if err != nil {
 		log.FromContext(ctx).Error(err, "cannot check instances_retrievable; skipping parameter drift")
 		return "", nil

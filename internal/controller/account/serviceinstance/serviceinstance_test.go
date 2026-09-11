@@ -56,6 +56,7 @@ type nativeClientMock struct {
 
 	retrievableRes bool
 	retrievableErr error
+	retrievableOfferingID string
 
 	// captured call args
 	createCalled bool
@@ -92,8 +93,8 @@ func (m *nativeClientMock) GetParameters(ctx context.Context, instanceID string)
 	return m.getParamsRes, m.getParamsErr
 }
 
-func (m *nativeClientMock) InstancesRetrievable(ctx context.Context, planID string) (bool, error) {
-	return m.retrievableRes, m.retrievableErr
+func (m *nativeClientMock) InstancesRetrievable(ctx context.Context, planID string) (bool, string, error) {
+	return m.retrievableRes, m.retrievableOfferingID, m.retrievableErr
 }
 
 // ====================================================================================
