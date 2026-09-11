@@ -1,5 +1,5 @@
 # Check the rules for PR labels
-name: "Label Rules"
+name: "PR Label Rules"
 
 on:
   pull_request:

@@ -15,7 +15,7 @@
 #
 # If solely markdown changes are detected, the e2e tests are skipped and the workflow will complete successfully without requiring approval.
 # Note that skipped jobs still satisfy the branch protection rules.
-name: PR E2E Test
+name: PR E2E Tests
 
 on:
   pull_request_target:
