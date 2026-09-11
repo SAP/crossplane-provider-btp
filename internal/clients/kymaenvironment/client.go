@@ -26,6 +26,11 @@ type Client interface {
 	// DeleteInstance deletes the Kyma environment using the external-name.
 	// Returns the HTTP response (for status code checking) and any error.
 	DeleteInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (*http.Response, error)
+	// SchemaFetcher exposes the BTP updateSchema fetcher/cache the
+	// implementation was constructed with. Callers use it to reason about
+	// which parameter fields participate in update-time drift detection and
+	// which schema-defaults may be safely ignored. See issue #682.
+	SchemaFetcher() SchemaFetcher
 }
 
 func GenerateObservation(
