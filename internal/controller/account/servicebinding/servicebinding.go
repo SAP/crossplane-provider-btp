@@ -165,6 +165,17 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceBinding)
 	}
 
+	// ADR(external-name): reject a non-UUID external-name before it reaches upjet
+	// as the TF id. "" (create) and external-name == cr.Name (legacy external name)
+	// are skipped as they are handled by the recovery / heal paths
+	externalName := meta.GetExternalName(cr)
+	if externalName != "" && externalName != cr.Name {
+		if !internal.IsValidUUID(externalName) {
+			return managed.ExternalObservation{},
+				errors.New("external-name is not a valid UUID. Set it to the ServiceBinding GUID to adopt an existing binding, or remove the annotation to create a new one")
+		}
+	}
+
 	observation, tfResource, err := e.client.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetBinding)
