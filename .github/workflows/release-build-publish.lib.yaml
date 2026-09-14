@@ -112,7 +112,6 @@ jobs:
         # GitHub sets the GITHUB_TOKEN secret automatically.
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # This step is specific to BTP provider
     - name: Check exporter exists
       id: check_exporter
       run: |
@@ -135,7 +134,6 @@ jobs:
           done
         done
 
-    # This step is specific to BTP provider
     - name: Upload Exporter Binaries
       if: inputs.release_type == 'release_candidate' && steps.check_exporter.outputs.exists == 'true'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
