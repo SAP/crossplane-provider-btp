@@ -70,7 +70,7 @@ concurrency:
 env:
   BUILD_ID: ${{ github.run_number }}-${{ github.run_attempt }} # using shorter run number for BTP character limits
   # hardcoded BTP CLI version
-  btp_cli_version: 2.116.2
+  BTP_CLI_VERSION: 2.116.2
   E2E_BUILD_REGISTRY: index.docker.io/e2e
   CROSSPLANE_CLI_VERSION: v2.0.2
   # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable versioning=semver allowedVersions=<2.2.0
@@ -406,10 +406,9 @@ jobs:
 
       - name: Install BTP CLI
         if: inputs.install-btp-cli
-        #hardcoded version
         run: |
-          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+          tar -xzf btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz
           cd linux-amd64
           mv btp /usr/local/bin
 
@@ -457,8 +456,8 @@ jobs:
       - name: Install BTP CLI
         if: inputs.install-btp-cli
         run: |
-          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+          tar -xzf btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz
           cd linux-amd64
           mv btp /usr/local/bin
 
