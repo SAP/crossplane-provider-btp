@@ -106,47 +106,35 @@ func TestValidateExternalName(t *testing.T) {
 }
 
 // --- isUpToDate ---
+// BTP GET returns Content but never Type (omitempty). Drift is detected via Content only.
 
-func TestIsUpToDate_ContentAndTypeSame(t *testing.T) {
-	certType := "PEM"
-	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc123", Type: "PEM",
-	})
-	observed := newObservedCert("cert", "", certType) // content always empty from API
-	if !isUpToDate(cr, observed) {
-		t.Error("isUpToDate = false, want true")
+func TestIsUpToDate_ContentMatches(t *testing.T) {
+	observed := newObservedCert("cert", "abc123", "")
+	if !isUpToDate("abc123", observed) {
+		t.Error("isUpToDate = false, want true (content matches)")
 	}
 }
 
 func TestIsUpToDate_ContentDiffers(t *testing.T) {
-	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "new-content",
-	})
-	// API never returns content — observed content is always ""; cert is still up-to-date
-	// as long as Type matches (content changes cannot be detected via GET).
-	observed := newObservedCert("cert", "", "")
-	if !isUpToDate(cr, observed) {
-		t.Error("isUpToDate = false, want true (content not detectable via API)")
+	observed := newObservedCert("cert", "old-content", "")
+	if isUpToDate("new-content", observed) {
+		t.Error("isUpToDate = true, want false (content changed)")
 	}
 }
 
-func TestIsUpToDate_TypeDiffers(t *testing.T) {
-	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc123", Type: "DER",
-	})
-	observed := newObservedCert("cert", "abc123", "PEM")
-	if isUpToDate(cr, observed) {
-		t.Error("isUpToDate = true, want false (type changed)")
+func TestIsUpToDate_TypeInSpecDoesNotTriggerDrift(t *testing.T) {
+	// Type is write-only — GET never returns it. A resource with type set in spec
+	// must not be considered out-of-date just because observed.Type is nil.
+	observed := newObservedCert("cert", "abc123", "") // Type absent in GET response
+	if !isUpToDate("abc123", observed) {
+		t.Error("isUpToDate = false, want true (type is write-only, not comparable)")
 	}
 }
 
-func TestIsUpToDate_TypeBothEmpty(t *testing.T) {
-	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc123",
-	})
-	observed := destclient.NewCertificate("cert", "abc123")
-	if !isUpToDate(cr, observed) {
-		t.Error("isUpToDate = false, want true (both types empty)")
+func TestIsUpToDate_EmptyCertContent(t *testing.T) {
+	// certContent "" (e.g. secret missing) never matches a real observed cert.
+	if isUpToDate("", newObservedCert("cert", "abc123", "")) {
+		t.Error("isUpToDate = true, want false (empty certContent never matches)")
 	}
 }
 
@@ -155,7 +143,7 @@ func TestIsUpToDate_TypeBothEmpty(t *testing.T) {
 func TestObserve_EmptyExternalName(t *testing.T) {
 	subID := "sub-id"
 	cr := newCertCR("", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc", SubaccountID: &subID,
+		Name: "cert", SubaccountID: &subID,
 	})
 	e := &external{client: &mockCertClient{}}
 
@@ -170,7 +158,7 @@ func TestObserve_EmptyExternalName(t *testing.T) {
 
 func TestObserve_NotFound(t *testing.T) {
 	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc",
+		Name: "cert",
 	})
 	e := &external{client: &mockCertClient{getErr: destination.NewNotFoundError()}}
 
@@ -185,12 +173,11 @@ func TestObserve_NotFound(t *testing.T) {
 
 func TestObserve_UpToDate(t *testing.T) {
 	subID := "sub-id"
-	certType := "PEM"
 	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc123", Type: "PEM", SubaccountID: &subID,
+		Name: "cert", Type: "PEM", SubaccountID: &subID,
 	})
-	// API returns empty content — isUpToDate only checks Type.
-	e := &external{client: &mockCertClient{getCert: newObservedCert("cert", "", certType)}}
+	// API returns Content; Type is absent (write-only).
+	e := &external{client: &mockCertClient{getCert: newObservedCert("cert", "abc123", "")}, certContent: "abc123"}
 
 	obs, err := e.Observe(context.Background(), cr)
 	if err != nil {
@@ -209,10 +196,10 @@ func TestObserve_UpToDate(t *testing.T) {
 
 func TestObserve_NotUpToDate(t *testing.T) {
 	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc123", Type: "PEM",
+		Name: "cert",
 	})
-	// Type differs — that's the only detectable drift.
-	e := &external{client: &mockCertClient{getCert: newObservedCert("cert", "", "DER")}}
+	// API returns old content — drift detected.
+	e := &external{client: &mockCertClient{getCert: newObservedCert("cert", "old-content", "")}, certContent: "new-content"}
 
 	obs, err := e.Observe(context.Background(), cr)
 	if err != nil {
@@ -222,13 +209,13 @@ func TestObserve_NotUpToDate(t *testing.T) {
 		t.Error("ResourceExists = false, want true")
 	}
 	if obs.ResourceUpToDate {
-		t.Error("ResourceUpToDate = true, want false (type changed)")
+		t.Error("ResourceUpToDate = true, want false (content changed)")
 	}
 }
 
 func TestObserve_GetError(t *testing.T) {
 	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc",
+		Name: "cert",
 	})
 	e := &external{client: &mockCertClient{getErr: fmt.Errorf("api error")}}
 
@@ -243,9 +230,9 @@ func TestObserve_GetError(t *testing.T) {
 func TestCreate_SetsExternalName(t *testing.T) {
 	subID := "sub-id"
 	cr := newCertCR("", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc123", SubaccountID: &subID,
+		Name: "cert", SubaccountID: &subID,
 	})
-	e := &external{client: &mockCertClient{}}
+	e := &external{client: &mockCertClient{}, certContent: "abc123"}
 
 	_, err := e.Create(context.Background(), cr)
 	if err != nil {
@@ -258,7 +245,7 @@ func TestCreate_SetsExternalName(t *testing.T) {
 
 func TestCreate_NilSubaccountIDReturnsError(t *testing.T) {
 	cr := newCertCR("", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc123",
+		Name: "cert",
 		// SubaccountID deliberately nil
 	})
 	e := &external{client: &mockCertClient{}}
@@ -272,9 +259,9 @@ func TestCreate_NilSubaccountIDReturnsError(t *testing.T) {
 func TestCreate_Conflict(t *testing.T) {
 	subID := "sub-id"
 	cr := newCertCR("", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc123", SubaccountID: &subID,
+		Name: "cert", SubaccountID: &subID,
 	})
-	e := &external{client: &mockCertClient{createErr: destination.NewConflictError()}}
+	e := &external{client: &mockCertClient{createErr: destination.NewConflictError()}, certContent: "abc123"}
 
 	_, err := e.Create(context.Background(), cr)
 	if err == nil {
@@ -285,13 +272,13 @@ func TestCreate_Conflict(t *testing.T) {
 func TestCreate_ImportScenario(t *testing.T) {
 	subID := "sub-id"
 	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc123", SubaccountID: &subID,
+		Name: "cert", SubaccountID: &subID,
 	})
 	// Resource exists — Get returns a cert; Create must not be called.
 	e := &external{client: &mockCertClient{
 		getCert:   newObservedCert("cert", "abc123", ""),
 		createErr: destination.NewConflictError(), // would fail if called
-	}}
+	}, certContent: "abc123"}
 
 	_, err := e.Create(context.Background(), cr)
 	if err != nil {
@@ -306,12 +293,12 @@ func TestCreate_PresetExternalNameUsedForCertName(t *testing.T) {
 	subID := "sub-id"
 	// User pre-set external-name with a different cert name than spec.forProvider.name.
 	cr := newCertCR("sub-id/preset-name.pem", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "spec-name.pem", Content: "abc123", SubaccountID: &subID,
+		Name: "spec-name.pem", SubaccountID: &subID,
 	})
 	// cert does not exist yet (404), so Create will be called.
 	var createdCert destclient.Certificate
 	mock := &capturingMockCertClient{getErr: destination.NewNotFoundError()}
-	e := &external{client: mock}
+	e := &external{client: mock, certContent: "abc123"}
 
 	_, err := e.Create(context.Background(), cr)
 	if err != nil {
@@ -331,9 +318,9 @@ func TestCreate_PresetExternalNameUsedForCertName(t *testing.T) {
 func TestUpdate_Success(t *testing.T) {
 	subID := "sub-id"
 	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "new-content", SubaccountID: &subID,
+		Name: "cert", SubaccountID: &subID,
 	})
-	e := &external{client: &mockCertClient{}}
+	e := &external{client: &mockCertClient{}, certContent: "new-content"}
 
 	_, err := e.Update(context.Background(), cr)
 	if err != nil {
@@ -344,7 +331,7 @@ func TestUpdate_Success(t *testing.T) {
 func TestUpdate_PropagatesError(t *testing.T) {
 	subID := "sub-id"
 	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc", SubaccountID: &subID,
+		Name: "cert", SubaccountID: &subID,
 	})
 	e := &external{client: &mockCertClient{updateErr: fmt.Errorf("server error")}}
 
@@ -358,7 +345,7 @@ func TestUpdate_PropagatesError(t *testing.T) {
 
 func TestDelete_Success(t *testing.T) {
 	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc",
+		Name: "cert",
 	})
 	e := &external{client: &mockCertClient{}}
 
@@ -370,7 +357,7 @@ func TestDelete_Success(t *testing.T) {
 
 func TestDelete_EmptyExternalName(t *testing.T) {
 	cr := newCertCR("", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc",
+		Name: "cert",
 	})
 	e := &external{client: &mockCertClient{}}
 
@@ -382,7 +369,7 @@ func TestDelete_EmptyExternalName(t *testing.T) {
 
 func TestDelete_MalformedExternalName(t *testing.T) {
 	cr := newCertCR("nodash", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc",
+		Name: "cert",
 	})
 	e := &external{client: &mockCertClient{}}
 
@@ -394,7 +381,7 @@ func TestDelete_MalformedExternalName(t *testing.T) {
 
 func TestDelete_PropagatesError(t *testing.T) {
 	cr := newCertCR("sub-id/cert", v1alpha1.SubaccountDestinationCertificateParameters{
-		Name: "cert", Content: "abc",
+		Name: "cert",
 	})
 	e := &external{client: &mockCertClient{deleteErr: fmt.Errorf("server error")}}
 

@@ -1863,6 +1863,11 @@ func (in *SubaccountDestinationCertificateInitParameters) DeepCopyInto(out *Suba
 		*out = new(v1.Selector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ContentSecretRef != nil {
+		in, out := &in.ContentSecretRef, &out.ContentSecretRef
+		*out = new(v1.SecretKeySelector)
+		**out = **in
+	}
 	if in.DestinationServiceBindingSecretRef != nil {
 		in, out := &in.DestinationServiceBindingSecretRef, &out.DestinationServiceBindingSecretRef
 		*out = new(v1.SecretKeySelector)
@@ -1954,6 +1959,11 @@ func (in *SubaccountDestinationCertificateParameters) DeepCopyInto(out *Subaccou
 		in, out := &in.SubaccountSelector, &out.SubaccountSelector
 		*out = new(v1.Selector)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.ContentSecretRef != nil {
+		in, out := &in.ContentSecretRef, &out.ContentSecretRef
+		*out = new(v1.SecretKeySelector)
+		**out = **in
 	}
 	if in.DestinationServiceBindingSecretRef != nil {
 		in, out := &in.DestinationServiceBindingSecretRef, &out.DestinationServiceBindingSecretRef

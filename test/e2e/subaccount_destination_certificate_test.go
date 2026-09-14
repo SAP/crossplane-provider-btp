@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
@@ -52,6 +53,33 @@ func TestSubaccountDestinationCertificate_CreationFlow(t *testing.T) {
 					t.Error("SubaccountDestinationCertificate atProvider.name not set after creation")
 				}
 
+				return ctx
+			},
+		).
+		Assess(
+			"Drift detection: updating contentSecretRef triggers reconciliation and resource stays Available",
+			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				cert := &v1alpha1.SubaccountDestinationCertificate{}
+				MustGetResource(t, cfg, certCreateName, nil, cert)
+
+				// Switch to the second certificate key in the same secret.
+				// The controller re-reads the secret on every Connect, so this
+				// causes isUpToDate to return false and triggers an Update to BTP.
+				updated := cert.DeepCopy()
+				updated.Spec.ForProvider.ContentSecretRef = &xpv1.SecretKeySelector{
+					SecretReference: xpv1.SecretReference{
+						Name:      cert.Spec.ForProvider.ContentSecretRef.Name,
+						Namespace: cert.Spec.ForProvider.ContentSecretRef.Namespace,
+					},
+					Key: "content-v2",
+				}
+
+				if err := cfg.Client().Resources().Update(ctx, updated); err != nil {
+					t.Fatalf("failed to update contentSecretRef key: %v", err)
+				}
+
+				// Confirm the resource reconciles and comes back Available after the update.
+				waitForResource(updated, cfg, t, wait.WithTimeout(5*time.Minute))
 				return ctx
 			},
 		).

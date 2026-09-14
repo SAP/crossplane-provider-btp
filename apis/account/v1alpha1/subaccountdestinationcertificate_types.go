@@ -28,12 +28,15 @@ type SubaccountDestinationCertificateInitParameters struct {
 
 	// Name of the certificate. Immutable after creation.
 	// +optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name can't be updated once set"
 	Name string `json:"name,omitempty"`
 
-	// Content is the base64-encoded certificate (PEM or DER).
+	// ContentSecretRef points to a Kubernetes Secret key whose value is the
+	// base64-encoded certificate data to upload.
+	// Supported formats: PEM, CER, CRT (single X.509 certificate) or JKS, PFX, P12 (key store).
+	// The format is determined by the file extension in the Name field (e.g. "my-cert.pfx").
+	// Note: JKS, PFX, and P12 key stores are not supported in FIPS environments.
 	// +optional
-	Content string `json:"content,omitempty"`
+	ContentSecretRef *xpv1.SecretKeySelector `json:"contentSecretRef,omitempty"`
 
 	// Type is the certificate type (e.g. PEM). Optional; API defaults apply when absent.
 	// +optional
@@ -50,6 +53,7 @@ type SubaccountDestinationCertificateParameters struct {
 	// Name of the certificate. Immutable after creation.
 	// Used as the second segment of the external-name annotation.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name can't be updated once set"
 	Name string `json:"name"`
 
 	// SubaccountID is the GUID of the subaccount that owns this certificate.
@@ -68,9 +72,13 @@ type SubaccountDestinationCertificateParameters struct {
 	// +optional
 	SubaccountSelector *xpv1.Selector `json:"subaccountSelector,omitempty"`
 
-	// Content is the base64-encoded certificate (PEM or DER).
+	// ContentSecretRef points to a Kubernetes Secret key whose value is the
+	// base64-encoded certificate data to upload.
+	// Supported formats: PEM, CER, CRT (single X.509 certificate) or JKS, PFX, P12 (key store).
+	// The format is determined by the file extension in the Name field (e.g. "my-cert.pfx").
+	// Note: JKS, PFX, and P12 key stores are not supported in FIPS environments.
 	// +kubebuilder:validation:Required
-	Content string `json:"content"`
+	ContentSecretRef *xpv1.SecretKeySelector `json:"contentSecretRef"`
 
 	// Type is the certificate type (e.g. PEM). Optional; API defaults apply when absent.
 	// +optional

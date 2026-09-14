@@ -9,6 +9,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -28,6 +30,7 @@ const (
 	errUpdate                              = "while updating certificate"
 	errDelete                              = "while deleting certificate"
 	errAlreadyExists                       = "certificate already exists — set crossplane.io/external-name annotation to adopt the existing resource"
+	errLoadContentSecret                   = "while loading certificate content secret"
 )
 
 type connector struct {
@@ -64,11 +67,34 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, errConnect)
 	}
-	return &external{client: certClient}, nil
+
+	if cr.Spec.ForProvider.ContentSecretRef == nil {
+		return nil, errors.Wrap(errors.New("contentSecretRef must be set"), errConnect)
+	}
+	secret := &corev1.Secret{}
+	if err := c.kube.Get(ctx, types.NamespacedName{
+		Namespace: cr.Spec.ForProvider.ContentSecretRef.Namespace,
+		Name:      cr.Spec.ForProvider.ContentSecretRef.Name,
+	}, secret); err != nil {
+		return nil, errors.Wrap(err, errLoadContentSecret)
+	}
+	certContent, ok := secret.Data[cr.Spec.ForProvider.ContentSecretRef.Key]
+	if !ok {
+		return nil, errors.Wrap(
+			errors.Errorf("key %q not found in secret %s/%s",
+				cr.Spec.ForProvider.ContentSecretRef.Key,
+				cr.Spec.ForProvider.ContentSecretRef.Namespace,
+				cr.Spec.ForProvider.ContentSecretRef.Name,
+			),
+			errLoadContentSecret,
+		)
+	}
+	return &external{client: certClient, certContent: string(certContent)}, nil
 }
 
 type external struct {
-	client destination.CertificateClientI
+	client      destination.CertificateClientI
+	certContent string
 }
 
 func (e *external) Disconnect(_ context.Context) error { return nil }
@@ -104,7 +130,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  isUpToDate(cr, observed),
+		ResourceUpToDate:  isUpToDate(e.certContent, observed),
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
@@ -140,7 +166,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.SetConditions(xpv1.Creating())
 
-	cert := buildCertificateWithName(cr, certName)
+	cert := buildCertificateWithName(cr, certName, e.certContent)
 	if err := e.client.Create(ctx, cert); err != nil {
 		if destination.IsConflict(err) {
 			return managed.ExternalCreation{}, errors.New(errAlreadyExists)
@@ -158,7 +184,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotSubaccountDestinationCertificate)
 	}
 
-	cert := buildCertificate(cr)
+	cert := buildCertificate(cr, e.certContent)
 	if err := e.client.Update(ctx, cert); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 	}
@@ -198,25 +224,20 @@ func validateExternalName(extName string) error {
 	return nil
 }
 
-func buildCertificate(cr *v1alpha1.SubaccountDestinationCertificate) destclient.Certificate {
-	return buildCertificateWithName(cr, cr.Spec.ForProvider.Name)
+func buildCertificate(cr *v1alpha1.SubaccountDestinationCertificate, content string) destclient.Certificate {
+	return buildCertificateWithName(cr, cr.Spec.ForProvider.Name, content)
 }
 
-func buildCertificateWithName(cr *v1alpha1.SubaccountDestinationCertificate, name string) destclient.Certificate {
-	cert := destclient.NewCertificate(name, cr.Spec.ForProvider.Content)
+func buildCertificateWithName(cr *v1alpha1.SubaccountDestinationCertificate, name string, content string) destclient.Certificate {
+	cert := destclient.NewCertificate(name, content)
 	if cr.Spec.ForProvider.Type != "" {
 		cert.Type = &cr.Spec.ForProvider.Type
 	}
 	return *cert
 }
 
-func isUpToDate(cr *v1alpha1.SubaccountDestinationCertificate, observed *destclient.Certificate) bool {
-	// BTP's Destination API does not return certificate content in GET responses,
-	// so observed.GetContent() is always "". Comparing content would always return
-	// false and cause an infinite Update loop — skip it.
-	observedType := ""
-	if observed.Type != nil {
-		observedType = observed.GetType()
-	}
-	return cr.Spec.ForProvider.Type == observedType
+func isUpToDate(certContent string, observed *destclient.Certificate) bool {
+	// BTP's Destination API returns Content in GET responses — compare it for drift detection.
+	// Type is not returned by GET (omitempty, never present in response) — skip it.
+	return certContent == observed.GetContent()
 }
