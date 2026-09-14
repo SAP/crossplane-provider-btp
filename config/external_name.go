@@ -10,7 +10,6 @@ import "github.com/crossplane/upjet/v2/pkg/config"
 // provider that use the default (CLI) external client.
 var CLIReconciledExternalNameConfigs = map[string]config.ExternalName{
 	"btp_subaccount_service_instance": config.IdentifierFromProvider,
-	"btp_subaccount_service_binding":  config.IdentifierFromProvider,
 }
 
 // TerraformPluginFrameworkReconciledExternalNameConfigs contains all external name configurations for this
@@ -21,6 +20,7 @@ var TerraformPluginFrameworkReconciledExternalNameConfigs = map[string]config.Ex
 	"btp_directory_entitlement":             config.IdentifierFromProvider,
 	"btp_subaccount_service_broker":         config.IdentifierFromProvider,
 	"btp_subaccount_api_credential":         config.IdentifierFromProvider,
+	"btp_subaccount_service_binding":        config.IdentifierFromProvider,
 }
 
 // ExternalNameConfigurations applies all external name configs listed in the
