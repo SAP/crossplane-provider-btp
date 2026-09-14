@@ -29,6 +29,11 @@ func SetDebug(debugFlag bool) {
 	debug = debugFlag
 }
 
+// IsDebug reports whether debug logging is enabled.
+func IsDebug() bool {
+	return debug
+}
+
 // NewBackgroundContextWithDebugPrintHTTPClient creates a new context with a HTTP client that logs the request and response in the RoundTrip.
 func NewBackgroundContextWithDebugPrintHTTPClient(opts ...Option) context.Context {
 	if debug {
