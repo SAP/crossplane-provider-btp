@@ -34,8 +34,16 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A ServiceBinding allows to manage a binding to a service instance
-          in BTP
+        description: |-
+          A ServiceBinding allows to manage a binding to a service instance in BTP
+
+          External-Name Configuration:
+            - Follows Standard: yes
+            - Format: ServiceBinding GUID (UUID format)
+            - Note: spec.forProvider.serviceInstanceID (or its ref/selector) must be set for adoption to work
+            - How to find:
+            - UI: the cockpit shows only the binding name, not its GUID; use the CLI
+            - CLI: btp list services/binding --subaccount `<subaccount-guid>` (field: id)
         properties:
           apiVersion:
             description: |-
