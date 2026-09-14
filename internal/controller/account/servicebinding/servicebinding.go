@@ -45,12 +45,9 @@ const (
 const iso8601Date = "2006-01-02T15:04:05Z0700"
 
 var newTfConnectorFn = func(kube kubeclient.Client) servicebindingclient.TfConnector {
-	return tfClient.NewInternalTfConnector(
+	return tfClient.NewInternalTfConnectorNoFork(
 		kube,
 		"btp_subaccount_service_binding",
-		v1alpha1.SubaccountServiceBinding_GroupVersionKind,
-		false,
-		nil,
 	)
 }
 
