@@ -583,6 +583,32 @@ func TestObserve(t *testing.T) {
 				),
 			},
 		},
+		"InvalidExternalNameUUIDWhileDeleting": {
+			reason: "should skip UUID validation while the CR is being deleted so the finalizer can clear",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						observation: managed.ExternalObservation{
+							ResourceExists: false,
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{},
+				tracker:    &MockTracker{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("not-a-uuid", nil),
+					func(cr *v1alpha1.ServiceBinding) { cr.SetDeletionTimestamp(&metav1.Time{Time: metav1.Now().Time}) },
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+			},
+		},
 		"ClientObserveError": {
 			reason: "should return error when client observe fails",
 			fields: fields{
