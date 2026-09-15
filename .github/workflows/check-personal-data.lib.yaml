@@ -11,7 +11,7 @@ jobs:
   content-check:
     runs-on: ubuntu-latest
     env:
-      ALLOWED_DOMAINS: "git\\.k8s\\.io|my-route-service\\.example\\.com|api\\.example\\.org|github\\.com|charts\\.crossplane\\.io|docs\\.github\\.com|v3-apidocs\\.cloudfoundry\\.org|zip\\.com|apache\\.org|docs\\.renovatebot\\.com|crossplane\\.io|v3-apidocs\\.cloudfoundry\\.space|releases\\.hashicorp\\.com|probot\\.github\\.io|facebook\\.github\\.io|example\\.com|test\\.com|developer\\.example\\.org"
+      ALLOWED_DOMAINS: "git\\.k8s\\.io|my-route-service\\.example\\.com|api\\.example\\.org|github\\.com|charts\\.crossplane\\.io|docs\\.github\\.com|v3-apidocs\\.cloudfoundry\\.org|zip\\.com|apache\\.org|docs\\.renovatebot\\.com|crossplane\\.io|v3-apidocs\\.cloudfoundry\\.space|releases\\.hashicorp\\.com|probot\\.github\\.io|facebook\\.github\\.io|example\\.com|test\\.com|developer\\.example\\.org|mycompany\\.com"
       ALLOWED_API_ENDPOINTS: "git\\.k8s\\.io|my-route-service\\.example\\.com|api\\.example\\.org|github\\.com|charts\\.crossplane\\.io|docs\\.github\\.com|v3-apidocs\\.cloudfoundry\\.org|zip\\.com|apache\\.org|docs\\.renovatebot\\.com|crossplane\\.io|v3-apidocs\\.cloudfoundry\\.space|releases\\.hashicorp\\.com|probot\\.github\\.io|facebook\\.github\\.io"
       EXCLUDE_DIRS: ".git build .github/workflows"
       EXCLUDED_FILES: "package/crossplane.yaml"
