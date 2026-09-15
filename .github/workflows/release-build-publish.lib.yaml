@@ -112,29 +112,38 @@ jobs:
         # GitHub sets the GITHUB_TOKEN secret automatically.
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Check exporter exists
+      id: check_exporter
+      run: |
+        if [ -d "./cmd/exporter" ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Build Exporter Binaries
-      if: inputs.release_type == 'release_candidate'
+      if: inputs.release_type == 'release_candidate' && steps.check_exporter.outputs.exists == 'true'
       run: |
         VERSION=${{ inputs.version }}
         for GOOS in linux darwin; do
           for GOARCH in amd64 arm64; do
             GOOS=$GOOS GOARCH=$GOARCH go build \
               -trimpath \
-              -o dist/crossplane-provider-btp_exporter_${VERSION}_${GOOS}_${GOARCH} \
+              -o dist/exporter_${VERSION}_${GOOS}_${GOARCH} \
               ./cmd/exporter
           done
         done
 
     - name: Upload Exporter Binaries
-      if: inputs.release_type == 'release_candidate'
+      if: inputs.release_type == 'release_candidate' && steps.check_exporter.outputs.exists == 'true'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         # The binaries will appear in the Artifacts section
         # at the bottom of the workflow run summary page, downloadable as a zip.
         name: exporter-binaries-${{ inputs.version }}.zip
-        path: dist/crossplane-provider-btp_exporter_*
+        path: dist/exporter_*
         retention-days: 14
 
     - name: Index CRD documentation
       if: inputs.release_type == 'release'
-      run: curl -sL "https://doc.crds.dev/github.com/SAP/crossplane-provider-btp@${{ inputs.version }}"
+      run: curl -sL "https://doc.crds.dev/github.com/${{ github.repository }}@${{ inputs.version }}"
