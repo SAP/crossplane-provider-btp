@@ -36,7 +36,6 @@ const (
 	errDeleteRetiredKeys    = "cannot delete retired keys"
 	errDeleteServiceBinding = "cannot delete servicebinding"
 	errFlattenSecret        = "cannot flatten secret"
-	errSeedBinding          = "cannot initialize servicebinding state for deletion"
 	errDestroyBinding       = "cannot destroy servicebinding"
 	errVerifyBinding        = "cannot verify servicebinding deletion"
 	errCommitName           = "cannot persist pending servicebinding name"
@@ -45,18 +44,15 @@ const (
 const iso8601Date = "2006-01-02T15:04:05Z0700"
 
 var newTfConnectorFn = func(kube kubeclient.Client) servicebindingclient.TfConnector {
-	return tfClient.NewInternalTfConnector(
+	return tfClient.NewInternalTfConnectorNoFork(
 		kube,
 		"btp_subaccount_service_binding",
-		v1alpha1.SubaccountServiceBinding_GroupVersionKind,
-		false,
-		nil,
 	)
 }
 
 // ServiceBindingClientFactory creates ServiceBindingClient instances
 type ServiceBindingClientFactory interface {
-	CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string, markForDeletion bool) (servicebindingclient.ServiceBindingClientInterface, error)
+	CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (servicebindingclient.ServiceBindingClientInterface, error)
 }
 
 // DefaultServiceBindingClientFactory is the production implementation
@@ -65,8 +61,8 @@ type DefaultServiceBindingClientFactory struct {
 	tfConnector servicebindingclient.TfConnector
 }
 
-func (f *DefaultServiceBindingClientFactory) CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string, markForDeletion bool) (servicebindingclient.ServiceBindingClientInterface, error) {
-	client, err := servicebindingclient.NewServiceBindingClient(ctx, f.kube, f.tfConnector, cr, targetName, targetExternalName, markForDeletion)
+func (f *DefaultServiceBindingClientFactory) CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (servicebindingclient.ServiceBindingClientInterface, error) {
+	client, err := servicebindingclient.NewServiceBindingClient(ctx, f.kube, f.tfConnector, cr, targetName, targetExternalName)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +112,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		targetName = cr.Spec.ForProvider.Name
 	}
 
-	client, err := c.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr), false)
+	client, err := c.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create client")
 	}
@@ -263,12 +259,18 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, nil
 	}
 
-	client, err := e.clientFactory.CreateClient(ctx, cr, name, name, false)
+	client, err := e.clientFactory.CreateClient(ctx, cr, name, name)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
 	e.client = client
+
+	// The no-fork upjet client caches its plan in Observe; Create reads that
+	// cached plan
+	if _, _, err := client.Observe(ctx); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
+	}
 
 	externalName, creation, err := client.Create(ctx)
 	if err != nil {
@@ -528,30 +530,12 @@ func (e *external) emit(cr resource.Managed, ev event.Event) {
 
 // DeleteBinding implements the BindingDeleter interface for the key rotator.
 //
-// It performs a three-phase terraform-based deletion that is robust to the
-// cold-workspace condition (setting delete on tf resource would not run a refresh, pjet detects the resource is missing and report successfully deleted, but the resource is still there in BTP) --> leaked service binding):
-//
-//	Phase 1 (seed):   Connect with markForDeletion=false. upjet's EnsureTFState
-//	                  seeds terraform.tfstate with {id: <externalName>} because
-//	                  WasDeleted is false. Without this, a container that never
-//	                  observed this GUID while it was current has an empty state,
-//	                  so destroy would run against nothing, destroy 0 and exit 0
-//	                  (a silent no-op). This happens on a pod restart.
-//	Phase 2 (destroy): Connect again with markForDeletion=true (same UID → same
-//	                  workspace dir, so the seeded state persists). WasDeleted is
-//	                  now true, so BuildMainTF sets prevent_destroy=false and the
-//	                  destroy runs against the seeded state and actually deletes.
-//	Phase 3 (verify): Connect once more with markForDeletion=false and Observe.
-//	                  If the binding still exists, destroy silently no-op'd and we
-//	                  return an error so the caller keeps the key.
+// The no-fork client reconstructs TF state from the CR's status.atProvider at
+// Connect time, so a cold client (e.g. after a pod restart) still holds the real
+// state before Delete runs. Delete, then verify by re-Observe: a positive read-back
+// means the destroy did not take, so we error and the caller keeps the key.
 func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
-	// Phase 1: seed the workspace state without marking for deletion.
-	if _, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName, false); err != nil {
-		return errors.Wrap(err, errSeedBinding)
-	}
-
-	// Phase 2: connect with the deletion mark set so prevent_destroy is off, then destroy.
-	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName, true)
+	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName)
 	if err != nil {
 		return errors.Wrap(err, errDestroyBinding)
 	}
@@ -559,17 +543,14 @@ func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBindin
 		return errors.Wrap(err, errDestroyBinding)
 	}
 
-	// Phase 3: verify the external resource is actually gone before the caller
-	// prunes any bookkeeping. A terraform destroy that no-op'd against an empty
-	// state exits 0; only a positive read-back proves the binding was deleted.
-	verifyClient, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName, false)
+	verifyClient, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName)
 	if err != nil {
 		return errors.Wrap(err, errVerifyBinding)
 	}
 	observation, _, err := verifyClient.Observe(ctx)
 	if err != nil {
 		// The read-back itself failed transiently; this does not prove the
-		// binding still exists, so retry
+		// binding still exists, so retry.
 		return errors.Wrap(
 			fmt.Errorf("%s: %w", err.Error(), servicebindingclient.ErrVerifyTransient),
 			errVerifyBinding,

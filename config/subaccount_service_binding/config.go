@@ -1,4 +1,4 @@
-package subaccount_trust_configuration
+package subaccount_service_binding
 
 import (
 	"context"
