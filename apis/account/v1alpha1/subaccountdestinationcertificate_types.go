@@ -105,6 +105,12 @@ type SubaccountDestinationCertificateObservation struct {
 	// Type of the certificate as reported by the API.
 	// +optional
 	Type *string `json:"type,omitempty"`
+
+	// ContentHash is the SHA-256 hex digest of the certificate content returned by
+	// the API. It changes whenever BTP accepts a new certificate upload, making it
+	// usable as a drift-detection witness in tests and tooling.
+	// +optional
+	ContentHash *string `json:"contentHash,omitempty"`
 }
 
 // SubaccountDestinationCertificateSpec defines the desired state.

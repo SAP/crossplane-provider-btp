@@ -2,6 +2,8 @@ package subaccountdestinationcertificate
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -125,6 +127,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	name := observed.GetName()
 	cr.Status.AtProvider.Name = &name
 	cr.Status.AtProvider.Type = observed.Type
+	h := sha256.Sum256([]byte(observed.GetContent()))
+	hash := hex.EncodeToString(h[:])
+	cr.Status.AtProvider.ContentHash = &hash
 
 	cr.SetConditions(xpv1.Available())
 

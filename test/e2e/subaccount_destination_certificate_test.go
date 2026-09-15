@@ -11,6 +11,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
@@ -62,6 +63,11 @@ func TestSubaccountDestinationCertificate_CreationFlow(t *testing.T) {
 				cert := &v1alpha1.SubaccountDestinationCertificate{}
 				MustGetResource(t, cfg, certCreateName, nil, cert)
 
+				prevHash := ""
+				if cert.Status.AtProvider.ContentHash != nil {
+					prevHash = *cert.Status.AtProvider.ContentHash
+				}
+
 				// Switch to the second certificate key in the same secret.
 				// The controller re-reads the secret on every Connect, so this
 				// causes isUpToDate to return false and triggers an Update to BTP.
@@ -78,8 +84,18 @@ func TestSubaccountDestinationCertificate_CreationFlow(t *testing.T) {
 					t.Fatalf("failed to update contentSecretRef key: %v", err)
 				}
 
-				// Confirm the resource reconciles and comes back Available after the update.
-				waitForResource(updated, cfg, t, wait.WithTimeout(5*time.Minute))
+				// Wait for atProvider.contentHash to change — the controller only
+				// writes the new hash after a successful PUT to BTP, so a changed
+				// hash proves the updated content reached the backend.
+				resources.AwaitResourceUpdateFor(
+					ctx, t, cfg, updated,
+					func(obj k8s.Object) bool {
+						c, ok := obj.(*v1alpha1.SubaccountDestinationCertificate)
+						return ok && c.Status.AtProvider.ContentHash != nil &&
+							*c.Status.AtProvider.ContentHash != prevHash
+					},
+					wait.WithTimeout(5*time.Minute),
+				)
 				return ctx
 			},
 		).

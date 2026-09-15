@@ -451,6 +451,12 @@ spec:
                 description: SubaccountDestinationCertificateObservation holds fields
                   observed from the API.
                 properties:
+                  contentHash:
+                    description: |-
+                      ContentHash is the SHA-256 hex digest of the certificate content returned by
+                      the API. It changes whenever BTP accepts a new certificate upload, making it
+                      usable as a drift-detection witness in tests and tooling.
+                    type: string
                   name:
                     description: Name of the certificate as reported by the API.
                     type: string
