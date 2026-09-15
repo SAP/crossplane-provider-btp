@@ -32,11 +32,6 @@ on:
         default: ''
         required: false
         type: string
-      install-btp-cli:
-        description: 'install the BTP CLI before running tests'
-        default: true
-        required: false
-        type: boolean
   workflow_dispatch:
     inputs:
       checkout-ref:
@@ -54,11 +49,6 @@ on:
         default: ''
         required: false
         type: string
-      install-btp-cli:
-        description: 'install the BTP CLI before running tests'
-        default: true
-        required: false
-        type: boolean
 
 permissions:
   contents: read
@@ -405,7 +395,6 @@ jobs:
           echo "CROSSPLANE_CHART_PATH=$(realpath "$CHART")" >> $GITHUB_ENV
 
       - name: Install BTP CLI
-        if: inputs.install-btp-cli
         run: |
           curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
           tar -xzf btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz
@@ -454,7 +443,6 @@ jobs:
           go-version-file: go.mod
 
       - name: Install BTP CLI
-        if: inputs.install-btp-cli
         run: |
           curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
           tar -xzf btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz
