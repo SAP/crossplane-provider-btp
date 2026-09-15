@@ -999,6 +999,27 @@ func TestSaveCallback(t *testing.T) {
 				err: nil,
 			},
 		},
+		"StripsTFPrefixAndNamespaceSeparator": {
+			reason: "upjet calls the async callback with the internal terraform name " +
+				"(\"/TF-<cr>\"); saveCallback must strip the leading \"namespace/\" " +
+				"separator and the \"TF-\" prefix so it looks up the real CR name",
+			args: args{
+				kube: &test.MockClient{
+					MockGet: func(_ context.Context, key client.ObjectKey, _ client.Object) error {
+						if key.Name != "cls-instance" {
+							return errors.New("expected Get for real CR name \"cls-instance\", got \"" + key.Name + "\"")
+						}
+						return nil
+					},
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+				name:       "/TF-cls-instance",
+				conditions: []xpv1.Condition{ujresource.AsyncOperationFinishedCondition()},
+			},
+			want: want{
+				err: nil,
+			},
+		},
 	}
 
 	for name, tc := range cases {

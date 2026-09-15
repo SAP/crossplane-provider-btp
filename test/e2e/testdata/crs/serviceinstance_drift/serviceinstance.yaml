@@ -1,0 +1,23 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: e2e-onemds-drift-instance
+  namespace: default
+spec:
+  forProvider:
+    name: e2e-onemds-drift-instance
+    # one-mds/sap-integration is a free plan that is instances_retrievable:true
+    # and allows updates, so the Service Manager returns the parameters and the
+    # parameter-drift compensation applies. businessSystemId is a free-form
+    # string with no cross-field dependency, ideal as the drift parameter.
+    offeringName: one-mds
+    planName: sap-integration
+    parameters:
+      businessSystemId: e2e-initial
+      # one-mds refuses deprovisioning unless this is set, so keep it on from
+      # the start to let the test teardown delete the instance cleanly.
+      enableTenantDeletion: true
+    serviceManagerRef:
+      name: e2e-sm-si-drift
+    subaccountRef:
+      name: e2e-test-si-drift
