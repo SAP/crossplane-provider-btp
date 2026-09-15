@@ -226,7 +226,7 @@ resources:
                 {
                   "directory_id": "ddfc2206-5f11-48ed-a1ec-29010af70050",
                   "role_collection_name": "Directory Viewer",
-                  "user_name": "john.doe@mycompany.com"
+                  "user_name": "john.doe@example.com"
                 }
             - name: directory_viewer_group
               manifest: |-
@@ -395,7 +395,7 @@ resources:
               manifest: |-
                 {
                   "role_collection_name": "Global Account Viewer",
-                  "user_name": "john.doe@mycompany.com"
+                  "user_name": "john.doe@example.com"
                 }
             - name: globalaccount_viewer_group
               manifest: |-
@@ -1057,7 +1057,7 @@ resources:
                 {
                   "role_collection_name": "Subaccount Viewer",
                   "subaccount_id": "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f",
-                  "user_name": "john.doe@mycompany.com"
+                  "user_name": "john.doe@example.com"
                 }
             - name: subaccount_viewer_group
               manifest: |-
