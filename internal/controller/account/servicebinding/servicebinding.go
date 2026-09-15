@@ -266,6 +266,12 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	e.client = client
 
+	// The no-fork upjet client caches its plan in Observe; Create reads that
+	// cached plan
+	if _, _, err := client.Observe(ctx); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
+	}
+
 	externalName, creation, err := client.Create(ctx)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
