@@ -98,7 +98,7 @@ func Test_authenticationParams(t *testing.T) {
 		{
 			name: "Grant Type user_token", args: args{
 				&Credentials{
-					UserCredential: &UserCredential{Email: "my@mail.com", Password: "mypassword"},
+					UserCredential: &UserCredential{Email: "my@example.com", Password: "mypassword"},
 					CISCredential: &CISCredential{
 						GrantType: "user_token",
 						Uaa: struct {
@@ -111,7 +111,7 @@ func Test_authenticationParams(t *testing.T) {
 					},
 				},
 			}, want: map[string][]string{
-				"username":   {"my@mail.com"},
+				"username":   {"my@example.com"},
 				"password":   {"mypassword"},
 				"grant_type": {"password"},
 			},
