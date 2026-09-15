@@ -6,8 +6,7 @@
 # the extra steps that differ between the two callers:
 #
 #   release:           tags the head commit with the version, runs GoReleaser
-#                      to create the GitHub release, indexes the CRD docs, and
-#                      passes BRANCH_NAME to `make xpkg.build`.
+#                      to create the GitHub release, and indexes the CRD docs.
 #   release_candidate: skips tagging/GoReleaser/CRD indexing and instead builds
 #                      the exporter binaries (linux/darwin x amd64/arm64) and
 #                      uploads them as a workflow artifact.
@@ -86,18 +85,8 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-      # BRANCH_NAME is passed only for release to preserve current behavior.
-      # release_candidate lets it default (via build/makelib/common.mk).
     - name: Publish Artifacts to DockerHub
-      run: |
-        if [ "${{ inputs.release_type }}" = "release" ]; then
-          BRANCH_ARG="BRANCH_NAME=${GITHUB_REF##*/}"
-        else
-          BRANCH_ARG=""
-        fi
-        make xpkg.build PLATFORM=linux_amd64 VERSION=${{ inputs.version }} $BRANCH_ARG
-        make xpkg.build PLATFORM=linux_arm64 VERSION=${{ inputs.version }} $BRANCH_ARG
-        make xpkg.release.publish VERSION=${{ inputs.version }}
+      run: make xpkg.release.publish VERSION=${{ inputs.version }}
       env:
         XPKG_REG_ORGS: ${{ vars.REGISTRY_URL }}/crossplane
 

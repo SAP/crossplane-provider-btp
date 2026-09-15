@@ -60,9 +60,8 @@ concurrency:
 env:
   BUILD_ID: ${{ github.run_number }}-${{ github.run_attempt }} # using shorter run number for BTP character limits
   # hardcoded BTP CLI version
-  btp_cli_version: 2.116.2
+  BTP_CLI_VERSION: 2.116.2
   E2E_BUILD_REGISTRY: index.docker.io/e2e
-  E2E_PROVIDER_IMAGE: index.docker.io/e2e/provider-btp-amd64
   CROSSPLANE_CLI_VERSION: v2.0.2
   # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable versioning=semver allowedVersions=<2.2.0
   # Pinned to last 2.1.x: 2.2.0+ (crossplane/crossplane#6981) resolves spec.package
@@ -254,11 +253,13 @@ jobs:
           path: .cache/tools
           key: ${{ steps.cli-tools-cache.outputs.cache-primary-key }}
 
+      - name: Set provider image name
+        run: |
+          repo="${GITHUB_REPOSITORY##*/}"
+          echo "E2E_PROVIDER_IMAGE=${{ env.E2E_BUILD_REGISTRY }}/${repo#crossplane-}-amd64" >> "$GITHUB_ENV"
+
       - name: Build provider image
         run: make build BUILD_REGISTRY=${{ env.E2E_BUILD_REGISTRY }} PLATFORMS=linux_amd64
-
-      - name: Build provider xpkg
-        run: make xpkg.build.provider-btp BUILD_REGISTRY=${{ env.E2E_BUILD_REGISTRY }} PLATFORMS=linux_amd64
 
       - name: Export provider image
         run: docker save "${{ env.E2E_PROVIDER_IMAGE }}" -o provider-image.tar
@@ -394,10 +395,9 @@ jobs:
           echo "CROSSPLANE_CHART_PATH=$(realpath "$CHART")" >> $GITHUB_ENV
 
       - name: Install BTP CLI
-        #hardcoded version
         run: |
-          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+          tar -xzf btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz
           cd linux-amd64
           mv btp /usr/local/bin
 
@@ -444,8 +444,8 @@ jobs:
 
       - name: Install BTP CLI
         run: |
-          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+          tar -xzf btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz
           cd linux-amd64
           mv btp /usr/local/bin
 
