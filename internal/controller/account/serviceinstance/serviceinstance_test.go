@@ -422,6 +422,25 @@ func TestObserve(t *testing.T) {
 				cr:  expectedServiceInstance(withExternalName("not-a-uuid")),
 			},
 		},
+		// ADR(external-name): the same invalid external-name must NOT block a
+		// delete — an Observe error returns before Delete runs and would strand
+		// the finalizer. Mirrors ServiceBinding's guard (#987).
+		"InvalidUUIDExternalName_WhileDeleting": {
+			reason: "should skip external-name validation when the CR is being deleted",
+			fields: fields{
+				client: &TfProxyMock{status: tfclient.NotExisting},
+			},
+			args: args{
+				mg: expectedServiceInstance(withExternalName("not-a-uuid"), withDeletionTimestamp()),
+			},
+			want: want{
+				err: nil,
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				cr: expectedServiceInstance(withExternalName("not-a-uuid"), withDeletionTimestamp()),
+			},
+		},
 		// ADR(external-name):: valid UUID in external-name, resource not found → trigger Create()
 		"ValidUUID_NotFound": {
 			reason: "should return resourceExists:false when valid UUID is set but resource does not exist (404)",
@@ -1183,6 +1202,15 @@ func withExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
 			cr.SetAnnotations(map[string]string{})
 		}
 		cr.GetAnnotations()["crossplane.io/external-name"] = externalName
+	}
+}
+
+// Option to mark the CR as being deleted. The timestamp is fixed so that the
+// want/got CRs compare equal.
+func withDeletionTimestamp() func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		ts := metav1.NewTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+		cr.SetDeletionTimestamp(&ts)
 	}
 }
 

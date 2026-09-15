@@ -1,6 +1,7 @@
 // Package tfclient — identity_injector.go patches an `identity` block into
-// the on-disk `terraform.tfstate` for each upjet-managed BTP resource so the
-// terraform-plugin-framework's post-Read identity check is satisfied.
+// the on-disk `terraform.tfstate` for each CLI-reconciled upjet BTP resource
+// (today: btp_subaccount_service_binding) so the terraform-plugin-framework's
+// post-Read identity check is satisfied.
 // Workaround for https://github.com/SAP/crossplane-provider-btp/issues/521.
 //
 // Why this exists: starting in BTP TF provider v1.19.0 every managed resource
@@ -9,7 +10,8 @@
 // state's `identity` block (req.CurrentIdentity). Upjet's pinned StateV4
 // struct has no identity field, so the state upjet writes never carries
 // identity, the framework check fires with "Missing Resource Identity After
-// Read", and every refresh fails. See ISSUE-521-tracking.md for the full
+// Read", and every refresh fails. See
+// https://github.com/SAP/crossplane-provider-btp/issues/521 for the full
 // diagnosis.
 //
 // How it works: we wrap upjet's `controller.Store` (a single-method
@@ -21,7 +23,7 @@
 // framework auto-seeds resp.NewIdentity. Whatever the CLI writes back after
 // refresh gets re-patched on the next reconcile.
 //
-// Why not an afero.Fs middleware via `terraform.WithFs(...)`: in upjet v2.2.0,
+// Why not an afero.Fs middleware via `terraform.WithFs(...)`: in upjet v2.4.2,
 // `WithFs` only sets `WorkspaceStore.fs` — used for MkdirAll/Stat/RemoveAll
 // on the workspace dir and for *reading* tfstate back. The actual write of
 // `terraform.tfstate` happens in `FileProducer.EnsureTFState()`, and
@@ -35,8 +37,10 @@
 // state file) logs a Debug line and the reconcile proceeds. Worst case is
 // the same framework error we'd hit without the injector.
 //
-// Removal: when no-fork (PR #680, issue #207) lands, this file and the two
-// call-site wraps can be deleted outright. Nothing else depends on it.
+// Removal: gated on issue #692 (SubaccountServiceBinding), not #691. The
+// instance moved to the no-fork client in #691 and no longer travels this
+// path; the binding still does, so this file and its call-site wrap in
+// setup.go stay until the binding migrates too.
 package tfclient
 
 import (
@@ -66,6 +70,12 @@ import (
 // Resources absent from the map have no IdentitySchema and are skipped
 // (e.g. btp_subaccount_api_credential).
 //
+// Only btp_subaccount_service_binding still reaches this map: the framework
+// branch of NewInternalTfConnector never constructs the identity-injecting
+// Store. The other four entries are unreachable leftovers from #953's no-fork
+// switch, kept because deleting them buys nothing and would risk a #521-class
+// failure if that routing analysis is wrong anywhere.
+//
 // Why we emit identity even when source attributes are empty / placeholder
 // values: per the upstream maintainer's guidance in
 // https://github.com/SAP/terraform-provider-btp/issues/1532, the framework's
@@ -79,7 +89,6 @@ var identityFields = map[string]map[string]string{
 	"btp_subaccount_trust_configuration":    {"subaccount_id": "subaccount_id", "origin": "id"},
 	"btp_globalaccount_trust_configuration": {"origin": "id"},
 	"btp_directory_entitlement":             {"directory_id": "directory_id", "service_name": "service_name", "plan_name": "plan_name"},
-	"btp_subaccount_service_instance":       {"subaccount_id": "subaccount_id", "id": "id"},
 	"btp_subaccount_service_binding":        {"subaccount_id": "subaccount_id", "id": "id"},
 	"btp_subaccount_service_broker":         {"subaccount_id": "subaccount_id", "id": "id"},
 }
@@ -141,8 +150,8 @@ func patchStateFile(path string, log logging.Logger) error {
 	if !changed {
 		return nil
 	}
-	// Preserve the original file permissions where possible. os.WriteFile would
-	// drop them on overwrite; using OpenFile + Write keeps the existing mode.
+	// os.WriteFile leaves an existing file's mode untouched, and the
+	// Stat-derived mode below only applies when the file must be created.
 	info, err := os.Stat(path)
 	mode := os.FileMode(0o600)
 	if err == nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -11,9 +12,12 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
+	"github.com/crossplane/upjet/v2/pkg/terraform"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -542,6 +546,96 @@ func TestTerraformSetupBuilderNoTracking_ErrorBranches(t *testing.T) {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("TerraformSetupBuilderNoTracking() error = %v, want it to contain %q", err, want)
 				}
+			}
+		})
+	}
+}
+
+// TestSetupBuildersPopulateFrameworkProvider pins that both setup builders
+// supply the plugin-framework provider instance. Upjet's framework client
+// hard-fails with "cannot retrieve framework provider" when Setup.FrameworkProvider
+// is nil, and that failure only surfaces at connect time against a live cluster.
+func TestSetupBuildersPopulateFrameworkProvider(t *testing.T) {
+	builders := map[string]func(string, string, string) terraform.SetupFn{
+		"TerraformSetupBuilder":           TerraformSetupBuilder,
+		"TerraformSetupBuilderNoTracking": TerraformSetupBuilderNoTracking,
+	}
+
+	userCred := btp.UserCredential{
+		Username: testUsername,
+		Password: testPassword,
+	}
+	credJSON, err := json.Marshal(userCred)
+	if err != nil {
+		t.Fatalf("failed to marshal credentials: %v", err)
+	}
+
+	for name, builder := range builders {
+		t.Run(name, func(t *testing.T) {
+			mg := &fake.LegacyManaged{}
+			mg.SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
+
+			kube := &test.MockClient{
+				MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+					switch o := obj.(type) {
+					case *v1alpha1.ProviderConfig:
+						*o = *fakeProviderConfig(testProviderName, testSecretName, testSecretNS, testGlobalAccount, testCliServerURL)
+					case *corev1.Secret:
+						o.Data = map[string][]byte{
+							"credentials": credJSON,
+						}
+					}
+					return nil
+				}),
+				MockList: test.NewMockListFn(nil),
+			}
+
+			setup, err := builder("1.3.9", "SAP/btp", "1.25.0")(context.Background(), kube, mg)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if setup.FrameworkProvider == nil {
+				t.Error("Setup.FrameworkProvider is nil; upjet's plugin-framework client cannot configure the provider")
+			}
+		})
+	}
+}
+
+// TestNewInternalTfConnectorSelectsClientByResourceConfig pins that the
+// connector kind comes from include-list membership (issue #691), not from a
+// call-site flag. The binding stays on the CLI client until issue #692.
+func TestNewInternalTfConnectorSelectsClientByResourceConfig(t *testing.T) {
+	tests := []struct {
+		reason   string
+		resource string
+		useAsync bool
+		want     any
+	}{
+		{
+			reason:   "framework-reconciled resource, async: plugin-framework async connector",
+			resource: "btp_subaccount_service_instance",
+			useAsync: true,
+			want:     &tjcontroller.TerraformPluginFrameworkAsyncConnector{},
+		},
+		{
+			reason:   "framework-reconciled resource, sync: plugin-framework connector",
+			resource: "btp_subaccount_service_instance",
+			useAsync: false,
+			want:     &tjcontroller.TerraformPluginFrameworkConnector{},
+		},
+		{
+			reason:   "CLI-reconciled resource keeps the forked connector",
+			resource: "btp_subaccount_service_binding",
+			useAsync: false,
+			want:     &tjcontroller.Connector{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.reason, func(t *testing.T) {
+			got := NewInternalTfConnector(nil, tc.resource, schema.GroupVersionKind{}, tc.useAsync, nil)
+			if reflect.TypeOf(got) != reflect.TypeOf(tc.want) {
+				t.Errorf("%s\nNewInternalTfConnector(...): want %T, got %T", tc.reason, tc.want, got)
 			}
 		})
 	}
