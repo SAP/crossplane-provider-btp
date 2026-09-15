@@ -1,3 +1,4 @@
+# Scans all text files in the repository for unauthorized email domains, phone numbers, and API endpoints.
 name: check-personal-data
 
 on:
@@ -40,8 +41,6 @@ jobs:
           for f in $EXCLUDED_FILES; do
             EXCLUDE_PATTERN="$EXCLUDE_PATTERN -not -path './$f' -not -path '*/$f'"
           done
-          TOTAL_FILES=$(eval "find . -type f $EXCLUDE_PATTERN" | wc -l)
-          echo "Found $TOTAL_FILES files to scan"
 
           check_email() {
             local file="$1" matches
@@ -49,7 +48,7 @@ jobs:
             [ -z "$matches" ] && return
             echo "$matches" | while read -r email; do
               domain=$(echo "$email" | awk -F@ '{print $2}')
-              if ! echo "$domain" | grep -iE "($ALLOWED_DOMAINS)$" > /dev/null; then
+              if ! grep -iE "($ALLOWED_DOMAINS)$" <<< "$domain" > /dev/null; then
                 echo "$file: $email" >> email_violations.txt
               fi
             done
@@ -70,7 +69,7 @@ jobs:
             if [ -n "$matches" ]; then
               echo "$matches" | while read -r url; do
                 domain=$(echo "$url" | sed -E 's|https?://([^/]+).*|\1|')
-                if ! echo "$domain" | grep -iE "^($ALLOWED_API_ENDPOINTS)$" > /dev/null; then
+                if ! grep -iE "^($ALLOWED_API_ENDPOINTS)$" <<< "$domain" > /dev/null; then
                   echo "$file: $url" >> api_violations.txt
                 fi
               done
@@ -79,19 +78,14 @@ jobs:
             if [ -n "$matches" ]; then
               echo "$matches" | while read -r domain_path; do
                 domain=$(echo "$domain_path" | sed -E 's|([^/]+).*|\1|')
-                if ! echo "$domain" | grep -iE "^($ALLOWED_API_ENDPOINTS)$" > /dev/null; then
+                if ! grep -iE "^($ALLOWED_API_ENDPOINTS)$" <<< "$domain" > /dev/null; then
                   echo "$file: $domain_path" >> api_violations.txt
                 fi
               done
             fi
           }
 
-          CHECKED_FILES=0
           eval "find . -type f $EXCLUDE_PATTERN" | while read -r file; do
-            CHECKED_FILES=$((CHECKED_FILES + 1))
-            if [ $((CHECKED_FILES % 100)) -eq 0 ]; then
-              echo "Progress: Checked $CHECKED_FILES/$TOTAL_FILES files"
-            fi
             if file "$file" | grep -q "text"; then
               check_email "$file"
               check_phone "$file"
@@ -100,28 +94,35 @@ jobs:
           done
 
           if [ -s email_violations.txt ]; then
-            echo "Found $(wc -l < email_violations.txt) unauthorized email domains:"
+            count=$(wc -l < email_violations.txt)
+            echo "Found $count unauthorized email domains:"
             sed 's/^/  - /' email_violations.txt
-            echo "::error::$(wc -l < email_violations.txt) unauthorized email domains found"
+            echo "::error::$count unauthorized email domains found"
           else
             echo "No unauthorized email domains found"
           fi
 
           if [ -s phone_violations.txt ]; then
-            echo "Found $(wc -l < phone_violations.txt) phone numbers (not allowed in codebase):"
+            count=$(wc -l < phone_violations.txt)
+            echo "Found $count phone numbers (not allowed in codebase):"
             sed 's/^/  - /' phone_violations.txt
-            echo "::error::$(wc -l < phone_violations.txt) phone numbers found"
+            echo "::error::$count phone numbers found"
           else
             echo "No phone numbers found"
           fi
 
           if [ -s api_violations.txt ]; then
-            echo "Found $(wc -l < api_violations.txt) unauthorized API endpoints:"
+            count=$(wc -l < api_violations.txt)
+            echo "Found $count unauthorized API endpoints:"
             sed 's/^/  - /' api_violations.txt
-            echo "::error::$(wc -l < api_violations.txt) unauthorized API endpoints found"
+            echo "::error::$count unauthorized API endpoints found"
           else
             echo "No unauthorized API endpoints found"
           fi
 
-          TOTAL_VIOLATIONS=$(cat email_violations.txt phone_violations.txt api_violations.txt | wc -l)
-          [ "$TOTAL_VIOLATIONS" -gt 0 ] && exit 1 || echo "All checks passed successfully!"
+          if [ -s email_violations.txt ] || [ -s phone_violations.txt ] || [ -s api_violations.txt ]; then
+
+            exit 1
+          else
+            echo "All checks passed successfully!"
+          fi
