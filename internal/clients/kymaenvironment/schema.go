@@ -185,7 +185,12 @@ func (c *SchemaCache) get(ctx context.Context, client btp.Client, scope, environ
 // fetch pulls the matching availableEnvironments entry and parses its
 // updateSchema JSON string into our internal Schema type.
 func fetch(ctx context.Context, client btp.Client, environmentType, planName string) (*Schema, error) {
-	req := client.ProvisioningServiceClient.GetAvailableEnvironments(ctx)
+	// Authorization("") is required by the generated client: the header
+	// parameter is mandatory (a nil value fails with "authorization is
+	// required and must be specified" before any request is sent), while the
+	// real bearer token is injected by the oauth2 HTTP transport. This matches
+	// the other ProvisioningServiceClient calls (e.g. GetEnvironmentInstances).
+	req := client.ProvisioningServiceClient.GetAvailableEnvironments(ctx).Authorization("")
 	resp, _, err := client.ProvisioningServiceClient.GetAvailableEnvironmentsExecute(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "fetching availableEnvironments from BTP")
