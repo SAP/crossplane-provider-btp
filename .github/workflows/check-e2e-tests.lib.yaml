@@ -438,11 +438,11 @@ jobs:
 
   cleanup-e2e:
     runs-on: ubuntu-latest
-    needs: [prepare-matrix, e2e-test]
+    needs: [prepare-matrix, prepare-build, e2e-test]
     environment:
       name: pr-e2e-no-approval
       deployment: false
-    if: always() && !inputs.skip && needs.prepare-matrix.result == 'success' # intentional: workflow cancellation skips cleanup; resources will persist until the next run
+    if: always() && !inputs.skip && needs.prepare-matrix.result == 'success' && needs.prepare-build.result == 'success' # intentional: workflow cancellation skips cleanup; resources will persist until the next run
     steps:
       - name: checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
