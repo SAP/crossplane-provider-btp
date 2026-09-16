@@ -214,6 +214,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Cache Go modules and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /opt/actions-runner/_work/_temp/go-module-cache
+            /opt/actions-runner/_work/_temp/go-build-cache
+          key: go-mod-cache-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-mod-cache-${{ runner.os }}-
+
       - name: Restore CLI tools cache (kind, kubectl, crank, btp)
         id: cli-tools-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -243,8 +252,10 @@ jobs:
           CRANK=".cache/tools/linux_x86_64/crossplane-cli-${CROSSPLANE_CLI_VERSION}"
           BTP=".cache/tools/linux_x86_64/btp-${BTP_CLI_VERSION}"
           retry make "$KIND" "$KUBECTL"
+          echo "Installing crossplane cli version ${CROSSPLANE_CLI_VERSION}"
           retry curl -fsSL --create-dirs -o "$CRANK" "https://releases.crossplane.io/stable/${CROSSPLANE_CLI_VERSION}/bin/linux_amd64/crank"
           chmod +x "$CRANK"
+          echo "Installing BTP CLI version ${BTP_CLI_VERSION}"
           retry curl -fsSL \
             --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt" \
             -o "${BTP}.tar.gz" \
