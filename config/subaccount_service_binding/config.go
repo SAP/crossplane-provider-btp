@@ -10,15 +10,11 @@ func Configure(p *config.Provider) {
 		r.ShortGroup = "account"
 		r.Kind = "SubaccountServiceBinding"
 
-		// issue #692: reconciled in-process by the Terraform Plugin Framework
-		// client. The helper writes "NOT_EMPTY_GUID" as "id" while the
-		// external-name is empty, so the pre-create Read fails instead of
-		// matching an arbitrary binding. It returns a fresh ExternalName, so the
-		// fields customised below must be re-applied after it.
+		// Writes "NOT_EMPTY_GUID" as "id" while the external-name is empty, so the
+		// pre-create Read fails instead of matching an arbitrary binding. Returns a
+		// fresh ExternalName, so the fields set below must follow it.
 		r.ExternalName = config.FrameworkResourceWithComputedIdentifier("id", "NOT_EMPTY_GUID")
 
-		// ADR: disable external-name initialization
-		// Re-applied: the assignment above returns a fresh ExternalName.
 		r.ExternalName.DisableNameInitializer = true
 
 		// note: can be overwritten during initialization

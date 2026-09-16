@@ -26,12 +26,9 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	name := managed.ControllerName(apisv1beta1.CloudManagementKind)
 	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(name)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 
-	// Built once at setup, not per reconcile: both connectors are the
-	// plugin-framework (no-fork) client and each owns an OperationTrackerStore
-	// keyed by resource UID that caches TF state, identity and the deletion
-	// marker. The store is never evicted: this setup helper offers no
-	// managed.WithFinalizer hook, and the synthesized sub-resource UIDs would
-	// not match upjet's parent-keyed tracker finalizer.
+	// Built once at setup, not per reconcile. Each connector owns an
+	// OperationTrackerStore that is never evicted: no managed.WithFinalizer hook
+	// here, and synthesized sub-resource UIDs miss upjet's parent-keyed finalizer.
 	instanceConnector := tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil)
 	bindingConnector := tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil)
 
