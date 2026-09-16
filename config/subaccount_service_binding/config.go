@@ -1,8 +1,6 @@
 package subaccount_service_binding
 
 import (
-	"context"
-
 	"github.com/crossplane/upjet/v2/pkg/config"
 )
 
@@ -11,14 +9,18 @@ func Configure(p *config.Provider) {
 	p.AddResourceConfigurator("btp_subaccount_service_binding", func(r *config.Resource) {
 		r.ShortGroup = "account"
 		r.Kind = "SubaccountServiceBinding"
-		r.ExternalName.GetIDFn = func(_ context.Context, externalName string, _ map[string]any, _ map[string]any) (string, error) {
-			// When using "" as ID the API endpoint call will fail, so we need to use anything else that
-			// won't yield a result
-			if externalName == "" {
-				return "NOT_EMPTY_GUID", nil
-			}
-			return externalName, nil
-		}
+
+		// issue #692: reconciled in-process by the Terraform Plugin Framework
+		// client. The helper writes "NOT_EMPTY_GUID" as "id" while the
+		// external-name is empty, so the pre-create Read fails instead of
+		// matching an arbitrary binding. It returns a fresh ExternalName, so the
+		// fields customised below must be re-applied after it.
+		r.ExternalName = config.FrameworkResourceWithComputedIdentifier("id", "NOT_EMPTY_GUID")
+
+		// ADR: disable external-name initialization
+		// Re-applied: the assignment above returns a fresh ExternalName.
+		r.ExternalName.DisableNameInitializer = true
+
 		// note: can be overwritten during initialization
 		r.UseAsync = true
 
