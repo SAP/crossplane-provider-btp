@@ -244,11 +244,13 @@ jobs:
           BTP=".cache/tools/linux_x86_64/btp-${BTP_CLI_VERSION}"
           retry make "$KIND" "$KUBECTL"
           retry curl -fsSL --create-dirs -o "$CRANK" "https://releases.crossplane.io/stable/${CROSSPLANE_CLI_VERSION}/bin/linux_amd64/crank"
+          chmod +x "$CRANK"
           retry curl -fsSL \
             --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt" \
             -o "${BTP}.tar.gz" \
             "https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-${BTP_CLI_VERSION}.tar.gz"
           tar -xzf "${BTP}.tar.gz" -O linux-amd64/btp > "$BTP"
+          chmod +x "$BTP"
 
       - name: Save CLI tools cache (kind, kubectl, crank, btp)
         if: success() && steps.cli-tools-cache.outputs.cache-hit != 'true'
