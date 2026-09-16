@@ -191,58 +191,27 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 
 // NewInternalTfConnector creates the internal Terraform connector for
 // resourceName. callbackProvider may be nil where async completion is not
-// routed back to a CR.
-//
-// The client kind comes from the resource's own upjet configuration, not from a
-// parameter: a non-nil TerraformPluginFrameworkResource means the resource is
-// framework-reconciled (no-fork), so no call site can disagree with
-// config/external_name.go.
+// routed back to a CR. Every configured resource is framework-reconciled
+// (no-fork): the provider's Go functions are called in-process, no workspace on
+// disk, no terraform binary, and no identity injection — the framework client
+// threads resource identity itself via the operation tracker.
 func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) managed.ExternalConnector {
 	tfVersion := TF_VERSION_CALLBACK()
 	zl := zap.New(zap.UseDevMode(tfVersion.DebugLogs))
 	setupFn := TerraformSetupBuilderNoTracking(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion)
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
-	provider := config.GetProvider()
-	eventHandler := handler.NewEventHandler(handler.WithLogger(log.WithValues("gvk", gvk)))
+	res := config.GetProvider().Resources[resourceName]
 
-	res := provider.Resources[resourceName]
-
-	if res.TerraformPluginFrameworkResource != nil {
-		// No-fork: the provider's Go functions are called in-process. No workspace
-		// on disk, no terraform binary, and no identity injection — the framework
-		// client threads resource identity itself via the operation tracker.
-		if useAsync {
-			return tjcontroller.NewTerraformPluginFrameworkAsyncConnector(client, tjcontroller.NewOperationStore(log), setupFn, res,
-				tjcontroller.WithTerraformPluginFrameworkAsyncLogger(log),
-				tjcontroller.WithTerraformPluginFrameworkAsyncConnectorEventHandler(eventHandler),
-				tjcontroller.WithTerraformPluginFrameworkAsyncCallbackProvider(callbackProvider),
-			)
-		}
-		return tjcontroller.NewTerraformPluginFrameworkConnector(client, setupFn, res, tjcontroller.NewOperationStore(log),
-			tjcontroller.WithTerraformPluginFrameworkLogger(log),
+	if useAsync {
+		eventHandler := handler.NewEventHandler(handler.WithLogger(log.WithValues("gvk", gvk)))
+		return tjcontroller.NewTerraformPluginFrameworkAsyncConnector(client, tjcontroller.NewOperationStore(log), setupFn, res,
+			tjcontroller.WithTerraformPluginFrameworkAsyncLogger(log),
+			tjcontroller.WithTerraformPluginFrameworkAsyncConnectorEventHandler(eventHandler),
+			tjcontroller.WithTerraformPluginFrameworkAsyncCallbackProvider(callbackProvider),
 		)
 	}
-
-	// Fork/CLI path, still used by btp_subaccount_service_binding until issue #692.
-	// Identity-injecting Store wraps upjet's WorkspaceStore so that every
-	// Workspace() call patches an `identity` block into the on-disk
-	// terraform.tfstate, satisfying plugin-framework's post-Read identity
-	// check (issue #521). The earlier afero.Fs middleware approach was
-	// inert — upjet's WithFs doesn't propagate to FileProducer, see
-	// identity_injector.go header.
-	ws := terraform.NewWorkspaceStore(log)
-	store := NewIdentityInjectingStore(ws, log)
-
-	// depending on the context we might need resources that are async or not.
-	// GetProvider() builds a fresh provider per call, so this mutates a private
-	// copy; do not memoise it without removing this write first.
-	res.UseAsync = useAsync
-
-	return tjcontroller.NewConnector(client, store, setupFn,
-		res,
-		tjcontroller.WithLogger(log),
-		tjcontroller.WithConnectorEventHandler(eventHandler),
-		tjcontroller.WithCallbackProvider(callbackProvider),
+	return tjcontroller.NewTerraformPluginFrameworkConnector(client, setupFn, res, tjcontroller.NewOperationStore(log),
+		tjcontroller.WithTerraformPluginFrameworkLogger(log),
 	)
 }
 
