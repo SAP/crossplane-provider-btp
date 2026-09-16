@@ -1,0 +1,128 @@
+# Scans all text files in the repository for unauthorized email domains, phone numbers, and API endpoints.
+name: check-personal-data
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  content-check:
+    runs-on: ubuntu-latest
+    env:
+      ALLOWED_DOMAINS: "git\\.k8s\\.io|my-route-service\\.example\\.com|api\\.example\\.org|github\\.com|charts\\.crossplane\\.io|docs\\.github\\.com|v3-apidocs\\.cloudfoundry\\.org|zip\\.com|apache\\.org|docs\\.renovatebot\\.com|crossplane\\.io|v3-apidocs\\.cloudfoundry\\.space|releases\\.hashicorp\\.com|probot\\.github\\.io|facebook\\.github\\.io|example\\.com|test\\.com|developer\\.example\\.org|mycompany\\.com"
+      ALLOWED_API_ENDPOINTS: "git\\.k8s\\.io|my-route-service\\.example\\.com|api\\.example\\.org|github\\.com|charts\\.crossplane\\.io|docs\\.github\\.com|v3-apidocs\\.cloudfoundry\\.org|zip\\.com|apache\\.org|docs\\.renovatebot\\.com|crossplane\\.io|v3-apidocs\\.cloudfoundry\\.space|releases\\.hashicorp\\.com|probot\\.github\\.io|facebook\\.github\\.io"
+      EXCLUDE_DIRS: ".git build .github/workflows"
+      EXCLUDED_FILES: "package/crossplane.yaml"
+      # Regex pattern matching email addresses
+      EMAIL_PATTERN: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+      # Phone number formats: +1 (XXX) XXX-XXXX, (XXX) XXX-XXXX, XXX-XXX-XXXX (and space variants)
+      PHONE_PATTERN: '(\+[0-9][ -]?\(?[0-9]{3}\)?[ -][0-9]{3}[ -][0-9]{4})|(\([0-9]{3}\)[ -][0-9]{3}[ -][0-9]{4})|([0-9]{3}[ -][0-9]{3}[ -][0-9]{4})'
+      # HTTP/HTTPS URLs
+      URL_PATTERN: |-
+        https?://[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](\.[a-zA-Z]{2,})+(/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]*)?
+      # Domain with path but no protocol
+      DOMAIN_PATH_PATTERN: |-
+        [a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](\.[a-zA-Z]{2,})+(/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]*)?
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Scan files
+        id: scan
+        shell: bash
+        run: |
+          EXCLUDE_PATTERN=""
+          for dir in $EXCLUDE_DIRS; do
+            EXCLUDE_PATTERN="$EXCLUDE_PATTERN -not -path './$dir/*'"
+          done
+          for f in $EXCLUDED_FILES; do
+            EXCLUDE_PATTERN="$EXCLUDE_PATTERN -not -path './$f' -not -path '*/$f'"
+          done
+
+          check_email() {
+            local file="$1" matches
+            matches=$(grep -oE "$EMAIL_PATTERN" "$file" 2>/dev/null || true)
+            [ -z "$matches" ] && return
+            echo "$matches" | while read -r email; do
+              domain=$(echo "$email" | awk -F@ '{print $2}')
+              if ! grep -iE "($ALLOWED_DOMAINS)$" <<< "$domain" > /dev/null; then
+                echo "$file: $email" >> email_violations.txt
+              fi
+            done
+          }
+
+          check_phone() {
+            local file="$1" matches
+            matches=$(grep -oE "$PHONE_PATTERN" "$file" 2>/dev/null || true)
+            [ -z "$matches" ] && return
+            echo "$matches" | while read -r phone; do
+              echo "$file: $phone" >> phone_violations.txt
+            done
+          }
+
+          check_api() {
+            local file="$1" matches
+            matches=$(grep -oE "$URL_PATTERN" "$file" 2>/dev/null || true)
+            if [ -n "$matches" ]; then
+              echo "$matches" | while read -r url; do
+                domain=$(echo "$url" | sed -E 's|https?://([^/]+).*|\1|')
+                if ! grep -iE "^($ALLOWED_API_ENDPOINTS)$" <<< "$domain" > /dev/null; then
+                  echo "$file: $url" >> api_violations.txt
+                fi
+              done
+            fi
+            matches=$(grep -oE "$DOMAIN_PATH_PATTERN" "$file" 2>/dev/null | grep -v -E '(com\.|org\.|net\.|io\.|edu\.)' || true)
+            if [ -n "$matches" ]; then
+              echo "$matches" | while read -r domain_path; do
+                domain=$(echo "$domain_path" | sed -E 's|([^/]+).*|\1|')
+                if ! grep -iE "^($ALLOWED_API_ENDPOINTS)$" <<< "$domain" > /dev/null; then
+                  echo "$file: $domain_path" >> api_violations.txt
+                fi
+              done
+            fi
+          }
+
+          eval "find . -type f $EXCLUDE_PATTERN" | while read -r file; do
+            if file "$file" | grep -q "text"; then
+              check_email "$file"
+              check_phone "$file"
+              check_api "$file"
+            fi
+          done
+
+          if [ -s email_violations.txt ]; then
+            count=$(wc -l < email_violations.txt)
+            echo "Found $count unauthorized email domains:"
+            sed 's/^/  - /' email_violations.txt
+            echo "::error::$count unauthorized email domains found"
+          else
+            echo "No unauthorized email domains found"
+          fi
+
+          if [ -s phone_violations.txt ]; then
+            count=$(wc -l < phone_violations.txt)
+            echo "Found $count phone numbers (not allowed in codebase):"
+            sed 's/^/  - /' phone_violations.txt
+            echo "::error::$count phone numbers found"
+          else
+            echo "No phone numbers found"
+          fi
+
+          if [ -s api_violations.txt ]; then
+            count=$(wc -l < api_violations.txt)
+            echo "Found $count unauthorized API endpoints:"
+            sed 's/^/  - /' api_violations.txt
+            echo "::error::$count unauthorized API endpoints found"
+          else
+            echo "No unauthorized API endpoints found"
+          fi
+
+          if [ -s email_violations.txt ] || [ -s phone_violations.txt ] || [ -s api_violations.txt ]; then
+
+            exit 1
+          else
+            echo "All checks passed successfully!"
+          fi

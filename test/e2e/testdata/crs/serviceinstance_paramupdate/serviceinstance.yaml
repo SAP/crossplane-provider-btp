@@ -1,0 +1,17 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: e2e-si-paramupdate
+  namespace: default
+spec:
+  forProvider:
+    name: e2e-si-paramupdate
+    offeringName: one-mds
+    planName: sap-integration
+    parameters:
+      businessSystemId: probe-1
+      enableTenantDeletion: true
+    serviceManagerRef:
+      name: e2e-sm-si-paramupdate
+    subaccountRef:
+      name: e2e-test-si-paramupdate

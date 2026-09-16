@@ -199,6 +199,21 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotCloudManagement)
 	}
 
+	// ADR(external-name) Observe Step 1 is intentionally omitted here: we do
+	// not short-circuit on an empty external-name because IsFallbackExternalName
+	// covers "" and the recovery path below must get a chance to run when
+	// ObserveResources returns !ResourceExists with a fallback name.
+
+	// ADR(external-name) Observe Step 2: skip on deletion so a malformed
+	// annotation can't strand the finalizer; ValidateExternalName handles
+	// fallbacks internally, so no separate IsFallbackExternalName guard needed.
+	extName := meta.GetExternalName(cr)
+	if !meta.WasDeleted(cr) {
+		if err := servicemanager.ValidateExternalName(cr.Name, extName); err != nil {
+			return managed.ExternalObservation{}, err
+		}
+	}
+
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
@@ -206,13 +221,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
 
-	// Recovery: BTP has a resource matching this managed CR, but our
-	// external-name is still a fallback — semantic lookup + ownership check
-	// (see internal/recovery). Fires only on TRUE fallback: a single-UUID
-	// external-name is the natural output of phase-1 Create and must NOT
-	// re-trigger recovery (would trap CM in an infinite loop before phase-2).
+	// Recovery: BTP has a matching resource but our external-name is a fallback
+	// or a truncated compound (bare instance UUID). Fires only when
+	// ResourceExists is false, so a healthy phase-1→phase-2 create is untouched.
 	if err == nil && !resStatus.ResourceExists &&
-		recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+		(recovery.IsFallbackExternalName(cr.Name, extName) ||
+			recovery.IsTruncatedCompoundExternalName(cr.Name, extName)) {
 		if healErr := c.healExternalName(ctx, cr); healErr != nil {
 			return managed.ExternalObservation{}, healErr
 		}
@@ -254,9 +268,31 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.CloudMa
 		return nil
 	}
 
-	// Uses the instance's created_at (phase-1 creates the instance first — if
-	// the instance isn't ours, the binding inside it isn't either).
-	if !recovery.IsOwnedByCR(cr, instanceCreatedAt) {
+	externalNameInstanceID, _ := splitExternalName(meta.GetExternalName(cr))
+
+	// Truncated external-name (bare instance UUID) with no binding found in BTP
+	// is a healthy phase-1: the instance UUID is already correct and there is no
+	// binding to heal. Do nothing so the two-phase Create runs phase-2 — healing
+	// here would rewrite the same bare UUID and requeue, starving phase-2.
+	truncated := recovery.IsTruncatedCompoundExternalName(cr.Name, meta.GetExternalName(cr))
+	if truncated && sbID == "" {
+		return nil
+	}
+
+	// Ownership proof depends on which state we're in:
+	//  - truncated: external-name holds our phase-1 instance UUID; ownership is
+	//    proven by matching that UUID against the found instance (stronger than
+	//    the time window, which cannot pass while a Conflict retry loop keeps
+	//    rewriting external-create-pending).
+	//  - fallback (external-name == "" or metadata.name): we have no UUID to
+	//    match, so fall back to the time window.
+	var owned bool
+	if truncated {
+		owned = sbID != "" && recovery.IsOwnedByExternalNameInstanceID(externalNameInstanceID, siID)
+	} else {
+		owned = recovery.IsOwnedByCR(cr, instanceCreatedAt)
+	}
+	if !owned {
 		log.FromContext(ctx).Info("external-name recovery refused: BTP cloud management is outside our Create-attempt window (brownfield)",
 			"serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID,
 			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", instanceCreatedAt)
@@ -315,6 +351,16 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	sID, bID, err := c.tfClient.CreateResources(ctx, cr)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
+	}
+	// Keep an already-complete instanceID/bindingID external-name intact when a
+	// re-entered Create returns an empty binding ID; only a real binding ID
+	// overwrites it (#289).
+	existingSID, existingBID := splitExternalName(meta.GetExternalName(cr))
+	if sID == "" {
+		sID = existingSID
+	}
+	if bID == "" {
+		bID = existingBID
 	}
 	meta.SetExternalName(cr, formExternalName(sID, bID))
 
@@ -391,6 +437,18 @@ func formExternalName(serviceInstanceID, serviceBindingID string) string {
 		return serviceInstanceID
 	}
 	return serviceInstanceID + "/" + serviceBindingID
+}
+
+// splitExternalName is the inverse of formExternalName: it splits an
+// external-name of the form "serviceInstanceID/serviceBindingID" back into its
+// two segments. A bare "serviceInstanceID" (no separator) yields an empty
+// binding ID.
+func splitExternalName(externalName string) (serviceInstanceID, serviceBindingID string) {
+	instanceID, bindingID, found := strings.Cut(externalName, "/")
+	if !found {
+		return externalName, ""
+	}
+	return instanceID, bindingID
 }
 
 func mapToInstance(src *apisv1alpha1.SubaccountServiceInstanceObservation) *apisv1beta1.Instance {

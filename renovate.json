@@ -1,18 +1,40 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended",
-    ":dependencyDashboard",
-    "schedule:weekly"
+    "config:best-practices",
+    ":dependencyDashboard"
   ],
+  "schedule": ["* * 1,15 * *"],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "baseBranchPatterns": ["main", "release/v1_10_x"],
   "ignorePresets": ["group:goOpenapi"],
   "postUpdateOptions": [
     "gomodTidy"
   ],
   "labels": ["release-notes/dependencies"],
-  "prConcurrentLimit": 10,
+  "prConcurrentLimit": 20,
   "prHourlyLimit": 0,
   "packageRules": [
+    {
+      "matchBaseBranches": ["release/v1_10_x"],
+      "matchUpdateTypes": ["major", "minor", "pin", "replacement", "rollback", "bump"],
+      "enabled": false
+    },
+    {
+      "matchBaseBranches": ["release/v1_10_x"],
+      "matchUpdateTypes": ["patch", "digest"],
+      "groupName": "release/v1_10_x dependencies"
+    },
+    {
+      "groupName": "terraform-provider-btp",
+      "matchPackageNames": ["SAP/btp", "github.com/SAP/terraform-provider-btp"]
+    },
+    {
+      "groupName": "other dependencies",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin"]
+    },
     {
       "groupName": "crossplane and upjet",
       "matchPackageNames": [
@@ -34,24 +56,25 @@
       ]
     },
     {
-      "groupName": "golang.org/x",
-      "matchPackageNames": ["golang.org/x/**"]
-    },
-    {
       "groupName": "github actions",
       "matchManagers": ["github-actions"]
+    },
+    {
+      "groupName": "docker images",
+      "matchManagers": ["dockerfile"]
     }
   ],
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": [
-        "(^|/)Makefile$",
-        "(^|/)Dockerfile$",
-        "(^|/)config.yml$"
+      "managerFilePatterns": [
+        "/(^|/)Makefile$/",
+        "/(^|/)Dockerfile$/",
+        "/(^|/)config.yml$/"
       ],
       "matchStrings": [
-        "(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+        "(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)",
+        "TERRAFORM_NATIVE_PROVIDER_BINARY *\\?= *terraform-provider-btp_v(?<currentValue>\\d+\\.\\d+\\.\\d+)_x5"
       ],
       "datasourceTemplate": "terraform-provider",
       "versioningTemplate": "hashicorp",
@@ -59,7 +82,9 @@
     },
     {
       "customType": "regex",
-      "fileMatch": ["^\\.github/workflows/e2e_test\\.yaml$"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/e2e_test\\.yaml$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=helm depName=crossplane registryUrl=https://charts\\.crossplane\\.io/stable\\s*\\n\\s*CROSSPLANE_CHART_VERSION:\\s*['\"]?(?<currentValue>[^'\"\\s]+)['\"]?(?:\\s*\\n[^\\n]*)*?\\s*\\n\\s*CROSSPLANE_CHART_SHA256:\\s*['\"]?(?<currentDigest>[a-f0-9]{64})['\"]?"
       ],

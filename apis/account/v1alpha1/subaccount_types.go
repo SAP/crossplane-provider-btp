@@ -61,17 +61,11 @@ type SubaccountParameters struct {
 	// +kubebuilder:default:=UNSET
 	UsedForProduction string `json:"usedForProduction,omitempty"`
 
-	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.GlobalAccount
-	// +crossplane:generate:reference:refFieldName=GlobalAccountRef
-	// +crossplane:generate:reference:selectorFieldName=GlobalAccountSelector
-	// +crossplane:generate:reference:extractor=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.GlobalAccountUuid()
+	// GlobalAccountGuid is the GUID of the global account the subaccount belongs to.
+	// The GlobalAccount managed resource was removed; set the global account via the
+	// globalAccount field in the ProviderConfig spec instead.
+	// +optional
 	GlobalAccountGuid string `json:"globalAccountGuid,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	GlobalAccountSelector *xpv1.Selector `json:"globalAccountSelector,omitempty"`
-	// GlobalAccountRef is deprecated, please use globalAccount field in the ProviderConfig spec instead and leave this field empty.
-	// +kubebuilder:validation:Optional
-	GlobalAccountRef *xpv1.Reference `json:"globalAccountRef,omitempty" reference-group:"account.btp.sap.crossplane.io" reference-kind:"GlobalAccount" reference-apiversion:"v1alpha1"`
 
 	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Directory
 	// +crossplane:generate:reference:refFieldName=DirectoryRef

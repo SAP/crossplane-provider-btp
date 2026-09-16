@@ -12,6 +12,7 @@ spec:
       - "DEFAULT"
     displayName: $BUILD_ID-e2e-test-directory-sa
     labels:
+      safe-to-delete: [ "yes" ]
       custom_label: ["custom_value"]
       another_label: ["onevalue", "twovalue"]
       BUILD_ID: [ "$BUILD_ID" ]

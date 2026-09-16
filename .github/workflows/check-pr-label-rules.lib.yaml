@@ -1,0 +1,40 @@
+# PR label rules
+#
+# This workflow blocks merging pull request when labels are set or missing.
+#
+# Note: This workflow does not use an aggregator job, so that the message to the user is clearer.
+#
+# Required:
+#   - release-notes/*
+# Forbidden:
+#   - do-not-merge
+name: "check-pr-label-rules"
+
+on:
+  workflow_call:
+    inputs:
+      labels:
+        description: "JSON array of label names on the pull request"
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  do-not-merge-block:
+    if: contains(fromJSON(inputs.labels), 'do-not-merge')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if 'do-not-merge' label is present
+        run: |
+          echo "The 'do-not-merge' label is present. Remove to succeed the job."
+          exit 1
+
+  release-note-missing-block:
+    if: ${{ !contains(inputs.labels, '"release-notes/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if no release-notes label is present
+        run: |
+          echo "A label starting with 'release-notes/' is required."
+          exit 1

@@ -68,10 +68,6 @@ var (
 	ResourceUsageListGroupVersionKind = SchemeGroupVersion.WithKind(ResourceUsageListKind)
 )
 
-func init() {
-	SchemeBuilder.Register(&ResourceUsage{}, &ResourceUsageList{})
-}
-
 const UseCondition xpv1.ConditionType = "ResourceUsage"
 const InUseReason xpv1.ConditionReason = "ResourceUsagesFound"
 const NotInUseReason xpv1.ConditionReason = "NoResourceUsagesFound"

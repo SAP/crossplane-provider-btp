@@ -20,6 +20,10 @@ const (
 	errFailedSetEntitlements     = "failed to set entitlement for service %s/%s."
 	errServiceNotFoundByName     = "failed to find service with the given name %s"
 	errServicePlanNotFoundByName = "failed to find service plan with the given name %s"
+	// errServicePlanNotFoundByQualifier reports a four-segment key whose plan
+	// name exists but whose unique identifier matches no plan, so the
+	// name-only message would point at the wrong field.
+	errServicePlanNotFoundByQualifier = "failed to find service plan with the given name %s and unique identifier %s"
 )
 
 type EntitlementsClient struct {
@@ -32,10 +36,9 @@ func NewEntitlementsClient(btp btp.Client) *EntitlementsClient {
 }
 
 // Package-level singleflight + short-TTL cache for GetDirectoryAssignments
-// responses. Keyed by (subaccountGUID, serviceName, planName). Singleflight
-// dedupes concurrent sibling reconciles; the TTL absorbs the back-to-back
-// fan-out across all CRs hitting the same key within a single poll tick.
-// Writes invalidate their own key so post-write reads see fresh state.
+// responses, keyed by (subaccountGUID, serviceName, planName); dedupes
+// concurrent reconciles and absorbs poll-tick fan-out; writes invalidate
+// their key. Fresh reads use a "fresh|"-prefixed key to skip the cache and any in-flight ordinary call.
 var (
 	describeGroup singleflight.Group
 	describeCache sync.Map // string → *describeEntry
@@ -43,6 +46,8 @@ var (
 
 const describeCacheT = 30 * time.Second
 
+// describeEntry caches one GetDirectoryAssignments response; at records
+// when it was issued, for TTL expiry and to reject stale overwrites.
 type describeEntry struct {
 	val *entclient.EntitledAndAssignedServicesResponseObject
 	at  time.Time
@@ -61,30 +66,69 @@ func describeCacheGet(key string) *entclient.EntitledAndAssignedServicesResponse
 	return e.val
 }
 
+// describeCacheStore stores val under key with issuedAt as its freshness
+// timestamp, unless a newer entry is already cached - this stops a slower
+// ordinary/fresh flight from regressing an already-cached response.
+func describeCacheStore(key string, val *entclient.EntitledAndAssignedServicesResponseObject, issuedAt time.Time) {
+	entry := &describeEntry{val: val, at: issuedAt}
+	for {
+		actual, loaded := describeCache.LoadOrStore(key, entry)
+		if !loaded {
+			return
+		}
+		prev := actual.(*describeEntry)
+		if !issuedAt.After(prev.at) {
+			return
+		}
+		if describeCache.CompareAndSwap(key, actual, entry) {
+			return
+		}
+	}
+}
+
 func (c EntitlementsClient) DescribeInstance(
 	ctx context.Context,
-	cr *v1alpha1.Entitlement,
+	key ExternalNameKey,
 ) (*Instance, error) {
 
-	subaccountGUID := cr.Spec.ForProvider.SubaccountGuid
-	serviceName := cr.Spec.ForProvider.ServiceName
-	planName := cr.Spec.ForProvider.ServicePlanName
-	key := subaccountGUID + "|" + serviceName + "|" + planName
-
-	response, err := c.fetchAssignments(ctx, key, subaccountGUID, serviceName, planName)
+	response, err := c.fetchAssignments(ctx, key, false)
 	if err != nil {
 		return nil, err
 	}
 
-	servicePlanName := planName
+	return c.instanceFromResponse(response, key)
+}
 
-	// assignment can be nil, that is a valid response, as acc/dir will anot always have all assignments set
-	assignment, err := c.findAssignedServicePlan(response, cr)
+// DescribeInstanceFresh behaves like DescribeInstance but bypasses the TTL
+// cache and any in-flight ordinary call; concurrent fresh calls for the
+// same key still coalesce and populate the ordinary cache key on success.
+func (c EntitlementsClient) DescribeInstanceFresh(
+	ctx context.Context,
+	key ExternalNameKey,
+) (*Instance, error) {
+
+	response, err := c.fetchAssignments(ctx, key, true)
 	if err != nil {
 		return nil, err
 	}
 
-	entitledServicePlan, errPlan := filterEntitledServices(response, serviceName, servicePlanName)
+	return c.instanceFromResponse(response, key)
+}
+
+// instanceFromResponse applies the qualifier-aware assigned and entitled
+// selectors shared by DescribeInstance and DescribeInstanceFresh to response,
+// so both return an *Instance shaped identically for the same payload.
+func (c EntitlementsClient) instanceFromResponse(
+	response *entclient.EntitledAndAssignedServicesResponseObject,
+	key ExternalNameKey,
+) (*Instance, error) {
+	// assignment can be nil, that is a valid response, as acc/dir will not always have all assignments set
+	assignment, err := c.findAssignedServicePlan(response, key)
+	if err != nil {
+		return nil, err
+	}
+
+	entitledServicePlan, errPlan := filterEntitledServices(response, key)
 
 	if errPlan != nil {
 		return nil, errPlan
@@ -100,26 +144,39 @@ func (c EntitlementsClient) DescribeInstance(
 	}, nil
 }
 
-// fetchAssignments returns the GetDirectoryAssignments response for the given
-// (subaccount, service, plan), reusing a cached value (TTL describeCacheT) and
-// deduping concurrent fetches via singleflight. serviceName+planName narrows
-// BOTH entitledServices and assignedServices server-side, dropping response
-// payload ~50-100× vs assignedServiceName alone.
-func (c EntitlementsClient) fetchAssignments(ctx context.Context, key, subaccountGUID, serviceName, planName string) (*entclient.EntitledAndAssignedServicesResponseObject, error) {
-	v, err, _ := describeGroup.Do(key, func() (any, error) {
-		if cached := describeCacheGet(key); cached != nil {
-			return cached, nil
+// fetchAssignments returns the GetDirectoryAssignments response for key's
+// (subaccount, service, plan), reusing a cached value (TTL describeCacheT)
+// and deduping concurrent fetches via singleflight; serviceName+planName
+// narrows both entitledServices and assignedServices server-side, dropping
+// payload ~50-100× vs assignedServiceName alone. fresh routes onto a
+// distinct "fresh|"-prefixed flight key to force a real round trip.
+func (c EntitlementsClient) fetchAssignments(
+	ctx context.Context,
+	key ExternalNameKey,
+	fresh bool,
+) (*entclient.EntitledAndAssignedServicesResponseObject, error) {
+	cacheKey := key.CacheKey()
+	flightKey := cacheKey
+	if fresh {
+		flightKey = "fresh|" + cacheKey
+	}
+	v, err, _ := describeGroup.Do(flightKey, func() (any, error) {
+		if !fresh {
+			if cached := describeCacheGet(cacheKey); cached != nil {
+				return cached, nil
+			}
 		}
+		issuedAt := time.Now()
 		resp, _, err := c.btp.EntitlementsServiceClient.
 			GetDirectoryAssignments(ctx).
-			SubaccountGUID(subaccountGUID).
-			ServiceName(serviceName).
-			PlanName(planName).
+			SubaccountGUID(key.SubaccountGUID).
+			ServiceName(key.ServiceName).
+			PlanName(key.ServicePlanName).
 			Execute()
 		if err != nil {
 			return nil, err
 		}
-		describeCache.Store(key, &describeEntry{val: resp, at: time.Now()})
+		describeCacheStore(cacheKey, resp, issuedAt)
 		return resp, nil
 	})
 	if err != nil {
@@ -128,11 +185,11 @@ func (c EntitlementsClient) fetchAssignments(ctx context.Context, key, subaccoun
 	return v.(*entclient.EntitledAndAssignedServicesResponseObject), nil
 }
 
-func (c EntitlementsClient) CreateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
-	return c.UpdateInstance(ctx, cr)
+func (c EntitlementsClient) CreateInstance(ctx context.Context, key ExternalNameKey, cr *v1alpha1.Entitlement) error {
+	return c.UpdateInstance(ctx, key, cr)
 }
 
-func (c EntitlementsClient) DeleteInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
+func (c EntitlementsClient) DeleteInstance(ctx context.Context, key ExternalNameKey, cr *v1alpha1.Entitlement) error {
 	// if multiple Entitlements for same plan exist and deleted at the same time, one particular
 	// Entitlement might already been cleaned up by the previous run for same plan, then assigned might be nil
 	if cr.Status.AtProvider.Assigned == nil {
@@ -158,13 +215,17 @@ func (c EntitlementsClient) DeleteInstance(ctx context.Context, cr *v1alpha1.Ent
 		enabled := false
 		cr.Status.AtProvider.Required.Enable = &enabled
 	}
-	return c.UpdateInstance(ctx, cr)
+	return c.UpdateInstance(ctx, key, cr)
 }
 
-func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
-	serviceName := cr.Spec.ForProvider.ServiceName
-	planName := cr.Spec.ForProvider.ServicePlanName
-	servicePlanUniqueIdentifier := cr.Spec.ForProvider.ServicePlanUniqueIdentifier
+func (c EntitlementsClient) UpdateInstance(ctx context.Context, key ExternalNameKey, cr *v1alpha1.Entitlement) error {
+	// AutoAssigned entitlements aren't removable by admin action; Create and
+	// Delete both funnel through here, so this guard alone covers all three
+	// write paths. AutoAssign (user intent) is separate and keeps writing.
+	if cr.Status.AtProvider.Assigned != nil && cr.Status.AtProvider.Assigned.AutoAssigned {
+		return nil
+	}
+
 	var amount *float32
 	if cr.Status.AtProvider.Required.Amount != nil {
 		amount = internal.Ptr(float32(*cr.Status.AtProvider.Required.Amount))
@@ -178,12 +239,12 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 						Amount:         amount,
 						Enable:         cr.Status.AtProvider.Required.Enable,
 						Resources:      nil,
-						SubaccountGUID: cr.Spec.ForProvider.SubaccountGuid,
+						SubaccountGUID: key.SubaccountGUID,
 					},
 				},
-				ServiceName:                 serviceName,
-				ServicePlanName:             planName,
-				ServicePlanUniqueIdentifier: servicePlanUniqueIdentifier,
+				ServiceName:                 key.ServiceName,
+				ServicePlanName:             key.ServicePlanName,
+				ServicePlanUniqueIdentifier: key.ServicePlanUniqueIdentifier,
 			},
 		},
 	)
@@ -191,37 +252,32 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Ent
 	_, _, err := c.btp.EntitlementsServiceClient.SetServicePlans(ctx).SubaccountServicePlansRequestPayloadCollection(*payload).Execute()
 
 	if err != nil {
-		return specifyAPIError(err, errors.Wrapf(err, errFailedSetEntitlements, serviceName, planName))
+		return specifyAPIError(err, errors.Wrapf(err, errFailedSetEntitlements, key.ServiceName, key.ServicePlanName))
 	}
 
 	// Invalidate the singleflight TTL cache so the next Observe reads
 	// fresh state instead of pre-write data.
-	describeCache.Delete(cr.Spec.ForProvider.SubaccountGuid + "|" + serviceName + "|" + planName)
+	describeCache.Delete(key.CacheKey())
 
 	return nil
 }
 
 // findAssignedServicePlan returns the assignment for the given service and service plan, if it exists
-func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledAndAssignedServicesResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
+func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledAndAssignedServicesResponseObject, key ExternalNameKey) (*entclient.AssignedServicePlanSubaccountDTO, error) {
 	// first find service via name, can be nil, if no assignment with that service name is set in account/dir
-	assignedService := findAssignedService(payload, cr.Spec.ForProvider.ServiceName)
+	assignedService := findAssignedService(payload, key.ServiceName)
 	if assignedService == nil {
 		return nil, nil
 	}
 
-	// then find service plan within service, can be nil, if no assignment with that service plan name is set in account/dir
-	var servicePlan *entclient.AssignedServicePlanResponseObject
-	if cr.Spec.ForProvider.ServicePlanUniqueIdentifier != nil {
-		servicePlan = findAssignedServicePlanByNameAndUniqueID(assignedService, cr.Spec.ForProvider.ServicePlanName, *cr.Spec.ForProvider.ServicePlanUniqueIdentifier)
-	} else {
-		servicePlan = findAssignedServicePlanByName(assignedService, cr.Spec.ForProvider.ServicePlanName)
-	}
+	// then find service plan within service, can be nil, if no assignment with that service plan name (and qualifier, if given) is set in account/dir
+	servicePlan := findAssignedServicePlanByKey(assignedService, key)
 	if servicePlan == nil {
 		return nil, nil
 	}
 
 	// lastly, extract the info on subaccount entity assignment
-	foundAssignment, errLook := filterAssignmentInfo(servicePlan, cr)
+	foundAssignment, errLook := filterAssignmentInfo(servicePlan, key)
 
 	if errLook != nil {
 		return nil, errLook
@@ -240,21 +296,23 @@ func findAssignedService(payload *entclient.EntitledAndAssignedServicesResponseO
 	return nil
 }
 
-// findAssignedServicePlanByName returns servicePlan within service if found by name, otherwise nil
-func findAssignedServicePlanByName(service *entclient.AssignedServiceResponseObject, servicePlanName string) *entclient.AssignedServicePlanResponseObject {
-	for _, servicePlan := range service.ServicePlans {
-		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName {
-			return &servicePlan
-		}
+// planMatchesKey reports whether a plan's name and (optional) qualifier
+// satisfy key; without a qualifier, key matches on name alone.
+func planMatchesKey(name *string, uniqueIdentifier *string, key ExternalNameKey) bool {
+	if internal.Val(name) != key.ServicePlanName {
+		return false
 	}
-	return nil
+	return key.ServicePlanUniqueIdentifier == nil || internal.Val(uniqueIdentifier) == *key.ServicePlanUniqueIdentifier
 }
 
-// findAssignedServicePlanByNameAndUniqueID returns servicePlan within service if found by name and uniqueID, otherwise nil
-func findAssignedServicePlanByNameAndUniqueID(service *entclient.AssignedServiceResponseObject, servicePlanName string, servicePlanUniqueID string) *entclient.AssignedServicePlanResponseObject {
-	for _, servicePlan := range service.ServicePlans {
-		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName && servicePlan.UniqueIdentifier != nil && *servicePlan.UniqueIdentifier == servicePlanUniqueID {
-			return &servicePlan
+// findAssignedServicePlanByKey returns the assigned service plan within
+// service whose name and (optional) unique identifier satisfy key, or nil if
+// none match.
+func findAssignedServicePlanByKey(service *entclient.AssignedServiceResponseObject, key ExternalNameKey) *entclient.AssignedServicePlanResponseObject {
+	for i := range service.ServicePlans {
+		plan := &service.ServicePlans[i]
+		if planMatchesKey(plan.Name, plan.UniqueIdentifier, key) {
+			return plan
 		}
 	}
 	return nil
@@ -262,11 +320,11 @@ func findAssignedServicePlanByNameAndUniqueID(service *entclient.AssignedService
 
 // filterAssignmentInfo the api can have multiple assignments for the same service plan, we need to filter by subaccount guid
 // (even though having more then one entry here shouldn't be a usecase since we are looking up by subaccount guid)
-func filterAssignmentInfo(servicePlan *entclient.AssignedServicePlanResponseObject, cr *v1alpha1.Entitlement) (*entclient.AssignedServicePlanSubaccountDTO, error) {
+func filterAssignmentInfo(servicePlan *entclient.AssignedServicePlanResponseObject, key ExternalNameKey) (*entclient.AssignedServicePlanSubaccountDTO, error) {
 	var assignment *entclient.AssignedServicePlanSubaccountDTO
 
 	for _, assignmentInfo := range servicePlan.AssignmentInfo {
-		if assignmentInfo.EntityId != nil && *assignmentInfo.EntityId == cr.Spec.ForProvider.SubaccountGuid {
+		if assignmentInfo.EntityId != nil && *assignmentInfo.EntityId == key.SubaccountGUID {
 			if assignment != nil {
 				return nil, errors.New(errMultipleServicePlans)
 			}
@@ -277,14 +335,14 @@ func filterAssignmentInfo(servicePlan *entclient.AssignedServicePlanResponseObje
 	return assignment, nil
 }
 
-func filterEntitledServices(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string, servicePlanName string) (*entclient.ServicePlanResponseObject, error) {
-	service, err := filterEntitledServiceByName(payload, serviceName)
+func filterEntitledServices(payload *entclient.EntitledAndAssignedServicesResponseObject, key ExternalNameKey) (*entclient.ServicePlanResponseObject, error) {
+	service, err := filterEntitledServiceByName(payload, key.ServiceName)
 
 	if err != nil {
 		return nil, err
 	}
 
-	servicePlan, errPlan := filterEntitledServicePlanByName(service, servicePlanName)
+	servicePlan, errPlan := filterEntitledServicePlan(service, key)
 
 	if errPlan != nil {
 		return nil, errPlan
@@ -293,13 +351,23 @@ func filterEntitledServices(payload *entclient.EntitledAndAssignedServicesRespon
 	return servicePlan, nil
 }
 
-func filterEntitledServicePlanByName(service *entclient.EntitledServicesResponseObject, servicePlanName string) (*entclient.ServicePlanResponseObject, error) {
-	for _, servicePlan := range service.ServicePlans {
-		if servicePlan.Name != nil && *servicePlan.Name == servicePlanName {
-			return &servicePlan, nil
+// filterEntitledServicePlan returns the entitled service plan within service
+// whose name and (optional) unique identifier satisfy key.
+func filterEntitledServicePlan(
+	service *entclient.EntitledServicesResponseObject,
+	key ExternalNameKey,
+) (*entclient.ServicePlanResponseObject, error) {
+	for i := range service.ServicePlans {
+		plan := &service.ServicePlans[i]
+		if planMatchesKey(plan.Name, plan.UniqueIdentifier, key) {
+			return plan, nil
 		}
 	}
-	return nil, errors.Errorf(errServicePlanNotFoundByName, servicePlanName)
+	if key.ServicePlanUniqueIdentifier != nil {
+		return nil, errors.Errorf(errServicePlanNotFoundByQualifier,
+			key.ServicePlanName, *key.ServicePlanUniqueIdentifier)
+	}
+	return nil, errors.Errorf(errServicePlanNotFoundByName, key.ServicePlanName)
 }
 
 func filterEntitledServiceByName(payload *entclient.EntitledAndAssignedServicesResponseObject, serviceName string) (*entclient.EntitledServicesResponseObject, error) {

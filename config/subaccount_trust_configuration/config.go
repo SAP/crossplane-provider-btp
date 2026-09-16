@@ -55,6 +55,17 @@ func Configure(p *config.Provider) {
 			return fmt.Sprintf("%s,%s", parts[0], parts[1]), nil
 		}
 
+		// Split the compound external-name "subaccount_id/origin" into the TF state fields the
+		// provider's Read uses (subaccount_id + origin).
+		r.ExternalName.SetIdentifierArgumentFn = func(base map[string]any, externalName string) {
+			parts := strings.SplitN(externalName, "/", 2)
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				return
+			}
+			base["subaccount_id"] = parts[0]
+			base["origin"] = parts[1]
+		}
+
 		// ADR(external-name): seeds status.atProvider.origin from the external-name annotation
 		// so that terraform refresh can locate the resource without triggering a spurious Create.
 		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {

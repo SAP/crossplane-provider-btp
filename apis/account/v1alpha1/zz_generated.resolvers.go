@@ -324,23 +324,6 @@ func (mg *Subaccount) ResolveReferences(ctx context.Context, c client.Reader) er
 	var err error
 
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: mg.Spec.ForProvider.GlobalAccountGuid,
-		Extract:      GlobalAccountUuid(),
-		Namespace:    mg.GetNamespace(),
-		Reference:    mg.Spec.ForProvider.GlobalAccountRef,
-		Selector:     mg.Spec.ForProvider.GlobalAccountSelector,
-		To: reference.To{
-			List:    &GlobalAccountList{},
-			Managed: &GlobalAccount{},
-		},
-	})
-	if err != nil {
-		return errors.Wrap(err, "mg.Spec.ForProvider.GlobalAccountGuid")
-	}
-	mg.Spec.ForProvider.GlobalAccountGuid = rsp.ResolvedValue
-	mg.Spec.ForProvider.GlobalAccountRef = rsp.ResolvedReference
-
-	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.DirectoryGuid,
 		Extract:      DirectoryUuid(),
 		Namespace:    mg.GetNamespace(),
@@ -356,6 +339,94 @@ func (mg *Subaccount) ResolveReferences(ctx context.Context, c client.Reader) er
 	}
 	mg.Spec.ForProvider.DirectoryGuid = rsp.ResolvedValue
 	mg.Spec.ForProvider.DirectoryRef = rsp.ResolvedReference
+
+	return nil
+}
+
+// ResolveReferences of this SubaccountDestination.
+func (mg *SubaccountDestination) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPIResolver(c, mg)
+
+	var rsp reference.ResolutionResponse
+	var err error
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountID),
+		Extract:      reference.ExternalName(),
+		Namespace:    mg.GetNamespace(),
+		Reference:    mg.Spec.ForProvider.SubaccountRef,
+		Selector:     mg.Spec.ForProvider.SubaccountSelector,
+		To: reference.To{
+			List:    &SubaccountList{},
+			Managed: &Subaccount{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.SubaccountID")
+	}
+	mg.Spec.ForProvider.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.ForProvider.SubaccountRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.SubaccountID),
+		Extract:      reference.ExternalName(),
+		Namespace:    mg.GetNamespace(),
+		Reference:    mg.Spec.InitProvider.SubaccountRef,
+		Selector:     mg.Spec.InitProvider.SubaccountSelector,
+		To: reference.To{
+			List:    &SubaccountList{},
+			Managed: &Subaccount{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.InitProvider.SubaccountID")
+	}
+	mg.Spec.InitProvider.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.InitProvider.SubaccountRef = rsp.ResolvedReference
+
+	return nil
+}
+
+// ResolveReferences of this SubaccountDestinationCertificate.
+func (mg *SubaccountDestinationCertificate) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPIResolver(c, mg)
+
+	var rsp reference.ResolutionResponse
+	var err error
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.SubaccountID),
+		Extract:      reference.ExternalName(),
+		Namespace:    mg.GetNamespace(),
+		Reference:    mg.Spec.ForProvider.SubaccountRef,
+		Selector:     mg.Spec.ForProvider.SubaccountSelector,
+		To: reference.To{
+			List:    &SubaccountList{},
+			Managed: &Subaccount{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.SubaccountID")
+	}
+	mg.Spec.ForProvider.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.ForProvider.SubaccountRef = rsp.ResolvedReference
+
+	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.SubaccountID),
+		Extract:      reference.ExternalName(),
+		Namespace:    mg.GetNamespace(),
+		Reference:    mg.Spec.InitProvider.SubaccountRef,
+		Selector:     mg.Spec.InitProvider.SubaccountSelector,
+		To: reference.To{
+			List:    &SubaccountList{},
+			Managed: &Subaccount{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.InitProvider.SubaccountID")
+	}
+	mg.Spec.InitProvider.SubaccountID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.InitProvider.SubaccountRef = rsp.ResolvedReference
 
 	return nil
 }

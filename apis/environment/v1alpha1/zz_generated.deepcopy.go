@@ -586,6 +586,11 @@ func (in *KymaEnvironmentParameters) DeepCopyInto(out *KymaEnvironmentParameters
 		*out = new(string)
 		**out = **in
 	}
+	if in.LandscapeLabel != nil {
+		in, out := &in.LandscapeLabel, &out.LandscapeLabel
+		*out = new(string)
+		**out = **in
+	}
 	in.Parameters.DeepCopyInto(&out.Parameters)
 }
 

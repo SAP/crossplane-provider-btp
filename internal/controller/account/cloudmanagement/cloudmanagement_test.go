@@ -272,6 +272,8 @@ func TestConnect(t *testing.T) {
 }
 
 func TestObserve(t *testing.T) {
+	const testUUID = "00000000-0000-0000-0000-000000000001"
+	const testUUID2 = "00000000-0000-0000-0000-000000000002"
 	// deletionTime is captured once so cases that read/write DeletionTimestamp
 	// share the exact same value (otherwise two separate metav1.Now() calls
 	// in args vs want disagree at microsecond precision).
@@ -292,9 +294,45 @@ func TestObserve(t *testing.T) {
 		want want
 	}{
 		{
+			name: "EmptyExternalName",
+			args: args{
+				cr: NewCloudManagement("test", WithExternalName("")),
+				tfClient: &TfClientFake{
+					observeFn: func() (cmclient.ResourcesStatus, error) {
+						return cmclient.ResourcesStatus{
+							ExternalObservation: managed.ExternalObservation{ResourceExists: false},
+						}, nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{ResourceExists: false},
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName(""),
+					WithStatus(v1beta1.CloudManagementObservation{
+						Status: v1alpha1.CisStatusUnbound,
+					}),
+					WithConditions(xpv1.Unavailable()),
+				),
+			},
+		},
+		{
+			name: "InvalidExternalNameFormat",
+			args: args{
+				cr:       NewCloudManagement("test", WithExternalName("not-a-uuid")),
+				tfClient: nil,
+			},
+			want: want{
+				obs: managed.ExternalObservation{},
+				err: servicemanager.ValidateExternalName("test", "not-a-uuid"),
+				cr:  NewCloudManagement("test", WithExternalName("not-a-uuid")),
+			},
+		},
+		{
 			name: "InstanceObserveError",
 			args: args{
-				cr: NewCloudManagement("test"),
+				cr: NewCloudManagement("test", WithExternalName(testUUID)),
 				tfClient: &TfClientFake{
 					observeFn: func() (cmclient.ResourcesStatus, error) {
 						return cmclient.ResourcesStatus{}, errors.New("observeError")
@@ -305,6 +343,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{},
 				err: errors.Wrap(errors.New("observeError"), "while observing resources"),
 				cr: NewCloudManagement("test",
+					WithExternalName(testUUID),
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status: v1alpha1.CisStatusUnbound,
 					}),
@@ -314,7 +353,7 @@ func TestObserve(t *testing.T) {
 		{
 			name: "NotAvailable",
 			args: args{
-				cr: NewCloudManagement("test"),
+				cr: NewCloudManagement("test", WithExternalName(testUUID)),
 				tfClient: &TfClientFake{
 					observeFn: func() (cmclient.ResourcesStatus, error) {
 						// Doesn't matter what observe is returned exactly, as long as its passed through and IDs are persisted
@@ -329,6 +368,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{ResourceExists: false},
 				err: nil,
 				cr: NewCloudManagement("test",
+					WithExternalName(testUUID),
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status:            v1alpha1.CisStatusUnbound,
 						ServiceInstanceID: "someID",
@@ -341,7 +381,7 @@ func TestObserve(t *testing.T) {
 		{
 			name: "IsAvailable",
 			args: args{
-				cr: NewCloudManagement("test"),
+				cr: NewCloudManagement("test", WithExternalName(testUUID+"/"+testUUID2)),
 				tfClient: &TfClientFake{
 					observeFn: func() (cmclient.ResourcesStatus, error) {
 						// Doesn't matter if updated or not
@@ -362,6 +402,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, ConnectionDetails: map[string][]byte{"key": []byte("value")}},
 				err: nil,
 				cr: NewCloudManagement("test",
+					WithExternalName(testUUID+"/"+testUUID2),
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status:            v1alpha1.CisStatusBound,
 						ServiceInstanceID: "someID",
@@ -375,7 +416,7 @@ func TestObserve(t *testing.T) {
 		{
 			name: "IsAvailableWithContext",
 			args: args{
-				cr: NewCloudManagement("test"),
+				cr: NewCloudManagement("test", WithExternalName(testUUID+"/"+testUUID2)),
 				tfClient: &TfClientFake{
 					observeFn: func() (cmclient.ResourcesStatus, error) {
 						// Doesn't matter if updated or not
@@ -396,6 +437,7 @@ func TestObserve(t *testing.T) {
 				obs: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, ConnectionDetails: map[string][]byte{"key": []byte("value")}},
 				err: nil,
 				cr: NewCloudManagement("test",
+					WithExternalName(testUUID+"/"+testUUID2),
 					WithStatus(v1beta1.CloudManagementObservation{
 						Status:            v1alpha1.CisStatusBound,
 						ServiceInstanceID: "someID",
@@ -507,6 +549,116 @@ func TestCreate(t *testing.T) {
 			},
 			want: want{
 				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName("someID/anotherID"),
+					WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		{
+			// First-ever provisioning, phase-1: external-name is unset. The guard
+			// has no existing binding ID to preserve and must write the bare
+			// instance ID (phase-2 later appends the binding). Confirms the guard
+			// is a no-op at creation time and never blocks a normal first create.
+			name: "FirstCreatePhase1NoExternalNameYet",
+			args: args{
+				cr: NewCloudManagement("test"),
+				tfClient: &TfClientFake{
+					createFn: func() (string, string, error) {
+						return "someID", "", nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName("someID"),
+					WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		{
+			// Regression for #289: a phase-1 re-entry (CreateResources returns an
+			// empty binding ID) must NOT truncate an already-complete
+			// instanceID/bindingID external-name down to the bare instanceID.
+			// That truncation strands the CM in a permanent "Service Binding
+			// (Subaccount): Conflict" loop because the binding ID is then lost
+			// from the CR while the binding still exists in BTP.
+			name: "Phase1ReEntryPreservesExistingBindingID",
+			args: args{
+				cr: NewCloudManagement("test", WithExternalName("someID/anotherID")),
+				tfClient: &TfClientFake{
+					createFn: func() (string, string, error) {
+						return "someID", "", nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName("someID/anotherID"),
+					WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		{
+			// A phase-1 re-entry that also loses the instance ID must keep both
+			// segments from the existing external-name rather than blanking it.
+			name: "Phase1ReEntryPreservesBothIDs",
+			args: args{
+				cr: NewCloudManagement("test", WithExternalName("someID/anotherID")),
+				tfClient: &TfClientFake{
+					createFn: func() (string, string, error) {
+						return "", "", nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName("someID/anotherID"),
+					WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		{
+			// Genuine self-heal: instance still there, binding was deleted in BTP,
+			// so phase-2 creates a NEW binding and returns its real ID. The guard
+			// must NOT block this — the new binding ID replaces the old one.
+			name: "Phase2NewBindingReplacesOldID",
+			args: args{
+				cr: NewCloudManagement("test", WithExternalName("someID/oldBinding")),
+				tfClient: &TfClientFake{
+					createFn: func() (string, string, error) {
+						return "someID", "newBinding", nil
+					},
+				},
+			},
+			want: want{
+				err: nil,
+				cr: NewCloudManagement("test",
+					WithExternalName("someID/newBinding"),
+					WithConditions(xpv1.Creating()),
+				),
+			},
+		},
+		{
+			// Both instance and binding gone in BTP (a formerly-healthy CM whose
+			// external-name is still the complete instanceID/bindingID): the
+			// re-create attempt returns an error, so Create() returns before the
+			// external-name is written. The guard must leave the existing
+			// external-name untouched rather than truncating it.
+			name: "BothGoneCreateErrorLeavesExternalNameIntact",
+			args: args{
+				cr: NewCloudManagement("test", WithExternalName("someID/anotherID")),
+				tfClient: &TfClientFake{
+					createFn: func() (string, string, error) {
+						return "", "", errors.New("createError")
+					},
+				},
+			},
+			want: want{
+				err: errors.Wrap(errors.New("createError"), "while creating resources"),
 				cr: NewCloudManagement("test",
 					WithExternalName("someID/anotherID"),
 					WithConditions(xpv1.Creating()),

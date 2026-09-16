@@ -25,7 +25,18 @@ import (
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	name := managed.ControllerName(apisv1beta1.CloudManagementKind)
 	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(name)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
-	return providerconfig.DefaultSetup(mgr, o, &apisv1beta1.CloudManagement{}, apisv1beta1.CloudManagementKind, apisv1beta1.CloudManagementGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
+
+	// Built once at setup, not per reconcile: the instance connector is the
+	// plugin-framework client (issue #691) and owns an OperationTrackerStore
+	// keyed by resource UID that caches TF state, identity and the deletion
+	// marker. The binding connector stays on the CLI client until issue #692.
+	// The store is never evicted: this setup helper offers no
+	// managed.WithFinalizer hook, and the synthesized sub-resource UIDs would
+	// not match upjet's parent-keyed tracker finalizer. Follow-up: issue #691.
+	instanceConnector := tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil)
+	bindingConnector := tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil)
+
+	return providerconfig.DefaultSetupWithoutDefaultInitializer(mgr, o, &apisv1beta1.CloudManagement{}, apisv1beta1.CloudManagementKind, apisv1beta1.CloudManagementGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 		return &connector{
 			kube:                kube,
 			usage:               usage,
@@ -34,8 +45,8 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 
 			newClientInitalizerFn: func() cmClient.ITfClientInitializer {
 				return cmClient.NewTfClient(
-					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil),
-					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil),
+					instanceConnector,
+					bindingConnector,
 				)
 			},
 

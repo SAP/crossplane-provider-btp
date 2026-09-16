@@ -115,7 +115,10 @@ func TestConnectResources(t *testing.T) {
 		},
 		{
 			name: "SuccessExternalNamesSplitAndSet",
-			cr:   testSMCr("subaccountId", "planId", "instanceID/bindingID", "instanceID", "custom-name", "another-custom-name"),
+			// Real GUIDs: this case documents the ADR key format, so it must use a
+			// value ValidateExternalName accepts. Placeholders here would advertise
+			// a key that Observe() rejects.
+			cr: testSMCr("subaccountId", "planId", testInstanceUUID+"/"+testBindingUUID, testInstanceUUID, "custom-name", "another-custom-name"),
 			instanceConnectorMock: func() (managed.ExternalClient, error) {
 				return ExternalClientFake{}, nil
 			},
@@ -125,17 +128,19 @@ func TestConnectResources(t *testing.T) {
 			want: want{
 				subaccountId:         "subaccountId",
 				planId:               "planId",
-				instanceExternalName: "instanceID",
+				instanceExternalName: testInstanceUUID,
 				instanceSpec: v1alpha1.SubaccountServiceInstanceParameters{
 					Name:          internal.Ptr("custom-name"),
 					ServiceplanID: internal.Ptr("planId"),
 					SubaccountID:  internal.Ptr("subaccountId"),
 				},
-				bindingExternalName: "bindingID",
+				bindingExternalName: testBindingUUID,
 				bindingSpec: v1alpha1.SubaccountServiceBindingParameters{
-					SubaccountID:      internal.Ptr("subaccountId"),
-					Name:              internal.Ptr("another-custom-name"),
-					ServiceInstanceID: internal.Ptr("instanceID/bindingID"),
+					SubaccountID: internal.Ptr("subaccountId"),
+					Name:         internal.Ptr("another-custom-name"),
+					// The instance GUID deconstructed from the compound key, not the
+					// whole annotation, which BTP would reject as an instance ID.
+					ServiceInstanceID: internal.Ptr(testInstanceUUID),
 				},
 			},
 		},
@@ -314,6 +319,96 @@ func TestObserveResources(t *testing.T) {
 					},
 					InstanceID: "someID",
 					BindingID:  "anotherID",
+				},
+				err: nil,
+			},
+		},
+		{
+			// The second instance Observe reports NotUpToDate, but the only difference
+			// is the immutable serviceplan_id (desired != observed live plan). We must
+			// report ResourceUpToDate:true so no in-place update fires - BTP rejects a
+			// plan change with "update_instance is not supported". ObservedPlanID
+			// carries the live plan back so the controller can heal status (#941).
+			name: "InstancePlanDiffTreatedUpToDate",
+			args: args{
+				cr: testSMCr("subaccountId", "wrongPlan", "someID/anotherID", "", "", ""),
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true,
+							ConnectionDetails: map[string][]byte{"attribute.credentials": []byte(`{"clientid":"someClientID","clientsecret":"someSecret","sm_url":"https://service-manager.cfapps.eu12.hana.ondemand.com","url":"https://subdomain.authentication.eu12.hana.ondemand.com","xsappname":"someAppName"}`)}}, nil
+					},
+				},
+				// desired plan (wrongPlan, from re-resolution) != live plan (livePlan).
+				sInstance: instanceWithPlan("someID", "wrongPlan", "livePlan"),
+				sBinding:  testServiceBinding("anotherID"),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{
+						ResourceExists:   true,
+						ResourceUpToDate: true,
+						ConnectionDetails: map[string][]byte{
+							v1beta1.ResourceCredentialsClientSecret:      []byte("someSecret"),
+							v1beta1.ResourceCredentialsClientId:          []byte("someClientID"),
+							v1beta1.ResourceCredentialsServiceManagerUrl: []byte("https://service-manager.cfapps.eu12.hana.ondemand.com"),
+							v1beta1.ResourceCredentialsXsuaaUrl:          []byte("https://subdomain.authentication.eu12.hana.ondemand.com"),
+							v1beta1.ResourceCredentialsXsappname:         []byte("someAppName"),
+							v1beta1.ResourceCredentialsXsuaaUrlSufix:     []byte("/oauth/token"),
+							providerv1alpha1.RawBindingKey:               []byte(`{"clientid":"someClientID","clientsecret":"someSecret","sm_url":"https://service-manager.cfapps.eu12.hana.ondemand.com","url":"https://subdomain.authentication.eu12.hana.ondemand.com","xsappname":"someAppName"}`),
+						},
+					},
+					InstanceID:     "someID",
+					BindingID:      "anotherID",
+					ObservedPlanID: "livePlan",
+				},
+				err: nil,
+			},
+		},
+		{
+			// desired plan == live plan (the CRD pins planName), and the second Observe
+			// reports NotUpToDate for a real, non-plan reason. The plan check must not
+			// short-circuit here: ResourceUpToDate stays false so the update still runs.
+			name: "InstanceNonPlanDiffStillNeedsUpdate",
+			args: args{
+				cr: testSMCr("subaccountId", "samePlan", "someID/anotherID", "", "", ""),
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, nil
+					},
+				},
+				sbExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true,
+							ConnectionDetails: map[string][]byte{"attribute.credentials": []byte(`{"clientid":"someClientID","clientsecret":"someSecret","sm_url":"https://service-manager.cfapps.eu12.hana.ondemand.com","url":"https://subdomain.authentication.eu12.hana.ondemand.com","xsappname":"someAppName"}`)}}, nil
+					},
+				},
+				// desired plan == live plan: guard is a no-op, update proceeds.
+				sInstance: instanceWithPlan("someID", "samePlan", "samePlan"),
+				sBinding:  testServiceBinding("anotherID"),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{
+						ResourceExists:   true,
+						ResourceUpToDate: false,
+						ConnectionDetails: map[string][]byte{
+							v1beta1.ResourceCredentialsClientSecret:      []byte("someSecret"),
+							v1beta1.ResourceCredentialsClientId:          []byte("someClientID"),
+							v1beta1.ResourceCredentialsServiceManagerUrl: []byte("https://service-manager.cfapps.eu12.hana.ondemand.com"),
+							v1beta1.ResourceCredentialsXsuaaUrl:          []byte("https://subdomain.authentication.eu12.hana.ondemand.com"),
+							v1beta1.ResourceCredentialsXsappname:         []byte("someAppName"),
+							v1beta1.ResourceCredentialsXsuaaUrlSufix:     []byte("/oauth/token"),
+							providerv1alpha1.RawBindingKey:               []byte(`{"clientid":"someClientID","clientsecret":"someSecret","sm_url":"https://service-manager.cfapps.eu12.hana.ondemand.com","url":"https://subdomain.authentication.eu12.hana.ondemand.com","xsappname":"someAppName"}`),
+						},
+					},
+					InstanceID:     "someID",
+					BindingID:      "anotherID",
+					ObservedPlanID: "samePlan",
 				},
 				err: nil,
 			},
@@ -809,6 +904,16 @@ func testServiceInstance(extName string) *v1alpha1.SubaccountServiceInstance {
 		Status: v1alpha1.SubaccountServiceInstanceStatus{},
 	}
 	meta.SetExternalName(instance, extName)
+	return instance
+}
+
+// instanceWithPlan builds a SubaccountServiceInstance whose desired
+// (spec.forProvider) and observed (status.atProvider) serviceplan_id can differ,
+// to drive the immutable-plan guard in resourcesUpToDate.
+func instanceWithPlan(extName, desiredPlan, observedPlan string) *v1alpha1.SubaccountServiceInstance {
+	instance := testServiceInstance(extName)
+	instance.Spec.ForProvider.ServiceplanID = internal.Ptr(desiredPlan)
+	instance.Status.AtProvider.ServiceplanID = internal.Ptr(observedPlan)
 	return instance
 }
 

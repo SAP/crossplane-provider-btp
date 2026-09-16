@@ -3,6 +3,7 @@ package servicemanager
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -34,6 +35,8 @@ const (
 	errDelete            = "while deleting resources"
 	errSetStatus         = "while setting status"
 	errGetServicePlan    = "while getting service manager plan ID by name"
+
+	errExternalNameFormat = "crossplane.io/external-name is malformed; fix the annotation to resume reconciliation"
 )
 
 // ServiceManagerPlanIdInitializer is will provide implementation of service plan id lookup by name
@@ -152,6 +155,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceManager)
 	}
 
+	// ADR(external-name) Observe() step 2: reject a malformed key before
+	// splitExternalName degrades it to instance-only and Create() duplicates the
+	// binding. Not while deleting: the error returns before the reconciler's
+	// meta.WasDeleted branch, stranding the finalizer and orphaning BTP resources.
+	if !meta.WasDeleted(cr) {
+		if err := sm.ValidateExternalName(cr.Name, meta.GetExternalName(cr)); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errExternalNameFormat)
+		}
+	}
+
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
@@ -159,13 +172,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
 
-	// Recovery: BTP has a resource matching this managed CR, but our
-	// external-name is still a fallback — semantic lookup + ownership check
-	// (see internal/recovery). Fires only on TRUE fallback: a single-UUID
-	// external-name is the natural output of phase-1 Create and must NOT
-	// re-trigger recovery (would trap SM in an infinite loop before phase-2).
+	// Recovery: BTP has a matching resource but our external-name is a fallback
+	// or a truncated compound (bare instance UUID). Fires only when
+	// ResourceExists is false, so a healthy phase-1→phase-2 create is untouched.
+	extName := meta.GetExternalName(cr)
 	if err == nil && !resStatus.ResourceExists &&
-		recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+		(recovery.IsFallbackExternalName(cr.Name, extName) ||
+			recovery.IsTruncatedCompoundExternalName(cr.Name, extName)) {
 		if healErr := c.healExternalName(ctx, cr); healErr != nil {
 			return managed.ExternalObservation{}, healErr
 		}
@@ -207,9 +220,31 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.Service
 		return nil
 	}
 
-	// Uses the instance's created_at (phase-1 creates the instance first — if
-	// the instance isn't ours, the binding inside it isn't either).
-	if !recovery.IsOwnedByCR(cr, instanceCreatedAt) {
+	externalNameInstanceID, _, _ := strings.Cut(meta.GetExternalName(cr), "/")
+
+	// Truncated external-name (bare instance UUID) with no binding found in BTP
+	// is a healthy phase-1: the instance UUID is already correct and there is no
+	// binding to heal. Do nothing so the two-phase Create runs phase-2 — healing
+	// here would rewrite the same bare UUID and requeue, starving phase-2.
+	truncated := recovery.IsTruncatedCompoundExternalName(cr.Name, meta.GetExternalName(cr))
+	if truncated && sbID == "" {
+		return nil
+	}
+
+	// Ownership proof depends on which state we're in:
+	//  - truncated: external-name holds our phase-1 instance UUID; ownership is
+	//    proven by matching that UUID against the found instance (stronger than
+	//    the time window, which cannot pass while a Conflict retry loop keeps
+	//    rewriting external-create-pending).
+	//  - fallback (external-name == "" or metadata.name): we have no UUID to
+	//    match, so fall back to the time window.
+	var owned bool
+	if truncated {
+		owned = sbID != "" && recovery.IsOwnedByExternalNameInstanceID(externalNameInstanceID, siID)
+	} else {
+		owned = recovery.IsOwnedByCR(cr, instanceCreatedAt)
+	}
+	if !owned {
 		log.FromContext(ctx).Info("external-name recovery refused: BTP service manager is outside our Create-attempt window (brownfield)",
 			"serviceInstanceID", siID, "serviceBindingID", sbID, "planID", planID,
 			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", instanceCreatedAt)
@@ -264,10 +299,17 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	cr.SetConditions(xpv1.Creating())
 
+	// ADR(external-name) Create(): on error we leave the annotation alone. Phase 1
+	// keeps it a fallback, which is what lets the recovery path adopt an instance a
+	// failed attempt already created; phase 2 keeps the instance UUID, so a failed
+	// binding create cannot strand the instance.
 	sID, bID, err := c.tfClient.CreateResources(ctx, cr)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
+	// bID is empty until the instance exists: phase 1 yields a single-UUID key,
+	// phase 2 completes it. No kube.Update, as crossplane-runtime persists this via
+	// UpdateCriticalAnnotations, an update that also reverts in-memory status.
 	meta.SetExternalName(cr, formExternalName(sID, bID))
 
 	return managed.ExternalCreation{}, nil
@@ -279,6 +321,8 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotServiceManager)
 	}
 
+	// ADR(external-name) Update() cannot rebuild the key: both halves are
+	// BTP-assigned GUIDs from Create(), and the fields selecting them are immutable.
 	err := c.tfClient.UpdateResources(ctx, cr)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
@@ -324,6 +368,14 @@ func (c *external) setStatus(ctx context.Context, status sm.ResourcesStatus, cr 
 	}
 	cr.Status.AtProvider.ServiceInstanceID = status.InstanceID
 	cr.Status.AtProvider.ServiceBindingID = status.BindingID
+
+	// Workaround for #941: self-heal a stale plan ID in status. An upgraded
+	// v1alpha1 SM lost dataSourceLookup and re-resolved the flipped default plan
+	// (#925) into status. Overwrite it with the observed live plan. For v1beta1
+	// these already match, so this is a no-op.
+	if cr.Status.AtProvider.DataSourceLookup != nil && status.ObservedPlanID != "" {
+		cr.Status.AtProvider.DataSourceLookup.ServiceManagerPlanID = status.ObservedPlanID
+	}
 	// Unfortunately we need to update the CR status manually here, because the reconciler will drop the change otherwise
 	// (I guess because we are attempting to save something while ResourceExists remains false for another cycle)
 	if err := c.kube.Status().Update(ctx, cr); err != nil {

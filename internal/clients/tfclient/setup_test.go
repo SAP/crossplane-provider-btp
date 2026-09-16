@@ -3,14 +3,21 @@ package tfclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"reflect"
+	"strings"
 	"testing"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
+	"github.com/crossplane/upjet/v2/pkg/terraform"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -260,5 +267,376 @@ func fakeProviderConfig(name, secretName, secretNS, globalAccount, cliServerURL 
 				},
 			},
 		},
+	}
+}
+
+func TestTerraformSetupBuilder_ErrorBranches(t *testing.T) {
+	errPCGet := errors.New("providerconfig-get-error")
+	errSecretGet := errors.New("secret-get-error")
+	errProviderConfigUsageApply := errors.New("provider-config-usage-apply-error")
+
+	type fields struct {
+		mg         resource.Managed
+		setPCRef   bool
+		mockGet    func(ctx context.Context, key client.ObjectKey, obj client.Object) error
+		mockCreate func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
+		mockUpdate func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error
+	}
+	type want struct {
+		// err pins the whole message; use it when every wrapper in the chain
+		// belongs to this repo
+		err string
+		// errContains is used instead when part of the chain comes from
+		// crossplane-runtime, whose wording can change on a dependency bump
+		errContains []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   want
+	}{
+		{
+			name: "NotLegacyManaged",
+			fields: fields{
+				mg: nil,
+			},
+			want: want{err: errNoProviderConfig},
+		},
+		{
+			name: "NoProviderConfigRef",
+			fields: fields{
+				mg: &fake.LegacyManaged{},
+			},
+			want: want{err: errNoProviderConfig},
+		},
+		{
+			name: "GetProviderConfigError",
+			fields: fields{
+				mg:       &fake.LegacyManaged{},
+				setPCRef: true,
+				mockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					if _, ok := obj.(*v1alpha1.ProviderConfig); ok {
+						return errPCGet
+					}
+					return nil
+				},
+			},
+			want: want{err: errGetProviderConfig + ": " + errPCGet.Error()},
+		},
+		{
+			// the usage tracker applies the ProviderConfigUsage, and Apply reads the
+			// object before writing it, so a failing Get is what surfaces here
+			name: "TrackProviderConfigUsageError",
+			fields: fields{
+				mg:       &fake.LegacyManaged{},
+				setPCRef: true,
+				mockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					switch v := obj.(type) {
+					case *v1alpha1.ProviderConfig:
+						*v = *fakeProviderConfig(testProviderName, testSecretName, testSecretNS, testGlobalAccount, testCliServerURL)
+					case *v1alpha1.ProviderConfigUsage:
+						return errProviderConfigUsageApply
+					}
+					return nil
+				},
+			},
+			want: want{errContains: []string{errTrackUsage, errProviderConfigUsageApply.Error()}},
+		},
+		{
+			name: "ExtractServiceAccountSecretError",
+			fields: fields{
+				mg:       &fake.LegacyManaged{},
+				setPCRef: true,
+				mockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					switch v := obj.(type) {
+					case *v1alpha1.ProviderConfig:
+						*v = *fakeProviderConfig(testProviderName, testSecretName, testSecretNS, testGlobalAccount, testCliServerURL)
+					case *corev1.Secret:
+						return errSecretGet
+					}
+					return nil
+				},
+			},
+			want: want{errContains: []string{errGetServiceAccountCreds, errSecretGet.Error()}},
+		},
+		{
+			name: "NilServiceAccountSecretData",
+			fields: fields{
+				mg:       &fake.LegacyManaged{},
+				setPCRef: true,
+				mockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					switch v := obj.(type) {
+					case *v1alpha1.ProviderConfig:
+						*v = *fakeProviderConfig(testProviderName, testSecretName, testSecretNS, testGlobalAccount, testCliServerURL)
+					case *corev1.Secret:
+						v.Data = map[string][]byte{"credentials": nil}
+					}
+					return nil
+				},
+			},
+			want: want{err: errGetServiceAccountCreds},
+		},
+		{
+			name: "UnmarshalUserCredentialError",
+			fields: fields{
+				mg:       &fake.LegacyManaged{},
+				setPCRef: true,
+				mockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					switch v := obj.(type) {
+					case *v1alpha1.ProviderConfig:
+						*v = *fakeProviderConfig(testProviderName, testSecretName, testSecretNS, testGlobalAccount, testCliServerURL)
+					case *corev1.Secret:
+						v.Data = map[string][]byte{"credentials": []byte("invalid-json")}
+					}
+					return nil
+				},
+			},
+			want: want{err: errCouldNotParseUserCredential + ": invalid character 'i' looking for beginning of value"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.fields.mg != nil && tc.fields.setPCRef {
+				tc.fields.mg.(*fake.LegacyManaged).SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
+			}
+
+			kube := &test.MockClient{
+				MockGet:    tc.fields.mockGet,
+				MockCreate: tc.fields.mockCreate,
+				MockUpdate: tc.fields.mockUpdate,
+				MockPatch:  test.NewMockPatchFn(nil),
+				MockList:   test.NewMockListFn(nil),
+			}
+
+			setupFn := TerraformSetupBuilder("1.5.0", "SAP/btp", "1.7.0")
+			_, err := setupFn(context.Background(), kube, tc.fields.mg)
+
+			if err == nil {
+				t.Fatalf("TerraformSetupBuilder() error = nil, want an error")
+			}
+			if tc.want.err != "" && err.Error() != tc.want.err {
+				t.Errorf("TerraformSetupBuilder() error = %v, want %q", err, tc.want.err)
+			}
+			for _, want := range tc.want.errContains {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("TerraformSetupBuilder() error = %v, want it to contain %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestTerraformSetupBuilderNoTracking_ErrorBranches(t *testing.T) {
+	errPCGet := errors.New("providerconfig-get-error")
+	errSecretGet := errors.New("secret-get-error")
+
+	type fields struct {
+		mg       resource.Managed
+		setPCRef bool
+		mockGet  func(ctx context.Context, key client.ObjectKey, obj client.Object) error
+	}
+	type want struct {
+		// err pins the whole message; use it when every wrapper in the chain
+		// belongs to this repo
+		err string
+		// errContains is used instead when part of the chain comes from
+		// crossplane-runtime, whose wording can change on a dependency bump
+		errContains []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   want
+	}{
+		{
+			name: "NotLegacyManaged",
+			fields: fields{
+				mg: nil,
+			},
+			want: want{err: errNoProviderConfig},
+		},
+		{
+			name: "GetProviderConfigError",
+			fields: fields{
+				mg:       &fake.LegacyManaged{},
+				setPCRef: true,
+				mockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					if _, ok := obj.(*v1alpha1.ProviderConfig); ok {
+						return errPCGet
+					}
+					return nil
+				},
+			},
+			want: want{err: errGetProviderConfig + ": " + errPCGet.Error()},
+		},
+		{
+			name: "ExtractServiceAccountSecretError",
+			fields: fields{
+				mg:       &fake.LegacyManaged{},
+				setPCRef: true,
+				mockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					switch v := obj.(type) {
+					case *v1alpha1.ProviderConfig:
+						*v = *fakeProviderConfig(testProviderName, testSecretName, testSecretNS, testGlobalAccount, testCliServerURL)
+					case *corev1.Secret:
+						return errSecretGet
+					}
+					return nil
+				},
+			},
+			want: want{errContains: []string{errGetServiceAccountCreds, errSecretGet.Error()}},
+		},
+		{
+			name: "NilServiceAccountSecretData",
+			fields: fields{
+				mg:       &fake.LegacyManaged{},
+				setPCRef: true,
+				mockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					switch v := obj.(type) {
+					case *v1alpha1.ProviderConfig:
+						*v = *fakeProviderConfig(testProviderName, testSecretName, testSecretNS, testGlobalAccount, testCliServerURL)
+					case *corev1.Secret:
+						v.Data = map[string][]byte{"credentials": nil}
+					}
+					return nil
+				},
+			},
+			want: want{err: errGetServiceAccountCreds},
+		},
+		{
+			name: "UnmarshalUserCredentialError",
+			fields: fields{
+				mg:       &fake.LegacyManaged{},
+				setPCRef: true,
+				mockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+					switch v := obj.(type) {
+					case *v1alpha1.ProviderConfig:
+						*v = *fakeProviderConfig(testProviderName, testSecretName, testSecretNS, testGlobalAccount, testCliServerURL)
+					case *corev1.Secret:
+						v.Data = map[string][]byte{"credentials": []byte("invalid-json")}
+					}
+					return nil
+				},
+			},
+			want: want{err: errCouldNotParseUserCredential + ": invalid character 'i' looking for beginning of value"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.fields.mg != nil && tc.fields.setPCRef {
+				tc.fields.mg.(*fake.LegacyManaged).SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
+			}
+
+			kube := &test.MockClient{
+				MockGet: tc.fields.mockGet,
+			}
+
+			setupFn := TerraformSetupBuilderNoTracking("1.5.0", "SAP/btp", "1.7.0")
+			_, err := setupFn(context.Background(), kube, tc.fields.mg)
+
+			if err == nil {
+				t.Fatalf("TerraformSetupBuilderNoTracking() error = nil, want an error")
+			}
+			if tc.want.err != "" && err.Error() != tc.want.err {
+				t.Errorf("TerraformSetupBuilderNoTracking() error = %v, want %q", err, tc.want.err)
+			}
+			for _, want := range tc.want.errContains {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("TerraformSetupBuilderNoTracking() error = %v, want it to contain %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+// TestSetupBuildersPopulateFrameworkProvider pins that both setup builders
+// supply the plugin-framework provider instance. Upjet's framework client
+// hard-fails with "cannot retrieve framework provider" when Setup.FrameworkProvider
+// is nil, and that failure only surfaces at connect time against a live cluster.
+func TestSetupBuildersPopulateFrameworkProvider(t *testing.T) {
+	builders := map[string]func(string, string, string) terraform.SetupFn{
+		"TerraformSetupBuilder":           TerraformSetupBuilder,
+		"TerraformSetupBuilderNoTracking": TerraformSetupBuilderNoTracking,
+	}
+
+	userCred := btp.UserCredential{
+		Username: testUsername,
+		Password: testPassword,
+	}
+	credJSON, err := json.Marshal(userCred)
+	if err != nil {
+		t.Fatalf("failed to marshal credentials: %v", err)
+	}
+
+	for name, builder := range builders {
+		t.Run(name, func(t *testing.T) {
+			mg := &fake.LegacyManaged{}
+			mg.SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
+
+			kube := &test.MockClient{
+				MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+					switch o := obj.(type) {
+					case *v1alpha1.ProviderConfig:
+						*o = *fakeProviderConfig(testProviderName, testSecretName, testSecretNS, testGlobalAccount, testCliServerURL)
+					case *corev1.Secret:
+						o.Data = map[string][]byte{
+							"credentials": credJSON,
+						}
+					}
+					return nil
+				}),
+				MockList: test.NewMockListFn(nil),
+			}
+
+			setup, err := builder("1.3.9", "SAP/btp", "1.25.0")(context.Background(), kube, mg)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if setup.FrameworkProvider == nil {
+				t.Error("Setup.FrameworkProvider is nil; upjet's plugin-framework client cannot configure the provider")
+			}
+		})
+	}
+}
+
+// TestNewInternalTfConnectorSelectsClientByResourceConfig pins that the
+// connector kind comes from include-list membership (issue #691), not from a
+// call-site flag. The binding stays on the CLI client until issue #692.
+func TestNewInternalTfConnectorSelectsClientByResourceConfig(t *testing.T) {
+	tests := []struct {
+		reason   string
+		resource string
+		useAsync bool
+		want     any
+	}{
+		{
+			reason:   "framework-reconciled resource, async: plugin-framework async connector",
+			resource: "btp_subaccount_service_instance",
+			useAsync: true,
+			want:     &tjcontroller.TerraformPluginFrameworkAsyncConnector{},
+		},
+		{
+			reason:   "framework-reconciled resource, sync: plugin-framework connector",
+			resource: "btp_subaccount_service_instance",
+			useAsync: false,
+			want:     &tjcontroller.TerraformPluginFrameworkConnector{},
+		},
+		{
+			reason:   "CLI-reconciled resource keeps the forked connector",
+			resource: "btp_subaccount_service_binding",
+			useAsync: false,
+			want:     &tjcontroller.Connector{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.reason, func(t *testing.T) {
+			got := NewInternalTfConnector(nil, tc.resource, schema.GroupVersionKind{}, tc.useAsync, nil)
+			if reflect.TypeOf(got) != reflect.TypeOf(tc.want) {
+				t.Errorf("%s\nNewInternalTfConnector(...): want %T, got %T", tc.reason, tc.want, got)
+			}
+		})
 	}
 }

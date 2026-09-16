@@ -32,23 +32,39 @@ It refreshes only when the cached `*oauth2.Token` actually expires
 ### 2. Entitlement describe results per `(subaccount, service, plan)`
 
 In `internal/clients/entitlement/entitlement.go`: `describeGroup`,
-`describeCache`, `describeCacheT`, `fetchAssignments`.
+`describeCache`, `describeCacheT`, `describeCacheStore`, `fetchAssignments`,
+`DescribeInstanceFresh`.
 
 A [`golang.org/x/sync/singleflight.Group`](https://pkg.go.dev/golang.org/x/sync/singleflight#Group)
 plus a `sync.Map` with TTL `describeCacheT = 30 * time.Second`. Key:
-`subaccountGUID + "|" + serviceName + "|" + planName`.
+`ExternalNameKey.CacheKey()`, i.e. `subaccountGUID + "|" + serviceName + "|" +
+planName` — deliberately without the optional plan qualifier, since the BTP
+request is narrowed by service and plan name only.
 
 Singleflight dedupes concurrent sibling reconciles. The TTL absorbs the
 back-to-back fan-out across all CRs that share a key in one poll tick.
 Writes via `UpdateInstance` (the `SetServicePlans` PUT) invalidate their
 own key so the next Observe reads fresh state.
 
+`DescribeInstanceFresh` is the exception: `Create` uses it to re-check for a
+concurrently created assignment, so it must not be answered from a 30s-old
+entry. It skips the TTL lookup and runs on a `"fresh|"`-prefixed flight key,
+which also keeps it from joining an ordinary call already in flight.
+Concurrent fresh reads for one key still coalesce with each other, and a
+successful fresh response populates the ordinary key so following Observes
+benefit.
+
+Both paths stamp an entry with the time its request was *issued*, not when it
+returned, and `describeCacheStore` refuses to overwrite a newer entry. Without
+that, a slow flight could land after a faster one and reinstate state the
+faster read had already superseded.
+
 ## BTP APIs affected
 
 | Endpoint | Effect |
 | --- | --- |
 | `POST <uaa>/oauth/token` | Cached implicitly via the shared `oauth2.ReuseTokenSource`. Drops from hundreds/min to ~1 per credential per token lifetime. |
-| `GET /entitlements/v1/assignments` | Cached for up to `describeCacheT` (30s) per `(subaccount, service, plan)`. |
+| `GET /entitlements/v1/assignments` | Cached for up to `describeCacheT` (30s) per `(subaccount, service, plan)`, except `Create`'s `DescribeInstanceFresh` re-check, which always issues a real request. |
 | `PUT /entitlements/v1/subaccountServicePlans` | Not cached. Each successful write invalidates the matching describe-cache key. |
 
 Other BTP endpoints (accounts, provisioning) are not cached at the

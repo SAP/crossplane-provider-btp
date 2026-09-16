@@ -56,15 +56,6 @@ func (l *EntitlementList) GetItems() []resource.Managed {
 	return items
 }
 
-// GetItems of this GlobalAccountList.
-func (l *GlobalAccountList) GetItems() []resource.Managed {
-	items := make([]resource.Managed, len(l.Items))
-	for i := range l.Items {
-		items[i] = &l.Items[i]
-	}
-	return items
-}
-
 // GetItems of this ServiceBindingList.
 func (l *ServiceBindingList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
@@ -85,6 +76,24 @@ func (l *ServiceInstanceList) GetItems() []resource.Managed {
 
 // GetItems of this ServiceManagerList.
 func (l *ServiceManagerList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this SubaccountDestinationCertificateList.
+func (l *SubaccountDestinationCertificateList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this SubaccountDestinationList.
+func (l *SubaccountDestinationList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]

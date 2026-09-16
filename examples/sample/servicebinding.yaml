@@ -10,10 +10,10 @@ spec:
       name: destination-instance
     subaccountRef:
       name: sa-serviceinstance
-  # Optional: Enable rotation
+  # Optional: Enable rotation.
   # rotation:
-  #   ttl: 1440h
-  #   frequency: 720h
+  #   ttl: 1440h # 60 days
+  #   frequency: 720h # 30 days
   writeConnectionSecretToRef:
     name: destination-binding
     namespace: default

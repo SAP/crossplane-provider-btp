@@ -1,0 +1,19 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subaccount
+metadata:
+  name: e2e-dest-subaccount
+  namespace: default
+spec:
+  providerConfigRef:
+    name: default
+  forProvider:
+    displayName: $BUILD_ID-e2e-dest-subaccount
+    region: eu10
+    subdomain: $BUILD_ID-e2e-dest-sa
+    usedForProduction: NOT_USED_FOR_PRODUCTION
+    subaccountAdmins:
+      - $TECHNICAL_USER_EMAIL
+    labels:
+      safe-to-delete: ["yes"]
+      BUILD_ID: ["$BUILD_ID"]
+      environment: ["e2e", "transient"]

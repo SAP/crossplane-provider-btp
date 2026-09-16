@@ -1,0 +1,12 @@
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: ServiceManager
+metadata:
+  name: upgrade-test-extn-sm
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: upgrade-test-extn-sm
+    namespace: default
+  forProvider:
+    subaccountRef:
+      name: upgrade-test-extn-sm-sa

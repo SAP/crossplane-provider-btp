@@ -1,0 +1,6 @@
+# Force maintainer review on code directly interaction with the pr-e2e-approval environment
+/.github/workflows/  @SAP/crossplane-provider-btp-admin
+/.github/actions/    @SAP/crossplane-provider-btp-admin
+/build/              @SAP/crossplane-provider-btp-admin
+/Makefile            @SAP/crossplane-provider-btp-admin
+/test/e2e/           @SAP/crossplane-provider-btp-admin

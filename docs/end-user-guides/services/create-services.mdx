@@ -12,8 +12,8 @@ This guide shows how to create entitlements, service instances, and subscription
 ## 🚧 Prerequisites
 
 - You've created a running control plane.
-- You've [configured the BTP provider](/docs/crossplane-provider-btp/docs/end-user-guides/setup/configure-provider-btp).
-- You've [created and set up a subaccount managed in code](/docs/crossplane-provider-btp/docs/end-user-guides/account/subaccount).
+- You've [configured the BTP provider](../setup/configure-provider-btp.mdx).
+- You've [created and set up a subaccount managed in code](../account/subaccount.mdx).
 - You're connected to your control plane.
 
 ## Service instance
@@ -189,12 +189,12 @@ Once the entitlement is in place, you can subscribe to SAP HANA Cloud Administra
     ```
 
 :::tip
-SAP HANA Cloud Administration Tools provides [multiple role collections](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/role-collections-for-sap-hana-cloud?locale=en-US&version=LATEST). To assign these to users or user groups, see [Configure user access](/docs/crossplane-provider-btp/docs/end-user-guides/account/usermanagement).
+SAP HANA Cloud Administration Tools provides [multiple role collections](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/role-collections-for-sap-hana-cloud?locale=en-US&version=LATEST). To assign these to users or user groups, see [Configure user access](../account/usermanagement.mdx).
 :::
 
 ## Next steps
 
-- [Consume services](/docs/crossplane-provider-btp/docs/end-user-guides/services/consume-service.mdx)
+- [Consume services](./consume-service.mdx)
 
 ## ⁉ FAQs
 
@@ -206,6 +206,12 @@ To list available services and plans in your subaccount, run the following comma
 btp target # target your subaccount
 btp --format=json list accounts/entitlement | jq '.quotas[] | {service, plan, uniqueIdentifier, quota, unlimited}'
 ```
+
+### An entitlement exists in the BTP cockpit/CLI but the provider can't find the service plan
+
+The BTP CLI queries entitlements via the global account path, while the provider uses the subaccount-scoped Service Manager API — these two can get out of sync. As a result, a plan may be visible via `btp list accounts/entitlement` but return zero results when the provider looks it up.
+
+**Fix:** Remove and re-add the entitlement for the affected service on the subaccount. This triggers a re-sync of the Service Manager catalog and makes the plan visible to the provider again.
 
 ### What's the difference between Crossplane BTP Provider and BTP Service Operator
 
