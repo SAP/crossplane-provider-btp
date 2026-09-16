@@ -6,10 +6,6 @@ package config
 
 import "github.com/crossplane/upjet/v2/pkg/config"
 
-// CLIReconciledExternalNameConfigs contains all external name configurations for this
-// provider that use the default (CLI) external client.
-var CLIReconciledExternalNameConfigs = map[string]config.ExternalName{
-
 // TerraformPluginFrameworkReconciledExternalNameConfigs contains all external name configurations for this
 // provider that use the terraform plugin framework external client.
 var TerraformPluginFrameworkReconciledExternalNameConfigs = map[string]config.ExternalName{
@@ -19,31 +15,18 @@ var TerraformPluginFrameworkReconciledExternalNameConfigs = map[string]config.Ex
 	"btp_subaccount_service_broker":         config.IdentifierFromProvider,
 	"btp_subaccount_api_credential":         config.IdentifierFromProvider,
 	"btp_subaccount_service_instance":       config.IdentifierFromProvider,
-	"btp_subaccount_service_binding":  		 config.IdentifierFromProvider,
+	"btp_subaccount_service_binding":        config.IdentifierFromProvider,
 }
 
-// ExternalNameConfigurations applies all external name configs listed in the
-// tables CLIReconciledExternalNameConfigs and
+// ExternalNameConfigurations applies all external name configs listed in
 // TerraformPluginFrameworkReconciledExternalNameConfigs and sets the version of
-// those resources to v1beta1 assuming they will be tested. The two maps are
-// disjoint by contract (see TestExternalNameConfigMapsDisjoint) — each resource
-// is reconciled by exactly one connector.
+// those resources to v1beta1 assuming they will be tested.
 func ExternalNameConfigurations() config.ResourceOption {
 	return func(r *config.Resource) {
-		if externalName, ok := CLIReconciledExternalNameConfigs[r.Name]; ok {
-			r.ExternalName = externalName
-			return
-		}
 		if externalName, ok := TerraformPluginFrameworkReconciledExternalNameConfigs[r.Name]; ok {
 			r.ExternalName = externalName
 		}
 	}
-}
-
-// CLIReconciledResourceList returns the list of all resources whose external name
-// is configured manually and reconciled via the CLI external client.
-func CLIReconciledResourceList() []string {
-	return externalNameResourceList(CLIReconciledExternalNameConfigs)
 }
 
 // TerraformPluginFrameworkReconciledResourceList returns the list of all resources whose external name
