@@ -430,7 +430,7 @@ jobs:
           name: e2e-logs-${{ matrix.testName }}-attempt-${{ github.run_attempt }}
           path: |
             test-output.log
-            logs/post-tests/
+            test/e2e/logs/post-tests/
           retention-days: 14
           if-no-files-found: warn
 
