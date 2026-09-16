@@ -214,14 +214,15 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Restore CLI tools cache (kind, kubectl, crank)
+      - name: Restore CLI tools cache (kind, kubectl, crank, btp)
         id: cli-tools-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/tools
-          key: e2e-tools-${{ runner.os }}-${{ runner.arch }}-crank-${{ env.CROSSPLANE_CLI_VERSION }}-${{ hashFiles('build/makelib/k8s_tools.mk') }}
+          key: e2e-tools-${{ runner.os }}-${{ runner.arch }}-crank-${{ env.CROSSPLANE_CLI_VERSION }}-btp-${{ env.BTP_CLI_VERSION }}-${{ hashFiles('build/makelib/k8s_tools.mk') }}
 
-      - name: Fetch CLI tools once (kind, kubectl, crank)
+      - name: Fetch CLI tools once (kind, kubectl, crank, btp)
+        if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           retry() {
@@ -238,15 +239,18 @@ jobs:
           }
           vars="$(make --no-print-directory build.vars | grep -E '^(KIND|KUBECTL)=')"
           eval "$vars"
-          : "${KIND:?}" "${KUBECTL:?}" "${CROSSPLANE_CLI_VERSION:?}"
+          : "${KIND:?}" "${KUBECTL:?}" "${CROSSPLANE_CLI_VERSION:?}" "${BTP_CLI_VERSION:?}"
           CRANK=".cache/tools/linux_x86_64/crossplane-cli-${CROSSPLANE_CLI_VERSION}"
+          BTP=".cache/tools/linux_x86_64/btp-${BTP_CLI_VERSION}"
           retry make "$KIND" "$KUBECTL"
-          if [ ! -x "$CRANK" ]; then
-            retry curl -fsSL --create-dirs -o "$CRANK" "https://releases.crossplane.io/stable/${CROSSPLANE_CLI_VERSION}/bin/linux_amd64/crank"
-            chmod +x "$CRANK"
-          fi
+          retry curl -fsSL --create-dirs -o "$CRANK" "https://releases.crossplane.io/stable/${CROSSPLANE_CLI_VERSION}/bin/linux_amd64/crank"
+          retry curl -fsSL \
+            --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt" \
+            -o "${BTP}.tar.gz" \
+            "https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-${BTP_CLI_VERSION}.tar.gz"
+          tar -xzf "${BTP}.tar.gz" -O linux-amd64/btp > "$BTP"
 
-      - name: Save CLI tools cache (kind, kubectl, crank)
+      - name: Save CLI tools cache (kind, kubectl, crank, btp)
         if: success() && steps.cli-tools-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -394,12 +398,8 @@ jobs:
           test -f "$CHART" || { echo "::error::no chart at .cache/charts/crossplane-*.tgz"; exit 1; }
           echo "CROSSPLANE_CHART_PATH=$(realpath "$CHART")" >> $GITHUB_ENV
 
-      - name: Install BTP CLI
-        run: |
-          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-          tar -xzf btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz
-          cd linux-amd64
-          mv btp /usr/local/bin
+      - name: Install BTP CLI from tools artifact
+        run: sudo cp ".cache/tools/linux_x86_64/btp-${BTP_CLI_VERSION}" /usr/local/bin/btp
 
       - name: Run e2e test
         timeout-minutes: 120
@@ -453,12 +453,18 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install BTP CLI
-        run: |
-          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-          tar -xzf btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz
-          cd linux-amd64
-          mv btp /usr/local/bin
+      - name: Download CLI tools
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e2e-tools
+          path: .cache/tools
+
+      - name: Restore tool executable bits
+        # upload-artifact drops the +x bit
+        run: find .cache/tools -type f -exec chmod +x {} +
+
+      - name: Install BTP CLI from tools artifact
+        run: sudo cp ".cache/tools/linux_x86_64/btp-${BTP_CLI_VERSION}" /usr/local/bin/btp
 
       - name: clean up cluster
         run: |
