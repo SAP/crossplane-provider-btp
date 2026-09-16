@@ -29,7 +29,7 @@ import (
 // https://github.com/golang/go/wiki/TestComments
 // https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md#contributing-code
 
-var aUser = v1alpha1.User{Username: "aaa@bbb.com"}
+var aUser = v1alpha1.User{Username: "aaa@example.com"}
 var mockGuid = "550e8400-e29b-41d4-a716-446655440000"
 
 func TestObserve(t *testing.T) {
