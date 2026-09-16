@@ -51,17 +51,6 @@ Setting up a resource using upjet is quite straight-forward and usually just req
 You can find a more comprehensive tutorial under: 
 https://github.com/crossplane/upjet/blob/main/docs/README.md
 
-### Regular vs. no-fork controllers
-
-Upjet supports two modes for invoking Terraform operations, and the generated controller code differs accordingly:
-
-- **Regular (forked):** Each reconciliation schedules a Terraform CLI process in a managed workspace on disk. The controller writes HCL, forks a `terraform` subprocess, and waits for it to finish. This is the older and more resource-intensive mode — it requires a Terraform binary at runtime and carries the overhead of process startup for every operation. The controller is implemented in [`pkg/controller/external.go`](https://github.com/crossplane/upjet/blob/main/pkg/controller/external.go) in upjet.
-
-- **No-fork:** The Terraform provider's Go functions are called directly in-process — no subprocess, no workspace on disk, no Terraform binary required. This is generally the superior approach: it is faster, uses less memory, avoids file system overhead, and makes the provider easier to deploy. The connector is implemented in [`pkg/controller/external_tfpluginfw.go`](https://github.com/crossplane/upjet/blob/main/pkg/controller/external_tfpluginfw.go) (for Plugin Framework-based providers, which the btp provider uses).
-
-> **Note:** Most of the Terraform-backed resources in this provider have already migrated to the no-fork mode: `btp_subaccount_trust_configuration`, `btp_globalaccount_trust_configuration`, `btp_directory_entitlement`, `btp_subaccount_service_broker`, `btp_subaccount_api_credential`, and `btp_subaccount_service_instance` are all reconciled in-process via the Terraform Plugin Framework connector. The remaining holdout is `btp_subaccount_service_binding`, which still goes through the regular (forked) CLI mode until [issue #692](https://github.com/SAP/crossplane-provider-btp/issues/692) migrates it too. Overall progress is tracked in this [epic](https://github.com/SAP/crossplane-provider-btp/issues/207)
-
-
 ### Resources using the upjet approach
 
 | Resource | Terraform resource backing |
@@ -95,7 +84,7 @@ The following sections show some of the key aspects of the implementation by usi
 
 #### Setting up the internal Terraform controller
 
-Before any reconciliation can happen, the native connector must construct the internal upjet controller it will delegate to. This involves creating the upjet-compatible connector — for `ServiceInstance` this is now an in-process Plugin Framework connector with no Terraform workspace on disk, while `ServiceBinding` still gets a Terraform CLI workspace, per the "Regular vs. no-fork controllers" note above — and wrapping it together with the mapper into a `TfProxyConnector`.
+Before any reconciliation can happen, the native connector must construct the internal upjet controller it will delegate to. It creates the upjet-compatible connector, then wraps it together with the mapper into a `TfProxyConnector`. For both `ServiceInstance` and `ServiceBinding` this connector is an in-process Plugin Framework connector with no Terraform workspace on disk.
 
 For `ServiceInstance` this wiring happens in [`newClientCreatorFn`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/controller/account/serviceinstance/serviceinstance.go#L53) and [`NewServiceInstanceConnector`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/clients/account/serviceinstance/serviceinstance.go#L22).
 
@@ -113,13 +102,11 @@ See [`Observe`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c
 
 #### Saving conditions and external name
 
-Terraform operations are often asynchronous. Upjet's Terraform Plugin Framework async client — the no-fork connector `ServiceInstance` uses — sets a `LastAsyncOperation` condition to `True` on the internal resource once its own `Observe` call finds that resource existing, up to date, and not being deleted. `QueryAsyncData` gates on exactly that condition, and `saveInstanceData` then writes the external name and the rest of the observation fields onto the native CR.
+Terraform operations are often asynchronous. Once an async operation completes, upjet signals this via conditions on the internal resource. The hybrid controller picks these up and writes them back onto the native CR so that Crossplane and users can observe the outcome.
 
-That observe-path write via `QueryAsyncData` is one of three paths meant to carry upjet-observed data onto the native CR — but only two of them work today. The second is the async callback: wired through `tfclient.NewAPICallbacks` and invoked directly by upjet when a Create/Update/Destroy call finishes or fails, it is supposed to carry `LastAsyncOperation` and `AsyncOperationFinished` onto the native CR via `saveCallback`, independently of the next Observe. It does not: upjet keys the callback off the *mapped* resource, so the name reaching `saveCallback` is `"/TF-<cr-name>"` (namespace-joined and `TF-`-prefixed) and its `kube.Get` never resolves the native CR. Consequently `checkAsyncOperationFailure` and the same-generation `Conflict` branch in `Observe` never fire in production, and `healExternalName` is reachable only from the not-existing leg. The defect predates the no-fork migration — the CLI client keys callbacks the same way — and needs its own fix. Once the observation data has been saved, the native controller sets the native CR's `Available` condition itself, rather than deriving it from any upjet-set condition.
+The external name is read back from the upjet resource after creation and set on the native CR. `QueryAsyncData` extracts the observed state once the async operation has finished, and the controller then sets the native CR's `Available` condition itself.
 
-A third path carries the identity alone. When a create fails after BTP has already created the instance, upjet recovers the instance GUID from the partial Terraform state it kept and stamps it onto the internal resource, reporting it only as `ResourceLateInitialized`. `QueryAsyncData`'s gate stays shut in that state — the operation failed, so `LastAsyncOperation` is never `True` — which is why [`recoverExternalNameFromTfState`](https://github.com/SAP/crossplane-provider-btp/blob/main/internal/controller/account/serviceinstance/serviceinstance.go) persists that external name on its own, before the status switch and without touching the observation fields. It only fills a fallback external name, only accepts a GUID (defence in depth: upjet's `GetExternalNameFn` for this resource errors rather than returning the `NOT_EMPTY_GUID` placeholder, so the placeholder never reaches the annotation), and then requeues, so no Create/Update/Delete runs in the same cycle against the identity just learned. Without it the GUID of a live instance would be discarded on every reconcile for as long as the resource cannot reach up to date, and the not-existing branch could create a duplicate.
-
-In `ServiceInstance`, the external name and all other observed data is written back in [`saveInstanceData`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/controller/account/serviceinstance/serviceinstance.go#L280), the identity-only recovery above excepted.
+In `ServiceInstance`, the external name and all other observed data is written back in [`saveInstanceData`](https://github.com/SAP/crossplane-provider-btp/blob/5307a512943c651545274de9426f84b5b676ca4c/internal/controller/account/serviceinstance/serviceinstance.go#L280).
 
 ## Resources using this approach
 
