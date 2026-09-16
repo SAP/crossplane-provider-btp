@@ -5,12 +5,8 @@ PROJECT_REPO := github.com/sap/$(PROJECT_NAME)
 
 # Terraform Related variables
 # Used at build time only, to generate the provider schema (config/schema.json)
-# that upjet codegen consumes. OpenTofu (MPL-2.0) is installed under the name
-# `terraform` for the host-side `terraform providers schema` call. The provider
-# runs no-fork: the BTP Terraform provider is compiled into the binary and
-# called in-process, so nothing here ends up in the runtime image.
+# that upjet codegen consumes.
 export TERRAFORM_VERSION ?= 1.12.3
-
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
 export TERRAFORM_PROVIDER_VERSION ?= 1.25.0
@@ -148,13 +144,13 @@ $(TERRAFORM_PROVIDER_SCHEMA): $(TERRAFORM)
 	@$(OK) generating provider schema for $(TERRAFORM_PROVIDER_SOURCE) $(TERRAFORM_PROVIDER_VERSION)
 
 $(TERRAFORM):
-	@$(INFO) installing opentofu $(TERRAFORM_VERSION) as terraform $(HOSTOS)-$(HOSTARCH)
+	@$(INFO) installing terraform $(TERRAFORM_VERSION) $(HOSTOS)-$(HOSTARCH)
 	@mkdir -p $(TOOLS_HOST_DIR)/tmp-terraform
-	@curl -fsSL https://github.com/opentofu/opentofu/releases/download/v$(TERRAFORM_VERSION)/tofu_$(TERRAFORM_VERSION)_$(SAFEHOST_PLATFORM).zip -o $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip
+	@curl -fsSL https://releases.hashicorp.com/terraform/$(TERRAFORM_VERSION)/terraform_$(TERRAFORM_VERSION)_$(SAFEHOST_PLATFORM).zip -o $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip
 	@unzip $(TOOLS_HOST_DIR)/tmp-terraform/terraform.zip -d $(TOOLS_HOST_DIR)/tmp-terraform
-	@mv $(TOOLS_HOST_DIR)/tmp-terraform/tofu $(TERRAFORM)
+	@mv $(TOOLS_HOST_DIR)/tmp-terraform/terraform $(TERRAFORM)
 	@rm -fr $(TOOLS_HOST_DIR)/tmp-terraform
-	@$(OK) installing opentofu $(TERRAFORM_VERSION) as terraform $(HOSTOS)-$(HOSTARCH)
+	@$(OK) installing terraform $(TERRAFORM_VERSION) $(HOSTOS)-$(HOSTARCH)
 pull-docs:
 	@$(INFO) pull-docs called
 	@if [ ! -d "$(WORK_DIR)/$(TERRAFORM_PROVIDER_SOURCE)" ]; then \
