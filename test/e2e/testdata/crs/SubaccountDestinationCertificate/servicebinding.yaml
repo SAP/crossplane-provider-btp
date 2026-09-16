@@ -1,0 +1,16 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceBinding
+metadata:
+  name: e2e-dest-cert-binding
+  namespace: default
+spec:
+  secretKey: credentials
+  writeConnectionSecretToRef:
+    name: e2e-dest-cert-binding-secret
+    namespace: crossplane-system
+  forProvider:
+    name: e2e-dest-cert-binding
+    serviceInstanceRef:
+      name: e2e-dest-cert-service-instance
+    subaccountRef:
+      name: e2e-dest-cert-subaccount
