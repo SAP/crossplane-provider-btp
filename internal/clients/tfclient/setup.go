@@ -246,24 +246,6 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	)
 }
 
-// NewInternalTfConnectorNoFork is the no-fork counterpart of NewInternalTfConnector:
-// it calls the TF provider in-process, keeping state in the OperationTrackerStore
-// (rebuilt from status.atProvider at Connect). Sync-only, so no callbacks and no
-// res.UseAsync write.
-func NewInternalTfConnectorNoFork(client client.Client, resourceName string) *tjcontroller.TerraformPluginFrameworkConnector {
-	tfVersion := TF_VERSION_CALLBACK()
-	zl := zap.New(zap.UseDevMode(tfVersion.DebugLogs))
-	setupFn := TerraformSetupBuilderNoTracking(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion)
-	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
-	res := config.GetProvider().Resources[resourceName]
-	ots := tjcontroller.NewOperationStore(log)
-
-	return tjcontroller.NewTerraformPluginFrameworkConnector(
-		client, setupFn, res, ots,
-		tjcontroller.WithTerraformPluginFrameworkLogger(log),
-	)
-}
-
 type TfEnvVersion struct {
 	Version         string
 	Providerversion string

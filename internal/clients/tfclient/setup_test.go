@@ -603,7 +603,7 @@ func TestSetupBuildersPopulateFrameworkProvider(t *testing.T) {
 
 // TestNewInternalTfConnectorSelectsClientByResourceConfig pins that the
 // connector kind comes from include-list membership (issue #691), not from a
-// call-site flag. The binding stays on the CLI client until issue #692.
+// call-site flag.
 func TestNewInternalTfConnectorSelectsClientByResourceConfig(t *testing.T) {
 	tests := []struct {
 		reason   string
@@ -624,10 +624,10 @@ func TestNewInternalTfConnectorSelectsClientByResourceConfig(t *testing.T) {
 			want:     &tjcontroller.TerraformPluginFrameworkConnector{},
 		},
 		{
-			reason:   "CLI-reconciled resource keeps the forked connector",
+			reason:   "service binding is framework-reconciled too (issue #692)",
 			resource: "btp_subaccount_service_binding",
 			useAsync: false,
-			want:     &tjcontroller.Connector{},
+			want:     &tjcontroller.TerraformPluginFrameworkConnector{},
 		},
 	}
 
