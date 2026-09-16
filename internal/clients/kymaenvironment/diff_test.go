@@ -36,7 +36,7 @@ func kymaAzureSchemaForDiffTest() *Schema {
 // provider-injected name default already applied).
 func baseDesired() map[string]any {
 	return map[string]any{
-		"administrators": []any{"justin.luong@sap.com"},
+		"administrators": []any{"admin@example.com"},
 		"autoScalerMax":  float64(3),
 		"autoScalerMin":  float64(3),
 		"machineType":    "Standard_D4_v3",

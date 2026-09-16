@@ -928,10 +928,10 @@ func TestObserve_SchemaAwareDriftSuppressesIssue682(t *testing.T) {
 
 	// User's spec: no ingressFiltering, no gvisor. Same shape as
 	// btp-kyma-fresh/kyma-environment.yaml minus the recovery workaround.
-	specParams := `{"region":"westeurope","machineType":"Standard_D4_v3","autoScalerMin":3,"autoScalerMax":3,"administrators":["justin.luong@sap.com"]}`
+	specParams := `{"region":"westeurope","machineType":"Standard_D4_v3","autoScalerMin":3,"autoScalerMax":3,"administrators":["admin@example.com"]}`
 
 	// BTP echo: user's fields plus the two schema-default ghosts.
-	btpEcho := `{"name":"kyma","region":"westeurope","machineType":"Standard_D4_v3","autoScalerMin":3,"autoScalerMax":3,"administrators":["justin.luong@sap.com"],"ingressFiltering":false,"gvisor":{"enabled":false}}`
+	btpEcho := `{"name":"kyma","region":"westeurope","machineType":"Standard_D4_v3","autoScalerMin":3,"autoScalerMax":3,"administrators":["admin@example.com"],"ingressFiltering":false,"gvisor":{"enabled":false}}`
 
 	mockClient := fake.MockClient{
 		MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
