@@ -213,15 +213,7 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-
-      - name: Cache Go modules and build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            /opt/actions-runner/_work/_temp/go-module-cache
-            /opt/actions-runner/_work/_temp/go-build-cache
-          key: go-mod-cache-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: go-mod-cache-${{ runner.os }}-
+          cache: true
 
       - name: Restore CLI tools cache (kind, kubectl, crank, btp)
         id: cli-tools-cache
