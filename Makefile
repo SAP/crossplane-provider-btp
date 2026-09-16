@@ -9,7 +9,7 @@ PROJECT_REPO := github.com/sap/$(PROJECT_NAME)
 export TERRAFORM_VERSION ?= 1.16.2
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
-export TERRAFORM_PROVIDER_VERSION ?= 1.25.0
+export TERRAFORM_PROVIDER_VERSION ?= 1.26.0
 export TERRAFORM_DOCS_PATH ?= docs/resources
 
 # set BUILD_ID if its not running in an action
