@@ -1,3 +1,16 @@
+// Clean up BTP resources after test runs.
+// This is invoked after the E2E and Upgrade tests have run.
+//
+// Uses the BUILD_ID environment variable to identify the resources that were created during the test run using labels on the resources,
+// and deletes them.
+//
+// Requires the BTP CLI to be installed and available in the PATH.
+//
+// Requires the following environment variables to be set:
+// - BUILD_ID: The build ID of the current test run.
+// - CIS_CENTRAL_BINDING: The CIS binding for the global account.
+// - BTP_TECHNICAL_USER: The technical user credentials for the BTP CLI.
+// - CLI_SERVER_URL: The URL of the BTP CLI server (optional).
 package main
 
 import (

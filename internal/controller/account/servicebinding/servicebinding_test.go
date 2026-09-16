@@ -158,9 +158,6 @@ type MockServiceBindingClientFactory struct {
 	Client servicebindingclient.ServiceBindingClientInterface
 	Error  error
 
-	// RequireDeletionTimestamp enforces that CR must have deletion timestamp before CreateClient is called
-	RequireDeletionTimestamp bool
-
 	// Capture calls for verification
 	CreateClientCalls []CreateClientCall
 }
@@ -169,25 +166,33 @@ type CreateClientCall struct {
 	CR                 *v1alpha1.ServiceBinding
 	TargetName         string
 	TargetExternalName string
+	MarkForDeletion    bool
 }
 
-func (f *MockServiceBindingClientFactory) CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (servicebindingclient.ServiceBindingClientInterface, error) {
-	// Enforce deletion timestamp requirement if configured
-	if f.RequireDeletionTimestamp && cr.GetDeletionTimestamp() == nil {
-		return nil, errors.New("CreateClient called without deletion timestamp - DeleteBinding must set deletion timestamp before calling CreateClient")
-	}
-
+func (f *MockServiceBindingClientFactory) CreateClient(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string, markForDeletion bool) (servicebindingclient.ServiceBindingClientInterface, error) {
 	// Capture the call for verification
 	f.CreateClientCalls = append(f.CreateClientCalls, CreateClientCall{
 		CR:                 cr,
 		TargetName:         targetName,
 		TargetExternalName: targetExternalName,
+		MarkForDeletion:    markForDeletion,
 	})
 
 	if f.Error != nil {
 		return nil, f.Error
 	}
 	return f.Client, nil
+}
+
+// MarkedForDeletion reports whether any captured CreateClient call requested
+// the destroy phase (markForDeletion=true).
+func (f *MockServiceBindingClientFactory) MarkedForDeletion() bool {
+	for _, c := range f.CreateClientCalls {
+		if c.MarkForDeletion {
+			return true
+		}
+	}
+	return false
 }
 
 // Reset clears the captured calls
@@ -398,10 +403,10 @@ func TestServiceBindingHelpers(t *testing.T) {
 	t.Run("withMetadata sets external name and annotations", func(t *testing.T) {
 		annotations := map[string]string{"test": "value"}
 		cr := expectedServiceBinding(
-			withMetadata("test-external-name", annotations),
+			withMetadata("a1b2c3d4-0000-4000-8000-000000000001", annotations),
 		)
 
-		if meta.GetExternalName(cr) != "test-external-name" {
+		if meta.GetExternalName(cr) != "a1b2c3d4-0000-4000-8000-000000000001" {
 			t.Errorf("withMetadata() failed to set external name, got: %s", meta.GetExternalName(cr))
 		}
 
@@ -556,6 +561,54 @@ func TestObserve(t *testing.T) {
 				err: errors.New(errNotServiceBinding),
 			},
 		},
+		"InvalidExternalNameUUID": {
+			reason: "should return error when external-name is set but not a valid UUID",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{},
+				},
+				keyRotator: &MockKeyRotator{},
+				tracker:    &MockTracker{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("not-a-uuid", nil),
+				),
+			},
+			want: want{
+				err: errors.New("external-name is not a valid UUID"),
+				cr: expectedServiceBinding(
+					withMetadata("not-a-uuid", nil),
+				),
+			},
+		},
+		"InvalidExternalNameUUIDWhileDeleting": {
+			reason: "should skip UUID validation while the CR is being deleted so the finalizer can clear",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						observation: managed.ExternalObservation{
+							ResourceExists: false,
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{},
+				tracker:    &MockTracker{},
+				kube:       &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("not-a-uuid", nil),
+					func(cr *v1alpha1.ServiceBinding) { cr.SetDeletionTimestamp(&metav1.Time{Time: metav1.Now().Time}) },
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+			},
+		},
 		"ClientObserveError": {
 			reason: "should return error when client observe fails",
 			fields: fields{
@@ -570,13 +623,13 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 				),
 			},
 			want: want{
 				err: errors.New("client observe error"),
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 				),
 			},
 		},
@@ -596,7 +649,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 				),
 			},
 			want: want{
@@ -604,7 +657,7 @@ func TestObserve(t *testing.T) {
 					ResourceExists: false,
 				},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 				),
 			},
 		},
@@ -630,7 +683,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 				),
 			},
 			want: want{
@@ -642,7 +695,7 @@ func TestObserve(t *testing.T) {
 					},
 				},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 				),
 			},
 		},
@@ -661,7 +714,7 @@ func TestObserve(t *testing.T) {
 						tfResource: &v1alpha1.SubaccountServiceBinding{
 							ObjectMeta: metav1.ObjectMeta{
 								Annotations: map[string]string{
-									"crossplane.io/external-name": "test-external-name",
+									"crossplane.io/external-name": "a1b2c3d4-0000-4000-8000-000000000001",
 								},
 							},
 							Status: v1alpha1.SubaccountServiceBindingStatus{
@@ -683,7 +736,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 				),
 			},
 			want: want{
@@ -695,7 +748,7 @@ func TestObserve(t *testing.T) {
 					},
 				},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", map[string]string{"crossplane.io/external-name": "test-external-name"}), // External name gets set from tfResource
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", map[string]string{"crossplane.io/external-name": "a1b2c3d4-0000-4000-8000-000000000001"}), // External name gets set from tfResource
 					withConditions(xpv1.Available()), // Available condition gets set
 					func(cr *v1alpha1.ServiceBinding) {
 						// AtProvider gets updated with tfResource data
@@ -748,7 +801,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 				),
 			},
 			want: want{
@@ -812,7 +865,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.SecretFormat = "sap-kubernetes"
 						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
@@ -849,7 +902,7 @@ func TestObserve(t *testing.T) {
 					},
 				},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.SecretFormat = "sap-kubernetes"
 						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
@@ -879,7 +932,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.SecretFormat = "sap-kubernetes"
 						// No ServiceInstanceRef set
@@ -895,7 +948,7 @@ func TestObserve(t *testing.T) {
 					},
 				},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.SecretFormat = "sap-kubernetes"
 					},
@@ -924,7 +977,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
 						// No SecretFormat set
@@ -940,7 +993,7 @@ func TestObserve(t *testing.T) {
 					},
 				},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.ForProvider.ServiceInstanceRef = &xpv1.Reference{Name: "my-si"}
 					},
@@ -980,7 +1033,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.SecretFormat = "sap-kubernetes"
 						sk := "credentials"
@@ -1017,7 +1070,7 @@ func TestObserve(t *testing.T) {
 					},
 				},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.SecretFormat = "sap-kubernetes"
 						sk := "credentials"
@@ -1049,7 +1102,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						sk := "credentials"
 						cr.Spec.SecretKey = &sk
@@ -1065,7 +1118,7 @@ func TestObserve(t *testing.T) {
 					},
 				},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						sk := "credentials"
 						cr.Spec.SecretKey = &sk
@@ -1111,7 +1164,7 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 				),
 			},
 			want: want{
@@ -1316,7 +1369,10 @@ func TestCreate(t *testing.T) {
 			want: want{
 				err: errors.New("mock: client creation not supported in current test architecture"),
 				cr: expectedServiceBinding(
-					withMetadata("old-external-name-uuid", map[string]string{servicebindingclient.ForceRotationKey: "true"}),
+					withMetadata("old-external-name-uuid", map[string]string{
+						servicebindingclient.ForceRotationKey:      "true",
+						servicebindingclient.PendingBindingNameKey: "test-binding-fixed1",
+					}),
 					withConditions(xpv1.Creating()),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Spec.ForProvider.Name = "test-binding"
@@ -1343,6 +1399,8 @@ func TestCreate(t *testing.T) {
 				kube:          tc.fields.kube,
 				clientFactory: tc.fields.clientFactory,
 				keyRotator:    tc.fields.keyRotator,
+				// Deterministic suffix so rotation cases have a stable pending name.
+				nameGenerator: func(base string) string { return base + "-fixed1" },
 			}
 
 			got, err := e.Create(context.Background(), tc.args.mg)
@@ -1436,7 +1494,7 @@ func TestUpdate(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
 					},
@@ -1446,7 +1504,7 @@ func TestUpdate(t *testing.T) {
 				err: errors.New("delete expired keys error"),
 				u:   managed.ExternalUpdate{},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
 					},
@@ -1468,7 +1526,7 @@ func TestUpdate(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
 					},
@@ -1477,7 +1535,7 @@ func TestUpdate(t *testing.T) {
 			want: want{
 				u: managed.ExternalUpdate{},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
 						cr.Status.RetiredKeys = []*v1alpha1.RetiredSBResource{}
@@ -1505,7 +1563,7 @@ func TestUpdate(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
 					},
@@ -1514,7 +1572,7 @@ func TestUpdate(t *testing.T) {
 			want: want{
 				u: managed.ExternalUpdate{},
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
 						cr.Status.RetiredKeys = []*v1alpha1.RetiredSBResource{
@@ -1628,7 +1686,7 @@ func TestDelete(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
 					},
@@ -1638,7 +1696,7 @@ func TestDelete(t *testing.T) {
 				err: errors.New(providerv1alpha1.ErrResourceInUse),
 				d:   managed.ExternalDelete{}, // Empty deletion result on error
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					withConditions(xpv1.Deleting()),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
@@ -1662,7 +1720,7 @@ func TestDelete(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
 					},
@@ -1672,7 +1730,7 @@ func TestDelete(t *testing.T) {
 				err: errors.New("delete retired keys error"),
 				d:   managed.ExternalDelete{}, // Empty deletion result on error
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					withConditions(xpv1.Deleting()),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
@@ -1696,7 +1754,7 @@ func TestDelete(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
 					},
@@ -1706,7 +1764,43 @@ func TestDelete(t *testing.T) {
 				err: errors.New("client delete error"),
 				d:   managed.ExternalDelete{}, // Empty deletion result on error
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
+					withConditions(xpv1.Deleting()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+		},
+		"DeleteVerificationFails": {
+			reason: "should return error when the binding still exists after destroy (silent no-op destroy)",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						// Destroy reports success, but read-back still sees the resource.
+						deletion:    managed.ExternalDelete{},
+						observation: managed.ExternalObservation{ResourceExists: true},
+					},
+				},
+				keyRotator: &MockKeyRotator{},
+				tracker: &MockTracker{
+					deleteBlocked: false,
+				},
+				kube: &test.MockClient{},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+			},
+			want: want{
+				err: errors.New(errVerifyBinding),
+				d:   managed.ExternalDelete{},
+				cr: expectedServiceBinding(
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					withConditions(xpv1.Deleting()),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
@@ -1730,7 +1824,7 @@ func TestDelete(t *testing.T) {
 			},
 			args: args{
 				mg: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
 					},
@@ -1739,7 +1833,7 @@ func TestDelete(t *testing.T) {
 			want: want{
 				d: managed.ExternalDelete{}, // Expected deletion result
 				cr: expectedServiceBinding(
-					withMetadata("test-external-name", nil),
+					withMetadata("a1b2c3d4-0000-4000-8000-000000000001", nil),
 					withConditions(xpv1.Deleting()),
 					func(cr *v1alpha1.ServiceBinding) {
 						cr.Status.AtProvider.Name = "test-binding"
@@ -1814,10 +1908,10 @@ func TestDeleteBinding(t *testing.T) {
 	}
 
 	type want struct {
-		err                    error
-		crHasDeletionTimestamp bool
-		crHasDeletingCondition bool
-		originalCrModified     bool // Verify original CR is not modified (deep copy)
+		err                error
+		createClientCalls  int  // number of CreateClient calls (3 = seed+destroy+verify)
+		markedForDeletion  bool // at least one call requested the destroy phase
+		originalCrModified bool // Verify original CR is not modified
 	}
 
 	cases := map[string]struct {
@@ -1826,14 +1920,15 @@ func TestDeleteBinding(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"DeletionTimestampSetBeforeClientCreation": {
-			reason: "should set deletion timestamp and deleting condition before creating client",
+		"SuccessfulThreePhaseDelete": {
+			reason: "should seed, destroy, then verify the binding is gone",
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
 					Client: &MockServiceBindingClient{
 						deletion: managed.ExternalDelete{},
+						// verify read-back reports the binding is gone
+						observation: managed.ExternalObservation{ResourceExists: false},
 					},
-					RequireDeletionTimestamp: true,
 				},
 			},
 			args: args{
@@ -1847,18 +1942,17 @@ func TestDeleteBinding(t *testing.T) {
 				targetExternalName: "retired-id-1",
 			},
 			want: want{
-				err:                    nil,
-				crHasDeletionTimestamp: true,
-				crHasDeletingCondition: true,
-				originalCrModified:     false,
+				err:                nil,
+				createClientCalls:  3,
+				markedForDeletion:  true,
+				originalCrModified: false,
 			},
 		},
-		"ClientCreationError": {
-			reason: "should return error when client creation fails",
+		"SeedClientCreationError": {
+			reason: "should return error when the seed-phase client creation fails",
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
-					Error:                    errors.New("client creation error"),
-					RequireDeletionTimestamp: true,
+					Error: errors.New("client creation error"),
 				},
 			},
 			args: args{
@@ -1872,20 +1966,19 @@ func TestDeleteBinding(t *testing.T) {
 				targetExternalName: "retired-id-1",
 			},
 			want: want{
-				err:                    errors.New("client creation error"),
-				crHasDeletionTimestamp: true, // Should still be set even on error
-				crHasDeletingCondition: true,
-				originalCrModified:     false,
+				err:                errors.New(errSeedBinding),
+				createClientCalls:  1,
+				markedForDeletion:  false,
+				originalCrModified: false,
 			},
 		},
 		"DeleteError": {
-			reason: "should return error when delete operation fails",
+			reason: "should return error when the destroy operation fails",
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
 					Client: &MockServiceBindingClient{
 						deleteErr: errors.New("delete error"),
 					},
-					RequireDeletionTimestamp: true,
 				},
 			},
 			args: args{
@@ -1899,10 +1992,37 @@ func TestDeleteBinding(t *testing.T) {
 				targetExternalName: "retired-id-1",
 			},
 			want: want{
-				err:                    errors.New("delete error"),
-				crHasDeletionTimestamp: true,
-				crHasDeletingCondition: true,
-				originalCrModified:     false,
+				err:                errors.New("delete error"),
+				createClientCalls:  2, // seed + destroy; verify not reached
+				markedForDeletion:  true,
+				originalCrModified: false,
+			},
+		},
+		"VerificationStillExists": {
+			reason: "should return error when read-back shows the binding still exists (silent no-op destroy)",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						deletion:    managed.ExternalDelete{},
+						observation: managed.ExternalObservation{ResourceExists: true},
+					},
+				},
+			},
+			args: args{
+				cr: expectedServiceBinding(
+					withMetadata("test-binding", nil),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Status.AtProvider.Name = "test-binding"
+					},
+				),
+				targetName:         "retired-binding-1",
+				targetExternalName: "retired-id-1",
+			},
+			want: want{
+				err:                errors.New(errVerifyBinding),
+				createClientCalls:  3,
+				markedForDeletion:  true,
+				originalCrModified: false,
 			},
 		},
 	}
@@ -1922,41 +2042,24 @@ func TestDeleteBinding(t *testing.T) {
 			if tc.want.err != nil {
 				if err == nil {
 					t.Errorf("\n%s\ne.DeleteBinding(...): expected error, got nil\n", tc.reason)
-				} else if err.Error() != tc.want.err.Error() {
-					t.Errorf("\n%s\ne.DeleteBinding(...): expected error %q, got %q\n", tc.reason, tc.want.err.Error(), err.Error())
+				} else if !containsError(err.Error(), tc.want.err.Error()) {
+					t.Errorf("\n%s\ne.DeleteBinding(...): expected error containing %q, got %q\n", tc.reason, tc.want.err.Error(), err.Error())
 				}
 			} else if err != nil {
 				t.Errorf("\n%s\ne.DeleteBinding(...): expected no error, got %v\n", tc.reason, err)
 			}
 
-			// Verify that the client factory was called and received a CR with deletion timestamp
 			if mockFactory, ok := tc.fields.clientFactory.(*MockServiceBindingClientFactory); ok {
-				if len(mockFactory.CreateClientCalls) != 1 {
-					t.Errorf("\n%s\nExpected 1 CreateClient call, got %d\n", tc.reason, len(mockFactory.CreateClientCalls))
-				} else {
-					capturedCR := mockFactory.CreateClientCalls[0].CR
+				if len(mockFactory.CreateClientCalls) != tc.want.createClientCalls {
+					t.Errorf("\n%s\nExpected %d CreateClient calls, got %d\n", tc.reason, tc.want.createClientCalls, len(mockFactory.CreateClientCalls))
+				}
 
-					// Verify deletion timestamp
-					hasDeletionTimestamp := capturedCR.GetDeletionTimestamp() != nil
-					if hasDeletionTimestamp != tc.want.crHasDeletionTimestamp {
-						t.Errorf("\n%s\nCR passed to CreateClient: expected deletion timestamp set=%v, got=%v\n",
-							tc.reason, tc.want.crHasDeletionTimestamp, hasDeletionTimestamp)
-					}
+				if mockFactory.MarkedForDeletion() != tc.want.markedForDeletion {
+					t.Errorf("\n%s\nExpected markedForDeletion=%v, got=%v\n", tc.reason, tc.want.markedForDeletion, mockFactory.MarkedForDeletion())
+				}
 
-					// Verify deleting condition
-					hasDeletingCondition := false
-					for _, condition := range capturedCR.Status.Conditions {
-						if condition.Type == xpv1.TypeReady && condition.Status == "False" && condition.Reason == xpv1.ReasonDeleting {
-							hasDeletingCondition = true
-							break
-						}
-					}
-					if hasDeletingCondition != tc.want.crHasDeletingCondition {
-						t.Errorf("\n%s\nCR passed to CreateClient: expected deleting condition set=%v, got=%v\n",
-							tc.reason, tc.want.crHasDeletingCondition, hasDeletingCondition)
-					}
-
-					// Verify target names
+				// Verify target names on the first (seed) call.
+				if len(mockFactory.CreateClientCalls) > 0 {
 					if mockFactory.CreateClientCalls[0].TargetName != tc.args.targetName {
 						t.Errorf("\n%s\nExpected targetName %q, got %q\n",
 							tc.reason, tc.args.targetName, mockFactory.CreateClientCalls[0].TargetName)
@@ -1965,10 +2068,14 @@ func TestDeleteBinding(t *testing.T) {
 						t.Errorf("\n%s\nExpected targetExternalName %q, got %q\n",
 							tc.reason, tc.args.targetExternalName, mockFactory.CreateClientCalls[0].TargetExternalName)
 					}
+					// The seed phase must NOT be marked for deletion.
+					if mockFactory.CreateClientCalls[0].MarkForDeletion {
+						t.Errorf("\n%s\nSeed-phase CreateClient should have markForDeletion=false\n", tc.reason)
+					}
 				}
 			}
 
-			// Verify original CR was not modified (deep copy was used)
+			// Verify original CR was not modified.
 			originalHasDeletionTimestamp := originalCR.GetDeletionTimestamp() != nil
 			currentHasDeletionTimestamp := tc.args.cr.GetDeletionTimestamp() != nil
 

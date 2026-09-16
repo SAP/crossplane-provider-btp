@@ -1,0 +1,37 @@
+# Run make reviewable and make check-diff
+#
+# reviewable:
+#   make generate
+#   make lint
+#   make test
+#
+# check-diff:
+#   runs make generate and check for uncommitted changes
+name: check-reviewable-diff
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+
+jobs:
+  check-reviewable-diff:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        submodules: true
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+
+    - name: Install Go tools
+      run: go install tool
+
+    - name: make reviewable
+      run: make reviewable
+
+    - name: make check-diff
+      run: make check-diff

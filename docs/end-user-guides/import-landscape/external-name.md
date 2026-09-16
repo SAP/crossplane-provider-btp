@@ -142,6 +142,16 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - CLI (RoleCollections): `btp --format json list security/role-collection --subaccount <subaccount-id>` (field: `name`)
   - CLI (User Assignments): `btp --format json get security/role-collection <role-collection-name> --subaccount <subaccount-id> --show-user-assignments` (fields: `origin`, `username`)
 
+### ServiceBinding
+
+- Follows Standard: yes
+- Format: ServiceBinding GUID (UUID format)
+- Note: spec.forProvider.serviceInstanceID (or its ref/selector) must be set for adoption to work
+- How to find:
+
+  - UI: the cockpit shows only the binding name, not its GUID; use the CLI
+  - CLI: btp list services/binding --subaccount `<subaccount-guid>` (field: id)
+
 ### ServiceInstance
 
 - Follows Standard: no
@@ -189,6 +199,15 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 
   - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)
   - API: GET /v1/subaccountDestinations/\{destination name\} (fields: subaccount_id + Name)
+
+### SubaccountDestinationCertificate
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<subaccount-id>/<certificate-name>`
+- How to find:
+
+  - UI: SAP BTP Cockpit → Subaccount → Connectivity → Certificates (field: Name)
+  - API: GET /v1/subaccountCertificates/\{certificate name\} (fields: subaccount_id + Name)
 
 ### SubaccountServiceBroker
 

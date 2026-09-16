@@ -124,6 +124,20 @@ type RetiredSBResource struct {
 	// The date and time when the resource will be deleted.
 	// May change if the rotation settings change
 	DeletionDate *metav1.Time `json:"deletionDate"`
+
+	// DeletionAttempts counts how many times deletion of this retired binding
+	// has been attempted and did not verifiably remove it from Service Manager.
+	// It stays at 0 while deletion is not yet due; a non-zero value means the
+	// binding is overdue and repeatedly failing to delete, so it is safe to
+	// alert on.
+	// +kubebuilder:validation:Optional
+	DeletionAttempts int32 `json:"deletionAttempts,omitempty"`
+
+	// LastDeletionError records the error from the most recent failed deletion
+	// attempt, for operator visibility. Empty when the last attempt succeeded
+	// or none has been made yet.
+	// +kubebuilder:validation:Optional
+	LastDeletionError string `json:"lastDeletionError,omitempty"`
 }
 
 // A ServiceBindingSpec defines the desired state of a ServiceBinding.
@@ -166,6 +180,15 @@ type ServiceBindingStatus struct {
 // +kubebuilder:object:root=true
 
 // A ServiceBinding allows to manage a binding to a service instance in BTP
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: ServiceBinding GUID (UUID format)
+//   - Note: spec.forProvider.serviceInstanceID (or its ref/selector) must be set for adoption to work
+//   - How to find:
+//   - UI: the cockpit shows only the binding name, not its GUID; use the CLI
+//   - CLI: btp list services/binding --subaccount `<subaccount-guid>` (field: id)
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

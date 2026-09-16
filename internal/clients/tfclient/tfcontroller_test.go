@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -401,6 +402,10 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+// TestQueryAsyncData pins the completion gate that guards observation
+// write-back. The framework async client signals a settled resource with
+// TypeLastAsyncOperation/True and never sets TypeAsyncOperation, so gating on
+// the latter would return nil forever and stop external-name propagation.
 func TestQueryAsyncData(t *testing.T) {
 	type args struct {
 		cr *fake.Terraformed
@@ -414,11 +419,23 @@ func TestQueryAsyncData(t *testing.T) {
 		want   want
 	}{
 		"CreationInProcess": {
-			reason: "No data available yet during creation",
+			reason: "No data available yet: the framework async client sets no condition at all while an operation is in flight",
+			args: args{
+				cr: terraformedCrWithData("test-external-name", "test-id", nil),
+			},
+			want: want{
+				data: nil,
+			},
+		},
+		"AsyncOperationFailed": {
+			reason: "A failed async operation must not write back a partial observation",
 			args: args{
 				cr: terraformedCrWithData("test-external-name", "test-id", []xpv1.Condition{
-					xpv1.Available(),
-					ujresource.AsyncOperationOngoingCondition(),
+					{
+						Type:   xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+						Status: corev1.ConditionFalse,
+						Reason: ujresource.ReasonApplyFailure,
+					},
 				}),
 			},
 			want: want{
@@ -426,19 +443,14 @@ func TestQueryAsyncData(t *testing.T) {
 			},
 		},
 		"DataAvailable": {
-			reason: "Data is available after creation",
+			reason: "Data is available once the framework client reports LastAsyncOperation=True",
 			args: args{
 				cr: terraformedCrWithData("test-external-name", "test-id", []xpv1.Condition{
-					xpv1.Available(),
-					ujresource.AsyncOperationFinishedCondition(),
+					ujresource.LastAsyncOperationCondition(nil),
 				}),
 			},
 			want: want{
 				data: &ObservationData{
-					Conditions: []xpv1.Condition{
-						xpv1.Available(),
-						ujresource.AsyncOperationFinishedCondition(),
-					},
 					ExternalName: "test-external-name",
 					ID:           "test-id",
 				},
@@ -448,8 +460,7 @@ func TestQueryAsyncData(t *testing.T) {
 			reason: "All observation fields are extracted from the Terraform resource",
 			args: args{
 				cr: terraformedCrWithObservation("test-external-name", "test-id", []xpv1.Condition{
-					xpv1.Available(),
-					ujresource.AsyncOperationFinishedCondition(),
+					ujresource.LastAsyncOperationCondition(nil),
 				}, map[string]any{
 					"dashboard_url": "https://dashboard.example.com",
 					"created_date":  "2023-01-15T10:30:00Z",
@@ -462,10 +473,6 @@ func TestQueryAsyncData(t *testing.T) {
 			},
 			want: want{
 				data: &ObservationData{
-					Conditions: []xpv1.Condition{
-						xpv1.Available(),
-						ujresource.AsyncOperationFinishedCondition(),
-					},
 					ExternalName: "test-external-name",
 					ID:           "test-id",
 					DashboardURL: "https://dashboard.example.com",
@@ -482,8 +489,7 @@ func TestQueryAsyncData(t *testing.T) {
 			reason: "Dates with ISO8601 timezone offset (no colon) are parsed correctly",
 			args: args{
 				cr: terraformedCrWithObservation("test-external-name", "test-id", []xpv1.Condition{
-					xpv1.Available(),
-					ujresource.AsyncOperationFinishedCondition(),
+					ujresource.LastAsyncOperationCondition(nil),
 				}, map[string]any{
 					"created_date":  "2023-01-15T10:30:00+0200",
 					"last_modified": "2023-01-16T10:30:00+0200",
@@ -491,10 +497,6 @@ func TestQueryAsyncData(t *testing.T) {
 			},
 			want: want{
 				data: &ObservationData{
-					Conditions: []xpv1.Condition{
-						xpv1.Available(),
-						ujresource.AsyncOperationFinishedCondition(),
-					},
 					ExternalName: "test-external-name",
 					ID:           "test-id",
 					CreatedDate:  func() *metav1.Time { t := metav1.NewTime(time.Date(2023, 1, 15, 8, 30, 0, 0, time.UTC)); return &t }(),

@@ -322,6 +322,94 @@ func TestObserve_RecoveryBrownfieldNotExistingBranch(t *testing.T) {
 	}
 }
 
+// TestObserve_RecoversIdentityFromTfState covers the identity upjet learns
+// without the async completion gate opening: a create that fails after BTP
+// created the instance leaves the GUID in the partial Terraform state, which
+// upjet stamps onto the mapped resource while QueryAsyncData reports nothing.
+func TestObserve_RecoversIdentityFromTfState(t *testing.T) {
+	const guid = "3f1c2d0e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
+	const adopted = "11111111-2222-3333-4444-555555555555"
+
+	newCR := func(externalName string) *v1alpha1.ServiceInstance {
+		cr := &v1alpha1.ServiceInstance{}
+		cr.SetName("cls-tfstate")
+		cr.Spec.ForProvider.Name = "cls-tfstate"
+		if externalName != "" {
+			meta.SetExternalName(cr, externalName)
+		}
+		return cr
+	}
+	mapped := func(externalName string) *v1alpha1.SubaccountServiceInstance {
+		tf := &v1alpha1.SubaccountServiceInstance{}
+		meta.SetExternalName(tf, externalName)
+		return tf
+	}
+
+	t.Run("fallback external-name adopts the recovered GUID and requeues", func(t *testing.T) {
+		cr := newCR("")
+		rec := &recorderFake{}
+		e := external{
+			tfClient: &TfProxyMock{status: tfclient.UpToDate, tfResource: mapped(guid)},
+			kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			recorder: rec,
+		}
+		_, err := e.Observe(context.TODO(), cr)
+		if !errors.Is(err, recovery.ErrRequeueAfterRecovery) {
+			t.Fatalf("expected ErrRequeueAfterRecovery, got %v", err)
+		}
+		if meta.GetExternalName(cr) != guid {
+			t.Errorf("external-name = %q, want %q", meta.GetExternalName(cr), guid)
+		}
+		if !rec.has(recovery.EventReasonRecovered) {
+			t.Errorf("expected an %q event, got %+v", recovery.EventReasonRecovered, rec.events)
+		}
+	})
+
+	t.Run("an adopted external-name is never overwritten from tf state", func(t *testing.T) {
+		cr := newCR(adopted)
+		e := external{
+			tfClient: &TfProxyMock{status: tfclient.UpToDate, tfResource: mapped(guid)},
+			kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+		}
+		obs, err := e.Observe(context.TODO(), cr)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if !obs.ResourceExists || !obs.ResourceUpToDate {
+			t.Errorf("expected an up-to-date observation, got %+v", obs)
+		}
+		if meta.GetExternalName(cr) != adopted {
+			t.Errorf("external-name = %q, want the adopted %q", meta.GetExternalName(cr), adopted)
+		}
+	})
+
+	t.Run("the placeholder identifier is refused", func(t *testing.T) {
+		cr := newCR("")
+		e := external{
+			tfClient: &TfProxyMock{status: tfclient.UpToDate, tfResource: mapped("NOT_EMPTY_GUID")},
+			kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+		}
+		if _, err := e.Observe(context.TODO(), cr); err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if got := meta.GetExternalName(cr); got != "" {
+			t.Errorf("external-name = %q, want it left empty", got)
+		}
+	})
+
+	t.Run("a failed write surfaces instead of being silently dropped", func(t *testing.T) {
+		cr := newCR("")
+		e := external{
+			tfClient: &TfProxyMock{status: tfclient.UpToDate, tfResource: mapped(guid)},
+			kube:     &test.MockClient{MockUpdate: test.NewMockUpdateFn(errKube)},
+		}
+		_, err := e.Observe(context.TODO(), cr)
+		if err == nil || !strings.Contains(err.Error(), errRecoverExternalName) {
+			t.Fatalf("expected the persist failure to surface, got %v", err)
+		}
+	})
+}
+
 // silence unused import in some builds
 var _ = strings.Contains
 var _ = managed.ExternalConnector(nil)

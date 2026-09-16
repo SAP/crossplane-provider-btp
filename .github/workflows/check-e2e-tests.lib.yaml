@@ -1,6 +1,8 @@
-# Runs e2e tests, potentially requiring approval based on the `environment` input.
+# Runs e2e tests.
 #
-# Enviroment variables/secrets that are needed
+# Approval is handled in the calling job.
+#
+# Environment variables/secrets that are needed
 # CLI_SERVER_URL contains the CLI server URL
 # GLOBAL_ACCOUNT contains the subdomain of the global account
 # IDP_URL contains the URL of an IDP that can be connected to the global account
@@ -10,7 +12,7 @@
 # TECHNICAL_USER_EMAIL contains the email of the BTP_TECHNICAL_USER
 # More information in the README.md
 
-name: E2E Test
+name: E2E Tests
 
 on:
   workflow_call:
@@ -20,9 +22,14 @@ on:
         default: ''
         required: false
         type: string
-      environment:
-        description: 'the environment to run in'
-        default: 'pr-e2e-approval'
+      skip:
+        description: 'skip all jobs (e.g. for doc-only changes); workflow still runs to satisfy branch protection'
+        default: false
+        required: false
+        type: boolean
+      concurrency-group:
+        description: 'concurrency group for the workflow run (defaults to using the workflow run number, for parallel runs)'
+        default: ''
         required: false
         type: string
   workflow_dispatch:
@@ -32,20 +39,29 @@ on:
         default: ''
         required: false
         type: string
-      environment:
-        description: 'the environment to run in'
-        default: 'pr-e2e-approval'
+      skip:
+        description: 'skip all jobs (e.g. for doc-only changes); workflow jobs still runs to satisfy branch protection'
+        default: false
+        required: false
+        type: boolean
+      concurrency-group:
+        description: 'concurrency group for the workflow run (defaults to the workflow run number, for parallel execution)'
+        default: ''
         required: false
         type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ inputs.concurrency-group != '' && inputs.concurrency-group || github.run_id }}
+  cancel-in-progress: false
+
 env:
+  BUILD_ID: ${{ github.run_number }}-${{ github.run_attempt }} # using shorter run number for BTP character limits
   # hardcoded BTP CLI version
-  btp_cli_version: 2.116.2
+  BTP_CLI_VERSION: 2.116.2
   E2E_BUILD_REGISTRY: index.docker.io/e2e
-  E2E_PROVIDER_IMAGE: index.docker.io/e2e/provider-btp-amd64
   CROSSPLANE_CLI_VERSION: v2.0.2
   # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable versioning=semver allowedVersions=<2.2.0
   # Pinned to last 2.1.x: 2.2.0+ (crossplane/crossplane#6981) resolves spec.package
@@ -58,10 +74,8 @@ env:
 
 jobs:
   prepare-matrix:
+    if: ${{ !inputs.skip }}
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment }}  # approval here for the entire workflow, later jobs use no approval environment
-      deployment: false
     outputs:
       test-names: ${{ steps.set-matrix.outputs.test-names }}
       # Resolve the checkout ref to a fixed commit SHA once, inside the gated job. Downstream jobs
@@ -75,7 +89,8 @@ jobs:
           #use inputs.checkout-ref to be able to call it from a pull_request_target workflow, since there it needs to be github.event.pull_request.merge_commit_sha and not the default
           ref: ${{ inputs.checkout-ref }}
           # Opt in to checking out fork PR code under pull_request_target. actions/checkout v7 refuses this by default.
-          # Safe here: the pr-e2e-approval environment (required_reviewers) gates this job, so a maintainer inspects the fork diff before it runs with secrets.
+# Opt in to checking out fork PR code under pull_request_target. actions/checkout v7 refuses this by default.
+# Safe here: the caller's `approve` job (pr-e2e-approval, required_reviewers) must succeed before this workflow's jobs run, so a maintainer inspects the fork diff before it runs with secrets.
           allow-unsafe-pr-checkout: true
 
       - name: Pin resolved checkout SHA
@@ -95,8 +110,8 @@ jobs:
 
   # Pull and verify the Crossplane chart in a dedicated job so that an upstream
   # CDN blip (charts.crossplane.io 403) does not waste the provider build setup
-  # and runs in parallel with `build` for faster wall-clock.
-  fetch-chart:
+  # and runs in parallel with `prepare-build` for faster wall-clock.
+  prepare-helm-chart:
     runs-on: ubuntu-latest
     needs: prepare-matrix
     steps:
@@ -111,7 +126,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
-          version: v4.2.3
+          version: v4.2.4
 
       - name: Restore Crossplane chart cache
         id: crossplane-chart-cache
@@ -143,7 +158,7 @@ jobs:
             --destination .cache/charts
           ls -la .cache/charts
 
-      # Defense-in-depth against artifact poisoning (CodeQL alert #64). The `build`
+      # Defense-in-depth against artifact poisoning (CodeQL alert #64). The `prepare-build`
       # job's `helm pull` step is workflow-mutable; a malicious PR could rewrite
       # it to upload a poisoned chart for matrix legs to install. Pinning the
       # expected SHA256 (sourced from upstream charts.crossplane.io/stable
@@ -180,9 +195,9 @@ jobs:
 
   # Build image + xpkg + CLI tools once; the matrix consumes them as artifacts.
   # NOTE: after the artifact retention window expires (retention-days below),
-  # "Re-run failed jobs" fails — build won't re-run, so its artifacts are gone.
+  # "Re-run failed jobs" fails — prepare-build won't re-run, so its artifacts are gone.
   # Use "Re-run all jobs" to rebuild them.
-  build:
+  prepare-build:
     runs-on: ubuntu-latest
     needs: prepare-matrix
     steps:
@@ -195,7 +210,7 @@ jobs:
           allow-unsafe-pr-checkout: true
 
       - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
@@ -238,11 +253,13 @@ jobs:
           path: .cache/tools
           key: ${{ steps.cli-tools-cache.outputs.cache-primary-key }}
 
+      - name: Set provider image name
+        run: |
+          repo="${GITHUB_REPOSITORY##*/}"
+          echo "E2E_PROVIDER_IMAGE=${{ env.E2E_BUILD_REGISTRY }}/${repo#crossplane-}-amd64" >> "$GITHUB_ENV"
+
       - name: Build provider image
         run: make build BUILD_REGISTRY=${{ env.E2E_BUILD_REGISTRY }} PLATFORMS=linux_amd64
-
-      - name: Build provider xpkg
-        run: make xpkg.build.provider-btp BUILD_REGISTRY=${{ env.E2E_BUILD_REGISTRY }} PLATFORMS=linux_amd64
 
       - name: Export provider image
         run: docker save "${{ env.E2E_PROVIDER_IMAGE }}" -o provider-image.tar
@@ -276,9 +293,9 @@ jobs:
 
   e2e-test:
     runs-on: ubuntu-latest
-    needs: [prepare-matrix, fetch-chart, build] # fetch-chart provides crossplane-chart artifact; build provides image/xpkg/tools artifacts
+    needs: [prepare-matrix, prepare-helm-chart, prepare-build] # prepare-helm-chart provides crossplane-chart artifact; prepare-build provides image/xpkg/tools artifacts
     environment:
-      name: pr-e2e-no-approval  # approval is on the preceding prepare-matrix job
+      name: pr-e2e-no-approval  # approval is on the preceding approval job
       deployment: false
     strategy:
       fail-fast: false
@@ -305,7 +322,7 @@ jobs:
             echo "::error::checked-out $actual != approved $expected"; exit 1
           fi
 
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - run: go version
@@ -362,7 +379,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
-          version: v4.2.3
+          version: v4.2.4
 
       - name: Download Crossplane chart
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -378,16 +395,11 @@ jobs:
           echo "CROSSPLANE_CHART_PATH=$(realpath "$CHART")" >> $GITHUB_ENV
 
       - name: Install BTP CLI
-        #hardcoded version
         run: |
-          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+          tar -xzf btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz
           cd linux-amd64
           mv btp /usr/local/bin
-
-      - name: Set BUILD_ID
-        run: |
-          echo "BUILD_ID=${{github.run_number}}-${{github.run_attempt}}" >> $GITHUB_ENV
 
       - name: Run e2e test
         timeout-minutes: 120
@@ -403,7 +415,6 @@ jobs:
           done
           exit "$rc"
         env:
-          BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
@@ -412,13 +423,24 @@ jobs:
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
           IDP_URL: ${{ secrets.IDP_URL }}
 
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-logs-${{ matrix.testName }}-attempt-${{ github.run_attempt }}
+          path: |
+            test-output.log
+            test/e2e/logs/post-tests/
+          retention-days: 14
+          if-no-files-found: warn
+
   cleanup-e2e:
     runs-on: ubuntu-latest
     needs: [prepare-matrix, e2e-test]
     environment:
       name: pr-e2e-no-approval
       deployment: false
-    if: always() && needs.prepare-matrix.result == 'success'  # only run if prepare-matrix was successful (requires manual approval) and then always run after e2e-test
+    if: always() && !inputs.skip && needs.prepare-matrix.result == 'success' # intentional: workflow cancellation skips cleanup; resources will persist until the next run
     steps:
       - name: checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -427,55 +449,51 @@ jobs:
           ref: ${{ github.base_ref }}
           submodules: true
 
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
       - name: Install BTP CLI
         run: |
-          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$btp_cli_version.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
-          tar -xzf btp-cli-linux-amd64-$btp_cli_version.tar.gz
+          curl -LJO https://tools.hana.ondemand.com/additional/btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz --cookie "eula_3_2_agreed=tools.hana.ondemand.com/developer-license-3_2.txt"
+          tar -xzf btp-cli-linux-amd64-$BTP_CLI_VERSION.tar.gz
           cd linux-amd64
           mv btp /usr/local/bin
-
-      - name: Set BUILD_ID
-        run: echo "BUILD_ID=${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_ENV
 
       - name: clean up cluster
         run: |
           go run .github/workflows/cleanup.go
         env:
-          BUILD_ID: ${{ env.BUILD_ID }}
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
           GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
 
   # required for test matrix status reporting. Ignores cleanup-e2e job failure/success.
-  e2e-tests:
+  e2e-status:
     runs-on: ubuntu-latest
     needs:
       - prepare-matrix
-      - fetch-chart
-      - build
+      - prepare-helm-chart
+      - prepare-build
       - e2e-test
     timeout-minutes: 1
-    if: always()
+    if: always() && !inputs.skip
     steps:
       - name: Fail for failed prepare-matrix job
         if: |
           needs.prepare-matrix.result == 'failure' ||
           needs.prepare-matrix.result == 'cancelled'
         run: exit 1
-      - name: Fail for failed fetch-chart job
+      - name: Fail for failed prepare-helm-chart job
         if: |
-          needs.fetch-chart.result == 'failure' ||
-          needs.fetch-chart.result == 'cancelled'
+          needs.prepare-helm-chart.result == 'failure' ||
+          needs.prepare-helm-chart.result == 'cancelled'
         run: exit 1
-      - name: Fail for failed build job
+      - name: Fail for failed prepare-build job
         if: |
-          needs.build.result == 'failure' ||
-          needs.build.result == 'cancelled'
+          needs.prepare-build.result == 'failure' ||
+          needs.prepare-build.result == 'cancelled'
         run: exit 1
       - name: Fail for failed matrix jobs
         if: |
