@@ -66,13 +66,11 @@ func NewServiceBindingClient(ctx context.Context, kube client.Client, tfConnecto
 }
 
 func (m *ServiceBindingClient) Create(ctx context.Context) (string, managed.ExternalCreation, error) {
-	// use a random name once for the creation. Afterwards, the external name sets a
-	// reasonable name. This means that when observing the resource for the first time after
-	// creating, another store for this resource will be created. This will create a dangling
-	// TF workspace, but this way no new name collisions will occur.
-	// instanceUID := GenerateInstanceUID(m.ssb.UID, GenerateRandomName(*m.ssb.Spec.ForProvider.Name))
-	//
-	// m.ssb.SetUID(instanceUID)
+	// The no-fork upjet client caches its plan in Observe; Create reads that
+	// cached plan, so prime it here before creating.
+	if _, err := m.tfClient.Observe(ctx, m.ssb); err != nil {
+		return "", managed.ExternalCreation{}, errors.Wrap(err, errObserveTfResource)
+	}
 
 	creation, err := m.tfClient.Create(ctx, m.ssb)
 	if err != nil {
