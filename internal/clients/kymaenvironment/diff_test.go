@@ -186,7 +186,7 @@ func TestDiffAgainstUpdateSchema(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			diff, needsUpdate := DiffAgainstUpdateSchema(tc.desired, tc.current, schema)
+			_, _, diff, needsUpdate := DiffAgainstUpdateSchema(tc.desired, tc.current, schema)
 			if needsUpdate != tc.wantNeedsUpdate {
 				t.Errorf("needsUpdate = %v, want %v\ndiff:\n%s",
 					needsUpdate, tc.wantNeedsUpdate, diff)
@@ -201,7 +201,7 @@ func TestDiffAgainstUpdateSchema_NilSchemaFallsBack(t *testing.T) {
 	desired := map[string]any{"a": 1}
 	current := map[string]any{"a": 2}
 
-	_, needsUpdate := DiffAgainstUpdateSchema(desired, current, nil)
+	_, _, _, needsUpdate := DiffAgainstUpdateSchema(desired, current, nil)
 	if !needsUpdate {
 		t.Errorf("nil-schema fallback should detect drift between {a:1} and {a:2}")
 	}
@@ -214,7 +214,7 @@ func TestDiffAgainstUpdateSchema_EmptySchemaFallsBack(t *testing.T) {
 	desired := map[string]any{"machineType": "Standard_D4_v3"}
 	current := map[string]any{"machineType": "Standard_D8_v3"}
 
-	_, needsUpdate := DiffAgainstUpdateSchema(desired, current, &Schema{Properties: map[string]Property{}})
+	_, _, _, needsUpdate := DiffAgainstUpdateSchema(desired, current, &Schema{Properties: map[string]Property{}})
 	if !needsUpdate {
 		t.Errorf("empty-schema fallback should detect drift; got needsUpdate=false")
 	}

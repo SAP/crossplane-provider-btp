@@ -972,6 +972,91 @@ func TestObserve_SchemaAwareDriftSuppressesIssue682(t *testing.T) {
 	}
 }
 
+// TestObserve_CircuitBreakerTripsOnPersistentSchemaDrift is a regression test
+// for issue #682's circuit-breaker decoupling: the retry hashes must be
+// computed over the schema-normalized maps, not the raw desired/current.
+//
+// Genuine drift on an in-contract field (machineType) persists while BTP
+// echoes a ghost default (gvisor.enabled) that the schema-aware diff drops.
+// The normalized maps — and thus the hashes — are stable across reconciles,
+// so the counter advances and the breaker trips. Before the fix, the raw
+// hashes churned on the ghost, resetting the counter so the breaker never
+// tripped; this test seeds normalized hashes and only passes with the fix.
+func TestObserve_CircuitBreakerTripsOnPersistentSchemaDrift(t *testing.T) {
+	schema := &kyma.Schema{Properties: map[string]kyma.Property{
+		"machineType": {Type: "string"},
+		"name":        {Type: "string"},
+		"gvisor": {
+			Type: "object",
+			Properties: map[string]kyma.Property{
+				"enabled": {Type: "boolean", Default: false},
+			},
+		},
+	}}
+
+	// Spec drifts on machineType. BTP echoes a different machineType plus a
+	// ghost default (gvisor) and an out-of-contract field (region).
+	specParams := `{"machineType":"Standard_D4_v3"}`
+	btpEcho := `{"name":"kyma","machineType":"Standard_D8_v3","region":"westeurope","gvisor":{"enabled":false}}`
+
+	// The maps the schema-aware diff compares: ghosts and out-of-contract keys
+	// dropped, "name" default kept. The retry hashes are seeded from these.
+	normalizedDesired := map[string]interface{}{"machineType": "Standard_D4_v3", "name": "kyma"}
+	normalizedCurrent := map[string]interface{}{"machineType": "Standard_D8_v3", "name": "kyma"}
+
+	mockClient := fake.MockClient{
+		MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+			return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+				Id:         internal.Ptr(testUUID),
+				State:      internal.Ptr("OK"),
+				Labels:     internal.Ptr(`{"name": "kyma", "KubeconfigURL": "someUrl"}`),
+				Parameters: internal.Ptr(btpEcho),
+			}, nil
+		},
+		MockSchemaFetcher: fixtureSchemaFetcher{schema: schema},
+	}
+
+	e := external{
+		client:     mockClient,
+		httpClient: mockedHttpClient(kubeConfigData),
+		kube:       test.NewMockClient(),
+		record:     event.NewNopRecorder(),
+	}
+
+	// One reconcile short of tripping, hashes seeded from the normalized maps.
+	cr := environment(
+		withExternalName(testUUID),
+		withUID("kyma"),
+		withKymaParameters(v1alpha1.KymaEnvironmentParameters{
+			Parameters: runtime.RawExtension{Raw: []byte(specParams)},
+		}),
+		withRetryStatus(&v1alpha1.RetryStatus{
+			DesiredHash:    hash(normalizedDesired),
+			CurrentHash:    hash(normalizedCurrent),
+			Count:          maxRetriesDefault - 1,
+			CircuitBreaker: false,
+		}),
+	)
+
+	if _, err := e.Observe(context.Background(), cr); err != nil {
+		t.Fatalf("Observe returned unexpected error: %v", err)
+	}
+
+	rs := cr.Status.RetryStatus
+	if rs == nil {
+		t.Fatal("RetryStatus is nil after Observe")
+	}
+	if rs.Count != maxRetriesDefault {
+		t.Errorf("Count = %d, want %d (stable normalized hashes should advance the counter, not reset it)", rs.Count, maxRetriesDefault)
+	}
+	if !rs.CircuitBreaker {
+		t.Errorf("CircuitBreaker = false, want true (persistent schema drift should trip the breaker at maxRetries)")
+	}
+	if rs.DesiredHash != hash(normalizedDesired) || rs.CurrentHash != hash(normalizedCurrent) {
+		t.Errorf("retry hashes drifted from the normalized maps; got desired=%q current=%q", rs.DesiredHash, rs.CurrentHash)
+	}
+}
+
 // fixtureSchemaFetcher is a tiny SchemaFetcher for tests: always returns the
 // stored schema regardless of arguments.
 type fixtureSchemaFetcher struct{ schema *kyma.Schema }

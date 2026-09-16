@@ -15,13 +15,14 @@ import (
 // where BTP materialises schema defaults into stored parameters after any
 // update.
 //
-// Returns a cmp.Diff-formatted string suitable for surfacing on
-// KymaEnvironment.status.updateRetryStatus.diff, and a bool indicating
-// whether an update is required.
+// Returns the normalized desired and current maps that were compared, the
+// cmp.Diff-formatted string, and whether an update is required. Callers that
+// track drift persistence (e.g. the circuit breaker) must hash the returned
+// maps, not the raw inputs, so the signal changes exactly when the diff does.
 //
 // See issue https://github.com/SAP/crossplane-provider-btp/issues/682 for the
 // full motivation.
-func DiffAgainstUpdateSchema(desired, current map[string]any, schema *Schema) (string, bool) {
+func DiffAgainstUpdateSchema(desired, current map[string]any, schema *Schema) (normalizedDesired, normalizedCurrent map[string]any, diff string, needsUpdate bool) {
 	if !usableSchema(schema) {
 		// No usable schema (nil, or an empty property set) means we can't
 		// reason about defaults or the update contract. Fall back to the
@@ -30,15 +31,15 @@ func DiffAgainstUpdateSchema(desired, current map[string]any, schema *Schema) (s
 		// would otherwise drop every key and make the resource appear
 		// permanently up-to-date. (In practice needsUpdateWithDiff should
 		// fail closed before reaching here with an unfetchable schema.)
-		diff := cmp.Diff(desired, current)
-		return diff, diff != ""
+		diff = cmp.Diff(desired, current)
+		return desired, current, diff, diff != ""
 	}
 
-	restrictedDesired := FilterToUpdateSchema(desired, schema)
-	normalizedCurrent := normalizeCurrent(desired, current, schema)
+	normalizedDesired = FilterToUpdateSchema(desired, schema)
+	normalizedCurrent = normalizeCurrent(desired, current, schema)
 
-	diff := cmp.Diff(restrictedDesired, normalizedCurrent)
-	return diff, diff != ""
+	diff = cmp.Diff(normalizedDesired, normalizedCurrent)
+	return normalizedDesired, normalizedCurrent, diff, diff != ""
 }
 
 // usableSchema reports whether schema carries enough information to drive

@@ -334,9 +334,13 @@ func (c *external) needsUpdateWithDiff(ctx context.Context, cr *v1alpha1.KymaEnv
 		return false, "", errors.Wrap(err, errCheckUpdate)
 	}
 
-	diff, needsUpdate := kymaenv.DiffAgainstUpdateSchema(desired, current, schema)
+	// Hash the normalized maps the diff used, not the raw desired/current:
+	// hashing raw maps lets BTP-materialised defaults churn the hashes while
+	// the real drift is stable, resetting the retry counter every reconcile
+	// so the breaker never trips (#682).
+	normalizedDesired, normalizedCurrent, diff, needsUpdate := kymaenv.DiffAgainstUpdateSchema(desired, current, schema)
 
-	updateCircuitBreakerStatus(cr, desired, current, diff, maxRetries)
+	updateCircuitBreakerStatus(cr, normalizedDesired, normalizedCurrent, diff, maxRetries)
 
 	return needsUpdate, diff, nil
 
