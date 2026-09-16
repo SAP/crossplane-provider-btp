@@ -49,30 +49,13 @@ var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
 	return tfprovider.New()
 })
 
-var (
-	// TF_VERSION_CALLBACK is a function callback to allow retrieval of Terraform env versions, its suppose to be set in
-	// the main method to the params being passed when starting the controller
-	// unfortunately, the way controllers are generically being initialized there is no other way to pass that downstream properly
-	TF_VERSION_CALLBACK = func() TfEnvVersion {
-		return TfEnvVersion{
-			// should reset from within main, these are just tested defaults
-			Version:         "1.3.9",
-			Providerversion: "1.0.0-rc1",
-			ProviderSource:  "SAP/btp",
-		}
-	}
-)
-
-// TerraformSetupBuilder builds Terraform a terraform.SetupFn function which
-// returns Terraform provider setup configuration
-func TerraformSetupBuilder(version, providerSource, providerVersion string) terraform.SetupFn {
+// TerraformSetupBuilder builds a terraform.SetupFn for the generated
+// (standalone) upjet controllers. It resolves the ProviderConfig and tracks
+// its usage. The returned Setup only carries FrameworkProvider + Configuration:
+// no-fork calls the provider in-process, so Version/Requirement are unused.
+func TerraformSetupBuilder() terraform.SetupFn {
 	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
 		ps := terraform.Setup{
-			Version: version,
-			Requirement: terraform.ProviderRequirement{
-				Source:  providerSource,
-				Version: providerVersion,
-			},
 			FrameworkProvider: frameworkProvider(),
 		}
 
@@ -134,14 +117,13 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 	}
 }
 
-func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion string) terraform.SetupFn {
+// TerraformSetupBuilderNoTracking is the setup builder for the hybrid
+// (class-2) internal connectors. It skips ProviderConfigUsage / reference
+// tracking because the outer native controller already tracks the
+// user-facing CR.
+func TerraformSetupBuilderNoTracking() terraform.SetupFn {
 	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
 		ps := terraform.Setup{
-			Version: version,
-			Requirement: terraform.ProviderRequirement{
-				Source:  providerSource,
-				Version: providerVersion,
-			},
 			FrameworkProvider: frameworkProvider(),
 		}
 
@@ -196,9 +178,8 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 // disk, no terraform binary, and no identity injection — the framework client
 // threads resource identity itself via the operation tracker.
 func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) managed.ExternalConnector {
-	tfVersion := TF_VERSION_CALLBACK()
-	zl := zap.New(zap.UseDevMode(tfVersion.DebugLogs))
-	setupFn := TerraformSetupBuilderNoTracking(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion)
+	zl := zap.New(zap.UseDevMode(btp.IsDebug()))
+	setupFn := TerraformSetupBuilderNoTracking()
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	res := config.GetProvider().Resources[resourceName]
 
@@ -213,12 +194,4 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	return tjcontroller.NewTerraformPluginFrameworkConnector(client, setupFn, res, tjcontroller.NewOperationStore(log),
 		tjcontroller.WithTerraformPluginFrameworkLogger(log),
 	)
-}
-
-type TfEnvVersion struct {
-	Version         string
-	Providerversion string
-	ProviderSource  string
-
-	DebugLogs bool
 }

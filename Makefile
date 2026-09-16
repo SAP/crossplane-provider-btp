@@ -4,20 +4,16 @@ PROJECT_NAME := crossplane-provider-btp
 PROJECT_REPO := github.com/sap/$(PROJECT_NAME)
 
 # Terraform Related variables
-# OpenTofu (MPL-2.0) is used as the `terraform` CLI to avoid the BSL of
-# Terraform CLI ≥ 1.6. We install the `tofu` binary under the name `terraform`
-# everywhere upjet expects it — upjet's executor hardcodes the binary name
-# "terraform" (workspace.go:413). OpenTofu is a drop-in replacement at the
-# CLI level. Required for the identity-injector workaround (#521): identity
-# forwarding to the provider lands in CLI 1.12+; OpenTofu 1.12+ has it too.
+# Used at build time only, to generate the provider schema (config/schema.json)
+# that upjet codegen consumes. OpenTofu (MPL-2.0) is installed under the name
+# `terraform` for the host-side `terraform providers schema` call. The provider
+# runs no-fork: the BTP Terraform provider is compiled into the binary and
+# called in-process, so nothing here ends up in the runtime image.
 export TERRAFORM_VERSION ?= 1.12.3
 
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
 export TERRAFORM_PROVIDER_VERSION ?= 1.25.0
-export TERRAFORM_PROVIDER_DOWNLOAD_NAME ?= terraform-provider-btp
-export TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX ?= https://releases.hashicorp.com/$(TERRAFORM_PROVIDER_DOWNLOAD_NAME)/$(TERRAFORM_PROVIDER_VERSION)
-export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-btp_v1.25.0_x5
 export TERRAFORM_DOCS_PATH ?= docs/resources
 
 # set BUILD_ID if its not running in an action
@@ -134,8 +130,6 @@ terraform.buildvars: common.buildvars
 	@echo TERRAFORM_PROVIDER_SOURCE=$(TERRAFORM_PROVIDER_SOURCE)
 	@echo TERRAFORM_PROVIDER_REPO=$(TERRAFORM_PROVIDER_REPO)
 	@echo TERRAFORM_PROVIDER_VERSION=$(TERRAFORM_PROVIDER_VERSION)
-	@echo TERRAFORM_PROVIDER_DOWNLOAD_NAME=$(TERRAFORM_PROVIDER_DOWNLOAD_NAME)
-	@echo TERRAFORM_NATIVE_PROVIDER_BINARY=$(TERRAFORM_NATIVE_PROVIDER_BINARY)
 	@echo TERRAFORM_DOCS_PATH=$(TERRAFORM_DOCS_PATH)
 	@echo TERRAFORM=$(TERRAFORM)
 	@echo TERRAFORM_WORKDIR=$(TERRAFORM_WORKDIR)

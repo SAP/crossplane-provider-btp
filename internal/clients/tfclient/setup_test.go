@@ -104,7 +104,7 @@ func TestTerraformSetupBuilder_ConditionalIDP(t *testing.T) {
 			mg.SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
 
 			// Call TerraformSetupBuilder
-			setupFn := TerraformSetupBuilder("1.5.0", "SAP/btp", "1.7.0")
+			setupFn := TerraformSetupBuilder()
 			setup, err := setupFn(context.Background(), kube, mg)
 
 			// Verify error
@@ -212,7 +212,7 @@ func TestTerraformSetupBuilderNoTracking_ConditionalIDP(t *testing.T) {
 			mg.SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
 
 			// Call TerraformSetupBuilderNoTracking
-			setupFn := TerraformSetupBuilderNoTracking("1.5.0", "SAP/btp", "1.7.0")
+			setupFn := TerraformSetupBuilderNoTracking()
 			setup, err := setupFn(context.Background(), kube, mg)
 
 			// Verify error
@@ -409,7 +409,7 @@ func TestTerraformSetupBuilder_ErrorBranches(t *testing.T) {
 				MockList:   test.NewMockListFn(nil),
 			}
 
-			setupFn := TerraformSetupBuilder("1.5.0", "SAP/btp", "1.7.0")
+			setupFn := TerraformSetupBuilder()
 			_, err := setupFn(context.Background(), kube, tc.fields.mg)
 
 			if err == nil {
@@ -533,7 +533,7 @@ func TestTerraformSetupBuilderNoTracking_ErrorBranches(t *testing.T) {
 				MockGet: tc.fields.mockGet,
 			}
 
-			setupFn := TerraformSetupBuilderNoTracking("1.5.0", "SAP/btp", "1.7.0")
+			setupFn := TerraformSetupBuilderNoTracking()
 			_, err := setupFn(context.Background(), kube, tc.fields.mg)
 
 			if err == nil {
@@ -556,7 +556,7 @@ func TestTerraformSetupBuilderNoTracking_ErrorBranches(t *testing.T) {
 // hard-fails with "cannot retrieve framework provider" when Setup.FrameworkProvider
 // is nil, and that failure only surfaces at connect time against a live cluster.
 func TestSetupBuildersPopulateFrameworkProvider(t *testing.T) {
-	builders := map[string]func(string, string, string) terraform.SetupFn{
+	builders := map[string]func() terraform.SetupFn{
 		"TerraformSetupBuilder":           TerraformSetupBuilder,
 		"TerraformSetupBuilderNoTracking": TerraformSetupBuilderNoTracking,
 	}
@@ -590,7 +590,7 @@ func TestSetupBuildersPopulateFrameworkProvider(t *testing.T) {
 				MockList: test.NewMockListFn(nil),
 			}
 
-			setup, err := builder("1.3.9", "SAP/btp", "1.25.0")(context.Background(), kube, mg)
+			setup, err := builder()(context.Background(), kube, mg)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
