@@ -3,6 +3,9 @@ RUN apk --no-cache add ca-certificates
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG COMMIT_HASH
+ARG VERSION
+ARG BASE_NAME
 
 ADD bin/${TARGETOS}_${TARGETARCH}/provider /usr/local/bin/crossplane-provider-btp
 
@@ -19,4 +22,6 @@ LABEL org.opencontainers.image.title="provider-btp" \
       org.opencontainers.image.url="https://github.com/sap/crossplane-provider-btp" \
       org.opencontainers.image.source="https://github.com/sap/crossplane-provider-btp.git" \
       org.opencontainers.image.vendor="SAP SE" \
-      org.opencontainers.image.base.name="docker.io/library/alpine:3.23.3"
+      org.opencontainers.image.base.name="${BASE_NAME}" \
+      org.opencontainers.image.revision="${COMMIT_HASH}" \
+      org.opencontainers.image.version="${VERSION}"
