@@ -6,7 +6,7 @@ PROJECT_REPO := github.com/sap/$(PROJECT_NAME)
 # Terraform Related variables
 # Used at build time only, to generate the provider schema (config/schema.json)
 # that upjet codegen consumes.
-export TERRAFORM_VERSION ?= 1.12.3
+export TERRAFORM_VERSION ?= 1.16.2
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
 export TERRAFORM_PROVIDER_VERSION ?= 1.25.0
