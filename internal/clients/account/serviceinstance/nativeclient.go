@@ -364,9 +364,12 @@ func normalizeValues(in []string) []string {
 	return out
 }
 
-// diffLabels computes the operation-based label PATCH. For each desired key that
-// is new or whose values changed, it emits an add op; for each observed key not
-// present in the desired set, it emits a remove op.
+// diffLabels computes the operation-based label PATCH. Service Manager's `add`
+// operation MERGES values into a key's existing set rather than replacing them,
+// so a key whose values changed cannot be corrected with an add alone (the stale
+// values would linger). For such keys we emit a remove of the observed values
+// followed by an add of the desired values. Brand-new keys emit a single add,
+// and observed keys absent from the desired set emit a remove.
 func diffLabels(desired map[string][]*string, observed map[string][]string) []smopenapi.Label {
 	desiredStr := toStringSliceMap(desired)
 
@@ -385,6 +388,11 @@ func diffLabels(desired map[string][]*string, observed map[string][]string) []sm
 			continue
 		}
 		key := k
+		// The key already exists with different values: clear the observed values
+		// first, otherwise the subsequent add would merge into the stale set.
+		if ok {
+			ops = append(ops, smopenapi.Label{Key: &key, Op: internal.Ptr(labelOpRemove), Values: have})
+		}
 		ops = append(ops, smopenapi.Label{Key: &key, Op: internal.Ptr(labelOpAdd), Values: desiredStr[k]})
 	}
 

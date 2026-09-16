@@ -423,6 +423,52 @@ func TestDiffLabels_NoChange(t *testing.T) {
 	}
 }
 
+// TestDiffLabels_ChangedValuesRemovesThenAdds guards the core fix: when an
+// existing key's values change (e.g. a value was added out-of-band in the BTP
+// UI), SM's add op merges rather than replaces, so we must remove the observed
+// values before adding the desired set. An add alone would leave the stale
+// values in place and drift would never converge.
+func TestDiffLabels_ChangedValuesRemovesThenAdds(t *testing.T) {
+	desired := map[string][]*string{"env": {internal.Ptr("dev")}}
+	observed := map[string][]string{"env": {"dev", "prod"}} // extra value added externally
+	ops := diffLabels(desired, observed)
+	want := []smopenapi.Label{
+		{Key: internal.Ptr("env"), Op: internal.Ptr(labelOpRemove), Values: []string{"dev", "prod"}},
+		{Key: internal.Ptr("env"), Op: internal.Ptr(labelOpAdd), Values: []string{"dev"}},
+	}
+	if diff := cmp.Diff(want, ops); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// TestDiffLabels_NewKeyAddsOnly ensures a brand-new key still emits a single add
+// (no spurious remove, since there is nothing observed to clear).
+func TestDiffLabels_NewKeyAddsOnly(t *testing.T) {
+	desired := map[string][]*string{"team": {internal.Ptr("a")}}
+	observed := map[string][]string{}
+	ops := diffLabels(desired, observed)
+	want := []smopenapi.Label{
+		{Key: internal.Ptr("team"), Op: internal.Ptr(labelOpAdd), Values: []string{"a"}},
+	}
+	if diff := cmp.Diff(want, ops); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// TestDiffLabels_RemovedKeyRemovesOnly ensures an observed key absent from the
+// desired set emits a single remove.
+func TestDiffLabels_RemovedKeyRemovesOnly(t *testing.T) {
+	desired := map[string][]*string{}
+	observed := map[string][]string{"team": {"a"}}
+	ops := diffLabels(desired, observed)
+	want := []smopenapi.Label{
+		{Key: internal.Ptr("team"), Op: internal.Ptr(labelOpRemove), Values: []string{"a"}},
+	}
+	if diff := cmp.Diff(want, ops); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
 // TestDiffLabels_IgnoresReservedObserved ensures the SM-managed subaccount_id
 // label (returned on the instance GET but not user-settable) never produces a
 // remove op, which BTP rejects with "Modifying is not allowed for label".
