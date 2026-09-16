@@ -43,11 +43,7 @@ func GetProvider() *ujconfig.Provider {
 
 	pc := ujconfig.NewProvider([]byte(providerSchema), resourcePrefix, modulePath, []byte(providerMetadata),
 		ujconfig.WithRootGroup("btp.sap.crossplane.io"),
-		// Override upjet's default IncludeList of ".+": with no CLI-reconciled
-		// resources left, an unset list would match every resource into the CLI
-		// include list and collide with the plugin-framework list (NewProvider
-		// panics on a resource in two lists).
-		ujconfig.WithIncludeList([]string{}),
+		ujconfig.WithIncludeList([]string{}), // no cli-path (fork) resources
 		ujconfig.WithTerraformPluginFrameworkIncludeList(TerraformPluginFrameworkReconciledResourceList()),
 		ujconfig.WithTerraformPluginFrameworkProvider(tfPluginFrameworkProvider),
 		ujconfig.WithFeaturesPackage("internal/features"),
