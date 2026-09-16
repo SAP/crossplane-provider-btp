@@ -423,6 +423,17 @@ jobs:
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
           IDP_URL: ${{ secrets.IDP_URL }}
 
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-logs-${{ matrix.testName }}-attempt-${{ github.run_attempt }}
+          path: |
+            test-output.log
+            logs/post-tests/
+          retention-days: 14
+          if-no-files-found: warn
+
   cleanup-e2e:
     runs-on: ubuntu-latest
     needs: [prepare-matrix, e2e-test]
