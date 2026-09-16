@@ -50,6 +50,8 @@ const (
 	errInitServicePlan = "while initializing service plan"
 	errConnectClient   = "while connecting to service"
 	errDeleteInstance  = "cannot delete serviceinstance"
+
+	errRecoverExternalName = "cannot persist external-name recovered from terraform state"
 )
 
 var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -177,17 +179,34 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// ADR(external-name): validate external-name is a UUID if set
+	//
+	// Skipped while deleting: an Observe error returns before Delete runs, so a
+	// bad external-name would strand the finalizer. Deletion then relies on the
+	// provider's Read answering 404 for the bogus id, which clears the state and
+	// lets the finalizer go; a non-404 answer still fails the reconcile. Same
+	// guard as ServiceBinding's Observe (#987).
 	externalName := meta.GetExternalName(cr)
-	if externalName != "" && externalName != cr.Name {
-		if !isValidUUID(externalName) {
-			return managed.ExternalObservation{},
-				errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one")
-		}
+	adopting := externalName != "" && externalName != cr.Name
+	if cr.GetDeletionTimestamp().IsZero() && adopting && !isValidUUID(externalName) {
+		return managed.ExternalObservation{},
+			errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one")
 	}
 
 	status, details, err := e.tfClient.Observe(ctx)
 	if err != nil {
 		return managed.ExternalObservation{}, err
+	}
+
+	// Identity before status: upjet can learn the GUID without the async
+	// completion gate ever opening, reporting it only as
+	// ResourceLateInitialized, which the proxy does not carry. Skipping this
+	// write would discard the identity of a live instance on every reconcile
+	// and let the NotExisting leg create a duplicate.
+	data := e.tfClient.QueryAsyncData(ctx)
+	if data == nil {
+		if recErr := e.recoverExternalNameFromTfState(ctx, cr); recErr != nil {
+			return managed.ExternalObservation{}, recErr
+		}
 	}
 
 	//Check for failed async operations ONCE, before the switch
@@ -229,9 +248,6 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			Diff:              diff,
 		}, nil
 	case tfClient.UpToDate:
-
-		data := e.tfClient.QueryAsyncData(ctx)
-
 		if data != nil {
 			// since its an async resource, we need to save the external-name in the observe()
 			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
@@ -367,6 +383,45 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceIns
 	log.FromContext(ctx).Info("recovered existing BTP service instance by external-name", "guid", guid, "name", name)
 	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
 		fmt.Sprintf("Recovered existing BTP service instance %s (semantic key: name=%s, created_at=%s)", guid, name, createdAt.Format(time.RFC3339))))
+	return recovery.ErrRequeueAfterRecovery
+}
+
+// recoverExternalNameFromTfState persists an external-name that upjet learned
+// from the Terraform state while ours is still a fallback. That happens when a
+// create fails after BTP created the instance: upjet keeps the GUID in the
+// partial state and stamps the mapped resource, but QueryAsyncData's gate stays
+// shut, so this is the only path carrying the identity to the CR.
+//
+// Guards: only a fallback external-name is filled in, so an adopted GUID is
+// never overwritten; and only a UUID is accepted, which is defence in depth
+// since upjet's GetExternalNameFn errors rather than returning the
+// "NOT_EMPTY_GUID" placeholder.
+//
+// Returns recovery.ErrRequeueAfterRecovery for the same reason healExternalName
+// does: the Terraform client captured the fallback external-name at Connect()
+// time, so no CRUD call may run this cycle against the identity just learned.
+func (e *external) recoverExternalNameFromTfState(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
+	if !recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
+		return nil
+	}
+	tfResource := e.tfClient.GetTfResource()
+	if tfResource == nil {
+		return nil
+	}
+	recovered := meta.GetExternalName(tfResource)
+	if recovered == "" || recovered == meta.GetExternalName(cr) || !isValidUUID(recovered) {
+		return nil
+	}
+
+	meta.SetExternalName(cr, recovered)
+	if uErr := e.kube.Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, errRecoverExternalName)
+	}
+
+	log.FromContext(ctx).Info("recovered instance identity from terraform state",
+		"guid", recovered, "name", cr.Spec.ForProvider.Name)
+	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
+		fmt.Sprintf("Recovered instance identity %s from the terraform state left by an interrupted create", recovered)))
 	return recovery.ErrRequeueAfterRecovery
 }
 

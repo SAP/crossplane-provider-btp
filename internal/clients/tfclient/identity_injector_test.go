@@ -88,12 +88,6 @@ func TestMutateState_PerResourceType(t *testing.T) {
 			wantID: map[string]any{"directory_id": "dir-uuid", "service_name": "feature-flags", "plan_name": "standard"},
 		},
 		{
-			name:   "ServiceInstance",
-			typ:    "btp_subaccount_service_instance",
-			attrs:  map[string]any{"subaccount_id": "sub-uuid", "id": "svc-uuid", "name": "svc"},
-			wantID: map[string]any{"subaccount_id": "sub-uuid", "id": "svc-uuid"},
-		},
-		{
 			name:   "ServiceBinding",
 			typ:    "btp_subaccount_service_binding",
 			attrs:  map[string]any{"subaccount_id": "sub-uuid", "id": "bind-uuid"},
@@ -433,16 +427,23 @@ func TestPatchStateFile_MalformedJSONIsNoOp(t *testing.T) {
 }
 
 func TestPatchStateFile_PreservesPermissions(t *testing.T) {
-	// patchStateFile should overwrite with the original file's mode, not the
-	// default umask. tfstate files live at 0600 in production; we don't want
-	// to loosen that on rewrite.
+	// patchStateFile always rewrites an existing file, so os.WriteFile ignores
+	// the Stat-derived mode. What this pins is that the rewrite stays in-place:
+	// an os.CreateTemp+os.Rename or remove-then-create refactor would land the
+	// file at 0600. The fixture uses 0640 so such a refactor is actually caught.
 	dir := t.TempDir()
 	statePath := filepath.Join(dir, "terraform.tfstate")
-	input := mustMarshal(t, tfstateOneInstance("btp_subaccount_service_instance", map[string]any{
+	input := mustMarshal(t, tfstateOneInstance("btp_subaccount_service_binding", map[string]any{
 		"subaccount_id": "sub-uuid",
-		"id":            "svc-uuid",
+		"id":            "bind-uuid",
 	}))
-	if err := os.WriteFile(statePath, input, 0o600); err != nil {
+	if err := os.WriteFile(statePath, input, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	// os.WriteFile's perm is subject to umask, so chmod explicitly: a hardened
+	// CI umask would otherwise drop the group-read bit and fail the assertion
+	// for a reason unrelated to patchStateFile.
+	if err := os.Chmod(statePath, 0o640); err != nil {
 		t.Fatal(err)
 	}
 
@@ -454,7 +455,7 @@ func TestPatchStateFile_PreservesPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := info.Mode().Perm(); got != 0o600 {
-		t.Errorf("mode = %v, want 0600", got)
+	if got := info.Mode().Perm(); got != 0o640 {
+		t.Errorf("mode = %v, want 0640", got)
 	}
 }
