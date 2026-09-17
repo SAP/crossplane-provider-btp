@@ -2,7 +2,15 @@
 #
 # Approval is handled in the calling job.
 #
-# Environment variables/secrets that are needed
+# Environment variables/secrets that are needed depend on which repo is
+# running the workflow. The secrets from the other repo will just be set to empty.
+#
+# The env vars to be set unfortunately need to be hardcoded in the ENV section of this workflow.
+# The only alternative to this would be a central JSON with base64 encoded secrets.
+# However, since the secrets are stored in GH environment secrets, which do not allow reading or
+# editing, maintaining this is extremely difficult, so this ugly solution was chosen.
+#
+# For BTP:
 # CLI_SERVER_URL contains the CLI server URL
 # GLOBAL_ACCOUNT contains the subdomain of the global account
 # IDP_URL contains the URL of an IDP that can be connected to the global account
@@ -10,6 +18,12 @@
 # CIS_CENTRAL_BINDING contents from the service binding of a `cis-central` service
 # BTP_TECHNICAL_USER
 # TECHNICAL_USER_EMAIL contains the email of the BTP_TECHNICAL_USER
+#
+# For CF:
+# CF_CREDENTIALS
+# CF_ENVIRONMENT
+
+#
 # More information in the README.md
 
 name: E2E Tests
@@ -415,6 +429,7 @@ jobs:
           done
           exit "$rc"
         env:
+          # secrets list for BTP
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
@@ -422,6 +437,9 @@ jobs:
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
           IDP_URL: ${{ secrets.IDP_URL }}
+          # secrets list for CF
+          CF_CREDENTIALS: ${{ secrets.CF_CREDENTIALS }}
+          CF_ENVIRONMENT: ${{ secrets.CF_ENVIRONMENT }}
 
       - name: Upload test logs
         if: always()
@@ -464,10 +482,14 @@ jobs:
         run: |
           go run .github/workflows/cleanup.go
         env:
+          # secrets list for BTP
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
           CLI_SERVER_URL: ${{ secrets.CLI_SERVER_URL }}
           GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
+          # secrets list for CF
+          CF_CREDENTIALS: ${{ secrets.CF_CREDENTIALS }}
+          CF_ENVIRONMENT: ${{ secrets.CF_ENVIRONMENT }}
 
   # required for test matrix status reporting. Ignores cleanup-e2e job failure/success.
   e2e-status:
