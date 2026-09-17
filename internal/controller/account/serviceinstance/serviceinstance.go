@@ -294,17 +294,22 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateInstance)
 	}
 
-	// Async create returned the new GUID: persist it as external-name (the
-	// crossplane reconciler won't update spec and status in one loop).
+	// Async create returned the new GUID: set it as external-name. The crossplane
+	// reconciler persists external-name via UpdateCriticalAnnotations immediately
+	// after Create returns, so we must NOT call client.Update here: a plain Update
+	// does not write the status subresource (enabled on this CRD) and would decode
+	// the server's empty status back onto the CR, clobbering the pending-op fields
+	// recorded below.
 	meta.SetExternalName(cr, id)
 
 	// Record the pending operation so Observe can promote the snapshot once it
-	// succeeds (and discard if it fails).
+	// succeeds (and discard if it fails). Persist it via the status subresource;
+	// external-name is persisted separately by the reconciler.
 	if err := e.recordPendingOp(cr, opID, params); err != nil {
 		log.FromContext(ctx).Error(err, "failed to record pending create op; snapshot will be absent until next update")
 	}
 
-	if err := e.kube.Update(ctx, cr); err != nil {
+	if err := e.kube.Status().Update(ctx, cr); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateInstance)
 	}
 

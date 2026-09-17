@@ -423,6 +423,7 @@ func TestCreate(t *testing.T) {
 		err            error
 		externalName   string
 		wantCreateCall bool
+		pendingOpID    string
 	}
 
 	cases := map[string]struct {
@@ -433,9 +434,9 @@ func TestCreate(t *testing.T) {
 	}{
 		"HappyPath_SetsExternalName": {
 			reason: "should set external-name from the created GUID and set Creating",
-			fields: fields{client: &nativeClientMock{createID: validUUID}},
+			fields: fields{client: &nativeClientMock{createID: validUUID, createOpID: "op-1"}},
 			args:   args{mg: siWithName("inst-1")},
-			want:   want{externalName: validUUID, wantCreateCall: true},
+			want:   want{externalName: validUUID, wantCreateCall: true, pendingOpID: "op-1"},
 		},
 		"ApiError_LeavesFallbackExternalName": {
 			reason: "on create error external-name must stay fallback (unset)",
@@ -455,7 +456,7 @@ func TestCreate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := external{
 				client: tc.fields.client,
-				kube:   &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+				kube:   &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
 			}
 			_, err := e.Create(context.Background(), tc.args.mg)
 			expectedErrorBehaviour(t, tc.want.err, err)
@@ -470,6 +471,9 @@ func TestCreate(t *testing.T) {
 			}
 			if got := meta.GetExternalName(cr); got != tc.want.externalName {
 				t.Errorf("\n%s\nexternal-name=%q, want %q", tc.reason, got, tc.want.externalName)
+			}
+			if got := cr.Status.AtProvider.PendingOperationID; got != tc.want.pendingOpID {
+				t.Errorf("\n%s\npendingOpID=%q, want %q", tc.reason, got, tc.want.pendingOpID)
 			}
 			if creating := cr.GetCondition(xpv1.TypeReady); creating.Reason != xpv1.ReasonCreating {
 				t.Errorf("\n%s\nexpected Creating condition, got %+v", tc.reason, creating)
