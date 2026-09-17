@@ -73,8 +73,7 @@
         "/(^|/)config.yml$/"
       ],
       "matchStrings": [
-        "(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)",
-        "TERRAFORM_NATIVE_PROVIDER_BINARY *\\?= *terraform-provider-btp_v(?<currentValue>\\d+\\.\\d+\\.\\d+)_x5"
+        "(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
       "datasourceTemplate": "terraform-provider",
       "versioningTemplate": "hashicorp",

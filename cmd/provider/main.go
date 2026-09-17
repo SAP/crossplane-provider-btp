@@ -8,7 +8,6 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
-	"github.com/crossplane/upjet/v2/pkg/terraform"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/config"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
@@ -61,20 +60,7 @@ func main() {
 		).Default("60s").Duration()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
-
-		terraformVersion = app.Flag("terraform-version", "Terraform version.").Required().Envar("TERRAFORM_VERSION").String()
-		providerSource   = app.Flag("terraform-provider-source", "Terraform provider source.").Required().Envar("TERRAFORM_PROVIDER_SOURCE").String()
-		providerVersion  = app.Flag("terraform-provider-version", "Terraform provider version.").Required().Envar("TERRAFORM_PROVIDER_VERSION").String()
 	)
-
-	tfclient.TF_VERSION_CALLBACK = func() tfclient.TfEnvVersion {
-		return tfclient.TfEnvVersion{
-			Version:         *terraformVersion,
-			Providerversion: *providerVersion,
-			ProviderSource:  *providerSource,
-			DebugLogs:       *debug,
-		}
-	}
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 
@@ -112,13 +98,13 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
-	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, backoffBase, backoffMax, enableManagementPolicies, terraformVersion, providerSource, providerVersion)
+	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, backoffBase, backoffMax, enableManagementPolicies)
 	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, backoffBase, backoffMax, enableManagementPolicies)
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
 
-func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool, terraformVersion *string, providerSource *string, providerVersion *string) {
+func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	o := internalopts.UpjetOptions{
 		Options: tjcontroller.Options{
 			Options: controller.Options{
@@ -128,12 +114,9 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 				MaxConcurrentReconciles: 1,
 				Features:                &feature.Flags{},
 			},
-			Provider: config.GetProvider(),
-			// use the following WorkspaceStoreOption to enable the shared gRPC mode
-			// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
-			WorkspaceStore:        terraform.NewWorkspaceStore(log),
+			Provider:              config.GetProvider(),
 			OperationTrackerStore: tjcontroller.NewOperationStore(log),
-			SetupFn:               tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
+			SetupFn:               tfclient.TerraformSetupBuilder(),
 		},
 		BackoffBase: *backoffBase,
 		BackoffMax:  *backoffMax,

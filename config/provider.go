@@ -43,7 +43,7 @@ func GetProvider() *ujconfig.Provider {
 
 	pc := ujconfig.NewProvider([]byte(providerSchema), resourcePrefix, modulePath, []byte(providerMetadata),
 		ujconfig.WithRootGroup("btp.sap.crossplane.io"),
-		ujconfig.WithIncludeList(CLIReconciledResourceList()),
+		ujconfig.WithIncludeList([]string{}), // no cli-path (fork) resources
 		ujconfig.WithTerraformPluginFrameworkIncludeList(TerraformPluginFrameworkReconciledResourceList()),
 		ujconfig.WithTerraformPluginFrameworkProvider(tfPluginFrameworkProvider),
 		ujconfig.WithFeaturesPackage("internal/features"),
