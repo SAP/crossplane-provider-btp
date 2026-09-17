@@ -48,8 +48,8 @@ type ServiceBindingClient struct {
 	ssb      *v1alpha1.SubaccountServiceBinding
 }
 
-func NewServiceBindingClient(ctx context.Context, kube client.Client, tfConnector TfConnector, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string, markForDeletion bool) (*ServiceBindingClient, error) {
-	subaccountServiceBinding, err := buildSubaccountServiceBinding(ctx, kube, cr, targetName, targetExternalName, markForDeletion)
+func NewServiceBindingClient(ctx context.Context, kube client.Client, tfConnector TfConnector, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) (*ServiceBindingClient, error) {
+	subaccountServiceBinding, err := buildSubaccountServiceBinding(ctx, kube, cr, targetName, targetExternalName)
 	if err != nil {
 		return nil, err
 	}
@@ -66,13 +66,11 @@ func NewServiceBindingClient(ctx context.Context, kube client.Client, tfConnecto
 }
 
 func (m *ServiceBindingClient) Create(ctx context.Context) (string, managed.ExternalCreation, error) {
-	// use a random name once for the creation. Afterwards, the external name sets a
-	// reasonable name. This means that when observing the resource for the first time after
-	// creating, another store for this resource will be created. This will create a dangling
-	// TF workspace, but this way no new name collisions will occur.
-	// instanceUID := GenerateInstanceUID(m.ssb.UID, GenerateRandomName(*m.ssb.Spec.ForProvider.Name))
-	//
-	// m.ssb.SetUID(instanceUID)
+	// The no-fork upjet client caches its plan in Observe; Create reads that
+	// cached plan, so prime it here before creating.
+	if _, err := m.tfClient.Observe(ctx, m.ssb); err != nil {
+		return "", managed.ExternalCreation{}, errors.Wrap(err, errObserveTfResource)
+	}
 
 	creation, err := m.tfClient.Create(ctx, m.ssb)
 	if err != nil {
@@ -110,12 +108,7 @@ func (m *ServiceBindingClient) Observe(ctx context.Context) (managed.ExternalObs
 }
 
 // buildSubaccountServiceBinding creates a SubaccountServiceBinding resource from a ServiceBinding.
-//
-// markForDeletion controls whether the built resource carries a DeletionTimestamp
-// (i.e. whether meta.WasDeleted reports true when upjet materialises the
-// workspace). It must NOT be inherited from the public CR's own
-// DeletionTimestamp: Upjet doesnt refresh the workspace for this resource if meta.WasDeleted is true. Resoluting in a leaked external service binding if the TF workspace was not refreshed otherwise before (like during the create).
-func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *v1alpha1.ServiceBinding, name string, externalName string, markForDeletion bool) (*v1alpha1.SubaccountServiceBinding, error) {
+func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *v1alpha1.ServiceBinding, name string, externalName string) (*v1alpha1.SubaccountServiceBinding, error) {
 
 	parameterJson, err := instanceClient.BuildComplexParameterJson(ctx, kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters.Raw)
 	if err != nil {
@@ -124,20 +117,14 @@ func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *
 
 	targetUID := GenerateInstanceUID(sb.UID, externalName)
 
-	var deletionTimestamp *metav1.Time
-	if markForDeletion {
-		deletionTimestamp = internal.Ptr(metav1.Now())
-	}
-
 	sBinding := &v1alpha1.SubaccountServiceBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha1.SubaccountServiceBinding_Kind,
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			UID:               targetUID,
-			DeletionTimestamp: deletionTimestamp,
+			Name: name,
+			UID:  targetUID,
 		},
 		Spec: v1alpha1.SubaccountServiceBindingSpec{
 			ResourceSpec: xpv1.ResourceSpec{
