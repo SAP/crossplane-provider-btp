@@ -32,23 +32,6 @@ on:
         default: ''
         required: false
         type: string
-  workflow_dispatch:
-    inputs:
-      checkout-ref:
-        description: 'the ref for the repo checkout step (defaults to the dispatched ref when empty)'
-        default: ''
-        required: false
-        type: string
-      skip:
-        description: 'skip all jobs (e.g. for doc-only changes); workflow jobs still runs to satisfy branch protection'
-        default: false
-        required: false
-        type: boolean
-      concurrency-group:
-        description: 'concurrency group for the workflow run (defaults to the workflow run number, for parallel execution)'
-        default: ''
-        required: false
-        type: string
 
 permissions:
   contents: read
