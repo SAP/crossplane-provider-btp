@@ -23,7 +23,7 @@ import (
 // Per-key verdicts:
 //
 //	desired present, observed present   -> drift iff values differ (exact value compare)
-//	desired present, observed absent    -> no drift (redaction-safe)
+//	desired present, observed absent    -> drift (spec key not yet applied to BTP)
 //	desired absent, lastApplied present, observed present -> drift (user removed key)
 //	desired absent, lastApplied absent, observed present  -> no drift (BTP extra)
 //	desired absent, lastApplied present, observed absent  -> no drift (already converged)
@@ -47,9 +47,11 @@ func driftAtMap(path string, desired, lastApplied, observed map[string]interface
 		if dOK {
 			// Desired has this key.
 			if !oOK {
-				// Observed absent: redaction-safe -> no drift (a redacted /
-				// write-only param that BTP omits must not read as drift).
-				continue
+				// Observed absent: the user put this key in spec but BTP does not
+				// hold it (e.g. a newly added parameter that was never applied).
+				// Report drift so it gets pushed; converges once the PATCH lands
+				// and BTP echoes the key back on the next observe.
+				return true, fmt.Sprintf("%s: present in spec but not present in Service Manager", child)
 			}
 			if drift, diff := valueDrift(child, d, l, o); drift {
 				return true, diff

@@ -49,12 +49,6 @@ func TestParameterDrift(t *testing.T) {
 			observed:    m("foo", "bar", "btp_extra", "value"),
 			wantDrift:   false,
 		},
-		"desired present, observed absent (redaction-safe)": {
-			desired:     m("secret", "pass"),
-			lastApplied: nil,
-			observed:    m(),
-			wantDrift:   false,
-		},
 		"desired absent, last-applied absent, observed present = BTP extra": {
 			desired:     m("foo", "bar"),
 			lastApplied: m("foo", "bar"),
@@ -104,6 +98,24 @@ func TestParameterDrift(t *testing.T) {
 			desired:     m("foo", "new"),
 			lastApplied: m("foo", "old"),
 			observed:    m("foo", "old"),
+			wantDrift:   true,
+		},
+		"new top-level key added to spec, not yet in BTP": {
+			desired:     m("foo", "bar", "added", "value"),
+			lastApplied: m("foo", "bar"),
+			observed:    m("foo", "bar"),
+			wantDrift:   true,
+		},
+		"new nested key added to spec, not yet in BTP": {
+			desired:     m("cfg", m("a", 1.0, "added", "value")),
+			lastApplied: m("cfg", m("a", 1.0)),
+			observed:    m("cfg", m("a", 1.0)),
+			wantDrift:   true,
+		},
+		"spec key never applied and absent in BTP": {
+			desired:     m("dashboard", m("custom_label", "test")),
+			lastApplied: nil,
+			observed:    m(),
 			wantDrift:   true,
 		},
 		"BTP value mutated (desired==last-applied != observed)": {
