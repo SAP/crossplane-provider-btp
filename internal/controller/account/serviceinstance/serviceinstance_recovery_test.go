@@ -49,6 +49,19 @@ type lookuperFake struct {
 	siErr       error
 	gotName     string
 	calls       int
+
+	// GetInstanceParameters behaviour
+	paramsResult map[string]any
+	paramsFound  bool
+	paramsErr    error
+	paramsGUID   string
+	paramsCalls  int
+
+	// UpdateInstanceParameters behaviour
+	updateErr     error
+	updateGUID    string
+	updatePayload []byte
+	updateCalls   int
 }
 
 func (l *lookuperFake) LookupServiceInstance(ctx context.Context, name string) (string, time.Time, bool, error) {
@@ -63,6 +76,19 @@ func (l *lookuperFake) LookupServiceBinding(ctx context.Context, serviceInstance
 
 func (l *lookuperFake) LookupInstanceAndBinding(ctx context.Context, planID, instanceName, bindingName string) (string, string, time.Time, bool, error) {
 	return "", "", time.Time{}, false, nil
+}
+
+func (l *lookuperFake) GetInstanceParameters(ctx context.Context, serviceInstanceID string) (map[string]any, bool, error) {
+	l.paramsCalls++
+	l.paramsGUID = serviceInstanceID
+	return l.paramsResult, l.paramsFound, l.paramsErr
+}
+
+func (l *lookuperFake) UpdateInstanceParameters(ctx context.Context, serviceInstanceID string, desiredParamsJSON []byte) error {
+	l.updateCalls++
+	l.updateGUID = serviceInstanceID
+	l.updatePayload = desiredParamsJSON
+	return l.updateErr
 }
 
 func mkFactory(lk *lookuperFake) func(context.Context, *v1alpha1.ServiceInstance) (smClient.SemanticLookuper, func(), error) {
