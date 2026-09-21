@@ -43,6 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ${{ (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR') && 'pr-e2e-no-approval' || 'pr-e2e-approval' }}
+      deployment: false
     steps:
       - run: echo "Approved"
   run-e2e-test:
