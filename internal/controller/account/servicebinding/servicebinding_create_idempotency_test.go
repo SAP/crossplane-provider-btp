@@ -41,10 +41,13 @@ func TestCreate_Idempotency(t *testing.T) {
 		var updates int
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
-			kube: &test.MockClient{MockUpdate: func(_ context.Context, _ kubeclient.Object, _ ...kubeclient.UpdateOption) error {
-				updates++
-				return nil
-			}},
+			kube: &test.MockClient{
+				MockUpdate: func(_ context.Context, _ kubeclient.Object, _ ...kubeclient.UpdateOption) error {
+					updates++
+					return nil
+				},
+				MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+			},
 			clientFactory: factory,
 			// no lookuper: with newAdminLookuperFn nil, lookupOwnedBinding is a
 			// no-op returning (‑, false, nil) so a create proceeds.
@@ -82,7 +85,7 @@ func TestCreate_Idempotency(t *testing.T) {
 
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
-			kube:          &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			kube:          &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
 			clientFactory: factory,
 			// A different generator suffix would be a bug if used; assert it is NOT.
 			nameGenerator: func(base string) string { return base + "-SHOULD-NOT-USE" },
