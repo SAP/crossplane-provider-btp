@@ -285,6 +285,17 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
+	// A rotated name carries a random suffix. Persist it to status.atProvider.name so
+	// the next Connect reuses this generation's name instead of regenerating one.
+	if e.isRotationEnabled(cr) {
+		if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) error {
+			cr.Status.AtProvider.Name = name
+			return nil
+		}); err != nil {
+			return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
+		}
+	}
+
 	creation.ConnectionDetails, err = processConnectionDetails(cr, creation.ConnectionDetails)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errFlattenSecret)
