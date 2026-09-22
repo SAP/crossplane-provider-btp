@@ -41,10 +41,13 @@ func TestCreate_Idempotency(t *testing.T) {
 		var updates int
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
-			kube: &test.MockClient{MockUpdate: func(_ context.Context, _ kubeclient.Object, _ ...kubeclient.UpdateOption) error {
-				updates++
-				return nil
-			}},
+			kube: &test.MockClient{
+				MockUpdate: func(_ context.Context, _ kubeclient.Object, _ ...kubeclient.UpdateOption) error {
+					updates++
+					return nil
+				},
+				MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+			},
 			clientFactory: factory,
 			// no lookuper: with newAdminLookuperFn nil, lookupOwnedBinding is a
 			// no-op returning (‑, false, nil) so a create proceeds.
@@ -82,7 +85,7 @@ func TestCreate_Idempotency(t *testing.T) {
 
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
-			kube:          &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			kube:          &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
 			clientFactory: factory,
 			// A different generator suffix would be a bug if used; assert it is NOT.
 			nameGenerator: func(base string) string { return base + "-SHOULD-NOT-USE" },
@@ -106,7 +109,7 @@ func TestCreate_Idempotency(t *testing.T) {
 		lk := &sbLookuperFake{guid: adoptGUID, createdAt: createPendingAtSB.Add(2 * time.Second), found: true}
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
-			kube:               &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			kube:               &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
 			clientFactory:      factory,
 			newAdminLookuperFn: sbFactory(lk),
 			nameGenerator:      func(base string) string { return base + "-fixed1" },
@@ -131,6 +134,9 @@ func TestCreate_Idempotency(t *testing.T) {
 		if _, ok := cr.GetAnnotations()[servicebindingclient.PendingBindingNameKey]; ok {
 			t.Errorf("pending-name annotation must be cleared after adoption")
 		}
+		if got := cr.Status.AtProvider.Name; got != "test-binding-prior" {
+			t.Errorf("status.atProvider.name = %q, want the committed test-binding-prior", got)
+		}
 	})
 
 	t.Run("lookup error aborts before creating (no duplicate)", func(t *testing.T) {
@@ -140,7 +146,7 @@ func TestCreate_Idempotency(t *testing.T) {
 		lk := &sbLookuperFake{err: errors.New("SM unavailable")}
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
-			kube:               &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			kube:               &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
 			clientFactory:      factory,
 			newAdminLookuperFn: sbFactory(lk),
 			nameGenerator:      func(base string) string { return base + "-fixed1" },
@@ -167,7 +173,7 @@ func TestCreate_Idempotency(t *testing.T) {
 		lk := &sbLookuperFake{guid: adoptGUID, createdAt: createPendingAtSB.Add(-time.Hour), found: true}
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
-			kube:               &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			kube:               &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
 			clientFactory:      factory,
 			newAdminLookuperFn: sbFactory(lk),
 			nameGenerator:      func(base string) string { return base + "-fixed1" },

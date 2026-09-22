@@ -1319,6 +1319,52 @@ func TestCreate(t *testing.T) {
 				),
 			},
 		},
+		"SuccessWithRotationPersistsName": {
+			reason: "on a successful rotated create the suffixed name is persisted to status.atProvider.name",
+			fields: fields{
+				clientFactory: &MockServiceBindingClientFactory{
+					Client: &MockServiceBindingClient{
+						creation: managed.ExternalCreation{
+							ConnectionDetails: managed.ConnectionDetails{
+								"test-key": []byte("test-value"),
+							},
+						},
+					},
+				},
+				keyRotator: &MockKeyRotator{},
+				kube: &test.MockClient{
+					MockUpdate:       test.NewMockUpdateFn(nil),
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+				},
+			},
+			args: args{
+				mg: expectedServiceBinding(
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.Name = "test-binding"
+						cr.Spec.Rotation = &v1alpha1.RotationParameters{
+							Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 24},
+						}
+					},
+				),
+			},
+			want: want{
+				err: nil,
+				cr: expectedServiceBinding(
+					withMetadata("12345678-1234-5678-9abc-123456789012", map[string]string{
+						"crossplane.io/external-name": "12345678-1234-5678-9abc-123456789012",
+					}),
+					withConditions(xpv1.Creating()),
+					func(cr *v1alpha1.ServiceBinding) {
+						cr.Spec.ForProvider.Name = "test-binding"
+						cr.Spec.Rotation = &v1alpha1.RotationParameters{
+							Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 24},
+						}
+						// The rotated name (base + deterministic suffix) is persisted to status.
+						cr.Status.AtProvider.Name = "test-binding-fixed1"
+					},
+				),
+			},
+		},
 		"SuccessWithRotation": {
 			reason: "should create successfully when rotation is enabled",
 			fields: fields{
@@ -1334,7 +1380,8 @@ func TestCreate(t *testing.T) {
 				},
 				keyRotator: &MockKeyRotator{},
 				kube: &test.MockClient{
-					MockUpdate: test.NewMockUpdateFn(nil),
+					MockUpdate:       test.NewMockUpdateFn(nil),
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 			},
 			args: args{
@@ -1366,9 +1413,10 @@ func TestCreate(t *testing.T) {
 						cr.Spec.Rotation = &v1alpha1.RotationParameters{
 							Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 24},
 						}
-						// Status should be preserved when create fails
+						// commitCreateName persists the freshly committed rotation name to status
+						// before the factory error aborts the create; the stale old name is replaced.
 						cr.Status.AtProvider.ID = "old-binding-id"
-						cr.Status.AtProvider.Name = "test-binding-old123"
+						cr.Status.AtProvider.Name = "test-binding-fixed1"
 						cr.Status.AtProvider.State = internal.Ptr("succeeded")
 						cr.Status.AtProvider.Ready = internal.Ptr(true)
 						// Other fields remain as they were
