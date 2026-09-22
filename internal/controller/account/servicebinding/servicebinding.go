@@ -249,11 +249,11 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.SetConditions(xpv1.Creating())
 
-	// Resolve the BTP binding name for this Create attempt. resolveCreateName also performs the
-	// lookup-before-create: if a binding under the committed name already exists
-	// and is ours, it is adopted and adopted=true is returned so we skip the
-	// create entirely.
-	name, adopted, err := e.resolveCreateName(ctx, cr)
+	// Resolve the BTP binding name for this Create attempt and persist it durably.
+	// commitCreateName also performs the lookup-before-create: if a binding under the
+	// committed name already exists and is ours, it is adopted and adopted=true is
+	// returned so we skip the create entirely.
+	name, adopted, err := e.commitCreateName(ctx, cr)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
@@ -272,17 +272,6 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	externalName, creation, err := client.Create(ctx)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
-	}
-
-	// The rotated name carries a random suffix and the pending annotation is cleared above.
-	// Persist it to status.atProvider.name, the only durable record Connect and the key rotator read.
-	if e.isRotationEnabled(cr) {
-		if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) error {
-			cr.Status.AtProvider.Name = name
-			return nil
-		}); err != nil {
-			return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
-		}
 	}
 
 	meta.SetExternalName(cr, externalName)
@@ -311,7 +300,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	return creation, nil
 }
 
-// resolveCreateName decides the BTP binding name for the current Create attempt
+// commitCreateName decides the BTP binding name for the current Create attempt
 // and makes that decision durable and idempotent across retries.
 //
 // It returns (name, adopted, err):
@@ -328,11 +317,13 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 //     PendingBindingNameKey annotation if present; otherwise a fresh name is
 //     generated and persisted BEFORE any external call. Persisting first guarantees a
 //     retried Create reuses the same name.
-//  3. With a committed name in hand, a lookup-before-create adopts an existing
+//  3. The committed name is persisted to status.atProvider.name, the durable record
+//     Connect and the key rotator read after create.
+//  4. With a committed name in hand, a lookup-before-create adopts an existing
 //     owned binding of that name (the previous attempt succeeded but lost its
 //     result). Lookup errors are propagated so we retry rather than risk a
 //     duplicate create.
-func (e *external) resolveCreateName(ctx context.Context, cr *v1alpha1.ServiceBinding) (string, bool, error) {
+func (e *external) commitCreateName(ctx context.Context, cr *v1alpha1.ServiceBinding) (string, bool, error) {
 	if !e.isRotationEnabled(cr) {
 		return cr.Spec.ForProvider.Name, false, nil
 	}
@@ -345,6 +336,16 @@ func (e *external) resolveCreateName(ctx context.Context, cr *v1alpha1.ServiceBi
 		if err := e.kube.Update(ctx, cr); err != nil {
 			return "", false, errors.Wrap(err, errCommitName)
 		}
+	}
+
+	// Persist the committed name to status.atProvider.name while the annotation still holds it.
+	// The adoption branch below clears the annotation, so status is the only durable record left
+	// for Connect and the key rotator. Written here, one reconcile before Observe would write it.
+	if err := reconcilerutil.UpdateStatusWithRetry(ctx, e.kube, cr, 3, func(cr *v1alpha1.ServiceBinding) error {
+		cr.Status.AtProvider.Name = name
+		return nil
+	}); err != nil {
+		return "", false, errors.Wrap(err, errUpdateStatus)
 	}
 
 	// The committed pending name carries a random suffix we generated and

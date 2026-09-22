@@ -1380,7 +1380,8 @@ func TestCreate(t *testing.T) {
 				},
 				keyRotator: &MockKeyRotator{},
 				kube: &test.MockClient{
-					MockUpdate: test.NewMockUpdateFn(nil),
+					MockUpdate:       test.NewMockUpdateFn(nil),
+					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 			},
 			args: args{
@@ -1412,9 +1413,10 @@ func TestCreate(t *testing.T) {
 						cr.Spec.Rotation = &v1alpha1.RotationParameters{
 							Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 24},
 						}
-						// Status should be preserved when create fails
+						// commitCreateName persists the freshly committed rotation name to status
+						// before the factory error aborts the create; the stale old name is replaced.
 						cr.Status.AtProvider.ID = "old-binding-id"
-						cr.Status.AtProvider.Name = "test-binding-old123"
+						cr.Status.AtProvider.Name = "test-binding-fixed1"
 						cr.Status.AtProvider.State = internal.Ptr("succeeded")
 						cr.Status.AtProvider.Ready = internal.Ptr(true)
 						// Other fields remain as they were
