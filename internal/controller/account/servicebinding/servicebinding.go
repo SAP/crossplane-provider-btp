@@ -274,17 +274,6 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
-	meta.SetExternalName(cr, externalName)
-	// Clear the pending-name and force-rotation markers atomically with
-	// persisting external-name: once external-name is durable the create result
-	// is recorded, so the next reconcile must NOT regenerate a name.
-	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey, servicebindingclient.PendingBindingNameKey)
-
-	// Call the kube client to update the external-name and clear the annotations
-	if err := e.kube.Update(ctx, cr); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
-	}
-
 	// The rotated name carries a random suffix and the pending annotation is cleared above.
 	// Persist it to status.atProvider.name, the only durable record Connect and the key rotator read.
 	if e.isRotationEnabled(cr) {
@@ -294,6 +283,17 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		}); err != nil {
 			return managed.ExternalCreation{}, errors.Wrap(err, errUpdateStatus)
 		}
+	}
+
+	meta.SetExternalName(cr, externalName)
+	// Clear the pending-name and force-rotation markers atomically with
+	// persisting external-name: once external-name is durable the create result
+	// is recorded, so the next reconcile must NOT regenerate a name.
+	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey, servicebindingclient.PendingBindingNameKey)
+
+	// Call the kube client to update the external-name and clear the annotations
+	if err := e.kube.Update(ctx, cr); err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
 	creation.ConnectionDetails, err = processConnectionDetails(cr, creation.ConnectionDetails)
