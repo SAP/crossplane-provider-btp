@@ -274,14 +274,16 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
+	// Persist via a MergeFrom patch rather than Update: the patch can't 409 on a
+	// stale resourceVersion, which would otherwise fail Create() and deadlock the
+	// resource with "cannot determine creation result".
+	base := cr.DeepCopy()
 	meta.SetExternalName(cr, externalName)
 	// Clear the pending-name and force-rotation markers atomically with
 	// persisting external-name: once external-name is durable the create result
 	// is recorded, so the next reconcile must NOT regenerate a name.
 	meta.RemoveAnnotations(cr, servicebindingclient.ForceRotationKey, servicebindingclient.PendingBindingNameKey)
-
-	// Call the kube client to update the external-name and clear the annotations
-	if err := e.kube.Update(ctx, cr); err != nil {
+	if err := e.kube.Patch(ctx, cr, kubeclient.MergeFrom(base)); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateBinding)
 	}
 
