@@ -38,12 +38,16 @@ func TestCreate_Idempotency(t *testing.T) {
 
 	t.Run("commits pending name before SM create and clears it after", func(t *testing.T) {
 		cr := sbRotating("sb-1", "si-1", "test-binding")
-		var updates int
+		var updates, patches int
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
 			kube: &test.MockClient{
 				MockUpdate: func(_ context.Context, _ kubeclient.Object, _ ...kubeclient.UpdateOption) error {
 					updates++
+					return nil
+				},
+				MockPatch: func(_ context.Context, _ kubeclient.Object, _ kubeclient.Patch, _ ...kubeclient.PatchOption) error {
+					patches++
 					return nil
 				},
 				MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
@@ -72,9 +76,9 @@ func TestCreate_Idempotency(t *testing.T) {
 		if factory.CreateClientCalls[0].TargetName != "test-binding-fixed1" {
 			t.Errorf("SM create name = %q, want test-binding-fixed1", factory.CreateClientCalls[0].TargetName)
 		}
-		// Two persists: one committing the pending name, one recording external-name.
-		if updates != 2 {
-			t.Errorf("want 2 kube.Update calls (commit + record), got %d", updates)
+		// Commit the name before creation, then patch the result after creation.
+		if updates != 1 || patches != 1 {
+			t.Errorf("want 1 kube.Update and 1 kube.Patch, got %d updates and %d patches", updates, patches)
 		}
 	})
 
@@ -85,7 +89,7 @@ func TestCreate_Idempotency(t *testing.T) {
 
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
-			kube:          &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
+			kube:          &test.MockClient{MockPatch: test.NewMockPatchFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
 			clientFactory: factory,
 			// A different generator suffix would be a bug if used; assert it is NOT.
 			nameGenerator: func(base string) string { return base + "-SHOULD-NOT-USE" },
@@ -199,7 +203,7 @@ func TestCreate_Idempotency(t *testing.T) {
 
 		factory := &MockServiceBindingClientFactory{Client: &MockServiceBindingClient{}}
 		e := external{
-			kube:          &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			kube:          &test.MockClient{MockPatch: test.NewMockPatchFn(nil)},
 			clientFactory: factory,
 			nameGenerator: func(base string) string { return base + "-SHOULD-NOT-USE" },
 		}
