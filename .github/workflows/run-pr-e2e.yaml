@@ -33,7 +33,7 @@ concurrency:
 
 jobs:
   detect-only-doc-changes:
-    uses: ./.github/workflows/detect-only-doc-changes.lib.yaml
+    uses: SAP/crossplane-shared-workflows/.github/workflows/detect-only-doc-changes.lib.yaml@main
 
   # Approval job detects user's author association and bypasses the manual approval step for certain users.
   approve:
@@ -49,7 +49,7 @@ jobs:
   run-e2e-test:
     needs: [approve, detect-only-doc-changes]
     if: always() && (needs.approve.result == 'success' || needs.approve.result == 'skipped')
-    uses: ./.github/workflows/check-e2e-tests.lib.yaml
+    uses: SAP/crossplane-shared-workflows/.github/workflows/check-e2e-tests.lib.yaml@main
     with:
       checkout-ref: ${{ github.event.pull_request.head.sha }}
       skip: ${{ needs.detect-only-doc-changes.outputs.has-only-doc-changes == 'true' }}

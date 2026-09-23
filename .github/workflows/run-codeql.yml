@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: [ "main" ]
   schedule:
-    - cron: '15 21 * * 2'
+    - cron: '19 21 * * 2'
 
 permissions:
   security-events: write
@@ -18,4 +18,4 @@ permissions:
 
 jobs:
   run-codeql:
-    uses: ./.github/workflows/check-codeql.lib.yaml
+    uses: SAP/crossplane-shared-workflows/.github/workflows/check-codeql.lib.yaml@main
