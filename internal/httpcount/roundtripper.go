@@ -4,7 +4,6 @@
 package httpcount
 
 import (
-	"maps"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -18,18 +17,16 @@ type RoundTripper struct {
 
 	total atomic.Uint64
 
-	mu     sync.RWMutex
-	byKey  map[string]uint64 // METHOD + " " + URL.Path
-	byHost map[string]uint64
+	mu    sync.RWMutex
+	byKey map[string]uint64 // METHOD + " " + URL.Path
 }
 
 // New returns a fresh RoundTripper. Pass base = nil to wrap the default
 // transport.
 func New(base http.RoundTripper) *RoundTripper {
 	return &RoundTripper{
-		Base:   base,
-		byKey:  make(map[string]uint64),
-		byHost: make(map[string]uint64),
+		Base:  base,
+		byKey: make(map[string]uint64),
 	}
 }
 
@@ -47,11 +44,9 @@ func (r *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	r.total.Add(1)
 
 	key := req.Method + " " + req.URL.Path
-	host := req.URL.Host
 
 	r.mu.Lock()
 	r.byKey[key]++
-	r.byHost[host]++
 	r.mu.Unlock()
 
 	base := r.Base
@@ -71,29 +66,4 @@ func (r *RoundTripper) CountFor(method, path string) uint64 {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.byKey[method+" "+path]
-}
-
-// CountForHost returns the count for a specific host.
-func (r *RoundTripper) CountForHost(host string) uint64 {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.byHost[host]
-}
-
-// Snapshot returns a copy of the per-key counts.
-func (r *RoundTripper) Snapshot() map[string]uint64 {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	out := make(map[string]uint64, len(r.byKey))
-	maps.Copy(out, r.byKey)
-	return out
-}
-
-// Reset zeroes all counters. Useful between phases of a single test.
-func (r *RoundTripper) Reset() {
-	r.total.Store(0)
-	r.mu.Lock()
-	clear(r.byKey)
-	clear(r.byHost)
-	r.mu.Unlock()
 }

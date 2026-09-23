@@ -83,25 +83,6 @@ func TestRoundTripper_ConcurrentSafe(t *testing.T) {
 	r.Equal(uint64(workers*perWorker), rt.CountFor("GET", "/entitlements"))
 }
 
-// TestRoundTripper_Reset ensures Reset zeroes all counters cleanly.
-func TestRoundTripper_Reset(t *testing.T) {
-	t.Parallel()
-	r := require.New(t)
-
-	srv := newTestServer(t)
-	rt := httpcount.New(nil)
-	client := rt.Client()
-
-	resp, err := client.Get(srv.URL + "/entitlements")
-	r.NoError(err)
-	_ = resp.Body.Close()
-
-	r.Equal(uint64(1), rt.Total())
-	rt.Reset()
-	r.Equal(uint64(0), rt.Total())
-	r.Empty(rt.Snapshot())
-}
-
 // TestRoundTripper_CountsFailedRequests verifies non-2xx / transport
 // failures are still counted — "did we hit the network?" is intent.
 func TestRoundTripper_CountsFailedRequests(t *testing.T) {
@@ -122,26 +103,4 @@ func TestRoundTripper_CountsFailedRequests(t *testing.T) {
 
 	r.Equal(uint64(1), rt.Total())
 	r.Equal(uint64(1), rt.CountFor("GET", "/boom"))
-}
-
-// TestRoundTripper_Snapshot_Independence — mutating the returned map
-// must not affect internal state.
-func TestRoundTripper_Snapshot_Independence(t *testing.T) {
-	t.Parallel()
-	r := require.New(t)
-
-	srv := newTestServer(t)
-	rt := httpcount.New(nil)
-	client := rt.Client()
-
-	resp, err := client.Get(srv.URL + "/entitlements")
-	r.NoError(err)
-	_ = resp.Body.Close()
-
-	snap := rt.Snapshot()
-	snap["GET /entitlements"] = 999
-	snap["GET /forged"] = 42
-
-	r.Equal(uint64(1), rt.CountFor("GET", "/entitlements"))
-	r.Equal(uint64(0), rt.CountFor("GET", "/forged"))
 }
