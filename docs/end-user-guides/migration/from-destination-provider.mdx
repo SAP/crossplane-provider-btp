@@ -1,0 +1,209 @@
+---
+sidebar_position: 1
+---
+
+# Migrate from crossplane-provider-destinations
+
+This guide helps you migrate from the deprecated
+[`crossplane-provider-destinations`](https://github.tools.sap/cloud-orchestration/crossplane-provider-destinations)
+to the `SubaccountDestination` and `SubaccountDestinationCertificate` resources now available in
+`crossplane-provider-btp`.
+
+:::info
+`crossplane-provider-destinations` is deprecated. Its functionality has been taken over by
+`crossplane-provider-btp` as part of [Epic #282](https://github.com/SAP/crossplane-provider-btp/issues/282).
+:::
+
+## What changed
+
+### Destination resource
+
+| Aspect | `crossplane-provider-destinations` | `crossplane-provider-btp` |
+|---|---|---|
+| API group | `destination.btp.orchestrate.cloud.sap/v1alpha1` | `account.btp.sap.crossplane.io/v1alpha1` |
+| Destination Service credentials | ProviderConfig-level (`Management-url`, `Token-url`, `Client-id`, `Client-secret`) | Per-resource `spec.forProvider.destinationServiceBindingSecretRef` |
+| Destination fields (`URL`, `Authentication`, `ProxyType`, …) | Top-level fields (`url`, `authentication`, `proxyType`) | Moved into `spec.forProvider.additionalProperties` (case-sensitive, passed to the Destination Service API as-is) |
+| Sensitive properties | Flat key-value `authConfigurationSecretRef` (e.g. `User`, `Password`) | `spec.forProvider.additionalConfigurationSecretRefs` — each referenced secret value is a JSON object |
+| Subaccount binding | Encoded in ProviderConfig credentials (`Management-url` is subaccount-scoped) | Explicit `spec.forProvider.subaccountRef` |
+| External-name format | Destination name only (e.g. `my-destination`) | `<subaccount-id>/<name>` (e.g. `6aa64c2f-.../my-destination`) |
+
+### Certificate resource
+
+`crossplane-provider-destinations` has no certificate resource. `crossplane-provider-btp` adds
+`SubaccountDestinationCertificate` — see [Create a SubaccountDestinationCertificate](../account/destinations.mdx#create-a-subaccountdestinationcertificate)
+for a full walkthrough.
+
+## Prerequisites
+
+The new resources authenticate against the Destination Service using OAuth2 credentials from a
+Kubernetes `Secret`, referenced per resource. You need to set this up once per subaccount.
+
+If you have not done this yet, follow [Set up the Destination service](../account/destinations.mdx#set-up-the-destination-service)
+to create the `Entitlement`, `ServiceInstance`, and `ServiceBinding`. The binding produces the
+secret you will reference as `destinationServiceBindingSecretRef`.
+
+## Migrate a destination
+
+### Old resource
+
+```yaml title="old-destination.yaml"
+apiVersion: destination.btp.orchestrate.cloud.sap/v1alpha1
+kind: SubaccountDestination
+metadata:
+  name: my-destination
+spec:
+  forProvider:
+    name: my-destination
+    type: HTTP
+    url: https://example.com
+    authentication: NoAuthentication
+    proxyType: Internet
+    description: My destination
+  providerConfigRef:
+    name: destination-provider-config
+```
+
+### New resource
+
+The top-level destination fields (`url`, `authentication`, `proxyType`, `description`) move into
+`spec.forProvider.additionalProperties`. Field names are case-sensitive and follow the
+[Destination Service REST API](https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150?locale=en-US&version=LATEST).
+
+```yaml title="new-destination.yaml"
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: SubaccountDestination
+metadata:
+  name: my-destination
+  annotations:
+    # Set to adopt an existing BTP destination instead of creating a new one.
+    crossplane.io/external-name: 6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f/my-destination
+spec:
+  forProvider:
+    name: my-destination
+    type: HTTP
+    additionalProperties:
+      URL: https://example.com
+      Authentication: NoAuthentication
+      ProxyType: Internet
+      Description: My destination
+    subaccountRef:
+      name: my-subaccount
+    destinationServiceBindingSecretRef:
+      name: destination-binding-secret
+      namespace: crossplane-system
+      key: credentials
+  providerConfigRef:
+    name: account-provider-config
+```
+
+### Migrate sensitive properties
+
+#### BasicAuthentication
+
+The old `authConfigurationSecretRef` stored flat keys (`User`, `Password`). In the new resource,
+create a `Secret` where the key holds a JSON object with the same property names the Destination
+Service API expects.
+
+Old secret:
+
+```yaml title="old-basic-auth-secret.yaml"
+apiVersion: v1
+kind: Secret
+metadata:
+  name: basic-auth-secret
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  User: my-user
+  Password: my-password
+```
+
+New secret:
+
+```yaml title="new-basic-auth-secret.yaml"
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-destination-credentials
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  credentials: |
+    {
+      "User": "my-user",
+      "Password": "my-password"
+    }
+```
+
+Reference it via `additionalConfigurationSecretRefs`:
+
+```yaml title="new-destination.yaml (relevant excerpt)"
+spec:
+  forProvider:
+    name: my-destination
+    type: HTTP
+    additionalProperties:
+      URL: https://example.com
+      Authentication: BasicAuthentication
+      ProxyType: Internet
+    additionalConfigurationSecretRefs:
+      - name: my-destination-credentials
+        namespace: crossplane-system
+        key: credentials
+    # ...
+```
+
+#### OAuth2ClientCredentials
+
+Old secret keys (`clientId`, `clientSecret`, `tokenServiceURL`, `tokenServiceURLType`) map directly
+to Destination Service property names. Wrap them in a JSON object in the new secret:
+
+```yaml title="new-oauth-secret.yaml"
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-destination-oauth
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  credentials: |
+    {
+      "clientId": "<client-id>",
+      "clientSecret": "<client-secret>",
+      "tokenServiceURL": "https://my-token-service.example.com/oauth/token",
+      "tokenServiceURLType": "dedicated"
+    }
+```
+
+## Adopt existing resources without downtime
+
+If the destination already exists in BTP (managed by the old provider), set the
+`crossplane.io/external-name` annotation as shown above. The new provider will observe and adopt
+the existing object instead of creating a duplicate.
+
+Apply the manifest and verify the resource reaches `Available`:
+
+```sh
+kubectl apply -f new-destination.yaml
+kubectl get subaccountdestination my-destination
+```
+
+Once the Crossplane resource is `Available`, delete the old resource object from the cluster and
+uninstall the old provider:
+
+```sh
+# Delete the old managed resource without deleting the BTP destination.
+# Patch the deletion policy first so the provider does not delete the destination on removal.
+kubectl patch subaccountdestination my-destination \
+  --type merge \
+  -p '{"spec":{"deletionPolicy":"Orphan"}}' \
+  --api-version destination.btp.orchestrate.cloud.sap/v1alpha1
+kubectl delete subaccountdestination my-destination \
+  --api-version destination.btp.orchestrate.cloud.sap/v1alpha1
+```
+
+:::caution
+Always set `deletionPolicy: Orphan` on the old resource **before** deleting it. Without it, the
+old provider will attempt to delete the BTP destination when the managed resource is removed,
+breaking the new provider's management of the same object.
+:::
