@@ -91,7 +91,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gergely-szabo-sap/xp-diadromos
-          ref: 547161f4252fdf0729b3923b5892c5d4a765d941
+          ref: 46824c4140810cadb5d16ad215f28d2de93e1d38
           token: ${{ secrets.XP_DIADROMOS_RELEASE_TOKEN }}
           path: .github/actions/xp-diadromos
           persist-credentials: false
@@ -127,7 +127,7 @@ jobs:
         with:
           config: benchmarks/btp/config.yaml
           cleanup: auto
-          version: v0.7.0
+          version: v0.7.1
           provider-artifact: ${{ steps.package.outputs.path }}
           provider-image: provider:v0
           release-token: ${{ secrets.XP_DIADROMOS_RELEASE_TOKEN }}
@@ -144,7 +144,7 @@ jobs:
         uses: ./.github/actions/xp-diadromos/.github/actions/metrics-ci-report
         with:
           input: ${{ steps.test.outputs.archive }}
-          version: v0.7.0
+          version: v0.7.1
           release-token: ${{ secrets.XP_DIADROMOS_RELEASE_TOKEN }}
           artifact-name: btp-synthetic-benchmark-reports
           retention-days: 7

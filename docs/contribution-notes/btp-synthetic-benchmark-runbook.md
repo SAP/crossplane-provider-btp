@@ -7,7 +7,7 @@ The workflow `BTP synthetic benchmark` is report-only. It builds the exact revie
 1. Provision a dedicated BTP test account with sufficient Subaccount quota in region `eu10`. Confirm the account owner, quota, billing responsibility, and a human cleanup contact. Do not use a developer or production account.
 2. Configure GitHub environment `pr-e2e-approval` with required reviewers. Every PR run, including fork PRs, waits for explicit review before checkout/build or secret access. A changed PR head fails the stale run; the new push must receive fresh review.
 3. Configure `pr-e2e-no-approval` secrets `BTP_TECHNICAL_USER`, `CIS_CENTRAL_BINDING`, and `XP_DIADROMOS_RELEASE_TOKEN`. Use the provider's established JSON credential formats. The release token should be a short-lived GitHub App installation token or fine-grained credential with only Contents: read on the private xp-diadromos repository. Never put credential material into config, scripts, artifacts, or logs.
-4. Confirm private action access and authenticated v0.7.0 asset installation in a trusted manually approved default-branch dispatch. A successful local syntax check does not prove the private action can be fetched or the release token works.
+4. Confirm private action access and authenticated v0.7.1 asset installation in a trusted manually approved default-branch dispatch. A successful local syntax check does not prove the private action can be fetched or the release token works.
 
 ## Resource ownership and discovery
 
@@ -27,4 +27,4 @@ Never upload kubeconfigs, the provider package, archives, diagnostics, credentia
 
 ## Operational interpretation
 
-The v0.7.0 k6 image and CLI are explicitly selected, and the package comes from the reviewed SHA. One VU/one iteration provides only a smoke-level observation; CPU, memory, and Prometheus series are informational. No latency threshold, baseline, or policy is configured. Benchmark creation/deletion failures are not repaired by report publication: the execution and reporting steps remain separate and either failure must remain visible.
+The v0.7.1 k6 image and CLI are explicitly selected, and the package comes from the reviewed SHA. One VU/one iteration provides only a smoke-level observation; CPU, memory, and Prometheus series are informational. No latency threshold, baseline, or policy is configured. Benchmark creation/deletion failures are not repaired by report publication: the execution and reporting steps remain separate and either failure must remain visible.

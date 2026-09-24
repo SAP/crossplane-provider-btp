@@ -49,7 +49,7 @@ k6:
     service_account_name: xp-diadromos-runner
   test_script: ./benchmarks/btp/k6/subaccount-create-delete.js
   helpers_path: ./benchmarks/btp/k6/crossplane-helpers.js
-  custom_image: ghcr.io/gergely-szabo-sap/xp-diadromos-k6:v0.7.0
+  custom_image: ghcr.io/gergely-szabo-sap/xp-diadromos-k6:v0.7.1
   load_image: true
   parallelism: 1
   wait_timeout: 2h
