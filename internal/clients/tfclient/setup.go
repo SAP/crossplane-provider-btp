@@ -44,9 +44,9 @@ const (
 // would always read false and debug HTTP tracing would never reach the provider.
 var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
 	if btp.IsDebug() {
-		return tfprovider.NewWithClient(btp.DebugPrintHTTPClient())
+		return newCachingProvider(tfprovider.NewWithClient(btp.DebugPrintHTTPClient()))
 	}
-	return tfprovider.New()
+	return newCachingProvider(tfprovider.New())
 })
 
 // TerraformSetupBuilder builds a terraform.SetupFn for the generated
