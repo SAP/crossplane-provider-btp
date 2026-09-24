@@ -87,6 +87,15 @@ jobs:
           actual="$(git rev-parse HEAD)"
           [[ "$actual" == "$EXPECTED_SHA" ]] || { echo '::error::checkout did not match reviewed SHA'; exit 1; }
 
+      - name: Check out pinned xp-diadromos actions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gergely-szabo-sap/xp-diadromos
+          ref: 547161f4252fdf0729b3923b5892c5d4a765d941
+          token: ${{ secrets.XP_DIADROMOS_RELEASE_TOKEN }}
+          path: .github/actions/xp-diadromos
+          persist-credentials: false
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -114,7 +123,7 @@ jobs:
 
       - name: Run Subaccount benchmark
         id: test
-        uses: gergely-szabo-sap/xp-diadromos/.github/actions/run-test@547161f4252fdf0729b3923b5892c5d4a765d941
+        uses: ./.github/actions/xp-diadromos/.github/actions/run-test
         with:
           config: benchmarks/btp/config.yaml
           cleanup: auto
@@ -131,7 +140,7 @@ jobs:
       - name: Publish available benchmark report
         id: report
         if: ${{ !cancelled() && steps.test.outputs.archive != '' }}
-        uses: gergely-szabo-sap/xp-diadromos/.github/actions/metrics-ci-report@547161f4252fdf0729b3923b5892c5d4a765d941
+        uses: ./.github/actions/xp-diadromos/.github/actions/metrics-ci-report
         with:
           input: ${{ steps.test.outputs.archive }}
           version: v0.7.0
