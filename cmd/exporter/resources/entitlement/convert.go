@@ -101,6 +101,7 @@ func convertDefaultEntitlementResource(ctx context.Context, btpClient *btpcli.Bt
 	servicePlanName := e.planName
 	subAccountGuid := e.assignment.EntityID
 	resourceName := e.GenerateK8sResourceName()
+	externalName := e.GetExternalName()
 
 	// Create Entitlement with required fields first.
 	managedEntitlement := yaml.NewResourceWithComment(
@@ -111,6 +112,9 @@ func convertDefaultEntitlementResource(ctx context.Context, btpClient *btpcli.Bt
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: resourceName,
+				Annotations: map[string]string{
+					"crossplane.io/external-name": externalName,
+				},
 			},
 			Spec: v1alpha1.EntitlementSpec{
 				ForProvider: v1alpha1.EntitlementParameters{
@@ -142,6 +146,9 @@ func convertDefaultEntitlementResource(ctx context.Context, btpClient *btpcli.Bt
 	}
 	if resourceName == resources.UndefinedName {
 		managedEntitlement.AddComment(resources.WarnUndefinedResourceName)
+	}
+	if externalName == resources.UndefinedExternalName {
+		managedEntitlement.AddComment(resources.WarnUndefinedExternalName)
 	}
 	if !isEnable {
 		managedEntitlement.AddComment(resources.WarnDefaultEntitlementEnableFalse)
