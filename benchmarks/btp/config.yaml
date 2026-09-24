@@ -62,7 +62,7 @@ k6:
 
 metrics:
   environment: local
-  dashboard: ./benchmarks/btp/perses/overview.yaml
+  dashboard: ./perses/overview.yaml
   sample_interval: 10s
   namespaces:
     - crossplane-system
