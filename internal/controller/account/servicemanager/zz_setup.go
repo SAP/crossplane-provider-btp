@@ -3,8 +3,8 @@ package servicemanager
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -19,15 +19,27 @@ import (
 
 // Setup adds a controller that reconciles GlobalAccount managed resources.
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
-	return providerconfig.DefaultSetup(
+	controllerName := managed.ControllerName(apisv1beta1.ServiceManagerKind)
+	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(controllerName)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
+
+	// Built once at setup, not per reconcile. Each connector owns an
+	// OperationTrackerStore that is never evicted: no managed.WithFinalizer hook
+	// here, and synthesized sub-resource UIDs miss upjet's parent-keyed finalizer.
+	instanceConnector := tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil)
+	bindingConnector := tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil)
+
+	// ADR(external-name): the default initializer must not run. It would stamp
+	// metadata.name into crossplane.io/external-name before the first Observe(),
+	// destroying the signal to adopt an existing service manager.
+	return providerconfig.DefaultSetupWithoutDefaultInitializer(
 		mgr,
 		o,
 		&apisv1beta1.ServiceManager{},
 		apisv1beta1.ServiceManagerKind,
 		apisv1beta1.ServiceManagerGroupVersionKind,
 		func(kube client.Client,
-			usage resource.Tracker,
-			resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnecter {
+			usage providerconfig.LegacyTracker,
+			resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 			return &connector{
 				kube:            kube,
 				newServiceFn:    btp.NewBTPClient,
@@ -45,8 +57,8 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 
 				newClientInitalizerFn: func() servicemanager.ITfClientInitializer {
 					return servicemanager.NewServiceManagerTfClient(
-						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil),
-						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil),
+						instanceConnector,
+						bindingConnector,
 
 						servicemanager.Defaults{
 							InstanceName: apisv1beta1.DefaultServiceInstanceName,
@@ -54,6 +66,16 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 						},
 					)
 				},
+
+				newAdminLookuperFn: func(ctx context.Context, cr *apisv1beta1.ServiceManager) (servicemanager.SemanticLookuper, func(), error) {
+					btpclient, err := providerconfig.CreateClient(ctx, cr, mgr.GetClient(), usage, btp.NewBTPClient, resourcetracker)
+					if err != nil {
+						return nil, func() {}, err
+					}
+					proxy := servicemanager.NewServiceManagerInstanceProxyClient(btpclient.AccountsServiceClient)
+					return proxy.EnsureSemanticLookuper(ctx, cr.Spec.ForProvider.SubaccountGuid)
+				},
+				recorder: recorder,
 			}
 		})
 }

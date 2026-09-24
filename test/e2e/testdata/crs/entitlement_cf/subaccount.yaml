@@ -5,8 +5,6 @@ metadata:
   name: entitlement-cf-sa-test
 spec:
   forProvider:
-    globalAccountRef:
-      name: my-global-account
     displayName: $BUILD_ID-e2e-test-sa-ent-cf
     region: eu10
     subdomain: $BUILD_ID-e2e-test-sa-ent-cf

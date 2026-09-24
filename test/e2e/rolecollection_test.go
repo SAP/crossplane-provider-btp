@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 )
@@ -51,7 +51,7 @@ func TestRoleCollectionImportFlow(t *testing.T) {
 		roleCollectionImportK8sResName,
 		WithWaitCreateTimeout[*v1alpha1.RoleCollection](wait.WithTimeout(5*time.Minute)),
 		WithWaitDeletionTimeout[*v1alpha1.RoleCollection](wait.WithTimeout(3*time.Minute)),
-		WithDependentResourceDirectory[*v1alpha1.RoleCollection]("./testdata/crs/rolecollection_import"),
+		WithDependentResourceDirectory[*v1alpha1.RoleCollection](crsPath("rolecollection_import")),
 		WithWaitDependentResourceTimeout[*v1alpha1.RoleCollection](wait.WithTimeout(15*time.Minute)),
 	)
 

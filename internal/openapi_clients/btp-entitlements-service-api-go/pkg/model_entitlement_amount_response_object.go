@@ -1,7 +1,7 @@
 /*
 Entitlements Service
 
-The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.   NOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -19,13 +19,15 @@ var _ MappedNullable = &EntitlementAmountResponseObject{}
 
 // EntitlementAmountResponseObject Relevant entitlements for the source that added the product.
 type EntitlementAmountResponseObject struct {
-	// The quantity of the entitlement that is assigned to the root global account or directory.
+	// The quantity of the plan that is entitled to the global account. This quantity is calculated by applying a quantity function property (specific to each service and defined by the service's provider) to the licensedQuantity of the entitlement.
 	Amount *float32 `json:"amount,omitempty"`
 	// Specifies if a plan associated with this entitlement will be automatically assigned by the system to any new subaccount. For example, free plans that are available to all subaccounts.
 	AutoAssign *bool `json:"autoAssign,omitempty"`
 	CommercialModel *CommercialModelResponseObject `json:"commercialModel,omitempty"`
 	// The technical name of the product.
 	EntitlementName *string `json:"entitlementName,omitempty"`
+	// The number of units of the product purchased in accordance with the contractual agreement of the global account. Also applies to free and beta services.
+	LicensedQuantity *float32 `json:"licensedQuantity,omitempty"`
 	// The unique ID of the material (product) to which the assigned service plan belongs.
 	ProductId *string `json:"productId,omitempty"`
 }
@@ -175,6 +177,38 @@ func (o *EntitlementAmountResponseObject) SetEntitlementName(v string) {
 	o.EntitlementName = &v
 }
 
+// GetLicensedQuantity returns the LicensedQuantity field value if set, zero value otherwise.
+func (o *EntitlementAmountResponseObject) GetLicensedQuantity() float32 {
+	if o == nil || IsNil(o.LicensedQuantity) {
+		var ret float32
+		return ret
+	}
+	return *o.LicensedQuantity
+}
+
+// GetLicensedQuantityOk returns a tuple with the LicensedQuantity field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *EntitlementAmountResponseObject) GetLicensedQuantityOk() (*float32, bool) {
+	if o == nil || IsNil(o.LicensedQuantity) {
+		return nil, false
+	}
+	return o.LicensedQuantity, true
+}
+
+// HasLicensedQuantity returns a boolean if a field has been set.
+func (o *EntitlementAmountResponseObject) HasLicensedQuantity() bool {
+	if o != nil && !IsNil(o.LicensedQuantity) {
+		return true
+	}
+
+	return false
+}
+
+// SetLicensedQuantity gets a reference to the given float32 and assigns it to the LicensedQuantity field.
+func (o *EntitlementAmountResponseObject) SetLicensedQuantity(v float32) {
+	o.LicensedQuantity = &v
+}
+
 // GetProductId returns the ProductId field value if set, zero value otherwise.
 func (o *EntitlementAmountResponseObject) GetProductId() string {
 	if o == nil || IsNil(o.ProductId) {
@@ -228,6 +262,9 @@ func (o EntitlementAmountResponseObject) ToMap() (map[string]interface{}, error)
 	}
 	if !IsNil(o.EntitlementName) {
 		toSerialize["entitlementName"] = o.EntitlementName
+	}
+	if !IsNil(o.LicensedQuantity) {
+		toSerialize["licensedQuantity"] = o.LicensedQuantity
 	}
 	if !IsNil(o.ProductId) {
 		toSerialize["productId"] = o.ProductId

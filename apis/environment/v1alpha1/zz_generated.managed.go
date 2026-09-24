@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha1
 
-import xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+import xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 
 // GetCondition of this CloudFoundryEnvironment.
 func (mg *CloudFoundryEnvironment) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
@@ -38,11 +38,6 @@ func (mg *CloudFoundryEnvironment) GetManagementPolicies() xpv1.ManagementPolici
 // GetProviderConfigReference of this CloudFoundryEnvironment.
 func (mg *CloudFoundryEnvironment) GetProviderConfigReference() *xpv1.Reference {
 	return mg.Spec.ProviderConfigReference
-}
-
-// GetPublishConnectionDetailsTo of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
-	return mg.Spec.PublishConnectionDetailsTo
 }
 
 // GetWriteConnectionSecretToReference of this CloudFoundryEnvironment.
@@ -70,11 +65,6 @@ func (mg *CloudFoundryEnvironment) SetProviderConfigReference(r *xpv1.Reference)
 	mg.Spec.ProviderConfigReference = r
 }
 
-// SetPublishConnectionDetailsTo of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetailsTo) {
-	mg.Spec.PublishConnectionDetailsTo = r
-}
-
 // SetWriteConnectionSecretToReference of this CloudFoundryEnvironment.
 func (mg *CloudFoundryEnvironment) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
@@ -98,11 +88,6 @@ func (mg *KymaEnvironment) GetManagementPolicies() xpv1.ManagementPolicies {
 // GetProviderConfigReference of this KymaEnvironment.
 func (mg *KymaEnvironment) GetProviderConfigReference() *xpv1.Reference {
 	return mg.Spec.ProviderConfigReference
-}
-
-// GetPublishConnectionDetailsTo of this KymaEnvironment.
-func (mg *KymaEnvironment) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
-	return mg.Spec.PublishConnectionDetailsTo
 }
 
 // GetWriteConnectionSecretToReference of this KymaEnvironment.
@@ -130,11 +115,6 @@ func (mg *KymaEnvironment) SetProviderConfigReference(r *xpv1.Reference) {
 	mg.Spec.ProviderConfigReference = r
 }
 
-// SetPublishConnectionDetailsTo of this KymaEnvironment.
-func (mg *KymaEnvironment) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetailsTo) {
-	mg.Spec.PublishConnectionDetailsTo = r
-}
-
 // SetWriteConnectionSecretToReference of this KymaEnvironment.
 func (mg *KymaEnvironment) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
@@ -158,11 +138,6 @@ func (mg *KymaEnvironmentBinding) GetManagementPolicies() xpv1.ManagementPolicie
 // GetProviderConfigReference of this KymaEnvironmentBinding.
 func (mg *KymaEnvironmentBinding) GetProviderConfigReference() *xpv1.Reference {
 	return mg.Spec.ProviderConfigReference
-}
-
-// GetPublishConnectionDetailsTo of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
-	return mg.Spec.PublishConnectionDetailsTo
 }
 
 // GetWriteConnectionSecretToReference of this KymaEnvironmentBinding.
@@ -190,11 +165,6 @@ func (mg *KymaEnvironmentBinding) SetProviderConfigReference(r *xpv1.Reference) 
 	mg.Spec.ProviderConfigReference = r
 }
 
-// SetPublishConnectionDetailsTo of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetailsTo) {
-	mg.Spec.PublishConnectionDetailsTo = r
-}
-
 // SetWriteConnectionSecretToReference of this KymaEnvironmentBinding.
 func (mg *KymaEnvironmentBinding) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
@@ -220,11 +190,6 @@ func (mg *KymaModule) GetProviderConfigReference() *xpv1.Reference {
 	return mg.Spec.ProviderConfigReference
 }
 
-// GetPublishConnectionDetailsTo of this KymaModule.
-func (mg *KymaModule) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
-	return mg.Spec.PublishConnectionDetailsTo
-}
-
 // GetWriteConnectionSecretToReference of this KymaModule.
 func (mg *KymaModule) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
 	return mg.Spec.WriteConnectionSecretToReference
@@ -248,11 +213,6 @@ func (mg *KymaModule) SetManagementPolicies(r xpv1.ManagementPolicies) {
 // SetProviderConfigReference of this KymaModule.
 func (mg *KymaModule) SetProviderConfigReference(r *xpv1.Reference) {
 	mg.Spec.ProviderConfigReference = r
-}
-
-// SetPublishConnectionDetailsTo of this KymaModule.
-func (mg *KymaModule) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetailsTo) {
-	mg.Spec.PublishConnectionDetailsTo = r
 }
 
 // SetWriteConnectionSecretToReference of this KymaModule.

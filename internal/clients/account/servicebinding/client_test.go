@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -487,7 +487,7 @@ func TestServiceBindingClient_buildSubaccountServiceBinding(t *testing.T) {
 	assert.Equal(t, v1alpha1.CRDGroupVersion.String(), result.APIVersion)
 	assert.Equal(t, name, result.Name)
 	assert.Equal(t, GenerateInstanceUID(publicCR.UID, externalName), result.UID)
-	assert.Equal(t, publicCR.DeletionTimestamp, result.DeletionTimestamp)
+	assert.Nil(t, result.DeletionTimestamp)
 
 	// Verify spec
 	assert.Equal(t, "test-provider-config", result.Spec.ProviderConfigReference.Name)

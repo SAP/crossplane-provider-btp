@@ -4,10 +4,9 @@ import (
 	"context"
 	"testing"
 
-	cp_xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/resource/fake"
-	test2 "github.com/crossplane/crossplane-runtime/pkg/test"
+	cp_xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
+	test2 "github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	trackingtest "github.com/sap/crossplane-provider-btp/internal/tracking/test"
@@ -35,7 +34,7 @@ var (
 		"data": []byte("{\"endpoints\": {\"accounts_service_url\": \"xxx\", \"cloud_automation_url\": \"xxx\", \"entitlements_service_url\": \"xxx\",      \"events_service_url\": \"xxx\",      \"external_provider_registry_url\": \"xxx\",      \"metadata_service_url\": \"xxx\",      \"order_processing_url\": \"xxx\",      \"provisioning_service_url\": \"xxx\",      \"saas_registry_service_url\": \"xxx\"    },    \"grant_type\": \"client_credentials\",    \"sap.cloud.service\": \"xxx\",    \"uaa\": {      \"apiurl\": \"xxx\",      \"clientid\": \"xxx\",      \"clientsecret\": \"xxx\",      \"credential-type\": \"binding-secret\",      \"identityzone\": \"xxx\",      \"identityzoneid\": \"xxx\",      \"sburl\": \"xxx\",      \"subaccountid\": \"xxx\",      \"tenantid\": \"xxx\",      \"tenantmode\": \"shared\",      \"uaadomain\": \"xxx\",      \"url\": \"xxx\",      \"verificationkey\": \"xxx\", \"xsappname\": \"xxx\", \"xsmasterappname\": \"xxx\", \"zoneid\": \"xxx\"}}"),
 	}
 	smSecret = map[string][]byte{
-		"credentials": []byte("{\"email\": \"1@sap.com\",\"username\": \"xxx\",\"password\": \"xxx\"}"),
+		"credentials": []byte("{\"email\": \"1@example.com\",\"username\": \"xxx\",\"password\": \"xxx\"}"),
 	}
 )
 
@@ -75,7 +74,7 @@ func TestCreateClient(t *testing.T) {
 
 func fakeResource() *e2e.FakeManaged {
 	var mg = e2e.FakeManaged{}
-	mg.ProviderConfigReferencer = &fake.ProviderConfigReferencer{Ref: &cp_xpv1.Reference{Name: "any"}}
+	mg.ProviderConfigReferencer = &fake.LegacyProviderConfigReferencer{Ref: &cp_xpv1.Reference{Name: "any"}}
 	return &mg
 }
 func mockClient(secretData map[string][]byte) *test2.MockClient {
@@ -131,4 +130,4 @@ func fakeProviderConfig(pc *v1alpha1.ProviderConfig) *v1alpha1.ProviderConfig {
 
 type tracker struct{}
 
-func (tr *tracker) Track(ctx context.Context, mg resource.Managed) error { return nil }
+func (tr *tracker) Track(ctx context.Context, mg LegacyManaged) error { return nil }

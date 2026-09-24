@@ -1,9 +1,20 @@
 package v1beta1
 
+// External-Name Configuration:
+//   - Resource: CloudManagement
+//   - Follows Standard: no (compound key: two UUIDs — instance ID and binding ID)
+//   - Format: `<serviceInstanceID>/<serviceBindingID>`
+//   - How to find:
+//     - UI: BTP Cockpit → Subaccount → Services → Service Instances → [instance] → ID
+//          and Service Bindings → [binding] → ID
+//     - CLI: `btp list services/instance --subaccount-id <guid> (field: id)`
+//            `btp list services/binding --subaccount-id <guid> (field: id)`
+//
+
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -168,7 +179,3 @@ var (
 	CloudManagementKindAPIVersion   = CloudManagementKind + "." + SchemeGroupVersion.String()
 	CloudManagementGroupVersionKind = SchemeGroupVersion.WithKind(CloudManagementKind)
 )
-
-func init() {
-	SchemeBuilder.Register(&CloudManagement{}, &CloudManagementList{})
-}

@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -699,11 +699,6 @@ func (in *SubaccountApiCredentialObservation) DeepCopyInto(out *SubaccountApiCre
 		*out = new(string)
 		**out = **in
 	}
-	if in.Key != nil {
-		in, out := &in.Key, &out.Key
-		*out = new(string)
-		**out = **in
-	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
 		*out = new(string)
@@ -873,6 +868,11 @@ func (in *SubaccountTrustConfigurationInitParameters) DeepCopyInto(out *Subaccou
 	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
+		*out = new(string)
+		**out = **in
+	}
+	if in.Origin != nil {
+		in, out := &in.Origin, &out.Origin
 		*out = new(string)
 		**out = **in
 	}
@@ -1060,6 +1060,11 @@ func (in *SubaccountTrustConfigurationParameters) DeepCopyInto(out *SubaccountTr
 	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
+		*out = new(string)
+		**out = **in
+	}
+	if in.Origin != nil {
+		in, out := &in.Origin, &out.Origin
 		*out = new(string)
 		**out = **in
 	}

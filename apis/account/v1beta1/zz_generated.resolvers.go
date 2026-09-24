@@ -20,8 +20,7 @@ package v1beta1
 
 import (
 	"context"
-
-	reference "github.com/crossplane/crossplane-runtime/pkg/reference"
+	reference "github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	errors "github.com/pkg/errors"
 	v1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,6 +36,7 @@ func (mg *CloudManagement) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.SubaccountGuid,
 		Extract:      v1alpha1.SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{
@@ -53,6 +53,7 @@ func (mg *CloudManagement) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecret,
 		Extract:      v1alpha1.ServiceManagerSecret(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
 		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
 		To: reference.To{
@@ -69,6 +70,7 @@ func (mg *CloudManagement) ResolveReferences(ctx context.Context, c client.Reade
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.ServiceManagerSecretNamespace,
 		Extract:      v1alpha1.ServiceManagerSecretNamespace(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.ServiceManagerRef,
 		Selector:     mg.Spec.ForProvider.ServiceManagerSelector,
 		To: reference.To{
@@ -95,6 +97,7 @@ func (mg *ServiceManager) ResolveReferences(ctx context.Context, c client.Reader
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
 		CurrentValue: mg.Spec.ForProvider.SubaccountGuid,
 		Extract:      v1alpha1.SubaccountUuid(),
+		Namespace:    mg.GetNamespace(),
 		Reference:    mg.Spec.ForProvider.SubaccountRef,
 		Selector:     mg.Spec.ForProvider.SubaccountSelector,
 		To: reference.To{

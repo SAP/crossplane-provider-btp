@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +29,7 @@ import (
 // https://github.com/golang/go/wiki/TestComments
 // https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md#contributing-code
 
-var aUser = v1alpha1.User{Username: "aaa@bbb.com"}
+var aUser = v1alpha1.User{Username: "aaa@example.com"}
 var mockGuid = "550e8400-e29b-41d4-a716-446655440000"
 
 func TestObserve(t *testing.T) {

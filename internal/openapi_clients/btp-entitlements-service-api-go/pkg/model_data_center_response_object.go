@@ -1,7 +1,7 @@
 /*
 Entitlements Service
 
-The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.   NOTE: These APIs are relevant only for cloud management tools feature set B. For details and information about whether this applies to your global account, see [Cloud Management Tools - Feature Set Overview](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/caf4e4e23aef4666ad8f125af393dfb2.html).  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
+The Entitlements service provides REST APIs that manage the assignments of entitlements and quotas to subaccounts and directories.   Entitlements and their quota are automatically assigned to the global account when a customer order is fulfilled. Use the APIs in this service to manage the distribution of this global quota to your directories and subaccounts.  See also: * [Authorization](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/3670474a58c24ac2b082e76cbbd9dc19.html) * [Rate Limiting](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77b217b3f57a45b987eb7fbc3305ce1e.html) * [Error Response Format](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/77fef2fb104b4b1795e2e6cee790e8b8.html) * [Asynchronous Jobs](https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/latest/en-US/0a0a6ab0ad114d72a6611c1c6b21683e.html)
 
 API version: 1.0
 */
@@ -25,7 +25,7 @@ type DataCenterResponseObject struct {
 	Domain *string `json:"domain,omitempty"`
 	// The environment that the data center supports. For example: Kubernetes, Cloud Foundry.
 	Environment *string `json:"environment,omitempty"`
-	// The infrastructure provider for the data center. Valid values: * <b>AWS:</b> Amazon Web Services. * <b>GCP:</b> Google Cloud Platform. * <b>AZURE:</b> Microsoft Azure. * <b>SAP:</b> SAP BTP (Neo). * <b>ALI:</b> Alibaba Cloud. * <b>IBM:</b> IBM Cloud.
+	// The infrastructure provider for the data center. Valid values: * <b>AWS:</b> Amazon Web Services. * <b>GCP:</b> Google Cloud Platform. * <b>AZURE:</b> Microsoft Azure. * <b>SAP:</b> SAP BTP (Neo). * <b>ALI:</b> Alibaba Cloud. * <b>IBM:</b> IBM Cloud.  * <b>ccee:</b> ccee prestaging.  * <b>gdch:</b> gdch.  
 	IaasProvider *string `json:"iaasProvider,omitempty"`
 	// Whether the data center is designated as the primary data center within its region. Note that regions that comprise multiple data centers can have only one main data center defined.
 	IsMainDataCenter *bool `json:"isMainDataCenter,omitempty"`

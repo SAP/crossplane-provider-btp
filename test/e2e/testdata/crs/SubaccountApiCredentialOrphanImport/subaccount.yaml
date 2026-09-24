@@ -1,0 +1,15 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subaccount
+metadata:
+  namespace: default
+  name: sac-orphan-subaccount
+spec:
+  forProvider:
+    displayName: $BUILD_ID-subaccount-sac-orphan-import
+    region: eu10
+    subdomain: $BUILD_ID-e2e-sac-orphan-import
+    labels:
+      safe-to-delete: [ "yes" ]
+      BUILD_ID: [ "$BUILD_ID" ]
+    subaccountAdmins:
+      - $TECHNICAL_USER_EMAIL

@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 
 	"github.com/sap/crossplane-provider-btp/internal"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
@@ -69,6 +69,7 @@ func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEn
 		parameters,
 		string(cr.UID),
 		c.btp.Credential.UserCredential.Email,
+		cr.Spec.ForProvider.LandscapeLabel,
 	)
 	if err != nil {
 		return "", errors.Wrap(err, errKymaInstanceCreateFailed)

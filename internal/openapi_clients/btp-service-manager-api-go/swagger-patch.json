@@ -1,3 +1,10 @@
 [
-
+  {
+    "op": "replace",
+    "path": "/components/schemas/ServicePlanResponseObject/properties/metadata",
+    "value": {
+      "description": "The metadata associated with the service plan.",
+      "type": "object"
+    }
+  }
 ]

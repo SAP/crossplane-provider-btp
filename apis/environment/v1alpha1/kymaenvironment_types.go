@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 const (
@@ -26,6 +26,15 @@ type KymaEnvironmentParameters struct {
 	// The name of the Kyma Environment.
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name"`
+
+	// LandscapeLabel is the name of the landscape within the logged-in region on which the
+	// environment instance is created. Only required when the region has more than one landscape;
+	// single-landscape regions default it server-side. Set at create only - landscape is fixed
+	// once the environment exists.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="landscapeLabel is immutable after creation"
+	LandscapeLabel *string `json:"landscapeLabel,omitempty"`
 
 	// Provisioning parameters for the instance.
 	//
@@ -46,6 +55,11 @@ type KymaEnvironmentObservation struct {
 type KymaEnvironmentSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
 	ForProvider       KymaEnvironmentParameters `json:"forProvider"`
+
+	// RecreateOnCreationFailure indicates whether the environment should be
+	// automatically deleted and recreated when it enters CREATION_FAILED state.
+	// +kubebuilder:validation:Optional
+	RecreateOnCreationFailure bool `json:"recreateOnCreationFailure,omitempty"`
 	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount
 	// +crossplane:generate:reference:refFieldName=SubaccountRef
 	// +crossplane:generate:reference:selectorFieldName=SubaccountSelector
@@ -147,7 +161,3 @@ var (
 	KymaEnvironmentKindAPIVersion   = KymaEnvironmentKind + "." + SchemeGroupVersion.String()
 	KymaEnvironmentGroupVersionKind = SchemeGroupVersion.WithKind(KymaEnvironmentKind)
 )
-
-func init() {
-	SchemeBuilder.Register(&KymaEnvironment{}, &KymaEnvironmentList{})
-}

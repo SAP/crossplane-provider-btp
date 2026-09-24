@@ -41,6 +41,17 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
   - UI: BTP Cockpit → Subaccounts → [Select Subaccount] → Instances and Subscriptions → Instance ID
   - CLI: Use BTP ClI: `btp list accounts/environment-instance`
 
+### CloudManagement
+
+- Follows Standard: no (compound key: two UUIDs — instance ID and binding ID)
+- Format: `<serviceInstanceID>/<serviceBindingID>`
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Services → Service Instances → [instance] → ID
+and Service Bindings → [binding] → ID
+- CLI: `btp list services/instance --subaccount-id <guid> (field: id)`
+`btp list services/binding --subaccount-id <guid> (field: id)`
+
 ### Directory
 
 - Follows Standard: yes
@@ -49,6 +60,37 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 
   - UI: Global Account → Account Explorer → Directories → [Select Directory] → Directory ID
   - CLI: btp list accounts/directory (field: guid)
+
+### DirectoryEntitlement
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format:`<directory-id>/<service-name>/<plan-name>` (e.g. "abc-123-def-456/hana-cloud/hana")
+- How to find:
+
+  - UI: BTP Cockpit → Global Account → Account Explorer → [Select Directory] → Entitlements → Service Assignments > Service Technical Name and Plan
+  - CLI: `btp list accounts/entitlement --directory <directory-id>` → `entitledServices[].name` and `entitledServices[].servicePlans[].name`
+
+### Entitlement
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<subaccount-guid>/<service-name>/<service-plan-name>`; append `/<service-plan-unique-identifier>` when `spec.forProvider.servicePlanUniqueIdentifier` is set
+- Note: Entitlement CRs can share one assignment; the first must carry the annotation, later ones join it. See docs/contribution-notes/external-name-handling.md
+- Note: every field in the key is immutable after creation, and `servicePlanUniqueIdentifier` can be neither added nor removed later. Changing any of them requires deleting and recreating the resource.
+- Note: deletion refuses to finalize when this resource carries no external-name annotation, no sibling resource proves the provider created the matching BTP assignment, and that assignment cannot be shown to have released this resource's share. The error explains both remediations: remove the finalizer to delete the resource without touching BTP, or set the annotation to the compound key so deletion removes the assignment.
+- Note: BTP `AutoAssigned` entitlements are never revoked by this provider. Deleting the resource finalizes without modifying BTP and emits an `AutoAssignedPreserved` event, because BTP reports these as always available and not removable by admin action.
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Entitlements → Service Assignments > Service Technical Name and Plan
+  - CLI: `btp list accounts/entitlement --subaccount <subaccount-guid>` → `entitledServices[].name`, `entitledServices[].servicePlans[].name`, and `entitledServices[].servicePlans[].uniqueIdentifier` when duplicate names exist
+
+### GlobalaccountTrustConfiguration
+
+- Follows Standard: no (origin key, not a GUID)
+- Format: Origin key of the identity provider (e.g. "sap.custom")
+- How to find:
+
+  - UI: BTP Cockpit → Global Account → Security → Trust Configurations → [Origin column]
+  - CLI: `btp list security/trust` → `Origin Key`
 
 ### KubeConfigGenerator
 
@@ -70,6 +112,15 @@ metadata.annotations.crossplane.io/external-name: <resource_uniq_ID>
 Instead of importing, create a new KymaEnvironmentBinding resource.
 - Format: Not applicable
 
+### KymaModule
+
+- Follows Standard: yes
+- Format: Kyma module name (e.g. "keda", "serverless")
+- How to find:
+
+  - UI: Kyma Dashboard → Modules → [Module Name]
+  - CLI: `kubectl get kyma default -n kyma-system -o jsonpath='{.spec.modules[*].name}'`
+
 ### RoleCollection
 
 - Follows Standard: no (uses name as identifier, not a GUID)
@@ -78,6 +129,28 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 
   - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
   - CLI: btp get security/role-collection `"<name>"` → `name`
+
+### RoleCollectionAssignment
+
+- Follows Standard: no - uses compound key as resource has no GUID available; user/group type derived from the mutually-exclusive spec fields userName/groupName
+- Format: `<origin>/<userOrGroupName>/<roleCollectionName>` (e.g. "sap.default/jane.doe@example.com/Subaccount Administrator")
+- Note: `spec.ForProvider` must match external name; mismatches will prompt an error
+- How to find:
+
+  - UI (RoleCollections): BTP Cockpit → Subaccount → Security → Role Collections
+  - UI (User Assignments): BTP Cockpit → Subaccount → Security → Users → [Select entry] → Role Collections
+  - CLI (RoleCollections): `btp --format json list security/role-collection --subaccount <subaccount-id>` (field: `name`)
+  - CLI (User Assignments): `btp --format json get security/role-collection <role-collection-name> --subaccount <subaccount-id> --show-user-assignments` (fields: `origin`, `username`)
+
+### ServiceBinding
+
+- Follows Standard: yes
+- Format: ServiceBinding GUID (UUID format)
+- Note: spec.forProvider.serviceInstanceID (or its ref/selector) must be set for adoption to work
+- How to find:
+
+  - UI: the cockpit shows only the binding name, not its GUID; use the CLI
+  - CLI: btp list services/binding --subaccount `<subaccount-guid>` (field: id)
 
 ### ServiceInstance
 
@@ -89,6 +162,16 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
   - UI: Subaccount → Services → Instances → [Select Instance] → Instance ID
   - CLI: btp list services/instance --subaccount `<subaccount-guid>` (field: id)
 
+### ServiceManager
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<service-instance-id>/<service-binding-id>` (e.g. "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f/9c2b1f80-3d4e-4a11-8f2c-7b5d6e1a4c33"), both canonical 36-character GUIDs; a bare `<service-instance-id>` is the valid transient form while the binding is still being created
+- Note: `subaccountGuid`, `planName`, `serviceInstanceName` and `serviceBindingName` are immutable once set (v1beta1); changing one strands the instance/binding pair, so delete and recreate instead. Once `subaccountGuid` is resolved, `subaccountRef`/`subaccountSelector` can no longer be repointed, though dropping them is allowed; a replace-style sync must still carry the resolved `subaccountGuid` and any non-default names.
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Services → Instances and Subscriptions → [Select the service manager instance] → the preview pane shows its ID; take the binding ID from the CLI
+  - CLI: `btp list services/instance --subaccount <subaccount-guid>` (field: id), then `btp list services/binding --subaccount <subaccount-guid>` (field: id) for the binding on that instance
+
 ### Subaccount
 
 - Follows Standard: yes
@@ -97,6 +180,53 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 
   - UI: Global Account → Account Explorer → Subaccounts → [Select Subaccount] → Subaccount ID
   - CLI: btp list accounts/subaccount (field: guid)
+
+### SubaccountApiCredential
+
+- Follows Standard: no (compound key; credentials are identified by subaccount ID and credential name)
+- Format: `<subaccount-id>/<name>` (e.g. "abc-123-def-456/my-credential")
+- Note: Existing name-only annotations are migrated automatically to the compound-key format; importing/adopting existing credentials is unsupported.
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Client Name]
+  - CLI: `btp list security/app --subaccount <subaccount-id>` → `name`
+
+### SubaccountDestination
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<subaccount-id>/<destination-name>`
+- How to find:
+
+  - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)
+  - API: GET /v1/subaccountDestinations/\{destination name\} (fields: subaccount_id + Name)
+
+### SubaccountDestinationCertificate
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<subaccount-id>/<certificate-name>`
+- How to find:
+
+  - UI: SAP BTP Cockpit → Subaccount → Connectivity → Certificates (field: Name)
+  - API: GET /v1/subaccountCertificates/\{certificate name\} (fields: subaccount_id + Name)
+
+### SubaccountServiceBroker
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format: `<subaccount-id>/<service-broker-id>` (e.g. "6aa64c2f-38c1-49a9-b2e8-cf9fea769b7f/6a55f158-41b5-4e63-aa77-84089fa0ab98")
+- Note: import requires managementPolicies: ["*"]; observe-only import is not supported for this resource
+- How to find:
+
+  - UI: Not available. The BTP cockpit does not show service brokers, only Service Marketplace and Instances and Subscriptions. Use the CLI or the Service Manager API.
+  - CLI: `btp list services/broker --subaccount <subaccount-id>` (field: id)
+
+### SubaccountTrustConfiguration
+
+- Follows Standard: no (compound key, not a single GUID)
+- Format:`<subaccount-id>/<origin>` (e.g. "abc-123-def-456/sap.custom")
+- How to find:
+
+  - UI: BTP Cockpit → Subaccount → Security → Trust Configurations → [Origin column]
+  - CLI: `btp list security/trust --subaccount <subaccount-id>` → `Origin Key`
 
 ### Subscription
 

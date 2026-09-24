@@ -22,8 +22,8 @@ import (
 	"dario.cat/mergo"
 	"github.com/pkg/errors"
 
-	"github.com/crossplane/upjet/pkg/resource"
-	"github.com/crossplane/upjet/pkg/resource/json"
+	"github.com/crossplane/upjet/v2/pkg/resource"
+	"github.com/crossplane/upjet/v2/pkg/resource/json"
 )
 
 // GetTerraformResourceType returns Terraform resource type for this SubaccountServiceInstance
@@ -96,7 +96,7 @@ func (tr *SubaccountServiceInstance) GetInitParameters() (map[string]any, error)
 func (tr *SubaccountServiceInstance) GetMergedParameters(shouldMergeInitProvider bool) (map[string]any, error) {
 	params, err := tr.GetParameters()
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get parameters for resource '%q'", tr.GetName())
+		return nil, errors.Wrapf(err, "cannot get parameters for resource \"%s/%s\"", tr.GetNamespace(), tr.GetName())
 	}
 	if !shouldMergeInitProvider {
 		return params, nil
@@ -104,7 +104,7 @@ func (tr *SubaccountServiceInstance) GetMergedParameters(shouldMergeInitProvider
 
 	initParams, err := tr.GetInitParameters()
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get init parameters for resource '%q'", tr.GetName())
+		return nil, errors.Wrapf(err, "cannot get init parameters for resource \"%s/%s\"", tr.GetNamespace(), tr.GetName())
 	}
 
 	// Note(lsviben): mergo.WithSliceDeepCopy is needed to merge the
@@ -116,7 +116,7 @@ func (tr *SubaccountServiceInstance) GetMergedParameters(shouldMergeInitProvider
 		c.Overwrite = false
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot merge spec.initProvider and spec.forProvider parameters for resource '%q'", tr.GetName())
+		return nil, errors.Wrapf(err, "cannot merge spec.initProvider and spec.forProvider parameters for resource \"%s/%s\"", tr.GetNamespace(), tr.GetName())
 	}
 
 	return params, nil
@@ -130,6 +130,10 @@ func (tr *SubaccountServiceInstance) LateInitialize(attrs []byte) (bool, error) 
 		return false, errors.Wrap(err, "failed to unmarshal Terraform state parameters for late-initialization")
 	}
 	opts := []resource.GenericLateInitializerOption{resource.WithZeroValueJSONOmitEmptyFilter(resource.CNameWildcard)}
+	opts = append(opts, resource.WithNameFilter("Parameters"))
+	opts = append(opts, resource.WithNameFilter("ServiceOfferingName"))
+	opts = append(opts, resource.WithNameFilter("ServiceplanID"))
+	opts = append(opts, resource.WithNameFilter("ServiceplanName"))
 
 	li := resource.NewGenericLateInitializer(opts...)
 	return li.LateInitialize(&tr.Spec.ForProvider, params)

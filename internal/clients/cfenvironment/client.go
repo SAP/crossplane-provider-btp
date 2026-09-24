@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 )
 
@@ -105,7 +106,7 @@ func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstan
 		return managed.ConnectionDetails{}, err
 	}
 	details := managed.ConnectionDetails{
-		v1alpha1.ResourceRaw: label,
+		providerv1alpha1.RawBindingKey: label,
 	}
 
 	if orgName, ok := cflabels["Org Name"]; ok {

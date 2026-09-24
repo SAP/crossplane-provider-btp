@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
 )
 

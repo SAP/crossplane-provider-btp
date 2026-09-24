@@ -10,7 +10,7 @@ import (
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -122,7 +122,7 @@ func newDirectoryResource(cfg *envconf.Config, dirK8sResName string) *v1alpha1.D
 func createK8sResources(ctx context.Context, t *testing.T, cfg *envconf.Config, r *res.Resources, directory string, pattern string, mutateFunc decoder.MutateFunc) {
 
 	errdecode := decoder.DecodeEachFile(
-		ctx, os.DirFS("./testdata/crs/"+directory), pattern,
+		ctx, os.DirFS(crsPath(directory)), pattern,
 		decoder.CreateHandler(r),
 		decoder.MutateOption(mutateFunc),
 		decoder.MutateNamespace(cfg.Namespace()),
@@ -131,10 +131,6 @@ func createK8sResources(ctx context.Context, t *testing.T, cfg *envconf.Config, 
 	if errdecode != nil {
 		t.Error("Error Details", "errdecode", errdecode)
 	}
-}
-
-func NewID(oldId string, buildId string) string {
-	return buildId + "-" + oldId
 }
 
 // TestDirectoryImport tests importing an existing Directory resource using external-name annotation

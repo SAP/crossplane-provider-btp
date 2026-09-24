@@ -1,0 +1,16 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: SubaccountServiceBroker
+metadata:
+  namespace: default
+  name: upgrade-test-extn-broker
+spec:
+  forProvider:
+    name: upgrade-test-extn-broker
+    url: $SERVICE_BROKER_URL
+    username: $SERVICE_BROKER_USERNAME
+    passwordSecretRef:
+      name: upgrade-test-extn-broker-credentials
+      namespace: default
+      key: password
+    subaccountRef:
+      name: upgrade-test-extn-broker-sa

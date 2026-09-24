@@ -1,0 +1,17 @@
+name: Check for Personal Data
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run-pii-check:
+    uses: SAP/crossplane-shared-workflows/.github/workflows/check-personal-data.lib.yaml@main
+    permissions:
+      contents: read

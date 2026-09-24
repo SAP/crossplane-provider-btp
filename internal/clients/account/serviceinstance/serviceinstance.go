@@ -8,9 +8,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
@@ -63,6 +63,16 @@ func (s *ServiceInstanceMapper) TfResource(ctx context.Context, si *v1alpha1.Ser
 		sInstance.Spec.ForProvider.ServiceplanID = &si.Status.AtProvider.ServiceplanID
 	}
 
+	timeout := "60m"
+	if si.Spec.ForProvider.OperationTimeout != nil {
+		timeout = *si.Spec.ForProvider.OperationTimeout
+	}
+	sInstance.Spec.ForProvider.Timeouts = &v1alpha1.TimeoutsParameters{
+		Create: &timeout,
+		Update: &timeout,
+		Delete: &timeout,
+	}
+
 	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
 	condition := si.GetCondition(xpv1.TypeReady)
 	sInstance.SetConditions(condition)
@@ -91,6 +101,10 @@ func BuildComplexParameterJson(ctx context.Context, kube client.Client, secretRe
 	return parameterJson, nil
 }
 
+// TfNamePrefix prevents mapped Terraform resource names from starting with
+// a digit. Callbacks strip it to locate the native ServiceInstance.
+const TfNamePrefix = "TF-"
+
 func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServiceInstance {
 	sInstance := &v1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{
@@ -98,8 +112,7 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// since terraform resources are not allowed to start with a number we ensure it by prefixing them with "TF-"
-			Name: "TF-" + si.Name,
+			Name: TfNamePrefix + si.Name,
 			// make sure no naming conflicts are there for upjet tmp folder creation
 			UID:               si.UID + "-service-instance",
 			DeletionTimestamp: si.DeletionTimestamp,
@@ -119,6 +132,7 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 				SubaccountID: si.Spec.ForProvider.SubaccountID,
 				Name:         internal.Ptr(si.Spec.ForProvider.Name),
 				Shared:       si.Spec.ForProvider.Shared,
+				Labels:       si.Spec.ForProvider.Labels,
 			},
 			InitProvider: v1alpha1.SubaccountServiceInstanceInitParameters{},
 		},

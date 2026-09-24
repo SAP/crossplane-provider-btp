@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.5
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: entitlements.account.btp.sap.crossplane.io
 spec:
   group: account.btp.sap.crossplane.io
@@ -107,14 +107,23 @@ spec:
                       type: object
                     type: array
                   serviceName:
+                    minLength: 1
                     type: string
+                    x-kubernetes-validations:
+                    - message: serviceName cannot be changed
+                      rule: self == oldSelf
                   servicePlanName:
+                    minLength: 1
                     type: string
+                    x-kubernetes-validations:
+                    - message: servicePlanName cannot be changed
+                      rule: self == oldSelf
                   servicePlanUniqueIdentifier:
                     description: The unique identifier of the service plan. This is
                       a unique identifier for service plans that can distinguish between
                       the same service plans with different hosting datacenters. Options
                       Include `hana-cloud-hana` or `hana-cloud-hana-sap_eu-de-1`.
+                    minLength: 1
                     type: string
                   subaccountGuid:
                     type: string
@@ -196,6 +205,19 @@ spec:
                 - serviceName
                 - servicePlanName
                 type: object
+                x-kubernetes-validations:
+                - message: subaccountGuid cannot be changed after resolution
+                  rule: '!has(oldSelf.subaccountGuid) || size(oldSelf.subaccountGuid)
+                    == 0 || (has(self.subaccountGuid) && self.subaccountGuid == oldSelf.subaccountGuid)'
+                - message: servicePlanUniqueIdentifier cannot be changed
+                  rule: has(self.servicePlanUniqueIdentifier) == has(oldSelf.servicePlanUniqueIdentifier)
+                    && (!has(self.servicePlanUniqueIdentifier) || self.servicePlanUniqueIdentifier
+                    == oldSelf.servicePlanUniqueIdentifier)
+                - message: subaccountRef cannot be changed after subaccountGuid is
+                    resolved
+                  rule: '!has(oldSelf.subaccountGuid) || size(oldSelf.subaccountGuid)
+                    == 0 || (has(self.subaccountRef) == has(oldSelf.subaccountRef)
+                    && (!has(self.subaccountRef) || self.subaccountRef == oldSelf.subaccountRef))'
               managementPolicies:
                 default:
                 - '*'
@@ -262,93 +284,12 @@ spec:
                 required:
                 - name
                 type: object
-              publishConnectionDetailsTo:
-                description: |-
-                  PublishConnectionDetailsTo specifies the connection secret config which
-                  contains a name, metadata and a reference to secret store config to
-                  which any connection details for this managed resource should be written.
-                  Connection details frequently include the endpoint, username,
-                  and password required to connect to the managed resource.
-                properties:
-                  configRef:
-                    default:
-                      name: default
-                    description: |-
-                      SecretStoreConfigRef specifies which secret store config should be used
-                      for this ConnectionSecret.
-                    properties:
-                      name:
-                        description: Name of the referenced object.
-                        type: string
-                      policy:
-                        description: Policies for referencing.
-                        properties:
-                          resolution:
-                            default: Required
-                            description: |-
-                              Resolution specifies whether resolution of this reference is required.
-                              The default is 'Required', which means the reconcile will fail if the
-                              reference cannot be resolved. 'Optional' means this reference will be
-                              a no-op if it cannot be resolved.
-                            enum:
-                            - Required
-                            - Optional
-                            type: string
-                          resolve:
-                            description: |-
-                              Resolve specifies when this reference should be resolved. The default
-                              is 'IfNotPresent', which will attempt to resolve the reference only when
-                              the corresponding field is not present. Use 'Always' to resolve the
-                              reference on every reconcile.
-                            enum:
-                            - Always
-                            - IfNotPresent
-                            type: string
-                        type: object
-                    required:
-                    - name
-                    type: object
-                  metadata:
-                    description: Metadata is the metadata for connection secret.
-                    properties:
-                      annotations:
-                        additionalProperties:
-                          type: string
-                        description: |-
-                          Annotations are the annotations to be added to connection secret.
-                          - For Kubernetes secrets, this will be used as "metadata.annotations".
-                          - It is up to Secret Store implementation for others store types.
-                        type: object
-                      labels:
-                        additionalProperties:
-                          type: string
-                        description: |-
-                          Labels are the labels/tags to be added to connection secret.
-                          - For Kubernetes secrets, this will be used as "metadata.labels".
-                          - It is up to Secret Store implementation for others store types.
-                        type: object
-                      type:
-                        description: |-
-                          Type is the SecretType for the connection secret.
-                          - Only valid for Kubernetes Secret Stores.
-                        type: string
-                    type: object
-                  name:
-                    description: Name is the name of the connection secret.
-                    type: string
-                required:
-                - name
-                type: object
               writeConnectionSecretToRef:
                 description: |-
                   WriteConnectionSecretToReference specifies the namespace and name of a
                   Secret to which any connection details for this managed resource should
                   be written. Connection details frequently include the endpoint, username,
                   and password required to connect to the managed resource.
-                  This field is planned to be replaced in a future release in favor of
-                  PublishConnectionDetailsTo. Currently, both could be set independently
-                  and connection details would be published to both without affecting
-                  each other.
                 properties:
                   name:
                     description: Name of the secret.

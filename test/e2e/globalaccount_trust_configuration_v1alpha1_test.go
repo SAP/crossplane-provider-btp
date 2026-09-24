@@ -9,19 +9,32 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
+	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 )
 
+// Both features drive the same external object: one trust configuration per
+// global account, keyed by the origin from IDP_URL. CI runs a parallel job per
+// top-level test, so they stay features of one sequential testenv.Test.
+// TestInParallel would race them.
 func Test_TrustConfiguration_v1alpha1(t *testing.T) {
+	testenv.Test(
+		t,
+		globalaccountTrustConfigurationFeature().Feature(),
+		globalaccountTrustConfigurationImportFeature().Feature(),
+	)
+}
 
+func globalaccountTrustConfigurationFeature() *features.FeatureBuilder {
 	resource := resources.ResourceTestConfig{
 		Kind:              "GlobalaccountTrustConfiguration",
-		ResourceDirectory: "testdata/crs/GlobalaccountTrustConfiguration",
+		ResourceDirectory: crsPath("GlobalaccountTrustConfiguration"),
 	}
 
 	fB := features.New(resource.Kind)
@@ -50,5 +63,29 @@ func Test_TrustConfiguration_v1alpha1(t *testing.T) {
 	fB.Assess("delete", resource.AssessDelete)
 	fB.Teardown(resource.Teardown)
 
-	testenv.Test(t, fB.Feature())
+	return fB
+}
+
+// globalaccountTrustConfigurationImportFeature tests the import flow for GlobalaccountTrustConfiguration.
+// ADR(external-name): uses the origin key (e.g. "sap.custom") as identifier; the global
+// account scope comes from the provider credentials, so no compound key is needed.
+func globalaccountTrustConfigurationImportFeature() *features.FeatureBuilder {
+	const importK8sResName = "ga-trust-config-import-test"
+
+	idpURL := envvar.GetOrPanic(IDP_URL_ENV_KEY)
+
+	importTester := NewImportTester(
+		&v1alpha1.GlobalaccountTrustConfiguration{
+			Spec: v1alpha1.GlobalaccountTrustConfigurationSpec{
+				ForProvider: v1alpha1.GlobalaccountTrustConfigurationParameters{
+					IdentityProvider: &idpURL,
+				},
+			},
+		},
+		importK8sResName,
+		WithWaitCreateTimeout[*v1alpha1.GlobalaccountTrustConfiguration](wait.WithTimeout(5*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.GlobalaccountTrustConfiguration](wait.WithTimeout(3*time.Minute)),
+	)
+
+	return importTester.BuildTestFeature("GlobalaccountTrustConfiguration Import Flow")
 }

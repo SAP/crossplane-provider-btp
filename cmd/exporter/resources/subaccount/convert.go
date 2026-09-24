@@ -2,7 +2,7 @@ package subaccount
 
 import (
 	"github.com/SAP/xp-clifford/yaml"
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -99,7 +99,11 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 
 	// Labels
 	if len(sa.Labels) > 0 {
-		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Labels = sa.Labels
+		labels := make(map[string]v1alpha1.SubaccountLabelValueList, len(sa.Labels))
+		for k, v := range sa.Labels {
+			labels[k] = v
+		}
+		saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.Labels = labels
 	}
 
 	// BetaEnabled

@@ -55,9 +55,10 @@ func loadTags() (string, string) {
 }
 
 func loadResourceDirectories() []string {
-	directories, err := test.LoadDirectoriesWithYAMLFiles(resourceDirectoryRoot, ignoreResourceDirectories)
+	root := resourceDirectoryRoot()
+	directories, err := test.LoadDirectoriesWithYAMLFiles(root, ignoreResourceDirectories)
 	if err != nil {
-		panic(fmt.Errorf("failed to read resource directories from %s: %w", resourceDirectoryRoot, err))
+		panic(fmt.Errorf("failed to read resource directories from %s: %w", root, err))
 	}
 
 	return directories

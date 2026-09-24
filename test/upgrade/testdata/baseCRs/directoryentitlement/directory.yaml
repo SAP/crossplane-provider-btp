@@ -1,0 +1,18 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Directory
+metadata:
+  namespace: default
+  name: upgrade-test-dir-ent-directory
+spec:
+  forProvider:
+    description: "$BUILD_ID-created by upgrade tests (directory entitlement)"
+    directoryAdmins:
+      - "$SECOND_DIRECTORY_ADMIN_EMAIL"
+      - "$TECHNICAL_USER_EMAIL"
+    directoryFeatures:
+      - "DEFAULT"
+      - "ENTITLEMENTS"
+    displayName: $BUILD_ID-upgrade-test-dir-ent-directory
+    labels:
+      safe-to-delete: [ "yes" ]
+      BUILD_ID: [ "$BUILD_ID" ]

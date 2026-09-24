@@ -6,10 +6,10 @@ import (
 	"reflect"
 	"strings"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/google/go-cmp/cmp"
 	"github.com/mitchellh/reflectwalk"
 	"github.com/samber/lo"
@@ -63,6 +63,9 @@ func (r *DefaultReferenceResolverTracker) CreateTrackingReference(
 
 // Track finds all references in the given managed resource and creates tracking resources for them.
 // It skips fields that do not have the `reference-group`, `reference-kind` and `reference-apiversion` tags.
+// It also refreshes the ResourceUsage condition on the resource. Track runs in every Connect(), so the
+// in-use condition stays current in steady state and is fresh before Observe() and Delete(), instead of
+// only being stamped transiently inside Delete().
 func (r *DefaultReferenceResolverTracker) Track(ctx context.Context, mg resource.Managed) error {
 	if hasIgnoreAnnotation(mg) {
 		return nil
@@ -79,6 +82,8 @@ func (r *DefaultReferenceResolverTracker) Track(ctx context.Context, mg resource
 			return err
 		}
 	}
+
+	r.SetConditions(ctx, mg)
 	return nil
 }
 

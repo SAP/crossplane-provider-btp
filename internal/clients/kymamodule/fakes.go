@@ -12,7 +12,7 @@ type MockKymaModuleClient struct {
 }
 
 // ObserveModule implements KymaModuleClient.ObserveModule
-func (m *MockKymaModuleClient) ObserveModule(ctx context.Context, moduleCr *v1alpha1.KymaModule) (*v1alpha1.ModuleStatus, error) {
+func (m *MockKymaModuleClient) ObserveModule(ctx context.Context, moduleName string) (*v1alpha1.ModuleStatus, error) {
 	return m.apiResponse, m.err
 }
 

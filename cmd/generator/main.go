@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/crossplane/upjet/pkg/pipeline"
+	"github.com/crossplane/upjet/v2/pkg/pipeline"
 
 	"github.com/sap/crossplane-provider-btp/config"
 )
@@ -29,5 +29,5 @@ func main() {
 	rg := provider.RootGroup
 	fmt.Println(rg)
 
-	pipeline.Run(provider, absRootDir)
+	pipeline.Run(provider, nil, absRootDir)
 }

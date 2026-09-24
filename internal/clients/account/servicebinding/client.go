@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -66,13 +66,11 @@ func NewServiceBindingClient(ctx context.Context, kube client.Client, tfConnecto
 }
 
 func (m *ServiceBindingClient) Create(ctx context.Context) (string, managed.ExternalCreation, error) {
-	// use a random name once for the creation. Afterwards, the external name sets a
-	// reasonable name. This means that when observing the resource for the first time after
-	// creating, another store for this resource will be created. This will create a dangling
-	// TF workspace, but this way no new name collisions will occur.
-	// instanceUID := GenerateInstanceUID(m.ssb.UID, GenerateRandomName(*m.ssb.Spec.ForProvider.Name))
-	//
-	// m.ssb.SetUID(instanceUID)
+	// The no-fork upjet client caches its plan in Observe; Create reads that
+	// cached plan, so prime it here before creating.
+	if _, err := m.tfClient.Observe(ctx, m.ssb); err != nil {
+		return "", managed.ExternalCreation{}, errors.Wrap(err, errObserveTfResource)
+	}
 
 	creation, err := m.tfClient.Create(ctx, m.ssb)
 	if err != nil {
@@ -109,7 +107,7 @@ func (m *ServiceBindingClient) Observe(ctx context.Context) (managed.ExternalObs
 	return observation, m.ssb, nil
 }
 
-// buildSubaccountServiceBinding creates a SubaccountServiceBinding resource from a ServiceBinding
+// buildSubaccountServiceBinding creates a SubaccountServiceBinding resource from a ServiceBinding.
 func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *v1alpha1.ServiceBinding, name string, externalName string) (*v1alpha1.SubaccountServiceBinding, error) {
 
 	parameterJson, err := instanceClient.BuildComplexParameterJson(ctx, kube, sb.Spec.ForProvider.ParameterSecretRefs, sb.Spec.ForProvider.Parameters.Raw)
@@ -125,9 +123,8 @@ func buildSubaccountServiceBinding(ctx context.Context, kube client.Client, sb *
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			UID:               targetUID,
-			DeletionTimestamp: sb.DeletionTimestamp,
+			Name: name,
+			UID:  targetUID,
 		},
 		Spec: v1alpha1.SubaccountServiceBindingSpec{
 			ResourceSpec: xpv1.ResourceSpec{

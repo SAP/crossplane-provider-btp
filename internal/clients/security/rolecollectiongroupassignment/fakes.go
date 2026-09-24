@@ -28,6 +28,10 @@ type groupApiFake struct {
 	RoleCollection string
 	Scenario       ApiScenario
 	Groups         []string
+
+	// BodyErr, when set, is returned verbatim from GetIdpAttributeValuesFromRoleCollectionByAttributeExecute
+	// (overriding Scenario). Used to exercise the SpecifyAPIError integration.
+	BodyErr error
 }
 
 var _ xsuaa.IdpRoleCollectionAPI = &groupApiFake{}
@@ -90,6 +94,9 @@ func (g groupApiFake) GetIdpAttributeValuesFromRoleCollectionByAttribute(ctx con
 }
 
 func (g groupApiFake) GetIdpAttributeValuesFromRoleCollectionByAttributeExecute(r xsuaa.IdpRoleCollectionAPIGetIdpAttributeValuesFromRoleCollectionByAttributeRequest) ([]xsuaa.RoleCollectionAttribute, *http.Response, error) {
+	if g.BodyErr != nil {
+		return nil, &http.Response{StatusCode: http.StatusInternalServerError}, g.BodyErr
+	}
 	switch g.Scenario {
 	case NoGroup:
 		return nil, &http.Response{StatusCode: http.StatusNotFound}, notFoundError

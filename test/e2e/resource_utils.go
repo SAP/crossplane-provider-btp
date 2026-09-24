@@ -1,16 +1,17 @@
-//go:build e2e
-// +build e2e
+//go:build e2e || e2e_long
 
 package e2e
 
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/test"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -24,10 +25,44 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 )
 
+// testCRsGeneratedPathEnv names the env var that points at the directory
+// containing rendered (envsubst-processed) e2e fixtures. The Makefile target
+// generate-test-crs renders templates from TEST_CRS_PATH into
+// TEST_CRS_GENERATED_PATH; that var is exported at the top of the Makefile,
+// so it is already in the test binary's environment when invoked via
+// `make test-acceptance`. Tests read from there so the committed templates
+// stay untouched on disk. Falls back to the in-tree templates dir when
+// unset, so raw `go test` invocations still work for read-only inspection
+// (substitutions won't be applied).
+const testCRsGeneratedPathEnv = "TEST_CRS_GENERATED_PATH"
+
+// crsPath resolves a fixture path relative to the e2e CRs directory.
+// Pass the path you would have hard-coded under testdata/crs/, e.g.
+//
+//	crsPath("cloudfoundry_env")              -> "<generated>/cloudfoundry_env"
+//	crsPath("servicebinding/env")            -> "<generated>/servicebinding/env"
+//
+// When TEST_CRS_GENERATED_PATH is set (the normal `make test-acceptance`
+// flow), the returned path lives under the rendered tree. When unset, the
+// path falls back to the committed templates directory so that quick local
+// runs without `make generate-test-crs` still resolve files (they just
+// won't have $BUILD_ID / $TECHNICAL_USER_EMAIL substituted).
+func crsPath(rel string) string {
+	base := os.Getenv(testCRsGeneratedPathEnv)
+	if base == "" {
+		base = "testdata/crs"
+	}
+	return filepath.Join(base, rel)
+}
+
 type mockList struct {
 	client.ObjectList
 
 	Items []k8s.Object
+}
+
+func NewID(oldId string, buildId string) string {
+	return buildId + "-" + oldId
 }
 
 func waitForResource(res k8s.Object, cfg *envconf.Config, t *testing.T, opts ...wait.Option) {

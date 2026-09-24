@@ -29,6 +29,10 @@ type roleCollectionApiFake struct {
 
 	// stub data to return whenever a RoleCollection would be returned
 	RoleCollection xsuaa.RoleCollection
+
+	// BodyErr, when set, is returned verbatim from GetRoleCollectionByNameExecute
+	// (overriding Scenario). Used to exercise the SpecifyAPIError integration.
+	BodyErr error
 }
 
 var _ xsuaa.RolecollectionsAPI = &roleCollectionApiFake{}
@@ -187,6 +191,9 @@ func (rf *roleCollectionApiFake) GetRoleCollectionByName(ctx context.Context, ro
 }
 
 func (rf *roleCollectionApiFake) GetRoleCollectionByNameExecute(r xsuaa.RolecollectionsAPIGetRoleCollectionByNameRequest) (*xsuaa.RoleCollection, *http.Response, error) {
+	if rf.BodyErr != nil {
+		return nil, &http.Response{StatusCode: http.StatusInternalServerError}, rf.BodyErr
+	}
 	switch rf.Scenario {
 	case InvalidCreds:
 		return nil, nil, invalidCredsError

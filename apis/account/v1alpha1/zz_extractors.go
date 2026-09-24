@@ -1,21 +1,9 @@
 package v1alpha1
 
 import (
-	"github.com/crossplane/crossplane-runtime/pkg/reference"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reference"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 )
-
-// GlobalAccountUuid Global Account UUID extractor function
-func GlobalAccountUuid() reference.ExtractValueFn {
-	return func(mg resource.Managed) string {
-		sg, ok := mg.(*GlobalAccount)
-		if !ok {
-			return ""
-		}
-		return sg.Status.AtProvider.Guid
-
-	}
-}
 
 // DirectoryUuid Directory Account UUID extractor function
 func DirectoryUuid() reference.ExtractValueFn {

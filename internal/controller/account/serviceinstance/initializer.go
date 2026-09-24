@@ -3,7 +3,7 @@ package serviceinstance
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
@@ -38,6 +38,15 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 		return nil
 	}
 
+	// Direct plan ID provided — skip name-based resolution
+	if cr.Spec.ForProvider.ServicePlanID != "" {
+		cr.Status.AtProvider.ServiceplanID = cr.Spec.ForProvider.ServicePlanID
+		if err := kube.Status().Update(ctx, cr); err != nil {
+			return errors.Wrap(err, errSaveData)
+		}
+		return nil
+	}
+
 	secretData, err := s.loadSecretFn(ctx, kube, cr.Spec.ForProvider.ServiceManagerSecret, cr.Spec.ForProvider.ServiceManagerSecretNamespace)
 	if err != nil {
 		return errors.Wrap(err, errLoadSmBinding)
@@ -48,7 +57,7 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 		return errors.Wrap(err, errInitPlanResolver)
 	}
 
-	planID, err := idResolver.PlanIDByName(ctx, cr.Spec.ForProvider.OfferingName, cr.Spec.ForProvider.PlanName)
+	planID, err := idResolver.PlanIDByName(ctx, cr.Spec.ForProvider.OfferingName, cr.Spec.ForProvider.PlanName, cr.Spec.ForProvider.DataCenter)
 	if err != nil {
 		return errors.Wrap(err, errInitialize)
 	}

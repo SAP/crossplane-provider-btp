@@ -34,7 +34,8 @@ type ServicePlanResponseObject struct {
 	Free *bool `json:"free,omitempty"`
 	// The ID of the service plan.
 	Id *string `json:"id,omitempty"`
-	Metadata *ServicePlanMetadata `json:"metadata,omitempty"`
+	// The metadata associated with the service plan.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	// The name of the service plan.
 	Name *string `json:"name,omitempty"`
 	// Whether the service plan is ready.
@@ -287,17 +288,17 @@ func (o *ServicePlanResponseObject) SetId(v string) {
 }
 
 // GetMetadata returns the Metadata field value if set, zero value otherwise.
-func (o *ServicePlanResponseObject) GetMetadata() ServicePlanMetadata {
+func (o *ServicePlanResponseObject) GetMetadata() map[string]interface{} {
 	if o == nil || IsNil(o.Metadata) {
-		var ret ServicePlanMetadata
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Metadata
+	return o.Metadata
 }
 
 // GetMetadataOk returns a tuple with the Metadata field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ServicePlanResponseObject) GetMetadataOk() (*ServicePlanMetadata, bool) {
+func (o *ServicePlanResponseObject) GetMetadataOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Metadata) {
 		return nil, false
 	}
@@ -313,9 +314,9 @@ func (o *ServicePlanResponseObject) HasMetadata() bool {
 	return false
 }
 
-// SetMetadata gets a reference to the given ServicePlanMetadata and assigns it to the Metadata field.
-func (o *ServicePlanResponseObject) SetMetadata(v ServicePlanMetadata) {
-	o.Metadata = &v
+// SetMetadata gets a reference to the given map[string]interface{} and assigns it to the Metadata field.
+func (o *ServicePlanResponseObject) SetMetadata(v map[string]interface{}) {
+	o.Metadata = v
 }
 
 // GetName returns the Name field value if set, zero value otherwise.

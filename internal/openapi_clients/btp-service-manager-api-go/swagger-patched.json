@@ -1314,7 +1314,8 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/ServicePlanMetadata"
+            "description": "The metadata associated with the service plan.",
+            "type": "object"
           },
           "name": {
             "description": "The name of the service plan.",

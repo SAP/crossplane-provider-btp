@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/pkg/errors"
@@ -25,6 +25,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	kyma "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
 	"github.com/sap/crossplane-provider-btp/internal/controller/environment/kyma/fake"
+	"github.com/sap/crossplane-provider-btp/internal/testutils"
 )
 
 // Unlike many Kubernetes projects Crossplane does not use third party testing
@@ -588,6 +589,88 @@ func TestObserve(t *testing.T) {
 	}
 }
 
+func TestRecreateOnCreationFailure(t *testing.T) {
+	deleteCounter := 0
+	mockClient := fake.MockClient{
+		MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+			return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+				Id:         internal.Ptr(testUUID),
+				State:      internal.Ptr(v1alpha1.InstanceStateCreationFailed),
+				Parameters: internal.Ptr("{\"name\":\"kyma\"}"),
+			}, nil
+		},
+		MockDeleteCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*http.Response, error) {
+			deleteCounter++
+			return &http.Response{StatusCode: http.StatusOK}, nil
+		},
+	}
+
+	e := external{
+		client:     mockClient,
+		httpClient: http.DefaultClient,
+		kube:       test.NewMockClient(),
+		record:     event.NewNopRecorder(),
+		tracker:    testutils.NewResourceTrackerMock(),
+	}
+
+	cr := environment(
+		withExternalName(testUUID),
+		withUID("1234"),
+		withRecreateOnCreationFailure(),
+	)
+
+	t.Run("TriggersDelete", func(t *testing.T) {
+		got, err := e.Observe(context.Background(), cr)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if deleteCounter != 1 {
+			t.Errorf("expected 1 delete call, got %d", deleteCounter)
+		}
+		if diff := cmp.Diff(managed.ExternalObservation{
+			ResourceExists:    true,
+			ResourceUpToDate:  true,
+			ConnectionDetails: managed.ConnectionDetails{},
+		}, got); diff != "" {
+			t.Errorf("-want, +got:\n%s", diff)
+		}
+	})
+
+	t.Run("SkipsDeleteWhenAlreadyDeleting", func(t *testing.T) {
+		got, err := e.Observe(context.Background(), cr)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if deleteCounter != 1 {
+			t.Errorf("expected no additional delete call, got %d", deleteCounter)
+		}
+		if diff := cmp.Diff(managed.ExternalObservation{
+			ResourceExists:    true,
+			ResourceUpToDate:  true,
+			ConnectionDetails: managed.ConnectionDetails{},
+		}, got); diff != "" {
+			t.Errorf("-want, +got:\n%s", diff)
+		}
+	})
+
+	t.Run("ResourceGoneAfterDeletion", func(t *testing.T) {
+		e.client = fake.MockClient{
+			MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+				return nil, nil
+			},
+		}
+		got, err := e.Observe(context.Background(), cr)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if diff := cmp.Diff(managed.ExternalObservation{
+			ResourceExists: false,
+		}, got); diff != "" {
+			t.Errorf("-want, +got:\n%s", diff)
+		}
+	})
+}
+
 func ignoreCircuitBreakerStatus() cmp.Option {
 	return cmpopts.IgnoreTypes(&v1alpha1.RetryStatus{})
 }
@@ -847,6 +930,12 @@ func withRetryStatus(retryStatus *v1alpha1.RetryStatus) environmentModifier {
 func withObservation(observation v1alpha1.KymaEnvironmentObservation) environmentModifier {
 	return func(r *v1alpha1.KymaEnvironment) {
 		r.Status.AtProvider = observation
+	}
+}
+
+func withRecreateOnCreationFailure() environmentModifier {
+	return func(r *v1alpha1.KymaEnvironment) {
+		r.Spec.RecreateOnCreationFailure = true
 	}
 }
 

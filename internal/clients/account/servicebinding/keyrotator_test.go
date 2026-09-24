@@ -3,6 +3,7 @@ package servicebindingclient
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 
 var (
@@ -37,8 +39,8 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 				},
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour * 24},
-						Frequency: &metav1.Duration{Duration: time.Hour * 6},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour * 24},
+						Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 6},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -61,8 +63,8 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 				},
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour * 24},
-						Frequency: &metav1.Duration{Duration: time.Hour * 6},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour * 24},
+						Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 6},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -89,8 +91,8 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour * 24},
-						Frequency: &metav1.Duration{Duration: time.Hour},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour * 24},
+						Frequency: &providerv1alpha1.Duration{Duration: time.Hour},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -109,8 +111,8 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour * 24},
-						Frequency: &metav1.Duration{Duration: time.Hour * 4},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour * 24},
+						Frequency: &providerv1alpha1.Duration{Duration: time.Hour * 4},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -142,8 +144,8 @@ func TestSBKeyRotator_RetireBinding(t *testing.T) {
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour * 24},
-						Frequency: &metav1.Duration{Duration: time.Hour},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour * 24},
+						Frequency: &providerv1alpha1.Duration{Duration: time.Hour},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -198,8 +200,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour},
-						Frequency: &metav1.Duration{Duration: 30 * time.Minute},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour},
+						Frequency: &providerv1alpha1.Duration{Duration: 30 * time.Minute},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -221,8 +223,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour},
-						Frequency: &metav1.Duration{Duration: 30 * time.Minute},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour},
+						Frequency: &providerv1alpha1.Duration{Duration: 30 * time.Minute},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -244,8 +246,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour},
-						Frequency: &metav1.Duration{Duration: 30 * time.Minute},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour},
+						Frequency: &providerv1alpha1.Duration{Duration: 30 * time.Minute},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -276,8 +278,8 @@ func TestSBKeyRotator_HasExpiredKeys(t *testing.T) {
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour},
-						Frequency: &metav1.Duration{Duration: 30 * time.Minute},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour},
+						Frequency: &providerv1alpha1.Duration{Duration: 30 * time.Minute},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -323,8 +325,8 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour},
-						Frequency: &metav1.Duration{Duration: 30 * time.Minute},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour},
+						Frequency: &providerv1alpha1.Duration{Duration: 30 * time.Minute},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -356,8 +358,8 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour},
-						Frequency: &metav1.Duration{Duration: 30 * time.Minute},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour},
+						Frequency: &providerv1alpha1.Duration{Duration: 30 * time.Minute},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -380,12 +382,40 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 			wantDeleteCallCount: 1,
 		},
 		{
+			name: "DeleteExpiredKeysWithTransientVerifyError",
+			cr: &v1alpha1.ServiceBinding{
+				Spec: v1alpha1.ServiceBindingSpec{
+					Rotation: &v1alpha1.RotationParameters{
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour},
+						Frequency: &providerv1alpha1.Duration{Duration: 30 * time.Minute},
+					},
+				},
+				Status: v1alpha1.ServiceBindingStatus{
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "expired-key",
+							Name:         "expired-name",
+							CreatedDate:  metav1.Time{Time: expiredTime},
+							RetiredDate:  metav1.Time{Time: expiredTime},
+							DeletionDate: &metav1.Time{Time: expiredTime.Add(30 * time.Minute)},
+						},
+					},
+				},
+			},
+			mockDeleter: &MockInstanceDeleter{
+				err: fmt.Errorf("read-back failed: %w", ErrVerifyTransient),
+			},
+			wantNewKeysCount:    1, // Key kept for retry
+			wantErr:             true,
+			wantDeleteCallCount: 1,
+		},
+		{
 			name: "NoExpiredKeys",
 			cr: &v1alpha1.ServiceBinding{
 				Spec: v1alpha1.ServiceBindingSpec{
 					Rotation: &v1alpha1.RotationParameters{
-						TTL:       &metav1.Duration{Duration: time.Hour},
-						Frequency: &metav1.Duration{Duration: 30 * time.Minute},
+						TTL:       &providerv1alpha1.Duration{Duration: time.Hour},
+						Frequency: &providerv1alpha1.Duration{Duration: 30 * time.Minute},
 					},
 				},
 				Status: v1alpha1.ServiceBindingStatus{
@@ -422,16 +452,35 @@ func TestSBKeyRotator_DeleteExpiredKeys(t *testing.T) {
 
 			assert.Equal(t, tt.wantNewKeysCount, len(gotKeys))
 			assert.Equal(t, tt.wantDeleteCallCount, mockDeleter.deleteCallCount)
+
+			// On a failed deletion the kept key must record the attempt and the
+			// error so the leak is visible/alertable.
+			if tt.name == "DeleteExpiredKeysWithError" {
+				assert.Len(t, gotKeys, 1)
+				assert.Equal(t, int32(1), gotKeys[0].DeletionAttempts)
+				assert.NotEmpty(t, gotKeys[0].LastDeletionError)
+			}
+
+			// A transient verification failure is not a proven leak: the key is
+			// kept for retry but must NOT record failure bookkeeping, otherwise
+			// a binding that is already gone raises a spurious leak alert.
+			if tt.name == "DeleteExpiredKeysWithTransientVerifyError" {
+				assert.Len(t, gotKeys, 1)
+				assert.Equal(t, int32(0), gotKeys[0].DeletionAttempts)
+				assert.Empty(t, gotKeys[0].LastDeletionError)
+			}
 		})
 	}
 }
 
 func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 	tests := []struct {
-		name        string
-		cr          *v1alpha1.ServiceBinding
-		mockDeleter BindingDeleter
-		wantErr     bool
+		name           string
+		cr             *v1alpha1.ServiceBinding
+		mockDeleter    BindingDeleter
+		wantErr        bool
+		wantAttempts   int32
+		wantLastErrSet bool
 	}{
 		{
 			name: "DeleteAllRetiredKeysSuccessfully",
@@ -470,6 +519,13 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 							RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
 							DeletionDate: nil,
 						},
+						{
+							ID:           "key2",
+							Name:         "name2",
+							CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+							RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
+							DeletionDate: nil,
+						},
 					},
 				},
 			},
@@ -477,6 +533,34 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 				err: errMockInstanceDelete,
 			},
 			wantErr: true,
+			// A stuck key must not hide the others: every key is attempted and
+			// each failure records the attempt/error so the leak is alertable.
+			wantAttempts:   1,
+			wantLastErrSet: true,
+		},
+		{
+			name: "DeleteRetiredKeysWithTransientVerifyError",
+			cr: &v1alpha1.ServiceBinding{
+				Status: v1alpha1.ServiceBindingStatus{
+					RetiredKeys: []*v1alpha1.RetiredSBResource{
+						{
+							ID:           "key1",
+							Name:         "name1",
+							CreatedDate:  metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+							RetiredDate:  metav1.Time{Time: time.Now().Add(-time.Hour)},
+							DeletionDate: nil,
+						},
+					},
+				},
+			},
+			mockDeleter: &MockInstanceDeleter{
+				err: fmt.Errorf("read-back failed: %w", ErrVerifyTransient),
+			},
+			wantErr: true,
+			// A transient verification failure is not a proven leak: retry
+			// without recording failure bookkeeping.
+			wantAttempts:   0,
+			wantLastErrSet: false,
 		},
 		{
 			name: "NoRetiredKeys",
@@ -506,6 +590,17 @@ func TestSBKeyRotator_DeleteRetiredKeys(t *testing.T) {
 
 			expectedCallCount := len(tt.cr.Status.RetiredKeys)
 			assert.Equal(t, expectedCallCount, mockDeleter.deleteCallCount)
+
+			// Bookkeeping is consistent with DeleteExpiredKeys: a proven delete
+			// failure records the attempt/error, a transient verify failure does not.
+			for _, key := range tt.cr.Status.RetiredKeys {
+				assert.Equal(t, tt.wantAttempts, key.DeletionAttempts)
+				if tt.wantLastErrSet {
+					assert.NotEmpty(t, key.LastDeletionError)
+				} else {
+					assert.Empty(t, key.LastDeletionError)
+				}
+			}
 		})
 	}
 }
@@ -536,8 +631,8 @@ func TestDeletionDate(t *testing.T) {
 			name:     "Normal case with TTL 24h and Frequency 6h",
 			baseTime: baseTime,
 			rotation: &v1alpha1.RotationParameters{
-				TTL:       &metav1.Duration{Duration: 24 * time.Hour},
-				Frequency: &metav1.Duration{Duration: 6 * time.Hour},
+				TTL:       &providerv1alpha1.Duration{Duration: 24 * time.Hour},
+				Frequency: &providerv1alpha1.Duration{Duration: 6 * time.Hour},
 			},
 			expectedTime: baseTime.Add(18 * time.Hour), // TTL - Frequency = 24h - 6h = 18h
 		},
@@ -545,8 +640,8 @@ func TestDeletionDate(t *testing.T) {
 			name:     "Edge case with TTL equal to Frequency",
 			baseTime: baseTime,
 			rotation: &v1alpha1.RotationParameters{
-				TTL:       &metav1.Duration{Duration: 6 * time.Hour},
-				Frequency: &metav1.Duration{Duration: 6 * time.Hour},
+				TTL:       &providerv1alpha1.Duration{Duration: 6 * time.Hour},
+				Frequency: &providerv1alpha1.Duration{Duration: 6 * time.Hour},
 			},
 			expectedTime: baseTime, // TTL - Frequency = 6h - 6h = 0h
 		},
@@ -554,8 +649,8 @@ func TestDeletionDate(t *testing.T) {
 			name:     "Large TTL with small Frequency",
 			baseTime: baseTime,
 			rotation: &v1alpha1.RotationParameters{
-				TTL:       &metav1.Duration{Duration: 7 * 24 * time.Hour}, // 7 days
-				Frequency: &metav1.Duration{Duration: 1 * time.Hour},
+				TTL:       &providerv1alpha1.Duration{Duration: 7 * 24 * time.Hour}, // 7 days
+				Frequency: &providerv1alpha1.Duration{Duration: 1 * time.Hour},
 			},
 			expectedTime: baseTime.Add(7*24*time.Hour - time.Hour), // 7 days - 1 hour
 		},

@@ -1,49 +1,16 @@
-FROM alpine:3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
-RUN apk --no-cache add ca-certificates bash
+ARG BASE_NAME=alpine:3.23.3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+FROM ${BASE_NAME}
+RUN apk --no-cache add ca-certificates
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG COMMIT_HASH
+ARG VERSION
+ARG BASE_NAME
 
 ADD bin/${TARGETOS}_${TARGETARCH}/provider /usr/local/bin/crossplane-provider-btp
 
 ENV USER_ID=65532
-
-# Setup Terraform environment
-
-## Provider-dependent configuration
-ARG TERRAFORM_VERSION
-ARG TERRAFORM_PROVIDER_SOURCE
-ARG TERRAFORM_PROVIDER_VERSION
-ARG TERRAFORM_PROVIDER_DOWNLOAD_NAME
-ARG TERRAFORM_NATIVE_PROVIDER_BINARY
-ARG CROSSPLANE_PROVIDER_VERSION
-
-## End of - Provider-dependent configuration
-
-ENV PLUGIN_DIR=/terraform/provider-mirror/registry.terraform.io/${TERRAFORM_PROVIDER_SOURCE}/${TERRAFORM_PROVIDER_VERSION}/${TARGETOS}_${TARGETARCH}
-ENV TF_CLI_CONFIG_FILE=/terraform/.terraformrc
-ENV TF_FORK=0
-
-RUN mkdir -p ${PLUGIN_DIR}
-
-ADD https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_${TARGETOS}_${TARGETARCH}.zip /tmp
-ADD https://github.com/SAP/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}/releases/download/v${TERRAFORM_PROVIDER_VERSION}/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}_${TERRAFORM_PROVIDER_VERSION}_${TARGETOS}_${TARGETARCH}.zip /tmp
-COPY terraformrc.hcl ${TF_CLI_CONFIG_FILE}
-
-RUN unzip /tmp/terraform_${TERRAFORM_VERSION}_${TARGETOS}_${TARGETARCH}.zip -d /usr/local/bin \
-  && chmod +x /usr/local/bin/terraform \
-  && rm /tmp/terraform_${TERRAFORM_VERSION}_${TARGETOS}_${TARGETARCH}.zip \
-  && unzip /tmp/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}_${TERRAFORM_PROVIDER_VERSION}_${TARGETOS}_${TARGETARCH}.zip -d ${PLUGIN_DIR} \
-  && chmod +x ${PLUGIN_DIR}/* \
-  && rm /tmp/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}_${TERRAFORM_PROVIDER_VERSION}_${TARGETOS}_${TARGETARCH}.zip \
-  && chown -R ${USER_ID}:${USER_ID} /terraform
-
-# Provider controller needs these environment variables at runtime
-ENV TERRAFORM_VERSION=${TERRAFORM_VERSION}
-ENV TERRAFORM_PROVIDER_SOURCE=${TERRAFORM_PROVIDER_SOURCE}
-ENV TERRAFORM_PROVIDER_VERSION=${TERRAFORM_PROVIDER_VERSION}
-ENV TERRAFORM_NATIVE_PROVIDER_PATH=${PLUGIN_DIR}/${TERRAFORM_NATIVE_PROVIDER_BINARY}
-ENV TF_APPEND_USER_AGENT="crossplane-provider-btp/${CROSSPLANE_PROVIDER_VERSION}"
 
 USER ${USER_ID}
 EXPOSE 8080
@@ -56,4 +23,6 @@ LABEL org.opencontainers.image.title="provider-btp" \
       org.opencontainers.image.url="https://github.com/sap/crossplane-provider-btp" \
       org.opencontainers.image.source="https://github.com/sap/crossplane-provider-btp.git" \
       org.opencontainers.image.vendor="SAP SE" \
-      org.opencontainers.image.base.name="docker.io/library/alpine:3.23.3"
+      org.opencontainers.image.base.name="${BASE_NAME}" \
+      org.opencontainers.image.revision="${COMMIT_HASH}" \
+      org.opencontainers.image.version="${VERSION}"

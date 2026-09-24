@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 
 	"golang.org/x/oauth2"
 )
@@ -27,6 +27,11 @@ func SetLogger(logger logging.Logger) {
 // SetDebug sets the debug flag for the debug client.
 func SetDebug(debugFlag bool) {
 	debug = debugFlag
+}
+
+// IsDebug reports whether debug logging is enabled.
+func IsDebug() bool {
+	return debug
 }
 
 // NewBackgroundContextWithDebugPrintHTTPClient creates a new context with a HTTP client that logs the request and response in the RoundTrip.

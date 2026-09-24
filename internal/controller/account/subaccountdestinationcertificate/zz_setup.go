@@ -1,0 +1,28 @@
+package subaccountdestinationcertificate
+
+import (
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
+	"github.com/sap/crossplane-provider-btp/internal/tracking"
+)
+
+func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
+	return providerconfig.DefaultSetupWithoutDefaultInitializer(
+		mgr, o,
+		&apisv1alpha1.SubaccountDestinationCertificate{},
+		apisv1alpha1.SubaccountDestinationCertificate_GroupKind,
+		apisv1alpha1.SubaccountDestinationCertificate_GroupVersionKind,
+		func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
+			return &connector{
+				kube:            kube,
+				usage:           usage,
+				resourcetracker: resourcetracker,
+			}
+		},
+	)
+}

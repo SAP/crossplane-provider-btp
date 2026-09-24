@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -125,6 +125,50 @@ func TestServicePlanInitializer_Initialize(t *testing.T) {
 				err:    nil,
 			},
 		},
+		"success with dataCenter": {
+			mg: &v1alpha1.ServiceInstance{
+				Spec: v1alpha1.ServiceInstanceSpec{
+					ForProvider: v1alpha1.ServiceInstanceParameters{
+						OfferingName: "hana-cloud",
+						PlanName:     "hana",
+						DataCenter:   "cf-eu10",
+					},
+				},
+			},
+			loadSecretFn: func(ctx context.Context, kube client.Client, name, ns string) (map[string][]byte, error) {
+				return map[string][]byte{}, nil
+			},
+			newIdResolverFn: func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error) {
+				return &mockPlanIdResolver{testPlanID, nil}, nil
+			},
+			kube: &test.MockClient{
+				MockStatusUpdate: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					return nil
+				},
+			},
+			want: want{
+				planID: testPlanID,
+				err:    nil,
+			},
+		},
+		"success with direct servicePlanID": {
+			mg: &v1alpha1.ServiceInstance{
+				Spec: v1alpha1.ServiceInstanceSpec{
+					ForProvider: v1alpha1.ServiceInstanceParameters{
+						ServicePlanID: "direct-plan-uuid",
+					},
+				},
+			},
+			kube: &test.MockClient{
+				MockStatusUpdate: func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					return nil
+				},
+			},
+			want: want{
+				planID: "direct-plan-uuid",
+				err:    nil,
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -166,6 +210,6 @@ type mockPlanIdResolver struct {
 	err    error
 }
 
-func (m *mockPlanIdResolver) PlanIDByName(ctx context.Context, offeringName, planName string) (string, error) {
+func (m *mockPlanIdResolver) PlanIDByName(ctx context.Context, offeringName, planName string, dataCenter string) (string, error) {
 	return m.planID, m.err
 }

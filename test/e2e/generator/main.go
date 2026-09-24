@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	ujconfig "github.com/crossplane/upjet/pkg/config"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
+	ujconfig "github.com/crossplane/upjet/v2/pkg/config"
 	"github.com/muvaf/typewriter/pkg/wrapper"
 
 	"github.com/sap/crossplane-provider-btp/config"

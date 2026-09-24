@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 type RoleReference struct {
@@ -63,8 +63,8 @@ type RoleCollectionStatus struct {
 //   - Follows Standard: no (uses name as identifier, not a GUID)
 //   - Format: Role Collection Name (string)
 //   - How to find:
-//     - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
-//     - CLI: btp get security/role-collection `"<name>"` → `name`
+//   - UI: BTP Cockpit → Subaccount → Security → Role Collections → [Role Collection Name]
+//   - CLI: btp get security/role-collection `"<name>"` → `name`
 //
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"

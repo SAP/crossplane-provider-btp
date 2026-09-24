@@ -4,17 +4,18 @@ import (
 	"context"
 	"fmt"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
+	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,7 +35,7 @@ var (
 // is called.
 type connector struct {
 	kube            client.Client
-	usage           resource.Tracker
+	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
 
 	newServiceFn func(kymaEnvironmentKubeconfig []byte) (kymamodule.Client, error)
@@ -90,6 +91,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotKymaModule)
 	}
 
+	// Per ADR: if external-name is not set, resource does not exist yet
+	externalName := meta.GetExternalName(cr)
+	if externalName == "" {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
+
 	// Get the reference for the kyma environment binding
 	if cr.Spec.KymaEnvironmentBindingRef == nil {
 		cr.SetConditions(xpv1.Unavailable().WithMessage(
@@ -129,7 +136,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	res, err := c.client.ObserveModule(ctx, cr)
+	res, err := c.client.ObserveModule(ctx, externalName)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errObserveResource)
 	}
@@ -140,6 +147,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
+	cr.Status.AtProvider = *res
 	cr.Status.SetConditions(xpv1.Available())
 
 	return managed.ExternalObservation{
@@ -186,9 +194,9 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, nil
 	}
 
-	// Delete the module from Kyma cluster
+	// Delete the module from Kyma cluster using external-name as the identifier
 	if c.client != nil {
-		err := c.client.DeleteModule(ctx, cr.Spec.ForProvider.Name)
+		err := c.client.DeleteModule(ctx, meta.GetExternalName(cr))
 		if err != nil {
 			return managed.ExternalDelete{}, errors.Wrap(err, errDeleteModule)
 		}

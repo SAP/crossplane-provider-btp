@@ -6,11 +6,19 @@ package e2e
 
 import (
 	"context"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
+	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
+	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 )
@@ -40,4 +48,87 @@ func Test_SubaccountServiceBroker_v1alpha1(t *testing.T) {
 	fB.Teardown(resource.Teardown)
 
 	testenv.TestInParallel(t, fB.Feature())
+}
+
+const (
+	SERVICE_BROKER_URL_ENV_KEY      = "SERVICE_BROKER_URL"
+	SERVICE_BROKER_USERNAME_ENV_KEY = "SERVICE_BROKER_USERNAME"
+	SERVICE_BROKER_PASSWORD_ENV_KEY = "SERVICE_BROKER_PASSWORD"
+)
+
+// TestSubaccountServiceBrokerImportFlow tests the import (adoption) flow for SubaccountServiceBroker.
+// ADR(external-name): compound key "<subaccount-id>/<broker-id>"; observe-only import is unsupported (tfstate id must stay the bare broker id), so this exercises adoption via managementPolicies: ["*"].
+func TestSubaccountServiceBrokerImportFlow(t *testing.T) {
+	const importK8sResName = "broker-import-test"
+
+	// The broker must be publicly reachable by the BTP service manager, so this
+	// flow can only run in an environment equipped with a live service broker.
+	// Gate on all three variables: a partial configuration must skip, not panic.
+	brokerURL := os.Getenv(SERVICE_BROKER_URL_ENV_KEY)
+	brokerUser := os.Getenv(SERVICE_BROKER_USERNAME_ENV_KEY)
+	brokerPassword := os.Getenv(SERVICE_BROKER_PASSWORD_ENV_KEY)
+	if brokerURL == "" || brokerUser == "" || brokerPassword == "" {
+		t.Skipf(
+			"Skipping SubaccountServiceBroker import flow: requires a service broker reachable by the BTP service manager; set %s, %s and %s to run.",
+			SERVICE_BROKER_URL_ENV_KEY, SERVICE_BROKER_USERNAME_ENV_KEY, SERVICE_BROKER_PASSWORD_ENV_KEY,
+		)
+	}
+
+	brokerName := importK8sResName
+
+	// The credentials Secret is created directly instead of via the dependent-resource
+	// directory: resources.ImportResources would relocate it into the random test
+	// namespace (decoder.MutateNamespace), away from the "default" namespace the
+	// broker's passwordSecretRef points at, and WaitForResourcesToBeSynced would wait
+	// for Synced/Ready conditions that a core Secret never gets.
+	// No Teardown here: features run sequentially, so a teardown would delete the
+	// Secret before the import feature runs.
+	credentialsFeature := features.New("SubaccountServiceBroker Import Flow credentials").
+		Setup(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "sub-broker-import-credentials",
+					Namespace: "default",
+				},
+				Type:       corev1.SecretTypeOpaque,
+				StringData: map[string]string{"password": brokerPassword},
+			}
+			if err := cfg.Client().Resources().Create(ctx, secret); err != nil && !k8serrors.IsAlreadyExists(err) {
+				t.Fatalf("Failed to create broker credentials secret: %v", err)
+			}
+			return ctx
+		}).Feature()
+
+	importTester := NewImportTester(
+		&v1alpha1.SubaccountServiceBroker{
+			Spec: v1alpha1.SubaccountServiceBrokerSpec{
+				ForProvider: v1alpha1.SubaccountServiceBrokerParameters{
+					Name:     &brokerName,
+					URL:      &brokerURL,
+					Username: &brokerUser,
+					PasswordSecretRef: &xpv1.SecretKeySelector{
+						SecretReference: xpv1.SecretReference{
+							Name:      "sub-broker-import-credentials",
+							Namespace: "default",
+						},
+						Key: "password",
+					},
+					SubaccountRef: &xpv1.Reference{
+						Name: "sub-broker-import-test",
+					},
+				},
+			},
+		},
+		importK8sResName,
+		WithWaitCreateTimeout[*v1alpha1.SubaccountServiceBroker](wait.WithTimeout(5*time.Minute)),
+		WithWaitDeletionTimeout[*v1alpha1.SubaccountServiceBroker](wait.WithTimeout(3*time.Minute)),
+		WithDependentResourceDirectory[*v1alpha1.SubaccountServiceBroker](crsPath("SubaccountServiceBrokerImport")),
+		WithWaitDependentResourceTimeout[*v1alpha1.SubaccountServiceBroker](wait.WithTimeout(15*time.Minute)),
+	)
+
+	testenv.Test(
+		t,
+		credentialsFeature,
+		importTester.BuildTestFeature("SubaccountServiceBroker Import Flow").Feature(),
+	)
 }

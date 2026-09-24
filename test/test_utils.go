@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -12,12 +13,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/logging"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	"github.com/crossplane-contrib/xp-testing/pkg/vendored"
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
-	v1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/pkg/errors"
 	metaApi "github.com/sap/crossplane-provider-btp/apis"
 	apiV1Alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/vladimirvivien/gexe"
@@ -36,11 +39,22 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
 	"sigs.k8s.io/e2e-framework/pkg/features"
+	"sigs.k8s.io/e2e-framework/third_party/helm"
 )
 
 const (
-	uutConfigKey = "crossplane/provider-btp"
+	uutConfigKey           = "crossplane/provider-btp"
+	uutControllerConfigKey = "crossplane/provider-btp-controller"
+
+	// firstSingleImageVersion is the first release that uses the single-image build
+	// (controller embedded in the package). Versions before this have a separate controller image.
+	firstSingleImageVersion = "1.10.0"
+
+	// firstBackoffFlagsVersion is the first release that accepts the
+	// `--backoff-base` / `--backoff-max` flags on the provider binary
+	firstBackoffFlagsVersion = "1.8.0"
 )
 
 type mockList struct {
@@ -53,6 +67,133 @@ func SetupLogging(verbosity int) {
 	logging.EnableVerboseLogging(&verbosity)
 	zl := zap.New(zap.UseDevMode(true))
 	ctrl.SetLogger(zl)
+}
+
+// crossplaneCacheMount is the host-path directory on the kind control-plane
+// container that backs the package-cache PVC. This must match the path
+// xp-testing's InstallCrossplaneProvider docker-cps the xpkg into:
+// /cache/xpkg/<name>.gz in xp-testing v1.9.2 (xpenvfuncs.go:326-327). The
+// Crossplane helm chart mounts the PVC at /cache in the pod, so a host
+// hostPath of /cache/xpkg surfaces files at /cache/<name>.gz inside the pod —
+// which is where Crossplane's package manager looks.
+const crossplaneCacheMount = "/cache/xpkg"
+
+// crossplaneCacheVolumeTemplate is the PV+PVC manifest pair that backs the
+// helm chart's `--set packageCache.pvc=<name>` reference. Format args:
+//  1. PV name
+//  2. PV hostPath
+//  3. PVC name
+//  4. PVC volumeName
+const crossplaneCacheVolumeTemplate = `apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: %s
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 5Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "%s"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: %s
+  namespace: crossplane-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeName: %s
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 1Mi
+`
+
+// setupCrossplanePackageCache prepares the Crossplane package-cache on the
+// given kind cluster's control-plane node:
+//  1. `docker exec <cluster>-control-plane mkdir -m 777 -p /cache` to create
+//     the host-path directory the PV binds to.
+//  2. Applies a PV (hostPath: /cache) + PVC (in crossplane-system) named
+//     cacheName, which the helm chart references via
+//     `--set packageCache.pvc=<cacheName>`.
+//
+// Inline replicates xp-testing v1.9.2's unexported helper of the same name
+// (pkg/xpenvfuncs/xpenvfuncs.go). When that helper becomes exportable
+// upstream (see crossplane-contrib/xp-testing#134 and follow-ups), this
+// implementation can be removed in favor of the upstream entry point.
+func setupCrossplanePackageCache(clusterName, cacheName string) env.Func {
+	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
+		controlPlane := clusterName + "-control-plane"
+
+		// Step 1: ensure the host-path dir exists on the kind container.
+		cmd := exec.CommandContext(ctx, "docker", "exec", controlPlane,
+			"mkdir", "-m", "777", "-p", crossplaneCacheMount)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return ctx, errors.Wrapf(err, "setupCrossplanePackageCache: docker exec mkdir on %s failed: %s", controlPlane, string(out))
+		}
+
+		// Step 2: apply PV + PVC.
+		manifest := fmt.Sprintf(crossplaneCacheVolumeTemplate,
+			cacheName,            // PV name
+			crossplaneCacheMount, // PV hostPath
+			cacheName,            // PVC name
+			cacheName,            // PVC volumeName
+		)
+
+		r, err := res.New(cfg.Client().RESTConfig())
+		if err != nil {
+			return ctx, errors.Wrap(err, "setupCrossplanePackageCache: resources.New failed")
+		}
+		if err := decoder.DecodeEach(ctx, strings.NewReader(manifest),
+			decoder.CreateHandler(r),
+		); err != nil {
+			return ctx, errors.Wrap(err, "setupCrossplanePackageCache: apply PV/PVC failed")
+		}
+		return ctx, nil
+	}
+}
+
+// InstallCrossplaneFromChart returns an env.Func that installs Crossplane
+// from a caller-supplied chart reference, bypassing the
+// `helm repo add https://charts.crossplane.io/stable` flow that has been
+// throwing intermittent 403 Forbidden errors. See
+// docs/development/flakiness-analysis.md (Pattern A) for context.
+//
+// chartRef is anything `helm.WithChart` accepts: a local tarball path
+// (e.g. /path/to/crossplane-2.1.3.tgz), an OCI URL
+// (e.g. oci://example.com/crossplane), or a `repo/name` reference (legacy).
+// version is the chart version tag.
+func InstallCrossplaneFromChart(clusterName, chartRef, version string) env.Func {
+	const cacheName = "package-cache"
+	return xpenvfuncs.Compose(
+		envfuncs.CreateNamespace(xpenvfuncs.CrossplaneNamespace),
+		setupCrossplanePackageCache(clusterName, cacheName),
+		func(ctx context.Context, _ *envconf.Config) (context.Context, error) {
+			cluster, ok := envfuncs.GetClusterFromContext(ctx, clusterName)
+			if !ok {
+				return ctx, fmt.Errorf("install crossplane from chart: cluster %q missing from context", clusterName)
+			}
+			mgr := helm.New(cluster.GetKubeconfig())
+			err := mgr.RunInstall(
+				helm.WithName("crossplane"),
+				helm.WithNamespace(xpenvfuncs.CrossplaneNamespace),
+				helm.WithChart(chartRef),
+				helm.WithVersion(version),
+				helm.WithArgs("--set", fmt.Sprintf("packageCache.pvc=%s", cacheName)),
+				helm.WithTimeout("10m"),
+				helm.WithWait(),
+			)
+			if err != nil {
+				return ctx, errors.Wrap(err, "install crossplane from chart: helm install failed")
+			}
+			return ctx, nil
+		},
+	)
 }
 
 func ApplySecretInCrossplaneNamespace(name string, data map[string]string) env.Func {
@@ -318,7 +459,7 @@ func LoadDirectoriesWithYAMLFiles(path string, ignoreDirectories []string) ([]st
 	return directories, nil
 }
 
-func GetImagesFromJsonOrPanic(imagesJson string) string {
+func GetImagesFromJsonOrPanic(imagesJson string) (string, string) {
 	imageMap := map[string]string{}
 
 	err := json.Unmarshal([]byte(imagesJson), &imageMap)
@@ -328,8 +469,15 @@ func GetImagesFromJsonOrPanic(imagesJson string) string {
 	}
 
 	uutConfig := imageMap[uutConfigKey]
+	uutController := imageMap[uutControllerConfigKey]
 
-	return uutConfig
+	// For single-image builds, the controller key may not exist.
+	// In that case, the controller image is the same as the package image.
+	if uutController == "" {
+		uutController = uutConfig
+	}
+
+	return uutConfig, uutController
 }
 
 // LoadUpgradePackages resolves provider packages for upgrade tests.
@@ -338,17 +486,18 @@ func GetImagesFromJsonOrPanic(imagesJson string) string {
 //   - "local" tag: Uses locally built images from the UUT_IMAGES env var
 //   - Other tags: Constructs image URLs from repositories and optionally pulls them
 //
-// Returns: fromProviderPackage, toProviderPackage
+// Returns: fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
 func LoadUpgradePackages(
 	fromTag, toTag string,
 	fromProviderRepository, toProviderRepository string,
+	fromControllerRepository, toControllerRepository string,
 	uutImagesEnvVar, localTagName string,
 	pullPackages bool,
-) (string, string) {
+) (string, string, string, string) {
 	isLocalFromTag := fromTag == localTagName
 	isLocalToTag := toTag == localTagName
 
-	var fromProviderPackage, toProviderPackage string
+	var fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage string
 
 	// If either tag is local, parse UUT_IMAGES once.
 	if isLocalFromTag || isLocalToTag {
@@ -357,37 +506,87 @@ func LoadUpgradePackages(
 			panic(uutImagesEnvVar + " environment variable is required when FROM_TAG or TO_TAG is set to \"" + localTagName + "\"")
 		}
 
-		localProviderPackage := GetImagesFromJsonOrPanic(uutImages)
+		localProviderPackage, localControllerPackage := GetImagesFromJsonOrPanic(uutImages)
 		localTag := strings.Split(localProviderPackage, ":")[1]
 
 		if isLocalFromTag {
 			fromTag = localTag
 			fromProviderPackage = localProviderPackage
+			fromControllerPackage = localControllerPackage
 		}
 
 		if isLocalToTag {
 			toTag = localTag
 			toProviderPackage = localProviderPackage
+			toControllerPackage = localControllerPackage
 		}
 	}
 
 	if !isLocalFromTag {
 		fromProviderPackage = fmt.Sprintf("%s:%s", fromProviderRepository, fromTag)
 
+		if isSingleImageVersion(fromTag) {
+			fromControllerPackage = fromProviderPackage
+		} else {
+			fromControllerPackage = fmt.Sprintf("%s:%s", fromControllerRepository, fromTag)
+		}
+
 		if pullPackages {
 			mustPullImage(fromProviderPackage)
+			if fromControllerPackage != fromProviderPackage {
+				mustPullImage(fromControllerPackage)
+			}
 		}
 	}
 
 	if !isLocalToTag {
 		toProviderPackage = fmt.Sprintf("%s:%s", toProviderRepository, toTag)
 
+		if isSingleImageVersion(toTag) {
+			toControllerPackage = toProviderPackage
+		} else {
+			toControllerPackage = fmt.Sprintf("%s:%s", toControllerRepository, toTag)
+		}
+
 		if pullPackages {
 			mustPullImage(toProviderPackage)
+			if toControllerPackage != toProviderPackage {
+				mustPullImage(toControllerPackage)
+			}
 		}
 	}
 
-	return fromProviderPackage, toProviderPackage
+	return fromProviderPackage, toProviderPackage, fromControllerPackage, toControllerPackage
+}
+
+// isSingleImageVersion returns true if the given tag uses the single-image build
+// (controller embedded in the package). For these versions, no separate controller image exists.
+func isSingleImageVersion(tag string) bool {
+	threshold, err := semver.Parse(firstSingleImageVersion)
+	if err != nil {
+		return false
+	}
+	v, err := semver.Parse(strings.TrimPrefix(tag, "v"))
+	if err != nil {
+		// Non-semver tags (e.g. commit hashes) are assumed to be from main/latest and single-image
+		return true
+	}
+	return v.GE(threshold)
+}
+
+// supportsBackoffFlags reports whether the provider binary of the given tag
+// accepts the `--backoff-base` / `--backoff-max` flags.
+func supportsBackoffFlags(tag string) bool {
+	threshold, err := semver.Parse(firstBackoffFlagsVersion)
+	if err != nil {
+		return false
+	}
+	v, err := semver.Parse(strings.TrimPrefix(tag, "v"))
+	if err != nil {
+		// Non-semver tags (e.g. commit hashes) are assumed to be from main/latest and single-image
+		return true
+	}
+	return v.GE(threshold)
 }
 
 func mustPullImage(image string) {
@@ -400,7 +599,16 @@ func mustPullImage(image string) {
 	klog.V(4).Info("Pulled ", image)
 }
 
-func DeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeConfig {
+// DeploymentRuntimeConfig builds the shared DeploymentRuntimeConfig used to run
+// the provider under test. `tag` is the image tag of the provider that will run
+// with this config; it gates the `--backoff-base` / `--backoff-max` flags, which
+// were introduced in v1.8.0 (see [supportsBackoffFlags]). Passing them to an
+// older binary makes it exit with `unknown long flag`.
+func DeploymentRuntimeConfig(namePrefix, tag string) vendored.DeploymentRuntimeConfig {
+	args := []string{"--debug", "--sync=10s", "--poll=10s"}
+	if supportsBackoffFlags(tag) {
+		args = append(args, "--backoff-base=1s", "--backoff-max=10s")
+	}
 	return vendored.DeploymentRuntimeConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namePrefix + "-runtime-config",
@@ -414,7 +622,7 @@ func DeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeConfig
 							Containers: []corev1.Container{
 								{
 									Name: "package-runtime",
-									Args: []string{"--debug", "--sync=10s"},
+									Args: args,
 								},
 							},
 						},
@@ -423,6 +631,16 @@ func DeploymentRuntimeConfig(namePrefix string) vendored.DeploymentRuntimeConfig
 			},
 		},
 	}
+}
+
+// InstallProviderOptionsWithController overrides the ControllerImage in the given options
+// with the correct controller package image. This is needed for pre-single-image builds
+// where the controller image is separate from the package image.
+func InstallProviderOptionsWithController(
+	options xpenvfuncs.InstallCrossplaneProviderOptions, controllerPackage string,
+) xpenvfuncs.InstallCrossplaneProviderOptions {
+	options.ControllerImage = &controllerPackage
+	return options
 }
 
 func LoadDurationMins(envVar string, defaultValue int) time.Duration {

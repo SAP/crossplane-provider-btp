@@ -1,0 +1,14 @@
+apiVersion: security.btp.sap.crossplane.io/v1alpha1
+kind: RoleCollectionAssignment
+metadata:
+  name: upgrade-test-extn-rca
+  namespace: default
+spec:
+  forProvider:
+    origin: sap.default
+    roleCollectionName: Subaccount Viewer
+    userName: $TECHNICAL_USER_EMAIL
+  subaccountApiCredentialRef:
+    name: upgrade-test-extn-sac
+  subaccountApiCredentialSecret: upgrade-test-extn-sac-secret
+  subaccountApiCredentialSecretNamespace: default

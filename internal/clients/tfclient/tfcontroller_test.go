@@ -5,14 +5,16 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	ujresource "github.com/crossplane/upjet/pkg/resource"
-	"github.com/crossplane/upjet/pkg/resource/fake"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
+	"github.com/crossplane/upjet/v2/pkg/resource/fake"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -200,8 +202,9 @@ func TestObserve(t *testing.T) {
 				status: UpToDate,
 				err:    nil,
 				details: map[string][]byte{
-					"key1": []byte("value1"),
-					"key2": []byte("value2"),
+					"key1":                         []byte("value1"),
+					"key2":                         []byte("value2"),
+					providerv1alpha1.RawBindingKey: []byte(`{"key1":"value1","key2":"value2"}`),
 				},
 			},
 		},
@@ -399,6 +402,10 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+// TestQueryAsyncData pins the completion gate that guards observation
+// write-back. The framework async client signals a settled resource with
+// TypeLastAsyncOperation/True and never sets TypeAsyncOperation, so gating on
+// the latter would return nil forever and stop external-name propagation.
 func TestQueryAsyncData(t *testing.T) {
 	type args struct {
 		cr *fake.Terraformed
@@ -412,11 +419,23 @@ func TestQueryAsyncData(t *testing.T) {
 		want   want
 	}{
 		"CreationInProcess": {
-			reason: "No data available yet during creation",
+			reason: "No data available yet: the framework async client sets no condition at all while an operation is in flight",
+			args: args{
+				cr: terraformedCrWithData("test-external-name", "test-id", nil),
+			},
+			want: want{
+				data: nil,
+			},
+		},
+		"AsyncOperationFailed": {
+			reason: "A failed async operation must not write back a partial observation",
 			args: args{
 				cr: terraformedCrWithData("test-external-name", "test-id", []xpv1.Condition{
-					xpv1.Available(),
-					ujresource.AsyncOperationOngoingCondition(),
+					{
+						Type:   xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
+						Status: corev1.ConditionFalse,
+						Reason: ujresource.ReasonApplyFailure,
+					},
 				}),
 			},
 			want: want{
@@ -424,19 +443,14 @@ func TestQueryAsyncData(t *testing.T) {
 			},
 		},
 		"DataAvailable": {
-			reason: "Data is available after creation",
+			reason: "Data is available once the framework client reports LastAsyncOperation=True",
 			args: args{
 				cr: terraformedCrWithData("test-external-name", "test-id", []xpv1.Condition{
-					xpv1.Available(),
-					ujresource.AsyncOperationFinishedCondition(),
+					ujresource.LastAsyncOperationCondition(nil),
 				}),
 			},
 			want: want{
 				data: &ObservationData{
-					Conditions: []xpv1.Condition{
-						xpv1.Available(),
-						ujresource.AsyncOperationFinishedCondition(),
-					},
 					ExternalName: "test-external-name",
 					ID:           "test-id",
 				},
@@ -446,8 +460,7 @@ func TestQueryAsyncData(t *testing.T) {
 			reason: "All observation fields are extracted from the Terraform resource",
 			args: args{
 				cr: terraformedCrWithObservation("test-external-name", "test-id", []xpv1.Condition{
-					xpv1.Available(),
-					ujresource.AsyncOperationFinishedCondition(),
+					ujresource.LastAsyncOperationCondition(nil),
 				}, map[string]any{
 					"dashboard_url": "https://dashboard.example.com",
 					"created_date":  "2023-01-15T10:30:00Z",
@@ -460,10 +473,6 @@ func TestQueryAsyncData(t *testing.T) {
 			},
 			want: want{
 				data: &ObservationData{
-					Conditions: []xpv1.Condition{
-						xpv1.Available(),
-						ujresource.AsyncOperationFinishedCondition(),
-					},
 					ExternalName: "test-external-name",
 					ID:           "test-id",
 					DashboardURL: "https://dashboard.example.com",
@@ -480,8 +489,7 @@ func TestQueryAsyncData(t *testing.T) {
 			reason: "Dates with ISO8601 timezone offset (no colon) are parsed correctly",
 			args: args{
 				cr: terraformedCrWithObservation("test-external-name", "test-id", []xpv1.Condition{
-					xpv1.Available(),
-					ujresource.AsyncOperationFinishedCondition(),
+					ujresource.LastAsyncOperationCondition(nil),
 				}, map[string]any{
 					"created_date":  "2023-01-15T10:30:00+0200",
 					"last_modified": "2023-01-16T10:30:00+0200",
@@ -489,10 +497,6 @@ func TestQueryAsyncData(t *testing.T) {
 			},
 			want: want{
 				data: &ObservationData{
-					Conditions: []xpv1.Condition{
-						xpv1.Available(),
-						ujresource.AsyncOperationFinishedCondition(),
-					},
 					ExternalName: "test-external-name",
 					ID:           "test-id",
 					CreatedDate:  func() *metav1.Time { t := metav1.NewTime(time.Date(2023, 1, 15, 8, 30, 0, 0, time.UTC)); return &t }(),
@@ -521,7 +525,7 @@ type ManagedMock struct {
 	resource.Managed
 }
 
-var _ managed.ExternalConnecter = &TfConnectorMock{}
+var _ managed.ExternalConnector = &TfConnectorMock{}
 
 // TF external connector mock
 type TfConnectorMock struct {

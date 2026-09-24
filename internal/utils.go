@@ -19,6 +19,9 @@ import (
 	yamlv3 "gopkg.in/yaml.v3"
 
 	"sigs.k8s.io/yaml"
+
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 
 const (
@@ -70,6 +73,40 @@ func Flatten(m map[string]interface{}) map[string][]byte {
 		}
 	}
 	return o
+}
+
+// FlattenConnectionDetails flattens JSON object values in a Crossplane
+// ConnectionDetails map. For every input value that parses as a JSON object,
+// its top-level keys are promoted to the result and the original blob is
+// preserved under providerv1alpha1.RawBindingKey ("__raw"). Non-object values
+// are passed through unchanged.
+//
+// If multiple input values are JSON objects, the last one written wins on the
+// __raw key. In practice BTP terraform observations carry a single
+// "attribute.credentials" blob, so this is unambiguous.
+func FlattenConnectionDetails(in map[string][]byte) (map[string][]byte, error) {
+	out := make(map[string][]byte, len(in))
+	for k, v := range in {
+		var jsonMap map[string]any
+		if err := json.Unmarshal(v, &jsonMap); err != nil {
+			out[k] = v
+			continue
+		}
+		out[providerv1alpha1.RawBindingKey] = v
+		for jk, jv := range jsonMap {
+			switch val := jv.(type) {
+			case string:
+				out[jk] = []byte(val)
+			default:
+				b, err := json.Marshal(val)
+				if err != nil {
+					return nil, err
+				}
+				out[jk] = b
+			}
+		}
+	}
+	return out, nil
 }
 
 func SliceEqualsFold(left []string, right []string) bool {
@@ -185,4 +222,25 @@ func LoadSecretData(ctx context.Context, kube client.Client, secretName string, 
 func IsValidUUID(s string) bool {
 	err := uuid.Validate(s)
 	return err == nil
+}
+
+// LookupSecrets retrieves JSON data from a list of SecretKeySelectors and merges them into a single map.
+func LookupSecrets(ctx context.Context, kube client.Client, selectors []xpv1.SecretKeySelector) (map[string]interface{}, error) {
+	combined := make(map[string]interface{})
+	for _, sel := range selectors {
+		secret := &corev1.Secret{}
+		if err := kube.Get(ctx, types.NamespacedName{Namespace: sel.Namespace, Name: sel.Name}, secret); err != nil {
+			return nil, err
+		}
+		val, ok := secret.Data[sel.Key]
+		if !ok {
+			return nil, fmt.Errorf("key %q not found in secret %s/%s", sel.Key, sel.Namespace, sel.Name)
+		}
+		var data map[string]interface{}
+		if err := json.Unmarshal(val, &data); err != nil {
+			return nil, err
+		}
+		CopyMaps(combined, data)
+	}
+	return combined, nil
 }

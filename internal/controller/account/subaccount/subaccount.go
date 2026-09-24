@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -22,6 +24,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
+	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 )
 
@@ -47,10 +50,13 @@ const (
 // is called.
 type connector struct {
 	kube            client.Client
-	usage           resource.Tracker
+	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
 
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
+
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 // Connect typically produces an ExternalClient by:
@@ -74,6 +80,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		btp:              *btpclient,
 		tracker:          c.resourcetracker,
 		accountsAccessor: &AccountsClient{btp: *btpclient},
+		recorder:         c.recorder,
 	}, nil
 }
 
@@ -87,6 +94,9 @@ type external struct {
 	tracker tracking.ReferenceResolverTracker
 
 	accountsAccessor AccountsApiAccessor
+
+	// recorder emits Kubernetes events for the heal path. May be nil.
+	recorder event.Recorder
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -103,7 +113,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// ADR Step 1: Check if external-name is empty
 	if meta.GetExternalName(desiredCR) == "" {
-		// Backwards compatibility: not necessary since previously it was in another format
+		// Recovery also covers the delete leg: healing here lets the next
+		// reconcile's Delete target the real subaccount instead of stripping
+		// the finalizer and orphaning it.
+		if hErr := c.healExternalName(ctx, desiredCR); hErr != nil {
+			return managed.ExternalObservation{}, hErr
+		}
 		return managed.ExternalObservation{
 			ResourceExists: false,
 		}, nil
@@ -152,6 +167,56 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		ResourceUpToDate:  true,
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
+}
+
+func (c *external) healExternalName(ctx context.Context, cr *apisv1alpha1.Subaccount) error {
+	// Defensive: unit tests exercise `external` directly without wiring up the
+	// accounts accessor. In production Connect() always sets it.
+	if c.accountsAccessor == nil {
+		return nil
+	}
+	if !recovery.HasCreateBeenAttempted(cr) {
+		return nil
+	}
+	subdomain := cr.Spec.ForProvider.Subdomain
+	guid, createdAt, found, err := c.accountsAccessor.SubaccountGuidBySubdomain(ctx, subdomain)
+	if err != nil {
+		ctrl.Log.Info("external-name recovery lookup failed", "subdomain", subdomain, "error", err.Error())
+		c.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
+		return nil
+	}
+	if !found {
+		return nil
+	}
+
+	if !recovery.IsOwnedByCR(cr, createdAt) {
+		ctrl.Log.Info("external-name recovery refused: BTP subaccount is outside our Create-attempt window (brownfield)",
+			"subdomain", subdomain, "guid", guid,
+			"crCreatedAt", cr.GetCreationTimestamp().Time, "btpCreatedAt", createdAt)
+		c.emit(cr, event.Warning(
+			event.Reason(recovery.EventReasonRefusedBrownfield),
+			errors.Errorf(
+				"refusing to recover existing BTP subaccount %s: created_at %s is outside the window where our own Create() attempt for this CR could have produced it (brownfield). Set crossplane.io/external-name explicitly to import it (see external-name ADR)",
+				guid, createdAt.Format(time.RFC3339))))
+		return nil
+	}
+
+	meta.SetExternalName(cr, guid)
+	if uErr := c.Client.Update(ctx, cr); uErr != nil {
+		return errors.Wrap(uErr, errUpdateExternalName)
+	}
+
+	ctrl.Log.Info("recovered existing BTP subaccount by external-name", "guid", guid, "subdomain", subdomain)
+	c.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
+		fmt.Sprintf("Recovered existing BTP subaccount %s (semantic key: subdomain=%s, created_at=%s)", guid, subdomain, createdAt.Format(time.RFC3339))))
+	return recovery.ErrRequeueAfterRecovery
+}
+
+// emit records a Kubernetes event when a recorder is configured.
+func (c *external) emit(cr resource.Managed, ev event.Event) {
+	if c.recorder != nil {
+		c.recorder.Event(cr, ev)
+	}
 }
 
 func (c *external) generateObservation(
@@ -334,13 +399,13 @@ func deleteBTPSubaccount(
 
 	_, raw, err := accountsServiceClient.AccountsServiceClient.SubaccountOperationsAPI.DeleteSubaccount(ctx, subaccountId).Execute()
 	// 404 not found means already deleted - not considered as error case
-	if raw.StatusCode == 404 {
+	if raw != nil && raw.StatusCode == 404 {
 		ctrl.Log.Info("associated BTP subaccount not found, continue deletion")
 		return nil
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "deletion of subaccount failed")
+		return errors.Wrap(specifyAPIError(err), "deletion of subaccount failed")
 	}
 
 	return nil
@@ -367,7 +432,7 @@ func (c *external) moveSubaccountAPI(ctx context.Context, subaccount *apisv1alph
 
 	err := c.accountsAccessor.MoveSubaccount(ctx, guid, targetID)
 	if err != nil {
-		return errors.Wrap(err, errMoveSubaccount)
+		return errors.Wrap(specifyAPIError(err), errMoveSubaccount)
 	}
 	return nil
 }
@@ -387,7 +452,7 @@ func (c *external) updateSubaccountAPI(ctx context.Context, subaccount *apisv1al
 
 	err := c.accountsAccessor.UpdateSubaccount(ctx, guid, params)
 	if err != nil {
-		return errors.Wrap(err, errUpdateAPI)
+		return errors.Wrap(specifyAPIError(err), errUpdateAPI)
 	}
 	return nil
 }
@@ -437,7 +502,7 @@ func (c *external) migrateExternalName(ctx context.Context, subaccount *apisv1al
 
 	response, _, err := c.btp.AccountsServiceClient.SubaccountOperationsAPI.GetSubaccounts(ctx).Execute()
 	if err != nil {
-		return errors.Wrap(err, errGetSubaccounts)
+		return errors.Wrap(specifyAPIError(err), errGetSubaccounts)
 	}
 
 	btpSubaccounts := response.Value
@@ -490,7 +555,9 @@ func addOperatorLabel(subaccount *apisv1alpha1.Subaccount) map[string][]string {
 		return map[string][]string{}
 	}
 	labels := map[string][]string{}
-	internal.CopyMaps(labels, subaccount.Spec.ForProvider.Labels)
+	for k, v := range subaccount.Spec.ForProvider.Labels {
+		labels[k] = v
+	}
 	labels[apisv1alpha1.SubaccountOperatorLabel] = []string{string(subaccount.UID)}
 	return labels
 }
@@ -520,7 +587,7 @@ func specifyAPIError(err error) error {
 	return err
 }
 
-func changedLabels(specLabels map[string][]string, statusLabels *map[string][]string) bool {
+func changedLabels(specLabels map[string]apisv1alpha1.SubaccountLabelValueList, statusLabels *map[string][]string) bool {
 	// pointer to maps can be pointer to nil values, which won't deep equal as expected here, so we need to treat this case manually
 	if statusLabels == nil {
 		return len(specLabels) != 0
@@ -528,5 +595,13 @@ func changedLabels(specLabels map[string][]string, statusLabels *map[string][]st
 	if len(*statusLabels) == 0 && len(specLabels) == 0 {
 		return false
 	}
-	return !reflect.DeepEqual(specLabels, *statusLabels)
+	if len(specLabels) != len(*statusLabels) {
+		return true
+	}
+	for k, v := range specLabels {
+		if !reflect.DeepEqual([]string(v), (*statusLabels)[k]) {
+			return true
+		}
+	}
+	return false
 }

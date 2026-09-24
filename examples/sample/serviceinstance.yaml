@@ -59,6 +59,28 @@ spec:
     subaccountRef:
       name: sa-serviceinstance
 ---
+# Service instance with arbitrary labels for classification in BTP Service Manager
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: destination-instance-labeled
+spec:
+  forProvider:
+    name: destination-instance-labeled
+    serviceManagerRef:
+      name: sa-serviceinstance-sm
+    offeringName: destination
+    planName: lite
+    subaccountRef:
+      name: sa-serviceinstance
+    labels:
+      env:
+        - dev
+      team:
+        - platform
+      managed-by:
+        - crossplane
+---
 apiVersion: v1
 kind: Secret
 metadata:

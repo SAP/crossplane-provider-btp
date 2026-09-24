@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -583,6 +583,11 @@ func (in *KymaEnvironmentParameters) DeepCopyInto(out *KymaEnvironmentParameters
 	*out = *in
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
+		*out = new(string)
+		**out = **in
+	}
+	if in.LandscapeLabel != nil {
+		in, out := &in.LandscapeLabel, &out.LandscapeLabel
 		*out = new(string)
 		**out = **in
 	}

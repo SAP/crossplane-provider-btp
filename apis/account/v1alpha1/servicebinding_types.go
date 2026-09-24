@@ -3,7 +3,8 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -72,12 +73,12 @@ type ServiceBindingParameters struct {
 type RotationParameters struct {
 	// Frequency defines how often the active key should be rotated.
 	// +kubebuilder:validation:Required
-	Frequency *metav1.Duration `json:"frequency"`
+	Frequency *providerv1alpha1.Duration `json:"frequency"`
 
 	// TTL (Time-To-Live) defines the total time a credential is valid for before it is deleted.
 	// Must be >= frequency
 	// +kubebuilder:validation:Optional
-	TTL *metav1.Duration `json:"ttl,omitempty"`
+	TTL *providerv1alpha1.Duration `json:"ttl,omitempty"`
 }
 
 // ServiceBindingObservation are the observable fields of a ServiceBinding.
@@ -123,6 +124,20 @@ type RetiredSBResource struct {
 	// The date and time when the resource will be deleted.
 	// May change if the rotation settings change
 	DeletionDate *metav1.Time `json:"deletionDate"`
+
+	// DeletionAttempts counts how many times deletion of this retired binding
+	// has been attempted and did not verifiably remove it from Service Manager.
+	// It stays at 0 while deletion is not yet due; a non-zero value means the
+	// binding is overdue and repeatedly failing to delete, so it is safe to
+	// alert on.
+	// +kubebuilder:validation:Optional
+	DeletionAttempts int32 `json:"deletionAttempts,omitempty"`
+
+	// LastDeletionError records the error from the most recent failed deletion
+	// attempt, for operator visibility. Empty when the last attempt succeeded
+	// or none has been made yet.
+	// +kubebuilder:validation:Optional
+	LastDeletionError string `json:"lastDeletionError,omitempty"`
 }
 
 // A ServiceBindingSpec defines the desired state of a ServiceBinding.
@@ -142,6 +157,14 @@ type ServiceBindingSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum="";"sap-kubernetes"
 	SecretFormat string `json:"secretFormat,omitempty"`
+
+	// SecretKey controls how credentials are stored in the connection secret.
+	// When set, all credential properties are bundled into a single JSON key with this name
+	// instead of being flattened into individual top-level keys.
+	// Combined with secretFormat "sap-kubernetes", the .metadata descriptor marks this key
+	// with "container: true" per the SAP Kubernetes Service Binding specification.
+	// +kubebuilder:validation:Optional
+	SecretKey *string `json:"secretKey,omitempty"`
 }
 
 // A ServiceBindingStatus represents the observed state of a ServiceBinding.
@@ -157,6 +180,15 @@ type ServiceBindingStatus struct {
 // +kubebuilder:object:root=true
 
 // A ServiceBinding allows to manage a binding to a service instance in BTP
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: ServiceBinding GUID (UUID format)
+//   - Note: spec.forProvider.serviceInstanceID (or its ref/selector) must be set for adoption to work
+//   - How to find:
+//   - UI: the cockpit shows only the binding name, not its GUID; use the CLI
+//   - CLI: btp list services/binding --subaccount `<subaccount-guid>` (field: id)
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

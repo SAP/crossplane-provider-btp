@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
 const (
@@ -67,10 +67,6 @@ var (
 	ResourceUsageListKindAPIVersion   = ResourceUsageListKind + "." + SchemeGroupVersion.String()
 	ResourceUsageListGroupVersionKind = SchemeGroupVersion.WithKind(ResourceUsageListKind)
 )
-
-func init() {
-	SchemeBuilder.Register(&ResourceUsage{}, &ResourceUsageList{})
-}
 
 const UseCondition xpv1.ConditionType = "ResourceUsage"
 const InUseReason xpv1.ConditionReason = "ResourceUsagesFound"

@@ -10,8 +10,8 @@ import (
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,12 +36,15 @@ var (
 )
 
 func TestSubaccountImportFlow(t *testing.T) {
+	buildID := envvar.GetOrDefault(UUT_BUILD_ID_KEY, "0000")
+	importName := NewID(subaccountImportK8sResName, buildID)
+
 	importTester := NewImportTester(
 		&v1alpha1.Subaccount{
 			Spec: v1alpha1.SubaccountSpec{
 				ForProvider: v1alpha1.SubaccountParameters{
-					DisplayName:      subaccountImportK8sResName,
-					Subdomain:        subaccountImportK8sResName,
+					DisplayName:      importName,
+					Subdomain:        importName,
 					Region:           "eu10",
 					SubaccountAdmins: []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
 				},

@@ -18,7 +18,7 @@ var (
 	kymaFromCustomTag             = "v1.2.1"
 	kymaToCustomTag               = "local"
 	kymaCustomResourceDirectories = []string{
-		"./testdata/customCRs/kymaExternalName",
+		upgradeCRsPath("customCRs/kymaExternalName"),
 	}
 )
 

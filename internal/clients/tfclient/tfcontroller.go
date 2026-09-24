@@ -2,16 +2,18 @@ package tfclient
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	ujresource "github.com/crossplane/upjet/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -43,7 +45,7 @@ type TfProxyControllerI interface {
 	GetTfResource() resource.Managed
 }
 
-type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
+type SaveConditionsFn func(ctx context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error
 
 // ObservationData is the bridge struct that carries data from the Terraform resource to the Crossplane CR.
 // It is filled by QueryAsyncData() and then saved to the CR status by saveInstanceData().
@@ -54,8 +56,6 @@ type ObservationData struct {
 	ID string `json:"id"`
 	// DashboardURL is the URL of the web-based management UI for the resource
 	DashboardURL string `json:"dashboardUrl"`
-	// Conditions are the Crossplane conditions to set on the CR (e.g. Available, AsyncOperationFinished)
-	Conditions []xpv1.Condition
 
 	// Additional observation fields populated from the Terraform resource
 	CreatedDate  *metav1.Time `json:"createdDate,omitempty"`
@@ -68,16 +68,20 @@ type ObservationData struct {
 
 // TfMapper is a generic interface to map a native resource to an upjet resource that will be used for applying to terraform
 type TfMapper[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] interface {
+	// TfResource maps the given native resource to a freshly built upjet
+	// resource. Implementations MUST build a new UPJETTED value on every call
+	// and MUST NOT carry over an async-operation condition, which
+	// QueryAsyncData reads straight off the returned object.
 	TfResource(context.Context, NATIVE, client.Client) (UPJETTED, error)
 }
 
 type TfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed] struct {
 	tfMapper  TfMapper[NATIVE, UPJETTED]
-	connector managed.ExternalConnecter
+	connector managed.ExternalConnector
 	kube      client.Client
 }
 
-func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed](tfConnector managed.ExternalConnecter, tfMapper TfMapper[NATIVE, UPJETTED], kube client.Client) TfProxyConnector[NATIVE, UPJETTED] {
+func NewTfProxyConnector[NATIVE resource.Managed, UPJETTED ujresource.Terraformed](tfConnector managed.ExternalConnector, tfMapper TfMapper[NATIVE, UPJETTED], kube client.Client) TfProxyConnector[NATIVE, UPJETTED] {
 	return TfProxyConnector[NATIVE, UPJETTED]{
 		connector: tfConnector,
 		tfMapper:  tfMapper,
@@ -114,12 +118,13 @@ type TfProxyController[UPJETTED ujresource.Terraformed] struct {
 
 // QueryUpdatedData returns the relevant status data once the async creation is done
 func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *ObservationData {
-	// only query the async data if the operation is finished
-	if t.tfResource.GetCondition(ujresource.TypeAsyncOperation).Reason == ujresource.ReasonFinished {
+	// The plugin-framework async client marks a settled resource with
+	// TypeLastAsyncOperation/True and never sets TypeAsyncOperation, unlike
+	// the CLI client the service binding still uses.
+	if t.tfResource.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation)).Status == corev1.ConditionTrue {
 		sid := &ObservationData{}
 		sid.ID = t.tfResource.GetID()
 		sid.ExternalName = meta.GetExternalName(t.tfResource)
-		sid.Conditions = []xpv1.Condition{xpv1.Available(), ujresource.AsyncOperationFinishedCondition()}
 
 		// GetObservation() returns the raw key-value map from the Terraform state.
 		// Each field is typed as "any", so we use type assertions e.g. .(string) to safely extract values.
@@ -128,7 +133,8 @@ func (t *TfProxyController[UPJETTED]) QueryAsyncData(ctx context.Context) *Obser
 			if dashboardURL, ok := obs["dashboard_url"].(string); ok {
 				sid.DashboardURL = dashboardURL
 			}
-			// Dates come as RFC3339 strings e.g. "2026-01-01T10:00:00Z".
+			// Dates arrive with a Z suffix or a colon-less offset (+0200);
+			// iso8601Date's Z0700 verb accepts both, time.RFC3339 does not.
 			// We parse them into Go time.Time and then wrap in metav1.Time for Kubernetes compatibility.
 			if createdDate, ok := obs["created_date"].(string); ok {
 				if t, err := time.Parse(iso8601Date, createdDate); err == nil {
@@ -199,36 +205,9 @@ func (t *TfProxyController[UPJETTED]) Observe(ctx context.Context) (Status, map[
 		return Drift, map[string][]byte{}, nil
 	}
 
-	flatDetails, err := flattenSecretData(obs.ConnectionDetails)
+	flatDetails, err := internal.FlattenConnectionDetails(obs.ConnectionDetails)
 	if err != nil {
 		return Unknown, nil, err
 	}
 	return UpToDate, flatDetails, nil
-}
-
-// flattenSecretData takes a map[string][]byte and flattens any JSON object values into the result map.
-// For each key whose value is a JSON object, its keys/values are added to the result map as top-level entries.
-// Non-JSON values are kept as-is.
-func flattenSecretData(secretData map[string][]byte) (map[string][]byte, error) {
-	result := make(map[string][]byte)
-	for k, v := range secretData {
-		var jsonMap map[string]any
-		if err := json.Unmarshal(v, &jsonMap); err == nil {
-			for jk, jv := range jsonMap {
-				switch val := jv.(type) {
-				case string:
-					result[jk] = []byte(val)
-				default:
-					b, err := json.Marshal(val)
-					if err != nil {
-						return nil, err
-					}
-					result[jk] = b
-				}
-			}
-		} else {
-			result[k] = v
-		}
-	}
-	return result, nil
 }

@@ -1,0 +1,21 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: SubaccountDestinationCertificate
+metadata:
+  name: e2e-cert-$BUILD_ID
+  namespace: default
+spec:
+  providerConfigRef:
+    name: default
+  forProvider:
+    # BTP requires a file extension in the name to determine the certificate format.
+    name: e2e-cert-$BUILD_ID.pem
+    contentSecretRef:
+      name: e2e-cert-content
+      namespace: crossplane-system
+      key: content
+    subaccountRef:
+      name: e2e-dest-cert-subaccount
+    destinationServiceBindingSecretRef:
+      name: e2e-dest-cert-binding-secret
+      namespace: crossplane-system
+      key: credentials

@@ -1,4 +1,4 @@
-//go:build e2e
+//go:build e2e || e2e_long
 
 package e2e
 
@@ -9,9 +9,9 @@ import (
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	xpmeta "github.com/crossplane/crossplane-runtime/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpmeta "github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	meta "github.com/sap/crossplane-provider-btp/apis"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 
