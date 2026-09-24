@@ -1,0 +1,150 @@
+name: BTP synthetic benchmark
+
+on:
+  pull_request_target:
+  workflow_dispatch:
+    inputs:
+      confirm_dedicated_account:
+        description: Confirm the dedicated BTP benchmark account is configured and safe to use
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: btp-benchmark-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  approval:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-24.04
+    environment:
+      name: pr-e2e-approval
+      deployment: false
+    outputs:
+      reviewed-sha: ${{ steps.pin.outputs.sha }}
+    steps:
+      - name: Confirm reviewed head is still current
+        id: pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha')"
+          if [[ "$current" != "$EVENT_SHA" ]]; then
+            echo '::error::PR head changed after this run was created; rerun to request fresh approval.'
+            exit 1
+          fi
+          echo "sha=$current" >> "$GITHUB_OUTPUT"
+
+  benchmark:
+    needs: approval
+    if: >-
+      always() &&
+      ((github.event_name == 'pull_request_target' && needs.approval.result == 'success') ||
+       github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    environment:
+      name: pr-e2e-no-approval
+      deployment: false
+    env:
+      VERSION: v0.0.0-${{ github.event_name == 'pull_request_target' && needs.approval.outputs.reviewed-sha || github.sha }}
+      BUILD_REGISTRY: provider-btp-benchmark
+      PLATFORMS: linux_amd64
+    steps:
+      - name: Enforce trusted dispatch ref
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/${{ github.event.repository.default_branch }}" ]] || {
+            echo '::error::Manual benchmark dispatch is allowed only from the default branch.'; exit 1;
+          }
+          [[ "${{ inputs.confirm_dedicated_account }}" == "true" ]] || {
+            echo '::error::Confirm the dedicated BTP benchmark account before dispatch.'; exit 1;
+          }
+
+      - name: Check out reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && needs.approval.outputs.reviewed-sha || github.sha }}
+          submodules: true
+          persist-credentials: false
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+
+      - name: Assert source matches reviewed revision
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'pull_request_target' && needs.approval.outputs.reviewed-sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          [[ "$actual" == "$EXPECTED_SHA" ]] || { echo '::error::checkout did not match reviewed SHA'; exit 1; }
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Build reviewed provider image
+        run: make build BUILD_REGISTRY="$BUILD_REGISTRY" PLATFORMS="$PLATFORMS" VERSION="$VERSION"
+
+      - name: Package reviewed provider for Crossplane
+        run: make xpkg.build.provider-btp BUILD_REGISTRY="$BUILD_REGISTRY" PLATFORMS="$PLATFORMS" VERSION="$VERSION"
+
+      - name: Validate exact single-image package
+        id: package
+        run: |
+          set -euo pipefail
+          package="_output/xpkg/linux_amd64/provider-btp-${VERSION}.xpkg"
+          [[ -f "$package" && ! -L "$package" ]] || { echo '::error::expected exact provider package is missing'; exit 1; }
+          size="$(stat -c '%s' "$package")"
+          (( size > 0 && size <= 536870912 )) || { echo '::error::provider package exceeds the 512 MiB action limit'; exit 1; }
+          manifest="$(tar -xOf "$package" manifest.json)"
+          jq -e 'type == "array" and length == 1 and
+            (.[0].Layers | type == "array" and length > 0)' <<<"$manifest" >/dev/null || {
+            echo '::error::expected a single-image provider package'; exit 1;
+          }
+          echo "path=$package" >> "$GITHUB_OUTPUT"
+
+      - name: Run Subaccount benchmark
+        id: test
+        uses: gergely-szabo-sap/xp-diadromos/.github/actions/run-test@547161f4252fdf0729b3923b5892c5d4a765d941
+        with:
+          config: benchmarks/btp/config.yaml
+          cleanup: auto
+          version: v0.7.0
+          provider-artifact: ${{ steps.package.outputs.path }}
+          provider-image: provider:v0
+          release-token: ${{ secrets.XP_DIADROMOS_RELEASE_TOKEN }}
+        env:
+          BTP_TECHNICAL_USER: ${{ secrets.BTP_TECHNICAL_USER }}
+          CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+
+      - name: Publish available benchmark report
+        id: report
+        if: ${{ !cancelled() && steps.test.outputs.archive != '' }}
+        uses: gergely-szabo-sap/xp-diadromos/.github/actions/metrics-ci-report@547161f4252fdf0729b3923b5892c5d4a765d941
+        with:
+          input: ${{ steps.test.outputs.archive }}
+          version: v0.7.0
+          release-token: ${{ secrets.XP_DIADROMOS_RELEASE_TOKEN }}
+          artifact-name: btp-synthetic-benchmark-reports
+          retention-days: 7
+
+      - name: Verify published report contract
+        if: ${{ !cancelled() && steps.report.outputs.report-json != '' }}
+        run: ./benchmarks/btp/verify-report.sh "${{ steps.report.outputs.report-json }}"
+
+      - name: Fail if no archive was produced
+        if: ${{ !cancelled() && steps.test.outputs.archive == '' }}
+        run: |
+          echo '::error::Benchmark did not produce a reportable archive.'
+          exit 1

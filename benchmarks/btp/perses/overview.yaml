@@ -1,0 +1,280 @@
+kind: Dashboard
+metadata:
+    name: overview
+    project: btp
+spec:
+    display:
+        name: overview
+    panels:
+        "0_0":
+            kind: Panel
+            spec:
+                display:
+                    name: Iteration duration
+                plugin:
+                    kind: TimeSeriesChart
+                    spec:
+                        legend:
+                            position: bottom
+                        yAxis:
+                            format:
+                                unit: milliseconds
+                            label: ""
+                            show: true
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                query: rate(xp_diadromos_k6_iteration_duration_sum[1m]) / rate(xp_diadromos_k6_iteration_duration_count[1m])
+                                seriesNameFormat: '{{archive_filename}}'
+        "0_1":
+            kind: Panel
+            spec:
+                display:
+                    name: Iterations per second
+                plugin:
+                    kind: TimeSeriesChart
+                    spec:
+                        legend:
+                            position: bottom
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                query: rate(xp_diadromos_k6_iterations_total[1m])
+                                seriesNameFormat: '{{archive_filename}}'
+        "1_0":
+            kind: Panel
+            spec:
+                display:
+                    name: Container CPU usage (cores)
+                plugin:
+                    kind: TimeSeriesChart
+                    spec:
+                        legend:
+                            position: bottom
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                query: sum by (pod, container, archive_filename) (xp_diadromos_container_cpu_usage_cores{job="resource"})
+                                seriesNameFormat: '{{pod}} / {{container}} ({{archive_filename}})'
+        "1_1":
+            kind: Panel
+            spec:
+                display:
+                    name: Container memory usage
+                plugin:
+                    kind: TimeSeriesChart
+                    spec:
+                        legend:
+                            position: bottom
+                        yAxis:
+                            format:
+                                unit: bytes
+                            label: ""
+                            show: true
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                query: sum by (pod, container, archive_filename) (xp_diadromos_container_memory_usage_bytes{job="resource"})
+                                seriesNameFormat: '{{pod}} / {{container}} ({{archive_filename}})'
+        "2_0":
+            kind: Panel
+            spec:
+                display:
+                    name: Time to ready
+                plugin:
+                    kind: TimeSeriesChart
+                    spec:
+                        legend:
+                            position: bottom
+                        yAxis:
+                            format:
+                                unit: milliseconds
+                            label: ""
+                            show: true
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                query: sum by (resource_kind, archive_filename) (rate(xp_diadromos_k6_xp_time_to_ready_sum[1m])) / sum by (resource_kind, archive_filename) (rate(xp_diadromos_k6_xp_time_to_ready_count[1m]))
+                                seriesNameFormat: '{{resource_kind}} ({{archive_filename}})'
+        "2_1":
+            kind: Panel
+            spec:
+                display:
+                    name: Time to update
+                plugin:
+                    kind: TimeSeriesChart
+                    spec:
+                        legend:
+                            position: bottom
+                        yAxis:
+                            format:
+                                unit: milliseconds
+                            label: ""
+                            show: true
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                query: sum by (resource_kind, archive_filename) (rate(xp_diadromos_k6_xp_time_to_update_sum[1m])) / sum by (resource_kind, archive_filename) (rate(xp_diadromos_k6_xp_time_to_update_count[1m]))
+                                seriesNameFormat: '{{resource_kind}} ({{archive_filename}})'
+        "2_2":
+            kind: Panel
+            spec:
+                display:
+                    name: Time to delete
+                plugin:
+                    kind: TimeSeriesChart
+                    spec:
+                        legend:
+                            position: bottom
+                        yAxis:
+                            format:
+                                unit: milliseconds
+                            label: ""
+                            show: true
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                query: sum by (resource_kind, archive_filename) (rate(xp_diadromos_k6_xp_time_to_delete_sum[1m])) / sum by (resource_kind, archive_filename) (rate(xp_diadromos_k6_xp_time_to_delete_count[1m]))
+                                seriesNameFormat: '{{resource_kind}} ({{archive_filename}})'
+        "3_0":
+            kind: Panel
+            spec:
+                display:
+                    name: Reconciliations per second
+                plugin:
+                    kind: TimeSeriesChart
+                    spec:
+                        legend:
+                            position: bottom
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                query: sum by (controller, archive_filename) (rate(controller_runtime_reconcile_total{job="provider"}[1m]))
+                                seriesNameFormat: '{{controller}} ({{archive_filename}})'
+        "3_1":
+            kind: Panel
+            spec:
+                display:
+                    name: Reconcile errors per second
+                plugin:
+                    kind: TimeSeriesChart
+                    spec:
+                        legend:
+                            position: bottom
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                query: sum by (controller, archive_filename) (rate(controller_runtime_reconcile_errors_total{job="provider"}[1m]))
+                                seriesNameFormat: '{{controller}} ({{archive_filename}})'
+    layouts:
+        - kind: Grid
+          spec:
+            display:
+                title: k6
+                collapse:
+                    open: true
+            items:
+                - x: 0
+                  "y": 0
+                  width: 12
+                  height: 8
+                  content:
+                    $ref: '#/spec/panels/0_0'
+                - x: 12
+                  "y": 0
+                  width: 12
+                  height: 8
+                  content:
+                    $ref: '#/spec/panels/0_1'
+        - kind: Grid
+          spec:
+            display:
+                title: Resource utilization
+                collapse:
+                    open: true
+            items:
+                - x: 0
+                  "y": 0
+                  width: 12
+                  height: 8
+                  content:
+                    $ref: '#/spec/panels/1_0'
+                - x: 12
+                  "y": 0
+                  width: 12
+                  height: 8
+                  content:
+                    $ref: '#/spec/panels/1_1'
+        - kind: Grid
+          spec:
+            display:
+                title: Lifecycle latency
+                collapse:
+                    open: true
+            items:
+                - x: 0
+                  "y": 0
+                  width: 8
+                  height: 8
+                  content:
+                    $ref: '#/spec/panels/2_0'
+                - x: 8
+                  "y": 0
+                  width: 8
+                  height: 8
+                  content:
+                    $ref: '#/spec/panels/2_1'
+                - x: 16
+                  "y": 0
+                  width: 8
+                  height: 8
+                  content:
+                    $ref: '#/spec/panels/2_2'
+        - kind: Grid
+          spec:
+            display:
+                title: Provider
+                collapse:
+                    open: true
+            items:
+                - x: 0
+                  "y": 0
+                  width: 12
+                  height: 8
+                  content:
+                    $ref: '#/spec/panels/3_0'
+                - x: 12
+                  "y": 0
+                  width: 12
+                  height: 8
+                  content:
+                    $ref: '#/spec/panels/3_1'
+    duration: 1h
+    refreshInterval: 0s

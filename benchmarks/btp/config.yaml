@@ -1,0 +1,82 @@
+# Report-only BTP benchmark. Creates a real Subaccount in the dedicated test account.
+environments:
+  local:
+    type: kind
+    kind:
+      cluster_name: xp-btp-benchmark
+      node_image: kindest/node:v1.30.2
+      nodes: 1
+
+crossplane:
+  environment: local
+  version: "2.1.8"
+  namespace: crossplane-system
+
+provider:
+  rbac:
+    mode: managed-cluster-admin
+  environment: local
+  package: provider:v0
+  config_crd: providerconfigs.btp.sap.crossplane.io
+  local_artifact:
+    archive: ${XP_DIADROMOS_RUN_TEST_PROVIDER_ARTIFACT}
+  credentials:
+    credentials: ${BTP_TECHNICAL_USER}
+    data: ${CIS_CENTRAL_BINDING}
+  config: |
+    apiVersion: btp.sap.crossplane.io/v1alpha1
+    kind: ProviderConfig
+    metadata:
+      name: default
+    spec:
+      serviceAccountSecret:
+        source: Secret
+        secretRef:
+          namespace: default
+          name: xp-diadromos-credentials
+          key: credentials
+      cisCredentials:
+        source: Secret
+        secretRef:
+          namespace: default
+          name: xp-diadromos-credentials
+          key: data
+
+k6:
+  environment: local
+  rbac:
+    mode: managed-cluster-admin
+    service_account_name: xp-diadromos-runner
+  test_script: ./benchmarks/btp/k6/subaccount-create-delete.js
+  helpers_path: ./benchmarks/btp/k6/crossplane-helpers.js
+  custom_image: ghcr.io/gergely-szabo-sap/xp-diadromos-k6:v0.7.0
+  load_image: true
+  parallelism: 1
+  wait_timeout: 2h
+  env:
+    XP_DIADROMOS_BTP_ITERATIONS: "1"
+    XP_DIADROMOS_BTP_VUS: "1"
+    XP_DIADROMOS_BTP_READY_TIMEOUT: "1800"
+    XP_DIADROMOS_BTP_DELETE_TIMEOUT: "1800"
+    XP_DIADROMOS_BTP_REGION: eu10
+
+metrics:
+  environment: local
+  dashboard: ./benchmarks/btp/perses/overview.yaml
+  sample_interval: 10s
+  namespaces:
+    - crossplane-system
+  prometheus:
+    port: 8080
+    path: /metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    max_response_size: 32MiB
+  archive:
+    name_prefix: btp-subaccount-ci
+    max_size: 1GiB
+    drop_labels: []
+    k6_bucket_interval: 1s
+
+output:
+  directory: ./results
