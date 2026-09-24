@@ -3,42 +3,107 @@ package serviceinstance
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
-	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
-	"github.com/sap/crossplane-provider-btp/internal"
-	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
-	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal"
+	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
+	smopenapi "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-service-manager-api-go/pkg"
 	"github.com/sap/crossplane-provider-btp/internal/testutils"
 )
 
 var (
 	errClient      = errors.New("apiError")
-	errKube        = errors.New("kubeError")
-	errCreator     = errors.New("creatorError")
 	errInitializer = errors.New("initializerError")
 	errTracking    = errors.New("trackingError")
+	errClientBuild = errors.New("clientBuildError")
 )
 
+const validUUID = "550e8400-e29b-41d4-a716-446655440000"
+
 // ====================================================================================
-// Resource Usage Tests
+// Native client mock
 // ====================================================================================
 
-func TestConnect_ResourceTracking(t *testing.T) {
+var _ siClient.ServiceInstanceClientI = &nativeClientMock{}
+
+type nativeClientMock struct {
+	observeRes siClient.ObserveResult
+	observeErr error
+
+	createID    string
+	createOpID  string
+	createErr   error
+
+	updateOpID string
+	updateErr  error
+
+	deleteErr error
+
+	getParamsRes map[string]interface{}
+	getParamsErr error
+
+	retrievableRes bool
+	retrievableErr error
+	retrievableOfferingID string
+
+	// captured call args
+	createCalled bool
+	updateCalled bool
+	deleteCalled bool
+
+	updatePayloadCR *v1alpha1.ServiceInstance
+	updateObserved  *smopenapi.ServiceInstanceResponseObject
+}
+
+func (m *nativeClientMock) Observe(ctx context.Context, externalName string) (siClient.ObserveResult, error) {
+	return m.observeRes, m.observeErr
+}
+
+func (m *nativeClientMock) Create(ctx context.Context, cr *v1alpha1.ServiceInstance, params map[string]interface{}) (string, string, error) {
+	m.createCalled = true
+	return m.createID, m.createOpID, m.createErr
+}
+
+func (m *nativeClientMock) Update(ctx context.Context, externalName string, cr *v1alpha1.ServiceInstance,
+	params map[string]interface{}, observed *smopenapi.ServiceInstanceResponseObject) (string, error) {
+	m.updateCalled = true
+	m.updatePayloadCR = cr
+	m.updateObserved = observed
+	return m.updateOpID, m.updateErr
+}
+
+func (m *nativeClientMock) Delete(ctx context.Context, externalName string) error {
+	m.deleteCalled = true
+	return m.deleteErr
+}
+
+func (m *nativeClientMock) GetParameters(ctx context.Context, instanceID string) (map[string]interface{}, error) {
+	return m.getParamsRes, m.getParamsErr
+}
+
+func (m *nativeClientMock) InstancesRetrievable(ctx context.Context, planID string) (bool, string, error) {
+	return m.retrievableRes, m.retrievableOfferingID, m.retrievableErr
+}
+
+// ====================================================================================
+// Connect Tests
+// ====================================================================================
+
+func TestConnect(t *testing.T) {
 	type fields struct {
-		creator         *TfProxyClientCreatorMock
+		clientErr       error
 		initializer     Initializer
 		resourcetracker *testutils.ResourceTrackerMock
 	}
@@ -58,94 +123,440 @@ func TestConnect_ResourceTracking(t *testing.T) {
 		"TrackError": {
 			reason: "should return an error when tracking fails",
 			fields: fields{
-				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{},
 				resourcetracker: testutils.NewResourceTrackerMockWithError(errTracking),
 			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err:         errTracking,
-				trackCalled: true,
-			},
+			args: args{mg: &v1alpha1.ServiceInstance{}},
+			want: want{err: errTracking, trackCalled: true},
 		},
-		"TrackingSuccessBeforeInitialization": {
-			reason: "should call Track before initialization",
+		"InitializerError": {
+			reason: "should return an error when the initializer fails",
 			fields: fields{
-				creator:         &TfProxyClientCreatorMock{},
+				initializer:     &InitializerMock{err: errInitializer},
+				resourcetracker: testutils.NewResourceTrackerMock(),
+			},
+			args: args{mg: &v1alpha1.ServiceInstance{}},
+			want: want{err: errInitializer, trackCalled: true},
+		},
+		"ClientBuildError": {
+			reason: "should return an error when building the native client fails",
+			fields: fields{
+				clientErr:       errClientBuild,
 				initializer:     &InitializerMock{},
 				resourcetracker: testutils.NewResourceTrackerMock(),
 			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err:         nil,
-				trackCalled: true,
-			},
+			args: args{mg: &v1alpha1.ServiceInstance{}},
+			want: want{err: errClientBuild, trackCalled: true},
 		},
-		"TrackingWithServiceManagerRef": {
-			reason: "should track ServiceManagerRef",
+		"Success": {
+			reason: "should return a client when everything succeeds",
 			fields: fields{
-				creator:         &TfProxyClientCreatorMock{},
 				initializer:     &InitializerMock{},
 				resourcetracker: testutils.NewResourceTrackerMock(),
 			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{
-					Spec: v1alpha1.ServiceInstanceSpec{
-						ForProvider: v1alpha1.ServiceInstanceParameters{
-							ServiceManagerRef: &xpv1.Reference{
-								Name: "test-servicemanager",
-							},
-						},
-					},
-				},
+			args: args{mg: &v1alpha1.ServiceInstance{}},
+			want: want{err: nil, trackCalled: true},
+		},
+		"WrongType": {
+			reason: "should return an error when mg is not a ServiceInstance",
+			fields: fields{
+				initializer:     &InitializerMock{},
+				resourcetracker: testutils.NewResourceTrackerMock(),
 			},
-			want: want{
-				err:         nil,
-				trackCalled: true,
-			},
+			args: args{mg: &v1alpha1.Subaccount{}},
+			want: want{err: errors.New(errNotServiceInstance), trackCalled: false},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			c := connector{
-				clientConnector:             tc.fields.creator,
+				kube:                        &test.MockClient{},
 				newServicePlanInitializerFn: func() Initializer { return tc.fields.initializer },
 				resourcetracker:             tc.fields.resourcetracker,
+				newServiceInstanceClientFn: func(ctx context.Context, cr *v1alpha1.ServiceInstance) (siClient.ServiceInstanceClientI, error) {
+					if tc.fields.clientErr != nil {
+						return nil, tc.fields.clientErr
+					}
+					return &nativeClientMock{}, nil
+				},
 			}
 			_, err := c.Connect(context.Background(), tc.args.mg)
 			expectedErrorBehaviour(t, tc.want.err, err)
-			// Verify if Track was called
 			if tc.want.trackCalled != tc.fields.resourcetracker.TrackCalled {
 				t.Errorf("expected Track() called=%v, got=%v", tc.want.trackCalled, tc.fields.resourcetracker.TrackCalled)
 			}
-			// Verify the correct resource was tracked
-			if tc.want.trackCalled && tc.fields.resourcetracker.TrackedResource != tc.args.mg {
-				t.Errorf("Track() called with wrong resource")
-			}
-
 		})
 	}
 }
 
 // ====================================================================================
-// Deletion Blocking Tests
+// Observe Tests
+// ====================================================================================
+
+func TestObserve(t *testing.T) {
+	type fields struct {
+		client *nativeClientMock
+	}
+	type args struct {
+		mg resource.Managed
+	}
+	type want struct {
+		o              managed.ExternalObservation
+		err            error
+		wantDriftCond  bool
+		wantAvailable  bool
+		wantCreating   bool
+		wantNoReadyChg bool
+	}
+
+	ready := true
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"FallbackExternalName_NoCreatePending_NotExisting": {
+			reason: "empty/fallback external-name and no create attempt -> not existing, no lookup",
+			fields: fields{client: &nativeClientMock{}},
+			args:   args{mg: siWithName("inst-1")},
+			want:   want{o: managed.ExternalObservation{ResourceExists: false}},
+		},
+		"InvalidUUID": {
+			reason: "should error when external-name is set but not a valid UUID",
+			fields: fields{client: &nativeClientMock{}},
+			args:   args{mg: siWithExternalName("inst-1", "not-a-uuid")},
+			want: want{
+				err: errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one"),
+			},
+		},
+		"ObserveError": {
+			reason: "should wrap client observe error",
+			fields: fields{client: &nativeClientMock{observeErr: errClient}},
+			args:   args{mg: siWithExternalName("inst-1", validUUID)},
+			want:   want{err: errClient},
+		},
+		"NotFound": {
+			reason: "should return not existing when the instance is gone",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{Exists: false}}},
+			args:   args{mg: siWithExternalName("inst-1", validUUID)},
+			want:   want{o: managed.ExternalObservation{ResourceExists: false}},
+		},
+		"InProgress": {
+			reason: "in-progress provisioning (not yet Ready) -> up-to-date to suppress Update, Ready=Creating",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{
+				Exists:   true,
+				Instance: instanceWith(validUUID, opStateInProgress, "plan-1", "inst-1", nil),
+			}}},
+			args: args{mg: withPlan(siWithExternalName("inst-1", validUUID), "plan-1")},
+			want: want{o: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, wantCreating: true},
+		},
+		"InProgressUpdate": {
+			reason: "in-progress update on an already-usable instance -> up-to-date, existing Ready left untouched",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{
+				Exists: true,
+				Instance: func() *smopenapi.ServiceInstanceResponseObject {
+					in := instanceWith(validUUID, opStateInProgress, "plan-1", "inst-1", nil)
+					in.Ready = internal.Ptr(true)
+					return in
+				}(),
+			}}},
+			args: args{mg: withPlan(siWithExternalName("inst-1", validUUID), "plan-1")},
+			want: want{o: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, wantNoReadyChg: true},
+		},
+		"Failed": {
+			reason: "failed operation -> exists, not up to date, drift/ready-false condition",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{
+				Exists:   true,
+				Instance: instanceWith(validUUID, opStateFailed, "plan-1", "inst-1", nil),
+			}}},
+			args: args{mg: withPlan(siWithExternalName("inst-1", validUUID), "plan-1")},
+			want: want{o: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false}, wantDriftCond: true},
+		},
+		"UpToDate": {
+			reason: "succeeded operation, no drift -> up to date + Available",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{
+				Exists: true,
+				Instance: func() *smopenapi.ServiceInstanceResponseObject {
+					in := instanceWith(validUUID, opStateSucceeded, "plan-1", "inst-1", nil)
+					in.Ready = &ready
+					return in
+				}(),
+			}}},
+			args: args{mg: withPlan(siWithExternalName("inst-1", validUUID), "plan-1")},
+			want: want{
+				o:             managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, ConnectionDetails: managed.ConnectionDetails{}},
+				wantAvailable: true,
+			},
+		},
+		"DriftName": {
+			reason: "name drift -> not up to date, drift condition",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{
+				Exists:   true,
+				Instance: instanceWith(validUUID, opStateSucceeded, "plan-1", "actual-name", nil),
+			}}},
+			args: args{mg: withPlan(siWithExternalName("desired-name", validUUID), "plan-1")},
+			want: want{
+				o:             managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false, ConnectionDetails: managed.ConnectionDetails{}},
+				wantDriftCond: true,
+			},
+		},
+		"DriftPlan": {
+			reason: "service plan drift -> not up to date",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{
+				Exists:   true,
+				Instance: instanceWith(validUUID, opStateSucceeded, "actual-plan", "inst-1", nil),
+			}}},
+			args: args{mg: withPlan(siWithExternalName("inst-1", validUUID), "desired-plan")},
+			want: want{
+				o:             managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false, ConnectionDetails: managed.ConnectionDetails{}},
+				wantDriftCond: true,
+			},
+		},
+		"DriftLabels": {
+			reason: "label drift -> not up to date",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{
+				Exists:   true,
+				Instance: instanceWith(validUUID, opStateSucceeded, "plan-1", "inst-1", map[string][]string{"team": {"red"}}),
+			}}},
+			args: args{mg: withLabels(withPlan(siWithExternalName("inst-1", validUUID), "plan-1"), map[string][]*string{"team": {internal.Ptr("blue")}})},
+			want: want{
+				o:             managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false, ConnectionDetails: managed.ConnectionDetails{}},
+				wantDriftCond: true,
+			},
+		},
+		"DriftShared": {
+			reason: "shared drift when managed -> not up to date",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{
+				Exists: true,
+				Instance: func() *smopenapi.ServiceInstanceResponseObject {
+					in := instanceWith(validUUID, opStateSucceeded, "plan-1", "inst-1", nil)
+					in.Shared = internal.Ptr(false)
+					return in
+				}(),
+			}}},
+			args: args{mg: withShared(withPlan(siWithExternalName("inst-1", validUUID), "plan-1"), true)},
+			want: want{
+				o:             managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false, ConnectionDetails: managed.ConnectionDetails{}},
+				wantDriftCond: true,
+			},
+		},
+		"ObserveOnly_SuppressesAvailable": {
+			reason: "observe-only management policy must not set Available",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{
+				Exists: true,
+				Instance: func() *smopenapi.ServiceInstanceResponseObject {
+					in := instanceWith(validUUID, opStateSucceeded, "plan-1", "inst-1", nil)
+					in.Ready = &ready
+					return in
+				}(),
+			}}},
+			args: args{mg: withObserveOnly(withPlan(siWithExternalName("inst-1", validUUID), "plan-1"))},
+			want: want{
+				o:             managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, ConnectionDetails: managed.ConnectionDetails{}},
+				wantAvailable: false,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				client: tc.fields.client,
+				kube:   &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
+			}
+
+			got, err := e.Observe(context.Background(), tc.args.mg)
+			expectedErrorBehaviour(t, tc.want.err, err)
+			if diff := cmp.Diff(tc.want.o, got, cmp.FilterPath(func(p cmp.Path) bool {
+				return p.String() == "Diff"
+			}, cmp.Ignore())); diff != "" {
+				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+
+			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
+			if !ok {
+				return
+			}
+			if tc.want.wantDriftCond {
+				readyCond := cr.GetCondition(xpv1.TypeReady)
+				if readyCond.Status != "False" {
+					t.Errorf("\n%s\nexpected Ready=False condition, got %+v", tc.reason, readyCond)
+				}
+			}
+			if tc.want.wantAvailable {
+				readyCond := cr.GetCondition(xpv1.TypeReady)
+				if readyCond.Reason != xpv1.ReasonAvailable {
+					t.Errorf("\n%s\nexpected Available condition, got %+v", tc.reason, readyCond)
+				}
+			}
+			if tc.want.wantCreating {
+				readyCond := cr.GetCondition(xpv1.TypeReady)
+				if readyCond.Reason != xpv1.ReasonCreating {
+					t.Errorf("\n%s\nexpected Creating condition, got %+v", tc.reason, readyCond)
+				}
+			}
+			if tc.want.wantNoReadyChg {
+				readyCond := cr.GetCondition(xpv1.TypeReady)
+				if readyCond.Reason == xpv1.ReasonCreating {
+					t.Errorf("\n%s\nexpected Ready to be left untouched, but it was downgraded to Creating: %+v", tc.reason, readyCond)
+				}
+			}
+		})
+	}
+}
+
+// ====================================================================================
+// Create Tests
+// ====================================================================================
+
+func TestCreate(t *testing.T) {
+	type fields struct {
+		client *nativeClientMock
+	}
+	type args struct {
+		mg resource.Managed
+	}
+	type want struct {
+		err            error
+		externalName   string
+		wantCreateCall bool
+		pendingOpID    string
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"HappyPath_SetsExternalName": {
+			reason: "should set external-name from the created GUID and set Creating",
+			fields: fields{client: &nativeClientMock{createID: validUUID, createOpID: "op-1"}},
+			args:   args{mg: siWithName("inst-1")},
+			want:   want{externalName: validUUID, wantCreateCall: true, pendingOpID: "op-1"},
+		},
+		"ApiError_LeavesFallbackExternalName": {
+			reason: "on create error external-name must stay fallback (unset)",
+			fields: fields{client: &nativeClientMock{createErr: errClient}},
+			args:   args{mg: siWithName("inst-1")},
+			want:   want{err: errClient, externalName: "", wantCreateCall: true},
+		},
+		"WrongType": {
+			reason: "should error when mg is not a ServiceInstance",
+			fields: fields{client: &nativeClientMock{}},
+			args:   args{mg: &v1alpha1.Subaccount{}},
+			want:   want{err: errors.New(errNotServiceInstance)},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				client: tc.fields.client,
+				kube:   &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil), MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil)},
+			}
+			_, err := e.Create(context.Background(), tc.args.mg)
+			expectedErrorBehaviour(t, tc.want.err, err)
+
+			if tc.want.wantCreateCall != tc.fields.client.createCalled {
+				t.Errorf("expected create called=%v got=%v", tc.want.wantCreateCall, tc.fields.client.createCalled)
+			}
+
+			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
+			if !ok {
+				return
+			}
+			if got := meta.GetExternalName(cr); got != tc.want.externalName {
+				t.Errorf("\n%s\nexternal-name=%q, want %q", tc.reason, got, tc.want.externalName)
+			}
+			if got := cr.Status.AtProvider.PendingOperationID; got != tc.want.pendingOpID {
+				t.Errorf("\n%s\npendingOpID=%q, want %q", tc.reason, got, tc.want.pendingOpID)
+			}
+			if creating := cr.GetCondition(xpv1.TypeReady); creating.Reason != xpv1.ReasonCreating {
+				t.Errorf("\n%s\nexpected Creating condition, got %+v", tc.reason, creating)
+			}
+		})
+	}
+}
+
+// ====================================================================================
+// Update Tests
+// ====================================================================================
+
+func TestUpdate(t *testing.T) {
+	type fields struct {
+		client *nativeClientMock
+	}
+	type args struct {
+		mg resource.Managed
+	}
+	type want struct {
+		err          error
+		updateCalled bool
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"HappyPath": {
+			reason: "should update passing observed instance for label diff",
+			fields: fields{client: &nativeClientMock{observeRes: siClient.ObserveResult{
+				Exists:   true,
+				Instance: instanceWith(validUUID, opStateSucceeded, "plan-1", "inst-1", nil),
+			}}},
+			args: args{mg: withPlan(siWithExternalName("inst-1", validUUID), "plan-1")},
+			want: want{updateCalled: true},
+		},
+		"UpdateError": {
+			reason: "should wrap update error",
+			fields: fields{client: &nativeClientMock{
+				observeRes: siClient.ObserveResult{Exists: true, Instance: instanceWith(validUUID, opStateSucceeded, "plan-1", "inst-1", nil)},
+				updateErr:  errClient,
+			}},
+			args: args{mg: withPlan(siWithExternalName("inst-1", validUUID), "plan-1")},
+			want: want{err: errClient, updateCalled: true},
+		},
+		"WrongType": {
+			reason: "should error when mg is not a ServiceInstance",
+			fields: fields{client: &nativeClientMock{}},
+			args:   args{mg: &v1alpha1.Subaccount{}},
+			want:   want{err: errors.New(errNotServiceInstance)},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{
+				client: tc.fields.client,
+				kube:   &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
+			}
+			_, err := e.Update(context.Background(), tc.args.mg)
+			expectedErrorBehaviour(t, tc.want.err, err)
+			if tc.want.updateCalled != tc.fields.client.updateCalled {
+				t.Errorf("expected update called=%v got=%v", tc.want.updateCalled, tc.fields.client.updateCalled)
+			}
+		})
+	}
+}
+
+// ====================================================================================
+// Delete Tests
 // ====================================================================================
 
 func TestDelete_DeletionBlocking(t *testing.T) {
 	type fields struct {
-		client  *TfProxyMock
+		client  *nativeClientMock
 		tracker *testutils.ResourceTrackerMock
 	}
-
 	type args struct {
 		mg resource.Managed
 	}
-
 	type want struct {
 		err                 error
 		setConditionsCalled bool
@@ -160,64 +571,33 @@ func TestDelete_DeletionBlocking(t *testing.T) {
 	}{
 		"BlockedByServiceBinding": {
 			reason: "should block deletion when ServiceBindings reference this instance",
-			fields: fields{
-				client:  &TfProxyMock{},
-				tracker: testutils.NewResourceTrackerMockBlocking(),
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err:                 errors.New(providerv1alpha1.ErrResourceInUse),
-				setConditionsCalled: true,
-				deleteAttempted:     false,
-			},
+			fields: fields{client: &nativeClientMock{}, tracker: testutils.NewResourceTrackerMockBlocking()},
+			args:   args{mg: &v1alpha1.ServiceInstance{}},
+			want:   want{err: errors.New(providerv1alpha1.ErrResourceInUse), setConditionsCalled: true, deleteAttempted: false},
 		},
 		"AllowedWhenNoBindings": {
-			reason: "should allow deletion when no ServiceBindings reference this instance",
-			fields: fields{
-				client:  &TfProxyMock{},
-				tracker: testutils.NewResourceTrackerMock(),
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err:                 nil,
-				setConditionsCalled: true,
-				deleteAttempted:     true,
-			},
+			reason: "should allow deletion when nothing references this instance",
+			fields: fields{client: &nativeClientMock{}, tracker: testutils.NewResourceTrackerMock()},
+			args:   args{mg: &v1alpha1.ServiceInstance{}},
+			want:   want{err: nil, setConditionsCalled: true, deleteAttempted: true},
 		},
 		"DeleteAPIErrorWhenNotBlocked": {
 			reason: "should return API error when deletion proceeds but API fails",
-			fields: fields{
-				client:  &TfProxyMock{err: errClient},
-				tracker: testutils.NewResourceTrackerMock(),
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err:                 errClient,
-				setConditionsCalled: true,
-				deleteAttempted:     true,
-			},
+			fields: fields{client: &nativeClientMock{deleteErr: errClient}, tracker: testutils.NewResourceTrackerMock()},
+			args:   args{mg: &v1alpha1.ServiceInstance{}},
+			want:   want{err: errClient, setConditionsCalled: true, deleteAttempted: true},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			e := external{
-				tfClient: tc.fields.client,
-				kube: &test.MockClient{
-					MockUpdate: test.NewMockUpdateFn(nil),
-				},
+				client:  tc.fields.client,
+				kube:    &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)},
 				tracker: tc.fields.tracker,
 			}
-
 			_, err := e.Delete(context.Background(), tc.args.mg)
 
-			// Check error
 			if tc.want.err != nil {
 				if err == nil {
 					t.Errorf("expected error %v, got nil", tc.want.err)
@@ -228,897 +608,64 @@ func TestDelete_DeletionBlocking(t *testing.T) {
 				t.Errorf("expected no error, got %v", err)
 			}
 
-			// Verify SetConditions was called
 			if tc.want.setConditionsCalled != tc.fields.tracker.SetConditionsCalled {
-				t.Errorf("expected SetConditions() called=%v, got=%v",
-					tc.want.setConditionsCalled, tc.fields.tracker.SetConditionsCalled)
+				t.Errorf("expected SetConditions called=%v got=%v", tc.want.setConditionsCalled, tc.fields.tracker.SetConditionsCalled)
 			}
-
-			// Verify delete was attempted (or not)
 			if tc.want.deleteAttempted != tc.fields.client.deleteCalled {
-				t.Errorf("expected Delete() called=%v, got=%v",
-					tc.want.deleteAttempted, tc.fields.client.deleteCalled)
-			}
-		})
-	}
-}
-func TestConnect(t *testing.T) {
-	type fields struct {
-		creator         *TfProxyClientCreatorMock
-		initializer     Initializer
-		resourcetracker *testutils.ResourceTrackerMock
-	}
-
-	type args struct {
-		mg resource.Managed
-	}
-
-	type want struct {
-		err            error
-		externalExists bool
-	}
-
-	cases := map[string]struct {
-		reason string
-		fields fields
-		args   args
-		want   want
-	}{
-		"InitializerError": {
-			reason: "should return an error when the initalizer fails",
-			fields: fields{
-				creator:         &TfProxyClientCreatorMock{},
-				initializer:     &InitializerMock{err: errInitializer},
-				resourcetracker: testutils.NewResourceTrackerMock(),
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: errInitializer,
-			},
-		},
-		"CreatorError": {
-			reason: "should return an error when the creator fails",
-			fields: fields{
-				creator:         &TfProxyClientCreatorMock{err: errCreator},
-				initializer:     &InitializerMock{},
-				resourcetracker: testutils.NewResourceTrackerMock(),
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: errCreator,
-			},
-		},
-		"ConnectSuccess": {
-			reason: "should return a client when the creator succeeds",
-			fields: fields{
-				creator:         &TfProxyClientCreatorMock{},
-				initializer:     &InitializerMock{},
-				resourcetracker: testutils.NewResourceTrackerMock(),
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: nil,
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			c := connector{
-				clientConnector:             tc.fields.creator,
-				newServicePlanInitializerFn: func() Initializer { return tc.fields.initializer },
-				resourcetracker:             tc.fields.resourcetracker,
-			}
-
-			got, err := c.Connect(context.Background(), tc.args.mg)
-			if tc.want.externalExists && got == nil {
-				t.Errorf("expected external client, got nil")
-			}
-			expectedErrorBehaviour(t, tc.want.err, err)
-		})
-	}
-}
-
-func TestObserve(t *testing.T) {
-	type fields struct {
-		client *TfProxyMock
-	}
-
-	type args struct {
-		mg resource.Managed
-	}
-
-	type want struct {
-		o                managed.ExternalObservation
-		err              error
-		cr               *v1alpha1.ServiceInstance // Expected complete CR
-		wantDriftCond    bool                      // Whether a DriftDetected condition should be set
-		wantDiffContains []string                  // Substrings that must appear in the Diff field
-	}
-
-	cases := map[string]struct {
-		reason string
-		fields fields
-		args   args
-		want   want
-	}{
-		// ADR(external-name):: external-name empty without conflict → no creation attempt, not existing
-		"EmptyExternalName_NoConflict": {
-			reason: "should return resourceExists:false when external-name is empty and no conflict error present",
-			fields: fields{
-				client: &TfProxyMock{status: tfclient.NotExisting},
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: nil,
-				o: managed.ExternalObservation{
-					ResourceExists: false,
-				},
-				cr: expectedServiceInstance(),
-			},
-		},
-		// ADR(external-name):: external-name empty + conflict in LastAsyncOperation → stay in error loop
-		"EmptyExternalName_ConflictError": {
-			reason: "should return error and resourceExists:false when external-name is empty but creation failed with Conflict",
-			fields: fields{
-				client: &TfProxyMock{},
-			},
-			args: args{
-				mg: withConflictCondition(&v1alpha1.ServiceInstance{}),
-			},
-			want: want{
-				err: errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one"),
-				o:   managed.ExternalObservation{ResourceExists: false},
-				cr:  withConflictCondition(expectedServiceInstance()),
-			},
-		},
-		// ADR(external-name):: external-name empty + conflict condition but spec changed → allow new Create attempt
-		"EmptyExternalName_ConflictError_SpecChanged": {
-			reason: "should not stay in error loop when spec changed since conflict (Generation > ObservedGeneration in condition)",
-			fields: fields{
-				client: &TfProxyMock{status: tfclient.NotExisting},
-			},
-			args: args{
-				// Generation=2 simulates a spec change after the conflict (condition has ObservedGeneration=1)
-				mg: func() *v1alpha1.ServiceInstance {
-					cr := &v1alpha1.ServiceInstance{}
-					cr.Generation = 1
-					withConflictCondition(cr) // stamps ObservedGeneration=1
-					cr.Generation = 2         // simulate spec change
-					return cr
-				}(),
-			},
-			want: want{
-				err: nil,
-				o:   managed.ExternalObservation{ResourceExists: false},
-				cr: func() *v1alpha1.ServiceInstance {
-					cr := expectedServiceInstance()
-					cr.Generation = 2
-					withConflictCondition(cr)
-					cr.Generation = 2
-					return cr
-				}(),
-			},
-		},
-		// ADR(external-name):: external-name set but not a valid UUID → return error
-		"InvalidUUIDExternalName": {
-			reason: "should return error when external-name is set but not a valid UUID",
-			fields: fields{
-				client: &TfProxyMock{},
-			},
-			args: args{
-				mg: expectedServiceInstance(withExternalName("not-a-uuid")),
-			},
-			want: want{
-				err: errors.New("external-name is not a valid UUID. Please check the value of the external-name annotation and set it to the ServiceInstance ID (UUID format) if you want to adopt an existing resource, or remove the annotation if you want to create a new one"),
-				cr:  expectedServiceInstance(withExternalName("not-a-uuid")),
-			},
-		},
-		// ADR(external-name): the same invalid external-name must NOT block a
-		// delete — an Observe error returns before Delete runs and would strand
-		// the finalizer. Mirrors ServiceBinding's guard (#987).
-		"InvalidUUIDExternalName_WhileDeleting": {
-			reason: "should skip external-name validation when the CR is being deleted",
-			fields: fields{
-				client: &TfProxyMock{status: tfclient.NotExisting},
-			},
-			args: args{
-				mg: expectedServiceInstance(withExternalName("not-a-uuid"), withDeletionTimestamp()),
-			},
-			want: want{
-				err: nil,
-				o: managed.ExternalObservation{
-					ResourceExists: false,
-				},
-				cr: expectedServiceInstance(withExternalName("not-a-uuid"), withDeletionTimestamp()),
-			},
-		},
-		// ADR(external-name):: valid UUID in external-name, resource not found → trigger Create()
-		"ValidUUID_NotFound": {
-			reason: "should return resourceExists:false when valid UUID is set but resource does not exist (404)",
-			fields: fields{
-				client: &TfProxyMock{status: tfclient.NotExisting},
-			},
-			args: args{
-				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
-			},
-			want: want{
-				err: nil,
-				o: managed.ExternalObservation{
-					ResourceExists: false,
-				},
-				cr: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
-			},
-		},
-		"LookupError": {
-			reason: "error should be returned",
-			fields: fields{
-				client: &TfProxyMock{err: errClient},
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: errClient,
-				cr:  expectedServiceInstance(), // No annotations, observation data, or conditions
-			},
-		},
-		"NotFound": {
-			reason: "should return not existing",
-			fields: fields{
-				client: &TfProxyMock{status: tfclient.NotExisting},
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: nil,
-				o: managed.ExternalObservation{
-					ResourceExists: false,
-				},
-				cr: expectedServiceInstance(), // No annotations, observation data, or conditions
-			},
-		},
-		// ADR(external-name):: drift detected → diff set in observation and condition on CR
-		"DriftDetected_DiffReported": {
-			reason: "should set drift condition on CR and return non-empty diff in observation when drift is detected",
-			fields: fields{
-				client: &TfProxyMock{
-					status:  tfclient.Drift,
-					details: map[string][]byte{},
-					tfResource: &v1alpha1.SubaccountServiceInstance{
-						Spec: v1alpha1.SubaccountServiceInstanceSpec{
-							ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
-								Name: internal.Ptr("desired-name"),
-							},
-						},
-						Status: v1alpha1.SubaccountServiceInstanceStatus{
-							AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
-								Name: internal.Ptr("actual-name"),
-							},
-						},
-					},
-				},
-			},
-			args: args{
-				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
-			},
-			want: want{
-				err: nil,
-				o: managed.ExternalObservation{
-					ResourceExists:    true,
-					ResourceUpToDate:  false,
-					ConnectionDetails: managed.ConnectionDetails{},
-				},
-				cr:               expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
-				wantDriftCond:    true,
-				wantDiffContains: []string{"desired-name", "actual-name"},
-			},
-		},
-		// ADR(external-name):: external-name set via Observe() after async creation (external-name flows through saveInstanceData)
-		"ExternalNameSetFromObservationData": {
-			reason: "should set external-name on CR from ObservationData when async creation completes",
-			fields: fields{
-				client: &TfProxyMock{
-					status: tfclient.UpToDate,
-					data: &tfclient.ObservationData{
-						ExternalName: "550e8400-e29b-41d4-a716-446655440000",
-						ID:           "some-id",
-					},
-					details: map[string][]byte{},
-				},
-			},
-			args: args{
-				mg: expectedServiceInstance(withObservationData("", "")),
-			},
-			want: want{
-				err: nil,
-				o: managed.ExternalObservation{
-					ResourceExists:    true,
-					ResourceUpToDate:  true,
-					ConnectionDetails: managed.ConnectionDetails{},
-				},
-				cr: expectedServiceInstance(
-					withExternalName("550e8400-e29b-41d4-a716-446655440000"),
-					withObservationData("some-id", ""),
-					withConditions(xpv1.Available()),
-				),
-			},
-		},
-		"Requires Update": {
-			reason: "should return existing, not up to date",
-			fields: fields{
-				client: &TfProxyMock{
-					status:  tfclient.Drift,
-					details: map[string][]byte{},
-					tfResource: &v1alpha1.SubaccountServiceInstance{
-						Spec: v1alpha1.SubaccountServiceInstanceSpec{
-							ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
-								Name: internal.Ptr("test-instance"),
-							},
-						},
-						Status: v1alpha1.SubaccountServiceInstanceStatus{
-							AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
-								Name: internal.Ptr("test-instance-modified"),
-							},
-						},
-					},
-				},
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: nil,
-				o: managed.ExternalObservation{
-					ResourceExists:    true,
-					ResourceUpToDate:  false,
-					ConnectionDetails: managed.ConnectionDetails{},
-					Diff:              "", // Will be filled with actual diff by calculateDiff
-				},
-				cr: expectedServiceInstance(), // No annotations, observation data, or conditions
-			},
-		},
-		"Happy, while async in process": {
-			reason: "should return existing, but no data",
-			fields: fields{
-				client: &TfProxyMock{
-					status:  tfclient.UpToDate,
-					details: map[string][]byte{},
-				},
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: nil,
-				o: managed.ExternalObservation{
-					ResourceExists:    true,
-					ResourceUpToDate:  true,
-					ConnectionDetails: managed.ConnectionDetails{},
-				},
-				cr: expectedServiceInstance(), // No annotations, observation data, or conditions
-			},
-		},
-		"Happy, no drift": {
-			reason: "should return existing and pull data from embedded tf resource",
-			fields: fields{
-				client: &TfProxyMock{
-					status: tfclient.UpToDate,
-					data: &tfclient.ObservationData{
-						ExternalName: "some-ext-name",
-						ID:           "some-id",
-					},
-					details: map[string][]byte{
-						"some-key": []byte("some-value"),
-					},
-				},
-			},
-			args: args{
-				mg: expectedServiceInstance(
-					withObservationData("", ""),
-				),
-			},
-			want: want{
-				err: nil,
-				o: managed.ExternalObservation{
-					ResourceExists:   true,
-					ResourceUpToDate: true,
-					ConnectionDetails: managed.ConnectionDetails{
-						"some-key": []byte("some-value"),
-					},
-				},
-				cr: expectedServiceInstance(
-					withExternalName("some-ext-name"),
-					withObservationData("some-id", ""),
-					withConditions(xpv1.Available()),
-				),
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			e := external{
-				tfClient: tc.fields.client,
-				kube: &test.MockClient{
-					MockUpdate: test.NewMockUpdateFn(nil),
-				},
-			}
-
-			got, err := e.Observe(context.Background(), tc.args.mg)
-			expectedErrorBehaviour(t, tc.want.err, err)
-			// Ignore Diff field in comparison as it contains dynamic content
-			if diff := cmp.Diff(tc.want.o, got, cmp.FilterPath(func(p cmp.Path) bool {
-				return p.String() == "Diff"
-			}, cmp.Ignore())); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
-			}
-
-			// Verify Diff contains expected substrings
-			for _, substr := range tc.want.wantDiffContains {
-				if !strings.Contains(got.Diff, substr) {
-					t.Errorf("\n%s\nexpected Diff to contain %q, got:\n%s", tc.reason, substr, got.Diff)
-				}
-			}
-
-			// Verify the entire CR
-			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
-			if !ok {
-				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
-			}
-			// Ignore conditions when comparing CR as they may contain timestamps and drift messages
-			if diff := cmp.Diff(tc.want.cr, cr, cmpopts.IgnoreFields(xpv1.ConditionedStatus{}, "Conditions")); diff != "" {
-				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
-			}
-
-			// Verify drift condition was set when expected
-			if tc.want.wantDriftCond {
-				readyCond := cr.GetCondition(xpv1.TypeReady)
-				if readyCond.Reason != "DriftDetected" {
-					t.Errorf("\n%s\nexpected DriftDetected condition, got reason=%q message=%q", tc.reason, readyCond.Reason, readyCond.Message)
-				}
-				if readyCond.Message == "" {
-					t.Errorf("\n%s\nexpected non-empty drift condition message", tc.reason)
-				}
+				t.Errorf("expected Delete called=%v got=%v", tc.want.deleteAttempted, tc.fields.client.deleteCalled)
 			}
 		})
 	}
 }
 
-func TestCreate(t *testing.T) {
-	type fields struct {
-		client *TfProxyMock
+// ====================================================================================
+// saveInstanceData Tests
+// ====================================================================================
+
+func TestSaveInstanceData(t *testing.T) {
+	ready := true
+	usable := true
+	shared := true
+
+	in := instanceWith(validUUID, opStateSucceeded, "plan-1", "inst-1", nil)
+	in.DashboardUrl = internal.Ptr("https://dash")
+	in.PlatformId = internal.Ptr("platform-1")
+	in.Ready = &ready
+	in.Usable = &usable
+	in.Shared = &shared
+
+	cr := &v1alpha1.ServiceInstance{}
+	e := external{kube: &test.MockClient{}}
+	if err := e.saveInstanceData(context.Background(), cr, in); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	type args struct {
-		mg resource.Managed
+	want := v1alpha1.ServiceInstanceObservation{
+		ID:           validUUID,
+		DashboardURL: "https://dash",
+		State:        opStateSucceeded,
+		Ready:        &ready,
+		Usable:       &usable,
+		PlatformID:   "platform-1",
+		Shared:       &shared,
 	}
-
-	type want struct {
-		err error
-		cr  *v1alpha1.ServiceInstance // Expected complete CR after creation
-	}
-
-	cases := map[string]struct {
-		reason string
-		fields fields
-		args   args
-		want   want
-	}{
-		"ApiError": {
-			reason: "should return an error when the API call fails",
-			fields: fields{
-				client: &TfProxyMock{err: errClient},
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: errClient,
-				cr: expectedServiceInstance(
-					withConditions(
-						xpv1.Creating(),
-					),
-				),
-			},
-		},
-		// ADR(external-name):: external-name already set means the resource was not found by Observe() (e.g. externally deleted).
-		// Create() should proceed normally and recreate it.
-		"ExternalNameAlreadySet_ProceedsWithCreate": {
-			reason: "should proceed with creation when external-name is already set (resource not found by Observe)",
-			fields: fields{
-				client: &TfProxyMock{},
-			},
-			args: args{
-				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
-			},
-			want: want{
-				err: nil,
-				cr: expectedServiceInstance(
-					withExternalName("550e8400-e29b-41d4-a716-446655440000"),
-					withConditions(xpv1.Creating()),
-				),
-			},
-		},
-		"HappyPath": {
-			reason: "should create the resource successfully and set Creating condition",
-			fields: fields{
-				client: &TfProxyMock{},
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: nil,
-				cr: expectedServiceInstance(
-					withConditions(
-						xpv1.Creating(),
-					),
-				),
-			},
-		},
-		"WrongType": {
-			reason: "should return an error when the managed resource is not a ServiceInstance",
-			fields: fields{
-				client: &TfProxyMock{},
-			},
-			args: args{
-				mg: &v1alpha1.Subaccount{},
-			},
-			want: want{
-				err: errors.New(errNotServiceInstance),
-				cr:  nil, // no ServiceInstance to assert on
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			e := external{
-				tfClient: tc.fields.client,
-				kube: &test.MockClient{
-					MockUpdate: test.NewMockUpdateFn(nil),
-				},
-			}
-
-			_, err := e.Create(context.Background(), tc.args.mg)
-			expectedErrorBehaviour(t, tc.want.err, err)
-
-			if tc.want.cr == nil {
-				return
-			}
-
-			// Verify the entire CR
-			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
-			if !ok {
-				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
-			}
-			// Ignore conditions when comparing CR as they may contain timestamps and drift messages
-			if diff := cmp.Diff(tc.want.cr, cr, cmpopts.IgnoreFields(xpv1.ConditionedStatus{}, "Conditions")); diff != "" {
-				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
-			}
-		})
+	if diff := cmp.Diff(want, cr.Status.AtProvider); diff != "" {
+		t.Errorf("status mismatch (-want +got):\n%s", diff)
 	}
 }
 
-func TestUpdate(t *testing.T) {
-	type fields struct {
-		client *TfProxyMock
+func TestIsValidUUID(t *testing.T) {
+	if !isValidUUID(validUUID) {
+		t.Errorf("expected %q to be valid", validUUID)
 	}
-	type args struct {
-		mg resource.Managed
-	}
-	type want struct {
-		err error
-		cr  *v1alpha1.ServiceInstance
-	}
-
-	cases := map[string]struct {
-		reason string
-		fields fields
-		args   args
-		want   want
-	}{
-		"ApiError": {
-			reason: "should return an error when the API call fails",
-			fields: fields{
-				client: &TfProxyMock{err: errClient},
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: errClient,
-				cr:  expectedServiceInstance(),
-			},
-		},
-		"HappyPath": {
-			reason: "should update the resource successfully",
-			fields: fields{
-				client: &TfProxyMock{},
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: nil,
-				cr:  expectedServiceInstance(),
-			},
-		},
-		// ADR(external-name):: Update uses external-name to identify the resource; external-name must be preserved
-		"HappyPath_WithExternalName": {
-			reason: "should update successfully and preserve the external-name on the CR",
-			fields: fields{
-				client: &TfProxyMock{},
-			},
-			args: args{
-				mg: expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
-			},
-			want: want{
-				err: nil,
-				cr:  expectedServiceInstance(withExternalName("550e8400-e29b-41d4-a716-446655440000")),
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			e := external{
-				tfClient: tc.fields.client,
-				kube: &test.MockClient{
-					MockUpdate: test.NewMockUpdateFn(nil),
-				},
-			}
-
-			_, err := e.Update(context.Background(), tc.args.mg)
-			expectedErrorBehaviour(t, tc.want.err, err)
-
-			// Verify the entire CR
-			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
-			if !ok {
-				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
-			}
-			// Ignore conditions when comparing CR as they may contain timestamps and drift messages
-			if diff := cmp.Diff(tc.want.cr, cr, cmpopts.IgnoreFields(xpv1.ConditionedStatus{}, "Conditions")); diff != "" {
-				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
-			}
-		})
+	if isValidUUID("not-a-uuid") {
+		t.Errorf("expected invalid")
 	}
 }
 
-func TestCalculateDiff(t *testing.T) {
-	cases := map[string]struct {
-		reason         string
-		tfResource     resource.Managed
-		wantContains   []string
-		wantNotContain string
-	}{
-		"NilTfResource": {
-			reason:       "should return fallback message when GetTfResource returns nil",
-			tfResource:   nil,
-			wantContains: []string{"unable to retrieve"},
-		},
-		"WrongResourceType": {
-			reason:       "should return fallback message when TfResource is not a SubaccountServiceInstance",
-			tfResource:   &v1alpha1.ServiceInstance{},
-			wantContains: []string{"unexpected resource type"},
-		},
-		"NoDiff_NoAsyncMessage": {
-			reason: "should return generic fallback when spec and status are identical and no async message",
-			tfResource: &v1alpha1.SubaccountServiceInstance{
-				Spec: v1alpha1.SubaccountServiceInstanceSpec{
-					ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
-						Name: internal.Ptr("same-name"),
-					},
-				},
-				Status: v1alpha1.SubaccountServiceInstanceStatus{
-					AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
-						Name: internal.Ptr("same-name"),
-					},
-				},
-			},
-			wantContains: []string{"Drift detected"},
-		},
-		"FieldDiff": {
-			reason: "should contain the differing field values when spec and status diverge",
-			tfResource: &v1alpha1.SubaccountServiceInstance{
-				Spec: v1alpha1.SubaccountServiceInstanceSpec{
-					ForProvider: v1alpha1.SubaccountServiceInstanceParameters{
-						Name: internal.Ptr("desired-name"),
-					},
-				},
-				Status: v1alpha1.SubaccountServiceInstanceStatus{
-					AtProvider: v1alpha1.SubaccountServiceInstanceObservation{
-						Name: internal.Ptr("actual-name"),
-					},
-				},
-			},
-			wantContains: []string{"desired-name", "actual-name"},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			e := external{
-				tfClient: &TfProxyMock{tfResource: tc.tfResource},
-				kube:     &test.MockClient{},
-			}
-
-			got := e.calculateDiff(&v1alpha1.ServiceInstance{})
-
-			for _, substr := range tc.wantContains {
-				if !strings.Contains(got, substr) {
-					t.Errorf("\n%s\nexpected diff to contain %q, got:\n%s", tc.reason, substr, got)
-				}
-			}
-		})
-	}
-}
-
-func TestSaveCallback(t *testing.T) {
-	type args struct {
-		kube       client.Client
-		name       string
-		conditions []xpv1.Condition
-	}
-
-	type want struct {
-		err error
-	}
-
-	cases := map[string]struct {
-		reason string
-		args   args
-		want   want
-	}{
-		"GetError": {
-			reason: "should return an error if the ServiceInstance cannot be retrieved",
-			args: args{
-				kube: &test.MockClient{MockGet: test.NewMockGetFn(errKube)},
-				name: "test-instance",
-			},
-			want: want{
-				err: errKube,
-			},
-		},
-		"UpdateError": {
-			reason: "should return an error if the ServiceInstance status cannot be updated",
-			args: args{
-				kube: &test.MockClient{
-					MockGet:          test.NewMockGetFn(nil),
-					MockStatusUpdate: test.NewMockSubResourceUpdateFn(errKube),
-				},
-				name:       "test-instance",
-				conditions: []xpv1.Condition{ujresource.AsyncOperationFinishedCondition()},
-			},
-			want: want{
-				err: errKube,
-			},
-		},
-		"Success": {
-			reason: "should successfully save conditions to the ServiceInstance",
-			args: args{
-				kube: &test.MockClient{
-					MockGet:          test.NewMockGetFn(nil),
-					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
-				},
-				name:       "test-instance",
-				conditions: []xpv1.Condition{ujresource.AsyncOperationFinishedCondition()},
-			},
-			want: want{
-				err: nil,
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			err := saveCallback(context.Background(), tc.args.kube, tc.args.name, tc.args.conditions...)
-			expectedErrorBehaviour(t, tc.want.err, err)
-		})
-	}
-}
-
-func TestDelete(t *testing.T) {
-	type fields struct {
-		client  *TfProxyMock
-		tracker *testutils.ResourceTrackerMock
-	}
-	type args struct {
-		mg resource.Managed
-	}
-	type want struct {
-		err error
-		cr  *v1alpha1.ServiceInstance
-	}
-
-	cases := map[string]struct {
-		reason string
-		fields fields
-		args   args
-		want   want
-	}{
-		"ApiError": {
-			reason: "should return an error when the API call fails",
-			fields: fields{
-				client:  &TfProxyMock{err: errClient},
-				tracker: testutils.NewResourceTrackerMock(),
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: errClient,
-				cr: expectedServiceInstance(
-					withConditions(xpv1.Deleting()),
-				),
-			},
-		},
-		"HappyPath": {
-			reason: "should delete the resource successfully and set Deleting condition",
-			fields: fields{
-				client:  &TfProxyMock{},
-				tracker: testutils.NewResourceTrackerMock(),
-			},
-			args: args{
-				mg: &v1alpha1.ServiceInstance{},
-			},
-			want: want{
-				err: nil,
-				cr: expectedServiceInstance(
-					withConditions(xpv1.Deleting()),
-				),
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			e := external{
-				tfClient: tc.fields.client,
-				kube: &test.MockClient{
-					MockUpdate: test.NewMockUpdateFn(nil),
-				},
-				tracker: tc.fields.tracker,
-			}
-
-			_, err := e.Delete(context.Background(), tc.args.mg)
-			expectedErrorBehaviour(t, tc.want.err, err)
-
-			// Verify the entire CR
-			cr, ok := tc.args.mg.(*v1alpha1.ServiceInstance)
-			if !ok {
-				t.Fatalf("expected *v1alpha1.ServiceInstance, got %T", tc.args.mg)
-			}
-			// Ignore conditions when comparing CR as they may contain timestamps and drift messages
-			if diff := cmp.Diff(tc.want.cr, cr, cmpopts.IgnoreFields(xpv1.ConditionedStatus{}, "Conditions")); diff != "" {
-				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
-			}
-		})
-	}
-}
-
-var _ tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] = &TfProxyClientCreatorMock{}
-
-type TfProxyClientCreatorMock struct {
-	err error
-}
-
-func (t *TfProxyClientCreatorMock) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (tfclient.TfProxyControllerI, error) {
-	if t.err != nil {
-		return nil, t.err
-	}
-	return &TfProxyMock{}, nil
-}
+// ====================================================================================
+// Helpers
+// ====================================================================================
 
 var _ Initializer = &InitializerMock{}
 
@@ -1126,48 +673,80 @@ type InitializerMock struct {
 	err error
 }
 
-// Initialize implements Initializer.
 func (i *InitializerMock) Initialize(kube client.Client, ctx context.Context, mg resource.Managed) error {
 	return i.err
 }
 
-var _ tfclient.TfProxyControllerI = &TfProxyMock{}
-
-type TfProxyMock struct {
-	status       tfclient.Status
-	data         *tfclient.ObservationData
-	err          error
-	details      map[string][]byte
-	deleteCalled bool
-	tfResource   resource.Managed
+func instanceWith(id, state, planID, name string, labels map[string][]string) *smopenapi.ServiceInstanceResponseObject {
+	in := &smopenapi.ServiceInstanceResponseObject{
+		Id:            internal.Ptr(id),
+		Name:          internal.Ptr(name),
+		ServicePlanId: internal.Ptr(planID),
+	}
+	if state != "" {
+		in.LastOperation = &smopenapi.OperationResponseObject{State: internal.Ptr(state)}
+	}
+	if labels != nil {
+		in.Labels = &labels
+	}
+	return in
 }
 
-func (t *TfProxyMock) Delete(ctx context.Context) error {
-	t.deleteCalled = true
-	return t.err
+func siWithName(name string) *v1alpha1.ServiceInstance {
+	cr := &v1alpha1.ServiceInstance{}
+	cr.SetName(name)
+	cr.Spec.ForProvider.Name = name
+	return cr
 }
 
-func (t *TfProxyMock) QueryAsyncData(ctx context.Context) *tfclient.ObservationData {
-	return t.data
+// expectedServiceInstance builds a ServiceInstance CR by applying option funcs.
+// Retained for the initializer tests.
+func expectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.ServiceInstance {
+	cr := &v1alpha1.ServiceInstance{}
+	for _, opt := range opts {
+		opt(cr)
+	}
+	return cr
 }
 
-func (t *TfProxyMock) Create(ctx context.Context) error {
-	return t.err
+// withObservationData sets ID and ServiceplanID in the CR status.
+func withObservationData(id string, planID string) func(*v1alpha1.ServiceInstance) {
+	return func(cr *v1alpha1.ServiceInstance) {
+		cr.Status.AtProvider = v1alpha1.ServiceInstanceObservation{
+			ID:            id,
+			ServiceplanID: planID,
+		}
+	}
 }
 
-func (t *TfProxyMock) Observe(context context.Context) (tfclient.Status, map[string][]byte, error) {
-	return t.status, t.details, t.err
+func siWithExternalName(name, externalName string) *v1alpha1.ServiceInstance {
+	cr := siWithName(name)
+	meta.SetExternalName(cr, externalName)
+	return cr
 }
 
-func (t *TfProxyMock) Update(ctx context.Context) error {
-	return t.err
+func withPlan(cr *v1alpha1.ServiceInstance, planID string) *v1alpha1.ServiceInstance {
+	cr.Status.AtProvider.ServiceplanID = planID
+	return cr
 }
 
-func (t *TfProxyMock) GetTfResource() resource.Managed {
-	return t.tfResource
+func withLabels(cr *v1alpha1.ServiceInstance, labels map[string][]*string) *v1alpha1.ServiceInstance {
+	cr.Spec.ForProvider.Labels = labels
+	return cr
+}
+
+func withShared(cr *v1alpha1.ServiceInstance, shared bool) *v1alpha1.ServiceInstance {
+	cr.Spec.ForProvider.Shared = internal.Ptr(shared)
+	return cr
+}
+
+func withObserveOnly(cr *v1alpha1.ServiceInstance) *v1alpha1.ServiceInstance {
+	cr.Spec.ManagementPolicies = []xpv1.ManagementAction{xpv1.ManagementActionObserve}
+	return cr
 }
 
 func expectedErrorBehaviour(t *testing.T, expectedErr error, gotErr error) {
+	t.Helper()
 	if gotErr != nil {
 		if expectedErr == nil {
 			t.Errorf("expected no error, got %v", gotErr)
@@ -1183,148 +762,33 @@ func expectedErrorBehaviour(t *testing.T, expectedErr error, gotErr error) {
 	}
 }
 
-// Helper function to build a complete ServiceInstance CR dynamically
-func expectedServiceInstance(opts ...func(*v1alpha1.ServiceInstance)) *v1alpha1.ServiceInstance {
+// keep imports used across files
+var _ = cmpopts.IgnoreFields
+var _ = metav1.Now
+
+// TestCalculateDiff_IgnoresReservedLabels ensures the SM-managed subaccount_id
+// label present on the observed instance does not register as drift when the
+// spec declares no labels. Otherwise every reconcile would trigger a spurious
+// Update that BTP rejects with "Modifying is not allowed for label subaccount_id".
+func TestCalculateDiff_IgnoresReservedLabels(t *testing.T) {
+	e := &external{}
 	cr := &v1alpha1.ServiceInstance{}
+	cr.Spec.ForProvider.Name = "my-instance"
+	cr.Status.AtProvider.ServiceplanID = "plan-1"
 
-	// Apply each option to modify the CR
-	for _, opt := range opts {
-		opt(cr)
-	}
-
-	return cr
-}
-
-// Option to set the external name annotation
-func withExternalName(externalName string) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		if cr.GetAnnotations() == nil {
-			cr.SetAnnotations(map[string]string{})
-		}
-		cr.GetAnnotations()["crossplane.io/external-name"] = externalName
-	}
-}
-
-// Option to mark the CR as being deleted. The timestamp is fixed so that the
-// want/got CRs compare equal.
-func withDeletionTimestamp() func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		ts := metav1.NewTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
-		cr.SetDeletionTimestamp(&ts)
-	}
-}
-
-// Option to set observation data (e.g., ID)
-func withObservationData(id string, planId string) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Status.AtProvider = v1alpha1.ServiceInstanceObservation{
-			ID:            id,
-			ServiceplanID: planId,
-		}
-	}
-}
-
-// Option to set conditions
-func withConditions(conditions ...xpv1.Condition) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Status.Conditions = conditions
-	}
-}
-
-// withConflictCondition sets the LastAsyncOperation condition with a Conflict message,
-// simulating a failed Create() that hit an "already exists" error.
-// ObservedGeneration defaults to 0, matching a CR with Generation=0 (no spec change yet).
-func withConflictCondition(cr *v1alpha1.ServiceInstance) *v1alpha1.ServiceInstance {
-	cr.SetConditions(xpv1.Condition{
-		Type:               ujresource.TypeLastAsyncOperation,
-		Status:             "False",
-		Reason:             "ReconcileError",
-		Message:            "Conflict: resource already exists",
-		ObservedGeneration: cr.Generation,
-	})
-	return cr
-}
-
-// Option to set the full AtProvider observation struct
-func withAtProvider(obs v1alpha1.ServiceInstanceObservation) func(*v1alpha1.ServiceInstance) {
-	return func(cr *v1alpha1.ServiceInstance) {
-		cr.Status.AtProvider = obs
-	}
-}
-
-func TestSaveInstanceData(t *testing.T) {
-	ready := true
-	usable := true
-	createdDate := metav1.NewTime(time.Date(2023, 1, 15, 10, 30, 0, 0, time.UTC))
-	lastModified := metav1.NewTime(time.Date(2023, 1, 16, 10, 30, 0, 0, time.UTC))
-
-	cases := map[string]struct {
-		reason string
-		cr     *v1alpha1.ServiceInstance
-		sid    tfclient.ObservationData
-		want   *v1alpha1.ServiceInstance
-	}{
-		"SavesBasicFields": {
-			reason: "should save ID and DashboardURL to the CR status",
-			cr:     &v1alpha1.ServiceInstance{},
-			sid: tfclient.ObservationData{
-				ExternalName: "some-ext-name",
-				ID:           "some-id",
-				DashboardURL: "https://dashboard.example.com",
-			},
-			want: expectedServiceInstance(
-				withExternalName("some-ext-name"),
-				withAtProvider(v1alpha1.ServiceInstanceObservation{
-					ID:           "some-id",
-					DashboardURL: "https://dashboard.example.com",
-				}),
-			),
-		},
-		"SavesAllObservationFields": {
-			reason: "should save all new observation fields (CreatedDate, LastModified, State, Ready, Usable, PlatformID) to the CR status",
-			cr:     &v1alpha1.ServiceInstance{},
-			sid: tfclient.ObservationData{
-				ExternalName: "some-ext-name",
-				ID:           "some-id",
-				DashboardURL: "https://dashboard.example.com",
-				CreatedDate:  &createdDate,
-				LastModified: &lastModified,
-				State:        "succeeded",
-				Ready:        &ready,
-				Usable:       &usable,
-				PlatformID:   "test-platform",
-			},
-			want: expectedServiceInstance(
-				withExternalName("some-ext-name"),
-				withAtProvider(v1alpha1.ServiceInstanceObservation{
-					ID:           "some-id",
-					DashboardURL: "https://dashboard.example.com",
-					CreatedDate:  &createdDate,
-					LastModified: &lastModified,
-					State:        "succeeded",
-					Ready:        &ready,
-					Usable:       &usable,
-					PlatformID:   "test-platform",
-				}),
-			),
+	instance := &smopenapi.ServiceInstanceResponseObject{
+		Name:          internal.Ptr("my-instance"),
+		ServicePlanId: internal.Ptr("plan-1"),
+		Labels: &map[string][]string{
+			"subaccount_id": {"550e8400-e29b-41d4-a716-446655440000"},
 		},
 	}
 
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			e := external{
-				kube: &test.MockClient{
-					MockUpdate: test.NewMockUpdateFn(nil),
-				},
-			}
-
-			err := e.saveInstanceData(context.Background(), tc.cr, tc.sid)
-			if err != nil {
-				t.Errorf("saveInstanceData() unexpected error: %v", err)
-			}
-			if diff := cmp.Diff(tc.want, tc.cr); diff != "" {
-				t.Errorf("\n%s\nCR mismatch (-want, +got):\n%s\n", tc.reason, diff)
-			}
-		})
+	diff, err := e.calculateDiff(context.Background(), cr, instance)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff != "" {
+		t.Errorf("expected no drift when only reserved labels differ, got: %s", diff)
 	}
 }

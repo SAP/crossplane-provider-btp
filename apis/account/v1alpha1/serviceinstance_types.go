@@ -10,6 +10,16 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 )
 
+const (
+	// AnnotationParameterDriftDetection opts a ServiceInstance into recursive
+	// parameter drift detection. It is value-based: the annotation must be set
+	// to "true" to enable detection. Any other value (or the annotation's
+	// absence) preserves the legacy behavior where spec.parameters are never
+	// compared against the Service Manager. Value-based (rather than
+	// presence-based) so users can disable detection without deleting the key.
+	AnnotationParameterDriftDetection = CRDGroup + "/parameter-drift-detection"
+)
+
 // ServiceInstanceParameters are the configurable fields of a ServiceInstance.
 type ServiceInstanceParameters struct {
 	// Name of the service instance in btp, required
@@ -118,6 +128,44 @@ type ServiceInstanceObservation struct {
 
 	// The platform ID of the service instance.
 	PlatformID string `json:"platformId,omitempty"`
+
+	// Whether the service instance is shared, as observed from the Service Manager API.
+	Shared *bool `json:"shared,omitempty"`
+
+	// OfferingID is the service offering ID resolved from the service plan.
+	// Stored here so the controller can look up offering properties (e.g.
+	// InstancesRetrievable) without an extra API call on every reconcile.
+	// +kubebuilder:validation:Optional
+	OfferingID string `json:"offeringId,omitempty"`
+
+	// InstancesRetrievable reflects the instances_retrievable flag of the
+	// service offering, cached from the Service Manager API. nil means the
+	// flag has not been fetched yet; true/false is the cached value.
+	// +kubebuilder:validation:Optional
+	InstancesRetrievable *bool `json:"instancesRetrievable,omitempty"`
+
+	// LastAppliedParameters is the canonical JSON of the parameter map most
+	// recently applied to the Service Manager by a successful Create/Update.
+	// It is provider bookkeeping (not user intent) and is the "last-applied"
+	// leg of the three-way parameter drift comparison, enabling detection of
+	// keys the user removed from spec. Written only after the operation that
+	// carried the parameters succeeds.
+	// +kubebuilder:validation:Optional
+	LastAppliedParameters string `json:"lastAppliedParameters,omitempty"`
+
+	// PendingOperationID is the Service Manager operation id of an in-flight
+	// async PATCH/create that carried parameters. It ties PendingParameters to
+	// the specific operation so the snapshot is promoted only when our own
+	// operation succeeds. Cleared once the operation settles.
+	// +kubebuilder:validation:Optional
+	PendingOperationID string `json:"pendingOperationID,omitempty"`
+
+	// PendingParameters is the canonical JSON of the parameter map sent with
+	// the operation identified by PendingOperationID. On that operation's
+	// success it is promoted into LastAppliedParameters; on failure it is
+	// discarded, leaving LastAppliedParameters untouched.
+	// +kubebuilder:validation:Optional
+	PendingParameters string `json:"pendingParameters,omitempty"`
 }
 
 // A ServiceInstanceSpec defines the desired state of a ServiceInstance.

@@ -418,9 +418,44 @@ spec:
                     type: string
                   id:
                     type: string
+                  instancesRetrievable:
+                    description: |-
+                      InstancesRetrievable reflects the instances_retrievable flag of the
+                      service offering, cached from the Service Manager API. nil means the
+                      flag has not been fetched yet; true/false is the cached value.
+                    type: boolean
+                  lastAppliedParameters:
+                    description: |-
+                      LastAppliedParameters is the canonical JSON of the parameter map most
+                      recently applied to the Service Manager by a successful Create/Update.
+                      It is provider bookkeeping (not user intent) and is the "last-applied"
+                      leg of the three-way parameter drift comparison, enabling detection of
+                      keys the user removed from spec. Written only after the operation that
+                      carried the parameters succeeds.
+                    type: string
                   lastModified:
                     description: The date and time when the resource was last modified.
                     format: date-time
+                    type: string
+                  offeringId:
+                    description: |-
+                      OfferingID is the service offering ID resolved from the service plan.
+                      Stored here so the controller can look up offering properties (e.g.
+                      InstancesRetrievable) without an extra API call on every reconcile.
+                    type: string
+                  pendingOperationID:
+                    description: |-
+                      PendingOperationID is the Service Manager operation id of an in-flight
+                      async PATCH/create that carried parameters. It ties PendingParameters to
+                      the specific operation so the snapshot is promoted only when our own
+                      operation succeeds. Cleared once the operation settles.
+                    type: string
+                  pendingParameters:
+                    description: |-
+                      PendingParameters is the canonical JSON of the parameter map sent with
+                      the operation identified by PendingOperationID. On that operation's
+                      success it is promoted into LastAppliedParameters; on failure it is
+                      discarded, leaving LastAppliedParameters untouched.
                     type: string
                   platformId:
                     description: The platform ID of the service instance.
@@ -431,6 +466,10 @@ spec:
                   serviceplanId:
                     description: The ID of the service plan as resolved by the ServiceManager
                     type: string
+                  shared:
+                    description: Whether the service instance is shared, as observed
+                      from the Service Manager API.
+                    type: boolean
                   state:
                     description: The current state of the service instance.
                     type: string

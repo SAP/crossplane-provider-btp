@@ -21,9 +21,11 @@ var _ MappedNullable = &ServiceInstanceResponseObject{}
 // ServiceInstanceResponseObject struct for ServiceInstanceResponseObject
 type ServiceInstanceResponseObject struct {
 	// Contextual data for the resource.
-	Context *map[string]string `json:"context,omitempty"`
+	Context map[string]interface{} `json:"context,omitempty"`
 	// The time the resource was created. <br/>In ISO 8601 format:</br> YYYY-MM-DDThh:mm:ssTZD
 	CreatedAt *time.Time `json:"created_at,omitempty"`
+	// The user that created this service instance.<br>If the instance was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes instances, this is the user ID as defined by that environment's user management system.
+	CreatedBy *string `json:"created_by,omitempty"`
 	// The URL of a web-based management user interface for the service instance, also known as service dashboard.
 	DashboardUrl *string `json:"dashboard_url,omitempty"`
 	// The ID of the service instance.
@@ -46,6 +48,8 @@ type ServiceInstanceResponseObject struct {
 	Shared *bool `json:"shared,omitempty"`
 	// The last time the resource was updated. <br/> In ISO 8601 format.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	// The user that last updated this service instance.<br>If the instance was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes instances, this is the user ID as defined by that environment's user management system.<br/>
+	UpdatedBy *string `json:"updated_by,omitempty"`
 	// Wheher the resource can be used.
 	Usable *bool `json:"usable,omitempty"`
 }
@@ -68,19 +72,19 @@ func NewServiceInstanceResponseObjectWithDefaults() *ServiceInstanceResponseObje
 }
 
 // GetContext returns the Context field value if set, zero value otherwise.
-func (o *ServiceInstanceResponseObject) GetContext() map[string]string {
+func (o *ServiceInstanceResponseObject) GetContext() map[string]interface{} {
 	if o == nil || IsNil(o.Context) {
-		var ret map[string]string
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Context
+	return o.Context
 }
 
 // GetContextOk returns a tuple with the Context field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ServiceInstanceResponseObject) GetContextOk() (*map[string]string, bool) {
+func (o *ServiceInstanceResponseObject) GetContextOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Context) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Context, true
 }
@@ -94,9 +98,9 @@ func (o *ServiceInstanceResponseObject) HasContext() bool {
 	return false
 }
 
-// SetContext gets a reference to the given map[string]string and assigns it to the Context field.
-func (o *ServiceInstanceResponseObject) SetContext(v map[string]string) {
-	o.Context = &v
+// SetContext gets a reference to the given map[string]interface{} and assigns it to the Context field.
+func (o *ServiceInstanceResponseObject) SetContext(v map[string]interface{}) {
+	o.Context = v
 }
 
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
@@ -129,6 +133,38 @@ func (o *ServiceInstanceResponseObject) HasCreatedAt() bool {
 // SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
 func (o *ServiceInstanceResponseObject) SetCreatedAt(v time.Time) {
 	o.CreatedAt = &v
+}
+
+// GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
+func (o *ServiceInstanceResponseObject) GetCreatedBy() string {
+	if o == nil || IsNil(o.CreatedBy) {
+		var ret string
+		return ret
+	}
+	return *o.CreatedBy
+}
+
+// GetCreatedByOk returns a tuple with the CreatedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ServiceInstanceResponseObject) GetCreatedByOk() (*string, bool) {
+	if o == nil || IsNil(o.CreatedBy) {
+		return nil, false
+	}
+	return o.CreatedBy, true
+}
+
+// HasCreatedBy returns a boolean if a field has been set.
+func (o *ServiceInstanceResponseObject) HasCreatedBy() bool {
+	if o != nil && !IsNil(o.CreatedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetCreatedBy gets a reference to the given string and assigns it to the CreatedBy field.
+func (o *ServiceInstanceResponseObject) SetCreatedBy(v string) {
+	o.CreatedBy = &v
 }
 
 // GetDashboardUrl returns the DashboardUrl field value if set, zero value otherwise.
@@ -515,6 +551,38 @@ func (o *ServiceInstanceResponseObject) SetUpdatedAt(v time.Time) {
 	o.UpdatedAt = &v
 }
 
+// GetUpdatedBy returns the UpdatedBy field value if set, zero value otherwise.
+func (o *ServiceInstanceResponseObject) GetUpdatedBy() string {
+	if o == nil || IsNil(o.UpdatedBy) {
+		var ret string
+		return ret
+	}
+	return *o.UpdatedBy
+}
+
+// GetUpdatedByOk returns a tuple with the UpdatedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ServiceInstanceResponseObject) GetUpdatedByOk() (*string, bool) {
+	if o == nil || IsNil(o.UpdatedBy) {
+		return nil, false
+	}
+	return o.UpdatedBy, true
+}
+
+// HasUpdatedBy returns a boolean if a field has been set.
+func (o *ServiceInstanceResponseObject) HasUpdatedBy() bool {
+	if o != nil && !IsNil(o.UpdatedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetUpdatedBy gets a reference to the given string and assigns it to the UpdatedBy field.
+func (o *ServiceInstanceResponseObject) SetUpdatedBy(v string) {
+	o.UpdatedBy = &v
+}
+
 // GetUsable returns the Usable field value if set, zero value otherwise.
 func (o *ServiceInstanceResponseObject) GetUsable() bool {
 	if o == nil || IsNil(o.Usable) {
@@ -563,6 +631,9 @@ func (o ServiceInstanceResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.CreatedAt) {
 		toSerialize["created_at"] = o.CreatedAt
 	}
+	if !IsNil(o.CreatedBy) {
+		toSerialize["created_by"] = o.CreatedBy
+	}
 	if !IsNil(o.DashboardUrl) {
 		toSerialize["dashboard_url"] = o.DashboardUrl
 	}
@@ -598,6 +669,9 @@ func (o ServiceInstanceResponseObject) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updated_at"] = o.UpdatedAt
+	}
+	if !IsNil(o.UpdatedBy) {
+		toSerialize["updated_by"] = o.UpdatedBy
 	}
 	if !IsNil(o.Usable) {
 		toSerialize["usable"] = o.Usable

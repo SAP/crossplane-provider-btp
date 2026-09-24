@@ -6,5 +6,37 @@
       "description": "The metadata associated with the service plan.",
       "type": "object"
     }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/CreateByPlanID/properties/parameters",
+    "value": {
+      "type": "object",
+      "description": "Additional configuration parameters for the service instance, as arbitrary JSON. Some services support providing configuration parameters during instance creation."
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/CreateByOfferingAndPlanName/properties/parameters",
+    "value": {
+      "type": "object",
+      "description": "Additional configuration parameters for the service instance, as arbitrary JSON. Some services support providing configuration parameters during instance creation."
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/components/schemas/UpdateServiceInstanceRequestPayload/properties/parameters",
+    "value": {
+      "type": "object",
+      "description": "Additional configuration parameters for the service instance, as arbitrary JSON. Some services support updating configuration parameters."
+    }
+  },
+  {
+    "op": "replace",
+    "path": "/paths/~1v1~1service_instances~1{serviceInstanceID}~1parameters/get/responses/200/content/application~1json/schema",
+    "value": {
+      "type": "object",
+      "description": "The configuration parameters of the service instance, as arbitrary JSON."
+    }
   }
 ]

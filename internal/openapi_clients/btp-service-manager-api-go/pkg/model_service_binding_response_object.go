@@ -23,9 +23,11 @@ type ServiceBindingResponseObject struct {
 	// The bound resources.
 	BindResource *map[string]string `json:"bind_resource,omitempty"`
 	// Contextual data for the resource.
-	Context *map[string]string `json:"context,omitempty"`
+	Context map[string]interface{} `json:"context,omitempty"`
 	// The time the binding was created.<br/>In ISO 8601 format:</br> YYYY-MM-DDThh:mm:ssTZD
 	CreatedAt *time.Time `json:"created_at,omitempty"`
+	// The user that created this service binding.<br>If the binding was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes bindings, this is the user ID as defined by that environment's user management system.
+	CreatedBy *string `json:"created_by,omitempty"`
 	// Credentials to access the binding.
 	Credentials map[string]interface{} `json:"credentials,omitempty"`
 	// The ID of the service binding.
@@ -41,6 +43,8 @@ type ServiceBindingResponseObject struct {
 	ServiceInstanceId *string `json:"service_instance_id,omitempty"`
 	// The last time the binding was updated.<br/> In ISO 8601 format.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	// The user that last updated this service binding.<br>If the binding was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes bindings, this is the user ID as defined by that environment's user management system.<br/>
+	UpdatedBy *string `json:"updated_by,omitempty"`
 }
 
 // NewServiceBindingResponseObject instantiates a new ServiceBindingResponseObject object
@@ -93,19 +97,19 @@ func (o *ServiceBindingResponseObject) SetBindResource(v map[string]string) {
 }
 
 // GetContext returns the Context field value if set, zero value otherwise.
-func (o *ServiceBindingResponseObject) GetContext() map[string]string {
+func (o *ServiceBindingResponseObject) GetContext() map[string]interface{} {
 	if o == nil || IsNil(o.Context) {
-		var ret map[string]string
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Context
+	return o.Context
 }
 
 // GetContextOk returns a tuple with the Context field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ServiceBindingResponseObject) GetContextOk() (*map[string]string, bool) {
+func (o *ServiceBindingResponseObject) GetContextOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Context) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Context, true
 }
@@ -119,9 +123,9 @@ func (o *ServiceBindingResponseObject) HasContext() bool {
 	return false
 }
 
-// SetContext gets a reference to the given map[string]string and assigns it to the Context field.
-func (o *ServiceBindingResponseObject) SetContext(v map[string]string) {
-	o.Context = &v
+// SetContext gets a reference to the given map[string]interface{} and assigns it to the Context field.
+func (o *ServiceBindingResponseObject) SetContext(v map[string]interface{}) {
+	o.Context = v
 }
 
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
@@ -154,6 +158,38 @@ func (o *ServiceBindingResponseObject) HasCreatedAt() bool {
 // SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
 func (o *ServiceBindingResponseObject) SetCreatedAt(v time.Time) {
 	o.CreatedAt = &v
+}
+
+// GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
+func (o *ServiceBindingResponseObject) GetCreatedBy() string {
+	if o == nil || IsNil(o.CreatedBy) {
+		var ret string
+		return ret
+	}
+	return *o.CreatedBy
+}
+
+// GetCreatedByOk returns a tuple with the CreatedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ServiceBindingResponseObject) GetCreatedByOk() (*string, bool) {
+	if o == nil || IsNil(o.CreatedBy) {
+		return nil, false
+	}
+	return o.CreatedBy, true
+}
+
+// HasCreatedBy returns a boolean if a field has been set.
+func (o *ServiceBindingResponseObject) HasCreatedBy() bool {
+	if o != nil && !IsNil(o.CreatedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetCreatedBy gets a reference to the given string and assigns it to the CreatedBy field.
+func (o *ServiceBindingResponseObject) SetCreatedBy(v string) {
+	o.CreatedBy = &v
 }
 
 // GetCredentials returns the Credentials field value if set, zero value otherwise.
@@ -412,6 +448,38 @@ func (o *ServiceBindingResponseObject) SetUpdatedAt(v time.Time) {
 	o.UpdatedAt = &v
 }
 
+// GetUpdatedBy returns the UpdatedBy field value if set, zero value otherwise.
+func (o *ServiceBindingResponseObject) GetUpdatedBy() string {
+	if o == nil || IsNil(o.UpdatedBy) {
+		var ret string
+		return ret
+	}
+	return *o.UpdatedBy
+}
+
+// GetUpdatedByOk returns a tuple with the UpdatedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ServiceBindingResponseObject) GetUpdatedByOk() (*string, bool) {
+	if o == nil || IsNil(o.UpdatedBy) {
+		return nil, false
+	}
+	return o.UpdatedBy, true
+}
+
+// HasUpdatedBy returns a boolean if a field has been set.
+func (o *ServiceBindingResponseObject) HasUpdatedBy() bool {
+	if o != nil && !IsNil(o.UpdatedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetUpdatedBy gets a reference to the given string and assigns it to the UpdatedBy field.
+func (o *ServiceBindingResponseObject) SetUpdatedBy(v string) {
+	o.UpdatedBy = &v
+}
+
 func (o ServiceBindingResponseObject) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -430,6 +498,9 @@ func (o ServiceBindingResponseObject) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["created_at"] = o.CreatedAt
+	}
+	if !IsNil(o.CreatedBy) {
+		toSerialize["created_by"] = o.CreatedBy
 	}
 	if !IsNil(o.Credentials) {
 		toSerialize["credentials"] = o.Credentials
@@ -454,6 +525,9 @@ func (o ServiceBindingResponseObject) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updated_at"] = o.UpdatedAt
+	}
+	if !IsNil(o.UpdatedBy) {
+		toSerialize["updated_by"] = o.UpdatedBy
 	}
 	return toSerialize, nil
 }

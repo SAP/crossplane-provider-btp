@@ -21,7 +21,7 @@ var _ MappedNullable = &UpdatedServiceInstanceResponseObject{}
 // UpdatedServiceInstanceResponseObject struct for UpdatedServiceInstanceResponseObject
 type UpdatedServiceInstanceResponseObject struct {
 	// Contextual data for the resource.
-	Context *map[string]string `json:"context,omitempty"`
+	Context map[string]interface{} `json:"context,omitempty"`
 	// The time the service instance was created. <br/>In ISO 8601 format:</br> YYYY-MM-DDThh:mm:ssTZD
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 	// The URL of the web-based management UI for the service instance.
@@ -66,19 +66,19 @@ func NewUpdatedServiceInstanceResponseObjectWithDefaults() *UpdatedServiceInstan
 }
 
 // GetContext returns the Context field value if set, zero value otherwise.
-func (o *UpdatedServiceInstanceResponseObject) GetContext() map[string]string {
+func (o *UpdatedServiceInstanceResponseObject) GetContext() map[string]interface{} {
 	if o == nil || IsNil(o.Context) {
-		var ret map[string]string
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Context
+	return o.Context
 }
 
 // GetContextOk returns a tuple with the Context field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UpdatedServiceInstanceResponseObject) GetContextOk() (*map[string]string, bool) {
+func (o *UpdatedServiceInstanceResponseObject) GetContextOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Context) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Context, true
 }
@@ -92,9 +92,9 @@ func (o *UpdatedServiceInstanceResponseObject) HasContext() bool {
 	return false
 }
 
-// SetContext gets a reference to the given map[string]string and assigns it to the Context field.
-func (o *UpdatedServiceInstanceResponseObject) SetContext(v map[string]string) {
-	o.Context = &v
+// SetContext gets a reference to the given map[string]interface{} and assigns it to the Context field.
+func (o *UpdatedServiceInstanceResponseObject) SetContext(v map[string]interface{}) {
+	o.Context = v
 }
 
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.

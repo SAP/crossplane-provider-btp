@@ -9,7 +9,7 @@
     "tags": [
         {
             "name": "Platforms",
-            "description": "Platforms<br/>Platforms are OSBAPI-enabled software systems on which applications and services are hosted. <br/> With the SAP Service Manager, you can now register your platform and enable it to consume the SAP BTP services from your native environment. <br/> This registration results in a returned set of credentials that are needed to deploy the SAP Service Manager agent.<br/> For more information, visit our <a href=\"https://help.sap.com/viewer/65de2977205c403bbc107264b8eccf4b/Cloud/en-US/20195bf3b6e64189966e08f669c275e1.html\">SAP Help Portal</a>. <br/> "
+            "description": "Platforms<br/>Platforms are OSBAPI-enabled software systems on which applications and services are hosted. <br/> With the SAP Service Manager, you can now register your platform and enable it to consume the SAP BTP services from your native environment. <br/> This registration results in a returned set of credentials that are needed to deploy the SAP Service Manager agent.<br/>"
         },
         {
             "name": "Service Brokers",
@@ -134,7 +134,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -205,7 +213,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -288,7 +304,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -416,7 +440,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -528,7 +560,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -626,7 +666,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -699,7 +747,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -717,7 +773,7 @@
                     "Service Instances"
                 ],
                 "summary": "Get all service instances",
-                "description": "View the list of all service instances in the subaccount. <br/><br/> Required scopes: <xsappname>.subaccount.service_instance.read",
+                "description": "View the list of all service instances in the subaccount. The list includes environment-specific instances, such as Cloud Foundry or Kubernetes instances, and environment-agnostic instances.<br/><br/> Required scopes: <xsappname>.subaccount.service_instance.read",
                 "operationId": "getAllServiceInstances",
                 "parameters": [
                     {
@@ -797,7 +853,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests allowed per hour or 1,000 requests per minute are allowed for the GET '/v1/service_instances' API.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -837,14 +901,46 @@
                                 "CreateByPlanID": {
                                     "value": {
                                         "name": "my-service-instance",
-                                        "service_plan_id": "fd1fdfd8-4891-8d91-46334e04600d"
+                                        "service_plan_id": "fd1fdfd8-4891-8d91-46334e04600d",
+                                        "parameters": {
+                                            "parameter1": "value1",
+                                            "parameter2": "value2"
+                                        },
+                                        "labels": {
+                                            "label1": [
+                                                "value1",
+                                                "value2",
+                                                "value3"
+                                            ],
+                                            "label2": [
+                                                "value1",
+                                                "value2",
+                                                "value3"
+                                            ]
+                                        }
                                     }
                                 },
                                 "CreateByOfferingAndPlanName": {
                                     "value": {
                                         "name": "my-service-instance",
                                         "service_offering_name": "service-offering-name",
-                                        "service_plan_name": "service-plan-name"
+                                        "service_plan_name": "service-plan-name",
+                                        "parameters": {
+                                            "parameter1": "value1",
+                                            "parameter2": "value2"
+                                        },
+                                        "labels": {
+                                            "label1": [
+                                                "value1",
+                                                "value2",
+                                                "value3"
+                                            ],
+                                            "label2": [
+                                                "value1",
+                                                "value2",
+                                                "value3"
+                                            ]
+                                        }
                                     }
                                 }
                             }
@@ -942,7 +1038,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 50 requests per minute are allowed for the POST '/v1/service_instances' API.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1025,7 +1129,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests allowed per hour or 1,000 requests per minute are allowed for the GET '/v1/service_instances' API.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1112,6 +1224,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Service instance not found",
                         "content": {
@@ -1153,7 +1275,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 6,000 requests allowed per hour or 600 requests per minute are allowed for the DELETE '/v1/service_instances' API.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1169,7 +1299,7 @@
                     "Service Instances"
                 ],
                 "summary": "Update a service instance",
-                "description": "Update details of a specified provisioned service instance. <br/><br/>Required scopes: <xsappname>.subaccount.service_instance.manage",
+                "description": "Update details of a specified provisioned service instance.<br/>**Note**<br/>When sharing or unsharing an instance, you must pass the \"shareable\" boolean alone in the request body. Updating any other parameters together with the \"shareable\" parameter returns an error.<br/><br/>Required scopes: <xsappname>.subaccount.service_instance.manage",
                 "operationId": "updateServiceInstance",
                 "parameters": [
                     {
@@ -1197,6 +1327,32 @@
                         "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/UpdateServiceInstanceRequestPayload"
+                            },
+                            "examples": {
+                                "updateServiceInstanceDetails": {
+                                    "value": {
+                                        "name": "newName",
+                                        "service_plan_id": "new_plan_id"
+                                    }
+                                },
+                                "shareInstance": {
+                                    "value": {
+                                        "shared": "true"
+                                    }
+                                },
+                                "UnShareInstance": {
+                                    "value": {
+                                        "shared": "false"
+                                    }
+                                },
+                                "updateServiceInstanceParameters": {
+                                    "value": {
+                                        "parameters": {
+                                            "parameter1": "value1",
+                                            "parameter2": "value2"
+                                        }
+                                    }
+                                }
                             }
                         }
                     },
@@ -1251,6 +1407,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "content": {
@@ -1282,7 +1448,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 6,000 requests allowed per hour or 600 requests per minute are allowed for the PATCH '/v1/service_instances' API.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1384,7 +1558,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1482,7 +1664,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 6,000 requests per hour or 600 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1602,7 +1792,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 6,000 requests per hour or 600 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1675,7 +1873,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 6,000 requests per hour or 600 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1752,6 +1958,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Service binding not found",
                         "content": {
@@ -1793,7 +2009,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 6,000 requests per hour or 600 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1884,7 +2108,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 6,000 requests per hour or 600 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1908,7 +2140,7 @@
                     {
                         "name": "environment",
                         "in": "query",
-                        "description": "Use this parameter to specify the environment for which you want to list service plans. Valid values: [btp, kubernetes, cloudfoundry]. <br/>If left empty, service plans associated with btp (Service Manager instances on a subaccount level) are returned.",
+                        "description": "Use this parameter to specify the environment for which you want to list service plans. Valid values: [sapbtp, kubernetes, cloudfoundry]. <br/>If left empty, service plans associated with sapbtp (Service Manager instances on a subaccount level) are returned.",
                         "required": false,
                         "schema": {
                             "type": "string"
@@ -2001,7 +2233,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 1,000 requests per hour or 100 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2074,7 +2314,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 1,000 requests per hour or 100 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2098,7 +2346,7 @@
                     {
                         "name": "environment",
                         "in": "query",
-                        "description": "Use this parameter to specify the environment for which you want to list service offerings. Valid values: [btp, kubernetes, cloudfoundry]. <br/>If left empty, service offerings associated with btp (Service Manager instances on a subaccount level) are returned.",
+                        "description": "Use this parameter to specify the environment for which you want to list service offerings. Valid values: [sapbtp, kubernetes, cloudfoundry]. <br/>If left empty, service offerings associated with sapbtp (Service Manager instances on a subaccount level) are returned.",
                         "required": false,
                         "schema": {
                             "type": "string"
@@ -2181,7 +2429,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 1,000 requests per hour or 100 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2244,7 +2500,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 1,000 requests per hour or 100 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2341,7 +2605,15 @@
                         }
                     },
                     "429": {
-                        "description": "Too Many Requests",
+                        "description": "Too Many Requests<br>When the rate limit is exceeded, the client receives the HTTP 429 \"Too Many Requests\" response status code.<br/>Total of 10,000 requests per hour or 1,000 requests per minute are allowed.<br><a href=\"https://help.sap.com/docs/SERVICEMANAGEMENT/09cc82baadc542a688176dce601398de/97be6794829a441f99c9da04532a3c2b.html?version=Cloud&locale=en-US\" target=\"_blank\">For more information, see Rate Limiting.</a>",
+                        "headers": {
+                            "Retry-After": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "description": "The 'Retry-After' response header indicates how long a service is expected to be unavailable. In the HTTP-Date format."
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2714,11 +2986,18 @@
                         "format": "date-time"
                     },
                     "errors": {
-                        "type": "array",
-                        "description": "The list of the errors if the operation has failed.",
-                        "items": {
-                            "$ref": "#/components/schemas/Error"
-                        }
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/Error"
+                            },
+                            {
+                                "type": "string",
+                                "description": "A JSON object that contains details about one or more errors if the operation has failed.",
+                                "items": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        ]
                     },
                     "labels": {
                         "$ref": "#/components/schemas/Labels"
@@ -2985,9 +3264,6 @@
                     },
                     "context": {
                         "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
                         "description": "Contextual data for the resource.",
                         "example": {
                             "account": "my-account"
@@ -3017,6 +3293,14 @@
                         "type": "string",
                         "description": "The last time the service instance was updated.<br/> In ISO 8601 format.",
                         "format": "date-time"
+                    },
+                    "created_by": {
+                        "type": "string",
+                        "description": "The user that created this service instance.<br>If the instance was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes instances, this is the user ID as defined by that environment's user management system."
+                    },
+                    "updated_by": {
+                        "type": "string",
+                        "description": "The user that last updated this service instance.<br>If the instance or binding was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes instances, this is the user ID as defined by that environment's user management system.<br/>"
                     },
                     "labels": {
                         "$ref": "#/components/schemas/Labels"
@@ -3050,6 +3334,14 @@
                         "type": "string",
                         "description": "The platform ID."
                     },
+                    "created_by": {
+                        "type": "string",
+                        "description": "The user that created this service instance.<br>If the instance was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes instances, this is the user ID as defined by that environment's user management system."
+                    },
+                    "updated_by": {
+                        "type": "string",
+                        "description": "The user that last updated this service instance.<br>If the instance was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes instances, this is the user ID as defined by that environment's user management system.<br/>"
+                    },
                     "dashboard_url": {
                         "type": "string",
                         "example": "http://my-service-dashboard.com",
@@ -3065,9 +3357,6 @@
                     },
                     "context": {
                         "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
                         "description": "Contextual data for the resource.",
                         "example": {
                             "account": "my-account"
@@ -3142,9 +3431,6 @@
                     },
                     "context": {
                         "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
                         "description": "Contextual data for the resource.",
                         "example": {
                             "account": "my-account"
@@ -3218,9 +3504,6 @@
                     },
                     "context": {
                         "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
                         "description": "Contextual data for the resource.",
                         "example": {
                             "account": "my-account"
@@ -3349,6 +3632,11 @@
                         "description": "The ID of the service plan for the service instance to update.",
                         "example": "dsdsdsadsa98898890dasdsa"
                     },
+                    "shared": {
+                        "type": "boolean",
+                        "description": "share or un-share service instance.",
+                        "example": "true"
+                    },
                     "parameters": {
                         "type": "object",
                         "description": "Some services support providing of additional configuration parameters during instance creation.<br>You can update these parameters.<br>For the list of supported configuration parameters, see the documentation of a particular service offering.<br>You can also use the *GET /v1/service_instances/{serviceInstanceID}/parameters* API later to view the parameters defined during this step.",
@@ -3452,9 +3740,6 @@
                     },
                     "context": {
                         "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
                         "description": "Contextual data for the resource.",
                         "example": {
                             "account": "my-account"
@@ -3485,6 +3770,14 @@
                         "description": "The last time the binding was updated.<br/> In ISO 8601 format.",
                         "format": "date-time"
                     },
+                    "created_by": {
+                        "type": "string",
+                        "description": "The user that created this service binding.<br>If the binding was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes bindings, this is the user ID as defined by that environment's user management system."
+                    },
+                    "updated_by": {
+                        "type": "string",
+                        "description": "The user that last updated this service binding.<br>If the binding was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes bindings, this is the user ID as defined by that environment's user management system.<br/>"
+                    },
                     "labels": {
                         "$ref": "#/components/schemas/Labels"
                     }
@@ -3514,9 +3807,6 @@
                     },
                     "context": {
                         "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
                         "description": "Contextual data for the resource.",
                         "example": {
                             "account": "my-account"
@@ -3579,9 +3869,6 @@
                     },
                     "context": {
                         "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
                         "description": "Contextual data for the resource.",
                         "example": {
                             "account": "my-account"
@@ -3611,6 +3898,14 @@
                         "type": "string",
                         "description": "The last time the binding was updated.<br/> In ISO 8601 format.",
                         "format": "date-time"
+                    },
+                    "created_by": {
+                        "type": "string",
+                        "description": "The user that created this service binding.<br>If the binding was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes bindings, this is the user ID as defined by that environment's user management system."
+                    },
+                    "updated_by": {
+                        "type": "string",
+                        "description": "The user that last updated this service binding.<br>If the binding was created programmatically (for example, by the SM API), this may be a client ID.<br>For Cloud Foundry or Kubernetes bindings, this is the user ID as defined by that environment's user management system.<br/>"
                     },
                     "labels": {
                         "$ref": "#/components/schemas/Labels"
@@ -3727,7 +4022,7 @@
                     "id": {
                         "type": "string",
                         "example": "my-service-offering-123-id",
-                        "description": "The ID of the service offering."
+                        "description": "The ID of the service offering, automatically generated by the Service Manager. This is the ID by which the offering is identified in the Service Manager database and which is used by the Service Manager API."
                     },
                     "ready": {
                         "type": "boolean",
@@ -3775,11 +4070,11 @@
                     },
                     "broker_id": {
                         "type": "string",
-                        "description": "The ID of the broker that provides the service plan."
+                        "description": "The ID of the broker that provides the service offering."
                     },
                     "catalog_id": {
                         "type": "string",
-                        "description": "The ID of the service offering as provided by the catalog."
+                        "description": "The ID of the offering as provided in the broker catalog. This ID is used when Service Manager communicates with the service broker."
                     },
                     "catalog_name": {
                         "type": "string",
@@ -3871,7 +4166,7 @@
                         }
                     }
                 },
-                "description": "Credentials to  authenticate with the SAP Service Manager."
+                "description": "Credentials to authenticate with the SAP Service Manager."
             },
             "Error": {
                 "type": "object",
@@ -3884,6 +4179,28 @@
                     "description": {
                         "type": "string",
                         "description": "The description of the error."
+                    },
+                    "broker_error": {
+                        "type": "object",
+                        "properties": {
+                            "StatusCode": {
+                                "type": "integer",
+                                "description": "The broker status code."
+                            },
+                            "ErrorMessage": {
+                                "type": "string",
+                                "description": "A machine-readable error string that may be returned by the broker."
+                            },
+                            "Description": {
+                                "type": "string",
+                                "description": "A human-readable description of the error that may be returned by the broker."
+                            },
+                            "ResponseError": {
+                                "type": "string",
+                                "description": "ResponseError is set to the error that occurred when unmarshalling a response body from the broker."
+                            }
+                        },
+                        "description": "The broker error"
                     }
                 }
             },
@@ -3896,7 +4213,8 @@
                             "type": "string",
                             "enum": [
                                 "kubernetes",
-                                "cloudfoundry"
+                                "cloudfoundry",
+                                "sapbtp"
                             ]
                         },
                         "description": "Platforms supported by the service plan."

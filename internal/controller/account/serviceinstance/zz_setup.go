@@ -5,9 +5,11 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
+	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
@@ -28,9 +30,24 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 
 			newServicePlanInitializerFn: newServicePlanInitializerFn,
 
-			// instead of passing the creatorFn as usual we need to execute here to make sure the connector has only one instance of the client
-			// this is required to ensure terraform workspace is shared among reconciliation loops, since the state of async operations is stored in the client
-			clientConnector: newClientCreatorFn(mgr.GetClient()),
+			// newServiceInstanceClientFn builds the native Service Manager client from
+			// the per-resource serviceManagerSecret (CRUD). This is distinct from the
+			// subaccount-admin lookuper below, which is used for recovery only.
+			newServiceInstanceClientFn: func(ctx context.Context, cr *v1alpha1.ServiceInstance) (siClient.ServiceInstanceClientI, error) {
+				secretData, err := internal.LoadSecretData(ctx, kube, cr.Spec.ForProvider.ServiceManagerSecret, cr.Spec.ForProvider.ServiceManagerSecretNamespace)
+				if err != nil {
+					return nil, errors.Wrap(err, errGetCreds)
+				}
+				creds, err := smClient.NewCredsFromOperatorSecret(secretData)
+				if err != nil {
+					return nil, err
+				}
+				smc, err := smClient.NewServiceManagerClient(ctx, &creds)
+				if err != nil {
+					return nil, err
+				}
+				return siClient.NewServiceInstanceClient(smc), nil
+			},
 			resourcetracker: resourcetracker,
 
 			// Adoption uses the subaccount-admin SM binding (via the accounts-service),

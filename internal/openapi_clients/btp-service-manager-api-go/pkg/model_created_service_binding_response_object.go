@@ -23,7 +23,7 @@ type CreatedServiceBindingResponseObject struct {
 	// The bound resources.
 	BindResource *map[string]string `json:"bind_resource,omitempty"`
 	// Contextual data for the resource.
-	Context *map[string]string `json:"context,omitempty"`
+	Context map[string]interface{} `json:"context,omitempty"`
 	// The time the binding was created. <br/>In ISO 8601 format:</br> YYYY-MM-DDThh:mm:ssTZD
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 	// Credentials to access the binding.
@@ -92,19 +92,19 @@ func (o *CreatedServiceBindingResponseObject) SetBindResource(v map[string]strin
 }
 
 // GetContext returns the Context field value if set, zero value otherwise.
-func (o *CreatedServiceBindingResponseObject) GetContext() map[string]string {
+func (o *CreatedServiceBindingResponseObject) GetContext() map[string]interface{} {
 	if o == nil || IsNil(o.Context) {
-		var ret map[string]string
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Context
+	return o.Context
 }
 
 // GetContextOk returns a tuple with the Context field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CreatedServiceBindingResponseObject) GetContextOk() (*map[string]string, bool) {
+func (o *CreatedServiceBindingResponseObject) GetContextOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Context) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Context, true
 }
@@ -118,9 +118,9 @@ func (o *CreatedServiceBindingResponseObject) HasContext() bool {
 	return false
 }
 
-// SetContext gets a reference to the given map[string]string and assigns it to the Context field.
-func (o *CreatedServiceBindingResponseObject) SetContext(v map[string]string) {
-	o.Context = &v
+// SetContext gets a reference to the given map[string]interface{} and assigns it to the Context field.
+func (o *CreatedServiceBindingResponseObject) SetContext(v map[string]interface{}) {
+	o.Context = v
 }
 
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
