@@ -104,7 +104,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: siResourceName,
 							Annotations: map[string]string{
-								"crossplane.io/external-name": subaccountID + "," + instanceID, // service instance format
+								"crossplane.io/external-name": instanceID, // service instance format
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{

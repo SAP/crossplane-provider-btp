@@ -24,7 +24,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 	instanceName := "service-manager-instance"
 	subAccountGuid := "x123e4567-e89b-12d3-a456-42661417400"
 	smExternalName := fmt.Sprintf("%s/%s", instanceID, bindingID)
-	siExternalName := fmt.Sprintf("%s,%s", subAccountGuid, instanceID)
+	siExternalName := instanceID
 	resourceName := fmt.Sprintf("%s.%s", instanceName, instanceID)
 	siResourceName := fmt.Sprintf("%s-%s", instanceName, instanceID)
 
