@@ -11,6 +11,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebindingbase"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstancebase"
 )
 
 const (
@@ -116,6 +117,18 @@ func filterBySelectedInstances(ctx context.Context, btpClient *btpcli.BtpCli, ca
 
 func convert(ctx context.Context, btpClient *btpcli.BtpCli, sb *servicebindingbase.ServiceBinding, eventHandler export.EventHandler, resolveReferences bool) {
 	if !register(ctx, sb) {
+		return
+	}
+
+	// Bindings for service manager and cloud management instances are owned by their
+	// dedicated CRs — skip emitting a generic ServiceBinding for them.
+	siCache, err := serviceinstancebase.Get(ctx, btpClient)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to get service instance cache", "error", err)
+		return
+	}
+	if si := siCache.Get(sb.ServiceInstanceID); si != nil && (si.IsServiceManager() || si.IsCloudManagement()) {
+		slog.DebugContext(ctx, "Skipping service binding for special instance type", "binding", sb.GetID(), "offering", si.OfferingName)
 		return
 	}
 
