@@ -2,6 +2,7 @@ package tfclient
 
 import (
 	"context"
+	"net/http"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -35,13 +36,17 @@ func (s *stubProvider) Configure(_ context.Context, _ provider.ConfigureRequest,
 }
 
 func cfg(t *testing.T, user string) tfsdk.Config {
+	return cfgGA(t, user, "ga")
+}
+
+func cfgGA(t *testing.T, user, ga string) tfsdk.Config {
 	objType := tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 		"username": tftypes.String, "password": tftypes.String, "globalaccount": tftypes.String,
 	}}
 	raw := tftypes.NewValue(objType, map[string]tftypes.Value{
 		"username":      tftypes.NewValue(tftypes.String, user),
 		"password":      tftypes.NewValue(tftypes.String, "pw"),
-		"globalaccount": tftypes.NewValue(tftypes.String, "ga"),
+		"globalaccount": tftypes.NewValue(tftypes.String, ga),
 	})
 	return tfsdk.Config{Raw: raw, Schema: rschema.Schema{Attributes: map[string]rschema.Attribute{
 		"username":      rschema.StringAttribute{Optional: true},
@@ -73,8 +78,7 @@ func TestCache(t *testing.T) {
 	}
 }
 
-// blockingProvider blocks each Configure until released, so a test can hold a
-// login open and prove other logins are not serialized behind it.
+// blockingProvider blocks each Configure until released.
 type blockingProvider struct {
 	provider.Provider
 	calls   atomic.Int64
@@ -126,8 +130,8 @@ func TestDifferentKeysDoNotSerialize(t *testing.T) {
 		close(done)
 	}()
 
-	// Wait until both logins are in flight. If different keys serialized, only
-	// one Configure would ever start and this would hang (test timeout = failure).
+	// Wait until both logins are in flight; if different keys serialized, only
+	// one would ever start and this hangs (test timeout = failure).
 	for stub.calls.Load() != 2 {
 		runtime.Gosched()
 	}
@@ -142,5 +146,98 @@ func TestOptionalInterfacePreserved(t *testing.T) {
 	w := newCachingProvider(tfprovider.New())
 	if _, ok := interface{}(w).(provider.ProviderWithFunctions); !ok {
 		t.Fatal("wrapper lost ProviderWithFunctions")
+	}
+}
+
+func TestEvictBySubdomain(t *testing.T) {
+	stub := &stubProvider{}
+	p := newCachingProvider(stub)
+	ctx := context.Background()
+
+	var r provider.ConfigureResponse
+	p.Configure(ctx, provider.ConfigureRequest{Config: cfgGA(t, "alice", "acct-A")}, &r)
+	p.Configure(ctx, provider.ConfigureRequest{Config: cfgGA(t, "bob", "acct-B")}, &r)
+	if len(p.entries) != 2 {
+		t.Fatalf("want 2 entries, got %d", len(p.entries))
+	}
+
+	p.evictBySubdomain("acct-A")
+	if len(p.entries) != 1 {
+		t.Fatalf("evict acct-A must leave 1 entry, got %d", len(p.entries))
+	}
+
+	// Re-configuring A must miss the cache and log in again; B still cached.
+	p.Configure(ctx, provider.ConfigureRequest{Config: cfgGA(t, "alice", "acct-A")}, &r)
+	if got := stub.calls.Load(); got != 3 {
+		t.Fatalf("want 3 logins (A, B, A-again), got %d", got)
+	}
+}
+
+func TestEvictAll(t *testing.T) {
+	stub := &stubProvider{}
+	p := newCachingProvider(stub)
+	ctx := context.Background()
+
+	var r provider.ConfigureResponse
+	p.Configure(ctx, provider.ConfigureRequest{Config: cfgGA(t, "alice", "acct-A")}, &r)
+	p.Configure(ctx, provider.ConfigureRequest{Config: cfgGA(t, "bob", "acct-B")}, &r)
+
+	p.evictAll()
+	if len(p.entries) != 0 {
+		t.Fatalf("evictAll must clear entries, got %d", len(p.entries))
+	}
+
+	p.Configure(ctx, provider.ConfigureRequest{Config: cfgGA(t, "alice", "acct-A")}, &r)
+	if got := stub.calls.Load(); got != 3 {
+		t.Fatalf("re-configure after evictAll must log in again, got %d logins", got)
+	}
+}
+
+// rtFunc adapts a func to http.RoundTripper.
+type rtFunc func(*http.Request) (*http.Response, error)
+
+func (f rtFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestEvictTransportOn401(t *testing.T) {
+	cases := []struct {
+		name             string
+		status           int
+		sessionID        string
+		subdomain        string
+		wantSub, wantAll bool
+	}{
+		{"401 with sessionid+subdomain evicts that subdomain", 401, "sess", "acct-A", true, false},
+		{"401 with sessionid, no subdomain evicts all", 401, "sess", "", false, true},
+		{"401 without sessionid (login POST) evicts nothing", 401, "", "acct-A", false, false},
+		{"200 evicts nothing", 200, "sess", "acct-A", false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotSub string
+			var subCalled, allCalled bool
+			tr := &evictTransport{
+				base: rtFunc(func(*http.Request) (*http.Response, error) {
+					return &http.Response{StatusCode: tc.status, Body: http.NoBody}, nil
+				}),
+				evictSub: func(sd string) { subCalled = true; gotSub = sd },
+				evictAll: func() { allCalled = true },
+			}
+			req, _ := http.NewRequest("POST", "https://cli.example/command", nil)
+			if tc.sessionID != "" {
+				req.Header.Set(headerCLISessionId, tc.sessionID)
+			}
+			if tc.subdomain != "" {
+				req.Header.Set(headerCLISubdomain, tc.subdomain)
+			}
+			if _, err := tr.RoundTrip(req); err != nil {
+				t.Fatal(err)
+			}
+			if subCalled != tc.wantSub || allCalled != tc.wantAll {
+				t.Fatalf("evictSub=%v evictAll=%v, want %v/%v", subCalled, allCalled, tc.wantSub, tc.wantAll)
+			}
+			if tc.wantSub && gotSub != tc.subdomain {
+				t.Fatalf("evictSub got %q, want %q", gotSub, tc.subdomain)
+			}
+		})
 	}
 }

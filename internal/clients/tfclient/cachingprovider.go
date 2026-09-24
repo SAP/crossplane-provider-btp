@@ -3,32 +3,26 @@ package tfclient
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/hashicorp/terraform-plugin-framework/function"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// cachingProvider wraps the BTP plugin-framework provider and caches the result
-// of Configure keyed on the resolved provider configuration.
-//
-// upjet's no-fork framework connector rebuilds a provider server and fires a
-// ConfigureProvider RPC on every reconcile (upjet
-// pkg/controller/external_tfpluginfw.go configureProvider). The BTP provider's
-// Configure logs in unconditionally, so that RPC is one BTP login per
-// reconcile — the ~1:1 login/request ratio tracked in #702.
-//
-// Because frameworkProvider() is a process-wide singleton (sync.OnceValue), the
-// same wrapper instance receives every ConfigureProvider RPC. On a cache hit we
-// replay the already-logged-in client onto resp instead of delegating to the
-// inner Configure, so no new login happens. Configure is the only channel from
-// the provider to its resources (resp.*Data reaches each resource's Configure),
-// so replaying those fields is equivalent to reconfiguring.
-//
-// ponytail: no TTL / no auth-error invalidation. The BTP session id has no
-// client-visible expiry and the server can revoke it; a stale entry surfaces as
-// a 401/403 on a data request, not here. Add TTL + evict-on-auth-error if the
-// PoC measurements show revocation churn.
+// btpcli sets these on every data request once a session exists; eviction reads
+// them off a 401'd request. Hard-coded because btpcli is internal/ and unimportable.
+const (
+	headerCLISessionId = "X-Cpcli-Sessionid"
+	headerCLISubdomain = "X-Cpcli-Subdomain"
+)
+
+// cachingProvider caches Configure so upjet's per-reconcile ConfigureProvider
+// RPC does not log in to BTP every time (the ~1:1 login/request ratio in #702).
+// On a cache hit it replays the logged-in client onto resp instead of calling
+// the inner Configure. A 401 to a data request evicts by globalaccount subdomain.
 type cachingProvider struct {
 	fwprovider.Provider // forwards Metadata/Schema/Resources/DataSources
 
@@ -36,12 +30,11 @@ type cachingProvider struct {
 	entries map[string]*cacheEntry
 }
 
-// cacheEntry logs in at most once per key. once.Do serializes concurrent
-// reconciles for the same credentials onto a single login; different keys hold
-// different entries and log in in parallel.
+// cacheEntry logs in at most once per key via once.Do; different keys log in in parallel.
 type cacheEntry struct {
-	once sync.Once
-	resp *fwprovider.ConfigureResponse // nil if the login errored (login retried next reconcile)
+	once      sync.Once
+	resp      *fwprovider.ConfigureResponse
+	subdomain string                        // globalaccount from config; eviction index
 }
 
 func newCachingProvider(inner fwprovider.Provider) *cachingProvider {
@@ -52,13 +45,10 @@ func newCachingProvider(inner fwprovider.Provider) *cachingProvider {
 }
 
 func (p *cachingProvider) Configure(ctx context.Context, req fwprovider.ConfigureRequest, resp *fwprovider.ConfigureResponse) {
-	// Key on the whole raw provider config. Schema-agnostic: it can't drift when
-	// terraform-provider-btp adds an attribute, and it already covers every field
-	// a login flow branches on (credentials, endpoint, idp, certs).
+	// Raw config as key: schema-agnostic, so it can't drift when the provider
+	// adds an attribute, and it covers every field a login branches on.
 	key := fmt.Sprintf("%v", req.Config.Raw)
 
-	// Global lock only guards the map lookup, not the login. A failed login
-	// clears the entry so the next reconcile retries instead of caching an error.
 	p.mu.Lock()
 	e, ok := p.entries[key]
 	if !ok {
@@ -70,6 +60,7 @@ func (p *cachingProvider) Configure(ctx context.Context, req fwprovider.Configur
 	e.once.Do(func() {
 		p.Provider.Configure(ctx, req, resp)
 		if resp.Diagnostics.HasError() {
+			// Drop the entry so the next reconcile retries instead of caching an error.
 			p.mu.Lock()
 			delete(p.entries, key)
 			p.mu.Unlock()
@@ -83,6 +74,9 @@ func (p *cachingProvider) Configure(ctx context.Context, req fwprovider.Configur
 			ActionData:            resp.ActionData,
 			EphemeralResourceData: resp.EphemeralResourceData,
 		}
+		var sd types.String
+		req.Config.GetAttribute(ctx, path.Root("globalaccount"), &sd)
+		e.subdomain = sd.ValueString()
 	})
 
 	if e.resp != nil {
@@ -94,13 +88,54 @@ func (p *cachingProvider) Configure(ctx context.Context, req fwprovider.Configur
 	}
 }
 
-// Functions forwards to the inner provider. Embedding fwprovider.Provider does
-// not promote it (the base interface omits Functions), so without this the
-// wrapper silently fails the providerserver ProviderWithFunctions assertion and
-// the btp_* provider functions disappear.
+// Functions forwards to the inner provider
 func (p *cachingProvider) Functions(ctx context.Context) []func() function.Function {
 	if wf, ok := p.Provider.(fwprovider.ProviderWithFunctions); ok {
 		return wf.Functions(ctx)
 	}
 	return nil
+}
+
+// evictBySubdomain drops every entry matching subdomain so the next reconcile re-logs-in.
+func (p *cachingProvider) evictBySubdomain(subdomain string) {
+	if subdomain == "" {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for k, e := range p.entries {
+		if e.subdomain == subdomain {
+			delete(p.entries, k)
+		}
+	}
+}
+
+// evictAll clears the cache when a 401 has a session id but no subdomain header;
+// used as fallback if subdomain header is not provided
+func (p *cachingProvider) evictAll() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.entries = map[string]*cacheEntry{}
+}
+
+// evictTransport evicts the cached session on a 401 to a data request, so a
+// transient 401 can't get stuck in the cache as a permanent one.
+type evictTransport struct {
+	base     http.RoundTripper
+	evictSub func(subdomain string)
+	evictAll func()
+}
+
+func (t *evictTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := t.base.RoundTrip(r)
+	// The session-id check skips login POSTs (no session headers), so a bad-creds
+	// login 401 can't evict a valid entry.
+	if resp != nil && resp.StatusCode == http.StatusUnauthorized && r.Header.Get(headerCLISessionId) != "" {
+		if sd := r.Header.Get(headerCLISubdomain); sd != "" {
+			t.evictSub(sd)
+		} else {
+			t.evictAll()
+		}
+	}
+	return resp, err
 }
