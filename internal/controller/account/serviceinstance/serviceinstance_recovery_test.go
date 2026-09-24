@@ -94,8 +94,8 @@ func siWithConflict(name string) *v1alpha1.ServiceInstance {
 	cr.SetConditions(xpv1.Condition{
 		Type:               xpv1.ConditionType(ujresource.TypeLastAsyncOperation),
 		Status:             corev1.ConditionFalse,
-		Reason:             "ApplyFailure",
-		Message:            "apply failed: API Error Creating Resource Service Instance (Subaccount): Conflict",
+		Reason:             ujresource.ReasonAsyncCreateFailure,
+		Message:            "async create failed: API Error Creating Resource Service Instance (Subaccount): Conflict",
 		ObservedGeneration: 2,
 	})
 	return cr
@@ -136,11 +136,11 @@ func TestObserve_RecoveryConflictBranch(t *testing.T) {
 		if lk.gotName != "cls-1" {
 			t.Errorf("lookup name = %q, want cls-1", lk.gotName)
 		}
-		// the stale LastAsyncOperation=ApplyFailure must be cleared so the next
-		// reconcile does not re-enter the Conflict branch.
+		// the stale LastAsyncOperation=AsyncCreateFailure must be cleared so the
+		// next reconcile does not re-enter the Conflict branch.
 		cond := cr.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation))
-		if cond.Reason == "ApplyFailure" {
-			t.Errorf("stale ApplyFailure condition was not cleared")
+		if cond.Reason == ujresource.ReasonAsyncCreateFailure {
+			t.Errorf("stale AsyncCreateFailure condition was not cleared")
 		}
 		// a real ID was resolved -> an ExternalNameRecovered event must be logged.
 		if !rec.has(recovery.EventReasonRecovered) {

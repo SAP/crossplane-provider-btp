@@ -3,6 +3,7 @@ package serviceinstance
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,6 +53,14 @@ const (
 	errDeleteInstance  = "cannot delete serviceinstance"
 
 	errRecoverExternalName = "cannot persist external-name recovered from terraform state"
+	errMarkAsyncOperation  = "cannot record the generation of the async operation about to start"
+
+	// Ready reason for an instance whose last async update failed.
+	reasonAsyncOperationFailed = "AsyncOperationFailed"
+
+	// AsyncOperationGenerationKey stores the generation recorded before async launch.
+	// It is metadata so the marker survives main-resource updates.
+	AsyncOperationGenerationKey = "serviceinstance.account.btp.crossplane.io/async-operation-generation"
 )
 
 var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -70,26 +79,30 @@ var newServicePlanInitializerFn = func() Initializer {
 	}
 }
 
-// SaveConditionsFn Callback for persisting conditions in the CR
-var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error {
+// saveCallback persists the result of an async terraform operation on the
+// native ServiceInstance.
+var saveCallback tfClient.SaveConditionsFn = func(ctx context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error {
+	// upjet keys the callback off the mapped terraform resource, whose name
+	// carries siClient.TfNamePrefix; without trimming it the lookup misses.
+	nn := types.NamespacedName{Namespace: name.Namespace, Name: strings.TrimPrefix(name.Name, siClient.TfNamePrefix)}
 
 	si := &v1alpha1.ServiceInstance{}
-
-	nn := types.NamespacedName{Name: name}
 	if kErr := kube.Get(ctx, nn, si); kErr != nil {
 		return errors.Wrap(kErr, errGetInstance)
 	}
 
-	// Store the CR's current generation on each condition so that Observe() can
-	// detect whether the spec has changed since the async operation was triggered.
+	// Prefer the recorded launch generation so a spec edit alone does not
+	// relabel an earlier operation's result.
+	generation := si.Generation
+	if marked, mErr := strconv.ParseInt(si.GetAnnotations()[AsyncOperationGenerationKey], 10, 64); mErr == nil {
+		generation = marked
+	}
 	for i := range conditions {
-		conditions[i].ObservedGeneration = si.Generation
+		conditions[i].ObservedGeneration = generation
 	}
 	si.SetConditions(conditions...)
 
-	uErr := kube.Status().Update(ctx, si)
-
-	return errors.Wrap(uErr, errSaveData)
+	return errors.Wrap(kube.Status().Update(ctx, si), errSaveData)
 }
 
 type connector struct {
@@ -161,18 +174,20 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotServiceInstance)
 	}
 
-	// ADR(external-name): check for conflict condition from a previous failed Create()
-	// Only block if the spec hasn't changed since the conflict (same Generation)
+	// ADR(external-name): check for conflict condition from a previous failed
+	// Create(). Gated to a create-only "Conflict" message at the current
+	// generation; skipped once deletion starts or external-name is explicitly
+	// adopted (no longer the fallback), so it cannot block delete or adoption.
 	lastAsyncOp := cr.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation))
-	if lastAsyncOp.Status == corev1.ConditionFalse &&
+	if isCreateFailure(lastAsyncOp) &&
 		strings.Contains(lastAsyncOp.Message, "Conflict") &&
-		lastAsyncOp.ObservedGeneration == cr.Generation {
+		lastAsyncOp.ObservedGeneration == cr.Generation &&
+		cr.GetDeletionTimestamp().IsZero() &&
+		recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
 		// Try recovery instead of forcing the ADR-prescribed error-loop path (see
 		// docs/contribution-notes/external-name-handling.md).
-		if recovery.IsFallbackExternalName(cr.Name, meta.GetExternalName(cr)) {
-			if healErr := e.healExternalName(ctx, cr); healErr != nil {
-				return managed.ExternalObservation{}, healErr
-			}
+		if healErr := e.healExternalName(ctx, cr); healErr != nil {
+			return managed.ExternalObservation{}, healErr
 		}
 		return managed.ExternalObservation{ResourceExists: false},
 			errors.New("creation failed - resource already exists. Please set external-name annotation to adopt the existing resource or change the name to create a new one")
@@ -209,8 +224,19 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 
-	//Check for failed async operations ONCE, before the switch
-	if e.checkAsyncOperationFailure(cr) {
+	// Hold on a recorded failure before the switch, excluding NotExisting so a
+	// stale rejection can't claim existence for a now-gone instance. Also holds
+	// through an in-flight retry, so Ready/Synced don't flip healthy mid-retry.
+	if failure, failed := e.asyncOperationFailure(cr); failed && status != tfClient.NotExisting {
+		// Ready=False is reported for Observe-only resources too, as the Drift
+		// branch does; only Available is withheld from them.
+		cr.SetConditions(xpv1.Condition{
+			Type:               xpv1.TypeReady,
+			Status:             corev1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             reasonAsyncOperationFailed,
+			Message:            failure.Message,
+		})
 		return managed.ExternalObservation{
 			ResourceExists:   true,
 			ResourceUpToDate: false,
@@ -281,7 +307,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	// and will be handled in the next Observe() call (see conflict detection logic above)
 
 	cr.SetConditions(xpv1.Creating())
-	if err := e.tfClient.Create(ctx); err != nil {
+	if err := e.startAsyncOperation(ctx, cr, e.tfClient.Create); err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateInstance)
 	}
 
@@ -290,14 +316,43 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	_, ok := mg.(*v1alpha1.ServiceInstance)
+// startAsyncOperation persists the generation marker before launching, since
+// upjet's apply goroutine can reach saveCallback before launch returns and
+// a marker written after would race it. An up-to-date marker is left alone.
+func (e *external) startAsyncOperation(ctx context.Context, cr *v1alpha1.ServiceInstance, launch func(context.Context) error) error {
+	current := strconv.FormatInt(cr.Generation, 10)
+
+	if cr.GetAnnotations()[AsyncOperationGenerationKey] != current {
+		if err := e.writeAsyncOperationGeneration(ctx, cr, current); err != nil {
+			return errors.Wrap(err, errMarkAsyncOperation)
+		}
+	}
+
+	return launch(ctx)
+}
+
+// writeAsyncOperationGeneration updates a copy to preserve in-memory
+// conditions, then carries back the new resourceVersion for the reconciler's
+// status write.
+func (e *external) writeAsyncOperationGeneration(ctx context.Context, cr *v1alpha1.ServiceInstance, generation string) error {
+	marker := map[string]string{AsyncOperationGenerationKey: generation}
+	marked := cr.DeepCopy()
+	meta.AddAnnotations(marked, marker)
+	if err := e.kube.Update(ctx, marked); err != nil {
+		return err
+	}
+	meta.AddAnnotations(cr, marker)
+	cr.SetResourceVersion(marked.GetResourceVersion())
+	return nil
+}
+
+func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
+	cr, ok := mg.(*v1alpha1.ServiceInstance)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotServiceInstance)
 	}
 
-	err := c.tfClient.Update(ctx)
-	if err != nil {
+	if err := e.startAsyncOperation(ctx, cr, e.tfClient.Update); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateInstance)
 	}
 
@@ -466,20 +521,23 @@ func (e *external) saveInstanceData(ctx context.Context, cr *v1alpha1.ServiceIns
 	return nil
 }
 
-// checkAsyncOperationFailure checks if there's a failed async operation and sets appropriate conditions
-func (e *external) checkAsyncOperationFailure(cr *v1alpha1.ServiceInstance) bool {
-	lastAsyncOp := cr.GetCondition(xpv1.ConditionType("LastAsyncOperation"))
-	if lastAsyncOp.Status == corev1.ConditionFalse && lastAsyncOp.Reason == "ApplyFailure" {
-		return true
+// asyncOperationFailure returns a rejected update for the current generation.
+// Create and delete failures must not force the resource through Update.
+func (e *external) asyncOperationFailure(cr *v1alpha1.ServiceInstance) (xpv1.Condition, bool) {
+	cond := cr.GetCondition(xpv1.ConditionType(ujresource.TypeLastAsyncOperation))
+	if cond.Status != corev1.ConditionFalse || cond.ObservedGeneration != cr.Generation {
+		return xpv1.Condition{}, false
 	}
+	failed := cond.Reason == ujresource.ReasonAsyncUpdateFailure
+	return cond, failed
+}
 
-	// Also check AsyncOperation as fallback
-	asyncOp := cr.GetCondition(ujresource.TypeAsyncOperation)
-	if asyncOp.Status == corev1.ConditionFalse && asyncOp.Reason == "ApplyFailure" {
-		return true
+// isCreateFailure reports whether cond records a rejected async create.
+func isCreateFailure(cond xpv1.Condition) bool {
+	if cond.Status != corev1.ConditionFalse {
+		return false
 	}
-
-	return false
+	return cond.Reason == ujresource.ReasonAsyncCreateFailure
 }
 
 func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
