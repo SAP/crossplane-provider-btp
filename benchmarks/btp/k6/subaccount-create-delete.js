@@ -9,6 +9,7 @@ export const options = { iterations: 1, vus: 1 };
 const READY_TIMEOUT = Number(__ENV.XP_DIADROMOS_BTP_READY_TIMEOUT || '1800');
 const DELETE_TIMEOUT = Number(__ENV.XP_DIADROMOS_BTP_DELETE_TIMEOUT || '1800');
 const REGION = __ENV.XP_DIADROMOS_BTP_REGION || 'eu10';
+const SUBACCOUNT_ADMIN = __ENV.XP_DIADROMOS_BTP_SUBACCOUNT_ADMIN;
 const NAME_PREFIX = 'xp-btp-bench';
 const SUBDOMAIN_PREFIX = 'xpbtpbench';
 
@@ -17,6 +18,10 @@ function safePart(value) {
 }
 
 export default function () {
+  if (!SUBACCOUNT_ADMIN) {
+    throw new Error('XP_DIADROMOS_BTP_SUBACCOUNT_ADMIN must be set to the BTP technical user email');
+  }
+
   const suffix = `${safePart(__ENV.GITHUB_RUN_ID || Date.now().toString(36))}-${safePart(__ENV.GITHUB_RUN_ATTEMPT || '1')}-${Date.now().toString(36)}`.slice(-35);
   const name = `${NAME_PREFIX}-${suffix}`.slice(0, 63).replace(/-+$/g, '');
   const subdomain = `${SUBDOMAIN_PREFIX}-${suffix}`.slice(0, 63).replace(/-+$/g, '');
@@ -27,7 +32,12 @@ export default function () {
     metadata: { namespace: 'default', name },
     spec: {
       providerConfigRef: { name: 'default' },
-      forProvider: { displayName: name, region: REGION, subdomain },
+      forProvider: {
+        displayName: name,
+        region: REGION,
+        subdomain,
+        subaccountAdmins: [SUBACCOUNT_ADMIN],
+      },
     },
   };
 
