@@ -234,7 +234,10 @@ func (e *entitlement) GetDisplayName() string {
 }
 
 func (e *entitlement) GetExternalName() string {
-	return ""
+	if e.assignment.EntityID == "" || e.serviceName == "" || e.planName == "" {
+		return resources.UndefinedExternalName
+	}
+	return fmt.Sprintf("%s/%s/%s", e.assignment.EntityID, e.serviceName, e.planName)
 }
 
 func (e *entitlement) GenerateK8sResourceName() string {
