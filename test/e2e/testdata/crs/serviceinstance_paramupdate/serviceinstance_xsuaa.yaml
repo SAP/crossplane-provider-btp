@@ -1,0 +1,16 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: e2e-si-rejectedupdate
+  namespace: default
+spec:
+  forProvider:
+    name: e2e-si-rejectedupdate
+    offeringName: xsuaa
+    planName: application
+    parameters:
+      xsappname: $BUILD_ID-e2e-si-rejectedupdate
+    serviceManagerRef:
+      name: e2e-sm-si-paramupdate
+    subaccountRef:
+      name: e2e-test-si-paramupdate

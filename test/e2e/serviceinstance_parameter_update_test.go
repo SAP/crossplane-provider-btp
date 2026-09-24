@@ -20,25 +20,29 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	ujresource "github.com/crossplane/upjet/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// TestServiceInstance_ParameterUpdate is the regression guard for issue #962:
-// a parameters-only update on a ServiceInstance must reach the BTP backend.
-//
-// It is verified using one-mds/sap-integration (master data integration): a plan
-// proven to support in-place parameter updates (instances_retrievable=true,
-// plan_updateable=true) and to echo parameters back through
-// GetServiceInstanceParameters.
+// TestServiceInstance_ParameterUpdate covers two parameter-update regressions:
+// #962, a parameters-only update must reach the BTP backend, verified on
+// one-mds/sap-integration (a plan with instances_retrievable=true,
+// plan_updateable=true that echoes parameters back through
+// GetServiceInstanceParameters); and #968, an update the broker rejects must
+// hold the resource unhealthy instead of flickering, verified on xsuaa, whose
+// xsappname is immutable once provisioned.
 func TestServiceInstance_ParameterUpdate(t *testing.T) {
 	const (
-		siName = "e2e-si-paramupdate"
-		smName = "e2e-sm-si-paramupdate"
+		siName       = "e2e-si-paramupdate"
+		siRejectName = "e2e-si-rejectedupdate"
+		smName       = "e2e-sm-si-paramupdate"
 	)
 
-	feature := features.New("ServiceInstance parameter-only update reaches backend (#962)").
+	feature := features.New("ServiceInstance parameter updates: applied when accepted (#962), held unhealthy when rejected (#968)").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, "testdata/crs/serviceinstance_paramupdate")
@@ -88,12 +92,98 @@ func TestServiceInstance_ParameterUpdate(t *testing.T) {
 				}
 			},
 		).
+		Assess(
+			"rejected parameter update holds the resource unhealthy (#968)", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				// Wait here so xsuaa readiness failures belong to this assessment and do not
+				// delay the independent #962 assessment.
+				siReject := v1alpha1.ServiceInstance{
+					ObjectMeta: metav1.ObjectMeta{Name: siRejectName, Namespace: cfg.Namespace()},
+				}
+				waitForResource(&siReject, cfg, t, wait.WithTimeout(15*time.Minute))
+				if t.Failed() {
+					t.FailNow()
+				}
+
+				si := MustGetResource(t, cfg, siRejectName, nil, &v1alpha1.ServiceInstance{})
+
+				var params map[string]any
+				if err := json.Unmarshal(si.Spec.ForProvider.Parameters.Raw, &params); err != nil {
+					t.Fatalf("failed to decode ServiceInstance parameters: %v", err)
+				}
+				appName, ok := params["xsappname"].(string)
+				if !ok {
+					t.Fatalf("fixture must carry a string xsappname, got %v", params["xsappname"])
+				}
+				// xsappname is immutable, so the broker rejects the PATCH.
+				params["xsappname"] = appName + "-b"
+				raw, err := json.Marshal(params)
+				if err != nil {
+					t.Fatalf("failed to encode ServiceInstance parameters: %v", err)
+				}
+				si.Spec.ForProvider.Parameters = runtime.RawExtension{Raw: raw}
+				if err := cfg.Client().Resources().Update(ctx, si); err != nil {
+					t.Fatalf("failed to update ServiceInstance parameters: %v", err)
+				}
+
+				lastAsyncOp := xpv1.ConditionType(ujresource.TypeLastAsyncOperation)
+
+				// Under the bug the lookup key was "TF-<name>", the Get missed
+				// and nothing was ever written. ObservedGeneration pins the
+				// condition to the update just made, so a stale one left by an
+				// earlier run on a reused cluster is not accepted.
+				deadline := time.Now().Add(10 * time.Minute)
+				for {
+					cur := MustGetResource(t, cfg, siRejectName, nil, &v1alpha1.ServiceInstance{})
+					cond := cur.GetCondition(lastAsyncOp)
+					if cond.Status == corev1.ConditionFalse && cond.ObservedGeneration == si.Generation {
+						if cond.Reason != ujresource.ReasonAsyncUpdateFailure {
+							t.Fatalf("expected LastAsyncOperation reason %q, got %q (message %q)",
+								ujresource.ReasonAsyncUpdateFailure, cond.Reason, cond.Message)
+						}
+						t.Logf("broker rejection recorded on the CR: reason=%q message=%q", cond.Reason, cond.Message)
+						break
+					}
+					if time.Now().After(deadline) {
+						t.Fatalf("rejected update never surfaced on the ServiceInstance (#968 regression): LastAsyncOperation status=%q reason=%q",
+							cond.Status, cond.Reason)
+					}
+					time.Sleep(15 * time.Second)
+				}
+
+				// Flicker guard (#967/#968): the rejection must not only be
+				// recorded once, it must keep the resource unhealthy. #968 names
+				// all three conditions the user reads.
+				holdUntil := time.Now().Add(3 * time.Minute)
+				for time.Now().Before(holdUntil) {
+					time.Sleep(30 * time.Second)
+					cur := MustGetResource(t, cfg, siRejectName, nil, &v1alpha1.ServiceInstance{})
+					ready := cur.GetCondition(xpv1.TypeReady)
+					if ready.Status != corev1.ConditionFalse || string(ready.Reason) != "AsyncOperationFailed" {
+						t.Fatalf("expected Ready=False/AsyncOperationFailed while the broker rejection stands, got status=%q reason=%q message=%q",
+							ready.Status, ready.Reason, ready.Message)
+					}
+					if synced := cur.GetCondition(xpv1.TypeSynced); synced.Status != corev1.ConditionFalse {
+						t.Fatalf("expected Synced=False while the broker rejection stands, got status=%q reason=%q message=%q",
+							synced.Status, synced.Reason, synced.Message)
+					}
+					if cond := cur.GetCondition(lastAsyncOp); cond.Status != corev1.ConditionFalse {
+						t.Fatalf("LastAsyncOperation stopped reporting the rejection: status=%q reason=%q", cond.Status, cond.Reason)
+					}
+				}
+				return ctx
+			},
+		).
 		Teardown(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				si := MustGetResource(t, cfg, siName, nil, &v1alpha1.ServiceInstance{})
 				AwaitResourceDeletionOrFail(ctx, t, cfg, si, wait.WithTimeout(time.Minute*10))
+				siReject := MustGetResource(t, cfg, siRejectName, nil, &v1alpha1.ServiceInstance{})
+				AwaitResourceDeletionOrFail(ctx, t, cfg, siReject, wait.WithTimeout(time.Minute*10))
 
-				DeleteResourcesIgnoreMissing(ctx, t, cfg, "serviceinstance_paramupdate", wait.WithTimeout(time.Minute*10))
+				// Not a bare directory name: GetObjectsToImport resolves the path
+				// against the working directory and silently matches nothing
+				// otherwise, leaving the fixtures behind.
+				DeleteResourcesIgnoreMissing(ctx, t, cfg, "testdata/crs/serviceinstance_paramupdate", wait.WithTimeout(time.Minute*10))
 				return ctx
 			},
 		).Feature()
