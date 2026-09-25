@@ -308,7 +308,7 @@ func TestIAS_ConcurrentCorrectLogins_EvictOldest_NoLock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("refresh POST: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("evicted-refresh status = %d, want 400 invalid_grant", resp.StatusCode)
 	}
@@ -513,7 +513,7 @@ func FuzzIASLoginPolicy(f *testing.F) {
 					"refresh_token": {"rt-does-not-exist"},
 				})
 				if err == nil {
-					resp.Body.Close()
+					_ = resp.Body.Close()
 				}
 			}
 		}

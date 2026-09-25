@@ -46,8 +46,8 @@ type fakeCF struct {
 func (f *fakeCF) start(t *testing.T) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/oauth/token":
+		switch r.URL.Path {
+		case "/oauth/token":
 			f.tokenPOSTs.Add(1)
 			_ = r.ParseForm()
 			f.mu.Lock()
