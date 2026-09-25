@@ -91,6 +91,10 @@ func BuildComplexParameterJson(ctx context.Context, kube client.Client, secretRe
 	return parameterJson, nil
 }
 
+// TfNamePrefix prevents mapped Terraform resource names from starting with
+// a digit. Callbacks strip it to locate the native ServiceInstance.
+const TfNamePrefix = "TF-"
+
 func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServiceInstance {
 	sInstance := &v1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{
@@ -98,8 +102,7 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// since terraform resources are not allowed to start with a number we ensure it by prefixing them with "TF-"
-			Name: "TF-" + si.Name,
+			Name: TfNamePrefix + si.Name,
 			// make sure no naming conflicts are there for upjet tmp folder creation
 			UID:               si.UID + "-service-instance",
 			DeletionTimestamp: si.DeletionTimestamp,
