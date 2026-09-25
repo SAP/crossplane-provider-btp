@@ -9,6 +9,7 @@ const READY_TIMEOUT = Number(__ENV.XP_DIADROMOS_BTP_READY_TIMEOUT || '600');
 const DELETE_TIMEOUT = Number(__ENV.XP_DIADROMOS_BTP_DELETE_TIMEOUT || '600');
 const REGION = __ENV.XP_DIADROMOS_BTP_REGION || 'eu10';
 const SUBACCOUNT_ADMIN = __ENV.XP_DIADROMOS_BTP_SUBACCOUNT_ADMIN;
+const SECOND_DIRECTORY_ADMIN = __ENV.XP_DIADROMOS_BTP_SECOND_DIRECTORY_ADMIN;
 const RUN_ID = __ENV.XP_DIADROMOS_BTP_RUN_ID || __ENV.GITHUB_RUN_ID;
 const NS = 'default';
 
@@ -33,6 +34,10 @@ function resource(kind, apiVersion, name, spec, namespaced = true) {
 
 export default function () {
   if (!SUBACCOUNT_ADMIN) throw new Error('XP_DIADROMOS_BTP_SUBACCOUNT_ADMIN is required');
+  if (!SECOND_DIRECTORY_ADMIN) throw new Error('XP_DIADROMOS_BTP_SECOND_DIRECTORY_ADMIN is required');
+  if (SUBACCOUNT_ADMIN.toLowerCase() === SECOND_DIRECTORY_ADMIN.toLowerCase()) {
+    throw new Error('Directory admins must be distinct');
+  }
   if (!RUN_ID) throw new Error('Set XP_DIADROMOS_BTP_RUN_ID (or GITHUB_RUN_ID) to identify owned resources');
 
   const suffix = `${safePart(RUN_ID)}-${safePart(__ENV.GITHUB_RUN_ATTEMPT || '1')}-${Date.now().toString(36)}`;
@@ -54,7 +59,7 @@ export default function () {
     }),
     resource('Directory', accountAPI, names.Directory, {
       description: `xp-diadromos benchmark ${suffix}`,
-      directoryAdmins: [SUBACCOUNT_ADMIN],
+      directoryAdmins: [SUBACCOUNT_ADMIN, SECOND_DIRECTORY_ADMIN],
       directoryFeatures: ['DEFAULT', 'ENTITLEMENTS'],
       displayName: names.Directory,
     }, false),
