@@ -68,7 +68,7 @@ func TestCCCache_ConcurrentOneLogin(t *testing.T) {
 			defer wg.Done()
 			resp, err := c.Get(url + "/resource")
 			if err == nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 		}()
 	}
@@ -83,7 +83,9 @@ func TestCCCache_SameKeySameClient(t *testing.T) {
 	resetCache()
 	url, _ := tokenServer(t)
 	ctx := context.Background()
-	if HTTPClient(ctx, cfgFor(url)) != HTTPClient(ctx, cfgFor(url)) {
+	a := HTTPClient(ctx, cfgFor(url))
+	b := HTTPClient(ctx, cfgFor(url))
+	if a != b {
 		t.Error("same credential must return the same cached *http.Client")
 	}
 }
