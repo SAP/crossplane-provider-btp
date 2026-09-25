@@ -43,12 +43,16 @@ function harness({ createFailure, readyFailure, deleteFailure, subaccountAdmin =
       GITHUB_RUN_ATTEMPT: '1',
     }, Date, console,
   };
-  vm.runInNewContext(`${source}\nthis.runWorkload = workload;`, context);
-  return { run: context.runWorkload, created, deleted, ready, metrics };
+  vm.runInNewContext(`${source}\nthis.runWorkload = workload; this.runOptions = options;`, context);
+  return { run: context.runWorkload, options: context.runOptions, created, deleted, ready, metrics };
 }
 
 const kinds = ['Subaccount', 'Directory', 'Entitlement', 'DirectoryEntitlement', 'SubaccountApiCredential'];
 const happy = harness();
+assert.equal(happy.options.scenarios.default.executor, 'shared-iterations');
+assert.equal(happy.options.scenarios.default.vus, 1);
+assert.equal(happy.options.scenarios.default.iterations, 1);
+assert.equal(happy.options.scenarios.default.maxDuration, '1h');
 happy.run();
 assert.deepEqual(happy.created.map((x) => x.kind), kinds);
 assert.deepEqual(happy.ready, kinds);

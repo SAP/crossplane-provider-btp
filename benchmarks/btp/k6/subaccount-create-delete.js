@@ -3,7 +3,16 @@ import { Trend } from 'k6/metrics';
 
 const xpTimeToReady = new Trend('xp_time_to_ready', true);
 const xpTimeToDelete = new Trend('xp_time_to_delete', true);
-export const options = { iterations: 1, vus: 1 };
+export const options = {
+  scenarios: {
+    default: {
+      executor: 'shared-iterations',
+      vus: 1,
+      iterations: 1,
+      maxDuration: '1h',
+    },
+  },
+};
 
 const READY_TIMEOUT = Number(__ENV.XP_DIADROMOS_BTP_READY_TIMEOUT || '600');
 const DELETE_TIMEOUT = Number(__ENV.XP_DIADROMOS_BTP_DELETE_TIMEOUT || '600');
