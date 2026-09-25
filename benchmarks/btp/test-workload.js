@@ -53,6 +53,7 @@ assert.deepEqual(happy.created.map((x) => x.kind), kinds);
 assert.deepEqual(happy.ready, kinds);
 assert.deepEqual(happy.deleted.map((x) => x.kind), [...kinds].reverse());
 assert.equal(new Set(happy.created.map((x) => x.metadata.name)).size, kinds.length);
+assert.equal(happy.created[1].metadata.namespace, undefined, 'Directory is cluster-scoped');
 assert.equal(happy.created[3].metadata.namespace, undefined, 'DirectoryEntitlement is cluster-scoped');
 assert.equal(happy.created[4].spec.forProvider.readOnly, true);
 assert.ok(happy.created[4].spec.writeConnectionSecretToRef.name.length <= 63);

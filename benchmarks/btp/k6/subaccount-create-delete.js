@@ -57,7 +57,7 @@ export default function () {
       directoryAdmins: [SUBACCOUNT_ADMIN],
       directoryFeatures: ['DEFAULT', 'ENTITLEMENTS'],
       displayName: names.Directory,
-    }),
+    }, false),
     resource('Entitlement', accountAPI, names.Entitlement, {
       serviceName: 'cis', servicePlanName: 'local', enable: true,
       subaccountRef: { name: names.Subaccount },
