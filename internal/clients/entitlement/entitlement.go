@@ -53,19 +53,6 @@ type describeEntry struct {
 	at  time.Time
 }
 
-func describeCacheGet(key string) *entclient.EntitledAndAssignedServicesResponseObject {
-	v, ok := describeCache.Load(key)
-	if !ok {
-		return nil
-	}
-	e := v.(*describeEntry)
-	if time.Since(e.at) > describeCacheT {
-		describeCache.Delete(key)
-		return nil
-	}
-	return e.val
-}
-
 // describeCacheStore stores val under key with issuedAt as its freshness
 // timestamp, unless a newer entry is already cached - this stops a slower
 // ordinary/fresh flight from regressing an already-cached response.
@@ -84,6 +71,21 @@ func describeCacheStore(key string, val *entclient.EntitledAndAssignedServicesRe
 			return
 		}
 	}
+}
+
+func describeCacheGet(key string) *entclient.EntitledAndAssignedServicesResponseObject {
+	v, ok := describeCache.Load(key)
+	if !ok {
+		return nil
+	}
+	e := v.(*describeEntry)
+	if time.Since(e.at) > describeCacheT {
+		// Compare-and-delete so a fresh entry stored by a concurrent
+		// writer between our Load and Delete is not wiped.
+		describeCache.CompareAndDelete(key, e)
+		return nil
+	}
+	return e.val
 }
 
 func (c EntitlementsClient) DescribeInstance(
