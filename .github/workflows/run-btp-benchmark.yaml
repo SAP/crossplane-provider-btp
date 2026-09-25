@@ -137,7 +137,6 @@ jobs:
           CIS_CENTRAL_BINDING: ${{ secrets.CIS_CENTRAL_BINDING }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
-          XP_DIADROMOS_BTP_RUN_ID: ${{ github.run_id }}
 
       - name: Publish available benchmark report
         id: report
