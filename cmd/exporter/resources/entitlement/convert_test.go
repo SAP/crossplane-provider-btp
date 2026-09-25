@@ -1,6 +1,7 @@
 package entitlement
 
 import (
+	"fmt"
 	"testing"
 
 	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -102,6 +103,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 	var parentAmount float64 = 10
 	var parentRemainingAmount float64 = 5
 	resourceName := planId + "." + subAccountUuid
+	externalName := fmt.Sprintf("%s/%s/%s", subAccountUuid, svcName, planName)
 
 	tests := []struct {
 		name string
@@ -131,6 +133,9 @@ func TestConvertEntitlementResource(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: resourceName,
+						Annotations: map[string]string{
+							"crossplane.io/external-name": externalName,
+						},
 					},
 					Spec: v1alpha1.EntitlementSpec{
 						ResourceSpec: v1.ResourceSpec{
@@ -170,6 +175,9 @@ func TestConvertEntitlementResource(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: resourceName,
+						Annotations: map[string]string{
+							"crossplane.io/external-name": externalName,
+						},
 					},
 					Spec: v1alpha1.EntitlementSpec{
 						ResourceSpec: v1.ResourceSpec{
@@ -208,6 +216,9 @@ func TestConvertEntitlementResource(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: resourceName,
+						Annotations: map[string]string{
+							"crossplane.io/external-name": externalName,
+						},
 					},
 					Spec: v1alpha1.EntitlementSpec{
 						ResourceSpec: v1.ResourceSpec{
@@ -247,6 +258,9 @@ func TestConvertEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{
@@ -263,6 +277,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 					})
 				rwc.AddComment(resources.WarnMissingServiceName)
 				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),
 		},
@@ -289,6 +304,9 @@ func TestConvertEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{
@@ -305,6 +323,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 					})
 				rwc.AddComment(resources.WarnMissingServicePlanName)
 				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),
 		},
@@ -331,6 +350,9 @@ func TestConvertEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{
@@ -347,6 +369,7 @@ func TestConvertEntitlementResource(t *testing.T) {
 					})
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
 				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),
 		},
@@ -374,6 +397,9 @@ func TestConvertEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": externalName,
+							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ResourceSpec: v1.ResourceSpec{
@@ -428,6 +454,7 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 	planName := "standard"
 	planId := svcName + "." + planName
 	resourceName := planId + "." + subAccountUuid
+	externalName := fmt.Sprintf("%s/%s/%s", subAccountUuid, svcName, planName)
 
 	tests := []struct {
 		name string
@@ -445,6 +472,9 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: resourceName,
+						Annotations: map[string]string{
+							"crossplane.io/external-name": externalName,
+						},
 					},
 					Spec: v1alpha1.EntitlementSpec{
 						ForProvider: v1alpha1.EntitlementParameters{
@@ -479,6 +509,9 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resourceName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": externalName,
+							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ForProvider: v1alpha1.EntitlementParameters{
@@ -504,6 +537,9 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ForProvider: v1alpha1.EntitlementParameters{
@@ -515,6 +551,7 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 					})
 				rwc.AddComment(resources.WarnMissingServiceName)
 				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),
 		},
@@ -530,6 +567,9 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ForProvider: v1alpha1.EntitlementParameters{
@@ -541,6 +581,7 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 					})
 				rwc.AddComment(resources.WarnMissingServicePlanName)
 				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),
 		},
@@ -556,6 +597,9 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ForProvider: v1alpha1.EntitlementParameters{
@@ -567,6 +611,7 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 					})
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
 				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),
 		},
@@ -582,6 +627,9 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resources.UndefinedName,
+							Annotations: map[string]string{
+								"crossplane.io/external-name": resources.UndefinedExternalName,
+							},
 						},
 						Spec: v1alpha1.EntitlementSpec{
 							ForProvider: v1alpha1.EntitlementParameters{
@@ -593,6 +641,7 @@ func TestConvertDefaultEntitlementResource(t *testing.T) {
 				rwc.AddComment(resources.WarnMissingServicePlanName)
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
 				rwc.AddComment(resources.WarnUndefinedResourceName)
+				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),
 		},

@@ -24,7 +24,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 	serviceName := "test-service"
 	planName := "standard"
 	subAccountGuid := "x123e4567-e89b-12d3-a456-42661417400"
-	externalName := fmt.Sprintf("%s,%s", subAccountGuid, instanceID)
+	externalName := instanceID
 	smName := "service-manager-resource"
 	resourceName := fmt.Sprintf("%s-%s", instanceName, instanceID)
 
@@ -196,7 +196,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resourceName,
 							Annotations: map[string]string{
-								"crossplane.io/external-name": resources.UndefinedExternalName,
+								"crossplane.io/external-name": instanceID,
 							},
 						},
 						Spec: v1alpha1.ServiceInstanceSpec{
@@ -217,7 +217,6 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
-				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),
 		},
