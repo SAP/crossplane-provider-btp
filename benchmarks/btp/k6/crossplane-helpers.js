@@ -381,7 +381,7 @@ export function waitForReady(kind, name, opts = {}) {
 
       const conditions = resource?.status?.conditions || [];
       const ready = conditions.find(
-        (c) => c.type === 'Ready' || c.type === 'Synced'
+        (c) => c.type === 'Ready' || (!opts.requireReady && c.type === 'Synced')
       );
 
       if (ready && (ready.status === 'True' || ready.status === true)) {
@@ -394,10 +394,8 @@ export function waitForReady(kind, name, opts = {}) {
       );
       if (failed) {
         xpResourcesFailed.add(1);
-        console.log(`[XP-OPS] failed ${kind}/${name}: ${failed.message || failed.reason}`);
-        throw new CrossplaneError(
-          `Resource ${kind}/${name} failed: ${failed.message || failed.reason}`
-        );
+        console.log(`[XP-OPS] failed ${kind}/${name}: reconciliation error`);
+        throw new CrossplaneError(`Resource ${kind}/${name} failed reconciliation`);
       }
     } catch (e) {
       // Re-raise our own errors (explicit reconciliation failures).
@@ -415,7 +413,7 @@ export function waitForReady(kind, name, opts = {}) {
   console.log(`[XP-OPS] failed ${kind}/${name}: timed out after ${timeout}s`);
   throw new TimeoutError(
     `Timed out waiting for ${kind}/${name} to become Ready within ${timeout}s` +
-    (lastError ? ` (last error: ${lastError.message || lastError})` : '')
+    (lastError ? ' (Kubernetes API polling error)' : '')
   );
 }
 

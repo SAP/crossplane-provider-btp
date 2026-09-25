@@ -3,77 +3,114 @@ import { Trend } from 'k6/metrics';
 
 const xpTimeToReady = new Trend('xp_time_to_ready', true);
 const xpTimeToDelete = new Trend('xp_time_to_delete', true);
-
 export const options = { iterations: 1, vus: 1 };
 
-const READY_TIMEOUT = Number(__ENV.XP_DIADROMOS_BTP_READY_TIMEOUT || '1800');
-const DELETE_TIMEOUT = Number(__ENV.XP_DIADROMOS_BTP_DELETE_TIMEOUT || '1800');
+const READY_TIMEOUT = Number(__ENV.XP_DIADROMOS_BTP_READY_TIMEOUT || '600');
+const DELETE_TIMEOUT = Number(__ENV.XP_DIADROMOS_BTP_DELETE_TIMEOUT || '600');
 const REGION = __ENV.XP_DIADROMOS_BTP_REGION || 'eu10';
 const SUBACCOUNT_ADMIN = __ENV.XP_DIADROMOS_BTP_SUBACCOUNT_ADMIN;
-const NAME_PREFIX = 'xp-btp-bench';
-const SUBDOMAIN_PREFIX = 'xpbtpbench';
+const RUN_ID = __ENV.XP_DIADROMOS_BTP_RUN_ID || __ENV.GITHUB_RUN_ID;
+const NS = 'default';
 
 function safePart(value) {
-  return value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
+  return String(value).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, 16) || 'run';
+}
+
+function resource(kind, apiVersion, name, spec, namespaced = true) {
+  return {
+    apiVersion,
+    kind,
+    metadata: { ...(namespaced ? { namespace: NS } : {}), name },
+    spec: {
+      providerConfigRef: { name: 'default' },
+      forProvider: spec,
+      ...(kind === 'SubaccountApiCredential' ? {
+        writeConnectionSecretToRef: { name: `${name.slice(0, 55)}-secret`, namespace: NS },
+      } : {}),
+    },
+  };
 }
 
 export default function () {
-  if (!SUBACCOUNT_ADMIN) {
-    throw new Error('XP_DIADROMOS_BTP_SUBACCOUNT_ADMIN must be set to the BTP technical user email');
-  }
+  if (!SUBACCOUNT_ADMIN) throw new Error('XP_DIADROMOS_BTP_SUBACCOUNT_ADMIN is required');
+  if (!RUN_ID) throw new Error('Set XP_DIADROMOS_BTP_RUN_ID (or GITHUB_RUN_ID) to identify owned resources');
 
-  const suffix = `${safePart(__ENV.GITHUB_RUN_ID || Date.now().toString(36))}-${safePart(__ENV.GITHUB_RUN_ATTEMPT || '1')}-${Date.now().toString(36)}`.slice(-35);
-  const name = `${NAME_PREFIX}-${suffix}`.slice(0, 63).replace(/-+$/g, '');
-  const subdomain = `${SUBDOMAIN_PREFIX}-${suffix}`.slice(0, 63).replace(/-+$/g, '');
-  const apiVersion = 'account.btp.sap.crossplane.io/v1alpha1';
-  const manifest = {
-    apiVersion,
-    kind: 'Subaccount',
-    metadata: { namespace: 'default', name },
-    spec: {
-      providerConfigRef: { name: 'default' },
-      forProvider: {
-        displayName: name,
-        region: REGION,
-        subdomain,
-        subaccountAdmins: [SUBACCOUNT_ADMIN],
-      },
-    },
+  const suffix = `${safePart(RUN_ID)}-${safePart(__ENV.GITHUB_RUN_ATTEMPT || '1')}-${Date.now().toString(36)}`;
+  const subName = `xp-btp-bench-${suffix}`.slice(0, 63).replace(/-+$/g, '');
+  const dirName = `xp-btp-bench-dir-${suffix}`.slice(0, 63).replace(/-+$/g, '');
+  const subdomain = `xpbtpbench-${suffix}`.slice(0, 63).replace(/-+$/g, '');
+  const names = {
+    Subaccount: subName,
+    Directory: dirName,
+    Entitlement: `xp-btp-bench-ent-${suffix}`.slice(0, 63).replace(/-+$/g, ''),
+    DirectoryEntitlement: `xp-btp-bench-dirent-${suffix}`.slice(0, 63).replace(/-+$/g, ''),
+    SubaccountApiCredential: `xp-btp-bench-api-${suffix}`.slice(0, 63).replace(/-+$/g, ''),
   };
+  const accountAPI = 'account.btp.sap.crossplane.io/v1alpha1';
+  const securityAPI = 'security.btp.sap.crossplane.io/v1alpha1';
+  const manifests = [
+    resource('Subaccount', accountAPI, names.Subaccount, {
+      displayName: names.Subaccount, region: REGION, subdomain, subaccountAdmins: [SUBACCOUNT_ADMIN],
+    }),
+    resource('Directory', accountAPI, names.Directory, {
+      description: `xp-diadromos benchmark ${suffix}`,
+      directoryAdmins: [SUBACCOUNT_ADMIN],
+      directoryFeatures: ['DEFAULT', 'ENTITLEMENTS'],
+      displayName: names.Directory,
+    }),
+    resource('Entitlement', accountAPI, names.Entitlement, {
+      serviceName: 'cis', servicePlanName: 'local', enable: true,
+      subaccountRef: { name: names.Subaccount },
+    }),
+    resource('DirectoryEntitlement', accountAPI, names.DirectoryEntitlement, {
+      directoryRef: { name: names.Directory }, serviceName: 'cis', planName: 'local',
+    }, false),
+    resource('SubaccountApiCredential', securityAPI, names.SubaccountApiCredential, {
+      readOnly: true, subaccountRef: { name: names.Subaccount },
+    }),
+  ];
 
   const client = xp.k8sClient();
-  let created = false;
-  let originalError;
-  let deletionError;
-  const createStarted = Date.now();
+  const created = [];
+  const errors = [];
   try {
-    xp.measureOperation('create', 'Subaccount', () => {
-      client.create(manifest);
-      created = true;
-      xp.xpResourcesCreated.add(1);
-      xp.waitForReady('Subaccount', name, { namespace: 'default', apiVersion, timeout: READY_TIMEOUT });
-      xpTimeToReady.add(Date.now() - createStarted, { resource_kind: 'Subaccount' });
-    });
+    for (const manifest of manifests) {
+      const kind = manifest.kind;
+      const name = manifest.metadata.name;
+      const started = Date.now();
+      xp.measureOperation('create', kind, () => {
+        client.create(manifest);
+        // Track immediately after API create, before readiness can time out.
+        created.push(manifest);
+        xp.xpResourcesCreated.add(1);
+        xp.waitForReady(kind, name, {
+          namespace: manifest.metadata.namespace || NS,
+          apiVersion: manifest.apiVersion,
+          timeout: READY_TIMEOUT,
+          requireReady: true,
+        });
+      });
+      xpTimeToReady.add(Date.now() - started, { resource_kind: kind });
+    }
   } catch (error) {
-    originalError = error;
-  }
-
-  finally {
-    if (created) {
+    errors.push(`create/readiness failed (${error?.name || 'error'})`);
+  } finally {
+    for (const manifest of created.reverse()) {
+      const kind = manifest.kind;
+      const name = manifest.metadata.name;
       try {
-        xp.deleteAndWait('Subaccount', name, {
-          namespace: 'default', apiVersion, timeout: DELETE_TIMEOUT,
-          trendMetric: xpTimeToDelete, trendTags: { resource_kind: 'Subaccount' },
+        xp.deleteAndWait(kind, name, {
+          namespace: manifest.metadata.namespace || NS,
+          apiVersion: manifest.apiVersion,
+          timeout: DELETE_TIMEOUT,
+          trendMetric: xpTimeToDelete,
+          trendTags: { resource_kind: kind },
         });
       } catch (error) {
         xp.xpResourcesFailed.add(1);
-        deletionError = error;
+        errors.push(`delete failed for owned ${kind}/${name} (${error?.name || 'error'})`);
       }
     }
   }
-  if (deletionError) {
-    const detail = originalError ? `; original create/readiness failure: ${originalError}` : '';
-    throw new Error(`Subaccount deletion failed for owned resource ${name}: ${deletionError}${detail}`);
-  }
-  if (originalError) throw originalError;
+  if (errors.length) throw new Error(errors.join('; '));
 }

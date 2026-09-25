@@ -56,8 +56,9 @@ k6:
   env:
     XP_DIADROMOS_BTP_ITERATIONS: "1"
     XP_DIADROMOS_BTP_VUS: "1"
-    XP_DIADROMOS_BTP_READY_TIMEOUT: "1800"
-    XP_DIADROMOS_BTP_DELETE_TIMEOUT: "1800"
+    XP_DIADROMOS_BTP_READY_TIMEOUT: "600"
+    XP_DIADROMOS_BTP_DELETE_TIMEOUT: "600"
+    XP_DIADROMOS_BTP_RUN_ID: ${XP_DIADROMOS_BTP_RUN_ID}
     XP_DIADROMOS_BTP_REGION: eu10
     XP_DIADROMOS_BTP_SUBACCOUNT_ADMIN: ${TECHNICAL_USER_EMAIL}
 
@@ -74,7 +75,7 @@ metrics:
     scrape_timeout: 5s
     max_response_size: 32MiB
   archive:
-    name_prefix: btp-subaccount-ci
+    name_prefix: btp-multi-resource-ci
     max_size: 1GiB
     drop_labels: []
     k6_bucket_interval: 1s
