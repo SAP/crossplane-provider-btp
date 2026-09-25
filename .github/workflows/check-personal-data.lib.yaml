@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ALLOWED_DOMAINS: "git\\.k8s\\.io|my-route-service\\.example\\.com|api\\.example\\.org|github\\.com|charts\\.crossplane\\.io|docs\\.github\\.com|v3-apidocs\\.cloudfoundry\\.org|zip\\.com|apache\\.org|docs\\.renovatebot\\.com|crossplane\\.io|v3-apidocs\\.cloudfoundry\\.space|releases\\.hashicorp\\.com|probot\\.github\\.io|facebook\\.github\\.io|example\\.com|test\\.com|developer\\.example\\.org|mycompany\\.com"
+      ALLOWED_EMAILS: "benchmark@example.invalid"
       ALLOWED_API_ENDPOINTS: "git\\.k8s\\.io|my-route-service\\.example\\.com|api\\.example\\.org|github\\.com|charts\\.crossplane\\.io|docs\\.github\\.com|v3-apidocs\\.cloudfoundry\\.org|zip\\.com|apache\\.org|docs\\.renovatebot\\.com|crossplane\\.io|v3-apidocs\\.cloudfoundry\\.space|releases\\.hashicorp\\.com|probot\\.github\\.io|facebook\\.github\\.io"
       EXCLUDE_DIRS: ".git build .github/workflows"
       EXCLUDED_FILES: "package/crossplane.yaml"
@@ -47,6 +48,9 @@ jobs:
             matches=$(grep -oE "$EMAIL_PATTERN" "$file" 2>/dev/null || true)
             [ -z "$matches" ] && return
             echo "$matches" | while read -r email; do
+              if grep -Fxiq -- "$email" <<< "$ALLOWED_EMAILS"; then
+                continue
+              fi
               domain=$(echo "$email" | awk -F@ '{print $2}')
               if ! grep -iE "($ALLOWED_DOMAINS)$" <<< "$domain" > /dev/null; then
                 echo "$file: $email" >> email_violations.txt
