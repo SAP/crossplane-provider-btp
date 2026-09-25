@@ -6,11 +6,12 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"golang.org/x/oauth2/clientcredentials"
+
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	saas_client "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-saas-provisioning-api-go/pkg"
-	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/sap/crossplane-provider-btp/internal/clients/cccache"
 )

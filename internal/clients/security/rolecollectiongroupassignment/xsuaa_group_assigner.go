@@ -4,10 +4,11 @@ import (
 	"context"
 	"net/url"
 
+	"golang.org/x/oauth2/clientcredentials"
+
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/security"
 	xsuaa "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-xsuaa-service-api-go/pkg"
-	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/sap/crossplane-provider-btp/internal/clients/cccache"
 )
