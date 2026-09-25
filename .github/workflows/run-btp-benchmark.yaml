@@ -71,6 +71,22 @@ jobs:
             echo '::error::Confirm the dedicated BTP benchmark account before dispatch.'; exit 1;
           }
 
+      - name: Validate Directory admin secrets
+        env:
+          TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
+          SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
+        run: |
+          set -euo pipefail
+          [[ -n "$TECHNICAL_USER_EMAIL" ]] || {
+            echo '::error::Configure the TECHNICAL_USER_EMAIL secret for the benchmark environment.'; exit 1;
+          }
+          [[ -n "$SECOND_DIRECTORY_ADMIN_EMAIL" ]] || {
+            echo '::error::Configure the SECOND_DIRECTORY_ADMIN_EMAIL secret for the benchmark environment.'; exit 1;
+          }
+          [[ "${TECHNICAL_USER_EMAIL,,}" != "${SECOND_DIRECTORY_ADMIN_EMAIL,,}" ]] || {
+            echo '::error::TECHNICAL_USER_EMAIL and SECOND_DIRECTORY_ADMIN_EMAIL must identify distinct BTP users.'; exit 1;
+          }
+
       - name: Check out reviewed source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
