@@ -150,6 +150,22 @@ func TestServiceInstance_ParameterUpdate(t *testing.T) {
 					time.Sleep(15 * time.Second)
 				}
 
+				// The callback only writes status, so the hold appears at the
+				// next reconcile, up to a poll interval later.
+				deadline = time.Now().Add(3 * time.Minute)
+				for {
+					cur := MustGetResource(t, cfg, siRejectName, nil, &v1alpha1.ServiceInstance{})
+					ready := cur.GetCondition(xpv1.TypeReady)
+					if ready.Status == corev1.ConditionFalse && string(ready.Reason) == "AsyncOperationFailed" {
+						break
+					}
+					if time.Now().After(deadline) {
+						t.Fatalf("expected the rejection to hold Ready=False/AsyncOperationFailed, got status=%q reason=%q message=%q",
+							ready.Status, ready.Reason, ready.Message)
+					}
+					time.Sleep(15 * time.Second)
+				}
+
 				// Flicker guard (#967/#968): the rejection must not only be
 				// recorded once, it must keep the resource unhealthy. #968 names
 				// all three conditions the user reads.
