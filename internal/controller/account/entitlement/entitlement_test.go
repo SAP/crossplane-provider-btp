@@ -597,6 +597,52 @@ func TestObserve(t *testing.T) {
 				err: nil,
 			},
 		},
+		"Amount differs, but its system-assigned (AutoAssigned), All up-to-date": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList:         test.NewMockListFn(nil, ListEntitlements(entitlement(withAmount(2)))),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount:       internal.Ptr(float32(1)),
+							AutoAssigned: internal.Ptr(true),
+						},
+					}, nil
+				}},
+				cr: entitlement(withAmount(2)),
+			},
+			want: want{
+				o:   managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				err: nil,
+			},
+		},
+		"Deletion of sole AutoAssigned CR, finalized without Delete()": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList: test.NewMockListFn(nil, ListEntitlements(
+						entitlement(withName("sole-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(1), withSubaccountGuid("a"), withConditions(xpv1.Deleting())),
+					)),
+				},
+				client: fake.MockClient{MockDescribeCluster: func(ctx context.Context, input v1alpha1.Entitlement) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount:       internal.Ptr(float32(2)),
+							AutoAssigned: internal.Ptr(true),
+						},
+					}, nil
+				}},
+				cr: entitlement(withName("sole-cr"), withUID("uid-1"), withServiceName("Alpha"), withServicePlan("One"), withAmount(1), withSubaccountGuid("a"), withDeletionTimestamp(), withConditions(xpv1.Deleting())),
+			},
+			want: want{
+				o:   managed.ExternalObservation{ResourceExists: false},
+				err: nil,
+			},
+		},
 	}
 
 	for name, tc := range cases {

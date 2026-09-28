@@ -1,11 +1,16 @@
 package entitlement
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
+	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 	entclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
 
@@ -449,4 +454,135 @@ func TestFilterEntitledServices(t *testing.T) {
 			},
 		)
 	}
+}
+
+// TestDeleteSkipsAutoAssigned verifies DeleteInstance never calls
+// SetServicePlans when Assigned.AutoAssigned is true: BTP documents such
+// assignments as unremovable by admin action.
+func TestDeleteSkipsAutoAssigned(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("DeleteInstance issued %s %s for an AutoAssigned entitlement; BTP documents this assignment as unremovable", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	})
+	c, closeServer := newTestEntitlementsClient(t, handler)
+	defer closeServer()
+
+	cr := &v1alpha1.Entitlement{
+		Spec: v1alpha1.EntitlementSpec{
+			ForProvider: v1alpha1.EntitlementParameters{
+				Amount: internal.Ptr(5),
+			},
+		},
+		Status: v1alpha1.EntitlementStatus{
+			AtProvider: &v1alpha1.EntitlementObservation{
+				Required: &v1alpha1.EntitlementSummary{
+					Amount: internal.Ptr(0),
+				},
+				Assigned: &v1alpha1.Assignable{
+					Amount:       internal.Ptr(5),
+					AutoAssigned: true,
+				},
+			},
+		},
+	}
+
+	if err := c.DeleteInstance(context.Background(), cr); err != nil {
+		t.Fatalf("DeleteInstance(...): unexpected error: %v", err)
+	}
+}
+
+// TestCreateSkipsAutoAssigned verifies CreateInstance (== UpdateInstance)
+// never calls SetServicePlans for an AutoAssigned entitlement.
+func TestCreateSkipsAutoAssigned(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("CreateInstance issued %s %s for an AutoAssigned entitlement; BTP documents this assignment as unremovable", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	})
+	c, closeServer := newTestEntitlementsClient(t, handler)
+	defer closeServer()
+
+	cr := &v1alpha1.Entitlement{
+		Spec: v1alpha1.EntitlementSpec{
+			ForProvider: v1alpha1.EntitlementParameters{
+				Amount: internal.Ptr(5),
+			},
+		},
+		Status: v1alpha1.EntitlementStatus{
+			AtProvider: &v1alpha1.EntitlementObservation{
+				Required: &v1alpha1.EntitlementSummary{
+					Amount: internal.Ptr(5),
+				},
+				Assigned: &v1alpha1.Assignable{
+					AutoAssigned: true,
+				},
+			},
+		},
+	}
+
+	if err := c.CreateInstance(context.Background(), cr); err != nil {
+		t.Fatalf("CreateInstance(...): unexpected error: %v", err)
+	}
+}
+
+// TestCreateWritesWhenAutoAssignOnly verifies CreateInstance still writes
+// when AutoAssign (user intent) is true but AutoAssigned (system-assigned)
+// is false: the guard must not suppress writes driven by AutoAssign.
+func TestCreateWritesWhenAutoAssignOnly(t *testing.T) {
+	requestSeen := make(chan struct{}, 1)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Non-blocking: a duplicate write must never block this handler
+		// goroutine, which would hang the test instead of failing with a diff.
+		select {
+		case requestSeen <- struct{}{}:
+		default:
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	c, closeServer := newTestEntitlementsClient(t, handler)
+	defer closeServer()
+
+	cr := &v1alpha1.Entitlement{
+		Spec: v1alpha1.EntitlementSpec{
+			ForProvider: v1alpha1.EntitlementParameters{
+				Amount: internal.Ptr(5),
+			},
+		},
+		Status: v1alpha1.EntitlementStatus{
+			AtProvider: &v1alpha1.EntitlementObservation{
+				Required: &v1alpha1.EntitlementSummary{
+					Amount: internal.Ptr(5),
+				},
+				Assigned: &v1alpha1.Assignable{
+					AutoAssign:   true,
+					AutoAssigned: false,
+				},
+			},
+		},
+	}
+
+	if err := c.CreateInstance(context.Background(), cr); err != nil {
+		t.Fatalf("CreateInstance(...): unexpected error: %v", err)
+	}
+
+	select {
+	case <-requestSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("CreateInstance(...): expected a SetServicePlans request for an AutoAssign (not AutoAssigned) entitlement, got none")
+	}
+}
+
+// newTestEntitlementsClient wires an EntitlementsClient to an httptest
+// server running handler, returning the client and a func to close the
+// server.
+func newTestEntitlementsClient(t *testing.T, handler http.Handler) (*EntitlementsClient, func()) {
+	t.Helper()
+	server := httptest.NewServer(handler)
+	cfg := entclient.NewConfiguration()
+	cfg.HTTPClient = server.Client()
+	cfg.Servers = []entclient.ServerConfiguration{{URL: server.URL}}
+	api := entclient.NewAPIClient(cfg)
+	client := NewEntitlementsClient(btp.Client{
+		EntitlementsServiceClient: api.ManageAssignedEntitlementsAPI,
+	})
+	return client, server.Close
 }

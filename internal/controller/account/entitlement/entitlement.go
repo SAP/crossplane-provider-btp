@@ -110,6 +110,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
+	if deletingAutoAssigned(cr) {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
+
 	// When deleting, check if this CR's portion has already been removed from BTP.
 	// Sibling CRs will continue to manage the remaining entitlement amount.
 	if cr.GetDeletionTimestamp() != nil {
@@ -292,6 +296,11 @@ func (c *external) needsUpdate(cr *apisv1alpha1.Entitlement) bool {
 	if autoAssign {
 		return false
 	}
+	// System-assigned entitlements are never resized or removed by us.
+	autoAssigned := cr.Status.AtProvider.Assigned.AutoAssigned
+	if autoAssigned {
+		return false
+	}
 	unlimitedAmountAssigned := cr.Status.AtProvider.Assigned.UnlimitedAmountAssigned
 	if unlimitedAmountAssigned {
 		return false
@@ -306,6 +315,15 @@ func (c *external) needsUpdate(cr *apisv1alpha1.Entitlement) bool {
 
 func (c *external) needsCreate(cr *apisv1alpha1.Entitlement) bool {
 	return cr.Status.AtProvider.Assigned == nil
+}
+
+// deletingAutoAssigned reports whether a deleting cr's BTP assignment is
+// AutoAssigned; it must finalize without writing to BTP. nil-safe.
+func deletingAutoAssigned(cr *apisv1alpha1.Entitlement) bool {
+	return cr.GetDeletionTimestamp() != nil &&
+		cr.Status.AtProvider != nil &&
+		cr.Status.AtProvider.Assigned != nil &&
+		cr.Status.AtProvider.Assigned.AutoAssigned
 }
 
 // deletionComplete checks whether this CR's portion has already been removed from BTP.
