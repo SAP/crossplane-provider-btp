@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/function"
+	"github.com/hashicorp/terraform-plugin-framework/list"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -92,6 +94,22 @@ func (p *cachingProvider) Configure(ctx context.Context, req fwprovider.Configur
 func (p *cachingProvider) Functions(ctx context.Context) []func() function.Function {
 	if wf, ok := p.Provider.(fwprovider.ProviderWithFunctions); ok {
 		return wf.Functions(ctx)
+	}
+	return nil
+}
+
+// ListResources forwards to the inner provider
+func (p *cachingProvider) ListResources(ctx context.Context) []func() list.ListResource {
+	if pl, ok := p.Provider.(fwprovider.ProviderWithListResources); ok {
+		return pl.ListResources(ctx)
+	}
+	return nil
+}
+
+// Actions forwards to the inner provider
+func (p *cachingProvider) Actions(ctx context.Context) []func() action.Action {
+	if pa, ok := p.Provider.(fwprovider.ProviderWithActions); ok {
+		return pa.Actions(ctx)
 	}
 	return nil
 }

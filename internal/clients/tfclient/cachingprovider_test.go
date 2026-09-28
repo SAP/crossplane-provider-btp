@@ -147,6 +147,12 @@ func TestOptionalInterfacePreserved(t *testing.T) {
 	if _, ok := interface{}(w).(provider.ProviderWithFunctions); !ok {
 		t.Fatal("wrapper lost ProviderWithFunctions")
 	}
+	if _, ok := interface{}(w).(provider.ProviderWithListResources); !ok {
+		t.Fatal("wrapper lost ProviderWithListResources")
+	}
+	if _, ok := interface{}(w).(provider.ProviderWithActions); !ok {
+		t.Fatal("wrapper lost ProviderWithActions")
+	}
 }
 
 func TestEvictBySubdomain(t *testing.T) {
