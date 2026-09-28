@@ -101,6 +101,13 @@ func (c EntitlementsClient) DeleteInstance(ctx context.Context, cr *v1alpha1.Ent
 }
 
 func (c EntitlementsClient) UpdateInstance(ctx context.Context, cr *v1alpha1.Entitlement) error {
+	// AutoAssigned entitlements aren't removable by admin action; Create and
+	// Delete both funnel through here, so this guard alone covers all three
+	// write paths. AutoAssign (user intent) is separate and keeps writing.
+	if cr.Status.AtProvider.Assigned != nil && cr.Status.AtProvider.Assigned.AutoAssigned {
+		return nil
+	}
+
 	serviceName := cr.Spec.ForProvider.ServiceName
 	planName := cr.Spec.ForProvider.ServicePlanName
 	servicePlanUniqueIdentifier := cr.Spec.ForProvider.ServicePlanUniqueIdentifier
