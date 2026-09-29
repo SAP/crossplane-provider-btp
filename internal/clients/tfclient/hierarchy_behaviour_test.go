@@ -232,7 +232,7 @@ func behaviourDo(t *testing.T, tr http.RoundTripper, req *http.Request) int {
 }
 
 func behaviourTransport(clock *behaviourClock, hierarchyCall bool) *cliTransport {
-	tr := newCLITransport(&cachingProvider{entries: map[string]*cacheEntry{}}, http.DefaultTransport, nil, hierarchyCall)
+	tr := newCLITransport(&cachingProvider{entries: map[string]*cacheEntry{}}, http.DefaultTransport, nil, hierarchyCall, true)
 	if tr.hierarchy != nil {
 		tr.hierarchy.now = clock.Now
 	}

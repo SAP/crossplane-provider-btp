@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -28,13 +30,24 @@ const (
 	hierarchyCallTTL     = 90 * time.Second
 	hierarchyCallTimeout = 10 * time.Second
 	maxCommandBodyBytes  = 1 << 20
+
+	// No resource reads backend status 500 as not found, forbidden or rate limited.
+	notLoadedBackendStatus = "500"
 )
 
-var hierarchyCallEnabled = true
+var (
+	hierarchyCallEnabled = true
+	failFastEnabled      = true
+)
 
 // SetSubaccountHierarchyCall switches the hierarchy call on or off. It must be
 // called before the first CLI client is built, i.e. from main().
 func SetSubaccountHierarchyCall(enabled bool) { hierarchyCallEnabled = enabled }
+
+// SetFailFastOnUnloadedSubaccount switches off btpcli's retries for a bare 500
+// that survives the hierarchy call. It must be called before the first CLI
+// client is built, i.e. from main().
+func SetFailFastOnUnloadedSubaccount(enabled bool) { failFastEnabled = enabled }
 
 type hierarchyLoader struct {
 	ttl     time.Duration
@@ -49,6 +62,7 @@ type hierarchyLoader struct {
 // hierarchy call.
 type hierarchyEntry struct {
 	loadedAt time.Time // start of the last successful hierarchy call
+	servedAt time.Time // last answer to a command that carried a backend status
 	// Concurrent commands share the outcome of the call in flight, failures
 	// included, so a hanging endpoint costs them one timeout rather than one each.
 	flight *hierarchyFlight
@@ -130,15 +144,35 @@ func (l *hierarchyLoader) entryLocked(key string) *hierarchyEntry {
 	return e
 }
 
-// forget drops a remembered call that a bare 500 at `sent` has disproved, so
-// btpcli's retries call before sending instead of sending, calling and resending
-// on every attempt. A call that succeeded after `sent` is kept.
+// forget drops a remembered call that a bare 500 at `sent` has disproved, so the
+// next attempt, a btpcli retry or with fail-fast the next reconcile, calls before
+// sending instead of sending, calling and resending. A call that succeeded after
+// `sent` is kept.
 func (l *hierarchyLoader) forget(key string, sent time.Time) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if e, ok := l.entries[key]; ok && !e.loadedAt.After(sent) {
 		e.loadedAt = time.Time{}
 	}
+}
+
+func (l *hierarchyLoader) markServed(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.entryLocked(key).servedAt = l.now()
+}
+
+// servedAgo reports how long ago the backend last answered a command for key,
+// and whether that was within the ttl the server is trusted to keep it loaded.
+func (l *hierarchyLoader) servedAgo(key string) (time.Duration, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	e, ok := l.entries[key]
+	if !ok || e.servedAt.IsZero() {
+		return 0, false
+	}
+	ago := l.now().Sub(e.servedAt)
+	return ago, ago < l.ttl
 }
 
 // ensureLoaded makes a hierarchy call unless one succeeded after `after`, or
@@ -257,10 +291,59 @@ func (t *cliTransport) hierarchyCall(r *http.Request, cmd *cliCommand) bool {
 	return ok
 }
 
+// notLoadedResponse replaces a bare 500 that survived the hierarchy call: btpcli
+// would retry it for about a minute under the session mutex, stalling every other
+// request of the provider config, while crossplane requeues the reconcile anyway.
+// HTTP 200 with a backend status is not retried and is the only shape whose
+// message btpcli passes on.
+func (t *cliTransport) notLoadedResponse(r *http.Request, cmd *cliCommand, bare *http.Response) *http.Response {
+	// A bare 500 carries no headers, so the request is the only source.
+	corr := r.Header.Get(headerCorrelationID)
+	msg := fmt.Sprintf("cli server has not loaded subaccount %s: it answered HTTP 500 without a backend status; not retried in-process", cmd.subaccount)
+	if corr != "" {
+		msg += fmt.Sprintf(" [Correlation ID: %s]", corr)
+	}
+	body, err := json.Marshal(struct {
+		Error string `json:"error"`
+	}{msg})
+	if err != nil {
+		return bare
+	}
+	if bare.Body != nil {
+		_ = bare.Body.Close()
+	}
+
+	if t.log != nil {
+		t.log.Info("cli server has not loaded the subaccount, failing the command without retries",
+			"cliServerURL", r.URL.Host,
+			"url", r.URL.Host+r.URL.Path,
+			"subaccount", cmd.subaccount,
+			"correlationID", corr)
+	}
+
+	h := http.Header{}
+	h.Set("Content-Type", "application/json")
+	h.Set(headerCLIBackendStatus, notLoadedBackendStatus)
+	if corr != "" {
+		h.Set(headerCorrelationID, corr)
+	}
+	return &http.Response{
+		StatusCode:    http.StatusOK,
+		Status:        "200 OK",
+		Proto:         bare.Proto,
+		ProtoMajor:    bare.ProtoMajor,
+		ProtoMinor:    bare.ProtoMinor,
+		Header:        h,
+		Body:          io.NopCloser(bytes.NewReader(body)),
+		ContentLength: int64(len(body)),
+		Request:       r,
+	}
+}
+
 // isBare500 recognises the CLI server's "subaccount not loaded" answer: real
 // backend errors always carry X-Cpcli-* headers, this one carries nothing.
 func isBare500(resp *http.Response, err error) bool {
-	if err != nil || resp == nil || resp.StatusCode != http.StatusInternalServerError {
+	if err != nil || resp == nil || resp.StatusCode != http.StatusInternalServerError || resp.ContentLength > 0 {
 		return false
 	}
 	for k := range resp.Header {
@@ -268,5 +351,10 @@ func isBare500(resp *http.Response, err error) bool {
 			return false
 		}
 	}
-	return peekBody(resp) == ""
+	if resp.Body == nil {
+		return true
+	}
+	// A body that fails to read may have held a real error; only a clean EOF is empty.
+	peeked, perr := peekBodyErr(resp)
+	return peeked == "" && errors.Is(perr, io.EOF)
 }

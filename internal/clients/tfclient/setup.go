@@ -37,9 +37,9 @@ const (
 )
 
 // frameworkProvider returns the BTP plugin-framework provider for upjet's no-fork
-// client. Lazy because btp.SetDebug() and SetSubaccountHierarchyCall() run in
-// main(), after init. It always injects an http.Client so cliTransport can drop a
-// cached session on a 401.
+// client. Lazy because btp.SetDebug(), SetSubaccountHierarchyCall() and
+// SetFailFastOnUnloadedSubaccount() run in main(), after init. It always injects
+// an http.Client so cliTransport can drop a cached session on a 401.
 var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
 	cp := &cachingProvider{entries: map[string]*cacheEntry{}}
 	base := http.DefaultTransport
@@ -47,17 +47,18 @@ var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
 		base = btp.DebugPrintHTTPClient().Transport
 	}
 	log := logging.NewLogrLogger(zap.New(zap.UseDevMode(btp.IsDebug())).WithName("crossplane-provider-btp-cli"))
-	hc := &http.Client{Transport: newCLITransport(cp, base, log, hierarchyCallEnabled)}
+	hc := &http.Client{Transport: newCLITransport(cp, base, log, hierarchyCallEnabled, failFastEnabled)}
 	cp.Provider = tfprovider.NewWithClient(hc)
 	return cp
 })
 
-func newCLITransport(cp *cachingProvider, base http.RoundTripper, log logging.Logger, hierarchyCall bool) *cliTransport {
+func newCLITransport(cp *cachingProvider, base http.RoundTripper, log logging.Logger, hierarchyCall, failFast bool) *cliTransport {
 	t := &cliTransport{
 		base:     base,
 		evictSub: cp.evictBySubdomain,
 		evictAll: cp.evictAll,
 		log:      log,
+		failFast: failFast,
 	}
 	if hierarchyCall {
 		t.hierarchy = newHierarchyLoader()

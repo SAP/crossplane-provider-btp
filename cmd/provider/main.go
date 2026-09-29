@@ -66,6 +66,10 @@ func main() {
 			"cli-subaccount-hierarchy-call",
 			"Make the CLI server load a subaccount before commands are sent for it. Disable with --no-cli-subaccount-hierarchy-call.",
 		).Default("true").Bool()
+		cliFailFastOnUnloadedSubaccount = app.Flag(
+			"cli-fail-fast-on-unloaded-subaccount",
+			"Fail a subaccount command the CLI server still refuses after the hierarchy call at once instead of retrying it in-process, unless the backend answered a command for that subaccount in the last 90 seconds. Has no effect without the hierarchy call. Disable with --no-cli-fail-fast-on-unloaded-subaccount.",
+		).Default("true").Bool()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 	)
@@ -78,6 +82,7 @@ func main() {
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
 	tfclient.SetSubaccountHierarchyCall(*cliSubaccountHierarchyCall)
+	tfclient.SetFailFastOnUnloadedSubaccount(*cliFailFastOnUnloadedSubaccount)
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")

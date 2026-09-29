@@ -766,7 +766,7 @@ func TestHierarchySwitch(t *testing.T) {
 	cp := &cachingProvider{entries: map[string]*cacheEntry{}}
 
 	base := &hierBase{}
-	off := newCLITransport(cp, base, nil, false)
+	off := newCLITransport(cp, base, nil, false, false)
 	if off.hierarchy != nil {
 		t.Fatal("switched off: hierarchy loader must be nil")
 	}
@@ -775,7 +775,7 @@ func TestHierarchySwitch(t *testing.T) {
 		t.Fatalf("switched off: hierarchy=%d commands=%d, want 0/1", h, c)
 	}
 
-	on := newCLITransport(cp, base, nil, true)
+	on := newCLITransport(cp, base, nil, true, false)
 	if on.hierarchy == nil || on.hierarchy.ttl != hierarchyCallTTL || on.hierarchy.timeout != hierarchyCallTimeout {
 		t.Fatalf("switched on: loader = %+v", on.hierarchy)
 	}

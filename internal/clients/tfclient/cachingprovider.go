@@ -152,23 +152,48 @@ type cliTransport struct {
 	// hierarchy is nil when the hierarchy call is switched off, which keeps a
 	// literal cliTransport without it behaving as before.
 	hierarchy *hierarchyLoader
+	// failFast is false in a literal cliTransport, which keeps handing the bare
+	// 500 up as before.
+	failFast bool
 }
 
 // RoundTrip absorbs the CLI server's bare 500 for a subaccount it has not loaded:
 // if that 500 reached btpcli's retry layer, the retry chain would hold the session
 // mutex and block every other request of the provider config for about a minute.
 // Resending is safe because a bare 500 carries no backend status, so the command
-// never reached the backend.
+// never reached the backend. A bare 500 that survives the hierarchy call and the
+// resend is replaced with failFast, so it never reaches that retry layer either,
+// unless the backend answered for the subaccount within the ttl: upstream create,
+// update and delete poll with further commands after the write, at most 10 s apart
+// by default, and failing such a poll fast would report a write that went through
+// as failed and drop its state.
 func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	cmd := t.hierarchy.parse(r)
 	if cmd == nil {
 		return t.send(r)
 	}
 	resp, sent, err := t.sendCommand(r, cmd)
-	if isBare500(resp, err) {
-		t.hierarchy.forget(cmd.key, sent)
+	if !isBare500(resp, err) {
+		if err == nil && resp.Header.Get(headerCLIBackendStatus) != "" {
+			t.hierarchy.markServed(cmd.key)
+		}
+		return resp, err
 	}
-	return resp, err
+	t.hierarchy.forget(cmd.key, sent)
+	if !t.failFast {
+		return resp, err
+	}
+	if ago, recent := t.hierarchy.servedAgo(cmd.key); recent {
+		if t.log != nil {
+			t.log.Info("cli server refused a subaccount it served recently, leaving the retries to btpcli",
+				"cliServerURL", r.URL.Host,
+				"subaccount", cmd.subaccount,
+				"lastServedAgoMs", ago.Milliseconds(),
+				"correlationID", r.Header.Get(headerCorrelationID))
+		}
+		return resp, err
+	}
+	return t.notLoadedResponse(r, cmd, resp), nil
 }
 
 // sendCommand also returns when the answer's request was sent.
@@ -251,14 +276,19 @@ func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error
 // peekBody reads up to 1KiB for logging without consuming the stream, so
 // downstream still gets the full body. The 500 body is the human-readable CLI error.
 func peekBody(resp *http.Response) string {
+	peeked, _ := peekBodyErr(resp) // short read (EOF) is fine: we log what we got
+	return peeked
+}
+
+func peekBodyErr(resp *http.Response) (string, error) {
 	if resp.Body == nil {
-		return ""
+		return "", nil
 	}
 	const max = 1 << 10
 	br := bufio.NewReaderSize(resp.Body, max)
 	resp.Body = &peekedBody{Reader: br, body: resp.Body}
-	peeked, _ := br.Peek(max) // short read (EOF) is fine: we log what we got
-	return string(peeked)
+	peeked, err := br.Peek(max)
+	return string(peeked), err
 }
 
 // peekedBody serves the buffered+unread bytes via the bufio.Reader while
