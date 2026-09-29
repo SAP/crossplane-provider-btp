@@ -38,14 +38,19 @@ const (
 
 // frameworkProvider returns the BTP plugin-framework provider for upjet's no-fork
 // client. Lazy because btp.SetDebug() runs in main(), after init. It always
-// injects an http.Client so evictTransport can drop a cached session on a 401.
+// injects an http.Client so cliTransport can drop a cached session on a 401.
 var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
 	cp := &cachingProvider{entries: map[string]*cacheEntry{}}
 	base := http.DefaultTransport
 	if btp.IsDebug() {
 		base = btp.DebugPrintHTTPClient().Transport
 	}
-	hc := &http.Client{Transport: &evictTransport{base: base, evictSub: cp.evictBySubdomain, evictAll: cp.evictAll}}
+	hc := &http.Client{Transport: &cliTransport{
+		base:     base,
+		evictSub: cp.evictBySubdomain,
+		evictAll: cp.evictAll,
+		log:      logging.NewLogrLogger(zap.New(zap.UseDevMode(btp.IsDebug())).WithName("crossplane-provider-btp-cli")),
+	}}
 	cp.Provider = tfprovider.NewWithClient(hc)
 	return cp
 })

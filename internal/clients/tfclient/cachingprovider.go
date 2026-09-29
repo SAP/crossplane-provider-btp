@@ -1,11 +1,16 @@
 package tfclient
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"strconv"
 	"sync"
+	"time"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -19,12 +24,13 @@ import (
 const (
 	headerCLISessionId = "X-Cpcli-Sessionid"
 	headerCLISubdomain = "X-Cpcli-Subdomain"
+	headerCorrelationID = "X-Correlationid"
+	headerCLIBackendStatus = "X-Cpcli-Backend-Status"
 )
 
-// cachingProvider caches Configure so upjet's per-reconcile ConfigureProvider
-// RPC does not log in to BTP every time (the ~1:1 login/request ratio in #702).
-// On a cache hit it replays the logged-in client onto resp instead of calling
-// the inner Configure. A 401 to a data request evicts by globalaccount subdomain.
+// cachingProvider caches Configure so upjet's per-reconcile ConfigureProvider RPC does not
+// log in to BTP on every reconcile (#702). Evicts on 401 by subdomain so a session expiry
+// doesn't get stuck.
 type cachingProvider struct {
 	fwprovider.Provider // forwards Metadata/Schema/Resources/DataSources
 
@@ -32,11 +38,11 @@ type cachingProvider struct {
 	entries map[string]*cacheEntry
 }
 
-// cacheEntry logs in at most once per key via once.Do; different keys log in in parallel.
+// cacheEntry: once.Do collapses concurrent reconciles for the same key to one login.
 type cacheEntry struct {
 	once      sync.Once
 	resp      *fwprovider.ConfigureResponse
-	subdomain string                        // globalaccount from config; eviction index
+	subdomain string // globalaccount from config; eviction index
 }
 
 func newCachingProvider(inner fwprovider.Provider) *cachingProvider {
@@ -114,7 +120,7 @@ func (p *cachingProvider) Actions(ctx context.Context) []func() action.Action {
 	return nil
 }
 
-// evictBySubdomain drops every entry matching subdomain so the next reconcile re-logs-in.
+// evictBySubdomain drops cached sessions for a subdomain so the next reconcile re-authenticates.
 func (p *cachingProvider) evictBySubdomain(subdomain string) {
 	if subdomain == "" {
 		return
@@ -128,24 +134,27 @@ func (p *cachingProvider) evictBySubdomain(subdomain string) {
 	}
 }
 
-// evictAll clears the cache when a 401 has a session id but no subdomain header;
-// used as fallback if subdomain header is not provided
+// evictAll is the fallback when a 401 carries a session ID but no subdomain header.
 func (p *cachingProvider) evictAll() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.entries = map[string]*cacheEntry{}
 }
 
-// evictTransport evicts the cached session on a 401 to a data request, so a
-// transient 401 can't get stuck in the cache as a permanent one.
-type evictTransport struct {
+// cliTransport is the single injection point for all CLI/TF requests. It evicts the session on
+// 401 (so a transient auth failure can't permanently poison the cache) and logs failures with
+// enough context to diagnose a CLI-server outage
+type cliTransport struct {
 	base     http.RoundTripper
 	evictSub func(subdomain string)
 	evictAll func()
+	log      logging.Logger
 }
 
-func (t *evictTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	start := time.Now()
 	resp, err := t.base.RoundTrip(r)
+	t.logResult(r, resp, err, time.Since(start))
 	// The session-id check skips login POSTs (no session headers), so a bad-creds
 	// login 401 can't evict a valid entry.
 	if resp != nil && resp.StatusCode == http.StatusUnauthorized && r.Header.Get(headerCLISessionId) != "" {
@@ -157,3 +166,62 @@ func (t *evictTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 	return resp, err
 }
+
+// logResult logs failed CLI calls at Info; success is silent and allocation-free.
+// The CLI proxy almost always returns HTTP 200 - the real status is in X-Cpcli-Backend-Status
+// Both transport status and that header are checked.
+// The body carries the CLI server's human-readable error, which upjet's newTFError swallows.
+func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error, d time.Duration) {
+	if t.log == nil {
+		return
+	}
+	// Backend status wins when present: it's the real result behind the 200 proxy.
+	status := 0
+	if resp != nil {
+		status = resp.StatusCode
+		if b, e := strconv.Atoi(resp.Header.Get(headerCLIBackendStatus)); e == nil {
+			status = b
+		}
+	}
+	if err == nil && status < 400 {
+		return
+	}
+	kv := []interface{}{
+		"method", r.Method,
+		"url", r.URL.Host + r.URL.Path,
+		"cliServerURL", r.URL.Host,
+		"durationMs", d.Milliseconds(),
+	}
+	if err != nil {
+		kv = append(kv, "error", err.Error())
+	} else {
+		kv = append(kv,
+			"status", status,
+			"httpStatus", resp.StatusCode,
+			"correlationID", resp.Header.Get(headerCorrelationID),
+			"body", peekBody(resp))
+	}
+	t.log.Info("cli request failed", kv...)
+}
+
+// peekBody reads up to 1KiB for logging without consuming the stream, so
+// downstream still gets the full body. The 500 body is the human-readable CLI error.
+func peekBody(resp *http.Response) string {
+	if resp.Body == nil {
+		return ""
+	}
+	const max = 1 << 10
+	br := bufio.NewReaderSize(resp.Body, max)
+	resp.Body = &peekedBody{Reader: br, body: resp.Body}
+	peeked, _ := br.Peek(max) // short read (EOF) is fine: we log what we got
+	return string(peeked)
+}
+
+// peekedBody serves the buffered+unread bytes via the bufio.Reader while
+// delegating Close to the original body.
+type peekedBody struct {
+	io.Reader
+	body io.Closer
+}
+
+func (b *peekedBody) Close() error { return b.body.Close() }
