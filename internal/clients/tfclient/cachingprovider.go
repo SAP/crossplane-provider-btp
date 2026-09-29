@@ -152,9 +152,6 @@ type cliTransport struct {
 }
 
 func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	if t.log != nil {
-		t.log.Debug("cli request", "method", r.Method, "url", r.URL.Host+r.URL.Path)
-	}
 	start := time.Now()
 	resp, err := t.base.RoundTrip(r)
 	t.logResult(r, resp, err, time.Since(start))
@@ -170,12 +167,23 @@ func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-// logResult logs failed CLI calls at Info; success is silent.
+// logResult logs failed CLI calls at Info; success is silent and allocation-free.
 // The CLI proxy almost always returns HTTP 200 - the real status is in X-Cpcli-Backend-Status
 // Both transport status and that header are checked.
 // The body carries the CLI server's human-readable error, which upjet's newTFError swallows.
 func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error, d time.Duration) {
 	if t.log == nil {
+		return
+	}
+	// Backend status wins when present: it's the real result behind the 200 proxy.
+	status := 0
+	if resp != nil {
+		status = resp.StatusCode
+		if b, e := strconv.Atoi(resp.Header.Get(headerCLIBackendStatus)); e == nil {
+			status = b
+		}
+	}
+	if err == nil && status < 400 {
 		return
 	}
 	kv := []interface{}{
@@ -185,22 +193,15 @@ func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error
 		"durationMs", d.Milliseconds(),
 	}
 	if err != nil {
-		t.log.Info("cli request failed", append(kv, "error", err.Error())...)
-		return
+		kv = append(kv, "error", err.Error())
+	} else {
+		kv = append(kv,
+			"status", status,
+			"httpStatus", resp.StatusCode,
+			"correlationID", resp.Header.Get(headerCorrelationID),
+			"body", peekBody(resp))
 	}
-	// Backend status wins when present: it's the real result behind the 200 proxy.
-	status := resp.StatusCode
-	if b, e := strconv.Atoi(resp.Header.Get(headerCLIBackendStatus)); e == nil {
-		status = b
-	}
-	if status >= 400 {
-		t.log.Info("cli request failed",
-			append(kv,
-				"status", status,
-				"httpStatus", resp.StatusCode,
-				"correlationID", resp.Header.Get(headerCorrelationID),
-				"body", peekBody(resp))...)
-	}
+	t.log.Info("cli request failed", kv...)
 }
 
 // peekBody reads up to 1KiB for logging then restores the stream. The 500 body is the
