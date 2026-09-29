@@ -1,7 +1,7 @@
 package tfclient
 
 import (
-	"bytes"
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -204,16 +204,24 @@ func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error
 	t.log.Info("cli request failed", kv...)
 }
 
-// peekBody reads up to 1KiB for logging then restores the stream. The 500 body is the
-// human-readable CLI error
+// peekBody reads up to 1KiB for logging without consuming the stream, so
+// downstream still gets the full body. The 500 body is the human-readable CLI error.
 func peekBody(resp *http.Response) string {
 	if resp.Body == nil {
 		return ""
 	}
 	const max = 1 << 10
-	buf, _ := io.ReadAll(io.LimitReader(resp.Body, max))
-	rest, _ := io.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	resp.Body = io.NopCloser(bytes.NewReader(append(buf, rest...)))
-	return string(buf)
+	br := bufio.NewReaderSize(resp.Body, max)
+	resp.Body = &peekedBody{Reader: br, body: resp.Body}
+	peeked, _ := br.Peek(max) // short read (EOF) is fine: we log what we got
+	return string(peeked)
 }
+
+// peekedBody serves the buffered+unread bytes via the bufio.Reader while
+// delegating Close to the original body.
+type peekedBody struct {
+	io.Reader
+	body io.Closer
+}
+
+func (b *peekedBody) Close() error { return b.body.Close() }
