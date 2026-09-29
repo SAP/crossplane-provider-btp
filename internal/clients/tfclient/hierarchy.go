@@ -30,6 +30,9 @@ const (
 	hierarchyCallTTL     = 90 * time.Second
 	hierarchyCallTimeout = 10 * time.Second
 	maxCommandBodyBytes  = 1 << 20
+	// Far above the ttl the entries are used for; bounds the map of subaccounts
+	// without a goroutine.
+	hierarchyEntryMaxIdle = 10 * time.Minute
 
 	// No resource reads backend status 500 as not found, forbidden or rate limited.
 	notLoadedBackendStatus = "500"
@@ -52,10 +55,12 @@ func SetFailFastOnUnloadedSubaccount(enabled bool) { failFastEnabled = enabled }
 type hierarchyLoader struct {
 	ttl     time.Duration
 	timeout time.Duration
+	maxIdle time.Duration
 	now     func() time.Time // replaced in tests
 
-	mu      sync.Mutex
-	entries map[string]*hierarchyEntry
+	mu       sync.Mutex
+	entries  map[string]*hierarchyEntry
+	prunedAt time.Time
 }
 
 // hierarchyEntry is guarded by hierarchyLoader.mu, which is never held across a
@@ -83,6 +88,7 @@ func newHierarchyLoader() *hierarchyLoader {
 	return &hierarchyLoader{
 		ttl:     hierarchyCallTTL,
 		timeout: hierarchyCallTimeout,
+		maxIdle: hierarchyEntryMaxIdle,
 		now:     time.Now,
 		entries: map[string]*hierarchyEntry{},
 	}
@@ -138,10 +144,27 @@ func (l *hierarchyLoader) parse(r *http.Request) *cliCommand {
 func (l *hierarchyLoader) entryLocked(key string) *hierarchyEntry {
 	e, ok := l.entries[key]
 	if !ok {
+		l.pruneLocked()
 		e = &hierarchyEntry{}
 		l.entries[key] = e
 	}
 	return e
+}
+
+// pruneLocked must be called with l.mu held.
+func (l *hierarchyLoader) pruneLocked() {
+	now := l.now()
+	if l.maxIdle <= 0 || now.Sub(l.prunedAt) < l.maxIdle {
+		return
+	}
+	l.prunedAt = now
+	limit := now.Add(-l.maxIdle)
+	for k, e := range l.entries {
+		// An entry with a call in flight is still referenced by ensureLoaded.
+		if e.flight == nil && e.loadedAt.Before(limit) && e.servedAt.Before(limit) {
+			delete(l.entries, k)
+		}
+	}
 }
 
 // forget drops a remembered call that a bare 500 at `sent` has disproved, so the

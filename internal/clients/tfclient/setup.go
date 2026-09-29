@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+	"time"
 
 	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
@@ -42,15 +43,31 @@ const (
 // an http.Client so cliTransport can drop a cached session on a 401.
 var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
 	cp := &cachingProvider{entries: map[string]*cacheEntry{}}
+	cp.Provider = tfprovider.NewWithClient(frameworkHTTPClient(cp))
+	return cp
+})
+
+// frameworkHTTPClient is split from frameworkProvider so a test can check the
+// client that btpcli really gets, not only newCLIHTTPClient.
+func frameworkHTTPClient(cp *cachingProvider) *http.Client {
 	base := http.DefaultTransport
 	if btp.IsDebug() {
 		base = btp.DebugPrintHTTPClient().Transport
 	}
 	log := logging.NewLogrLogger(zap.New(zap.UseDevMode(btp.IsDebug())).WithName("crossplane-provider-btp-cli"))
-	hc := &http.Client{Transport: newCLITransport(cp, base, log, hierarchyCallEnabled, failFastEnabled)}
-	cp.Provider = tfprovider.NewWithClient(hc)
-	return cp
-})
+	return newCLIHTTPClient(newCLITransport(cp, base, log, hierarchyCallEnabled, failFastEnabled))
+}
+
+// cliRequestTimeout bounds one btpcli attempt, both hierarchy calls of the
+// attempt included, so it must exceed 2*hierarchyCallTimeout. It stays below the
+// default reconcile deadline of one minute so a hung attempt ends with a named
+// cause instead of holding the session mutex until the context ends; btpcli
+// retries the timeout like any transport error.
+const cliRequestTimeout = 30 * time.Second
+
+func newCLIHTTPClient(rt http.RoundTripper) *http.Client {
+	return &http.Client{Transport: rt, Timeout: cliRequestTimeout}
+}
 
 func newCLITransport(cp *cachingProvider, base http.RoundTripper, log logging.Logger, hierarchyCall, failFast bool) *cliTransport {
 	t := &cliTransport{
