@@ -1,0 +1,18 @@
+# v1alpha1 ServiceManager with no planName. v1alpha1 has no planName field, so
+# the plan resolves from the runtime DefaultPlanName: service-operator-access
+# under v1.13.0, subaccount-admin under v2 (#925). The instance is created on the
+# old plan and must keep it across the upgrade - the service plan is immutable in
+# BTP, so an in-place plan update calls update_instance and BTP rejects it with
+# "update_instance is not supported" (#941).
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceManager
+metadata:
+  name: upgrade-test-planflip-sm
+  namespace: default
+spec:
+  writeConnectionSecretToRef:
+    name: upgrade-test-planflip-sm
+    namespace: default
+  forProvider:
+    subaccountRef:
+      name: upgrade-test-planflip-sm-sa

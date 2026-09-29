@@ -21,6 +21,13 @@ import (
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	controllerName := managed.ControllerName(apisv1beta1.ServiceManagerKind)
 	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(controllerName)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
+
+	// Built once at setup, not per reconcile. Each connector owns an
+	// OperationTrackerStore that is never evicted: no managed.WithFinalizer hook
+	// here, and synthesized sub-resource UIDs miss upjet's parent-keyed finalizer.
+	instanceConnector := tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil)
+	bindingConnector := tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil)
+
 	// ADR(external-name): the default initializer must not run. It would stamp
 	// metadata.name into crossplane.io/external-name before the first Observe(),
 	// destroying the signal to adopt an existing service manager.
@@ -50,8 +57,8 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 
 				newClientInitalizerFn: func() servicemanager.ITfClientInitializer {
 					return servicemanager.NewServiceManagerTfClient(
-						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil),
-						tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil),
+						instanceConnector,
+						bindingConnector,
 
 						servicemanager.Defaults{
 							InstanceName: apisv1beta1.DefaultServiceInstanceName,

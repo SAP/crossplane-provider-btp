@@ -213,7 +213,7 @@ Else, if we have an error in our request, return with error.
 
 Comments in this format should be on top of the CRDs which will support external name.
 Script (see below) will use it for the docs generation.
-And append the file [docs/end-user-guides/import-landscape/external-name.md](/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/external-name)
+And append the file [docs/end-user-guides/import-landscape/external-name.md](../end-user-guides/import-landscape/external-name.md)
 
 ```go
 //

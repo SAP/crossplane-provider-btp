@@ -20,6 +20,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 
@@ -221,4 +222,25 @@ func LoadSecretData(ctx context.Context, kube client.Client, secretName string, 
 func IsValidUUID(s string) bool {
 	err := uuid.Validate(s)
 	return err == nil
+}
+
+// LookupSecrets retrieves JSON data from a list of SecretKeySelectors and merges them into a single map.
+func LookupSecrets(ctx context.Context, kube client.Client, selectors []xpv1.SecretKeySelector) (map[string]interface{}, error) {
+	combined := make(map[string]interface{})
+	for _, sel := range selectors {
+		secret := &corev1.Secret{}
+		if err := kube.Get(ctx, types.NamespacedName{Namespace: sel.Namespace, Name: sel.Name}, secret); err != nil {
+			return nil, err
+		}
+		val, ok := secret.Data[sel.Key]
+		if !ok {
+			return nil, fmt.Errorf("key %q not found in secret %s/%s", sel.Key, sel.Namespace, sel.Name)
+		}
+		var data map[string]interface{}
+		if err := json.Unmarshal(val, &data); err != nil {
+			return nil, err
+		}
+		CopyMaps(combined, data)
+	}
+	return combined, nil
 }

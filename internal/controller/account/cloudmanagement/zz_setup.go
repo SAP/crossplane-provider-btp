@@ -25,6 +25,13 @@ import (
 func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 	name := managed.ControllerName(apisv1beta1.CloudManagementKind)
 	recorder := event.NewAPIRecorder(mgr.GetEventRecorderFor(name)) //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
+
+	// Built once at setup, not per reconcile. Each connector owns an
+	// OperationTrackerStore that is never evicted: no managed.WithFinalizer hook
+	// here, and synthesized sub-resource UIDs miss upjet's parent-keyed finalizer.
+	instanceConnector := tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil)
+	bindingConnector := tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil)
+
 	return providerconfig.DefaultSetupWithoutDefaultInitializer(mgr, o, &apisv1beta1.CloudManagement{}, apisv1beta1.CloudManagementKind, apisv1beta1.CloudManagementGroupVersionKind, func(kube client.Client, usage providerconfig.LegacyTracker, resourcetracker tracking.ReferenceResolverTracker) managed.ExternalConnector {
 		return &connector{
 			kube:                kube,
@@ -34,8 +41,8 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 
 			newClientInitalizerFn: func() cmClient.ITfClientInitializer {
 				return cmClient.NewTfClient(
-					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_instance", apisv1alpha1.SubaccountServiceInstance_GroupVersionKind, false, nil),
-					tfclient.NewInternalTfConnector(mgr.GetClient(), "btp_subaccount_service_binding", apisv1alpha1.SubaccountServiceBinding_GroupVersionKind, false, nil),
+					instanceConnector,
+					bindingConnector,
 				)
 			},
 

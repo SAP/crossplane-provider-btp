@@ -82,6 +82,16 @@ func (s *ServiceInstanceMapper) TfResource(ctx context.Context, si *v1alpha1.Ser
 		sInstance.Spec.ForProvider.ServiceplanID = &si.Status.AtProvider.ServiceplanID
 	}
 
+	timeout := "60m"
+	if si.Spec.ForProvider.OperationTimeout != nil {
+		timeout = *si.Spec.ForProvider.OperationTimeout
+	}
+	sInstance.Spec.ForProvider.Timeouts = &v1alpha1.TimeoutsParameters{
+		Create: &timeout,
+		Update: &timeout,
+		Delete: &timeout,
+	}
+
 	// in order for the tf reconciler to properly work we need to mimic the ready condition as well
 	sInstance.SetConditions(shadowReadyCondition(si))
 
@@ -138,6 +148,10 @@ func BuildComplexParameterJson(ctx context.Context, kube client.Client, secretRe
 	return parameterJson, nil
 }
 
+// TfNamePrefix prevents mapped Terraform resource names from starting with
+// a digit. Callbacks strip it to locate the native ServiceInstance.
+const TfNamePrefix = tfclient.ShadowNamePrefix
+
 func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServiceInstance {
 	sInstance := &v1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{
@@ -151,7 +165,7 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 			// tfclient.StripShadowPrefix to find the ServiceInstance this
 			// shadow belongs to — use the constant on both ends so they cannot
 			// drift apart.
-			Name: tfclient.ShadowNamePrefix + si.Name,
+			Name: TfNamePrefix + si.Name,
 			// make sure no naming conflicts are there for upjet tmp folder creation
 			UID:               si.UID + "-service-instance",
 			DeletionTimestamp: si.DeletionTimestamp,

@@ -1,0 +1,21 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: SubaccountDestination
+metadata:
+  name: e2e-dest-$BUILD_ID
+  namespace: default
+spec:
+  providerConfigRef:
+    name: default
+  forProvider:
+    name: e2e-dest-$BUILD_ID
+    type: HTTP
+    additionalProperties:
+      Authentication: NoAuthentication
+      URL: https://example.com
+      ProxyType: Internet
+    subaccountRef:
+      name: e2e-dest-subaccount
+    destinationServiceBindingSecretRef:
+      name: e2e-destination-binding-secret
+      namespace: crossplane-system
+      key: credentials

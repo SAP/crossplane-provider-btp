@@ -397,7 +397,7 @@ func TestSyncStatus(t *testing.T) {
 				mockClient: MockDirClient{GetErr: errors.New("apiError")},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -407,7 +407,7 @@ func TestSyncStatus(t *testing.T) {
 			want: want{
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -420,7 +420,7 @@ func TestSyncStatus(t *testing.T) {
 			args: args{
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -436,7 +436,7 @@ func TestSyncStatus(t *testing.T) {
 			want: want{
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -488,7 +488,7 @@ func TestCreateDirectory(t *testing.T) {
 				mockClient: MockDirClient{CreateErr: errors.New("InternalServerError")},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -498,7 +498,7 @@ func TestCreateDirectory(t *testing.T) {
 				err: errors.New("InternalServerError"),
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -515,7 +515,7 @@ func TestCreateDirectory(t *testing.T) {
 				},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -524,7 +524,7 @@ func TestCreateDirectory(t *testing.T) {
 			want: want{
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -573,7 +573,7 @@ func TestUpdateDirectory(t *testing.T) {
 			args: args{
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -583,7 +583,7 @@ func TestUpdateDirectory(t *testing.T) {
 				err: errors.New(errMisUse),
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -596,7 +596,7 @@ func TestUpdateDirectory(t *testing.T) {
 				mockClient: MockDirClient{UpdateErr: errors.New("internalServerError")},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -606,7 +606,7 @@ func TestUpdateDirectory(t *testing.T) {
 				err: errors.New("internalServerError"),
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -619,7 +619,7 @@ func TestUpdateDirectory(t *testing.T) {
 				mockClient: MockDirClient{UpdateErr: nil, UpdateSettingsErr: errors.New("updateSettingsInternalServerError")},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT", "ENTITLEMENTS"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -629,7 +629,7 @@ func TestUpdateDirectory(t *testing.T) {
 				err: errors.New("updateSettingsInternalServerError"),
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT", "ENTITLEMENTS"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -642,7 +642,7 @@ func TestUpdateDirectory(t *testing.T) {
 				mockClient: MockDirClient{UpdateErr: nil, UpdateSettingsErr: nil},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT", "ENTITLEMENTS"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -651,7 +651,7 @@ func TestUpdateDirectory(t *testing.T) {
 			want: want{
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT", "ENTITLEMENTS"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -698,7 +698,7 @@ func TestDeleteDirectory(t *testing.T) {
 			args: args{
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -714,7 +714,7 @@ func TestDeleteDirectory(t *testing.T) {
 				mockClient: MockDirClient{DeleteErr: errors.New("InternalServerError")},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -745,7 +745,7 @@ func TestDeleteDirectory(t *testing.T) {
 				},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr("Some Directory"),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -795,7 +795,7 @@ func TestDirectoryPayload(t *testing.T) {
 				},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr(""),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -804,7 +804,7 @@ func TestDirectoryPayload(t *testing.T) {
 			want: want{
 				create: accountclient.CreateDirectoryRequestPayload{
 					Description:       internal.Ptr(""),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       "created-from-unittest",
 					Labels:            &map[string][]string{"custom_label": {"custom_value"}},
@@ -816,7 +816,7 @@ func TestDirectoryPayload(t *testing.T) {
 				},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       internal.Ptr(""),
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -833,7 +833,7 @@ func TestDirectoryPayload(t *testing.T) {
 				},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       nil,
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},
@@ -842,7 +842,7 @@ func TestDirectoryPayload(t *testing.T) {
 			want: want{
 				create: accountclient.CreateDirectoryRequestPayload{
 					Description:       nil,
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       "created-from-unittest",
 					Labels:            &map[string][]string{"custom_label": {"custom_value"}},
@@ -854,7 +854,7 @@ func TestDirectoryPayload(t *testing.T) {
 				},
 				cr: testutils.NewDirectory("unittest-client", testutils.WithData(v1alpha1.DirectoryParameters{
 					Description:       nil,
-					DirectoryAdmins:   []string{"1@sap.com"},
+					DirectoryAdmins:   []string{"1@example.com"},
 					DirectoryFeatures: []string{"DEFAULT"},
 					DisplayName:       internal.Ptr("created-from-unittest"),
 					Labels:            map[string][]string{"custom_label": {"custom_value"}},

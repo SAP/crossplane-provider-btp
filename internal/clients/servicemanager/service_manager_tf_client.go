@@ -24,6 +24,9 @@ type ResourcesStatus struct {
 	managed.ExternalObservation
 	InstanceID string
 	BindingID  string
+	// ObservedPlanID is the live instance's serviceplan_id, used to self-heal a
+	// stale plan ID in status. Workaround for #941; empty when not observed.
+	ObservedPlanID string
 }
 
 // ITfClientInitializer will produce the ITfClient used by external
@@ -272,15 +275,32 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 			ResourceUpToDate:  resourceUpToDate,
 			ConnectionDetails: conDetails,
 		},
-		InstanceID: meta.GetExternalName(tf.sInstance),
-		BindingID:  meta.GetExternalName(tf.sBinding),
+		InstanceID:     meta.GetExternalName(tf.sInstance),
+		BindingID:      meta.GetExternalName(tf.sBinding),
+		ObservedPlanID: internal.Val(tf.sInstance.Status.AtProvider.ServiceplanID),
 	}, nil
 }
 
-// ResourcesUpToDate runs another observe on instance and returns whether they are up to date, currently updates on bindings are not supported
+// resourcesUpToDate runs another observe on the instance and returns whether it
+// is up to date. Binding updates are not supported.
 func (tf *TfClient) resourcesUpToDate(ctx context.Context) bool {
 	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
-	return err != nil || siObs.ResourceUpToDate
+	if err != nil {
+		return true
+	}
+	if siObs.ResourceUpToDate {
+		return true
+	}
+
+	// Workaround for #941: the service plan is immutable in BTP, so an in-place
+	// update on a plan-only diff calls update_instance, which BTP rejects. That
+	// diff only arises for an upgraded v1alpha1 SM whose status lost
+	// dataSourceLookup and re-resolved the flipped default plan (#925). Report
+	// up-to-date so no Update fires. For v1beta1 the plan is pinned by the CRD, so
+	// desired == observed and this is a no-op.
+	desiredPlan := internal.Val(tf.sInstance.Spec.ForProvider.ServiceplanID)
+	observedPlan := internal.Val(tf.sInstance.Status.AtProvider.ServiceplanID)
+	return desiredPlan != observedPlan
 }
 
 func (tf *TfClient) createInstance(ctx context.Context) (string, error) {

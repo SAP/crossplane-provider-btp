@@ -27,6 +27,10 @@
       "groupName": "release/v1_10_x dependencies"
     },
     {
+      "groupName": "terraform-provider-btp",
+      "matchPackageNames": ["SAP/btp", "github.com/SAP/terraform-provider-btp"]
+    },
+    {
       "groupName": "other dependencies",
       "matchManagers": ["gomod"],
       "matchUpdateTypes": ["minor", "patch", "digest", "pin"]

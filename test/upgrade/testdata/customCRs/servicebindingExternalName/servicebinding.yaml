@@ -1,0 +1,15 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceBinding
+metadata:
+  name: upgrade-test-extn-sb
+  namespace: default
+spec:
+  forProvider:
+    name: upgrade-test-extn-sb
+    serviceInstanceRef:
+      name: upgrade-test-extn-sb-si
+    subaccountRef:
+      name: upgrade-test-extn-sb-sa
+  writeConnectionSecretToRef:
+    name: upgrade-test-extn-sb
+    namespace: default

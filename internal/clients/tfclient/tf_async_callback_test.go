@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
+	"github.com/pkg/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	runtimeobj "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -349,5 +350,17 @@ func TestStripShadowPrefix(t *testing.T) {
 				t.Errorf("StripShadowPrefix(...) mismatch (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestAPICallbacks_ReturnsSaveError(t *testing.T) {
+	boom := errors.New("cannot write status")
+	ac := NewAPICallbacks(nil, func(context.Context, client.Client, types.NamespacedName, ...xpv1.Condition) error {
+		return boom
+	})
+
+	err := ac.Destroy(types.NamespacedName{Name: "TF-test-instance"}, false)(errors.New("async delete failed"), context.Background())
+	if !errors.Is(err, boom) {
+		t.Errorf("expected the save error to be returned, got %v", err)
 	}
 }

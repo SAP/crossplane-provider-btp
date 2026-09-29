@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.22.0
   name: cloudfoundryenvironments.environment.btp.sap.crossplane.io
 spec:
   group: environment.btp.sap.crossplane.io
@@ -168,7 +168,7 @@ spec:
                   initialOrgManagers:
                     description: |-
                       A list of users to assign as the Org Manager role.
-                      Each entry is either a plain email address (uses "sap.ids" as origin) or "email|origin" to specify a custom identity provider (e.g. "user@company.com|custom.idp").
+                      Each entry is either a plain email address (uses "sap.ids" as origin) or "email|origin" to specify a custom identity provider (e.g. "user@example.com|custom.idp").
                       The technical user referenced in the ProviderConfig is automatically added as Org Manager and can be omitted from this list (see https://help.sap.com/docs/btp/sap-business-technology-platform/about-roles-in-cloud-foundry-environment).
                       Cannot be updated after creation --> initial creation only
                     items:

@@ -180,6 +180,15 @@ type ServiceBindingStatus struct {
 // +kubebuilder:object:root=true
 
 // A ServiceBinding allows to manage a binding to a service instance in BTP
+//
+// External-Name Configuration:
+//   - Follows Standard: yes
+//   - Format: ServiceBinding GUID (UUID format)
+//   - Note: spec.forProvider.serviceInstanceID (or its ref/selector) must be set for adoption to work
+//   - How to find:
+//   - UI: the cockpit shows only the binding name, not its GUID; use the CLI
+//   - CLI: btp list services/binding --subaccount `<subaccount-guid>` (field: id)
+//
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="EXTERNAL-NAME",type="string",JSONPath=".metadata.annotations.crossplane\\.io/external-name"

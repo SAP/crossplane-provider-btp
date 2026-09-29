@@ -33,7 +33,7 @@ jobs:
     environment: pr-e2e-approval
     env:
       # hardcoded BTP CLI version
-      btp_cli_version: 2.90.2
+      btp_cli_version: 2.116.2
     steps:
       - name: Set TARGET_IMAGE_VERSION
         run: |
@@ -54,7 +54,7 @@ jobs:
           ref: ${{ inputs.checkout-ref }}
           submodules: true
 
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - run: go version
@@ -91,7 +91,7 @@ jobs:
           GLOBAL_ACCOUNT: ${{ secrets.GLOBAL_ACCOUNT }}
           TECHNICAL_USER_EMAIL: ${{ secrets.TECHNICAL_USER_EMAIL }}
           SECOND_DIRECTORY_ADMIN_EMAIL: ${{ secrets.SECOND_DIRECTORY_ADMIN_EMAIL }}
-          IDP_URL: ${{ secrets.SECOND_IDP_URL }} # Use a different IDP for the upgrade tests to avoid conflicts
+          IDP_URL: ${{ secrets.IDP_URL }} # Primary IDP: SECOND_IDP_URL is not a registered IAS host, so subaccount trust config creation 404s against it
           UPGRADE_TEST_FROM_TAG: ${{ github.event.inputs.source }}
           UPGRADE_TEST_TO_TAG: ${{ env.TARGET_IMAGE_VERSION }}
 

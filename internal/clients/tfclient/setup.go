@@ -3,12 +3,17 @@ package tfclient
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"sync"
 
+	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
 	"github.com/crossplane/upjet/v2/pkg/controller/handler"
 	"github.com/crossplane/upjet/v2/pkg/terraform"
+	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -31,30 +36,26 @@ const (
 	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
 )
 
-var (
-	// TF_VERSION_CALLBACK is a function callback to allow retrieval of Terraform env versions, its suppose to be set in
-	// the main method to the params being passed when starting the controller
-	// unfortunately, the way controllers are generically being initialized there is no other way to pass that downstream properly
-	TF_VERSION_CALLBACK = func() TfEnvVersion {
-		return TfEnvVersion{
-			// should reset from within main, these are just tested defaults
-			Version:         "1.3.9",
-			Providerversion: "1.0.0-rc1",
-			ProviderSource:  "SAP/btp",
-		}
+// frameworkProvider returns the BTP plugin-framework provider for upjet's no-fork
+// client. Lazy because btp.SetDebug() runs in main(), after init. It always
+// injects an http.Client so evictTransport can drop a cached session on a 401.
+var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
+	cp := &cachingProvider{entries: map[string]*cacheEntry{}}
+	base := http.DefaultTransport
+	if btp.IsDebug() {
+		base = btp.DebugPrintHTTPClient().Transport
 	}
-)
+	hc := &http.Client{Transport: &evictTransport{base: base, evictSub: cp.evictBySubdomain, evictAll: cp.evictAll}}
+	cp.Provider = tfprovider.NewWithClient(hc)
+	return cp
+})
 
-// TerraformSetupBuilder builds Terraform a terraform.SetupFn function which
-// returns Terraform provider setup configuration
-func TerraformSetupBuilder(version, providerSource, providerVersion string) terraform.SetupFn {
+// TerraformSetupBuilder builds a terraform.SetupFn for the generated upjet
+// controllers: it resolves the ProviderConfig and tracks its usage.
+func TerraformSetupBuilder() terraform.SetupFn {
 	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
 		ps := terraform.Setup{
-			Version: version,
-			Requirement: terraform.ProviderRequirement{
-				Source:  providerSource,
-				Version: providerVersion,
-			},
+			FrameworkProvider: frameworkProvider(),
 		}
 
 		lm, ok := mg.(providerconfig.LegacyManaged)
@@ -118,14 +119,13 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 	}
 }
 
-func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion string) terraform.SetupFn {
+// TerraformSetupBuilderNoTracking is the setup builder for the hybrid internal
+// connectors; it skips usage tracking because the outer native controller
+// already tracks the user-facing CR.
+func TerraformSetupBuilderNoTracking() terraform.SetupFn {
 	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
 		ps := terraform.Setup{
-			Version: version,
-			Requirement: terraform.ProviderRequirement{
-				Source:  providerSource,
-				Version: providerVersion,
-			},
+			FrameworkProvider: frameworkProvider(),
 		}
 
 		lm, ok := mg.(providerconfig.LegacyManaged)
@@ -172,42 +172,24 @@ func TerraformSetupBuilderNoTracking(version, providerSource, providerVersion st
 	}
 }
 
-// NewInternalTfConnector creates a new internal Terraform connector, it does not have a callback handler, since those won't be managed by the controller manager
-func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) *tjcontroller.Connector {
-	tfVersion := TF_VERSION_CALLBACK()
-	zl := zap.New(zap.UseDevMode(tfVersion.DebugLogs))
-	setupFn := TerraformSetupBuilderNoTracking(tfVersion.Version, tfVersion.ProviderSource, tfVersion.Providerversion)
+// NewInternalTfConnector creates the internal Terraform connector for
+// resourceName. callbackProvider may be nil where async completion is not
+// routed back to a CR.
+func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) managed.ExternalConnector {
+	zl := zap.New(zap.UseDevMode(btp.IsDebug()))
+	setupFn := TerraformSetupBuilderNoTracking()
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
-	// Identity-injecting Store wraps upjet's WorkspaceStore so that every
-	// Workspace() call patches an `identity` block into the on-disk
-	// terraform.tfstate, satisfying plugin-framework's post-Read identity
-	// check (issue #521). The earlier afero.Fs middleware approach was
-	// inert — upjet's WithFs doesn't propagate to FileProducer, see
-	// identity_injector.go header. Remove the wrap when no-fork (PR #680 /
-	// issue #207) lands.
-	ws := terraform.NewWorkspaceStore(log)
-	store := NewIdentityInjectingStore(ws, log)
-	provider := config.GetProvider()
-	eventHandler := handler.NewEventHandler(handler.WithLogger(log.WithValues("gvk", gvk)))
+	res := config.GetProvider().Resources[resourceName]
 
-	// depending on the context we might need resources that are async or not
-	res := provider.Resources[resourceName]
-	res.UseAsync = useAsync
-
-	connector := tjcontroller.NewConnector(client, store, setupFn,
-		res,
-		tjcontroller.WithLogger(log),
-		tjcontroller.WithConnectorEventHandler(eventHandler),
-		tjcontroller.WithCallbackProvider(callbackProvider),
+	if useAsync {
+		eventHandler := handler.NewEventHandler(handler.WithLogger(log.WithValues("gvk", gvk)))
+		return tjcontroller.NewTerraformPluginFrameworkAsyncConnector(client, tjcontroller.NewOperationStore(log), setupFn, res,
+			tjcontroller.WithTerraformPluginFrameworkAsyncLogger(log),
+			tjcontroller.WithTerraformPluginFrameworkAsyncConnectorEventHandler(eventHandler),
+			tjcontroller.WithTerraformPluginFrameworkAsyncCallbackProvider(callbackProvider),
+		)
+	}
+	return tjcontroller.NewTerraformPluginFrameworkConnector(client, setupFn, res, tjcontroller.NewOperationStore(log),
+		tjcontroller.WithTerraformPluginFrameworkLogger(log),
 	)
-
-	return connector
-}
-
-type TfEnvVersion struct {
-	Version         string
-	Providerversion string
-	ProviderSource  string
-
-	DebugLogs bool
 }

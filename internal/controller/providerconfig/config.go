@@ -22,16 +22,16 @@ import (
 )
 
 const (
-	errGetPC              = "cannot get ProviderConfig"
-	errGetCISCreds        = "cannot get CIS credentials"
-	errGetSACreds         = "cannot get Service Account credentials"
-	errTrackRUsage        = "cannot track ResourceUsage"
-	errTrackPCUsage       = "cannot track ProviderConfig usage"
-	errNewClient          = "cannot create new Service"
-	errCisSecretEmpty     = "CIS Secret is empty or nil, please check config & secrets referenced in provider config"
-	errSaSecretEmpty      = "Service Account Secret is empty or nil, please check config & secrets referenced in provider config"
-	errSecretKeyNotFound  = "%s: %v key not found in secret data"
-	errCisSecretCorrupted = "CIS Secret does not match expected format"
+	errGetPC                   = "cannot get ProviderConfig"
+	errGetCISCreds             = "cannot get CIS credentials"
+	errGetSACreds              = "cannot get Service Account credentials"
+	errTrackRUsage             = "cannot track ResourceUsage"
+	errTrackPCUsage            = "cannot track ProviderConfig usage"
+	errNewClient               = "cannot create new Service"
+	errCisSecretEmpty          = "CIS Secret is empty or nil, please check config & secrets referenced in provider config"
+	errSaSecretEmpty           = "Service Account Secret is empty or nil, please check config & secrets referenced in provider config"
+	errSecretKeyNotFound       = "%s: %v key not found in secret data"
+	errCisSecretCorrupted      = "CIS Secret does not match expected format"
 )
 
 // Setup adds a controller that reconciles ProviderConfigs by accounting for

@@ -1,0 +1,248 @@
+---
+sidebar_position: 2
+title: Manage destinations
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Manage destinations
+
+This guide shows how to manage [SAP BTP destinations](https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/managing-destinations?locale=en-US&version=LATEST) and their client certificates in code, using the `SubaccountDestination` and `SubaccountDestinationCertificate` custom resources. Destinations let applications in your subaccount reach external systems (HTTP, RFC, Mail, LDAP), and destination certificates provide the client certificates some of those connections need.
+
+Both resources talk to the [Destination Service](https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150?locale=en-US&version=LATEST), so before you can create either one you need a Destination service instance and a binding that hands over the OAuth2 credentials.
+
+## 🚧 Prerequisites
+
+- You've created a running control plane.
+- You've [configured the BTP provider](../setup/configure-provider-btp.mdx).
+- You've [created and set up a subaccount managed in code](./subaccount.mdx).
+- You're connected to your control plane.
+
+## Set up the Destination service
+
+Both `SubaccountDestination` and `SubaccountDestinationCertificate` authenticate against the Destination Service using OAuth2 credentials taken from a `Secret`. The recommended way to produce that secret is to create a Destination service instance and bind to it — the `ServiceBinding` writes the credentials into a `Secret` you then reference from your destination resources.
+
+### Create an `Entitlement`
+
+Entitle the `destination` service to your subaccount.
+
+1. Save the following YAML content to `destination-entitlement.yaml`:
+
+    ```yaml title="destination-entitlement.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: Entitlement
+    metadata:
+      name: destination-entitlement
+    spec:
+      forProvider:
+        serviceName: destination
+        servicePlanName: lite
+        enable: true
+        subaccountRef:
+          name: my-subaccount
+      providerConfigRef:
+        name: account-provider-config
+    ```
+
+2. Apply `destination-entitlement.yaml` to your control plane:
+
+    ```sh title="Run in terminal"
+    kubectl create -f destination-entitlement.yaml
+    ```
+
+### Create a `ServiceInstance`
+
+Create a Destination service instance from the entitled `destination`/`lite` plan.
+
+1. Save the following YAML content to `destination-instance.yaml`:
+
+    ```yaml title="destination-instance.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: ServiceInstance
+    metadata:
+      name: destination-instance
+    spec:
+      forProvider:
+        name: destination-instance
+        serviceManagerRef:
+          name: my-subaccount-service-manager
+        subaccountRef:
+          name: my-subaccount
+        offeringName: destination
+        planName: lite
+      providerConfigRef:
+        name: account-provider-config
+    ```
+
+    <button onClick={() => window.open("https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceInstance/v1alpha1@v2.1.0", "_blank")} className='button button--secondary'>See full CRD reference</button>
+
+2. Apply `destination-instance.yaml` to your control plane:
+
+    ```sh title="Run in terminal"
+    kubectl create -f destination-instance.yaml
+    ```
+
+### Create a `ServiceBinding`
+
+Bind to the instance to obtain the OAuth2 credentials. The binding writes them to the `Secret` named in `spec.writeConnectionSecretToRef`. Setting `spec.forProvider.secretKey` bundles the credentials into a single JSON key (here `credentials`), which is the format the destination resources read most cleanly.
+
+1. Save the following YAML content to `destination-binding.yaml`:
+
+    ```yaml title="destination-binding.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: ServiceBinding
+    metadata:
+      name: destination-binding
+    spec:
+      forProvider:
+        name: destination-binding
+        secretKey: credentials
+        serviceInstanceRef:
+          name: destination-instance
+        subaccountRef:
+          name: my-subaccount
+      writeConnectionSecretToRef:
+        name: destination-binding-secret
+        namespace: crossplane-system
+      providerConfigRef:
+        name: account-provider-config
+    ```
+
+    <button onClick={() => window.open("https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/ServiceBinding/v1alpha1@v2.1.0", "_blank")} className='button button--secondary'>See full CRD reference</button>
+
+2. Apply `destination-binding.yaml` to your control plane:
+
+    ```sh title="Run in terminal"
+    kubectl create -f destination-binding.yaml
+    ```
+
+Once the binding is ready, the `destination-binding-secret` `Secret` holds the credentials your destination resources will reference through `spec.forProvider.destinationServiceBindingSecretRef`.
+
+:::info
+The `destinationServiceBindingSecretRef` accepts two secret shapes:
+
+- **Single JSON key** — set `key` (e.g. `credentials`), the format produced above when the `ServiceBinding` sets `secretKey`.
+- **Flat keys** — leave `key` empty, and the secret must carry the individual keys `clientid`, `clientsecret`, `tokenurl` (or `token_url`), and `uri` (or `url`), the format produced when the `ServiceBinding` sets no `secretKey`.
+:::
+
+## Create a `SubaccountDestination`
+
+A destination stores the connection details an application uses to reach an external system. With the `SubaccountDestination` custom resource you can manage one in code. Destination-specific fields such as `URL`, `Authentication`, and `ProxyType` go into `spec.forProvider.additionalProperties` and are passed to the Destination Service as-is — see the [supported properties](https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/destination-service-rest-api-23ccafbea18f4b65919a2799f2cd20e6-150?locale=en-US&version=LATEST) for the full list.
+
+1. Save the following YAML content to `my-destination.yaml`:
+
+    ```yaml title="my-destination.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: SubaccountDestination
+    metadata:
+      name: my-destination
+    spec:
+      forProvider:
+        name: my-destination
+        type: HTTP
+        additionalProperties:
+          URL: https://example.com
+          Authentication: NoAuthentication
+          ProxyType: Internet
+        subaccountRef:
+          name: my-subaccount
+        destinationServiceBindingSecretRef:
+          name: destination-binding-secret
+          namespace: crossplane-system
+          key: credentials
+      providerConfigRef:
+        name: account-provider-config
+    ```
+
+    :::note
+    `spec.forProvider.name` is the destination name in BTP and can't be changed after creation. `spec.forProvider.type` must be one of `HTTP`, `RFC`, `MAIL`, or `LDAP`.
+    :::
+
+    :::tip
+    For sensitive properties you don't want in the CR spec (such as credentials for `BasicAuthentication`), put them in a `Secret` and reference it through `spec.forProvider.additionalConfigurationSecretRefs` instead of `additionalProperties`. Each referenced secret value is a JSON object that gets merged into the destination's properties.
+    :::
+
+    <button onClick={() => window.open("https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/SubaccountDestination/v1alpha1@v2.1.0", "_blank")} className='button button--secondary'>See full CRD reference</button>
+
+2. Apply `my-destination.yaml` to your control plane:
+
+    ```sh title="Run in terminal"
+    kubectl create -f my-destination.yaml
+    ```
+
+That's it! Your destination is now managed in code and visible under **Connectivity → Destinations** in the SAP BTP cockpit.
+
+## Create a `SubaccountDestinationCertificate`
+
+Some destinations authenticate with a client certificate. The `SubaccountDestinationCertificate` custom resource uploads and manages such a certificate. The certificate content is supplied through a `Secret` as **base64-encoded** data, and the file extension in `spec.forProvider.name` tells BTP which format the content is in.
+
+1. Store the base64-encoded certificate content in a `Secret`. Save the following YAML content to `certificate-content-secret.yaml`:
+
+    ```yaml title="certificate-content-secret.yaml"
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: my-certificate-content
+      namespace: crossplane-system
+    type: Opaque
+    stringData:
+      content: <base64-encoded-certificate>
+    ```
+
+    :::note
+    Replace `<base64-encoded-certificate>` with your base64-encoded certificate data, for example the output of `base64 -i my-cert.pem`.
+    :::
+
+2. Save the following YAML content to `my-certificate.yaml`:
+
+    ```yaml title="my-certificate.yaml"
+    apiVersion: account.btp.sap.crossplane.io/v1alpha1
+    kind: SubaccountDestinationCertificate
+    metadata:
+      name: my-certificate
+    spec:
+      forProvider:
+        # BTP determines the certificate format from the file extension in the name.
+        name: my-certificate.pem
+        contentSecretRef:
+          name: my-certificate-content
+          namespace: crossplane-system
+          key: content
+        subaccountRef:
+          name: my-subaccount
+        destinationServiceBindingSecretRef:
+          name: destination-binding-secret
+          namespace: crossplane-system
+          key: credentials
+      providerConfigRef:
+        name: account-provider-config
+    ```
+
+    :::note
+    The extension in `spec.forProvider.name` selects the format: `.pem`, `.cer`, `.crt` for a single X.509 certificate, or `.jks`, `.pfx`, `.p12` for a key store. Key stores (`JKS`, `PFX`, `P12`) aren't supported in FIPS environments. The name is immutable after creation.
+    :::
+
+    <button onClick={() => window.open("https://doc.crds.dev/github.com/SAP/crossplane-provider-btp/account.btp.sap.crossplane.io/SubaccountDestinationCertificate/v1alpha1@v2.1.0", "_blank")} className='button button--secondary'>See full CRD reference</button>
+
+3. Apply both files to your control plane:
+
+    ```sh title="Run in terminal"
+    kubectl create -f certificate-content-secret.yaml -f my-certificate.yaml
+    ```
+
+Your certificate is now managed in code and visible under **Connectivity → Certificates** in the SAP BTP cockpit.
+
+## ⁉ FAQs
+
+### How do I adopt a destination or certificate that already exists in BTP?
+
+Both resources use a compound external-name in the form `<subaccount-id>/<name>`. Set the `crossplane.io/external-name` annotation to that value on your manifest so the provider adopts the existing object instead of creating a new one. See [External name](../import-landscape/external-name.md#subaccountdestination) for the exact format and how to find the IDs in the cockpit or via the API.
+
+### Where do the OAuth2 credentials in `destinationServiceBindingSecretRef` come from?
+
+They come from a binding to a Destination service instance — the `ServiceBinding` created in [Set up the Destination service](#set-up-the-destination-service) writes them into a `Secret`. You can also create that secret manually as long as it matches one of the two accepted formats described in the info box above.
+
+### Why doesn't my `spec.forProvider.name` change take effect?
+
+The destination and certificate names are immutable — the CRD rejects changes to `spec.forProvider.name` once the resource is created. To rename, delete the resource and create a new one with the new name.
