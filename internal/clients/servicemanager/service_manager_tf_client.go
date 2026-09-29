@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
@@ -16,6 +17,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ResourcesStatus contains a summary of the status of the tf resources managed by the ITfClient
@@ -206,7 +208,12 @@ func (tf *TfClient) CreateResources(ctx context.Context, cr *apisv1beta1.Service
 }
 
 func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.ServiceManager) (ResourcesStatus, error) {
+	logger := log.FromContext(ctx)
+	observeStart := time.Now()
+
+	t0 := time.Now()
 	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
+	logger.V(1).Info("ObserveResources: SI observe", "duration", time.Since(t0), "elapsed", time.Since(observeStart))
 	if err != nil {
 		return ResourcesStatus{}, err
 	}
@@ -248,7 +255,9 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 			ExternalObservation: managed.ExternalObservation{ResourceExists: false},
 		}, nil
 	}
+	t1 := time.Now()
 	sbObs, err := tf.sbExternal.Observe(ctx, tf.sBinding)
+	logger.V(1).Info("ObserveResources: SB observe", "duration", time.Since(t1), "elapsed", time.Since(observeStart))
 	if err != nil {
 		return ResourcesStatus{}, err
 	}
@@ -267,7 +276,9 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 	// the way the reconciler is implemented we need to do another observe run to actually retrieve if updates are nessecary,
 	// the first one is just used to set ready state for any reason, should be rechecked when we have the in-memory clients in place
 	// since they reimplement Observe()
+	t2 := time.Now()
 	resourceUpToDate := tf.resourcesUpToDate(ctx)
+	logger.V(1).Info("ObserveResources: SI observe (upToDate check)", "duration", time.Since(t2), "elapsed", time.Since(observeStart))
 
 	return ResourcesStatus{
 		ExternalObservation: managed.ExternalObservation{

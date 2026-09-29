@@ -23,8 +23,9 @@ var _ RuntimeOptionsGenerator = CrossplaneOptions{}
 type CrossplaneOptions struct {
 	xpcontroller.Options
 
-	BackoffBase time.Duration
-	BackoffMax  time.Duration
+	BackoffBase      time.Duration
+	BackoffMax       time.Duration
+	ReconcileTimeout time.Duration
 }
 
 // ForControllerRuntime returns default controller-runtime options. Its basically just an alias.
