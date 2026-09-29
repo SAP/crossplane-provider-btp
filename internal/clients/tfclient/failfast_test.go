@@ -16,7 +16,7 @@ import (
 const (
 	failFastCorrelationID = "ff-corr-0123"
 	failFastLogMessage    = "cli server has not loaded the subaccount, failing the command without retries"
-	failFastRecentMessage = "cli server refused a subaccount it served recently, leaving the retries to btpcli"
+	failFastRecentMessage = "cli server refused a subaccount after a write, leaving the retries to btpcli"
 )
 
 // failFastTransport returns a transport with the hierarchy call and fail-fast on.
@@ -345,15 +345,25 @@ func TestFailFastRecentlyServed(t *testing.T) {
 		name    string
 		backend string
 	}{
-		{"served 200", "200"},
-		{"served backend 404", "404"},
+		{"write served 200", "200"},
+		{"write served 202", "202"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			base := &hierBase{onCommand: func() (*http.Response, error) { return hierResp(200, tc.backend, `{}`), nil }}
 			log := &hierLogger{}
 			tr, clk := failFastTransport(base, log)
-			if status, _ := hierRoundTrip(t, tr, failFastCommand(t, failFastCorrelationID)); status != 200 {
+			var mu sync.Mutex
+			var waits []time.Duration
+			tr.hierarchy.sleep = func(_ context.Context, d time.Duration) error {
+				mu.Lock()
+				defer mu.Unlock()
+				waits = append(waits, d)
+				return nil
+			}
+			write := failFastCommand(t, failFastCorrelationID)
+			write.URL.RawQuery = "create"
+			if status, _ := hierRoundTrip(t, tr, write); status != 200 {
 				t.Fatalf("served answer status = %d", status)
 			}
 			clk.advance(time.Second)
@@ -368,7 +378,7 @@ func TestFailFastRecentlyServed(t *testing.T) {
 			}
 			lines := log.find("info", failFastRecentMessage)
 			if len(lines) != 1 {
-				t.Fatalf("served-recently log lines = %d, want 1", len(lines))
+				t.Fatalf("hand-up log lines = %d, want 1", len(lines))
 			}
 			kv := failFastKV(lines[0].kv)
 			for k, want := range map[string]string{
@@ -376,15 +386,22 @@ func TestFailFastRecentlyServed(t *testing.T) {
 				"correlationID":   failFastCorrelationID,
 				"cliServerURL":    hierHost,
 				"lastServedAgoMs": "1000",
+				"resends":         "3",
 			} {
 				if got := fmt.Sprint(kv[k]); got != want {
 					t.Errorf("%s = %q, want %q", k, got, want)
 				}
 			}
+			mu.Lock()
+			if want := []time.Duration{500 * time.Millisecond, time.Second, 2 * time.Second}; fmt.Sprint(waits) != fmt.Sprint(want) {
+				t.Errorf("waits = %v, want %v", waits, want)
+			}
+			mu.Unlock()
 
-			// The handed-up bare 500 must not count as served.
+			// The handed-up bare 500 must not count as served. btpcli gives every
+			// command its own correlation id; a reused one would be a retry.
 			clk.advance(hierarchyCallTTL)
-			resp, err := tr.RoundTrip(failFastCommand(t, failFastCorrelationID))
+			resp, err := tr.RoundTrip(failFastCommand(t, "ff-corr-4567"))
 			failFastIsReplacement(t, resp, err)
 		})
 	}

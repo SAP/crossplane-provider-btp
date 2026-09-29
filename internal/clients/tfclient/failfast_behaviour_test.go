@@ -676,9 +676,12 @@ func TestFailFastBehaviourDeleteFailsFast(t *testing.T) {
 // it by. btpcli's retry has to carry the read through.
 func TestFailFastBehaviourCreateReadAfterServedWriteIsRetried(t *testing.T) {
 	t.Parallel()
-	// Two refusals outlast cliTransport's own resend.
-	srv := ffbNewServer(t, func(s *ffbServer) { s.flakyGets = 2 })
-	env := ffbProvider(t, srv, ffbTransport(true, true))
+	// The refusals outlast cliTransport's own resend and its guarded resends.
+	flakyGets := 2 + len(guardedResendWaits)
+	srv := ffbNewServer(t, func(s *ffbServer) { s.flakyGets = flakyGets })
+	tr := ffbTransport(true, true)
+	tr.hierarchy.sleep = func(context.Context, time.Duration) error { return nil }
+	env := ffbProvider(t, srv, tr)
 
 	resp := env.applyResourceChange(t, nil, map[string]any{
 		"subaccount_id":  ffbFlaky,
@@ -692,8 +695,8 @@ func TestFailFastBehaviourCreateReadAfterServedWriteIsRetried(t *testing.T) {
 	if id := env.stateID(t, resp.NewState); id != ffbInstanceID {
 		t.Errorf("state id after create = %q, want %q", id, ffbInstanceID)
 	}
-	if n := srv.instanceGets(ffbFlaky); n < 3 {
-		t.Errorf("instance reads = %d, want at least 3 (refused, resent, retried by btpcli)", n)
+	if n := srv.instanceGets(ffbFlaky); n < flakyGets+1 {
+		t.Errorf("instance reads = %d, want at least %d (refused, resent, retried by btpcli)", n, flakyGets+1)
 	}
 
 	env.probe.mu.Lock()

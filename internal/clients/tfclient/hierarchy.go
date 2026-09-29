@@ -43,6 +43,10 @@ var (
 	failFastEnabled      = true
 )
 
+// The session lock is held while the transport waits, so the waits add up to a
+// few seconds rather than btpcli's minute.
+var guardedResendWaits = []time.Duration{500 * time.Millisecond, time.Second, 2 * time.Second}
+
 // SetSubaccountHierarchyCall switches the hierarchy call on or off. It must be
 // called before the first CLI client is built, i.e. from main().
 func SetSubaccountHierarchyCall(enabled bool) { hierarchyCallEnabled = enabled }
@@ -53,10 +57,12 @@ func SetSubaccountHierarchyCall(enabled bool) { hierarchyCallEnabled = enabled }
 func SetFailFastOnUnloadedSubaccount(enabled bool) { failFastEnabled = enabled }
 
 type hierarchyLoader struct {
-	ttl     time.Duration
-	timeout time.Duration
-	maxIdle time.Duration
-	now     func() time.Time // replaced in tests
+	ttl         time.Duration
+	timeout     time.Duration
+	maxIdle     time.Duration
+	now         func() time.Time // replaced in tests
+	resendWaits []time.Duration
+	sleep       func(ctx context.Context, d time.Duration) error // replaced in tests
 
 	mu       sync.Mutex
 	entries  map[string]*hierarchyEntry
@@ -67,7 +73,12 @@ type hierarchyLoader struct {
 // hierarchy call.
 type hierarchyEntry struct {
 	loadedAt time.Time // start of the last successful hierarchy call
-	servedAt time.Time // last answer to a command that carried a backend status
+	// last answered write, or last answered command while the guard was up
+	guardedAt time.Time
+	// Correlation id of the last command whose bare 500 was handed up. btpcli
+	// resends a command with the same id, so a match is one of its own retries,
+	// never another command or another session's.
+	handedUpCorr string
 	// Concurrent commands share the outcome of the call in flight, failures
 	// included, so a hanging endpoint costs them one timeout rather than one each.
 	flight *hierarchyFlight
@@ -82,16 +93,36 @@ type cliCommand struct {
 	key          string // r.URL.Host + "/" + subaccount
 	subaccount   string
 	hierarchyURL string
+	write        bool
 }
 
 func newHierarchyLoader() *hierarchyLoader {
 	return &hierarchyLoader{
-		ttl:     hierarchyCallTTL,
-		timeout: hierarchyCallTimeout,
-		maxIdle: hierarchyEntryMaxIdle,
-		now:     time.Now,
-		entries: map[string]*hierarchyEntry{},
+		ttl:         hierarchyCallTTL,
+		timeout:     hierarchyCallTimeout,
+		maxIdle:     hierarchyEntryMaxIdle,
+		now:         time.Now,
+		resendWaits: guardedResendWaits,
+		sleep:       sleepContext,
+		entries:     map[string]*hierarchyEntry{},
 	}
+}
+
+func sleepContext(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// isReadAction: get and list are the only actions terraform-provider-btp reads
+// with; anything else, unknown actions included, may have changed the backend.
+func isReadAction(action string) bool {
+	return action == "get" || action == "list"
 }
 
 // parse returns nil for anything that is not a subaccount-scoped CLI command, so
@@ -137,6 +168,7 @@ func (l *hierarchyLoader) parse(r *http.Request) *cliCommand {
 		key:          r.URL.Host + "/" + sa,
 		subaccount:   sa,
 		hierarchyURL: u.String(),
+		write:        !isReadAction(r.URL.RawQuery),
 	}
 }
 
@@ -161,7 +193,7 @@ func (l *hierarchyLoader) pruneLocked() {
 	limit := now.Add(-l.maxIdle)
 	for k, e := range l.entries {
 		// An entry with a call in flight is still referenced by ensureLoaded.
-		if e.flight == nil && e.loadedAt.Before(limit) && e.servedAt.Before(limit) {
+		if e.flight == nil && e.loadedAt.Before(limit) && e.guardedAt.Before(limit) {
 			delete(l.entries, k)
 		}
 	}
@@ -179,23 +211,38 @@ func (l *hierarchyLoader) forget(key string, sent time.Time) {
 	}
 }
 
-func (l *hierarchyLoader) markServed(key string) {
+// markServed starts the guard on a write and keeps it up with every answered
+// command, since upstream polls with reads, often of other command paths, for as
+// long as the write takes.
+func (l *hierarchyLoader) markServed(key string, write bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.entryLocked(key).servedAt = l.now()
+	e := l.entryLocked(key)
+	e.handedUpCorr = ""
+	now := l.now()
+	if write || (!e.guardedAt.IsZero() && now.Sub(e.guardedAt) < l.ttl) {
+		e.guardedAt = now
+	}
 }
 
-// servedAgo reports how long ago the backend last answered a command for key,
-// and whether that was within the ttl the server is trusted to keep it loaded.
-func (l *hierarchyLoader) servedAgo(key string) (time.Duration, bool) {
+// guard reports how long ago the guard for key was last refreshed, whether it
+// is still up, and whether the command with correlation id corr was handed up
+// since the last answer.
+func (l *hierarchyLoader) guard(key, corr string) (ago time.Duration, guarded, handedUp bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	e, ok := l.entries[key]
-	if !ok || e.servedAt.IsZero() {
-		return 0, false
+	if !ok || e.guardedAt.IsZero() {
+		return 0, false, false
 	}
-	ago := l.now().Sub(e.servedAt)
-	return ago, ago < l.ttl
+	ago = l.now().Sub(e.guardedAt)
+	return ago, ago < l.ttl, corr != "" && e.handedUpCorr == corr
+}
+
+func (l *hierarchyLoader) markHandedUp(key, corr string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.entryLocked(key).handedUpCorr = corr
 }
 
 // ensureLoaded makes a hierarchy call unless one succeeded after `after`, or

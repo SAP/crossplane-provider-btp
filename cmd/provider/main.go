@@ -68,7 +68,7 @@ func main() {
 		).Default("true").Envar("CLI_SUBACCOUNT_HIERARCHY_CALL").Bool()
 		cliFailFastOnUnloadedSubaccount = app.Flag(
 			"cli-fail-fast-on-unloaded-subaccount",
-			"Fail a subaccount command the CLI server still refuses after the hierarchy call at once instead of retrying it in-process, unless the backend answered a command for that subaccount in the last 90 seconds. Has no effect without the hierarchy call. Disable with --no-cli-fail-fast-on-unloaded-subaccount.",
+			"Fail a subaccount command the CLI server still refuses after the hierarchy call at once instead of retrying it in-process, unless a write to that subaccount was answered in the last 90 seconds, in which case the command is resent a few times and then left to the in-process retries. Has no effect without the hierarchy call. Disable with --no-cli-fail-fast-on-unloaded-subaccount.",
 		).Default("true").Envar("CLI_FAIL_FAST_ON_UNLOADED_SUBACCOUNT").Bool()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()

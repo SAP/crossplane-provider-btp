@@ -117,15 +117,15 @@ func TestHierarchyPruneKeepsEntryInFlight(t *testing.T) {
 	}
 }
 
-// Either timestamp alone keeps an entry: servedAt without loadedAt is a
+// Either timestamp alone keeps an entry: guardedAt without loadedAt is a
 // subaccount whose hierarchy calls fail while its commands are still served, and
-// servedAgo must keep reporting it.
+// guard must keep reporting it.
 func TestHierarchyPruneKeepsEntryWithOneRecentTimestamp(t *testing.T) {
 	clk := &hierClock{t: time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)}
 	l := newHierarchyLoader()
 	l.now = clk.now
 	recent := clk.now().Add(-time.Minute)
-	l.entries["served"] = &hierarchyEntry{servedAt: recent}
+	l.entries["guarded"] = &hierarchyEntry{guardedAt: recent}
 	l.entries["loaded"] = &hierarchyEntry{loadedAt: recent}
 	l.entries["idle"] = &hierarchyEntry{}
 
@@ -133,8 +133,8 @@ func TestHierarchyPruneKeepsEntryWithOneRecentTimestamp(t *testing.T) {
 	l.pruneLocked()
 	l.mu.Unlock()
 
-	if keys := sfKeys(l); strings.Join(keys, ",") != "loaded,served" {
-		t.Fatalf("entries = %v, want [loaded served]", keys)
+	if keys := sfKeys(l); strings.Join(keys, ",") != "guarded,loaded" {
+		t.Fatalf("entries = %v, want [guarded loaded]", keys)
 	}
 }
 

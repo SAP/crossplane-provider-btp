@@ -58,11 +58,13 @@ func frameworkHTTPClient(cp *cachingProvider) *http.Client {
 	return newCLIHTTPClient(newCLITransport(cp, base, log, hierarchyCallEnabled, failFastEnabled))
 }
 
-// cliRequestTimeout bounds one btpcli attempt, both hierarchy calls of the
-// attempt included, so it must exceed 2*hierarchyCallTimeout. It stays below the
-// default reconcile deadline of one minute so a hung attempt ends with a named
-// cause instead of holding the session mutex until the context ends; btpcli
-// retries the timeout like any transport error.
+// cliRequestTimeout bounds one btpcli attempt, its hierarchy calls and guarded
+// resends included. Resends stop at the first failed hierarchy call, so a hanging
+// endpoint costs at most two hierarchy calls per attempt and the timeout must
+// exceed 2*hierarchyCallTimeout. It stays below the default reconcile deadline
+// of one minute so a hung attempt ends with a named cause instead of holding the
+// session mutex until the context ends; btpcli retries the timeout like any
+// transport error.
 const cliRequestTimeout = 30 * time.Second
 
 func newCLIHTTPClient(rt http.RoundTripper) *http.Client {

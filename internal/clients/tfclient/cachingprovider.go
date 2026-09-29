@@ -163,10 +163,15 @@ type cliTransport struct {
 // Resending is safe because a bare 500 carries no backend status, so the command
 // never reached the backend. A bare 500 that survives the hierarchy call and the
 // resend is replaced with failFast, so it never reaches that retry layer either,
-// unless the backend answered for the subaccount within the ttl: upstream create,
-// update and delete poll with further commands after the write, at most 10 s apart
-// by default, and failing such a poll fast would report a write that went through
-// as failed and drop its state.
+// unless the subaccount is guarded: a write to it was answered within the ttl, or
+// a command was answered while the guard was up. Upstream create, update and
+// delete poll with further commands after the write, at most 10 s apart by
+// default, and failing such a poll fast would report a write that went through as
+// failed and drop its state. Inside the guard the transport first resends a few
+// times after short waits, each after a new hierarchy call, and only then hands
+// the bare 500 up, so btpcli's retries carry the poll. Those retries keep the
+// correlation id and are handed up at once, even after the guard ran out, so
+// they neither repeat the waits nor end the chain in a fail-fast.
 func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	cmd := t.hierarchy.parse(r)
 	if cmd == nil {
@@ -174,8 +179,8 @@ func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 	resp, sent, err := t.sendCommand(r, cmd)
 	if !isBare500(resp, err) {
-		if err == nil && resp.Header.Get(headerCLIBackendStatus) != "" {
-			t.hierarchy.markServed(cmd.key)
+		if err == nil {
+			t.markAnswered(cmd, resp)
 		}
 		return resp, err
 	}
@@ -183,17 +188,87 @@ func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if !t.failFast {
 		return resp, err
 	}
-	if ago, recent := t.hierarchy.servedAgo(cmd.key); recent {
-		if t.log != nil {
-			t.log.Info("cli server refused a subaccount it served recently, leaving the retries to btpcli",
-				"cliServerURL", r.URL.Host,
-				"subaccount", cmd.subaccount,
-				"lastServedAgoMs", ago.Milliseconds(),
-				"correlationID", r.Header.Get(headerCorrelationID))
-		}
-		return resp, err
+	corr := r.Header.Get(headerCorrelationID)
+	ago, guarded, handedUp := t.hierarchy.guard(cmd.key, corr)
+	if !guarded && !handedUp {
+		return t.notLoadedResponse(r, cmd, resp), nil
 	}
-	return t.notLoadedResponse(r, cmd, resp), nil
+	resends := 0
+	if !handedUp {
+		resp, resends, err = t.resendGuarded(r, cmd, resp, sent)
+		if err == nil && resp.Header.Get(headerCLIBackendStatus) != "" {
+			return resp, nil
+		}
+		// btpcli retries a failed resend as it would the bare 500.
+		t.hierarchy.markHandedUp(cmd.key, corr)
+		if err != nil || !isBare500(resp, nil) {
+			return resp, err
+		}
+	}
+	if t.log != nil {
+		t.log.Info("cli server refused a subaccount after a write, leaving the retries to btpcli",
+			"cliServerURL", r.URL.Host,
+			"subaccount", cmd.subaccount,
+			"lastServedAgoMs", ago.Milliseconds(),
+			"resends", resends,
+			"correlationID", corr)
+	}
+	return resp, nil
+}
+
+// markAnswered ignores answers without a backend status: only the backend can
+// have acted on a write. A write it rejected is reported as failed by upstream
+// without polls, so it starts no guard.
+func (t *cliTransport) markAnswered(cmd *cliCommand, resp *http.Response) bool {
+	backend := resp.Header.Get(headerCLIBackendStatus)
+	if backend == "" {
+		return false
+	}
+	status, perr := strconv.Atoi(backend)
+	t.hierarchy.markServed(cmd.key, cmd.write && (perr != nil || status < 400))
+	return true
+}
+
+// resendGuarded returns the first answer that is no bare 500, or the last bare
+// 500 when the waits run out or the hierarchy call fails, since a resend to a
+// subaccount the server has not loaded is refused again.
+func (t *cliTransport) resendGuarded(r *http.Request, cmd *cliCommand, resp *http.Response, sent time.Time) (*http.Response, int, error) {
+	l := t.hierarchy
+	resends := 0
+	for _, wait := range l.resendWaits {
+		if err := l.sleep(r.Context(), wait); err != nil {
+			_ = resp.Body.Close()
+			return nil, resends, err
+		}
+		if _, loaded := t.ensureLoaded(r, cmd, sent); !loaded {
+			return resp, resends, nil
+		}
+		body, gerr := r.GetBody()
+		if gerr != nil {
+			return resp, resends, nil
+		}
+		_ = resp.Body.Close()
+		r2 := r.Clone(r.Context())
+		r2.Body = body
+		sent = l.now()
+		var err error
+		resp, err = t.send(r2)
+		resends++
+		if !isBare500(resp, err) {
+			if err == nil && t.markAnswered(cmd, resp) {
+				if t.log != nil {
+					t.log.Info("cli server served the subaccount after repeating the hierarchy call",
+						"cliServerURL", r.URL.Host,
+						"subaccount", cmd.subaccount,
+						"resends", resends,
+						"correlationID", r.Header.Get(headerCorrelationID))
+				}
+			}
+			return resp, resends, err
+		}
+		l.forget(cmd.key, sent)
+	}
+	return resp, resends, nil
 }
 
 // sendCommand also returns when the answer's request was sent.

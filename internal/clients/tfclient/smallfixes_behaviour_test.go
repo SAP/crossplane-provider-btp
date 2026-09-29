@@ -5,6 +5,7 @@ package tfclient
 // idle subaccounts, all against fake CLI servers.
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -61,9 +62,13 @@ func sfbStates(sa string) (prior, planned map[string]any) {
 
 func TestSmallFixesBehaviourUpdateReadAfterServedWriteIsRetried(t *testing.T) {
 	t.Parallel()
-	// Two refusals outlast the transport's own resend, so upstream has to retry.
-	srv := sfbNewServer(t, 2)
-	env := ffbProvider(t, srv, ffbTransport(true, true))
+	// The refusals outlast the transport's own resend and its guarded resends, so
+	// upstream has to retry.
+	flakyGets := 2 + len(guardedResendWaits)
+	srv := sfbNewServer(t, flakyGets)
+	tr := ffbTransport(true, true)
+	tr.hierarchy.sleep = func(context.Context, time.Duration) error { return nil }
+	env := ffbProvider(t, srv, tr)
 
 	prior, planned := sfbStates(ffbFlaky)
 	resp := env.applyResourceChange(t, prior, planned)
@@ -72,8 +77,8 @@ func TestSmallFixesBehaviourUpdateReadAfterServedWriteIsRetried(t *testing.T) {
 	if got := env.stateID(t, resp.NewState); got != ffbInstanceID {
 		t.Errorf("state id = %q, want %q", got, ffbInstanceID)
 	}
-	if n := srv.instanceGets(ffbFlaky); n < 3 {
-		t.Errorf("instance reads = %d, want at least 3", n)
+	if n := srv.instanceGets(ffbFlaky); n < flakyGets+1 {
+		t.Errorf("instance reads = %d, want at least %d", n, flakyGets+1)
 	}
 	env.probe.mu.Lock()
 	defer env.probe.mu.Unlock()
