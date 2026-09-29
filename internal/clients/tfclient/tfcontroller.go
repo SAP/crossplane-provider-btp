@@ -45,14 +45,6 @@ type TfProxyControllerI interface {
 	GetTfResource() resource.Managed
 }
 
-// SaveConditionsFn persists conditions on the *native* managed resource
-// identified by name.
-//
-// name is the identity of the native managed resource, already resolved from
-// the terraform shadow identity by the caller — it is never a stringified
-// NamespacedName. Taking a typed key removes the String()/parse round-trip
-// that used to inject a leading "/" for cluster-scoped resources, which made
-// every lookup inside implementations of this function fail with NotFound.
 type SaveConditionsFn func(ctx context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error
 
 // ObservationData is the bridge struct that carries data from the Terraform resource to the Crossplane CR.

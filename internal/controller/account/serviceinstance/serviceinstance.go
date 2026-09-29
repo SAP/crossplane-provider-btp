@@ -91,10 +91,8 @@ var newServicePlanInitializerFn = func() Initializer {
 // newSaveCallback builds the callback that persists the result of an
 // asynchronous terraform operation on the ServiceInstance.
 //
-// name identifies the ServiceInstance itself: the terraform shadow identity
-// the callbacks receive is resolved back to it by tfclient before we are
-// called. siClient.TfNamePrefix is trimmed here as well so a caller handing in
-// the shadow identity still reaches the native resource.
+// upjet keys the callback off the mapped terraform resource, whose name
+// carries siClient.TfNamePrefix; without trimming it the lookup misses.
 //
 // The write is retried on conflict. Upjet invokes an async callback exactly
 // once and only logs a returned error, so a single lost write is a permanently
@@ -303,15 +301,6 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			Reason:             reasonAsyncOperationFailed,
 			Message:            failure.Message,
 		})
-		// The hold above reports the rejection itself. When BTP additionally
-		// reports the instance as unhealthy, say so: this early return skips
-		// the UpToDate branch where the external-health veto normally runs.
-		// Known limitation: atProvider is refreshed only in the UpToDate
-		// branch, so on this path the veto judges the last refreshed
-		// observation.
-		if cond, unhealthy := externalHealthCondition(cr); unhealthy && !isObserveOnly(cr) {
-			cr.SetConditions(cond)
-		}
 		return managed.ExternalObservation{
 			ResourceExists:   true,
 			ResourceUpToDate: false,

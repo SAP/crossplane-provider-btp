@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -46,14 +47,15 @@ func NewServiceInstanceConnector(saveConditionsCallback tfclient.SaveConditionsF
 	return con
 }
 
-// newEventTarget builds the object a callback failure is reported against. The
-// managed resource could not be fetched at that point, so only the identity is
-// available. TypeMeta is set explicitly so building a reference to it needs no
-// scheme lookup and cannot fail.
+// newEventTarget builds the object a callback failure is reported against
+// from the mapped terraform resource name. The managed resource could not be
+// fetched at that point, so only the identity is available. TypeMeta is set
+// explicitly so building a reference to it needs no scheme lookup and cannot
+// fail.
 func newEventTarget(nn types.NamespacedName) resource.Managed {
 	si := &v1alpha1.ServiceInstance{}
 	si.SetGroupVersionKind(v1alpha1.ServiceInstanceGroupVersionKind)
-	si.SetName(nn.Name)
+	si.SetName(strings.TrimPrefix(nn.Name, TfNamePrefix))
 	si.SetNamespace(nn.Namespace)
 	return si
 }
@@ -150,7 +152,7 @@ func BuildComplexParameterJson(ctx context.Context, kube client.Client, secretRe
 
 // TfNamePrefix prevents mapped Terraform resource names from starting with
 // a digit. Callbacks strip it to locate the native ServiceInstance.
-const TfNamePrefix = tfclient.ShadowNamePrefix
+const TfNamePrefix = "TF-"
 
 func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServiceInstance {
 	sInstance := &v1alpha1.SubaccountServiceInstance{
@@ -159,12 +161,6 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// Since terraform resources are not allowed to start with a number
-			// we ensure it by prefixing them with tfclient.ShadowNamePrefix.
-			// The async callbacks strip this prefix again through
-			// tfclient.StripShadowPrefix to find the ServiceInstance this
-			// shadow belongs to — use the constant on both ends so they cannot
-			// drift apart.
 			Name: TfNamePrefix + si.Name,
 			// make sure no naming conflicts are there for upjet tmp folder creation
 			UID:               si.UID + "-service-instance",

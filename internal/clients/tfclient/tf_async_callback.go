@@ -2,7 +2,6 @@ package tfclient
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -21,13 +20,6 @@ import (
 )
 
 const (
-	// ShadowNamePrefix is the prefix native controllers put in front of the
-	// native managed resource name when they drive BTP through an internal
-	// upjet shadow resource, because terraform resource names may not start
-	// with a digit. See
-	// internal/clients/account/serviceinstance.buildBaseTfResource.
-	ShadowNamePrefix = "TF-"
-
 	// defaultMaxConditionMessageBytes bounds how much terraform output is
 	// copied into a condition message. The error of a failed terraform
 	// apply/destroy is the full CLI output and can be tens of kilobytes;
@@ -46,31 +38,8 @@ const (
 
 var errUpdateStatusFmt = "cannot update status of the resource %s after an async %s"
 
-// NameResolverFn maps the identity upjet hands to the async callbacks — the
-// identity of the terraform SHADOW resource — back to the identity of the
-// native managed resource whose status must carry the result.
-type NameResolverFn func(types.NamespacedName) types.NamespacedName
-
-// StripShadowPrefix is the default NameResolverFn. It removes the shadow
-// prefix when present and leaves every other name byte-identical, so consumers
-// that do not use shadow naming keep working unchanged.
-func StripShadowPrefix(nn types.NamespacedName) types.NamespacedName {
-	nn.Name = strings.TrimPrefix(nn.Name, ShadowNamePrefix)
-	return nn
-}
-
 // APICallbacksOption configures an APICallbacks.
 type APICallbacksOption func(*APICallbacks)
-
-// WithNameResolver overrides how the terraform shadow identity is mapped back
-// to the native managed resource.
-func WithNameResolver(fn NameResolverFn) APICallbacksOption {
-	return func(ac *APICallbacks) {
-		if fn != nil {
-			ac.resolveName = fn
-		}
-	}
-}
 
 // WithCallbackLogger overrides the logger used for the (loud) failure path.
 func WithCallbackLogger(l logr.Logger) APICallbacksOption {
@@ -81,7 +50,8 @@ func WithCallbackLogger(l logr.Logger) APICallbacksOption {
 
 // WithCallbackEventRecorder makes the callbacks emit a Warning event on the
 // managed resource when an async result cannot be persisted. objFn builds the
-// event target from the resolved name and may return nil to skip the event.
+// event target from the terraform resource name and may return nil to skip the
+// event.
 func WithCallbackEventRecorder(rec event.Recorder, objFn func(types.NamespacedName) resource.Managed) APICallbacksOption {
 	return func(ac *APICallbacks) {
 		ac.record = rec
@@ -103,7 +73,6 @@ func NewAPICallbacks(kube client.Client, saveConditionsFn SaveConditionsFn, opts
 	ac := &APICallbacks{
 		kube:           kube,
 		saveCallbackFn: saveConditionsFn,
-		resolveName:    StripShadowPrefix,
 		log:            ctrl.Log.WithName("tf-async-callback"),
 		maxMsgBytes:    defaultMaxConditionMessageBytes,
 	}
@@ -119,10 +88,6 @@ type APICallbacks struct {
 	kube           client.Client
 	saveCallbackFn SaveConditionsFn
 
-	// resolveName maps the shadow identity back to the native managed
-	// resource. Never nil once built through NewAPICallbacks.
-	resolveName NameResolverFn
-
 	log logr.Logger
 
 	// record and newEventTarget are optional; both must be set for an event
@@ -133,69 +98,41 @@ type APICallbacks struct {
 	maxMsgBytes int
 }
 
-// Create makes sure the error is saved in the async operation condition.
+// Create makes sure the error is saved in async operation condition.
 func (ac *APICallbacks) Create(name types.NamespacedName, _ bool) terraform.CallbackFn {
 	return ac.callback("create", name)
 }
 
-// Update makes sure the error is saved in the async operation condition.
+// Update makes sure the error is saved in async operation condition.
 func (ac *APICallbacks) Update(name types.NamespacedName, _ bool) terraform.CallbackFn {
 	return ac.callback("update", name)
 }
 
-// Destroy makes sure the error is saved in the async operation condition.
+// Destroy makes sure the error is saved in async operation condition.
 func (ac *APICallbacks) Destroy(name types.NamespacedName, _ bool) terraform.CallbackFn {
 	return ac.callback("destroy", name)
 }
 
-// callback is the single implementation behind all three verbs.
-//
-// The requestReconcile bool the interface carries is deliberately dropped:
-// upjet's own APICallbacks uses it to enqueue an immediate reconcile of the
-// (watched) terraform resource, but the shadow resource here is not watched
-// by any controller and the native resource is driven by its own poll cadence,
-// so completion is picked up on the next poll.
-//
-// name is the identity of the terraform shadow resource upjet built for this
-// operation, which for shadow-driven kinds is not the identity of any object
-// that exists in the API server. It is resolved back to the native managed
-// resource before the result is persisted; resolution happens once here, on
-// the reconcile goroutine, so both names remain available for logging from the
-// detached callback goroutine.
+// callback resolves the terraform resource name to the native managed
+// resource via SaveConditionsFn.
 func (ac *APICallbacks) callback(op string, name types.NamespacedName) terraform.CallbackFn {
-	target := ac.resolveName(name)
 	return func(err error, ctx context.Context) error {
 		// The context upjet hands the callback carries the async operation's
-		// own deadline (StartTime + defaultAsyncTimeout, pkg/terraform/
-		// workspace.go). When the operation is killed BY that deadline — a
-		// platform call hung past the async budget, the one failure class
-		// that most needs recording — the callback runs with the context
-		// already expired and every write would fail instantly with
-		// DeadlineExceeded. Decouple the persistence of the result from the
-		// operation's lifetime, keeping a short budget of its own.
+		// own deadline. When the operation is killed BY that deadline the
+		// callback runs with the context already expired and every write
+		// would fail with DeadlineExceeded, so the write gets a budget of its
+		// own.
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), saveResultTimeout)
 		defer cancel()
-		conds := []xpv1.Condition{
-			ac.bound(ujresource.LastAsyncOperationCondition(err)),
-			ujresource.AsyncOperationFinishedCondition(),
-		}
-		uErr := ac.saveCallbackFn(ctx, ac.kube, target, conds...)
+		uErr := ac.saveCallbackFn(ctx, ac.kube, name, ac.bound(ujresource.LastAsyncOperationCondition(err)), ujresource.AsyncOperationFinishedCondition())
 		if uErr == nil {
 			return nil
 		}
-		// Loud on purpose. Upjet logs a failing callback only at info level
-		// (pkg/terraform/workspace.go), and a dropped async result is not
-		// cosmetic: it masks failed creates — nothing records the failure, so
-		// the resource still goes Available — and it wedges failed destroys
-		// into an unbounded blind-retry loop with no error condition and no
-		// backoff.
-		ac.log.Error(uErr, "async terraform callback could not persist its result on the managed resource",
-			"operation", op,
-			"terraformName", name.String(),
-			"managedResource", target.String(),
-			"asyncError", errString(err))
-		ac.emitWarning(target, op, uErr)
-		return errors.Wrapf(uErr, errUpdateStatusFmt, target, op)
+		// upjet logs a failing callback at info level only (#968).
+		ac.log.Error(uErr, "async terraform callback could not persist its result",
+			"operation", op, "terraformName", name.String())
+		ac.emitWarning(name, op, uErr)
+		return errors.Wrapf(uErr, errUpdateStatusFmt, name, op)
 	}
 }
 
@@ -211,21 +148,14 @@ func (ac *APICallbacks) bound(c xpv1.Condition) xpv1.Condition {
 // result could not be persisted. It is best effort: by construction the object
 // could not be fetched, so the event target carries only TypeMeta and a name.
 // The error log above is the load-bearing signal.
-func (ac *APICallbacks) emitWarning(target types.NamespacedName, op string, err error) {
+func (ac *APICallbacks) emitWarning(name types.NamespacedName, op string, err error) {
 	if ac.record == nil || ac.newEventTarget == nil {
 		return
 	}
-	obj := ac.newEventTarget(target)
+	obj := ac.newEventTarget(name)
 	if obj == nil {
 		return
 	}
 	ac.record.Event(obj, event.Warning(event.Reason(eventReasonAsyncCallbackFailed),
 		errors.Wrapf(err, "cannot persist the result of the async %s operation", op)))
-}
-
-func errString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
 }

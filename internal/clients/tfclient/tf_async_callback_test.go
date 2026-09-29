@@ -101,10 +101,9 @@ func (e *eventSpy) Event(obj runtimeobj.Object, ev event.Event) {
 }
 func (e *eventSpy) WithAnnotations(...string) event.Recorder { return e }
 
-func TestAPICallbacks_ResolvesShadowName(t *testing.T) {
-	// A ServiceInstance named "x" is driven through a terraform shadow named
-	// "TF-x" with no namespace. Upjet hands the callbacks the shadow identity;
-	// the result must land on the ServiceInstance.
+func TestAPICallbacks_HandsTheTerraformNameToSave(t *testing.T) {
+	// Resolving the terraform resource name to the native managed resource is
+	// the job of the SaveConditionsFn; the callbacks pass the name through.
 	for _, verb := range []string{"create", "update", "destroy"} {
 		t.Run(verb, func(t *testing.T) {
 			spy := &saveSpy{}
@@ -118,9 +117,9 @@ func TestAPICallbacks_ResolvesShadowName(t *testing.T) {
 			if spy.calls != 1 {
 				t.Fatalf("expected exactly one save call, got %d", spy.calls)
 			}
-			want := types.NamespacedName{Name: "x"}
+			want := types.NamespacedName{Name: "TF-x"}
 			if diff := cmp.Diff(want, spy.gotName); diff != "" {
-				t.Errorf("resolved name mismatch (-want, +got):\n%s", diff)
+				t.Errorf("name mismatch (-want, +got):\n%s", diff)
 			}
 			wantConds := []string{ujresource.TypeLastAsyncOperation, ujresource.TypeAsyncOperation}
 			if diff := cmp.Diff(wantConds, spy.conditionTypes()); diff != "" {
@@ -167,38 +166,7 @@ func TestAPICallbacks_SurvivesExpiredOperationContext(t *testing.T) {
 	}
 }
 
-func TestAPICallbacks_NonPrefixedNameUsedAsIs(t *testing.T) {
-	// Other consumers of this package do not prefix their shadow names; the
-	// resolver must be a no-op for them.
-	for _, name := range []string{"SERVICE_MANAGER_INSTANCE", "my-binding"} {
-		t.Run(name, func(t *testing.T) {
-			spy := &saveSpy{}
-			ac := NewAPICallbacks(&test.MockClient{}, spy.fn())
-
-			if err := ac.Create(types.NamespacedName{Name: name}, true)(nil, context.Background()); err != nil {
-				t.Fatalf("callback returned unexpected error: %v", err)
-			}
-			if spy.gotName.Name != name {
-				t.Errorf("expected name %q to be used as-is, got %q", name, spy.gotName.Name)
-			}
-		})
-	}
-}
-
-func TestAPICallbacks_NamespacedNamePreserved(t *testing.T) {
-	spy := &saveSpy{}
-	ac := NewAPICallbacks(&test.MockClient{}, spy.fn())
-
-	if err := ac.Update(types.NamespacedName{Namespace: "ns", Name: "TF-x"}, true)(nil, context.Background()); err != nil {
-		t.Fatalf("callback returned unexpected error: %v", err)
-	}
-	want := types.NamespacedName{Namespace: "ns", Name: "x"}
-	if diff := cmp.Diff(want, spy.gotName); diff != "" {
-		t.Errorf("resolved name mismatch (-want, +got):\n%s", diff)
-	}
-}
-
-func TestAPICallbacks_ResolutionFailureIsLoud(t *testing.T) {
+func TestAPICallbacks_SaveFailureIsLoud(t *testing.T) {
 	notFound := kerrors.NewNotFound(schema.GroupResource{Group: "account.btp.sap.crossplane.io", Resource: "serviceinstances"}, "x")
 	spy := &saveSpy{returnErr: notFound}
 	sink := &logSink{}
@@ -217,9 +185,8 @@ func TestAPICallbacks_ResolutionFailureIsLoud(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected the callback to return an error when the result cannot be persisted")
 	}
-	// The error must name the RESOLVED managed resource, not the shadow.
-	if !strings.Contains(err.Error(), "/x") || strings.Contains(err.Error(), "TF-x") {
-		t.Errorf("expected the error to name the resolved resource, got: %v", err)
+	if !strings.Contains(err.Error(), "TF-x") {
+		t.Errorf("expected the error to name the terraform resource, got: %v", err)
 	}
 
 	if len(sink.errors) != 1 {
@@ -313,44 +280,6 @@ func TestAPICallbacks_BoundsConditionMessage(t *testing.T) {
 			t.Errorf("expected no truncation when the bound is disabled: got %d bytes, want %d", len(got), len(want))
 		}
 	})
-}
-
-func TestAPICallbacks_WithNameResolver(t *testing.T) {
-	spy := &saveSpy{}
-	ac := NewAPICallbacks(&test.MockClient{}, spy.fn(), WithNameResolver(func(nn types.NamespacedName) types.NamespacedName {
-		return types.NamespacedName{Name: "override"}
-	}))
-
-	if err := ac.Create(types.NamespacedName{Name: "TF-x"}, true)(nil, context.Background()); err != nil {
-		t.Fatalf("callback returned unexpected error: %v", err)
-	}
-	if spy.gotName.Name != "override" {
-		t.Errorf("expected the injected resolver to be used, got %q", spy.gotName.Name)
-	}
-}
-
-func TestStripShadowPrefix(t *testing.T) {
-	cases := map[string]struct {
-		in   types.NamespacedName
-		want types.NamespacedName
-	}{
-		"Prefixed":             {in: types.NamespacedName{Name: "TF-x"}, want: types.NamespacedName{Name: "x"}},
-		"PrefixOnly":           {in: types.NamespacedName{Name: "TF-"}, want: types.NamespacedName{Name: ""}},
-		"DoublePrefixOnlyOnce": {in: types.NamespacedName{Name: "TF-TF-x"}, want: types.NamespacedName{Name: "TF-x"}},
-		"PrefixNotAtStart":     {in: types.NamespacedName{Name: "notTF-x"}, want: types.NamespacedName{Name: "notTF-x"}},
-		"NoPrefix":             {in: types.NamespacedName{Name: "my-binding"}, want: types.NamespacedName{Name: "my-binding"}},
-		"NamespacePreserved":   {in: types.NamespacedName{Namespace: "ns", Name: "TF-x"}, want: types.NamespacedName{Namespace: "ns", Name: "x"}},
-		"EmptyName":            {in: types.NamespacedName{}, want: types.NamespacedName{}},
-		"CaseSensitivePrefix":  {in: types.NamespacedName{Name: "tf-x"}, want: types.NamespacedName{Name: "tf-x"}},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			if diff := cmp.Diff(tc.want, StripShadowPrefix(tc.in)); diff != "" {
-				t.Errorf("StripShadowPrefix(...) mismatch (-want, +got):\n%s", diff)
-			}
-		})
-	}
 }
 
 func TestAPICallbacks_ReturnsSaveError(t *testing.T) {
