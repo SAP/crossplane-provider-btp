@@ -212,7 +212,7 @@ func peekBody(resp *http.Response) string {
 	const max = 1 << 10
 	buf, _ := io.ReadAll(io.LimitReader(resp.Body, max))
 	rest, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	resp.Body = io.NopCloser(bytes.NewReader(append(buf, rest...)))
 	return string(buf)
 }
