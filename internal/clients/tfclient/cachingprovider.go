@@ -155,9 +155,30 @@ type cliTransport struct {
 	// failFast is false in a literal cliTransport, which keeps handing the bare
 	// 500 up as before.
 	failFast bool
+	// lookups is nil in a literal cliTransport and when the cache is switched
+	// off, which keeps every lookup going to the server as before.
+	lookups *lookupCache
 }
 
-// RoundTrip absorbs the CLI server's bare 500 for a subaccount it has not loaded:
+// RoundTrip serves plan and offering lookups by id from the cache: they repeat on
+// every observe and each costs the single in-flight slot of the session. A cached
+// answer is returned before the hierarchy call, so it costs no request at all.
+func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	q := t.lookups.parse(r)
+	if q == nil {
+		return t.roundTrip(r)
+	}
+	if resp := t.lookups.get(r, q); resp != nil {
+		return resp, nil
+	}
+	resp, err := t.roundTrip(r)
+	if err == nil {
+		t.lookups.put(q, resp)
+	}
+	return resp, err
+}
+
+// roundTrip absorbs the CLI server's bare 500 for a subaccount it has not loaded:
 // if that 500 reached btpcli's retry layer, the retry chain would hold the session
 // mutex and block every other request of the provider config for about a minute.
 // Resending is safe because a bare 500 carries no backend status, so the command
@@ -172,7 +193,7 @@ type cliTransport struct {
 // the bare 500 up, so btpcli's retries carry the poll. Those retries keep the
 // correlation id and are handed up at once, even after the guard ran out, so
 // they neither repeat the waits nor end the chain in a fail-fast.
-func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+func (t *cliTransport) roundTrip(r *http.Request) (*http.Response, error) {
 	cmd := t.hierarchy.parse(r)
 	if cmd == nil {
 		return t.send(r)

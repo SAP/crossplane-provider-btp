@@ -38,9 +38,10 @@ const (
 )
 
 // frameworkProvider returns the BTP plugin-framework provider for upjet's no-fork
-// client. Lazy because btp.SetDebug(), SetSubaccountHierarchyCall() and
-// SetFailFastOnUnloadedSubaccount() run in main(), after init. It always injects
-// an http.Client so cliTransport can drop a cached session on a 401.
+// client. Lazy because btp.SetDebug(), SetSubaccountHierarchyCall(),
+// SetFailFastOnUnloadedSubaccount() and SetLookupCacheTTL() run in main(), after
+// init. It always injects an http.Client so cliTransport can drop a cached
+// session on a 401.
 var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
 	cp := &cachingProvider{entries: map[string]*cacheEntry{}}
 	cp.Provider = tfprovider.NewWithClient(frameworkHTTPClient(cp))
@@ -55,7 +56,12 @@ func frameworkHTTPClient(cp *cachingProvider) *http.Client {
 		base = btp.DebugPrintHTTPClient().Transport
 	}
 	log := logging.NewLogrLogger(zap.New(zap.UseDevMode(btp.IsDebug())).WithName("crossplane-provider-btp-cli"))
-	return newCLIHTTPClient(newCLITransport(cp, base, log, hierarchyCallEnabled, failFastEnabled))
+	tr := newCLITransport(cp, base, log, hierarchyCallEnabled, failFastEnabled)
+	tr.lookups = newLookupCache(lookupCacheTTL, log)
+	if tr.lookups != nil {
+		log.Info("cli plan and offering lookups are cached", "ttl", lookupCacheTTL.String())
+	}
+	return newCLIHTTPClient(tr)
 }
 
 // cliRequestTimeout bounds one btpcli attempt, its hierarchy calls and guarded
