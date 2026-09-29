@@ -313,8 +313,8 @@ func TestEvictTransportLogsFailures(t *testing.T) {
 			if !tc.wantLog {
 				return
 			}
-			if got := log.kv["cliServerURL"]; got != "cli.example" {
-				t.Fatalf("cliServerURL=%v, want cli.example", got)
+			if got := log.kv["url"]; got != "cli.example/command" {
+				t.Fatalf("url=%v, want cli.example/command", got)
 			}
 			if tc.rtErr == nil {
 				if got := log.kv["status"]; got != tc.wantStatus {
