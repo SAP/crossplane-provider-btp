@@ -168,11 +168,18 @@ func redactJwtTokensFromBody(body []byte) []byte {
 	return jwtPattern.ReplaceAll([]byte(body), []byte("<REDACTED>"))
 }
 
+// Session id and id token are live credentials of the CLI server.
+var sensitiveHeaders = map[string]struct{}{
+	"Authorization":     {},
+	"X-Cpcli-Sessionid": {},
+	"X-Id-Token":        {},
+}
+
 // redactSensitiveHeaders returns a redacted copy of the header.
 func redactSensitiveHeaders(header http.Header) http.Header {
 	filteredHeader := make(http.Header)
 	for key, values := range header {
-		if key == "Authorization" {
+		if _, ok := sensitiveHeaders[http.CanonicalHeaderKey(key)]; ok {
 			filteredHeader[key] = []string{"<REDACTED>"}
 		} else {
 			filteredHeader[key] = values

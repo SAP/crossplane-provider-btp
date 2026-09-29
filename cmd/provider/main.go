@@ -62,6 +62,18 @@ func main() {
 			"reconcile-timeout",
 			"Timeout for a single reconcile cycle (externalCtx budget). The reconciler adds a 30s grace period on top for status writes. Default is 1m.",
 		).Default("1m").Envar("RECONCILE_TIMEOUT").Duration()
+		cliSubaccountHierarchyCall = app.Flag(
+			"cli-subaccount-hierarchy-call",
+			"Make the CLI server load a subaccount before commands are sent for it. Disable with --no-cli-subaccount-hierarchy-call.",
+		).Default("true").Envar("CLI_SUBACCOUNT_HIERARCHY_CALL").Bool()
+		cliFailFastOnUnloadedSubaccount = app.Flag(
+			"cli-fail-fast-on-unloaded-subaccount",
+			"Fail a subaccount command the CLI server still refuses after the hierarchy call at once instead of retrying it in-process, unless a write to that subaccount was answered in the last 90 seconds, in which case the command is resent a few times and then left to the in-process retries. Has no effect without the hierarchy call. Disable with --no-cli-fail-fast-on-unloaded-subaccount.",
+		).Default("true").Envar("CLI_FAIL_FAST_ON_UNLOADED_SUBACCOUNT").Bool()
+		cliLookupCacheTTL = app.Flag(
+			"cli-lookup-cache-ttl",
+			"How long a successful answer to a service plan or service offering lookup by id is reused instead of asking the CLI server again. 0 switches the cache off.",
+		).Default("6h").Envar("CLI_LOOKUP_CACHE_TTL").Duration()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 	)
@@ -73,6 +85,9 @@ func main() {
 	ctrl.SetLogger(zl)
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
+	tfclient.SetSubaccountHierarchyCall(*cliSubaccountHierarchyCall)
+	tfclient.SetFailFastOnUnloadedSubaccount(*cliFailFastOnUnloadedSubaccount)
+	tfclient.SetLookupCacheTTL(*cliLookupCacheTTL)
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")

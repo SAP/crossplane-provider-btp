@@ -266,7 +266,7 @@ func (l *capLogger) Info(msg string, kv ...interface{}) {
 		l.kv[fmt.Sprint(kv[i])] = kv[i+1]
 	}
 }
-func (l *capLogger) Debug(string, ...interface{}) {}
+func (l *capLogger) Debug(string, ...interface{})             {}
 func (l *capLogger) WithValues(...interface{}) logging.Logger { return l }
 
 func TestEvictTransportLogsFailures(t *testing.T) {
