@@ -22,9 +22,9 @@ import (
 // btpcli sets these on every data request once a session exists; eviction reads
 // them off a 401'd request. Hard-coded because btpcli is internal/ and unimportable.
 const (
-	headerCLISessionId = "X-Cpcli-Sessionid"
-	headerCLISubdomain = "X-Cpcli-Subdomain"
-	headerCorrelationID = "X-Correlationid"
+	headerCLISessionId     = "X-Cpcli-Sessionid"
+	headerCLISubdomain     = "X-Cpcli-Subdomain"
+	headerCorrelationID    = "X-Correlationid"
 	headerCLIBackendStatus = "X-Cpcli-Backend-Status"
 )
 
@@ -149,9 +149,53 @@ type cliTransport struct {
 	evictSub func(subdomain string)
 	evictAll func()
 	log      logging.Logger
+	// hierarchy is nil when the hierarchy call is switched off, which keeps a
+	// literal cliTransport without it behaving as before.
+	hierarchy *hierarchyLoader
 }
 
+// RoundTrip absorbs the CLI server's bare 500 for a subaccount it has not loaded:
+// if that 500 reached btpcli's retry layer, the retry chain would hold the session
+// mutex and block every other request of the provider config for about a minute.
+// Resending is safe because a bare 500 carries no backend status, so the command
+// never reached the backend.
 func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	cmd := t.hierarchy.parse(r)
+	if cmd == nil {
+		return t.send(r)
+	}
+	resp, sent, err := t.sendCommand(r, cmd)
+	if isBare500(resp, err) {
+		t.hierarchy.forget(cmd.key, sent)
+	}
+	return resp, err
+}
+
+// sendCommand also returns when the answer's request was sent.
+func (t *cliTransport) sendCommand(r *http.Request, cmd *cliCommand) (*http.Response, time.Time, error) {
+	called, loaded := t.ensureLoaded(r, cmd, t.hierarchy.now().Add(-t.hierarchy.ttl))
+	sent := t.hierarchy.now()
+	resp, err := t.send(r)
+	if !loaded || called || !isBare500(resp, err) {
+		return resp, sent, err
+	}
+	// The remembered call was stale; repeat it unless someone did so after our send.
+	if _, loaded = t.ensureLoaded(r, cmd, sent); !loaded {
+		return resp, sent, err
+	}
+	body, gerr := r.GetBody()
+	if gerr != nil {
+		return resp, sent, err
+	}
+	_ = resp.Body.Close()
+	r2 := r.Clone(r.Context())
+	r2.Body = body
+	sent = t.hierarchy.now()
+	resp, err = t.send(r2)
+	return resp, sent, err
+}
+
+func (t *cliTransport) send(r *http.Request) (*http.Response, error) {
 	start := time.Now()
 	resp, err := t.base.RoundTrip(r)
 	t.logResult(r, resp, err, time.Since(start))

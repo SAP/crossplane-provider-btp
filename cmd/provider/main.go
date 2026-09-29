@@ -62,6 +62,10 @@ func main() {
 			"reconcile-timeout",
 			"Timeout for a single reconcile cycle (externalCtx budget). The reconciler adds a 30s grace period on top for status writes. Default is 1m.",
 		).Default("1m").Envar("RECONCILE_TIMEOUT").Duration()
+		cliSubaccountHierarchyCall = app.Flag(
+			"cli-subaccount-hierarchy-call",
+			"Make the CLI server load a subaccount before commands are sent for it. Disable with --no-cli-subaccount-hierarchy-call.",
+		).Default("true").Bool()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 	)
@@ -73,6 +77,7 @@ func main() {
 	ctrl.SetLogger(zl)
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
+	tfclient.SetSubaccountHierarchyCall(*cliSubaccountHierarchyCall)
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
