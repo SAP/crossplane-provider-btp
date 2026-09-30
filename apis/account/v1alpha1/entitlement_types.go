@@ -320,8 +320,9 @@ const (
 // -- the two are mutually exclusive, never both).
 //
 // Drift is reported whether or not the controller intends to correct it:
-// an AutoAssign, AutoAssigned, or unlimited assignment is never written
-// by needsUpdate, so it can hold Drift=True indefinitely. That is the
+// an AutoAssign or AutoAssigned assignment is never written by needsUpdate,
+// and numeric quota changes are suppressed for unlimited assignments, so
+// those can hold Drift=True indefinitely. That is the
 // ADR's intent -- a spec disagreeing with reality is most worth
 // surfacing precisely when nothing will fix it. Synced=True alongside
 // Drift=True is how a user tells "observed, not corrected" apart from a

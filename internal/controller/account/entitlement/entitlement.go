@@ -729,6 +729,12 @@ func (c *external) needsUpdate(cr *apisv1alpha1.Entitlement) bool {
 	if autoAssigned {
 		return false
 	}
+	// Enable-based aggregates compare the assigned flag even when BTP also
+	// reports an amount. An enabled assignment must still be disableable.
+	required := cr.Status.AtProvider.Required
+	if required != nil && required.Amount == nil && required.Enable != nil {
+		return *required.Enable != cr.Status.AtProvider.Assigned.UnlimitedAmountAssigned
+	}
 	unlimitedAmountAssigned := cr.Status.AtProvider.Assigned.UnlimitedAmountAssigned
 	if unlimitedAmountAssigned {
 		return false

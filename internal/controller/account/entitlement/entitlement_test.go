@@ -3245,7 +3245,7 @@ func TestObserveDrift(t *testing.T) {
 		}
 	})
 
-	t.Run("suppressed drift: enable-based CR (needsUpdate always false) still returns ResourceUpToDate=true with Diff set, no BTP write, and the Ready switch does not clear the Drift condition", func(t *testing.T) {
+	t.Run("enable drift requests Update and preserves Drift without writing during Observe", func(t *testing.T) {
 		cr := entitlement(withUID("cr-1"), withEnabled(true), withExternalName("subaccount-guid/service-name/service-plan-name"))
 		var createCalled, updateCalled, deleteCalled bool
 		mockClient := fake.MockClient{
@@ -3283,23 +3283,20 @@ func TestObserveDrift(t *testing.T) {
 		if err != nil {
 			t.Fatalf("e.Observe(...) returned unexpected error: %v", err)
 		}
-		if diff := cmp.Diff(managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true, Diff: wantDiff}, got); diff != "" {
+		if diff := cmp.Diff(managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: false, Diff: wantDiff}, got); diff != "" {
 			t.Errorf("\ne.Observe(...): -want, +got:\n%s\n", diff)
 		}
 		if createCalled || updateCalled || deleteCalled {
 			t.Errorf("Observe must never write to BTP: create=%v update=%v delete=%v", createCalled, updateCalled, deleteCalled)
 		}
 		assertDriftCondition(t, cr, wantDiff, true)
-		if readyStatus := cr.Status.GetCondition(xpv1.Available().Type).Status; readyStatus != xpv1.Available().Status {
-			t.Errorf("Ready condition status = %v, want %v -- setting Drift must not suppress the normal status switch", readyStatus, xpv1.Available().Status)
-		}
 		if len(recorder.events) != 1 {
 			t.Fatalf("recorded %d events, want 1", len(recorder.events))
 		}
 	})
 
 	t.Run("agreeing enable-based aggregate whose BTP assignment also carries an amount: needsCreate/assignFailedNoQuota do not block reaching drift, calculateDiff still prefers the enable comparison, so ResourceUpToDate=true with an empty Diff, NoDrift, and zero events", func(t *testing.T) {
-		// Mirrors the "suppressed drift" fixture above, but the desired
+		// Mirrors the enable-drift fixture above, but the desired
 		// enable AGREES with UnlimitedAmountAssigned even though the
 		// assignment also reports a numeric Amount. Pins that such a CR
 		// still reaches calculateDiff and produces no condition churn or
