@@ -34,6 +34,7 @@ func TestReconcileEntitlementProcessingFailed(t *testing.T) {
 		amount       *int
 		desired      int
 		enable       bool
+		autoAssign   bool
 		autoAssigned bool
 		wantDrift    bool
 		wantCreate   bool
@@ -42,10 +43,12 @@ func TestReconcileEntitlementProcessingFailed(t *testing.T) {
 		"historical failed reduction with correct quota":           {amount: internal.Ptr(2), desired: 2},
 		"historical failed removal with correct environment quota": {amount: internal.Ptr(1), desired: 1},
 		"rejected amount change retries update":                    {amount: internal.Ptr(2), desired: 1, wantDrift: true, wantUpdate: true},
-		"enable drift with positive quota":                         {amount: internal.Ptr(2000000000), enable: true, wantDrift: true},
-		"zero quota retries create":                                {amount: internal.Ptr(0), enable: true, wantCreate: true},
-		"unset quota retries create":                               {enable: true, wantCreate: true},
-		"auto-assigned zero quota is not recreated":                {amount: internal.Ptr(0), desired: 0, autoAssigned: true},
+		// AutoAssign intentionally suppresses writes independently of whether
+		// the controller reconciles enable drift for ordinary assignments.
+		"auto-assign enable drift with positive quota": {amount: internal.Ptr(2000000000), enable: true, autoAssign: true, wantDrift: true},
+		"zero quota retries create":                    {amount: internal.Ptr(0), enable: true, wantCreate: true},
+		"unset quota retries create":                   {enable: true, wantCreate: true},
+		"auto-assigned zero quota is not recreated":    {amount: internal.Ptr(0), desired: 0, autoAssigned: true},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -69,6 +72,7 @@ func TestReconcileEntitlementProcessingFailed(t *testing.T) {
 			assignment := &api.AssignedServicePlanSubaccountDTO{
 				EntityState:  internal.Ptr("PROCESSING_FAILED"),
 				StateMessage: internal.Ptr(message),
+				AutoAssign:   internal.Ptr(tc.autoAssign),
 				AutoAssigned: internal.Ptr(tc.autoAssigned),
 			}
 			if tc.amount != nil {
