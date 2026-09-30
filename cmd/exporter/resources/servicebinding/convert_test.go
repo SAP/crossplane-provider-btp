@@ -379,3 +379,16 @@ func TestConvertServiceBindingResource(t *testing.T) {
 		})
 	}
 }
+
+func TestRegisterDeduplicatesServiceBindings(t *testing.T) {
+	previousRegistry := registry
+	registry = resources.NewRegistry()
+	t.Cleanup(func() { registry = previousRegistry })
+
+	binding := &servicebindingbase.ServiceBinding{
+		ServiceBinding: &btpcli.ServiceBinding{ID: "binding-1"},
+	}
+
+	require.True(t, register(t.Context(), binding))
+	require.False(t, register(t.Context(), binding))
+}

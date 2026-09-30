@@ -4,6 +4,7 @@ import (
 	"context"
 	"maps"
 	"slices"
+	"sort"
 
 	"github.com/SAP/xp-clifford/cli/configparam"
 	"github.com/SAP/xp-clifford/cli/export"
@@ -23,7 +24,7 @@ type Kind interface {
 	// parameters. Then it collects the resource definitions
 	// through BTP Client. Finally, the resources are exported
 	// using the eventHandler.
-	Export(ctx context.Context, btpClient *btpcli.BtpCli, evHandler export.EventHandler, resolveReferences bool) error
+	Export(ctx context.Context, btpClient *btpcli.BtpCli, evHandler export.EventHandler, options Options) error
 }
 
 var kinds = map[string]Kind{}
@@ -33,25 +34,27 @@ func RegisterKind(kind Kind) {
 	kinds[kind.KindName()] = kind
 }
 
-// ConfigParams function returns the configuration parameters of all
-// registered resource kinds.
+// ConfigParams returns the selector configuration parameter for every
+// registered resource kind, ordered by kind name.
 func ConfigParams() []configparam.ConfigParam {
-	result := make([]configparam.ConfigParam, 0, len(kinds))
-	for _, kind := range kinds {
-		if p := kind.Param(); p != nil {
-			result = append(result, p)
+	params := make([]configparam.ConfigParam, 0, len(kinds))
+	for _, name := range KindNames() {
+		if param := kinds[name].Param(); param != nil {
+			params = append(params, param)
 		}
 	}
-	return result
+	return params
 }
 
 // KindNames function returns the names of the registered kinds.
 func KindNames() []string {
-	return slices.Collect(maps.Keys(kinds))
+	names := slices.Collect(maps.Keys(kinds))
+	sort.Strings(names)
+	return names
 }
 
 // ExportFn returns the export function of a given kind.
-func ExportFn(kind string) func(context.Context, *btpcli.BtpCli, export.EventHandler, bool) error {
+func ExportFn(kind string) func(context.Context, *btpcli.BtpCli, export.EventHandler, Options) error {
 	resource, ok := kinds[kind]
 	if !ok || resource == nil {
 		return nil
