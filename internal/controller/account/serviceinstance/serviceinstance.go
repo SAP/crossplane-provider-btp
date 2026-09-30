@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -279,9 +280,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			if err := e.saveInstanceData(ctx, cr, *data); err != nil {
 				return managed.ExternalObservation{}, errors.Wrap(err, errSaveData)
 			}
-			// Only set Available condition if ManagementPolicy is not only "Observe", since Available condition sets Ready to True
-			// and we don't want that for Observe-only resources
-			if !isObserveOnly(cr) {
+		}
+		// Terraform being up to date describes configuration, not BTP health.
+		// When async data is withheld, retain the last observed health instead
+		// of letting a previously failed instance report Available.
+		if !isObserveOnly(cr) {
+			if condition, unhealthy := externalHealthCondition(cr); unhealthy {
+				cr.SetConditions(condition)
+			} else if data != nil {
 				cr.SetConditions(xpv1.Available())
 			}
 		}
@@ -538,6 +544,47 @@ func isCreateFailure(cond xpv1.Condition) bool {
 		return false
 	}
 	return cond.Reason == ujresource.ReasonAsyncCreateFailure
+}
+
+// externalHealthCondition separates a failed BTP operation from an instance
+// that is not ready or usable yet. Missing flags do not imply failure, and
+// false flags alone are expected during deletion.
+func externalHealthCondition(cr *v1alpha1.ServiceInstance) (xpv1.Condition, bool) {
+	at := cr.Status.AtProvider
+	flagsFalse := (at.Ready != nil && !*at.Ready) || (at.Usable != nil && !*at.Usable)
+	reason := xpv1.ReasonUnavailable
+	if strings.EqualFold(at.State, "failed") {
+		reason = "ExternalResourceFailed"
+	} else if !cr.GetDeletionTimestamp().IsZero() || !flagsFalse {
+		return xpv1.Condition{}, false
+	}
+
+	message := fmt.Sprintf("BTP reports service instance health: state=%q ready=%s usable=%s",
+		at.State, boolPtrStr(at.Ready), boolPtrStr(at.Usable))
+	// Keep platform text bounded without splitting a UTF-8 character.
+	const maxMessageBytes = 1024
+	if len(message) > maxMessageBytes {
+		end := maxMessageBytes - len("...")
+		for !utf8.RuneStart(message[end]) {
+			end--
+		}
+		message = message[:end] + "..."
+	}
+	return xpv1.Condition{
+		Type:               xpv1.TypeReady,
+		Status:             corev1.ConditionFalse,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: cr.Generation,
+	}, true
+}
+
+func boolPtrStr(b *bool) string {
+	if b == nil {
+		return "unknown"
+	}
+	return strconv.FormatBool(*b)
 }
 
 func isObserveOnly(cr *v1alpha1.ServiceInstance) bool {
