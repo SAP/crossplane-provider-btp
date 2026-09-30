@@ -149,11 +149,11 @@ func (si *ServiceInstance) GetExternalName() string {
 }
 
 func (si *ServiceInstance) serviceInstanceExternalName() string {
-	if si.GetID() == "" || si.SubaccountID == "" {
+	if si.GetID() == "" {
 		return resources.UndefinedExternalName
 	}
 
-	return fmt.Sprintf("%s,%s", si.SubaccountID, si.GetID())
+	return si.GetID()
 }
 
 func (si *ServiceInstance) serviceManagerExternalName() string {
