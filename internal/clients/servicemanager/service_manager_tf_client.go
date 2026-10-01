@@ -68,16 +68,21 @@ type TfClientInitializer struct {
 }
 
 func (tfI *TfClientInitializer) ConnectResources(ctx context.Context, cr *apisv1beta1.ServiceManager) (ITfClient, error) {
-	siInstance := tfI.serviceInstanceCr(cr)
-	siExternal, err := tfI.siConnector.Connect(ctx, siInstance)
+	logger := log.FromContext(ctx)
+	connectStart := time.Now()
 
+	siInstance := tfI.serviceInstanceCr(cr)
+	t0 := time.Now()
+	siExternal, err := tfI.siConnector.Connect(ctx, siInstance)
+	logger.Info("ConnectResources: SI connect", "duration", time.Since(t0), "elapsed", time.Since(connectStart))
 	if err != nil {
 		return nil, err
 	}
 
 	siBinding := tfI.serviceBindingCr(cr)
+	t1 := time.Now()
 	sbExternal, err := tfI.sbConnector.Connect(ctx, siBinding)
-
+	logger.Info("ConnectResources: SB connect", "duration", time.Since(t1), "elapsed", time.Since(connectStart))
 	if err != nil {
 		return nil, err
 	}
@@ -211,15 +216,15 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 	logger := log.FromContext(ctx)
 	observeStart := time.Now()
 
-	// No SI GUID yet: skip TF observe. Upjet would call GetById("") → BTP CLI 400,
+	// No SI GUID yet: skip TF observe. Upjet would call GetById("") → BTP CLI 400
 	if meta.GetExternalName(tf.sInstance) == "" {
-		logger.V(1).Info("ObserveResources: SI external-name empty, skipping TF observe (no instance yet)")
+		logger.Info("ObserveResources: SI external-name empty, skipping TF observe (no instance yet)")
 		return ResourcesStatus{ExternalObservation: managed.ExternalObservation{ResourceExists: false}}, nil
 	}
 
 	t0 := time.Now()
 	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
-	logger.V(1).Info("ObserveResources: SI observe", "duration", time.Since(t0), "elapsed", time.Since(observeStart))
+	logger.Info("ObserveResources: SI observe", "duration", time.Since(t0), "elapsed", time.Since(observeStart))
 	if err != nil {
 		return ResourcesStatus{}, err
 	}
@@ -263,7 +268,7 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 	}
 	t1 := time.Now()
 	sbObs, err := tf.sbExternal.Observe(ctx, tf.sBinding)
-	logger.V(1).Info("ObserveResources: SB observe", "duration", time.Since(t1), "elapsed", time.Since(observeStart))
+	logger.Info("ObserveResources: SB observe", "duration", time.Since(t1), "elapsed", time.Since(observeStart))
 	if err != nil {
 		return ResourcesStatus{}, err
 	}
@@ -284,7 +289,7 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 	// since they reimplement Observe()
 	t2 := time.Now()
 	resourceUpToDate := tf.resourcesUpToDate(ctx)
-	logger.V(1).Info("ObserveResources: SI observe (upToDate check)", "duration", time.Since(t2), "elapsed", time.Since(observeStart))
+	logger.Info("ObserveResources: SI observe (upToDate check)", "duration", time.Since(t2), "elapsed", time.Since(observeStart))
 
 	return ResourcesStatus{
 		ExternalObservation: managed.ExternalObservation{
