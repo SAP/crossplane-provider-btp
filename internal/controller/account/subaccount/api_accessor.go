@@ -13,10 +13,18 @@ import (
 type AccountsApiAccessor interface {
 	MoveSubaccount(ctx context.Context, subaccountGuid string, targetId string) error
 	UpdateSubaccount(ctx context.Context, subaccountGuid string, payload accountclient.UpdateSubaccountRequestPayload) error
-	// SubaccountGuidBySubdomain looks up a subaccount by subdomain (unique in a
-	// global account) and returns its BTP-reported createdAt for the ownership
-	// check in internal/recovery.
-	SubaccountGuidBySubdomain(ctx context.Context, subdomain string) (guid string, createdAt time.Time, found bool, err error)
+	// FindSubaccount looks up the subaccount with the given subdomain, which
+	// is unique in a global account.
+	FindSubaccount(ctx context.Context, subdomain string) (SubaccountMatch, bool, error)
+}
+
+// SubaccountMatch identifies the subaccount a lookup found. CreatedAt feeds
+// the ownership check in internal/recovery, Region the identity check of
+// adoption.
+type SubaccountMatch struct {
+	GUID      string
+	Region    string
+	CreatedAt time.Time
 }
 
 type AccountsClient struct {
@@ -45,39 +53,36 @@ func (a *AccountsClient) MoveSubaccount(ctx context.Context, subaccountGuid stri
 
 var _ AccountsApiAccessor = &AccountsClient{}
 
-// SubaccountGuidBySubdomain implements AccountsApiAccessor.
-func (a *AccountsClient) SubaccountGuidBySubdomain(ctx context.Context, subdomain string) (string, time.Time, bool, error) {
+// FindSubaccount implements AccountsApiAccessor.
+func (a *AccountsClient) FindSubaccount(ctx context.Context, subdomain string) (SubaccountMatch, bool, error) {
 	if subdomain == "" {
-		return "", time.Time{}, false, nil
+		return SubaccountMatch{}, false, nil
 	}
 	collection, _, err := a.btp.AccountsServiceClient.SubaccountOperationsAPI.
 		GetSubaccounts(ctx).
 		Execute()
 	if err != nil {
-		return "", time.Time{}, false, err
+		return SubaccountMatch{}, false, err
 	}
 
-	type match struct {
-		guid    string
-		created time.Time
-	}
-	var matches []match
+	var matches []SubaccountMatch
 	for _, sa := range collection.GetValue() {
 		if sa.Subdomain == subdomain {
 			// BTP accounts service returns createdDate as milliseconds since epoch.
-			matches = append(matches, match{
-				guid:    sa.Guid,
-				created: time.UnixMilli(sa.GetCreatedDate()),
+			matches = append(matches, SubaccountMatch{
+				GUID:      sa.Guid,
+				Region:    sa.Region,
+				CreatedAt: time.UnixMilli(sa.GetCreatedDate()),
 			})
 		}
 	}
 	switch len(matches) {
 	case 0:
-		return "", time.Time{}, false, nil
+		return SubaccountMatch{}, false, nil
 	case 1:
-		return matches[0].guid, matches[0].created, true, nil
+		return matches[0], true, nil
 	default:
-		return "", time.Time{}, false, errors.Errorf(
-			"refusing to recover: %d subaccounts match subdomain %q in this global account", len(matches), subdomain)
+		return SubaccountMatch{}, false, errors.Errorf(
+			"%d subaccounts match subdomain %q in this global account", len(matches), subdomain)
 	}
 }
