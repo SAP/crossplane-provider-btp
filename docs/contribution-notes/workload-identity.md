@@ -1,6 +1,9 @@
 # Workload identity authentication
 
-This opt-in PoC replaces the provider user's email/password authentication with a
+For the complete IAS, BTP, manual CIS and Kubernetes setup procedure, see the
+[end-user workload identity guide](../end-user-guides/setup/workload-identity.md).
+
+This opt-in mode replaces the provider user's email/password authentication with a
 rotating projected ServiceAccount assertion. CIS instances and bindings remain
 manually provisioned, and their service-client secrets remain. Legacy password
 ProviderConfigs select their existing path when workloadIdentity is absent.
@@ -14,7 +17,7 @@ ProviderConfigs select their existing path when workloadIdentity is absent.
    Corporate Identity Providers and Save. A displayed row is not proof that its
    trust checkbox is selected. Keep trust-all disabled.
 3. Mount a projected ServiceAccount JWT without subPath so kubelet rotation is
-   visible. Audience must equal the IAS discovery issuer; request600seconds.
+   visible. Audience must equal the IAS discovery issuer; request 600 seconds.
    Keep the Kubernetes API token separate. Never store/assert the JWT in a CR,
    environment variable, example, local file or log.
 4. Manually install central CIS credentials for account APIs. Environment CRs
@@ -90,22 +93,22 @@ are a separate validation item.
 ## Token lifecycle and verification
 
 Terraform sessions reuse issuer/subject identity across JWT rotation and recycle
-at15minutes; HTTP/backend401 evicts them for reconciliation retry. CF sessions
-rebuild from the mounted token after refresh/authentication failure or15minutes;
+at 15 minutes; HTTP/backend 401 evicts them for reconciliation retry. CF sessions
+rebuild from the mounted token after refresh/authentication failure or 15 minutes;
 access/refresh tokens remain in memory. Native CIS user tokens reread the mounted
-JWT on token expiry/15minute replacement; backend401 invalidates the cached token
+JWT on token expiry/15-minute replacement; backend 401 invalidates the cached token
 for the next reconcile without replaying a potentially mutating native API call.
 Server session policy, revocation and long-duration expiry are separate gates.
 
 Tests cover existing password paths, both Terraform builders, manual CIS metadata,
 real CF/JWT protocol, concurrent login, rotation/principal isolation, access-token
-expiry, rejected/absent refresh tokens and401 invalidation. Live tests must record
+expiry, rejected/absent refresh tokens and 401 invalidation. Live tests must record
 exact source/image and independently verify backend create/update/delete and audit
 identity. Restart proves fresh login; a steady process crossing the original JWT
-expiry and15minute recycle is needed to prove replacement from a new projection.
+expiry and 15-minute recycle is needed to prove replacement from a new projection.
 
 ServiceInstance name-based plan resolution still needs Service Manager credentials;
 a pre-resolved plan ID skips it. Existing SI/SB ownership/rotation/recovery behavior
 and service-specific credential requirements remain. Full legacy live regression,
 all-resource parity, interrupted-create recovery and same-principal allow/deny
-audit comparison are separate from the demonstrated authentication PoC.
+audit comparison are separate from the demonstrated authentication flows.
