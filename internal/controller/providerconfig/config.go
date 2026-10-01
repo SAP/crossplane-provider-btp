@@ -111,8 +111,8 @@ func CreateClient(
 
 	if pc.Spec.WorkloadIdentity != nil {
 		var cis btp.CISCredential
-		if err := json.Unmarshal(CISSecretData, &cis); err != nil || cis.GrantType != "client_credentials" {
-			return nil, errors.New("workload identity requires native CIS credentials with grant_type=client_credentials; password grants are unsupported")
+		if err := json.Unmarshal(CISSecretData, &cis); err != nil || !allowedWorkloadCISGrant(pc, cis.GrantType) {
+			return nil, errors.New("workload identity requires client_credentials CIS or configured IAS user exchange")
 		}
 	}
 	ServiceAccountSecretData, saErr := loadSaCredentials(ctx, kube, pc)
@@ -174,7 +174,7 @@ func loadCisCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.Pr
 // loadSaCredentials loads Service Account credentials from secret
 func loadSaCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig) ([]byte, error) {
 	if pc.Spec.WorkloadIdentity != nil {
-		return json.Marshal(btp.UserCredential{Email: pc.Spec.WorkloadIdentity.UserEmail, Username: pc.Spec.WorkloadIdentity.UserEmail, Idp: pc.Spec.WorkloadIdentity.IdentityProvider, TokenFile: pc.Spec.WorkloadIdentity.TokenFile})
+		return json.Marshal(btp.UserCredential{Email: pc.Spec.WorkloadIdentity.UserEmail, Username: pc.Spec.WorkloadIdentity.UserEmail, Idp: pc.Spec.WorkloadIdentity.IdentityProvider, TokenFile: pc.Spec.WorkloadIdentity.TokenFile, IASURL: pc.Spec.WorkloadIdentity.IASURL, IASClientID: pc.Spec.WorkloadIdentity.IASClientID, IASResource: pc.Spec.WorkloadIdentity.IASResource})
 	}
 	cd := pc.Spec.ServiceAccountSecret
 
@@ -230,6 +230,11 @@ func ValidateWorkloadIdentity(pc *v1alpha1.ProviderConfig) error {
 	if w.TokenFile == "" || w.IdentityProvider == "" || w.UserEmail == "" || pc.Spec.GlobalAccount == "" {
 		return errors.New("workload identity requires tokenFile, identityProvider, userEmail and globalAccount")
 	}
+	if w.IASURL != "" || w.IASClientID != "" || w.IASResource != "" {
+		if w.IASURL == "" || w.IASClientID == "" || w.IASResource == "" {
+			return errors.New("native IAS exchange requires iasUrl, iasClientId and iasResource")
+		}
+	}
 	cd := pc.Spec.ServiceAccountSecret
 	if cd.Source != "" && cd.Source != "None" || cd.SecretRef != nil {
 		return errors.New("workload identity cannot be combined with serviceAccountSecret credentials")
@@ -244,9 +249,13 @@ func LoadEnvironmentUserCredentials(ctx context.Context, kube client.Client, pc 
 	}
 	if pc.Spec.WorkloadIdentity != nil {
 		var cis btp.CISCredential
-		if err := json.Unmarshal(cisBinding, &cis); err != nil || cis.GrantType != "client_credentials" {
-			return nil, errors.New("workload identity requires local CIS grant_type=client_credentials")
+		if err := json.Unmarshal(cisBinding, &cis); err != nil || !allowedWorkloadCISGrant(pc, cis.GrantType) {
+			return nil, errors.New("workload identity requires local client_credentials CIS or configured IAS user exchange")
 		}
 	}
 	return loadSaCredentials(ctx, kube, pc)
+}
+
+func allowedWorkloadCISGrant(pc *v1alpha1.ProviderConfig, grant string) bool {
+	return grant == "client_credentials" || grant == "user_token" && pc.Spec.WorkloadIdentity.IASURL != "" && pc.Spec.WorkloadIdentity.IASClientID != "" && pc.Spec.WorkloadIdentity.IASResource != ""
 }

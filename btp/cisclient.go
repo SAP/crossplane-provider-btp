@@ -47,11 +47,14 @@ type Credentials struct {
 }
 
 type UserCredential struct {
-	Email     string
-	Username  string
-	Password  string
-	Idp       string
-	TokenFile string `json:",omitempty"`
+	Email       string
+	Username    string
+	Password    string
+	Idp         string
+	TokenFile   string `json:",omitempty"`
+	IASURL      string `json:",omitempty"`
+	IASClientID string `json:",omitempty"`
+	IASResource string `json:",omitempty"`
 }
 
 type CISCredential struct {
@@ -174,6 +177,7 @@ func credentialCacheKey(c *Credentials) string {
 			c.UserCredential.Password,
 			c.UserCredential.Idp,
 			c.UserCredential.TokenFile,
+			c.UserCredential.IASURL, c.UserCredential.IASClientID, c.UserCredential.IASResource,
 		)
 	}
 	return strings.Join(parts, "\x00")
@@ -214,6 +218,9 @@ func createClient(credential *Credentials, config *clientcredentials.Config) Cli
 	// own *http.Client → 3 independent token caches → extra token POSTs per
 	// Observe.
 	sharedHTTPClient := sharedOAuthClient(config)
+	if credential.UserCredential != nil && credential.UserCredential.TokenFile != "" && !isGrantTypeClientCredentials(credential) {
+		sharedHTTPClient = workloadCISHTTPClient(credential)
+	}
 	client := Client{
 		AccountsServiceClient:     createAccountsServiceClient(credential, sharedHTTPClient),
 		EntitlementsServiceClient: createEntitlementsServiceClient(credential, sharedHTTPClient),
@@ -331,6 +338,12 @@ func ServiceClientFromSecret(cisSecret []byte, userSecret []byte) (Client, error
 	if err := json.Unmarshal(userSecret, &userCredential); err != nil {
 		return Client{}, errors.Wrap(err, errCouldNotParseUserCredential)
 
+	}
+
+	if userCredential.TokenFile != "" && cisCredential.GrantType != "client_credentials" {
+		if cisCredential.GrantType != "user_token" || userCredential.IASURL == "" || userCredential.IASClientID == "" || userCredential.IASResource == "" {
+			return Client{}, errors.New("workload user CIS binding requires explicit IAS federation configuration")
+		}
 	}
 
 	credential := &Credentials{
