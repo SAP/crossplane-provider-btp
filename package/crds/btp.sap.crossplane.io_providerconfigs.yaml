@@ -184,9 +184,18 @@ spec:
                 type: object
               workloadIdentity:
                 description: |-
-                  WorkloadIdentity replaces user/password authentication for Terraform/CLI clients.
+                  WorkloadIdentity replaces user/password authentication with projected assertions.
                   Native clients still require manually provisioned CIS credentials.
                 properties:
+                  iasClientId:
+                    type: string
+                  iasResource:
+                    type: string
+                  iasUrl:
+                    description: |-
+                      IASURL, IASClientID and IASResource enable user-preserving native CIS JWT exchange.
+                      The confidential IAS client authenticates with the projected JWT; CIS bindings remain manual.
+                    type: string
                   identityProvider:
                     description: IdentityProvider is the BTP platform trust origin.
                     minLength: 1
