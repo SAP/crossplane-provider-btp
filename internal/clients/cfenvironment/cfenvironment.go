@@ -122,6 +122,9 @@ func (c CloudFoundryOrganization) createClient(environment *provisioningclient.B
 	*organizationClient,
 	error,
 ) {
+	if err := c.requirePassword(); err != nil {
+		return nil, err
+	}
 	org, err := c.btp.ExtractOrg(environment)
 	if err != nil {
 		return nil, err
@@ -138,6 +141,9 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 	*organizationClient,
 	error,
 ) {
+	if err := c.requirePassword(); err != nil {
+		return nil, err
+	}
 	cloudFoundryClient, err := newOrganizationClient(
 		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
 		c.btp.Credential.UserCredential.Password, c.btp.Credential.UserCredential.Idp,
@@ -272,4 +278,11 @@ func newOrganizationClient(organizationName string, url string, orgId string, us
 		organizationName: organizationName,
 		orgGuid:          orgId,
 	}, nil
+}
+
+func (c CloudFoundryOrganization) requirePassword() error {
+	if c.btp.Credential == nil || c.btp.Credential.UserCredential == nil || c.btp.Credential.UserCredential.Username == "" || c.btp.Credential.UserCredential.Password == "" {
+		return fmt.Errorf("Cloud Foundry organization manager operations require username/password credentials; workload assertion authentication covers BTP Terraform/CLI only")
+	}
+	return nil
 }
