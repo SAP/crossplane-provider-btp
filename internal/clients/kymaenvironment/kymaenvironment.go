@@ -55,6 +55,12 @@ func (c KymaEnvironments) DescribeInstance(
 	return environment, nil
 }
 
+// FindInstance implements Client. It matches on the environment name only;
+// the caller verifies the rest of the identity.
+func (c KymaEnvironments) FindInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
+	return c.btp.FindEnvironment(ctx, btp.KymaEnvironmentType(), GetKymaEnvironmentName(cr))
+}
+
 func (c KymaEnvironments) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error) {
 
 	parameters, err := internal.UnmarshalRawParameters(cr.Spec.ForProvider.Parameters.Raw)

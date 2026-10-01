@@ -23,6 +23,10 @@ type Client interface {
 		[]v1alpha1.User,
 		error,
 	)
+	// FindInstance returns the subaccount's Cloud Foundry environment; found
+	// is false when there is none. BTP allows one per subaccount, so it is not
+	// matched by name: verifying what cr declares is the caller's job.
+	FindInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (instance provisioningclient.BusinessEnvironmentInstanceResponseObject, found bool, err error)
 	CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error)
 	UpdateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error
 	DeleteInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error)

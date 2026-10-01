@@ -12,6 +12,7 @@ import (
 type MockClient struct {
 	MockDescribeCluster func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error)
 	MockCreate          func(cr v1alpha1.CloudFoundryEnvironment) (string, error)
+	MockFindInstance    func(cr v1alpha1.CloudFoundryEnvironment) (provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error)
 	MockDelete          func(cr v1alpha1.CloudFoundryEnvironment) (*http.Response, error)
 	MockUpdate          func(cr v1alpha1.CloudFoundryEnvironment) error
 
@@ -24,6 +25,10 @@ func (m MockClient) NeedsUpdate(cr v1alpha1.CloudFoundryEnvironment) bool {
 
 func (m MockClient) DescribeInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 	return m.MockDescribeCluster(cr)
+}
+
+func (m MockClient) FindInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
+	return m.MockFindInstance(cr)
 }
 
 func (m MockClient) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error) {

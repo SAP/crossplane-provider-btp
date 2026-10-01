@@ -179,6 +179,11 @@ func (c CloudFoundryOrganization) DeleteInstance(ctx context.Context, cr v1alpha
 	return c.btp.DeleteEnvironmentInstanceByID(ctx, externalName)
 }
 
+// FindInstance implements Client.
+func (c CloudFoundryOrganization) FindInstance(ctx context.Context, _ v1alpha1.CloudFoundryEnvironment) (provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
+	return c.btp.FindCloudFoundryEnvironment(ctx)
+}
+
 func FormOrgName(orgName string, subaccountId string, crName string) string {
 	if orgName == "" {
 		return subaccountId + "-" + crName
