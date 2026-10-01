@@ -43,6 +43,10 @@ func (r *recorderFake) has(reason string) bool {
 
 // lookuperFake is a test double for servicemanager.SemanticLookuper.
 type lookuperFake struct {
+	// Embedded so the fake satisfies the interface; recovery never calls
+	// the adoption Find* methods, and a call would panic on the nil interface.
+	smClient.SemanticLookuper
+
 	siGUID      string
 	siCreatedAt time.Time
 	siFound     bool
