@@ -28,6 +28,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	kymaenv "github.com/sap/crossplane-provider-btp/internal/clients/kymaenvironment"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -35,6 +36,7 @@ import (
 
 const (
 	errNotKymaEnvironment   = "managed resource is not a KymaEnvironment custom resource"
+	errAdoptLookup          = "cannot look up kyma environment to adopt"
 	errExtractSecretKey     = "No Cloud Management Secret Found"
 	errGetCredentialsSecret = "Could not get secret of local cloud management"
 	errTrackPCUsage         = "cannot track ProviderConfig usage"
@@ -103,10 +105,46 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
+// adopt imports an existing Kyma environment when the user opted in (see
+// package adoption). The environment is found by name in the subaccount and
+// must run on the declared plan: the plan fixes the hyperscaler and cannot
+// change, so a match on another plan is refused rather than adopted, and
+// nothing is created over it. When nothing matches, adopt returns nil and
+// Observe goes on to report the environment missing, so it is created.
+func (c *external) adopt(ctx context.Context, cr *v1alpha1.KymaEnvironment) error {
+	pending, err := adoption.Pending(cr)
+	if err != nil || !pending {
+		return err
+	}
+
+	instance, found, err := c.client.FindInstance(ctx, *cr)
+	if err != nil {
+		return errors.Wrap(err, errAdoptLookup)
+	}
+	if !found {
+		return nil
+	}
+
+	name := kymaenv.GetKymaEnvironmentName(*cr)
+	if declared := cr.Spec.ForProvider.PlanName; instance.GetPlanName() != declared {
+		return errPlanMismatch(name, instance.GetId(), instance.GetPlanName(), declared)
+	}
+
+	return adoption.Commit(ctx, c.kube, c.record, cr, instance.GetId(), "name="+name)
+}
+
+func errPlanMismatch(name, id, found, declared string) error {
+	return errors.Errorf("refusing to adopt kyma environment %q (%s): it runs on plan %s, the spec declares %s", name, id, found, declared)
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.KymaEnvironment)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotKymaEnvironment)
+	}
+
+	if err := c.adopt(ctx, cr); err != nil {
+		return managed.ExternalObservation{}, err
 	}
 
 	// Check if external-name is empty first - resource needs creation

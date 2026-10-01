@@ -2,9 +2,12 @@ package cloudfoundry
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -16,8 +19,10 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	env "github.com/sap/crossplane-provider-btp/internal/clients/cfenvironment"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
+	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
 
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -38,6 +43,9 @@ const (
 
 	errGetPC    = "cannot get ProviderConfig"
 	errGetCreds = "cannot get credentials"
+
+	errAdoptLookup  = "cannot look up cloud foundry environment to adopt"
+	errAdoptOrgName = "cannot read the org name of the cloud foundry environment to adopt"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -48,6 +56,8 @@ type connector struct {
 	resourcetracker tracking.ReferenceResolverTracker
 
 	newServiceFn func(cisSecretData []byte, serviceAccountSecretData []byte) (*btp.Client, error)
+	// recorder emits Kubernetes events for adoption. May be nil.
+	recorder event.Recorder
 }
 
 // Connect typically produces an ExternalClient by:
@@ -106,7 +116,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 	svc, err := c.newServiceFn(cisBinding, ServiceAccountSecretData)
 
-	return &external{client: env.NewCloudFoundryOrganization(*svc), kube: c.kube}, err
+	return &external{client: env.NewCloudFoundryOrganization(*svc), kube: c.kube, recorder: c.recorder}, err
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
@@ -114,6 +124,8 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 type external struct {
 	client env.Client
 	kube   client.Client
+	// recorder emits Kubernetes events for adoption. May be nil.
+	recorder event.Recorder
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -122,10 +134,76 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
+// adopt imports the subaccount's Cloud Foundry environment when the user
+// opted in (see package adoption). BTP allows one per subaccount, so it is
+// found by type, and every field the spec declares must match it: orgName,
+// environmentName and landscape. The provider never updates a Cloud Foundry
+// environment, so a declared value that differs could never converge; such a
+// match is refused rather than adopted, and nothing is created over it.
+// Fields the spec leaves out state no intent and are not compared;
+// initialOrgManagers only applies at creation and is never compared. When
+// there is no environment, adopt returns nil and Observe goes on to report it
+// missing, so it is created.
+func (c *external) adopt(ctx context.Context, cr *v1alpha1.CloudFoundryEnvironment) error {
+	pending, err := adoption.Pending(cr)
+	if err != nil || !pending {
+		return err
+	}
+
+	instance, found, err := c.client.FindInstance(ctx, *cr)
+	if err != nil {
+		return errors.Wrap(err, errAdoptLookup)
+	}
+	if !found {
+		return nil
+	}
+
+	mismatches, err := identityMismatches(cr.Spec.ForProvider, instance)
+	if err != nil {
+		return err
+	}
+	if len(mismatches) > 0 {
+		return errIdentityMismatch(instance.GetId(), mismatches)
+	}
+
+	return adoption.Commit(ctx, c.kube, c.recorder, cr, instance.GetId(), "the subaccount's cloudfoundry environment")
+}
+
+// identityMismatches lists every field fp declares that differs from
+// instance. The org name is read from the labels BTP sets on the environment,
+// and only when fp declares one.
+func identityMismatches(fp v1alpha1.CfEnvironmentParameters, instance provisioningclient.BusinessEnvironmentInstanceResponseObject) ([]string, error) {
+	var mismatches []string
+	differs := func(field, declared, actual string) {
+		if declared != "" && declared != actual {
+			mismatches = append(mismatches, fmt.Sprintf("%s: spec declares %q, environment has %q", field, declared, actual))
+		}
+	}
+
+	if fp.OrgName != "" {
+		org, err := btp.NewCloudFoundryOrgByLabel(instance.GetLabels())
+		if err != nil {
+			return nil, errors.Wrap(err, errAdoptOrgName)
+		}
+		differs("orgName", fp.OrgName, org.Name)
+	}
+	differs("environmentName", fp.EnvironmentName, instance.GetName())
+	differs("landscape", fp.Landscape, instance.GetLandscapeLabel())
+	return mismatches, nil
+}
+
+func errIdentityMismatch(id string, mismatches []string) error {
+	return errors.Errorf("refusing to adopt cloud foundry environment %s: %s", id, strings.Join(mismatches, "; "))
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotEnvironment)
+	}
+
+	if err := c.adopt(ctx, cr); err != nil {
+		return managed.ExternalObservation{}, err
 	}
 
 	// Check if external-name is empty

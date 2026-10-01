@@ -32,6 +32,10 @@ type InstanceParameters = map[string]interface{}
 type EnvironmentType struct {
 	Identifier  string
 	ServiceName string
+
+	// InstanceNameParameter is the creation parameter that carries an
+	// environment's name, which is how FindEnvironment identifies it.
+	InstanceNameParameter string
 }
 
 type Client struct {
