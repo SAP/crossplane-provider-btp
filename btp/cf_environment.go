@@ -44,7 +44,7 @@ func (c *Client) CreateCloudFoundryEnvironment(
 		EnvironmentType: envType.Identifier,
 		LandscapeLabel:  &landscape,
 		Name:            envName,
-		Origin:          nil,
+		Origin:          c.workloadOrigin(),
 		Parameters:      parameters,
 		PlanName:        cloudFoundryPlanName,
 		ServiceName:     envType.ServiceName,
@@ -186,4 +186,11 @@ func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 		Name:        labels["Org Name"],
 		ApiEndpoint: labels["API Endpoint"],
 	}, nil
+}
+
+func (c *Client) workloadOrigin() *string {
+	if c.Credential != nil && c.Credential.UserCredential != nil && c.Credential.UserCredential.TokenFile != "" {
+		return internal.Ptr(c.Credential.UserCredential.Idp)
+	}
+	return nil
 }

@@ -174,7 +174,7 @@ func loadCisCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.Pr
 // loadSaCredentials loads Service Account credentials from secret
 func loadSaCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig) ([]byte, error) {
 	if pc.Spec.WorkloadIdentity != nil {
-		return json.Marshal(btp.UserCredential{Email: pc.Spec.WorkloadIdentity.UserEmail, Idp: pc.Spec.WorkloadIdentity.IdentityProvider})
+		return json.Marshal(btp.UserCredential{Email: pc.Spec.WorkloadIdentity.UserEmail, Username: pc.Spec.WorkloadIdentity.UserEmail, Idp: pc.Spec.WorkloadIdentity.IdentityProvider, TokenFile: pc.Spec.WorkloadIdentity.TokenFile})
 	}
 	cd := pc.Spec.ServiceAccountSecret
 
@@ -235,4 +235,18 @@ func ValidateWorkloadIdentity(pc *v1alpha1.ProviderConfig) error {
 		return errors.New("workload identity cannot be combined with serviceAccountSecret credentials")
 	}
 	return nil
+}
+
+// LoadEnvironmentUserCredentials keeps manual local CIS credentials independent of user authentication.
+func LoadEnvironmentUserCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig, cisBinding []byte) ([]byte, error) {
+	if err := ValidateWorkloadIdentity(pc); err != nil {
+		return nil, err
+	}
+	if pc.Spec.WorkloadIdentity != nil {
+		var cis btp.CISCredential
+		if err := json.Unmarshal(cisBinding, &cis); err != nil || cis.GrantType != "client_credentials" {
+			return nil, errors.New("workload identity requires local CIS grant_type=client_credentials")
+		}
+	}
+	return loadSaCredentials(ctx, kube, pc)
 }

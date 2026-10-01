@@ -42,3 +42,14 @@ ServiceInstance name-based plan resolution still needs a Service Manager Secret.
 ## Validation
 
 Tests exercise both setup paths without reading any Secret, refreshed token reads, rejection of mixed user credential inputs, real Terraform protocol-v5 assertion login with no username/password, cache reuse across JWT rotation, eviction/recycle reauthentication, and native email metadata. Existing password setup/cache tests remain applicable. Live verification should create/delete SI/SB CRs with a manual CIS Secret, restart the provider, and repeat using a newly issued projected token. Do not infer real expiry recovery from restart alone.
+
+
+Cloud Foundry environment support uses a separate manually supplied local CIS
+client-credentials binding (`__raw` in the environment's Cloud Management Secret).
+The provider passes the workload email and origin to native environment creation,
+and uses JWT-bearer authentication for CF organization-manager calls. The mounted
+assertion is reread after authentication/refresh failure and every 15 minutes.
+The central CIS binding in ProviderConfig remains responsible for account APIs.
+Legacy password authentication remains selected when workloadIdentity is absent.
+Kyma connectors now accept workload metadata plus manual local CIS credentials;
+a CF lifecycle does not establish Kyma or subscription lifecycle coverage.
