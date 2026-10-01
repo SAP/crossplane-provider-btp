@@ -182,6 +182,30 @@ spec:
                 required:
                 - source
                 type: object
+              workloadIdentity:
+                description: |-
+                  WorkloadIdentity replaces user/password authentication for Terraform/CLI clients.
+                  Native clients still require manually provisioned CIS credentials.
+                properties:
+                  identityProvider:
+                    description: IdentityProvider is the BTP platform trust origin.
+                    minLength: 1
+                    type: string
+                  tokenFile:
+                    description: TokenFile is the mounted projected ServiceAccount
+                      JWT path.
+                    minLength: 1
+                    type: string
+                  userEmail:
+                    description: UserEmail supplies non-secret identity metadata required
+                      by native operations.
+                    minLength: 1
+                    type: string
+                required:
+                - identityProvider
+                - tokenFile
+                - userEmail
+                type: object
             required:
             - cisCredentials
             type: object
