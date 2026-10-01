@@ -98,6 +98,8 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
+	go runCISDiagnostic(mgr.GetAPIReader(), log)
+
 	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, backoffBase, backoffMax, enableManagementPolicies)
 	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, backoffBase, backoffMax, enableManagementPolicies)
 
