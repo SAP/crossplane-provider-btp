@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/pkg/errors"
@@ -68,8 +69,12 @@ func TestLookup(t *testing.T) {
 				PlanLookupMockFn: func() (string, error) {
 					return "", errors.New("PlanLookupError")
 				},
+				DeleteMockFn: func() (*http.Response, error) {
+					return response(200), nil
+				},
 			}, want: want{
-				err: true,
+				err:          true,
+				deleteCalled: true,
 			},
 		},
 		{
@@ -161,6 +166,99 @@ func TestLookup(t *testing.T) {
 			}
 		})
 	}
+}
+
+// These failures occur after the Accounts API has created the temporary helper.
+// Its deletion must still run, with usable credentials and a bounded context,
+// and must not hide either the lookup failure or a cleanup failure.
+func TestDynamicServiceInstanceCleanup(t *testing.T) {
+	lookupErr := errors.New("plan lookup failed")
+	cleanupErr := errors.New("admin binding delete failed")
+	tests := []struct {
+		name         string
+		lookupErr    error
+		lookupID     string
+		cleanupErr   error
+		cancelLookup bool
+	}{
+		{name: "lookup failure", lookupErr: lookupErr},
+		{name: "partial lookup failure", lookupErr: lookupErr, lookupID: "partial-id"},
+		{name: "canceled lookup", lookupErr: context.Canceled, cancelLookup: true},
+		{name: "lookup succeeds after cancellation", cancelLookup: true},
+		{name: "cleanup failure", cleanupErr: cleanupErr},
+		{name: "lookup and cleanup fail", lookupErr: lookupErr, cleanupErr: cleanupErr},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			type contextKey struct{}
+			ctx, cancel := context.WithCancel(context.WithValue(context.Background(), contextKey{}, "credentials"))
+			defer cancel()
+			deleteCalls := 0
+			api := &cleanupContextSubaccountService{
+				SubaccountServiceFake: SubaccountServiceFake{
+					CreateMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
+						return adminBinding(), response(200), nil
+					},
+				},
+				deleteFn: func(deleteCtx context.Context) (*http.Response, error) {
+					deleteCalls++
+					if deleteCtx.Err() != nil {
+						t.Errorf("cleanup context is canceled: %v", deleteCtx.Err())
+					}
+					if deleteCtx.Value(contextKey{}) != "credentials" {
+						t.Error("cleanup context lost authentication values")
+					}
+					deadline, ok := deleteCtx.Deadline()
+					if !ok || time.Until(deadline) <= 0 || time.Until(deadline) > time.Minute {
+						t.Errorf("cleanup must have a bounded future deadline, got %v (set: %v)", deadline, ok)
+					}
+					return response(200), tc.cleanupErr
+				},
+			}
+			client := ServiceManagerInstanceProxyClient{SubaccountOperationsAPI: api}
+			id, err := client.dynamicServiceInstance(ctx, "subaccount", func(*BindingCredentials) (string, error) {
+				if tc.cancelLookup {
+					cancel()
+				}
+				if tc.lookupErr != nil {
+					return tc.lookupID, tc.lookupErr
+				}
+				return "plan-id", nil
+			})
+			if deleteCalls != 1 {
+				t.Errorf("expected one helper deletion, got %d", deleteCalls)
+			}
+			if tc.lookupErr != nil && !errors.Is(err, tc.lookupErr) {
+				t.Errorf("lookup error was lost: %v", err)
+			}
+			if tc.cleanupErr != nil && !errors.Is(err, tc.cleanupErr) {
+				t.Errorf("cleanup error was lost: %v", err)
+			}
+			if tc.lookupErr != nil && tc.cleanupErr == nil && err != tc.lookupErr {
+				t.Errorf("successful cleanup must preserve the original lookup error, got %v", err)
+			}
+			if tc.lookupErr == nil && tc.cleanupErr == nil {
+				if err != nil || id != "plan-id" {
+					t.Errorf("expected successful lookup, got id %q, error %v", id, err)
+				}
+			} else if id != "" {
+				t.Errorf("failed lookup or cleanup must not return a plan ID, got %q", id)
+			}
+		})
+	}
+}
+
+// Override the request builder to inspect the context supplied to deletion;
+// generated request fields are private and the shared fake drops the context.
+type cleanupContextSubaccountService struct {
+	SubaccountServiceFake
+	deleteFn func(context.Context) (*http.Response, error)
+}
+
+func (s *cleanupContextSubaccountService) DeleteServiceManagementBindingOfSubaccount(ctx context.Context, _ string) saops.ApiDeleteServiceManagementBindingOfSubaccountRequest {
+	result, err := s.deleteFn(ctx)
+	s.DeleteMockFn = func() (*http.Response, error) { return result, err }
+	return saops.ApiDeleteServiceManagementBindingOfSubaccountRequest{ApiService: &s.SubaccountServiceFake}
 }
 
 func response(code int) *http.Response {
