@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	errCouldNotParseCISSecret      = "CIS Secret seems malformed"
-	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
-	errCISBindingCredentialIsNil        = "CIS binding credential is nil"
-	errCISBindingMissingRequiredFields  = "CIS binding is missing required fields: %s"
+	errCouldNotParseCISSecret          = "CIS Secret seems malformed"
+	errCouldNotParseUserCredential     = "error while parsing sa-provider-secret JSON"
+	errCISBindingCredentialIsNil       = "CIS binding credential is nil"
+	errCISBindingMissingRequiredFields = "CIS binding is missing required fields: %s"
 )
 
 type InstanceParameters = map[string]interface{}
@@ -47,10 +47,11 @@ type Credentials struct {
 }
 
 type UserCredential struct {
-	Email    string
-	Username string
-	Password string
-	Idp      string
+	Email     string
+	Username  string
+	Password  string
+	Idp       string
+	TokenFile string `json:",omitempty"`
 }
 
 type CISCredential struct {
@@ -144,8 +145,8 @@ var buildClientFn = createClient
 // Credential rotation produces a new key automatically; old entries leak
 // until process restart. Add a TTL/LRU if rotation churn becomes an issue.
 var (
-	clientCache       sync.Map
-	clientBuildGroup  singleflight.Group
+	clientCache      sync.Map
+	clientBuildGroup singleflight.Group
 )
 
 // credentialCacheKey builds a stable string key from the credential bundle.
@@ -172,6 +173,7 @@ func credentialCacheKey(c *Credentials) string {
 			c.UserCredential.Username,
 			c.UserCredential.Password,
 			c.UserCredential.Idp,
+			c.UserCredential.TokenFile,
 		)
 	}
 	return strings.Join(parts, "\x00")

@@ -52,22 +52,21 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errGetCredentialsSecret)
 	}
 
-	cd := pc.Spec.ServiceAccountSecret
-	ServiceAccountSecretData, err := resource.CommonCredentialExtractor(
-		ctx,
-		cd.Source,
-		c.kube,
-		cd.CommonCredentialSelectors,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, errGetCreds)
-	}
-
 	cisBinding := secret.Data[providerv1alpha1.RawBindingKey]
 	if cisBinding == nil {
 		return nil, errors.New(errGetCredentialsSecret)
 	}
+	ServiceAccountSecretData, err := providerconfig.LoadEnvironmentUserCredentials(ctx, c.kube, pc, cisBinding)
+	if err != nil {
+		return nil, errors.Wrap(err, errGetCreds)
+	}
 	svc, err := c.newServiceFn(cisBinding, ServiceAccountSecretData)
+	if err != nil {
+		return nil, err
+	}
+	if svc == nil {
+		return nil, errors.New("environment client is nil")
+	}
 	return &external{
 			client:     kymaenvironmentbinding.NewKymaBindings(*svc),
 			tracker:    c.resourcetracker,
