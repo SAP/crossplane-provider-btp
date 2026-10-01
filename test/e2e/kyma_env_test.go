@@ -93,6 +93,7 @@ func TestKymaEnvironmentImportFlow(t *testing.T) {
 		kymaImportName,
 		WithWaitDependentResourceTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(15*time.Minute)),
 		WithWaitCreateTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(50*time.Minute)),
+		WithLookupReimport[*v1alpha1.KymaEnvironment](),
 		WithWaitDeletionTimeout[*v1alpha1.KymaEnvironment](wait.WithTimeout(50*time.Minute)),
 		WithDependentResourceDirectory[*v1alpha1.KymaEnvironment](crsPath("kyma_env_import")),
 	)

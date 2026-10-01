@@ -124,6 +124,7 @@ func TestSubscriptionImport(t *testing.T) {
 		"sub-import-test",
 		WithDependentResourceDirectory[*v1alpha1.Subscription](crsPath("subscription/import/environment")),
 		WithWaitCreateTimeout[*v1alpha1.Subscription](wait.WithTimeout(10*time.Minute)),
+		WithLookupReimport[*v1alpha1.Subscription](),
 		WithWaitDeletionTimeout[*v1alpha1.Subscription](wait.WithTimeout(7*time.Minute)),
 		WithWaitDependentResourceTimeout[*v1alpha1.Subscription](wait.WithTimeout(15*time.Minute)),
 	)
