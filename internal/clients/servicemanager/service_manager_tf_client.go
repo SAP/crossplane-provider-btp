@@ -211,6 +211,12 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 	logger := log.FromContext(ctx)
 	observeStart := time.Now()
 
+	// No SI GUID yet: skip TF observe. Upjet would call GetById("") → BTP CLI 400,
+	if meta.GetExternalName(tf.sInstance) == "" {
+		logger.V(1).Info("ObserveResources: SI external-name empty, skipping TF observe (no instance yet)")
+		return ResourcesStatus{ExternalObservation: managed.ExternalObservation{ResourceExists: false}}, nil
+	}
+
 	t0 := time.Now()
 	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
 	logger.V(1).Info("ObserveResources: SI observe", "duration", time.Since(t0), "elapsed", time.Since(observeStart))

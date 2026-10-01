@@ -182,6 +182,11 @@ func (tf *TfClient) CreateResources(ctx context.Context, cr *apisv1beta1.CloudMa
 }
 
 func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.CloudManagement) (ResourcesStatus, error) {
+	// No SI GUID yet: skip TF observe. Upjet would call GetById("") → BTP CLI 400
+	if meta.GetExternalName(tf.sInstance) == "" {
+		return ResourcesStatus{ExternalObservation: managed.ExternalObservation{ResourceExists: false}}, nil
+	}
+
 	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
 	if err != nil {
 		return ResourcesStatus{}, err

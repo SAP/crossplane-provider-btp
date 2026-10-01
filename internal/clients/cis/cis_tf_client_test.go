@@ -511,6 +511,32 @@ func TestObserveResources(t *testing.T) {
 	}
 }
 
+func TestObserveResources_EmptyExternalName(t *testing.T) {
+	// SM CR has no external-name yet (pre-Create or failed Create with pending
+	// annotation). Upjet would POST GetById with empty id → BTP CLI returns 400,
+	// retryablehttp retries 6×, exhausting the reconcile context → deadline exceeded.
+	// Short-circuit before TF observe.
+	cr := testCMCr(utilCloudManagementParams{extName: "", siName: defaultInstanceName, sbName: defaultBindingName})
+	uua := &TfClient{
+		siExternal: ExternalClientFake{
+			observeFn: func() (managed.ExternalObservation, error) {
+				return managed.ExternalObservation{}, errors.New("should not be called")
+			},
+		},
+		sbExternal: ExternalClientFake{},
+		sInstance:  testServiceInstance("", defaultInstanceName),
+		sBinding:   testServiceBinding("", defaultBindingName),
+	}
+	obs, err := uua.ObserveResources(context.TODO(), cr)
+	want := ResourcesStatus{ExternalObservation: managed.ExternalObservation{ResourceExists: false}}
+	if diff := cmp.Diff(want, obs); diff != "" {
+		t.Errorf("ObserveResources() with empty external-name: -want, +got:\n%s", diff)
+	}
+	if err != nil {
+		t.Errorf("ObserveResources() with empty external-name: unexpected error: %v", err)
+	}
+}
+
 func TestCreateResources(t *testing.T) {
 	type want struct {
 		err error
