@@ -18,6 +18,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	servicebindingclient "github.com/sap/crossplane-provider-btp/internal/clients/account/servicebinding"
 	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
@@ -39,6 +40,10 @@ const (
 	errDestroyBinding       = "cannot destroy servicebinding"
 	errVerifyBinding        = "cannot verify servicebinding deletion"
 	errCommitName           = "cannot persist pending servicebinding name"
+
+	errAdoptLookup   = "cannot look up service binding to adopt"
+	errAdoptRotation = "incompatible configuration: the btp.sap.crossplane.io/lookup annotation cannot be combined with rotation; set crossplane.io/external-name to the binding ID to import a rotating binding"
+	errAdoptNoParent = "cannot adopt service binding yet: its parent service instance ID is not resolved"
 )
 
 const iso8601Date = "2006-01-02T15:04:05Z0700"
@@ -113,6 +118,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		targetName = cr.Status.AtProvider.Name
 	} else {
 		targetName = cr.Spec.ForProvider.Name
+	}
+
+	// Adopt before the terraform clients are built from the external-name
+	// (see package adoption).
+	if err := c.adopt(ctx, cr); err != nil {
+		return nil, err
 	}
 
 	client, err := c.clientFactory.CreateClient(ctx, cr, targetName, meta.GetExternalName(cr))
@@ -469,6 +480,48 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceBin
 	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
 		fmt.Sprintf("Recovered existing BTP service binding %s (semantic key: serviceInstanceID=%s name=%s)", guid, internal.Val(cr.Spec.ForProvider.ServiceInstanceID), name)))
 	return recovery.ErrRequeueAfterRecovery
+}
+
+// adopt imports an existing binding when the user opted in (see package
+// adoption). The binding is found by its exact name under the resolved parent
+// instance, which is the identity check: names are unique per instance. When
+// nothing matches, adopt returns nil and Observe goes on to report the binding
+// missing, so it is created.
+//
+// Rotation is refused. A rotating binding lives under a generated
+// "<name>-<suffix>" name and rotation rewrites its external-name, so a lookup
+// by spec name cannot identify it and mirroring a match could revert a
+// rotation. Such bindings are imported by setting the external-name directly.
+func (c *connector) adopt(ctx context.Context, cr *v1alpha1.ServiceBinding) error {
+	pending, err := adoption.Pending(cr)
+	if err != nil || !pending {
+		return err
+	}
+	if cr.Spec.Rotation != nil {
+		return errors.New(errAdoptRotation)
+	}
+	instanceID := internal.Val(cr.Spec.ForProvider.ServiceInstanceID)
+	if instanceID == "" {
+		return errors.New(errAdoptNoParent)
+	}
+
+	lookuper, cleanup, err := c.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		return errors.Wrap(err, errAdoptLookup)
+	}
+	defer cleanup()
+
+	name := cr.Spec.ForProvider.Name
+	match, found, err := lookuper.FindServiceBinding(ctx, instanceID, name)
+	if err != nil {
+		return errors.Wrap(err, errAdoptLookup)
+	}
+	if !found {
+		return nil
+	}
+
+	key := fmt.Sprintf("serviceInstanceID=%s name=%s", instanceID, name)
+	return adoption.Commit(ctx, c.kube, c.recorder, cr, match.ID, key)
 }
 
 // lookupOwnedBinding runs the subaccount-admin semantic lookup for a binding

@@ -12,6 +12,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	sm "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,6 +38,9 @@ const (
 	errGetServicePlan    = "while getting service manager plan ID by name"
 
 	errExternalNameFormat = "crossplane.io/external-name is malformed; fix the annotation to resume reconciliation"
+
+	errAdoptLookup = "cannot look up service manager to adopt"
+	errAdoptNoPlan = "cannot adopt service manager yet: its plan ID is not resolved"
 )
 
 // ServiceManagerPlanIdInitializer is will provide implementation of service plan id lookup by name
@@ -72,6 +76,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	if err := c.InitializeServicePlanId(ctx, cr); err != nil {
 		return nil, errors.Wrap(err, errInitialize)
+	}
+
+	// Adopt before the terraform clients are built from the external-name
+	// (see package adoption).
+	if err := c.adopt(ctx, cr); err != nil {
+		return nil, err
 	}
 
 	tfClientInit := c.newClientInitalizerFn()
@@ -185,6 +195,45 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	return resStatus.ExternalObservation, err
+}
+
+// adopt imports an existing service manager instance and binding when the
+// user opted in (see package adoption). The instance is found by name on any
+// plan and must run on the declared one (see AdoptablePair). An instance
+// without its binding is adopted as the bare instance ID, the phase-1 state
+// from which Create adds the binding. When nothing matches, adopt returns nil
+// and Observe goes on to report the resources missing, so they are created.
+func (c *connector) adopt(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
+	pending, err := adoption.Pending(cr)
+	if err != nil || !pending {
+		return err
+	}
+
+	var planID string
+	if lookup := cr.Status.AtProvider.DataSourceLookup; lookup != nil {
+		planID = lookup.ServiceManagerPlanID
+	}
+	if planID == "" {
+		return errors.New(errAdoptNoPlan)
+	}
+
+	lookuper, cleanup, err := c.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		return errors.Wrap(err, errAdoptLookup)
+	}
+	defer cleanup()
+
+	instanceName, bindingName := smInstanceName(cr), smBindingName(cr)
+	externalName, found, err := sm.AdoptablePair(ctx, lookuper, planID, instanceName, bindingName)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+
+	key := fmt.Sprintf("plan=%s instance=%s binding=%s", planID, instanceName, bindingName)
+	return adoption.Commit(ctx, c.kube, c.recorder, cr, externalName, key)
 }
 
 func (c *external) healExternalName(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
