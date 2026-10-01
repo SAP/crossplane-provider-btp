@@ -27,6 +27,10 @@ var (
 // sbLookuperFake is a test double for servicemanager.SemanticLookuper scoped
 // to the ServiceBinding heal use case.
 type sbLookuperFake struct {
+	// Embedded so the fake satisfies the interface; recovery never calls
+	// the adoption Find* methods, and a call would panic on the nil interface.
+	smClient.SemanticLookuper
+
 	guid      string
 	createdAt time.Time
 	found     bool

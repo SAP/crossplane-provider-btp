@@ -13,10 +13,18 @@ import (
 )
 
 // SemanticLookuper performs the semantic lookups used by the orphaned
-// external-name recovery path. Implementations are scoped to one subaccount by
-// their credentials; callers still apply the ownership check from
-// internal/recovery before patching external-name.
+// external-name recovery path (Lookup*) and by opt-in adoption (Find*).
+// Implementations are scoped to one subaccount by their credentials; callers
+// still apply their own ownership or identity checks before patching
+// external-name.
 type SemanticLookuper interface {
+	// FindServiceInstance returns the single instance named name.
+	FindServiceInstance(ctx context.Context, name string) (InstanceMatch, bool, error)
+
+	// FindServiceBinding returns the single binding named exactly name under
+	// the instance. It never matches rotated "<name>-<suffix>" bindings.
+	FindServiceBinding(ctx context.Context, serviceInstanceID, name string) (BindingMatch, bool, error)
+
 	LookupServiceInstance(ctx context.Context, name string) (guid string, createdAt time.Time, found bool, err error)
 
 	// LookupServiceBinding falls back to the single ready rotated binding named
@@ -33,47 +41,27 @@ type SemanticLookuper interface {
 var _ SemanticLookuper = &ServiceManagerClient{}
 
 func (sm *ServiceManagerClient) LookupServiceInstance(ctx context.Context, name string) (string, time.Time, bool, error) {
-	query := fmt.Sprintf("name eq '%s'", name)
-
-	list, _, err := sm.GetAllServiceInstances(ctx).FieldQuery(query).Execute()
+	match, found, err := sm.FindServiceInstance(ctx, name)
 	if err != nil {
-		return "", time.Time{}, false, specifyAPIError(err)
+		return "", time.Time{}, false, err
 	}
-
-	items := list.GetItems()
-	switch len(items) {
-	case 0:
-		return "", time.Time{}, false, nil
-	case 1:
-		return internal.Val(items[0].Id), items[0].GetCreatedAt(), true, nil
-	default:
-		return "", time.Time{}, false, errors.Errorf(
-			"refusing to recover: %d service instances match name %q in this subaccount", len(items), name)
-	}
+	return match.ID, match.CreatedAt, found, nil
 }
 
 func (sm *ServiceManagerClient) LookupServiceBinding(ctx context.Context, serviceInstanceID, name string) (string, time.Time, bool, error) {
-	query := fmt.Sprintf("service_instance_id eq '%s' and name eq '%s'", serviceInstanceID, name)
-	list, _, err := sm.GetAllServiceBindings(ctx).FieldQuery(query).Execute()
+	match, found, err := sm.FindServiceBinding(ctx, serviceInstanceID, name)
 	if err != nil {
-		return "", time.Time{}, false, specifyAPIError(err)
+		return "", time.Time{}, false, err
 	}
-	items := list.GetItems()
-	switch len(items) {
-	case 0:
+	if !found {
 		return sm.lookupRotatedBinding(ctx, serviceInstanceID, name)
-	case 1:
-		return internal.Val(items[0].Id), items[0].GetCreatedAt(), true, nil
-	default:
-		return "", time.Time{}, false, errors.Errorf(
-			"refusing to recover: %d service bindings match name %q for service instance %q",
-			len(items), name, serviceInstanceID)
 	}
+	return match.ID, match.CreatedAt, true, nil
 }
 
 func (sm *ServiceManagerClient) lookupRotatedBinding(ctx context.Context, serviceInstanceID, name string) (string, time.Time, bool, error) {
 	all, _, err := sm.GetAllServiceBindings(ctx).
-		FieldQuery(fmt.Sprintf("service_instance_id eq '%s'", serviceInstanceID)).Execute()
+		FieldQuery("service_instance_id eq " + quote(serviceInstanceID)).Execute()
 	if err != nil {
 		return "", time.Time{}, false, specifyAPIError(err)
 	}
@@ -97,7 +85,7 @@ func (sm *ServiceManagerClient) lookupRotatedBinding(ctx context.Context, servic
 }
 
 func (sm *ServiceManagerClient) LookupInstanceAndBinding(ctx context.Context, planID, instanceName, bindingName string) (string, string, time.Time, bool, error) {
-	instanceQuery := fmt.Sprintf("service_plan_id eq '%s' and name eq '%s'", planID, instanceName)
+	instanceQuery := fmt.Sprintf("service_plan_id eq %s and name eq %s", quote(planID), quote(instanceName))
 
 	instances, _, err := sm.GetAllServiceInstances(ctx).FieldQuery(instanceQuery).Execute()
 	if err != nil {
@@ -112,14 +100,14 @@ func (sm *ServiceManagerClient) LookupInstanceAndBinding(ctx context.Context, pl
 		// proceed
 	default:
 		return "", "", time.Time{}, false, errors.Errorf(
-			"refusing to recover: %d service instances match plan %q name %q in this subaccount",
+			"%d service instances match plan %q name %q in this subaccount",
 			len(instanceItems), planID, instanceName)
 	}
 
 	instanceID := internal.Val(instanceItems[0].Id)
 	instanceCreatedAt := instanceItems[0].GetCreatedAt()
 
-	bindingQuery := fmt.Sprintf("service_instance_id eq '%s' and name eq '%s'", instanceID, bindingName)
+	bindingQuery := fmt.Sprintf("service_instance_id eq %s and name eq %s", quote(instanceID), quote(bindingName))
 	bindings, _, err := sm.GetAllServiceBindings(ctx).FieldQuery(bindingQuery).Execute()
 	if err != nil {
 		return "", "", time.Time{}, false, specifyAPIError(err)
@@ -133,7 +121,7 @@ func (sm *ServiceManagerClient) LookupInstanceAndBinding(ctx context.Context, pl
 		return instanceID, internal.Val(bindingItems[0].Id), instanceCreatedAt, true, nil
 	default:
 		return "", "", time.Time{}, false, errors.Errorf(
-			"refusing to recover: %d bindings match name %q for service instance %q",
+			"%d bindings match name %q for service instance %q",
 			len(bindingItems), bindingName, instanceID)
 	}
 }
