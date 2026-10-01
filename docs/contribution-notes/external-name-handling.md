@@ -100,6 +100,48 @@ Implementation: `internal/recovery`,
 `internal/clients/servicemanager/recovery.go` (`SemanticLookuper` returns
 `created_at` alongside the ID), and `healExternalName` on each controller.
 
+### Opt-in adoption by lookup
+
+Recovery and adoption differ in who asked. Recovery runs automatically,
+without user intent, so it must prove the match is the provider's own lost
+Create and refuses everything else as brownfield. Adoption runs only when the
+user sets `btp.sap.crossplane.io/lookup: "true"`, which states the same intent
+as setting `crossplane.io/external-name` by hand ("this resource should exist;
+adopt it"), with the provider finding the identifier. Principle 1 of our
+definition is therefore kept: the provider never adopts a resource the user did
+not ask it to adopt.
+
+Rules (`internal/adoption`, and an `adopt` method at the top of each supported
+controller's `Observe()`):
+
+- The lookup runs only while the resource has no identifier and is not being
+  deleted. An external-name counts as unset when it is empty, or equal to
+  `metadata.name` while that name is not a GUID (the default initializer's or an
+  older version's value); any other external-name always wins. Values other
+  than `"true"` or `"false"` are errors.
+- Upjet-backed controllers (ServiceInstance, ServiceBinding, ServiceManager,
+  CloudManagement) adopt in `Connect()`, before building their terraform
+  clients: upjet seeds its in-memory state from the external-name only the first
+  time it sees a resource, so adopting later would leave a client that observes
+  the adopted resource as missing, and `Create()` would duplicate it.
+- Instead of recovery's time window, a match must agree with the identity the
+  spec declares (plan, region, parent instance). A disagreeing match is refused
+  with an error and nothing is created.
+- No match falls through to the normal `Create()`. A failed or ambiguous lookup
+  is an error; unlike recovery, it is never swallowed, because reporting the
+  resource as missing would create a duplicate.
+- On a match, `adoption.Commit` patches only the external-name and the managed
+  finalizer (guarded by the resourceVersion), records
+  `ExternalNameAdopted`, and returns `adoption.ErrRequeueAfterAdoption` for the
+  same reason recovery requeues: clients are built from the external-name in
+  `Connect()`.
+
+Adoption and recovery share the lookups: the exact-match `Find*` primitives in
+`internal/clients/servicemanager` back both, and recovery's `Lookup*` add its
+rotated-binding fallback on top. Supported kinds and refused combinations (such
+as a `ServiceBinding` with rotation) are listed in
+[Import by Lookup](../end-user-guides/import-landscape/lookup.md).
+
 ### Entitlement aggregate ownership
 
 `Entitlement` maps N managed resources onto one BTP external assignment identified by
