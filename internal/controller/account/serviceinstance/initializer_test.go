@@ -213,3 +213,70 @@ type mockPlanIdResolver struct {
 func (m *mockPlanIdResolver) PlanIDByName(ctx context.Context, offeringName, planName string, dataCenter string) (string, error) {
 	return m.planID, m.err
 }
+
+func TestServicePlanInitializer_PlanID(t *testing.T) {
+	type want struct {
+		planID string
+		err    error
+	}
+
+	cases := map[string]struct {
+		reason   string
+		cr       *v1alpha1.ServiceInstance
+		resolver *mockPlanIdResolver
+		want     want
+	}{
+		"ResolvesNamesIgnoringStaleStatus": {
+			reason: "PlanID answers what the spec declares now; a plan cached in status from an earlier spec must not be returned.",
+			cr: &v1alpha1.ServiceInstance{
+				Spec:   v1alpha1.ServiceInstanceSpec{ForProvider: v1alpha1.ServiceInstanceParameters{OfferingName: "hana-cloud", PlanName: "hana"}},
+				Status: v1alpha1.ServiceInstanceStatus{AtProvider: v1alpha1.ServiceInstanceObservation{ServiceplanID: "plan-stale"}},
+			},
+			resolver: &mockPlanIdResolver{planID: "plan-hana"},
+			want:     want{planID: "plan-hana"},
+		},
+		"DirectServicePlanIDWins": {
+			reason: "A servicePlanID in the spec is the declared plan; no resolution is needed.",
+			cr: &v1alpha1.ServiceInstance{
+				Spec: v1alpha1.ServiceInstanceSpec{ForProvider: v1alpha1.ServiceInstanceParameters{ServicePlanID: "plan-direct", OfferingName: "hana-cloud", PlanName: "hana"}},
+			},
+			resolver: &mockPlanIdResolver{planID: "plan-hana"},
+			want:     want{planID: "plan-direct"},
+		},
+		"ResolutionFails": {
+			reason: "A failed resolution is an error, never an empty plan that would skip the check.",
+			cr: &v1alpha1.ServiceInstance{
+				Spec: v1alpha1.ServiceInstanceSpec{ForProvider: v1alpha1.ServiceInstanceParameters{OfferingName: "hana-cloud", PlanName: "hana"}},
+			},
+			resolver: &mockPlanIdResolver{err: errApi},
+			want:     want{err: errors.Wrap(errApi, errInitialize)},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			init := &servicePlanInitializer{
+				loadSecretFn: func(context.Context, client.Client, string, string) (map[string][]byte, error) {
+					return map[string][]byte{}, nil
+				},
+				newIdResolverFn: func(context.Context, map[string][]byte) (smClient.PlanIdResolver, error) {
+					return tc.resolver, nil
+				},
+			}
+			before := tc.cr.DeepCopy()
+
+			// A nil client: PlanID must not write anything.
+			got, err := init.PlanID(context.Background(), nil, tc.cr)
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("%s\nPlanID(...): -want error, +got error:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.planID, got); diff != "" {
+				t.Errorf("%s\nPlanID(...): -want, +got:\n%s", tc.reason, diff)
+			}
+			if diff := cmp.Diff(before, tc.cr); diff != "" {
+				t.Errorf("%s\nPlanID(...) must not modify the resource: -want, +got:\n%s", tc.reason, diff)
+			}
+		})
+	}
+}
