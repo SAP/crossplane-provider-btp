@@ -9,12 +9,14 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	"github.com/sap/crossplane-provider-btp/internal/clients/subscription"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -33,6 +35,7 @@ const (
 	errLoadSecret           = "while loading secret"
 	errInitService          = "while initializing service"
 	errLoadSubscription     = "while loading subscription"
+	errAdoptLookup          = "cannot look up subscription to adopt"
 	errCreate               = "while creating subscription"
 	errUpdate               = "while updating subscription"
 	errDelete               = "while deleting subscription"
@@ -71,6 +74,8 @@ type connector struct {
 	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
 	newServiceFn    func(ctx context.Context, cisSecretData map[string][]byte) (subscription.SubscriptionApiHandlerI, error)
+	// recorder emits Kubernetes events for adoption. May be nil.
+	recorder event.Recorder
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -103,6 +108,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		kube:       c.kube,
 		apiHandler: svc,
 		typeMapper: subscription.NewSubscriptionTypeMapper(),
+		recorder:   c.recorder,
 	}, nil
 }
 
@@ -111,6 +117,8 @@ type external struct {
 	apiHandler subscription.SubscriptionApiHandlerI
 	typeMapper subscription.SubscriptionTypeMapperI
 	tracker    tracking.ReferenceResolverTracker
+	// recorder emits Kubernetes events for adoption. May be nil.
+	recorder event.Recorder
 }
 
 // subscriptionBeingDeleted returns true if the resource conditions
@@ -131,6 +139,11 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotSubscription)
 	}
+
+	if err := c.adopt(ctx, cr); err != nil {
+		return managed.ExternalObservation{}, err
+	}
+
 	externalName := meta.GetExternalName(cr)
 	if externalName == cr.Name {
 		// Set correct external-name format for import/observe scenarios
@@ -239,6 +252,29 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, nil
 	}
 	return managed.ExternalDelete{}, errors.Wrap(c.apiHandler.DeleteSubscription(ctx, meta.GetExternalName(cr)), errDelete)
+}
+
+// adopt imports an existing subscription when the user opted in (see package
+// adoption). A subscription is identified by its app and plan, which form the
+// external-name the provider itself uses, so adopting it is a lookup under
+// that key. When the app is not subscribed, adopt returns nil and Observe goes
+// on to report the subscription missing, so it is created.
+func (c *external) adopt(ctx context.Context, cr *v1alpha1.Subscription) error {
+	pending, err := adoption.Pending(cr)
+	if err != nil || !pending {
+		return err
+	}
+
+	key := fmt.Sprintf("%s/%s", cr.Spec.ForProvider.AppName, cr.Spec.ForProvider.PlanName)
+	existing, err := c.apiHandler.GetSubscription(ctx, key)
+	if err != nil {
+		return errors.Wrap(err, errAdoptLookup)
+	}
+	if existing == nil {
+		return nil
+	}
+
+	return adoption.Commit(ctx, c.kube, c.recorder, cr, key, "appName/planName="+key)
 }
 
 // loadSubscription gets a Subscription using the APIHandler if a proper externalName has been set, otherwise returns nil

@@ -14,6 +14,7 @@ type MockAccountsApiAccessor struct {
 	returnErr      error
 
 	lookupGuid      string
+	lookupRegion    string
 	lookupCreatedAt time.Time
 	lookupFound     bool
 	lookupErr       error
@@ -29,9 +30,10 @@ func (m *MockAccountsApiAccessor) UpdateSubaccount(ctx context.Context, subaccou
 	return m.returnErr
 }
 
-func (m *MockAccountsApiAccessor) SubaccountGuidBySubdomain(ctx context.Context, subdomain string) (string, time.Time, bool, error) {
+func (m *MockAccountsApiAccessor) FindSubaccount(ctx context.Context, subdomain string) (SubaccountMatch, bool, error) {
 	m.lookupCalls++
-	return m.lookupGuid, m.lookupCreatedAt, m.lookupFound, m.lookupErr
+	match := SubaccountMatch{GUID: m.lookupGuid, Region: m.lookupRegion, CreatedAt: m.lookupCreatedAt}
+	return match, m.lookupFound, m.lookupErr
 }
 
 var _ AccountsApiAccessor = &MockAccountsApiAccessor{}

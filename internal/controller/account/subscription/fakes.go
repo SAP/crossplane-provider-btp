@@ -12,6 +12,8 @@ type MockApiHandler struct {
 	returnExternalName string
 	returnGet          *subscription.SubscriptionGet
 	returnErr          error
+
+	gotGetKey string
 }
 
 func (m *MockApiHandler) CreateSubscription(ctx context.Context, payload subscription.SubscriptionPost) (string, error) {
@@ -28,6 +30,7 @@ func (m *MockApiHandler) DeleteSubscription(ctx context.Context, externalName st
 }
 
 func (m *MockApiHandler) GetSubscription(ctx context.Context, externalName string) (*subscription.SubscriptionGet, error) {
+	m.gotGetKey = externalName
 	return m.returnGet, m.returnErr
 }
 
