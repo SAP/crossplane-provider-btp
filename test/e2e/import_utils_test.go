@@ -13,6 +13,7 @@ import (
 	xpmeta "github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	meta "github.com/sap/crossplane-provider-btp/apis"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 
 	"k8s.io/klog/v2"
@@ -54,6 +55,10 @@ type ImportTester[T resource.Managed] struct {
 
 	// the timeout for waiting till resource get deleted (in setup and teardown)
 	WaitDeletionTimeout wait.Option
+
+	// LookupReimport adds a step that imports the resource a second time, by
+	// the lookup annotation instead of the external-name.
+	LookupReimport bool
 }
 
 type ImportTesterOption[T resource.Managed] func(*ImportTester[T])
@@ -73,6 +78,15 @@ func WithWaitCreateTimeout[T resource.Managed](timeout wait.Option) ImportTester
 func WithWaitDeletionTimeout[T resource.Managed](timeout wait.Option) ImportTesterOption[T] {
 	return func(it *ImportTester[T]) {
 		it.WaitDeletionTimeout = timeout
+	}
+}
+
+// WithLookupReimport makes the feature re-import the resource by the
+// btp.sap.crossplane.io/lookup annotation after the external-name import, and
+// assert that the provider adopts the same external resource.
+func WithLookupReimport[T resource.Managed]() ImportTesterOption[T] {
+	return func(it *ImportTester[T]) {
+		it.LookupReimport = true
 	}
 }
 
@@ -107,7 +121,7 @@ func (it *ImportTester[T]) GetPrefixedName() string {
 }
 
 func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilder {
-	return features.New(name).
+	fb := features.New(name).
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				r, _ := res.New(cfg.Client().RESTConfig())
@@ -170,7 +184,13 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 			})
 			return ctx
 		},
-	).Teardown(
+	)
+
+	if it.LookupReimport {
+		fb = fb.Assess("Check resource re-imported by lookup adopts the same external resource", it.assessLookupReimport)
+	}
+
+	return fb.Teardown(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			resource := it.BaseResource.DeepCopyObject().(T)
 			MustGetResource(t, cfg, it.GetPrefixedName(), nil, resource)
@@ -187,6 +207,47 @@ func (it *ImportTester[T]) BuildTestFeature(name string) *features.FeatureBuilde
 			return ctx
 		},
 	)
+}
+
+// assessLookupReimport orphans the imported resource, creates it again with
+// only the lookup annotation, and asserts that the provider adopts the external
+// resource captured in setup.
+func (it *ImportTester[T]) assessLookupReimport(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+	externalName := ctx.Value(importFeatureContextKey).(string)
+
+	imported := it.BaseResource.DeepCopyObject().(T)
+	MustGetResource(t, cfg, it.GetPrefixedName(), nil, imported)
+
+	// Without Delete in the policies, deleting the CR leaves the external
+	// resource in place for the lookup to find.
+	log("Orphaning imported resource", imported, func() {
+		imported.SetManagementPolicies(importManagementPolicies)
+		if err := cfg.Client().Resources().Update(ctx, imported); err != nil {
+			t.Fatalf("Failed to drop Delete from management policies: %v", err)
+		}
+		AwaitResourceDeletionOrFail(ctx, t, cfg, imported, it.WaitDeletionTimeout)
+	})
+
+	resource := it.BaseResource.DeepCopyObject().(T)
+	xpmeta.AddAnnotations(resource, map[string]string{adoption.Annotation: "true"})
+	resource.SetManagementPolicies(xpv1.ManagementPolicies{xpv1.ManagementActionAll})
+
+	log("Create MR for importing by lookup", resource, func() {
+		if err := cfg.Client().Resources().Create(ctx, resource); err != nil {
+			t.Fatalf("Failed to create cr when importing by lookup: %v", err)
+		}
+	})
+
+	log("Waiting for resource imported by lookup to become healthy", resource, func() {
+		waitForResource(resource, cfg, t, it.WaitCreateTimeout)
+	})
+
+	adopted := it.BaseResource.DeepCopyObject().(T)
+	MustGetResource(t, cfg, it.GetPrefixedName(), nil, adopted)
+	if got := xpmeta.GetExternalName(adopted); got != externalName {
+		t.Errorf("lookup adopted external-name %q, want the existing resource %q", got, externalName)
+	}
+	return ctx
 }
 
 // log is a helper function to log the start and end of an operation on a managed resource with name and external name.

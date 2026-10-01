@@ -100,6 +100,7 @@ func TestServiceManagerImportFlow(t *testing.T) {
 		smImportName,
 		WithWaitDependentResourceTimeout[*v1beta1.ServiceManager](wait.WithTimeout(15*time.Minute)),
 		WithWaitCreateTimeout[*v1beta1.ServiceManager](wait.WithTimeout(10*time.Minute)),
+		WithLookupReimport[*v1beta1.ServiceManager](),
 		// Also bounds the dependent Subaccount teardown, which is the slowest of
 		// the three waits this option feeds. Matches TestServiceInstanceImportFlow.
 		WithWaitDeletionTimeout[*v1beta1.ServiceManager](wait.WithTimeout(20*time.Minute)),

@@ -52,6 +52,7 @@ func TestSubaccountImportFlow(t *testing.T) {
 		},
 		subaccountImportK8sResName,
 		WithWaitCreateTimeout[*v1alpha1.Subaccount](wait.WithTimeout(5*time.Minute)),
+		WithLookupReimport[*v1alpha1.Subaccount](),
 		WithWaitDeletionTimeout[*v1alpha1.Subaccount](wait.WithTimeout(5*time.Minute)),
 	)
 
