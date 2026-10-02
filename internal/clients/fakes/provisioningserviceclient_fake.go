@@ -165,15 +165,45 @@ func (m *MockProvisioningServiceClient) UpdateEnvironmentInstanceExecute(r clien
 
 var _ client.EnvironmentsAPI = &MockProvisioningServiceClient{}
 
-// MockProvisioningServiceClientWithGetByID mocks GetEnvironmentInstanceExecute for GUID lookups
+// MockProvisioningServiceClientWithGetByID mocks GetEnvironmentInstanceExecute for GUID lookups.
+// GetByIDStatusCode sets the status code of the returned response, so callers that derive
+// not-found from the raw HTTP status can be exercised; it defaults to 0, i.e. unset.
 type MockProvisioningServiceClientWithGetByID struct {
 	MockProvisioningServiceClient
-	GetByIDResponse *client.BusinessEnvironmentInstanceResponseObject
-	GetByIDError    error
+	GetByIDResponse   *client.BusinessEnvironmentInstanceResponseObject
+	GetByIDStatusCode int
+	GetByIDError      error
+}
+
+// GetEnvironmentInstance has to be overridden so that the request carries the outer
+// mock as its ApiService; the embedded one would dispatch Execute() back to the
+// embedded implementation and never reach the override below.
+func (m *MockProvisioningServiceClientWithGetByID) GetEnvironmentInstance(ctx context.Context, environmentInstanceId string) client.ApiGetEnvironmentInstanceRequest {
+	return client.ApiGetEnvironmentInstanceRequest{ApiService: m}
 }
 
 func (m *MockProvisioningServiceClientWithGetByID) GetEnvironmentInstanceExecute(r client.ApiGetEnvironmentInstanceRequest) (*client.BusinessEnvironmentInstanceResponseObject, *http.Response, error) {
-	return m.GetByIDResponse, &http.Response{}, m.GetByIDError
+	return m.GetByIDResponse, &http.Response{StatusCode: m.GetByIDStatusCode}, m.GetByIDError
+}
+
+// MockProvisioningServiceClientTransportError models the openapi-generated
+// client on a transport-level failure: nil *http.Response together with a
+// non-nil error. The other fakes always return a non-nil response, which
+// hides nil-dereference bugs in callers.
+type MockProvisioningServiceClientTransportError struct {
+	MockProvisioningServiceClient
+	TransportError error
+}
+
+// GetEnvironmentInstance has to be overridden so that the request carries the outer
+// mock as its ApiService; the embedded one would dispatch Execute() back to the
+// embedded implementation and never reach the override below.
+func (m *MockProvisioningServiceClientTransportError) GetEnvironmentInstance(ctx context.Context, environmentInstanceId string) client.ApiGetEnvironmentInstanceRequest {
+	return client.ApiGetEnvironmentInstanceRequest{ApiService: m}
+}
+
+func (m *MockProvisioningServiceClientTransportError) GetEnvironmentInstanceExecute(r client.ApiGetEnvironmentInstanceRequest) (*client.BusinessEnvironmentInstanceResponseObject, *http.Response, error) {
+	return nil, nil, m.TransportError
 }
 
 // MockProvisioningServiceClientWithCreate mocks CreateInstance
