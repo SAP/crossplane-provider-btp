@@ -1,0 +1,4 @@
+---
+serviceInstances:
+  - name: my-service-instance
+    id: si-uuid-aaaa-1111

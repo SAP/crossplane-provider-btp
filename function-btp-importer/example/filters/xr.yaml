@@ -1,0 +1,13 @@
+---
+# XR for the filters example. The composition uses include/exclude patterns to
+# control which composed resources are attempted for import.
+# include: ["prod-.*"]  — only resources whose composition resource name starts with "prod-"
+# exclude: [".*-skip$"] — additionally skip any resource whose name ends with "-skip"
+apiVersion: example.crossplane.io/v1
+kind: XBTPResources
+metadata:
+  name: my-workload-xr
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+spec: {}

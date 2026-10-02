@@ -1,0 +1,10 @@
+---
+serviceInstances:
+  - name: prod-instance
+    id: si-uuid-ffff-6666
+  - name: dev-instance
+    id: si-uuid-gggg-7777
+  - name: test-skip-instance
+    id: si-uuid-hhhh-8888
+subaccounts: []
+environments: []
