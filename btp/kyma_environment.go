@@ -10,8 +10,9 @@ import (
 
 func KymaEnvironmentType() EnvironmentType {
 	return EnvironmentType{
-		Identifier:  "kyma",
-		ServiceName: "kymaruntime",
+		Identifier:            "kyma",
+		ServiceName:           "kymaruntime",
+		InstanceNameParameter: KymaenvironmentParameterInstanceName,
 	}
 }
 

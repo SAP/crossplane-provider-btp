@@ -74,6 +74,7 @@ func TestCloudFoundryEnvironmentImportFlow(t *testing.T) {
 		cfImportName,
 		WithWaitDependentResourceTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(15*time.Minute)),
 		WithWaitCreateTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(10*time.Minute)),
+		WithLookupReimport[*v1alpha1.CloudFoundryEnvironment](),
 		WithWaitDeletionTimeout[*v1alpha1.CloudFoundryEnvironment](wait.WithTimeout(10*time.Minute)),
 		WithDependentResourceDirectory[*v1alpha1.CloudFoundryEnvironment](crsPath("cloudfoundry_env_import")),
 	)

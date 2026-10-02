@@ -13,8 +13,9 @@ import (
 
 func CloudFoundryEnvironmentType() EnvironmentType {
 	return EnvironmentType{
-		Identifier:  "cloudfoundry",
-		ServiceName: "cloudfoundry",
+		Identifier:            "cloudfoundry",
+		ServiceName:           "cloudfoundry",
+		InstanceNameParameter: cfenvironmentParameterInstanceName,
 	}
 }
 

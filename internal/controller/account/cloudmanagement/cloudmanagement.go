@@ -12,6 +12,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/recovery"
 	corev1 "k8s.io/api/core/v1"
@@ -47,6 +48,9 @@ const (
 	errDelete               = "while deleting resources"
 	errSaveId               = "while saving ID"
 	errGetPlanId            = "while getting plan ID"
+
+	errAdoptLookup = "cannot look up cloud management to adopt"
+	errAdoptNoPlan = "cannot adopt cloud management yet: its plan ID is not resolved"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -102,6 +106,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	err = c.ensureCompatibility(ctx, cr)
 	if err != nil {
 		return nil, errors.Wrap(err, errEnsureCompatibility)
+	}
+
+	// Adopt before the terraform clients are built from the external-name
+	// (see package adoption).
+	if err := c.adopt(ctx, cr); err != nil {
+		return nil, err
 	}
 
 	tfClientInit := c.newClientInitalizerFn()
@@ -320,6 +330,45 @@ func (c *external) emit(cr resource.Managed, ev event.Event) {
 	if c.recorder != nil {
 		c.recorder.Event(cr, ev)
 	}
+}
+
+// adopt imports an existing cloud management instance and binding when the
+// user opted in (see package adoption). The instance is found by name on any
+// plan and must run on cis/local (see AdoptablePair). An instance without
+// its binding is adopted as the bare instance ID, the phase-1 state from which
+// Create adds the binding. When nothing matches, adopt returns nil and Observe
+// goes on to report the resources missing, so they are created.
+func (c *connector) adopt(ctx context.Context, cr *apisv1beta1.CloudManagement) error {
+	pending, err := adoption.Pending(cr)
+	if err != nil || !pending {
+		return err
+	}
+
+	var planID string
+	if lookup := cr.Status.AtProvider.DataSourceLookup; lookup != nil {
+		planID = lookup.CloudManagementPlanID
+	}
+	if planID == "" {
+		return errors.New(errAdoptNoPlan)
+	}
+
+	lookuper, cleanup, err := c.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		return errors.Wrap(err, errAdoptLookup)
+	}
+	defer cleanup()
+
+	instanceName, bindingName := cmInstanceName(cr), cmBindingName(cr)
+	externalName, found, err := servicemanager.AdoptablePair(ctx, lookuper, planID, instanceName, bindingName)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+
+	key := fmt.Sprintf("plan=%s instance=%s binding=%s", planID, instanceName, bindingName)
+	return adoption.Commit(ctx, c.kube, c.recorder, cr, externalName, key)
 }
 
 // cmInstanceName returns the managed cloud-management instance name used to

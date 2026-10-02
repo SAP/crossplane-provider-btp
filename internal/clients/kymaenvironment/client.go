@@ -21,6 +21,9 @@ type Client interface {
 		*provisioningclient.BusinessEnvironmentInstanceResponseObject,
 		error,
 	)
+	// FindInstance returns the Kyma environment named as cr names it; found is
+	// false when none exists. More than one is an error.
+	FindInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (instance provisioningclient.BusinessEnvironmentInstanceResponseObject, found bool, err error)
 	CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error)
 	UpdateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) error
 	// DeleteInstance deletes the Kyma environment using the external-name.

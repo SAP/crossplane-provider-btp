@@ -26,6 +26,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	siClient "github.com/sap/crossplane-provider-btp/internal/clients/account/serviceinstance"
 	smClient "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	tfClient "github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
@@ -53,6 +54,8 @@ const (
 	errDeleteInstance  = "cannot delete serviceinstance"
 
 	errRecoverExternalName = "cannot persist external-name recovered from terraform state"
+	errAdoptLookup         = "cannot look up service instance to adopt"
+	errAdoptPlan           = "cannot resolve the declared service plan to verify the instance to adopt"
 	errMarkAsyncOperation  = "cannot record the generation of the async operation about to start"
 
 	// Ready reason for an instance whose last async update failed.
@@ -136,6 +139,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 
 	if err != nil {
 		return nil, errors.Wrap(err, errInitServicePlan)
+	}
+
+	// Adopt before the terraform clients are built from the external-name
+	// (see package adoption).
+	if err := c.adopt(ctx, mg.(*v1alpha1.ServiceInstance)); err != nil {
+		return nil, err
 	}
 
 	// when working with tf proxy resources we want to keep the Connect() logic as part of the delgating Connect calls of the native resources to
@@ -439,6 +448,61 @@ func (e *external) healExternalName(ctx context.Context, cr *v1alpha1.ServiceIns
 	e.emit(cr, event.Normal(event.Reason(recovery.EventReasonRecovered),
 		fmt.Sprintf("Recovered existing BTP service instance %s (semantic key: name=%s, created_at=%s)", guid, name, createdAt.Format(time.RFC3339))))
 	return recovery.ErrRequeueAfterRecovery
+}
+
+// adopt imports an existing instance when the user opted in (see package
+// adoption). The instance is found by name in the subaccount and must run on
+// the plan the spec declares: a name match on another plan is refused rather
+// than adopted, and nothing is created over it. When nothing matches, adopt
+// returns nil and Connect goes on to build the client, so the instance is
+// created.
+//
+// The declared plan is resolved afresh rather than read from
+// status.atProvider.serviceplanID: the initializer resolves that once and
+// never again, so after a refusal and a corrected spec it would still hold the
+// plan of the old spec.
+func (c *connector) adopt(ctx context.Context, cr *v1alpha1.ServiceInstance) error {
+	pending, err := adoption.Pending(cr)
+	if err != nil || !pending {
+		return err
+	}
+
+	lookuper, cleanup, err := c.newAdminLookuperFn(ctx, cr)
+	if err != nil {
+		return errors.Wrap(err, errAdoptLookup)
+	}
+	defer cleanup()
+
+	name := cr.Spec.ForProvider.Name
+	match, found, err := lookuper.FindServiceInstance(ctx, name)
+	if err != nil {
+		return errors.Wrap(err, errAdoptLookup)
+	}
+	if !found {
+		return nil
+	}
+
+	declared, err := c.newServicePlanInitializerFn().PlanID(ctx, c.kube, cr)
+	if err != nil {
+		return errors.Wrap(err, errAdoptPlan)
+	}
+	if match.PlanID != declared {
+		return errPlanMismatch(cr, match, declared)
+	}
+
+	return adoption.Commit(ctx, c.kube, c.recorder, cr, match.ID, "name="+name)
+}
+
+func errPlanMismatch(cr *v1alpha1.ServiceInstance, match smClient.InstanceMatch, declaredID string) error {
+	fp := cr.Spec.ForProvider
+	declared := declaredID
+	if fp.ServicePlanID == "" {
+		declared = fmt.Sprintf("%s/%s (%s)", fp.OfferingName, fp.PlanName, declaredID)
+	}
+	return errors.Errorf("refusing to adopt service instance %q (%s): it runs on service plan %s, the spec declares %s; "+
+		"instance names are unique, so it can neither be adopted nor created under this name: "+
+		"declare the plan it runs on to adopt it, or choose another name to create a new one",
+		fp.Name, match.ID, match.PlanID, declared)
 }
 
 // recoverExternalNameFromTfState persists an external-name that upjet learned

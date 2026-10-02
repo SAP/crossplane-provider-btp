@@ -22,6 +22,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
+	"github.com/sap/crossplane-provider-btp/internal/adoption"
 	"github.com/sap/crossplane-provider-btp/internal/controller/providerconfig"
 	accountclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
 	"github.com/sap/crossplane-provider-btp/internal/recovery"
@@ -35,6 +36,7 @@ const (
 	errConnect              = "while connecting to provider"
 	errObserve              = "while observing subaccount"
 	errMigrateExternalName  = "while migrating external name"
+	errAdoptLookup          = "cannot look up subaccount to adopt"
 	errInvalidExternalName  = "external-name is not a valid GUID format"
 	errGenerateObservation  = "while generating observation"
 	errCreate               = "while creating subaccount"
@@ -111,6 +113,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotSubaccount)
 	}
 
+	if err := c.adopt(ctx, desiredCR); err != nil {
+		return managed.ExternalObservation{}, err
+	}
+
 	// ADR Step 1: Check if external-name is empty
 	if meta.GetExternalName(desiredCR) == "" {
 		// Recovery also covers the delete leg: healing here lets the next
@@ -169,6 +175,38 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}, nil
 }
 
+// adopt imports an existing subaccount when the user opted in (see package
+// adoption). The subaccount is found by its subdomain, which is unique in the
+// global account, and must live in the declared region: region is immutable,
+// so a match elsewhere is refused rather than adopted, and nothing is created
+// over it. When nothing matches, adopt returns nil and Observe goes on to
+// report the subaccount missing, so it is created.
+func (c *external) adopt(ctx context.Context, cr *apisv1alpha1.Subaccount) error {
+	pending, err := adoption.Pending(cr)
+	if err != nil || !pending {
+		return err
+	}
+
+	subdomain := cr.Spec.ForProvider.Subdomain
+	match, found, err := c.accountsAccessor.FindSubaccount(ctx, subdomain)
+	if err != nil {
+		return errors.Wrap(err, errAdoptLookup)
+	}
+	if !found {
+		return nil
+	}
+
+	if declared := cr.Spec.ForProvider.Region; match.Region != declared {
+		return errRegionMismatch(subdomain, match.GUID, match.Region, declared)
+	}
+
+	return adoption.Commit(ctx, c.Client, c.recorder, cr, match.GUID, "subdomain="+subdomain)
+}
+
+func errRegionMismatch(subdomain, guid, found, declared string) error {
+	return errors.Errorf("refusing to adopt subaccount %q (%s): it is in region %s, the spec declares %s", subdomain, guid, found, declared)
+}
+
 func (c *external) healExternalName(ctx context.Context, cr *apisv1alpha1.Subaccount) error {
 	// Defensive: unit tests exercise `external` directly without wiring up the
 	// accounts accessor. In production Connect() always sets it.
@@ -179,7 +217,7 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1alpha1.Subacc
 		return nil
 	}
 	subdomain := cr.Spec.ForProvider.Subdomain
-	guid, createdAt, found, err := c.accountsAccessor.SubaccountGuidBySubdomain(ctx, subdomain)
+	match, found, err := c.accountsAccessor.FindSubaccount(ctx, subdomain)
 	if err != nil {
 		ctrl.Log.Info("external-name recovery lookup failed", "subdomain", subdomain, "error", err.Error())
 		c.emit(cr, event.Warning(event.Reason(recovery.EventReasonLookupFailed), err))
@@ -189,6 +227,7 @@ func (c *external) healExternalName(ctx context.Context, cr *apisv1alpha1.Subacc
 		return nil
 	}
 
+	guid, createdAt := match.GUID, match.CreatedAt
 	if !recovery.IsOwnedByCR(cr, createdAt) {
 		ctrl.Log.Info("external-name recovery refused: BTP subaccount is outside our Create-attempt window (brownfield)",
 			"subdomain", subdomain, "guid", guid,

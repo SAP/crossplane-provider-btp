@@ -1851,10 +1851,12 @@ func TestDelete(t *testing.T) {
 var _ tfclient.TfProxyConnectorI[*v1alpha1.ServiceInstance] = &TfProxyClientCreatorMock{}
 
 type TfProxyClientCreatorMock struct {
-	err error
+	err   error
+	calls int
 }
 
 func (t *TfProxyClientCreatorMock) Connect(ctx context.Context, cr *v1alpha1.ServiceInstance) (tfclient.TfProxyControllerI, error) {
+	t.calls++
 	if t.err != nil {
 		return nil, t.err
 	}
@@ -1865,6 +1867,14 @@ var _ Initializer = &InitializerMock{}
 
 type InitializerMock struct {
 	err error
+
+	planID  string
+	planErr error
+}
+
+// PlanID implements Initializer.
+func (i *InitializerMock) PlanID(context.Context, client.Client, *v1alpha1.ServiceInstance) (string, error) {
+	return i.planID, i.planErr
 }
 
 // Initialize implements Initializer.

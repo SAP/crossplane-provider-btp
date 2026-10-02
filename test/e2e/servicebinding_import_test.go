@@ -38,6 +38,7 @@ func TestServiceBindingImportFlow(t *testing.T) {
 		"e2e-destination-binding-import",
 		WithWaitDependentResourceTimeout[*v1alpha1.ServiceBinding](wait.WithTimeout(20*time.Minute)),
 		WithWaitCreateTimeout[*v1alpha1.ServiceBinding](wait.WithTimeout(20*time.Minute)),
+		WithLookupReimport[*v1alpha1.ServiceBinding](),
 		WithWaitDeletionTimeout[*v1alpha1.ServiceBinding](wait.WithTimeout(20*time.Minute)),
 		WithDependentResourceDirectory[*v1alpha1.ServiceBinding](crsPath("servicebinding_import")),
 	)

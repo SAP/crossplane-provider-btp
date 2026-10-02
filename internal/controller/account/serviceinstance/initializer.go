@@ -18,6 +18,10 @@ var (
 
 type Initializer interface {
 	Initialize(kube client.Client, ctx context.Context, mg resource.Managed) error
+
+	// PlanID resolves the plan cr declares now, from servicePlanID or
+	// offeringName/planName/dataCenter. It neither reads nor writes status.
+	PlanID(ctx context.Context, kube client.Client, cr *v1alpha1.ServiceInstance) (string, error)
 }
 
 var _ Initializer = &servicePlanInitializer{}
@@ -39,33 +43,38 @@ func (s *servicePlanInitializer) Initialize(kube client.Client, ctx context.Cont
 	}
 
 	// Direct plan ID provided — skip name-based resolution
-	if cr.Spec.ForProvider.ServicePlanID != "" {
-		cr.Status.AtProvider.ServiceplanID = cr.Spec.ForProvider.ServicePlanID
-		if err := kube.Status().Update(ctx, cr); err != nil {
-			return errors.Wrap(err, errSaveData)
-		}
-		return nil
-	}
-
-	secretData, err := s.loadSecretFn(ctx, kube, cr.Spec.ForProvider.ServiceManagerSecret, cr.Spec.ForProvider.ServiceManagerSecretNamespace)
+	planID, err := s.PlanID(ctx, kube, cr)
 	if err != nil {
-		return errors.Wrap(err, errLoadSmBinding)
-	}
-
-	idResolver, err := s.newIdResolverFn(ctx, secretData)
-	if err != nil {
-		return errors.Wrap(err, errInitPlanResolver)
-	}
-
-	planID, err := idResolver.PlanIDByName(ctx, cr.Spec.ForProvider.OfferingName, cr.Spec.ForProvider.PlanName, cr.Spec.ForProvider.DataCenter)
-	if err != nil {
-		return errors.Wrap(err, errInitialize)
+		return err
 	}
 	cr.Status.AtProvider.ServiceplanID = planID
 	if err := kube.Status().Update(ctx, cr); err != nil {
 		return errors.Wrap(err, errSaveData)
 	}
 	return nil
+}
+
+// PlanID implements Initializer.
+func (s *servicePlanInitializer) PlanID(ctx context.Context, kube client.Client, cr *v1alpha1.ServiceInstance) (string, error) {
+	if id := cr.Spec.ForProvider.ServicePlanID; id != "" {
+		return id, nil
+	}
+
+	secretData, err := s.loadSecretFn(ctx, kube, cr.Spec.ForProvider.ServiceManagerSecret, cr.Spec.ForProvider.ServiceManagerSecretNamespace)
+	if err != nil {
+		return "", errors.Wrap(err, errLoadSmBinding)
+	}
+
+	idResolver, err := s.newIdResolverFn(ctx, secretData)
+	if err != nil {
+		return "", errors.Wrap(err, errInitPlanResolver)
+	}
+
+	planID, err := idResolver.PlanIDByName(ctx, cr.Spec.ForProvider.OfferingName, cr.Spec.ForProvider.PlanName, cr.Spec.ForProvider.DataCenter)
+	if err != nil {
+		return "", errors.Wrap(err, errInitialize)
+	}
+	return planID, nil
 }
 
 func isInitialized(cr *v1alpha1.ServiceInstance) bool {

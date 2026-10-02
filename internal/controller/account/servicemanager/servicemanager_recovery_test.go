@@ -30,12 +30,22 @@ var (
 // smLookuperFake is a test double for servicemanager.SemanticLookuper scoped
 // to the ServiceManager use case (LookupInstanceAndBinding).
 type smLookuperFake struct {
+	// Embedded so the fake satisfies the interface; recovery never calls
+	// the adoption Find* methods, and a call would panic on the nil interface.
+	sm.SemanticLookuper
+
 	siID        string
 	sbID        string
 	siCreatedAt time.Time
 	found       bool
 	err         error
 	gotPlan     string
+
+	// By-name lookup used by adoption (AdoptablePair).
+	byName      sm.InstanceMatch
+	byNameFound bool
+	byNameErr   error
+	gotName     string
 	gotSI       string
 	gotSB       string
 }
@@ -51,6 +61,11 @@ func (l *smLookuperFake) LookupInstanceAndBinding(ctx context.Context, planID, i
 	l.gotSI = instanceName
 	l.gotSB = bindingName
 	return l.siID, l.sbID, l.siCreatedAt, l.found, l.err
+}
+
+func (l *smLookuperFake) FindServiceInstance(_ context.Context, name string) (sm.InstanceMatch, bool, error) {
+	l.gotName = name
+	return l.byName, l.byNameFound, l.byNameErr
 }
 
 type smRecorderFake struct{ events []string }

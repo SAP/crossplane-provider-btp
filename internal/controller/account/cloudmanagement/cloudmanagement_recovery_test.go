@@ -29,12 +29,24 @@ var (
 )
 
 type cmLookuperFake struct {
+	// Embedded so the fake satisfies the interface; recovery never calls
+	// the adoption Find* methods, and a call would panic on the nil interface.
+	smClient.SemanticLookuper
+
 	siID        string
 	sbID        string
 	siCreatedAt time.Time
 	found       bool
 	err         error
 	gotPlan     string
+
+	// By-name lookup used by adoption (AdoptablePair).
+	byName      smClient.InstanceMatch
+	byNameFound bool
+	byNameErr   error
+	gotName     string
+	gotSI       string
+	gotSB       string
 }
 
 func (l *cmLookuperFake) LookupServiceInstance(ctx context.Context, name string) (string, time.Time, bool, error) {
@@ -45,7 +57,14 @@ func (l *cmLookuperFake) LookupServiceBinding(ctx context.Context, serviceInstan
 }
 func (l *cmLookuperFake) LookupInstanceAndBinding(ctx context.Context, planID, instanceName, bindingName string) (string, string, time.Time, bool, error) {
 	l.gotPlan = planID
+	l.gotSI = instanceName
+	l.gotSB = bindingName
 	return l.siID, l.sbID, l.siCreatedAt, l.found, l.err
+}
+
+func (l *cmLookuperFake) FindServiceInstance(_ context.Context, name string) (smClient.InstanceMatch, bool, error) {
+	l.gotName = name
+	return l.byName, l.byNameFound, l.byNameErr
 }
 
 type cmRecorderFake struct{ events []string }

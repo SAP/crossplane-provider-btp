@@ -88,6 +88,7 @@ func TestServiceInstanceImportFlow(t *testing.T) {
 		"e2e-destination-instance-import",
 		WithWaitDependentResourceTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(15*time.Minute)),
 		WithWaitCreateTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(20*time.Minute)),
+		WithLookupReimport[*v1alpha1.ServiceInstance](),
 		WithWaitDeletionTimeout[*v1alpha1.ServiceInstance](wait.WithTimeout(20*time.Minute)),
 		WithDependentResourceDirectory[*v1alpha1.ServiceInstance](crsPath("serviceinstance_import")),
 	)

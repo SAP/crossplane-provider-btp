@@ -43,6 +43,16 @@ Use this when:
 - You want full control over the manifest content
 - You are already familiar with the resource identifiers
 
+## Declarative: Lookup Annotation
+
+For supported resource types, you can let the provider find the existing resource instead of looking up its identifier yourself. Set `btp.sap.crossplane.io/lookup: "true"` on the managed resource: the provider adopts the resource when exactly one match agrees with your spec, and creates it when none exists.
+
+Use this when:
+- You manage resources through compositions and do not know their IDs up front
+- The same manifests must work for both new and already existing landscapes
+
+See [Import by Lookup](./lookup.md) for the supported resource types, how matches are verified, and the combinations that are refused. In compositions, let whoever creates the composite resource choose whether to adopt; see [Using Lookup in Compositions](./lookup.md#using-lookup-in-compositions).
+
 ## Reference: External Name per Resource Type
 
 Not sure which identifier to use for a given resource type? The [External Name Reference](./external-name.md) lists the expected format and where to find the identifier for each supported BTP resource — both in the BTP Cockpit UI and via the BTP CLI.

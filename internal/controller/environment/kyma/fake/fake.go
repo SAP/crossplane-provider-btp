@@ -14,6 +14,7 @@ var _ environments.Client = &MockClient{}
 type MockClient struct {
 	MockDescribeCluster func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error)
 	MockCreateCluster   func(ctx context.Context, input *v1alpha1.KymaEnvironment) (string, error)
+	MockFindInstance    func(ctx context.Context, input *v1alpha1.KymaEnvironment) (provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error)
 	MockDeleteCluster   func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*http.Response, error)
 }
 
@@ -22,6 +23,9 @@ func (c MockClient) DescribeInstance(ctx context.Context, cr v1alpha1.KymaEnviro
 	error,
 ) {
 	return c.MockDescribeCluster(ctx, &cr)
+}
+func (c MockClient) FindInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (provisioningclient.BusinessEnvironmentInstanceResponseObject, bool, error) {
+	return c.MockFindInstance(ctx, &cr)
 }
 func (c MockClient) CreateInstance(ctx context.Context, cr v1alpha1.KymaEnvironment) (string, error) {
 	return c.MockCreateCluster(ctx, &cr)
