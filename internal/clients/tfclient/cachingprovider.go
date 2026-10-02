@@ -189,8 +189,8 @@ func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error
 	kv := []interface{}{
 		"method", r.Method,
 		"url", r.URL.Host + r.URL.Path,
-		"cliServerURL", r.URL.Host,
 		"durationMs", d.Milliseconds(),
+		"subdomain", r.Header.Get(headerCLISubdomain),
 	}
 	if err != nil {
 		kv = append(kv, "error", err.Error())

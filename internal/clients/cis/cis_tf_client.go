@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
@@ -15,6 +16,7 @@ import (
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ResourcesStatus contains a summary of the status of the tf resources managed by the ITfClient
@@ -53,16 +55,21 @@ type TfClientInitializer struct {
 }
 
 func (tfI *TfClientInitializer) ConnectResources(ctx context.Context, cr *apisv1beta1.CloudManagement) (ITfClient, error) {
-	siInstance := tfI.serviceInstanceCr(cr)
-	siExternal, err := tfI.siConnector.Connect(ctx, siInstance)
+	logger := log.FromContext(ctx)
+	connectStart := time.Now()
 
+	siInstance := tfI.serviceInstanceCr(cr)
+	t0 := time.Now()
+	siExternal, err := tfI.siConnector.Connect(ctx, siInstance)
+	logger.Info("ConnectResources: SI connect", "duration", time.Since(t0), "elapsed", time.Since(connectStart))
 	if err != nil {
 		return nil, err
 	}
 
 	siBinding := tfI.serviceBindingCr(cr)
+	t1 := time.Now()
 	sbExternal, err := tfI.sbConnector.Connect(ctx, siBinding)
-
+	logger.Info("ConnectResources: SB connect", "duration", time.Since(t1), "elapsed", time.Since(connectStart))
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +189,12 @@ func (tf *TfClient) CreateResources(ctx context.Context, cr *apisv1beta1.CloudMa
 }
 
 func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.CloudManagement) (ResourcesStatus, error) {
+	logger := log.FromContext(ctx)
+	observeStart := time.Now()
+
+	t0 := time.Now()
 	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
+	logger.Info("ObserveResources: SI observe", "duration", time.Since(t0), "elapsed", time.Since(observeStart))
 	if err != nil {
 		return ResourcesStatus{}, err
 	}
@@ -225,7 +237,9 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.CloudM
 			ExternalObservation: managed.ExternalObservation{ResourceExists: false},
 		}, nil
 	}
+	t1 := time.Now()
 	sbObs, err := tf.sbExternal.Observe(ctx, tf.sBinding)
+	logger.Info("ObserveResources: SB observe", "duration", time.Since(t1), "elapsed", time.Since(observeStart))
 	if err != nil {
 		return ResourcesStatus{}, err
 	}
@@ -244,7 +258,9 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.CloudM
 	// the way the reconciler is implemented we need to do another observe run to actually retrieve if updates are nessecary,
 	// the first one is just used to set ready state for any reason, should be rechecked when we have the in-memory clients in place
 	// since they reimplement Observe()
+	t2 := time.Now()
 	resourceUpToDate := tf.resourcesUpToDate(ctx, cr)
+	logger.Info("ObserveResources: SI observe (upToDate check)", "duration", time.Since(t2), "elapsed", time.Since(observeStart))
 
 	return ResourcesStatus{
 		ExternalObservation: managed.ExternalObservation{
