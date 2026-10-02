@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -302,6 +303,140 @@ func Test_Track(t *testing.T) {
 		)
 	}
 
+}
+
+// Test_Track_SourceGone covers the deletion-tolerance rule: a tracked source that is
+// already gone must not abort Track for a resource that is itself being deleted,
+// because Connect() sits in front of Observe, Delete and finalizer removal - aborting
+// there strands the resource forever. While the resource is alive the fail-closed
+// behaviour is unchanged, and a non-NotFound error always aborts.
+func Test_Track_SourceGone(t *testing.T) {
+	errBoom := kerrors.NewInternalError(fmt.Errorf("boom"))
+	notFoundDirectory := kerrors.NewNotFound(
+		schema.GroupResource{Group: "account.btp.sap.crossplane.io", Resource: "directories"},
+		"fake-directory",
+	)
+
+	tests := []struct {
+		name string
+		// mg is the resource being tracked; it is deliberately NOT seeded into the
+		// fake client, mirroring Connect() where mg comes from the reconciler.
+		mg                resource.Managed
+		additionalObjects []kclient.Object
+		getErr            error
+		wantErr           error
+		wantCondition     *xpv1.Condition
+		// wantTracked are the ResourceUsages that must exist after Track.
+		wantTracked []*providerv1alpha1.ResourceUsage
+	}{
+		{
+			name:              "SourceGoneWhileDeleting",
+			mg:                markDeleted(newFakeSubaccount()),
+			additionalObjects: []kclient.Object{},
+			wantErr:           nil,
+			wantCondition:     lo.ToPtr(providerv1alpha1.NotInUse()),
+		},
+		{
+			name:              "SourceGoneNotDeleting",
+			mg:                newFakeSubaccount(),
+			additionalObjects: []kclient.Object{},
+			wantErr:           notFoundDirectory,
+		},
+		{
+			name:              "NonNotFoundErrorWhileDeleting",
+			mg:                markDeleted(newFakeSubaccount()),
+			additionalObjects: []kclient.Object{newFakeDirectory()},
+			getErr:            errBoom,
+			wantErr:           errBoom,
+		},
+		{
+			name: "MultipleReferences_OneGoneWhileDeleting",
+			mg:   markDeleted(newFakeServiceBindingWithTwoReferences()),
+			additionalObjects: []kclient.Object{
+				newFakeSubaccount(),
+			},
+			wantErr: nil,
+			wantTracked: []*providerv1alpha1.ResourceUsage{
+				newResourceUsage(newFakeSubaccount(), newFakeServiceBindingWithTwoReferences()),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			client, tracker := buildFakeClientWithGetError(tt.additionalObjects, tt.getErr, t)
+
+			err := tracker.Track(ctx, tt.mg)
+
+			if diff := cmp.Diff(tt.wantErr, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\ne.Track(...): -want error, +got error:\n%s\n", tt.name, diff)
+			}
+
+			for _, want := range tt.wantTracked {
+				got := &providerv1alpha1.ResourceUsage{}
+				if gErr := client.Get(ctx, kclient.ObjectKeyFromObject(want), got); gErr != nil {
+					t.Errorf("\n%s\ne.Track(...): expected ResourceUsage %s to exist: %s\n", tt.name, want.GetName(), gErr)
+				}
+			}
+
+			if tt.wantCondition != nil {
+				got := tt.mg.GetCondition(providerv1alpha1.UseCondition)
+				if diff := cmp.Diff(*tt.wantCondition, got); diff != "" {
+					t.Errorf("\n%s\ne.Track(...) condition: -want, +got:\n%s\n", tt.name, diff)
+				}
+			}
+		})
+	}
+}
+
+// buildFakeClientWithGetError builds a fake client that fails every Get with getErr
+// when it is non-nil, which is the only way to produce a non-NotFound read failure.
+func buildFakeClientWithGetError(
+	initialObjects []kclient.Object,
+	getErr error,
+	t *testing.T,
+) (kclient.WithWatch, *DefaultReferenceResolverTracker) {
+	builder := fake.NewClientBuilder()
+	for _, object := range initialObjects {
+		builder.WithObjects(object)
+	}
+	scheme := runtime.NewScheme()
+	if err := apis.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	builder.WithScheme(scheme)
+	if getErr != nil {
+		builder.WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(_ context.Context, _ kclient.WithWatch, _ kclient.ObjectKey, _ kclient.Object, _ ...kclient.GetOption) error {
+				return getErr
+			},
+		})
+	}
+	client := builder.Build()
+	return client, NewDefaultReferenceResolverTracker(client)
+}
+
+func markDeleted(mg resource.Managed) resource.Managed {
+	mg.SetDeletionTimestamp(lo.ToPtr(metav1.Now()))
+	return mg
+}
+
+// newFakeServiceBindingWithTwoReferences carries two tracked references: the
+// subaccount, which exists in these tests, and a service instance that never
+// does. Both SubaccountRef and ServiceInstanceRef carry the reference-* tags
+// the tracker walks, so both are resolved (unlike Subaccount, which since the
+// removal of the GlobalAccount MR has only one tracked reference field).
+func newFakeServiceBindingWithTwoReferences() *v1alpha1.ServiceBinding {
+	return &v1alpha1.ServiceBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "fake-servicebinding", UID: "servicebinding-uid"},
+		Spec: v1alpha1.ServiceBindingSpec{
+			ForProvider: v1alpha1.ServiceBindingParameters{
+				SubaccountRef:      &xpv1.Reference{Name: "fake-subaccount"},
+				ServiceInstanceRef: &xpv1.Reference{Name: "gone-service-instance"},
+			},
+		},
+	}
 }
 
 func checkNoResourceUsagesExist(t *testing.T) func(

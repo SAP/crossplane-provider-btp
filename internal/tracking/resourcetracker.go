@@ -13,9 +13,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mitchellh/reflectwalk"
 	"github.com/samber/lo"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
@@ -66,6 +68,11 @@ func (r *DefaultReferenceResolverTracker) CreateTrackingReference(
 // It also refreshes the ResourceUsage condition on the resource. Track runs in every Connect(), so the
 // in-use condition stays current in steady state and is fresh before Observe() and Delete(), instead of
 // only being stamped transiently inside Delete().
+//
+// A source that no longer exists aborts Track while the referencing resource is alive, because
+// the tracking object is what stops the source being deleted from under it. Once the referencing
+// resource is itself being deleted that protection has nothing left to protect, and aborting would
+// strand the resource, so a NotFound source is tolerated in that case only.
 func (r *DefaultReferenceResolverTracker) Track(ctx context.Context, mg resource.Managed) error {
 	if hasIgnoreAnnotation(mg) {
 		return nil
@@ -76,10 +83,25 @@ func (r *DefaultReferenceResolverTracker) Track(ctx context.Context, mg resource
 		return err
 	}
 
+	deleting := meta.WasDeleted(mg)
+
 	for _, reference := range references {
-		err := r.createTracking(ctx, mg, reference)
-		if err != nil {
-			return err
+		if err := r.createTracking(ctx, mg, reference); err != nil {
+			// Fail-closed in steady state: without the tracking object the
+			// referenced source could be deleted from under this resource.
+			if !deleting || !kerrors.IsNotFound(err) {
+				return err
+			}
+			// The resource is being deleted and the source it referenced is
+			// already gone. Aborting Connect() here strands the resource
+			// permanently: neither Observe/Delete nor finalizer removal can
+			// run, so it can never be reconciled OR deleted. There is nothing
+			// left to protect - continue.
+			ctrl.Log.Info("tracked source not found while the referencing resource is being deleted; continuing so deletion can proceed",
+				"resource", mg.GetName(),
+				"kind", mg.GetObjectKind().GroupVersionKind().Kind,
+				"sourceKind", reference.Kind,
+				"sourceName", reference.Reference.Name)
 		}
 	}
 
