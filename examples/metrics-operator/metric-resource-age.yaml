@@ -1,0 +1,51 @@
+# ──────────────────────────────────────────────────────────────────
+# Cross-cutting: resource age metrics (using Metric + valueFrom)
+#
+# These track how long BTP resources have existed (Unix seconds),
+# useful for detecting stale/stuck resources or governance drift.
+# Uses the base Metric type (not ManagedMetric) because valueFrom
+# is only supported on Metric/FederatedMetric.
+# ──────────────────────────────────────────────────────────────────
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: Metric
+metadata:
+  name: btp-subaccount-age
+spec:
+  name: btp_subaccount_creation_timestamp_seconds
+  description: "Unix creation timestamp of each BTP Subaccount (use to derive resource age)"
+  target:
+    kind: Subaccount
+    group: account.btp.sap.crossplane.io
+    version: v1alpha1
+  interval: "5m"
+  valueFrom:
+    fieldPath: "metadata.creationTimestamp"
+    type: timestamp
+  projections:
+    - name: name
+      fieldPath: "metadata.name"
+    - name: region
+      fieldPath: "spec.forProvider.region"
+---
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: Metric
+metadata:
+  name: btp-service-instance-age
+spec:
+  name: btp_service_instance_creation_timestamp_seconds
+  description: "Unix creation timestamp of each BTP ServiceInstance (use to derive resource age)"
+  target:
+    kind: ServiceInstance
+    group: account.btp.sap.crossplane.io
+    version: v1alpha1
+  interval: "5m"
+  valueFrom:
+    fieldPath: "metadata.creationTimestamp"
+    type: timestamp
+  projections:
+    - name: name
+      fieldPath: "metadata.name"
+    - name: offering_name
+      fieldPath: "spec.forProvider.serviceOfferingName"
+    - name: plan_name
+      fieldPath: "spec.forProvider.servicePlanName"
