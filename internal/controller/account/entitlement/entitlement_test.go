@@ -2,6 +2,7 @@ package entitlement
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	entclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-entitlements-service-api-go/pkg"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,6 +25,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	entitlement2 "github.com/sap/crossplane-provider-btp/internal/clients/entitlement"
 	"github.com/sap/crossplane-provider-btp/internal/controller/account/entitlement/fake"
+	"github.com/sap/crossplane-provider-btp/internal/mrstatus"
 	test2 "github.com/sap/crossplane-provider-btp/internal/tracking/test"
 )
 
@@ -233,7 +236,9 @@ func TestObserve(t *testing.T) {
 				err: nil,
 			},
 		},
-		"Simple Case, All up-to-date, unavailable condition": {
+		// upstream issue #280: PROCESSING_FAILED never reports Available, even
+		// with an amount still assigned. This asserted Available before.
+		"PROCESSING_FAILED with assigned amount -- must not report Available": {
 			args: args{
 				kube: &test.MockClient{
 					MockStatusUpdate: noopStatusUpdate,
@@ -253,7 +258,49 @@ func TestObserve(t *testing.T) {
 			want: want{
 				o: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
 				comparefn: func(v *v1alpha1.Entitlement) string {
-					return cmp.Diff(v.Status.GetCondition(xpv1.Available().Type).Status, xpv1.Available().Status)
+					got := v.Status.GetCondition(xpv1.TypeReady)
+					if got.Status != corev1.ConditionFalse {
+						return fmt.Sprintf("expected Ready=False for PROCESSING_FAILED, got %s", got.Status)
+					}
+					if got.Reason != mrstatus.ReasonExternalResourceFailed {
+						return fmt.Sprintf("expected reason %q, got %q", mrstatus.ReasonExternalResourceFailed, got.Reason)
+					}
+					if !strings.Contains(got.Message, "PROCESSING_FAILED") {
+						return fmt.Sprintf("expected the condition message to name the platform state, got %q", got.Message)
+					}
+					return ""
+				},
+				err: nil,
+			},
+		},
+		// The BTP rejection reason must be readable on the resource; it used to
+		// be dropped entirely.
+		"PROCESSING_FAILED stateMessage lands on the condition": {
+			args: args{
+				kube: &test.MockClient{
+					MockStatusUpdate: noopStatusUpdate,
+					MockList:         test.NewMockListFn(nil, ListEntitlements(entitlement(withAmount(1)))),
+				},
+				client: fake.MockClient{MockDescribeInstanceFn: func(ctx context.Context, key entitlement2.ExternalNameKey) (*entitlement2.Instance, error) {
+					return &entitlement2.Instance{
+						EntitledServicePlan: &entclient.ServicePlanResponseObject{},
+						Assignment: &entclient.AssignedServicePlanSubaccountDTO{
+							Amount:       internal.Ptr(float32(1)),
+							EntityState:  internal.Ptr("PROCESSING_FAILED"),
+							StateMessage: internal.Ptr("requested quota amount change [0] is lower than the currently consumed quota [2]"),
+						},
+					}, nil
+				}},
+				cr: entitlement(withAmount(1), withExternalName("subaccount-guid/service-name/service-plan-name")),
+			},
+			want: want{
+				o: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
+				comparefn: func(v *v1alpha1.Entitlement) string {
+					got := v.Status.GetCondition(xpv1.TypeReady)
+					if !strings.Contains(got.Message, "requested quota amount change [0] is lower than the currently consumed quota [2]") {
+						return fmt.Sprintf("expected the BTP stateMessage on the condition, got %q", got.Message)
+					}
+					return ""
 				},
 				err: nil,
 			},
@@ -310,7 +357,16 @@ func TestObserve(t *testing.T) {
 				err: nil,
 			},
 		},
-		"Assign-time PROCESSING_FAILED with amount=0 -- Ready must not be Available": {
+		// Scope note: this pins what Observe itself leaves on the resource. On
+		// the amount==0 path Observe reports the external resource as absent,
+		// so the managed reconciler goes on to mark Creating() - which replaces
+		// Ready - before it persists the status. What an operator reads off
+		// this resource while the assignment is being retried is therefore
+		// Creating, not ExternalResourceFailed; the rejection resurfaces on the
+		// resource once the failed assignment reserves a non-zero amount (the
+		// "PROCESSING_FAILED stateMessage lands on the condition" case above,
+		// which does persist because Observe reports the resource as existing).
+		"Assign-time PROCESSING_FAILED with amount=0 -- Observe must not leave Available behind": {
 			args: args{
 				kube: &test.MockClient{
 					MockStatusUpdate: noopStatusUpdate,
@@ -332,9 +388,15 @@ func TestObserve(t *testing.T) {
 			want: want{
 				o: managed.ExternalObservation{ResourceExists: false},
 				comparefn: func(v *v1alpha1.Entitlement) string {
-					got := v.Status.GetCondition(xpv1.Available().Type).Status
-					if got == xpv1.Available().Status {
+					got := v.Status.GetCondition(xpv1.TypeReady)
+					if got.Status != corev1.ConditionFalse {
 						return "Ready=True/Available should not be set when BTP reports PROCESSING_FAILED with amount=0"
+					}
+					if got.Reason != mrstatus.ReasonExternalResourceFailed {
+						return fmt.Sprintf("expected reason %q, got %q", mrstatus.ReasonExternalResourceFailed, got.Reason)
+					}
+					if got.Message == "" {
+						return "expected a non-empty condition message naming the platform state"
 					}
 					return ""
 				},

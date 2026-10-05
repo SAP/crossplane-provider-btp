@@ -27,6 +27,7 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2
 	github.com/muvaf/typewriter v0.0.0-20240614220100-70f9d4a54ea0
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.24.0
 	github.com/samber/lo v1.53.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
@@ -162,6 +163,7 @@ require (
 	github.com/int128/oauth2cli v1.14.0 // indirect
 	github.com/int128/oauth2dev v1.1.0 // indirect
 	github.com/klauspost/compress v1.19.0 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/martini-contrib/render v0.0.0-20150707142108-ec18f8345a11 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
@@ -198,7 +200,6 @@ require (
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
 	github.com/pelletier/go-toml/v2 v2.3.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.24.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.70.0 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect

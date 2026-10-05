@@ -82,6 +82,9 @@ func TerraformSetupBuilder() terraform.SetupFn {
 			return ps, errors.Wrap(err, errTrackUsage)
 		}
 
+		// Track tolerates a NotFound on the tracked source while mg is itself being deleted, so this
+		// wrap can no longer abort Connect() for a resource whose source was deleted first - which
+		// would leave it unable to be observed, deleted or unfinalized.
 		if err = tracking.NewDefaultReferenceResolverTracker(client).Track(ctx, mg); err != nil {
 			return ps, errors.Wrap(err, errTrackRUsage)
 		}
