@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 type GlobalaccountTrustConfigurationInitParameters struct {
@@ -120,8 +120,8 @@ type GlobalaccountTrustConfigurationParameters struct {
 
 // GlobalaccountTrustConfigurationSpec defines the desired state of GlobalaccountTrustConfiguration
 type GlobalaccountTrustConfigurationSpec struct {
-	v1.ResourceSpec `json:",inline"`
-	ForProvider     GlobalaccountTrustConfigurationParameters `json:"forProvider"`
+	v2.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                   GlobalaccountTrustConfigurationParameters `json:"forProvider"`
 	// THIS IS A BETA FIELD. It will be honored
 	// unless the Management Policies feature flag is disabled.
 	// InitProvider holds the same fields as ForProvider, with the exception
@@ -137,8 +137,8 @@ type GlobalaccountTrustConfigurationSpec struct {
 
 // GlobalaccountTrustConfigurationStatus defines the observed state of GlobalaccountTrustConfiguration.
 type GlobalaccountTrustConfigurationStatus struct {
-	v1.ResourceStatus `json:",inline"`
-	AtProvider        GlobalaccountTrustConfigurationObservation `json:"atProvider,omitempty"`
+	v2.ManagedResourceStatus `json:",inline"`
+	AtProvider               GlobalaccountTrustConfigurationObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true
