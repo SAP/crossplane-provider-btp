@@ -38,6 +38,30 @@ type SubscriptionObservation struct {
 	// State as received from the API instance
 	// +optional
 	State *string `json:"state,omitempty"`
+
+	// SubscriptionError holds the failure details reported by BTP when a
+	// subscription operation fails (for example in SUBSCRIBE_FAILED state).
+	// It mirrors the subscriptionError object of the SaaS Provisioning API
+	// response and carries the message shown in the BTP Cockpit.
+	// +optional
+	SubscriptionError *SubscriptionError `json:"subscriptionError,omitempty"`
+
+	// AutomationStateMessage is the state description reported by BTP for the
+	// current automation state, if any.
+	// +optional
+	AutomationStateMessage *string `json:"automationStateMessage,omitempty"`
+}
+
+// SubscriptionError mirrors the error information returned by the SaaS
+// Provisioning API (EntitledApplicationsErrorResponseObject).
+type SubscriptionError struct {
+	// AppError is the application specific error code or text, if provided.
+	// +optional
+	AppError *string `json:"appError,omitempty"`
+
+	// ErrorMessage is the human readable failure message shown in the BTP Cockpit.
+	// +optional
+	ErrorMessage *string `json:"errorMessage,omitempty"`
 }
 
 // A SubscriptionSpec defines the desired state of a Subscription.
