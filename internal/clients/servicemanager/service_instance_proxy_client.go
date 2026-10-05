@@ -61,7 +61,6 @@ func (t ServiceManagerInstanceProxyClient) dynamicServiceInstance(ctx context.Co
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), adminBindingCleanupTimeout)
 		defer cancel()
 		if cleanupErr := t.deleteAdminBinding(cleanupCtx, subaccountId); cleanupErr != nil {
-			id = ""
 			cleanupErr = fmt.Errorf("delete temporary service-manager admin binding: %w", cleanupErr)
 			if err == nil {
 				err = cleanupErr
@@ -150,7 +149,8 @@ func (t ServiceManagerInstanceProxyClient) EnsureSemanticLookuper(ctx context.Co
 		// caller defers cleanup(). Also log the error instead of dropping it on
 		// the floor so a persistent failure is at least visible.
 		cleanup = func() {
-			delCtx := context.WithoutCancel(ctx)
+			delCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), adminBindingCleanupTimeout)
+			defer cancel()
 			if dErr := t.deleteAdminBinding(delCtx, subaccountGuid); dErr != nil {
 				ctrl.Log.Info("EnsureSemanticLookuper cleanup: failed to delete temporary admin binding",
 					"subaccountGuid", subaccountGuid, "error", dErr.Error())

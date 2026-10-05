@@ -95,6 +95,7 @@ func TestLookup(t *testing.T) {
 			},
 			want: want{
 				err:          true,
+				id:           "someId",
 				deleteCalled: true,
 			},
 		},
@@ -241,8 +242,13 @@ func TestDynamicServiceInstanceCleanup(t *testing.T) {
 				if err != nil || id != "plan-id" {
 					t.Errorf("expected successful lookup, got id %q, error %v", id, err)
 				}
-			} else if id != "" {
-				t.Errorf("failed lookup or cleanup must not return a plan ID, got %q", id)
+			} else if tc.lookupErr == nil && tc.cleanupErr != nil {
+				// Lookup succeeded: plan ID must be preserved even when cleanup fails.
+				if id != "plan-id" {
+					t.Errorf("cleanup failure must not discard a successful plan ID, got %q", id)
+				}
+			} else if tc.lookupErr != nil && id != "" {
+				t.Errorf("failed lookup must not return a plan ID, got %q", id)
 			}
 		})
 	}
