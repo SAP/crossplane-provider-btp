@@ -48,15 +48,18 @@ func DefaultSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions, object cli
 			&providerv1alpha1.ProviderConfigUsage{},
 		)
 
-	r := managed.NewReconciler(
-		mgr,
-		resource.ManagedKind(gvk),
+	opts := []managed.ReconcilerOption{
 		managed.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		managed.WithPollInterval(o.PollInterval),
 		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
-	)
+	}
+	if o.ReconcileTimeout > 0 {
+		opts = append(opts, managed.WithTimeout(o.ReconcileTimeout))
+	}
+
+	r := managed.NewReconciler(mgr, resource.ManagedKind(gvk), opts...)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
@@ -79,16 +82,19 @@ func DefaultSetupWithoutDefaultInitializer(mgr ctrl.Manager, o internalopts.Cros
 			&providerv1alpha1.ProviderConfigUsage{},
 		)
 
-	r := managed.NewReconciler(
-		mgr,
-		resource.ManagedKind(gvk),
+	opts := []managed.ReconcilerOption{
 		managed.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithInitializers(), // No default initializer
 		enableBetaManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)),
-	)
+	}
+	if o.ReconcileTimeout > 0 {
+		opts = append(opts, managed.WithTimeout(o.ReconcileTimeout))
+	}
+
+	r := managed.NewReconciler(mgr, resource.ManagedKind(gvk), opts...)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
