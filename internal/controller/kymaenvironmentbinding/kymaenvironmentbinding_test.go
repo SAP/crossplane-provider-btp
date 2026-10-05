@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	managed "github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -404,7 +404,7 @@ func Test_external_Observe(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{},
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{},
 					},
 				},
 			},
@@ -417,7 +417,7 @@ func Test_external_Observe(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 					},
@@ -458,7 +458,7 @@ func Test_external_Observe(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
@@ -508,7 +508,7 @@ func Test_external_Observe(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
@@ -558,7 +558,7 @@ func Test_external_Observe(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
@@ -609,7 +609,7 @@ func Test_external_Observe(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
@@ -674,7 +674,7 @@ func Test_external_Observe(t *testing.T) {
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
 							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 2},
 						},
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 					},
@@ -725,7 +725,7 @@ func Test_external_Observe(t *testing.T) {
 						ForProvider: v1alpha1.KymaEnvironmentBindingParameters{
 							RotationInterval: providerv1alpha1.Duration{Duration: time.Hour * 2},
 						},
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 					},
@@ -778,7 +778,7 @@ func Test_external_Observe(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 					},
@@ -816,7 +816,7 @@ func Test_external_Observe(t *testing.T) {
 				ctx: context.Background(),
 				mg: &v1alpha1.KymaEnvironmentBinding{
 					Spec: v1alpha1.KymaEnvironmentBindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{},
 						},
 					},

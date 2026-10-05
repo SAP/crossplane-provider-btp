@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"

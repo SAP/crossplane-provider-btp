@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	resourcefake "github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

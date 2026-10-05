@@ -4,7 +4,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 // SubaccountDestinationInitParameters holds the reference fields needed by
@@ -136,15 +136,15 @@ type SubaccountDestinationObservation struct {
 
 // SubaccountDestinationSpec defines the desired state.
 type SubaccountDestinationSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       SubaccountDestinationParameters     `json:"forProvider"`
-	InitProvider      SubaccountDestinationInitParameters `json:"initProvider,omitempty"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     SubaccountDestinationParameters     `json:"forProvider"`
+	InitProvider                    SubaccountDestinationInitParameters `json:"initProvider,omitempty"`
 }
 
 // SubaccountDestinationStatus defines the observed state.
 type SubaccountDestinationStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          SubaccountDestinationObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 SubaccountDestinationObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -156,8 +156,8 @@ type SubaccountDestinationStatus struct {
 //   - Follows Standard: no (compound key, not a single GUID)
 //   - Format: `<subaccount-id>/<destination-name>`
 //   - How to find:
-//     - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)
-//     - API: GET /v1/subaccountDestinations/\{destination name\} (fields: subaccount_id + Name)
+//   - UI: SAP BTP Cockpit → Subaccount → Connectivity → Destinations (field: Name)
+//   - API: GET /v1/subaccountDestinations/\{destination name\} (fields: subaccount_id + Name)
 //
 // +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
