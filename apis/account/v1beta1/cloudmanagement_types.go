@@ -14,7 +14,7 @@ package v1beta1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -135,14 +135,14 @@ type Binding struct {
 
 // A CloudManagementSpec defines the desired state of a CloudManagement.
 type CloudManagementSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       CloudManagementParameters `json:"forProvider,omitempty"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     CloudManagementParameters `json:"forProvider,omitempty"`
 }
 
 // A CloudManagementStatus represents the observed state of a CloudManagement.
 type CloudManagementStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          CloudManagementObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 CloudManagementObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

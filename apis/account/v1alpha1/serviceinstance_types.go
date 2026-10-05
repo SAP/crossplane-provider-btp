@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 // ServiceInstanceParameters are the configurable fields of a ServiceInstance.
@@ -122,14 +122,14 @@ type ServiceInstanceObservation struct {
 
 // A ServiceInstanceSpec defines the desired state of a ServiceInstance.
 type ServiceInstanceSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       ServiceInstanceParameters `json:"forProvider"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     ServiceInstanceParameters `json:"forProvider"`
 }
 
 // A ServiceInstanceStatus represents the observed state of a ServiceInstance.
 type ServiceInstanceStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          ServiceInstanceObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 ServiceInstanceObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

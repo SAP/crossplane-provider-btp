@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 type RoleReference struct {
@@ -43,16 +43,16 @@ type RoleCollectionObservation struct {
 
 // A RoleCollectionSpec defines the desired state of a RoleCollection.
 type RoleCollectionSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       RoleCollectionParameters `json:"forProvider"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     RoleCollectionParameters `json:"forProvider"`
 
 	XSUAACredentialsReference `json:",inline"`
 }
 
 // A RoleCollectionStatus represents the observed state of a RoleCollection.
 type RoleCollectionStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          RoleCollectionObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 RoleCollectionObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

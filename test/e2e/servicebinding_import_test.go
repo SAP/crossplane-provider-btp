@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -27,7 +27,7 @@ func TestServiceBindingImportFlow(t *testing.T) {
 					ServiceInstanceRef: &xpv1.Reference{Name: "e2e-servicebinding-import-instance"},
 					SubaccountRef:      &xpv1.Reference{Name: "e2e-test-servicebinding-import"},
 				},
-				ResourceSpec: xpv1.ResourceSpec{
+				ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 					WriteConnectionSecretToReference: &xpv1.SecretReference{
 						Name:      "e2e-destination-binding-import",
 						Namespace: "default",

@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	xpmeta "github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	meta "github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -107,7 +107,7 @@ func TestEntitlements(t *testing.T) {
 						Namespace: cfg.Namespace(),
 					},
 					Spec: v1alpha1.EntitlementSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							ProviderConfigReference: &xpv1.Reference{Name: "default"},
 						},
 						ForProvider: v1alpha1.EntitlementParameters{
@@ -295,7 +295,7 @@ func requireEntitlementCreateRejected(
 			Namespace: cfg.Namespace(),
 		},
 		Spec: v1alpha1.EntitlementSpec{
-			ResourceSpec: xpv1.ResourceSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{Name: "default"},
 			},
 			ForProvider: v1alpha1.EntitlementParameters{
