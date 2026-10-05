@@ -62,7 +62,7 @@ type bindingDeletionTransport struct {
 
 func (b *bindingDeletionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if strings.HasPrefix(req.URL.Path, "/login/") {
-		return bindingDeletionResponse(req, 200, `{"mail":"test@example.invalid","issuer":"https://idp.invalid"}`), nil
+		return bindingDeletionResponse(req, 200, `{"mail":"test@example.com","issuer":"https://idp.invalid"}`), nil
 	}
 	if !strings.HasSuffix(req.URL.Path, "/services/binding") {
 		b.t.Errorf("unexpected BTP command: %s", req.URL)
