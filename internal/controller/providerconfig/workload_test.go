@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 )
@@ -20,14 +22,14 @@ func TestWorkloadNativeMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	var fields map[string]any
-	json.Unmarshal(data, &fields)
+	require.NoError(t, json.Unmarshal(data, &fields))
 	for _, key := range []string{"TokenFile", "IASURL", "IASClientID", "IASResource"} {
 		if _, exists := fields[key]; exists {
 			t.Fatal("workload config serialized as user credentials")
 		}
 	}
 	var user btp.UserCredential
-	json.Unmarshal(data, &user)
+	require.NoError(t, json.Unmarshal(data, &user))
 	if user.Email != "workload@example.com" || user.Idp != "test-origin" || user.Password != "" {
 		t.Fatal("incorrect native identity metadata")
 	}

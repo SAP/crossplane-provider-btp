@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"golang.org/x/oauth2"
 )
 
@@ -24,12 +26,12 @@ func cisTestJWT(claims map[string]interface{}) string {
 func TestNativeCISWorkloadExchangeRefreshAndPrincipal(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "token")
 	assertion := cisTestJWT(map[string]interface{}{"iss": "https://issuer.example", "sub": "sa", "aud": []string{"ias"}, "exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix()})
-	os.WriteFile(file, []byte(assertion), 0600)
+	require.NoError(t, os.WriteFile(file, []byte(assertion), 0600))
 	var mu sync.Mutex
 	var got []string
 	badUser := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
+		require.NoError(t, r.ParseForm())
 		w.Header().Set("Content-Type", "application/json")
 		if r.Form.Get("password") != "" || r.Form.Get("grant_type") != "urn:ietf:params:oauth:grant-type:jwt-bearer" {
 			t.Error("unexpected password/grant")
@@ -49,7 +51,7 @@ func TestNativeCISWorkloadExchangeRefreshAndPrincipal(t *testing.T) {
 		} else if r.Form.Get("client_secret") != "manual-binding-secret" {
 			t.Error("missing manual CIS secret")
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{"access_token": cisTestJWT(claims), "token_type": "bearer", "expires_in": 3600})
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]interface{}{"access_token": cisTestJWT(claims), "token_type": "bearer", "expires_in": 3600}))
 	}))
 	defer server.Close()
 	credentials := &Credentials{WorkloadIdentity: &WorkloadIdentityConfiguration{UserEmail: "workload@example.com", IdentityProvider: "test-origin", TokenFile: file, IASURL: server.URL, IASClientID: "consumer", IASResource: "test-dependency"}, CISCredential: &CISCredential{GrantType: "user_token"}}
@@ -72,7 +74,7 @@ func TestNativeCISWorkloadExchangeRefreshAndPrincipal(t *testing.T) {
 		t.Fatalf("login stampede=%d", len(got))
 	}
 	rotated := assertion[:len(assertion)-4] + "c2lnMg"
-	os.WriteFile(file, []byte(rotated), 0600)
+	require.NoError(t, os.WriteFile(file, []byte(rotated), 0600))
 	source.acquired = time.Now().Add(-16 * time.Minute)
 	if _, err := source.Token(); err != nil {
 		t.Fatal(err)
@@ -93,7 +95,7 @@ func TestNativeCISWorkloadExchangeRefreshAndPrincipal(t *testing.T) {
 		t.Fatal("accepted different IAS user")
 	}
 	badUser = false
-	os.WriteFile(file, []byte(cisTestJWT(map[string]interface{}{"iss": "other", "sub": "other", "exp": time.Now().Add(time.Hour).Unix()})), 0600)
+	require.NoError(t, os.WriteFile(file, []byte(cisTestJWT(map[string]interface{}{"iss": "other", "sub": "other", "exp": time.Now().Add(time.Hour).Unix()})), 0600))
 	if _, err := source.Token(); err == nil {
 		t.Fatal("accepted different workload principal")
 	}
@@ -109,7 +111,7 @@ func TestWorkloadCISInvalidatesUnauthorizedToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	require.NoError(t, resp.Body.Close())
 	if source.token != nil {
 		t.Fatal("401 did not invalidate native user token")
 	}

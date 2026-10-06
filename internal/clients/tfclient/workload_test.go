@@ -14,9 +14,10 @@ import (
 	"testing"
 	"time"
 
+	account "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/stretchr/testify/require"
+
 	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/crossplane/upjet/v2/pkg/terraform"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
@@ -29,7 +30,7 @@ import (
 
 func TestWorkloadBothSetupPathsRereadToken(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "token")
-	os.WriteFile(file, []byte("first-jwt"), 0600)
+	require.NoError(t, os.WriteFile(file, []byte("first-jwt"), 0600))
 	pc := fakeProviderConfig(testProviderName, "manual-cis", testSecretNS, testGlobalAccount, testCliServerURL)
 	pc.Spec.ServiceAccountSecret = v1alpha1.ProviderCredentials{}
 	pc.Spec.WorkloadIdentity = &v1alpha1.WorkloadIdentityConfiguration{TokenFile: file, IdentityProvider: "test-origin", UserEmail: "workload@example.com"}
@@ -43,8 +44,8 @@ func TestWorkloadBothSetupPathsRereadToken(t *testing.T) {
 		}
 		return nil
 	}, MockList: test.NewMockListFn(nil)}
-	mg := &fake.LegacyManaged{}
-	mg.SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
+	mg := &account.Subaccount{}
+	require.NoError(t, json.Unmarshal([]byte(fmt.Sprintf(`{"spec":{"providerConfigRef":{"name":%q}}}`, testProviderName)), mg))
 	for _, builder := range []struct {
 		name    string
 		tracked bool
@@ -55,7 +56,7 @@ func TestWorkloadBothSetupPathsRereadToken(t *testing.T) {
 				setup = TerraformSetupBuilder()
 			}
 			for _, token := range []string{"first-jwt", "rotated-jwt"} {
-				os.WriteFile(file, []byte(token), 0600)
+				require.NoError(t, os.WriteFile(file, []byte(token), 0600))
 				got, err := setup(context.Background(), kube, mg)
 				if err != nil {
 					t.Fatal(err)
@@ -76,7 +77,7 @@ func TestWorkloadBothSetupPathsRereadToken(t *testing.T) {
 		t.Fatal("accepted mixed user credentials")
 	}
 	pc.Spec.ServiceAccountSecret = v1alpha1.ProviderCredentials{}
-	os.WriteFile(file, nil, 0600)
+	require.NoError(t, os.WriteFile(file, nil, 0600))
 	if _, err := terraformConfiguration(context.Background(), kube, pc); err == nil {
 		t.Fatal("accepted empty assertion")
 	}
@@ -86,7 +87,7 @@ func TestRealTerraformAssertionLoginAndCacheRecovery(t *testing.T) {
 	var assertions []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
-		json.NewDecoder(r.Body).Decode(&body)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		if body["customIdp"] != "test-origin" || body["subdomain"] != "test-ga" {
 			t.Error("incorrect login identity")
 		}
@@ -95,7 +96,8 @@ func TestRealTerraformAssertionLoginAndCacheRecovery(t *testing.T) {
 		}
 		assertions = append(assertions, body["jwt"].(string))
 		w.Header().Set("X-Cpcli-Sessionid", "test-session")
-		io.WriteString(w, `{"mail":"workload@example.com","issuer":"https://issuer.example"}`)
+		_, err := io.WriteString(w, `{"mail":"workload@example.com","issuer":"https://issuer.example"}`)
+		require.NoError(t, err)
 	}))
 	defer server.Close()
 	p := newCachingProvider(tfprovider.New())
@@ -183,8 +185,8 @@ func TestBothTerraformPathsRejectWorkloadKeysInLegacySecret(t *testing.T) {
 		}
 		return nil
 	}, MockList: test.NewMockListFn(nil)}
-	mg := &fake.LegacyManaged{}
-	mg.SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
+	mg := &account.Subaccount{}
+	require.NoError(t, json.Unmarshal([]byte(fmt.Sprintf(`{"spec":{"providerConfigRef":{"name":%q}}}`, testProviderName)), mg))
 	for _, setup := range []terraform.SetupFn{TerraformSetupBuilder(), TerraformSetupBuilderNoTracking()} {
 		if _, err := setup(context.Background(), kube, mg); err == nil {
 			t.Fatal("legacy Secret workload keys accepted")

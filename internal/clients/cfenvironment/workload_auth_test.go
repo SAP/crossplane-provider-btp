@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/cloudfoundry/go-cfclient/v3/config"
 	"github.com/sap/crossplane-provider-btp/btp"
 )
@@ -27,7 +29,7 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 	workloadCFMu.Unlock()
 	file := filepath.Join(t.TempDir(), "token")
 	first := cfTestAssertion("first")
-	os.WriteFile(file, []byte(first), 0600)
+	require.NoError(t, os.WriteFile(file, []byte(first), 0600))
 	var mu sync.Mutex
 	var assertions []string
 	reject := false
@@ -36,13 +38,14 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/oauth/token" {
-			r.ParseForm()
+			require.NoError(t, r.ParseForm())
 			mu.Lock()
 			defer mu.Unlock()
 			grant := r.Form.Get("grant_type")
 			if grant == "refresh_token" {
 				w.WriteHeader(400)
-				io.WriteString(w, `{"error":"invalid_grant"}`)
+				_, err := io.WriteString(w, `{"error":"invalid_grant"}`)
+				require.NoError(t, err)
 				return
 			}
 			if grant != "urn:ietf:params:oauth:grant-type:jwt-bearer" || r.Form.Get("password") != "" || r.URL.Query().Get("login_hint") != `{"origin":"origin-test"}` {
@@ -57,7 +60,7 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 			if !noRefresh {
 				response["refresh_token"] = "rt"
 			}
-			json.NewEncoder(w).Encode(response)
+			require.NoError(t, json.NewEncoder(w).Encode(response))
 			return
 		}
 		if r.URL.Path == "/probe" {
@@ -66,13 +69,15 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 			if reject {
 				reject = false
 				w.WriteHeader(401)
-				io.WriteString(w, `{"errors":[]}`)
+				_, err := io.WriteString(w, `{"errors":[]}`)
+				require.NoError(t, err)
 				return
 			}
-			io.WriteString(w, `{}`)
+			_, err := io.WriteString(w, `{}`)
+			require.NoError(t, err)
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]any{"links": map[string]any{"login": map[string]string{"href": "http://" + r.Host}, "uaa": map[string]string{"href": "http://" + r.Host}, "app_ssh": map[string]any{"meta": map[string]string{"oauth_client": "ssh"}}}})
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"links": map[string]any{"login": map[string]string{"href": "http://" + r.Host}, "uaa": map[string]string{"href": "http://" + r.Host}, "app_ssh": map[string]any{"meta": map[string]string{"oauth_client": "ssh"}}}}))
 	}))
 	defer server.Close()
 	org := &btp.CloudFoundryOrg{Name: "org", Id: "guid", ApiEndpoint: server.URL}
@@ -93,7 +98,7 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 	}
 	// Same principal, rotated signature: cache stays stable.
 	rotated := first[:len(first)-4] + "c2lnMg"
-	os.WriteFile(file, []byte(rotated), 0600)
+	require.NoError(t, os.WriteFile(file, []byte(rotated), 0600))
 	if _, err := newWorkloadOrganizationClient(org, user); err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +116,7 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	require.NoError(t, resp.Body.Close())
 	if len(assertions) != 2 || assertions[1] != rotated {
 		t.Fatal("recycle did not read rotated assertion")
 	}
@@ -124,7 +129,7 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	require.NoError(t, resp.Body.Close())
 	if len(assertions) != 3 || assertions[2] != rotated {
 		t.Fatal("401 recovery did not read fresh assertion")
 	}
@@ -137,7 +142,7 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	require.NoError(t, resp.Body.Close())
 	if len(assertions) != 5 {
 		t.Fatalf("refresh rejection recovery logins=%d", len(assertions))
 	}
@@ -151,11 +156,11 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	require.NoError(t, resp.Body.Close())
 	if len(assertions) != 7 {
 		t.Fatalf("no-refresh recovery logins=%d", len(assertions))
 	}
-	os.WriteFile(file, []byte(cfTestAssertion("other")), 0600)
+	require.NoError(t, os.WriteFile(file, []byte(cfTestAssertion("other")), 0600))
 	transport.created = time.Now().Add(-16 * time.Minute)
 	if _, err = cfg.HTTPAuthClient().Get(server.URL + "/probe"); err == nil {
 		t.Fatal("accepted changed principal in old session")

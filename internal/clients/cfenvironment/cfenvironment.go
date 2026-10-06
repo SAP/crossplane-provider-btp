@@ -287,7 +287,7 @@ func (c CloudFoundryOrganization) requireUserAuthentication() error {
 		return nil
 	}
 	if c.btp.Credential == nil || c.btp.Credential.UserCredential == nil || c.btp.Credential.UserCredential.Username == "" || c.btp.Credential.UserCredential.Password == "" {
-		return fmt.Errorf("Cloud Foundry organization manager operations require username/password or workload assertion credentials")
+		return fmt.Errorf("cloud foundry organization manager operations require username/password or workload assertion credentials")
 	}
 	return nil
 }

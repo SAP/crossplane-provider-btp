@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/oauth2"
 	"io"
 	"log"
 	"net/http"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	cf "github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/config"
@@ -80,7 +81,7 @@ func newWorkloadOrganizationClient(org *btp.CloudFoundryOrg, user *btp.WorkloadI
 func loginCFWorkload(api, assertion, origin string) (*config.Config, error) {
 	cfg, err := config.New(api, config.JWTBearerAssertion(assertion), config.Origin(origin), config.HttpClient(&http.Client{Timeout: 30 * time.Second}))
 	if err != nil {
-		return nil, fmt.Errorf("Cloud Foundry workload assertion login failed")
+		return nil, fmt.Errorf("cloud foundry workload assertion login failed")
 	}
 	var claims struct {
 		Iat int64 `json:"iat"`
@@ -140,8 +141,8 @@ func (t *workloadCFTransport) RoundTrip(req *http.Request) (*http.Response, erro
 		return resp, err
 	}
 	if resp != nil && resp.Body != nil {
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
 	}
 	if req.Body != nil && req.GetBody == nil {
 		return nil, fmt.Errorf("cannot replay Cloud Foundry request after authentication failure")
@@ -158,7 +159,7 @@ func (t *workloadCFTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	}
 	resp, err = t.inner.RoundTrip(clone)
 	if err != nil {
-		return nil, fmt.Errorf("Cloud Foundry request failed after workload reauthentication")
+		return nil, fmt.Errorf("cloud foundry request failed after workload reauthentication")
 	}
 	return resp, nil
 }
