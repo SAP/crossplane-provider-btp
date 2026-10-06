@@ -546,16 +546,16 @@ func isCreateFailure(cond xpv1.Condition) bool {
 	return cond.Reason == ujresource.ReasonAsyncCreateFailure
 }
 
-// externalHealthCondition separates a failed BTP operation from an instance
-// that is not ready or usable yet. Missing flags do not imply failure, and
-// false flags alone are expected during deletion.
+// externalHealthCondition maps BTP-observed health to a Crossplane Ready condition.
+// ready and usable are SM-internal top-level fields and are the authoritative source;
+// they reflect the actual instance state independently of any Crossplane operation.
+// state reflects last_operation.state only — an operation result, not instance health.
+// Missing flags do not imply failure, and false flags during deletion are expected.
 func externalHealthCondition(cr *v1alpha1.ServiceInstance) (xpv1.Condition, bool) {
 	at := cr.Status.AtProvider
 	flagsFalse := (at.Ready != nil && !*at.Ready) || (at.Usable != nil && !*at.Usable)
-	reason := xpv1.ReasonUnavailable
-	if strings.EqualFold(at.State, "failed") {
-		reason = "ExternalResourceFailed"
-	} else if !cr.GetDeletionTimestamp().IsZero() || !flagsFalse {
+
+	if !cr.GetDeletionTimestamp().IsZero() || !flagsFalse {
 		return xpv1.Condition{}, false
 	}
 
@@ -574,7 +574,7 @@ func externalHealthCondition(cr *v1alpha1.ServiceInstance) (xpv1.Condition, bool
 		Type:               xpv1.TypeReady,
 		Status:             corev1.ConditionFalse,
 		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
+		Reason:             xpv1.ReasonUnavailable,
 		Message:            message,
 		ObservedGeneration: cr.Generation,
 	}, true

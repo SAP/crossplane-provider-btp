@@ -37,14 +37,16 @@ func TestObserveExternalHealth(t *testing.T) {
 		wantStatus  corev1.ConditionStatus
 		wantReason  xpv1.ConditionReason
 	}{
-		"FailedWithoutFlags":  {state: "failed", wantStatus: corev1.ConditionFalse, wantReason: "ExternalResourceFailed"},
-		"FailedWithTrueFlags": {state: "FAILED", ready: internal.Ptr(true), usable: internal.Ptr(true), wantStatus: corev1.ConditionFalse, wantReason: "ExternalResourceFailed"},
+		"FailedWithoutFlags":  {state: "failed", wantStatus: corev1.ConditionTrue, wantReason: xpv1.ReasonAvailable},
+		"FailedWithTrueFlags": {state: "FAILED", ready: internal.Ptr(true), usable: internal.Ptr(true), wantStatus: corev1.ConditionTrue, wantReason: xpv1.ReasonAvailable},
 		"ReadyFalse":          {state: "in progress", ready: internal.Ptr(false), usable: internal.Ptr(true), wantStatus: corev1.ConditionFalse, wantReason: xpv1.ReasonUnavailable},
 		"UsableFalse":         {state: "succeeded", ready: internal.Ptr(true), usable: internal.Ptr(false), wantStatus: corev1.ConditionFalse, wantReason: xpv1.ReasonUnavailable},
+		"FailedReadyFalse":    {state: "failed", ready: internal.Ptr(false), usable: internal.Ptr(true), wantStatus: corev1.ConditionFalse, wantReason: xpv1.ReasonUnavailable},
+		"FailedUsableFalse":   {state: "failed", ready: internal.Ptr(true), usable: internal.Ptr(false), wantStatus: corev1.ConditionFalse, wantReason: xpv1.ReasonUnavailable},
 		"FlagsNotReported":    {state: "succeeded", wantStatus: corev1.ConditionTrue, wantReason: xpv1.ReasonAvailable},
 		"Healthy":             {state: "succeeded", ready: internal.Ptr(true), usable: internal.Ptr(true), wantStatus: corev1.ConditionTrue, wantReason: xpv1.ReasonAvailable},
 		"DeletingFalseFlags":  {state: "in progress", ready: internal.Ptr(false), usable: internal.Ptr(false), deleting: true, wantStatus: corev1.ConditionTrue, wantReason: xpv1.ReasonAvailable},
-		"DeletingFailedState": {state: "failed", deleting: true, wantStatus: corev1.ConditionFalse, wantReason: "ExternalResourceFailed"},
+		"DeletingFailedState": {state: "failed", deleting: true, wantStatus: corev1.ConditionTrue, wantReason: xpv1.ReasonAvailable},
 		"ObserveOnlyFailed":   {state: "failed", observeOnly: true, wantStatus: corev1.ConditionUnknown},
 		"ObserveOnlyHealthy":  {state: "succeeded", ready: internal.Ptr(true), usable: internal.Ptr(true), observeOnly: true, wantStatus: corev1.ConditionUnknown},
 	}
@@ -138,7 +140,7 @@ func TestReconcileExternalHealthAndRecovery(t *testing.T) {
 					t.Errorf("successful observation must keep Synced=True: %#v", synced)
 				}
 			}
-			check(corev1.ConditionFalse, "ExternalResourceFailed")
+			check(corev1.ConditionFalse, xpv1.ReasonUnavailable)
 			// A fresh healthy observation supersedes both the failed health and a
 			// stale ApplyFailure callback; it does not need a spec change.
 			tf.data = &tfclient.ObservationData{ExternalName: healthTestID, ID: healthTestID, State: "succeeded", Ready: internal.Ptr(true), Usable: internal.Ptr(true)}
