@@ -13,6 +13,7 @@ import (
 type MockKymaModuleClient struct {
 	MockObserve func(moduleName string) (*v1alpha1.ModuleStatus, error)
 	MockCreate  func(moduleName string, moduleChannel string, customResourcePolicy string) error
+	MockUpdate  func(moduleName string, moduleChannel string) error
 	MockDelete  func(moduleName string) error
 }
 
@@ -24,6 +25,11 @@ func (m *MockKymaModuleClient) ObserveModule(ctx context.Context, moduleName str
 // CreateModule implements KymaModuleClient.CreateModule
 func (m *MockKymaModuleClient) CreateModule(ctx context.Context, moduleName string, moduleChannel string, customResourcePolicy string) error {
 	return m.MockCreate(moduleName, moduleChannel, customResourcePolicy)
+}
+
+// UpdateModule implements KymaModuleClient.UpdateModule
+func (m *MockKymaModuleClient) UpdateModule(ctx context.Context, moduleName string, moduleChannel string) error {
+	return m.MockUpdate(moduleName, moduleChannel)
 }
 
 // DeleteModule implements KymaModuleClient.DeleteModule

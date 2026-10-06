@@ -119,6 +119,59 @@ func TestEnableModule(t *testing.T) {
 	}
 }
 
+func TestUpdateModule(t *testing.T) {
+	var updatedModules []Module
+	kube := &test.MockClient{
+		MockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object) error {
+			u := obj.(*unstructured.Unstructured)
+			u.Object = map[string]interface{}{
+				"apiVersion": GVKKyma.GroupVersion().String(),
+				"kind":       GVKKyma.Kind,
+				"metadata": map[string]interface{}{
+					"name":            DefaultKymaName,
+					"namespace":       DefaultKymaNamespace,
+					"resourceVersion": "1",
+				},
+				"spec": map[string]interface{}{
+					"modules": []interface{}{
+						map[string]interface{}{
+							"name":                 "managed-module",
+							"channel":              "old",
+							"customResourcePolicy": "Keep",
+						},
+						map[string]interface{}{
+							"name":    "other-module",
+							"channel": "regular",
+						},
+					},
+				},
+			}
+			return nil
+		},
+		MockUpdate: func(_ context.Context, obj client.Object, _ ...client.UpdateOption) error {
+			updated := &KymaCr{}
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.(*unstructured.Unstructured).Object, updated); err != nil {
+				return err
+			}
+			updatedModules = updated.Spec.Modules
+			return nil
+		},
+	}
+	c := &KymaModuleClient{kube: kube}
+
+	if err := c.UpdateModule(context.Background(), "managed-module", "fast"); err != nil {
+		t.Fatalf("UpdateModule() error = %v", err)
+	}
+
+	want := []Module{
+		{Name: "managed-module", Channel: "fast", CustomResourcePolicy: "Keep"},
+		{Name: "other-module", Channel: "regular"},
+	}
+	if diff := cmp.Diff(want, updatedModules); diff != "" {
+		t.Errorf("Updated modules mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestDisableModule(t *testing.T) {
 	type args struct {
 		initialModules []Module
