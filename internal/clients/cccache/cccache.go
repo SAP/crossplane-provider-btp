@@ -38,7 +38,9 @@ func HTTPClient(ctx context.Context, cfg *clientcredentials.Config) *http.Client
 	if c, ok := cache[key]; ok {
 		return c
 	}
-	c := cfg.Client(ctx)
+	// The client outlives this call; a reconcile ctx would be cancelled and break
+	// every later token refresh. WithoutCancel keeps values (oauth2.HTTPClient).
+	c := cfg.Client(context.WithoutCancel(ctx))
 	cache[key] = c
 	return c
 }

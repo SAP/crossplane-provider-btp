@@ -19,14 +19,14 @@ func resetCache() {
 }
 
 // tokenServer counts token POSTs (logins) and serves everything else 200.
-func tokenServer(t *testing.T) (url string, logins *atomic.Int64) {
+func tokenServer(t *testing.T, expiresIn int) (url string, logins *atomic.Int64) {
 	t.Helper()
 	var n atomic.Int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/oauth/token" {
 			n.Add(1)
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "at", "token_type": "bearer", "expires_in": 3600})
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "at", "token_type": "bearer", "expires_in": expiresIn})
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -42,7 +42,7 @@ func cfgFor(url string) *clientcredentials.Config {
 // Same credential reused across many uses -> one login.
 func TestCCCache_ReusesToken(t *testing.T) {
 	resetCache()
-	url, logins := tokenServer(t)
+	url, logins := tokenServer(t, 3600)
 	ctx := context.Background()
 	for i := 0; i < 50; i++ {
 		c := HTTPClient(ctx, cfgFor(url))
@@ -58,7 +58,7 @@ func TestCCCache_ReusesToken(t *testing.T) {
 // Concurrent uses of one credential -> one login.
 func TestCCCache_ConcurrentOneLogin(t *testing.T) {
 	resetCache()
-	url, logins := tokenServer(t)
+	url, logins := tokenServer(t, 3600)
 	ctx := context.Background()
 	c := HTTPClient(ctx, cfgFor(url))
 	var wg sync.WaitGroup
@@ -81,7 +81,7 @@ func TestCCCache_ConcurrentOneLogin(t *testing.T) {
 // Same key returns the same cached client instance.
 func TestCCCache_SameKeySameClient(t *testing.T) {
 	resetCache()
-	url, _ := tokenServer(t)
+	url, _ := tokenServer(t, 3600)
 	ctx := context.Background()
 	a := HTTPClient(ctx, cfgFor(url))
 	b := HTTPClient(ctx, cfgFor(url))
@@ -93,8 +93,8 @@ func TestCCCache_SameKeySameClient(t *testing.T) {
 // Distinct credentials get distinct clients and distinct logins.
 func TestCCCache_DistinctCredsDistinctLogins(t *testing.T) {
 	resetCache()
-	u1, l1 := tokenServer(t)
-	u2, l2 := tokenServer(t)
+	u1, l1 := tokenServer(t, 3600)
+	u2, l2 := tokenServer(t, 3600)
 	ctx := context.Background()
 	c1 := HTTPClient(ctx, cfgFor(u1))
 	c2 := HTTPClient(ctx, cfgFor(u2))
@@ -105,5 +105,21 @@ func TestCCCache_DistinctCredsDistinctLogins(t *testing.T) {
 	_, _ = c2.Get(u2 + "/r")
 	if l1.Load() != 1 || l2.Load() != 1 {
 		t.Errorf("distinct-credential logins = (%d,%d), want (1,1)", l1.Load(), l2.Load())
+	}
+}
+
+// A cancelled creation ctx must not break later token refreshes.
+func TestCCCache_SurvivesCancelledCtx(t *testing.T) {
+	resetCache()
+	// expires_in below oauth2's 10s expiryDelta -> every request refetches the token.
+	url, logins := tokenServer(t, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	c := HTTPClient(ctx, cfgFor(url))
+	cancel()
+	if _, err := c.Get(url + "/resource"); err != nil {
+		t.Fatalf("get after ctx cancel: %v", err)
+	}
+	if logins.Load() != 1 {
+		t.Errorf("logins = %d, want 1", logins.Load())
 	}
 }
