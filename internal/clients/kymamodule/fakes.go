@@ -21,6 +21,11 @@ func (m *MockKymaModuleClient) CreateModule(ctx context.Context, moduleName stri
 	return m.err
 }
 
+// UpdateModule implements KymaModuleClient.UpdateModule
+func (m *MockKymaModuleClient) UpdateModule(ctx context.Context, moduleName string, moduleChannel string) error {
+	return m.err
+}
+
 // DeleteModule implements KymaModuleClient.DeleteModule
 func (m *MockKymaModuleClient) DeleteModule(ctx context.Context, moduleName string) error {
 	return m.err

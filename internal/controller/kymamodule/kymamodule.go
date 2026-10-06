@@ -28,8 +28,11 @@ var (
 	errObserveResource                = "cannot observe KymaModule"
 	errKymaEnvironmentBindingNotFound = "cannot get referenced KymaEnvironmentBinding"
 	errCreateModule                   = "cannot create KymaModule"
+	errUpdateModule                   = "cannot update KymaModule"
 	errDeleteModule                   = "cannot delete KymaModule"
 )
+
+const defaultModuleChannel = "regular"
 
 // A connector is expected to produce an ExternalClient when its Connect method
 // is called.
@@ -152,8 +155,15 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	return managed.ExternalObservation{
 		ResourceExists:   true,
-		ResourceUpToDate: true,
+		ResourceUpToDate: res.Channel == desiredModuleChannel(cr),
 	}, nil
+}
+
+func desiredModuleChannel(cr *v1alpha1.KymaModule) string {
+	if cr.Spec.ForProvider.Channel == nil {
+		return defaultModuleChannel
+	}
+	return *cr.Spec.ForProvider.Channel
 }
 
 // Disconnect is a no-op for the external client to close its connection.
@@ -170,7 +180,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.Status.SetConditions(xpv1.Creating())
 
-	err := c.client.CreateModule(ctx, cr.Spec.ForProvider.Name, *cr.Spec.ForProvider.Channel, *cr.Spec.ForProvider.CustomResourcePolicy)
+	err := c.client.CreateModule(ctx, cr.Spec.ForProvider.Name, desiredModuleChannel(cr), *cr.Spec.ForProvider.CustomResourcePolicy)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateModule)
 	}
@@ -181,7 +191,19 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	return managed.ExternalUpdate{}, errors.New("Update is not implemented - should not be called, only create")
+	cr, ok := mg.(*v1alpha1.KymaModule)
+	if !ok {
+		return managed.ExternalUpdate{}, errors.New(errNotKymaModule)
+	}
+	if c.client == nil {
+		return managed.ExternalUpdate{}, errors.New("KymaModule client is not configured")
+	}
+
+	if err := c.client.UpdateModule(ctx, cr.Spec.ForProvider.Name, desiredModuleChannel(cr)); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateModule)
+	}
+
+	return managed.ExternalUpdate{}, nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
