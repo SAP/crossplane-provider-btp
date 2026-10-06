@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -233,7 +233,7 @@ func TestCompoundExternalNameInitializer_Initialize(t *testing.T) {
 				cr := &securityv1alpha1.SubaccountApiCredential{
 					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
 					Spec: securityv1alpha1.SubaccountApiCredentialSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"},
 						},
 					},
@@ -432,7 +432,7 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 		"secret has client_secret": {
 			cr: &securityv1alpha1.SubaccountApiCredential{
 				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
-					ResourceSpec: xpv1.ResourceSpec{
+					ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 						WriteConnectionSecretToReference: &xpv1.SecretReference{
 							Name:      "my-secret",
 							Namespace: "default",
@@ -455,7 +455,7 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 		"secret missing client_secret with other keys present": {
 			cr: &securityv1alpha1.SubaccountApiCredential{
 				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
-					ResourceSpec: xpv1.ResourceSpec{
+					ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 						WriteConnectionSecretToReference: &xpv1.SecretReference{
 							Name:      "my-secret",
 							Namespace: "default",
@@ -480,7 +480,7 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 		"secret incomplete - only client_id present - no error": {
 			cr: &securityv1alpha1.SubaccountApiCredential{
 				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
-					ResourceSpec: xpv1.ResourceSpec{
+					ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 						WriteConnectionSecretToReference: &xpv1.SecretReference{
 							Name:      "my-secret",
 							Namespace: "default",

@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 
@@ -39,8 +39,8 @@ type KymaEnvironmentBindingObservation struct {
 
 // A KymaEnvironmentBindingSpec defines the desired state of a KymaEnvironmentBinding.
 type KymaEnvironmentBindingSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       KymaEnvironmentBindingParameters `json:"forProvider"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     KymaEnvironmentBindingParameters `json:"forProvider"`
 	// +crossplane:generate:reference:type=github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1.KymaEnvironment
 	// +crossplane:generate:reference:refFieldName=KymaEnvironmentRef
 	// +crossplane:generate:reference:selectorFieldName=KymaEnvironmentSelector
@@ -75,8 +75,8 @@ type KymaEnvironmentBindingSpec struct {
 
 // A KymaEnvironmentBindingStatus represents the observed state of a KymaEnvironmentBinding.
 type KymaEnvironmentBindingStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          KymaEnvironmentBindingObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 KymaEnvironmentBindingObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

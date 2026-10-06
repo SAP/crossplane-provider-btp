@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 const (
@@ -53,8 +53,8 @@ type KymaEnvironmentObservation struct {
 
 // A KymaEnvironmentSpec defines the desired state of a KymaEnvironment.
 type KymaEnvironmentSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       KymaEnvironmentParameters `json:"forProvider"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     KymaEnvironmentParameters `json:"forProvider"`
 
 	// RecreateOnCreationFailure indicates whether the environment should be
 	// automatically deleted and recreated when it enters CREATION_FAILED state.
@@ -94,8 +94,8 @@ type KymaEnvironmentSpec struct {
 
 // A KymaEnvironmentStatus represents the observed state of a KymaEnvironment.
 type KymaEnvironmentStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          KymaEnvironmentObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 KymaEnvironmentObservation `json:"atProvider,omitempty"`
 	// RetryStatus holds information about the circuit breaker
 	// In some cases, the update of the environment fails and the circuit breaker is triggered.
 	// This field contains the last detected difference and the number of retries.
