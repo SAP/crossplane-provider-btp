@@ -2,7 +2,7 @@ package tfclient
 
 import (
 	"context"
-	"encoding/json"
+
 	"os"
 	"strings"
 	"sync"
@@ -166,8 +166,8 @@ func terraformConfiguration(ctx context.Context, kube client.Client, pc *v1alpha
 	if data == nil {
 		return nil, errors.New(errGetServiceAccountCreds)
 	}
-	var user btp.UserCredential
-	if err := json.Unmarshal(data, &user); err != nil {
+	user, err := btp.ParseUserCredential(data)
+	if err != nil {
 		return nil, errors.Wrap(err, errCouldNotParseUserCredential)
 	}
 	configuration["username"] = user.Username

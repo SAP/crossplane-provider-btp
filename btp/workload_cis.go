@@ -38,7 +38,7 @@ func (s *workloadCISTokenSource) Token() (*oauth2.Token, error) {
 	if s.token != nil && s.token.Valid() && time.Since(s.acquired) < 15*time.Minute {
 		return s.token, nil
 	}
-	u := s.credentials.UserCredential
+	u := s.credentials.WorkloadIdentity
 	raw, err := os.ReadFile(u.TokenFile)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read native CIS workload assertion")
@@ -68,7 +68,7 @@ func (s *workloadCISTokenSource) Token() (*oauth2.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	if iasClaims["mail"] != u.Email || iasClaims["sub"] == "" {
+	if iasClaims["mail"] != u.UserEmail || iasClaims["sub"] == "" {
 		return nil, fmt.Errorf("IAS user token does not match configured workload email")
 	}
 	cis := s.credentials.CISCredential
@@ -80,7 +80,7 @@ func (s *workloadCISTokenSource) Token() (*oauth2.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	if nativeClaims["user_name"] != u.Email || nativeClaims["origin"] != u.Idp {
+	if nativeClaims["user_name"] != u.UserEmail || nativeClaims["origin"] != u.IdentityProvider {
 		return nil, fmt.Errorf("CIS user token does not match workload email and origin")
 	}
 	s.principal = principal

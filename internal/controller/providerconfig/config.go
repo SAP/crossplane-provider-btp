@@ -120,7 +120,7 @@ func CreateClient(
 		return nil, saErr
 	}
 
-	svc, err := newServiceFn(CISSecretData, ServiceAccountSecretData)
+	svc, err := NewConfiguredClient(pc, CISSecretData, ServiceAccountSecretData, newServiceFn)
 	return svc, errors.Wrap(err, errNewClient)
 }
 
@@ -174,7 +174,7 @@ func loadCisCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.Pr
 // loadSaCredentials loads Service Account credentials from secret
 func loadSaCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig) ([]byte, error) {
 	if pc.Spec.WorkloadIdentity != nil {
-		return json.Marshal(btp.UserCredential{Email: pc.Spec.WorkloadIdentity.UserEmail, Username: pc.Spec.WorkloadIdentity.UserEmail, Idp: pc.Spec.WorkloadIdentity.IdentityProvider, TokenFile: pc.Spec.WorkloadIdentity.TokenFile, IASURL: pc.Spec.WorkloadIdentity.IASURL, IASClientID: pc.Spec.WorkloadIdentity.IASClientID, IASResource: pc.Spec.WorkloadIdentity.IASResource})
+		return json.Marshal(btp.UserCredential{Email: pc.Spec.WorkloadIdentity.UserEmail, Username: pc.Spec.WorkloadIdentity.UserEmail, Idp: pc.Spec.WorkloadIdentity.IdentityProvider})
 	}
 	cd := pc.Spec.ServiceAccountSecret
 
@@ -191,6 +191,9 @@ func loadSaCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.Pro
 		return nil, fmt.Errorf(errSecretKeyNotFound, errSaSecretEmpty, cd.SecretRef.Key)
 	}
 
+	if _, err := btp.ParseUserCredential(ServiceAccountSecretData); err != nil {
+		return nil, errors.Wrap(err, errGetSACreds)
+	}
 	return ServiceAccountSecretData, nil
 }
 
@@ -258,4 +261,22 @@ func LoadEnvironmentUserCredentials(ctx context.Context, kube client.Client, pc 
 
 func allowedWorkloadCISGrant(pc *v1alpha1.ProviderConfig, grant string) bool {
 	return grant == "client_credentials" || grant == "user_token" && pc.Spec.WorkloadIdentity.IASURL != "" && pc.Spec.WorkloadIdentity.IASClientID != "" && pc.Spec.WorkloadIdentity.IASResource != ""
+}
+
+// NewConfiguredClient makes the authentication mode an explicit ProviderConfig choice.
+func NewConfiguredClient(pc *v1alpha1.ProviderConfig, cis, user []byte, legacy func([]byte, []byte) (*btp.Client, error)) (*btp.Client, error) {
+	if err := ValidateWorkloadIdentity(pc); err != nil {
+		return nil, err
+	}
+	if w := pc.Spec.WorkloadIdentity; w != nil {
+		c, err := btp.ServiceClientWithWorkloadIdentity(cis, &btp.WorkloadIdentityConfiguration{TokenFile: w.TokenFile, IdentityProvider: w.IdentityProvider, UserEmail: w.UserEmail, IASURL: w.IASURL, IASClientID: w.IASClientID, IASResource: w.IASResource})
+		if err != nil {
+			return nil, err
+		}
+		return &c, nil
+	}
+	if _, err := btp.ParseUserCredential(user); err != nil {
+		return nil, err
+	}
+	return legacy(cis, user)
 }

@@ -140,8 +140,11 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 	if err := c.requireUserAuthentication(); err != nil {
 		return nil, err
 	}
-	if c.btp.Credential.UserCredential.TokenFile != "" {
-		return newWorkloadOrganizationClient(org, c.btp.Credential.UserCredential)
+	if org == nil {
+		return nil, fmt.Errorf("missing Cloud Foundry organization metadata")
+	}
+	if c.btp.Credential.WorkloadIdentity != nil {
+		return newWorkloadOrganizationClient(org, c.btp.Credential.WorkloadIdentity)
 	}
 	cloudFoundryClient, err := newOrganizationClient(
 		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
@@ -280,7 +283,7 @@ func newOrganizationClient(organizationName string, url string, orgId string, us
 }
 
 func (c CloudFoundryOrganization) requireUserAuthentication() error {
-	if c.btp.Credential != nil && c.btp.Credential.UserCredential != nil && c.btp.Credential.UserCredential.TokenFile != "" {
+	if c.btp.Credential != nil && c.btp.Credential.UserCredential != nil && c.btp.Credential.WorkloadIdentity != nil {
 		return nil
 	}
 	if c.btp.Credential == nil || c.btp.Credential.UserCredential == nil || c.btp.Credential.UserCredential.Username == "" || c.btp.Credential.UserCredential.Password == "" {

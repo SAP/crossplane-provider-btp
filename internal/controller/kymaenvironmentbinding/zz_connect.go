@@ -60,7 +60,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, errGetCreds)
 	}
-	svc, err := c.newServiceFn(cisBinding, ServiceAccountSecretData)
+	svc, err := providerconfig.NewConfiguredClient(pc, cisBinding, ServiceAccountSecretData, c.newServiceFn)
 	if err != nil {
 		return nil, err
 	}

@@ -189,8 +189,8 @@ func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 }
 
 func (c *Client) workloadOrigin() *string {
-	if c.Credential != nil && c.Credential.UserCredential != nil && c.Credential.UserCredential.TokenFile != "" {
-		return internal.Ptr(c.Credential.UserCredential.Idp)
+	if c.Credential != nil && c.Credential.WorkloadIdentity != nil {
+		return internal.Ptr(c.Credential.WorkloadIdentity.IdentityProvider)
 	}
 	return nil
 }

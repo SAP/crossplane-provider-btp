@@ -49,7 +49,7 @@ func readCFAssertion(file string) (string, string, error) {
 	return assertion, strings.Join([]string{claims.Iss, claims.Sub, string(audience)}, "\x00"), nil
 }
 
-func newWorkloadOrganizationClient(org *btp.CloudFoundryOrg, user *btp.UserCredential) (*organizationClient, error) {
+func newWorkloadOrganizationClient(org *btp.CloudFoundryOrg, user *btp.WorkloadIdentityConfiguration) (*organizationClient, error) {
 	if org == nil || org.Name == "" || org.Id == "" {
 		return nil, fmt.Errorf("missing Cloud Foundry organization metadata")
 	}
@@ -57,24 +57,24 @@ func newWorkloadOrganizationClient(org *btp.CloudFoundryOrg, user *btp.UserCrede
 	if err != nil {
 		return nil, err
 	}
-	key := strings.Join([]string{org.ApiEndpoint, user.TokenFile, user.Email, user.Idp, principal}, "\x00")
+	key := strings.Join([]string{org.ApiEndpoint, user.TokenFile, user.UserEmail, user.IdentityProvider, principal}, "\x00")
 	workloadCFMu.Lock()
 	defer workloadCFMu.Unlock()
 	cfg := workloadCFCache[key]
 	if cfg == nil {
-		cfg, err = loginCFWorkload(org.ApiEndpoint, assertion, user.Idp)
+		cfg, err = loginCFWorkload(org.ApiEndpoint, assertion, user.IdentityProvider)
 		if err != nil {
 			return nil, err
 		}
 		auth := cfg.HTTPAuthClient()
-		auth.Transport = &workloadCFTransport{inner: auth.Transport, api: org.ApiEndpoint, file: user.TokenFile, origin: user.Idp, principal: principal, created: time.Now()}
+		auth.Transport = &workloadCFTransport{inner: auth.Transport, api: org.ApiEndpoint, file: user.TokenFile, origin: user.IdentityProvider, principal: principal, created: time.Now()}
 		workloadCFCache[key] = cfg
 	}
 	cli, err := cf.New(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create workload Cloud Foundry client")
 	}
-	return &organizationClient{c: *cli, username: user.Email, organizationName: org.Name, orgGuid: org.Id}, nil
+	return &organizationClient{c: *cli, username: user.UserEmail, organizationName: org.Name, orgGuid: org.Id}, nil
 }
 
 func loginCFWorkload(api, assertion, origin string) (*config.Config, error) {
