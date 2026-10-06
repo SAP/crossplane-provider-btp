@@ -14,7 +14,9 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/e2e-framework/klient/wait"
+	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -150,12 +152,13 @@ func TestServiceInstance_ParameterUpdate(t *testing.T) {
 					time.Sleep(15 * time.Second)
 				}
 
-				// Flicker guard (#967/#968): the rejection must not only be
-				// recorded once, it must keep the resource unhealthy. #968 names
-				// all three conditions the user reads.
-				holdUntil := time.Now().Add(3 * time.Minute)
+				// Flicker guard (#967/#968): the rejection must keep the resource
+				// unhealthy, not only show up once. Check all three conditions
+				// named in #968. The bug flipped Ready on every reconcile, so
+				// 45s (about 4 reconciles at --poll=10s) is enough to catch it.
+				holdUntil := time.Now().Add(45 * time.Second)
 				for time.Now().Before(holdUntil) {
-					time.Sleep(30 * time.Second)
+					time.Sleep(5 * time.Second)
 					cur := MustGetResource(t, cfg, siRejectName, nil, &v1alpha1.ServiceInstance{})
 					ready := cur.GetCondition(xpv1.TypeReady)
 					if ready.Status != corev1.ConditionFalse || string(ready.Reason) != "AsyncOperationFailed" {
@@ -175,10 +178,23 @@ func TestServiceInstance_ParameterUpdate(t *testing.T) {
 		).
 		Teardown(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				si := MustGetResource(t, cfg, siName, nil, &v1alpha1.ServiceInstance{})
-				AwaitResourceDeletionOrFail(ctx, t, cfg, si, wait.WithTimeout(time.Minute*10))
-				siReject := MustGetResource(t, cfg, siRejectName, nil, &v1alpha1.ServiceInstance{})
-				AwaitResourceDeletionOrFail(ctx, t, cfg, siReject, wait.WithTimeout(time.Minute*10))
+				// Delete both instances, then wait. They are independent, so
+				// their deletions run at the same time.
+				r := cfg.Client().Resources()
+				sis := []k8s.Object{
+					MustGetResource(t, cfg, siName, nil, &v1alpha1.ServiceInstance{}),
+					MustGetResource(t, cfg, siRejectName, nil, &v1alpha1.ServiceInstance{}),
+				}
+				for _, si := range sis {
+					if err := r.Delete(ctx, si); err != nil {
+						t.Fatalf("failed to delete ServiceInstance %s: %v", si.GetName(), err)
+					}
+				}
+				for _, si := range sis {
+					if err := wait.For(conditions.New(r).ResourceDeleted(si), wait.WithTimeout(10*time.Minute)); err != nil {
+						t.Fatalf("ServiceInstance %s was not deleted in time: %v", si.GetName(), err)
+					}
+				}
 
 				// crsPath, not a bare directory name: GetObjectsToImport resolves
 				// the path against the working directory and silently matches
