@@ -8,11 +8,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
@@ -196,6 +196,19 @@ func TestConnect(t *testing.T) {
 	}
 }
 
+func TestDesiredModuleChannel(t *testing.T) {
+	cr := module()
+	cr.Spec.ForProvider.Channel = nil
+	if got := desiredModuleChannel(cr); got != defaultModuleChannel {
+		t.Errorf("desiredModuleChannel() = %q, want %q", got, defaultModuleChannel)
+	}
+
+	cr.Spec.ForProvider.Channel = ptrString("fast")
+	if got := desiredModuleChannel(cr); got != "fast" {
+		t.Errorf("desiredModuleChannel() = %q, want %q", got, "fast")
+	}
+}
+
 func TestObserve(t *testing.T) {
 	type args struct {
 		cr            resource.Managed
@@ -236,7 +249,7 @@ func TestObserve(t *testing.T) {
 				cr: module(withBindingRef("test-binding"), withExternalName("testModule")),
 				client: &fake.MockKymaModuleClient{
 					MockObserve: func(moduleName string) (*v1alpha1.ModuleStatus, error) {
-						return &v1alpha1.ModuleStatus{}, nil
+						return &v1alpha1.ModuleStatus{Channel: "regular"}, nil
 					},
 				},
 				kube: &test.MockClient{
@@ -261,6 +274,37 @@ func TestObserve(t *testing.T) {
 					ResourceUpToDate: true,
 				},
 				err: nil,
+			},
+		},
+		"ChannelDrift": {
+			args: args{
+				cr: module(withBindingRef("test-binding"), withExternalName("testModule")),
+				client: &fake.MockKymaModuleClient{
+					MockObserve: func(moduleName string) (*v1alpha1.ModuleStatus, error) {
+						return &v1alpha1.ModuleStatus{Channel: "old"}, nil
+					},
+				},
+				kube: &test.MockClient{
+					MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+						if binding, ok := obj.(*v1alpha1.KymaEnvironmentBinding); ok {
+							binding.SetName("test-binding")
+							binding.SetNamespace("default")
+						}
+						return nil
+					}),
+				},
+				tracker: &fake.MockTracker{},
+				secretfetcher: &fake.MockSecretFetcher{
+					MockFetch: func(ctx context.Context, cr *v1alpha1.KymaModule) ([]byte, error) {
+						return []byte("VALID KUBECONFIG"), nil
+					},
+				},
+			},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+				},
 			},
 		},
 		"NeedsCreation": {
@@ -352,7 +396,7 @@ func TestObserve(t *testing.T) {
 				cr: module(withBindingRef("deleting-binding"), withExternalName("testModule")),
 				client: &fake.MockKymaModuleClient{
 					MockObserve: func(moduleName string) (*v1alpha1.ModuleStatus, error) {
-						return &v1alpha1.ModuleStatus{}, nil
+						return &v1alpha1.ModuleStatus{Channel: "regular"}, nil
 					},
 				},
 				kube: &test.MockClient{
@@ -456,6 +500,49 @@ func TestCreate(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want.obs, got); diff != "" {
 				t.Errorf("\ne.Create(...): -want, +got:\n%s\n", diff)
+			}
+		})
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	cases := map[string]struct {
+		cr     resource.Managed
+		client kymamodule.Client
+		want   error
+	}{
+		"HappyPath": {
+			cr: module(withModuleChannel("fast")),
+			client: &fake.MockKymaModuleClient{
+				MockUpdate: func(moduleName string, moduleChannel string) error {
+					if moduleName != "testModule" || moduleChannel != "fast" {
+						return errors.Errorf("unexpected update request: %s channel %s", moduleName, moduleChannel)
+					}
+					return nil
+				},
+			},
+		},
+		"ApiNotAvailable": {
+			cr: module(),
+			client: &fake.MockKymaModuleClient{
+				MockUpdate: func(moduleName string, moduleChannel string) error {
+					return errors.New("CRASH")
+				},
+			},
+			want: errors.Wrap(errors.New("CRASH"), errUpdateModule),
+		},
+		"ClientNotConfigured": {
+			cr:   module(),
+			want: errors.New("KymaModule client is not configured"),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{client: tc.client}
+			_, err := e.Update(context.Background(), tc.cr)
+			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\ne.Update(...): -want error, +got error:\n%s\n", diff)
 			}
 		})
 	}
@@ -666,6 +753,12 @@ func withBindingRef(name string) moduleModifier {
 		km.Spec.KymaEnvironmentBindingRef = &xpv1.Reference{
 			Name: name,
 		}
+	}
+}
+
+func withModuleChannel(channel string) moduleModifier {
+	return func(km *v1alpha1.KymaModule) {
+		km.Spec.ForProvider.Channel = ptrString(channel)
 	}
 }
 

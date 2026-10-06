@@ -15,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 const (
@@ -88,6 +88,9 @@ type ServiceManagerParameters struct {
 
 type DataSourceLookup struct {
 	ServiceManagerPlanID string `json:"serviceManagerPlanID,omitempty"`
+	// PendingAdminBindingCleanup indicates that the temporary admin binding used
+	// during plan-ID lookup could not be deleted. The next reconcile will retry.
+	PendingAdminBindingCleanup bool `json:"pendingAdminBindingCleanup,omitempty"`
 }
 
 // ServiceManagerObservation are the observable fields of a ServiceManager.
@@ -104,14 +107,14 @@ type ServiceManagerObservation struct {
 
 // A ServiceManagerSpec defines the desired state of a ServiceManager.
 type ServiceManagerSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       ServiceManagerParameters `json:"forProvider"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     ServiceManagerParameters `json:"forProvider"`
 }
 
 // A ServiceManagerStatus represents the observed state of a ServiceManager.
 type ServiceManagerStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          ServiceManagerObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 ServiceManagerObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

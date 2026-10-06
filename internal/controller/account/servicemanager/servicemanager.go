@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	sm "github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
 	"github.com/sap/crossplane-provider-btp/internal/recovery"
@@ -42,6 +42,7 @@ const (
 // ServiceManagerPlanIdInitializer is will provide implementation of service plan id lookup by name
 type ServiceManagerPlanIdInitializer interface {
 	ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string) (string, error)
+	DeleteAdminBinding(ctx context.Context, subaccountId string) error
 }
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -97,7 +98,7 @@ func (c *connector) IsInitialized(cr *apisv1beta1.ServiceManager) bool {
 
 func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
 	if c.IsInitialized(cr) {
-		return nil
+		return c.retryPendingCleanup(ctx, cr)
 	}
 
 	planIdInitializer, err := c.newPlanIdInitializerFn(ctx, cr)
@@ -106,11 +107,37 @@ func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1beta1
 	}
 
 	id, err := planIdInitializer.ServiceManagerPlanIDByName(ctx, cr.Spec.ForProvider.SubaccountGuid, c.ServicePlanName(cr))
-	if err != nil {
+	if err != nil && id == "" {
 		return errors.Wrap(err, errGetServicePlan)
 	}
+	if err != nil {
+		// Plan ID resolved but temporary binding delete failed — save ID and mark
+		// cleanup as pending so the next reconcile retries the delete.
+		log.FromContext(ctx).Info("temporary admin binding cleanup failed, will retry on next reconcile", "error", err.Error())
+		c.emit(cr, event.Warning("AdminBindingCleanupFailed", err))
+		return c.saveId(ctx, cr, id, true)
+	}
+	return c.saveId(ctx, cr, id, false)
+}
 
-	return c.saveId(ctx, cr, id)
+func (c *connector) retryPendingCleanup(ctx context.Context, cr *apisv1beta1.ServiceManager) error {
+	if cr.Status.AtProvider.DataSourceLookup == nil || !cr.Status.AtProvider.DataSourceLookup.PendingAdminBindingCleanup {
+		return nil
+	}
+	planIdInitializer, err := c.newPlanIdInitializerFn(ctx, cr)
+	if err != nil {
+		return errors.Wrap(err, errGetPlanID)
+	}
+	if err := planIdInitializer.DeleteAdminBinding(ctx, cr.Spec.ForProvider.SubaccountGuid); err != nil {
+		log.FromContext(ctx).Info("pending admin binding cleanup still failing, will retry", "error", err.Error())
+		c.emit(cr, event.Warning("AdminBindingCleanupFailed", err))
+		return nil
+	}
+	cr.Status.AtProvider.DataSourceLookup.PendingAdminBindingCleanup = false
+	if err := c.kube.Status().Update(ctx, cr); err != nil {
+		return errors.Wrap(err, errUpdateStatus)
+	}
+	return nil
 }
 
 func (c *connector) ServicePlanName(cr *apisv1beta1.ServiceManager) string {
@@ -120,9 +147,16 @@ func (c *connector) ServicePlanName(cr *apisv1beta1.ServiceManager) string {
 	return apisv1beta1.DefaultPlanName
 }
 
-func (c *connector) saveId(ctx context.Context, cr *apisv1beta1.ServiceManager, id string) error {
+func (c *connector) emit(cr resource.Managed, ev event.Event) {
+	if c.recorder != nil {
+		c.recorder.Event(cr, ev)
+	}
+}
+
+func (c *connector) saveId(ctx context.Context, cr *apisv1beta1.ServiceManager, id string, pendingCleanup bool) error {
 	cr.Status.AtProvider.DataSourceLookup = &apisv1beta1.DataSourceLookup{
-		ServiceManagerPlanID: id,
+		ServiceManagerPlanID:       id,
+		PendingAdminBindingCleanup: pendingCleanup,
 	}
 	if err := c.kube.Status().Update(ctx, cr); err != nil {
 		return errors.Wrap(err, errUpdateStatus)

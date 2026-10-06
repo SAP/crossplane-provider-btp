@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/samber/lo"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -90,7 +90,7 @@ func Test_findReferences(t *testing.T) {
 			args: args{
 				res: &v1alpha1.ServiceManager{
 					Spec: v1alpha1.ServiceManagerSpec{
-						ResourceSpec: xpv1.ResourceSpec{},
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{},
 						ForProvider: v1alpha1.ServiceManagerParameters{
 							SubaccountRef: &xpv1.Reference{
 								Name: "asd",

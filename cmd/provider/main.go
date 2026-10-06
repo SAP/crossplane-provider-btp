@@ -58,6 +58,10 @@ func main() {
 			"backoff-max",
 			"Maximum duration for exponential backoff for reconciling resources in error cases. Default is 60s",
 		).Default("60s").Duration()
+		reconcileTimeout = app.Flag(
+			"reconcile-timeout",
+			"Timeout for a single reconcile cycle (externalCtx budget). The reconciler adds a 30s grace period on top for status writes. Default is 1m.",
+		).Default("1m").Envar("RECONCILE_TIMEOUT").Duration()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 	)
@@ -99,7 +103,7 @@ func main() {
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
 	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, backoffBase, backoffMax, enableManagementPolicies)
-	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, backoffBase, backoffMax, enableManagementPolicies)
+	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
@@ -129,7 +133,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
-func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
+func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	co := internalopts.CrossplaneOptions{
 		Options: controller.Options{
 			Logger:                  log,
@@ -138,8 +142,9 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
 			Features:                &feature.Flags{},
 		},
-		BackoffBase: *backoffBase,
-		BackoffMax:  *backoffMax,
+		BackoffBase:      *backoffBase,
+		BackoffMax:       *backoffMax,
+		ReconcileTimeout: *reconcileTimeout,
 	}
 
 	if *enableManagementPolicies {

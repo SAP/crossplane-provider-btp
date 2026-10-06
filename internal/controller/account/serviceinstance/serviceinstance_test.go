@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -1666,28 +1666,28 @@ func TestSaveCallback(t *testing.T) {
 			build: func() (args, func(t *testing.T)) {
 				var writes [][]xpv1.Condition
 				return args{
-						kube: &test.MockClient{
-							MockGet: func(_ context.Context, key client.ObjectKey, obj client.Object) error {
-								si, ok := obj.(*v1alpha1.ServiceInstance)
-								if !ok {
-									return errors.New("unexpected object kind")
-								}
-								si.SetName(key.Name)
-								// The user edited the spec while the apply ran.
-								si.SetGeneration(crGeneration + 1)
-								withAsyncOperationMarker(crGeneration)(si)
-								return nil
-							},
-							MockStatusUpdate: captureWrites(&writes, func(int) error { return nil }),
+					kube: &test.MockClient{
+						MockGet: func(_ context.Context, key client.ObjectKey, obj client.Object) error {
+							si, ok := obj.(*v1alpha1.ServiceInstance)
+							if !ok {
+								return errors.New("unexpected object kind")
+							}
+							si.SetName(key.Name)
+							// The user edited the spec while the apply ran.
+							si.SetGeneration(crGeneration + 1)
+							withAsyncOperationMarker(crGeneration)(si)
+							return nil
 						},
-						name:       types.NamespacedName{Name: "TF-test-instance"},
-						conditions: []xpv1.Condition{failure, ujresource.AsyncOperationFinishedCondition()},
-					}, func(t *testing.T) {
-						if len(writes) != 1 {
-							t.Fatalf("expected a single status write, got %d", len(writes))
-						}
-						wroteFailure(t, writes[0])
+						MockStatusUpdate: captureWrites(&writes, func(int) error { return nil }),
+					},
+					name:       types.NamespacedName{Name: "TF-test-instance"},
+					conditions: []xpv1.Condition{failure, ujresource.AsyncOperationFinishedCondition()},
+				}, func(t *testing.T) {
+					if len(writes) != 1 {
+						t.Fatalf("expected a single status write, got %d", len(writes))
 					}
+					wroteFailure(t, writes[0])
+				}
 			},
 			want: want{err: nil},
 		},
@@ -1737,21 +1737,21 @@ func TestSaveCallback(t *testing.T) {
 				var keys []client.ObjectKey
 				var writes [][]xpv1.Condition
 				return args{
-						kube: &test.MockClient{
-							MockGet:          getInto(&keys),
-							MockStatusUpdate: captureWrites(&writes, func(int) error { return nil }),
-						},
-						name:       types.NamespacedName{Name: "TF-test-instance"},
-						conditions: []xpv1.Condition{failure, ujresource.AsyncOperationFinishedCondition()},
-					}, func(t *testing.T) {
-						if want := []client.ObjectKey{{Name: "test-instance"}}; !cmp.Equal(keys, want) {
-							t.Errorf("expected lookup keys %v, got %v", want, keys)
-						}
-						if len(writes) != 1 {
-							t.Fatalf("expected a single status write, got %d", len(writes))
-						}
-						wroteFailure(t, writes[0])
+					kube: &test.MockClient{
+						MockGet:          getInto(&keys),
+						MockStatusUpdate: captureWrites(&writes, func(int) error { return nil }),
+					},
+					name:       types.NamespacedName{Name: "TF-test-instance"},
+					conditions: []xpv1.Condition{failure, ujresource.AsyncOperationFinishedCondition()},
+				}, func(t *testing.T) {
+					if want := []client.ObjectKey{{Name: "test-instance"}}; !cmp.Equal(keys, want) {
+						t.Errorf("expected lookup keys %v, got %v", want, keys)
 					}
+					if len(writes) != 1 {
+						t.Fatalf("expected a single status write, got %d", len(writes))
+					}
+					wroteFailure(t, writes[0])
+				}
 			},
 			want: want{err: nil},
 		},

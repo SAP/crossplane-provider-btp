@@ -284,9 +284,30 @@ spec:
                 description: SubscriptionObservation are the observable fields of
                   a Subscription.
                 properties:
+                  automationStateMessage:
+                    description: |-
+                      AutomationStateMessage is the state description reported by BTP for the
+                      current automation state, if any.
+                    type: string
                   state:
                     description: State as received from the API instance
                     type: string
+                  subscriptionError:
+                    description: |-
+                      SubscriptionError holds the failure details reported by BTP when a
+                      subscription operation fails (for example in SUBSCRIBE_FAILED state).
+                      It mirrors the subscriptionError object of the SaaS Provisioning API
+                      response and carries the message shown in the BTP Cockpit.
+                    properties:
+                      appError:
+                        description: AppError is the application specific error code
+                          or text, if provided.
+                        type: string
+                      errorMessage:
+                        description: ErrorMessage is the human readable failure message
+                          shown in the BTP Cockpit.
+                        type: string
+                    type: object
                 type: object
               conditions:
                 description: Conditions of the resource.
@@ -334,6 +355,13 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              lastHandledReconcileAt:
+                description: |-
+                  LastHandledReconcileAt holds the value of the most recent
+                  reconcile-requested-at annotation token that the controller has
+                  processed. Users can compare this to the annotation to determine
+                  whether a reconcile request has been handled.
+                type: string
               observedGeneration:
                 description: |-
                   ObservedGeneration is the latest metadata.generation

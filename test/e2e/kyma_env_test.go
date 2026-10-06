@@ -4,14 +4,21 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
+	"github.com/google/go-cmp/cmp"
+	kymaModuleClient "github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 
 	meta "github.com/sap/crossplane-provider-btp/apis"
@@ -24,11 +31,14 @@ import (
 
 const (
 	kymaModuleImportBindingRefName = "kyma-module-import-binding"
+	kymaModuleName                 = "cloud-manager-module"
+	kymaModuleExternalName         = "cloud-manager"
+	kymaModuleChannelTimeout       = 15 * time.Minute
 )
 
 func TestKymaEnvironment(t *testing.T) {
 	var manifestDir = crsPath("kyma_env")
-	crudFeature := features.New("BTP Kyma Environment Controller").
+	crudFeature := features.New("BTP Kyma Environment and Module Controllers").
 		Setup(
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				resources.ImportResources(ctx, t, cfg, manifestDir)
@@ -43,6 +53,76 @@ func TestKymaEnvironment(t *testing.T) {
 				if err := resources.WaitForResourcesToBeSynced(ctx, cfg, manifestDir, nil, wait.WithTimeout(time.Minute*50)); err != nil {
 					t.Fatal(err)
 				}
+				return ctx
+			},
+		).
+		Assess(
+			"verify a channel update is applied by the remote Kyma cluster",
+			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				clusterScope := ""
+				module, err := GetResource(cfg, kymaModuleName, &clusterScope, &v1alpha1.KymaModule{})
+				if err != nil {
+					t.Fatalf("failed to get KymaModule %q: %v", kymaModuleName, err)
+				}
+
+				originalChannel := "regular"
+				if module.Spec.ForProvider.Channel != nil {
+					originalChannel = *module.Spec.ForProvider.Channel
+				}
+				if originalChannel != "regular" {
+					t.Fatalf("test fixture must start on channel regular, got %q", originalChannel)
+				}
+
+				if err := waitForManagedKymaModuleChannel(ctx, cfg, originalChannel, 5*time.Minute); err != nil {
+					t.Fatalf("remote Kyma module did not start on %q: %v", originalChannel, err)
+				}
+				originalKymaSpec, err := assertRemoteKymaModuleChannel(ctx, cfg, originalChannel)
+				if err != nil {
+					t.Fatalf("unexpected starting channel on remote Kyma: %v", err)
+				}
+
+				fastChannel := "fast"
+				module.Spec.ForProvider.Channel = &fastChannel
+				if err := cfg.Client().Resources().Update(ctx, module); err != nil {
+					t.Fatalf("failed to request KymaModule channel update to %q: %v", fastChannel, err)
+				}
+
+				if err := waitForManagedKymaModuleChannel(ctx, cfg, fastChannel, kymaModuleChannelTimeout); err != nil {
+					t.Fatalf("Kyma did not report module channel %q after the update: %v", fastChannel, err)
+				}
+				fastKymaSpec, err := assertRemoteKymaModuleChannel(ctx, cfg, fastChannel)
+				if err != nil {
+					t.Fatalf("channel %q was not applied on the remote Kyma cluster: %v", fastChannel, err)
+				}
+				expectedFastSpec, err := kymaSpecWithModuleChannel(originalKymaSpec, kymaModuleExternalName, fastChannel)
+				if err != nil {
+					t.Fatalf("failed to prepare expected Kyma spec after the channel update: %v", err)
+				}
+				if diff := cmp.Diff(expectedFastSpec, fastKymaSpec); diff != "" {
+					t.Fatalf("Kyma spec changed outside the requested module channel (-want +got):\n%s", diff)
+				}
+
+				// Restore the fixture value so the test leaves the managed resource
+				// converged before the normal teardown deletes the Kyma environment.
+				module, err = GetResource(cfg, kymaModuleName, &clusterScope, &v1alpha1.KymaModule{})
+				if err != nil {
+					t.Fatalf("failed to refresh KymaModule %q before restoring its channel: %v", kymaModuleName, err)
+				}
+				module.Spec.ForProvider.Channel = &originalChannel
+				if err := cfg.Client().Resources().Update(ctx, module); err != nil {
+					t.Fatalf("failed to restore KymaModule channel %q: %v", originalChannel, err)
+				}
+				if err := waitForManagedKymaModuleChannel(ctx, cfg, originalChannel, kymaModuleChannelTimeout); err != nil {
+					t.Fatalf("Kyma did not return to module channel %q after restoring it: %v", originalChannel, err)
+				}
+				restoredKymaSpec, err := assertRemoteKymaModuleChannel(ctx, cfg, originalChannel)
+				if err != nil {
+					t.Fatalf("restored channel %q was not applied on the remote Kyma cluster: %v", originalChannel, err)
+				}
+				if diff := cmp.Diff(originalKymaSpec, restoredKymaSpec); diff != "" {
+					t.Fatalf("Kyma spec did not return to its original configuration after restoring the channel (-want +got):\n%s", diff)
+				}
+
 				return ctx
 			},
 		).
@@ -62,6 +142,142 @@ func TestKymaEnvironment(t *testing.T) {
 		Feature()
 
 	testenv.Test(t, crudFeature)
+}
+
+func assertRemoteKymaModuleChannel(ctx context.Context, cfg *envconf.Config, expected string) (map[string]interface{}, error) {
+	specChannel, statusChannel, spec, err := observeRemoteKymaModuleChannels(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if specChannel != expected || statusChannel != expected {
+		return nil, fmt.Errorf("remote Kyma reports spec.modules channel %q and status.modules channel %q, want both %q", specChannel, statusChannel, expected)
+	}
+	return spec, nil
+}
+
+func observeRemoteKymaModuleChannels(ctx context.Context, cfg *envconf.Config) (string, string, map[string]interface{}, error) {
+	bindingSecret := &corev1.Secret{}
+	namespace := "default"
+	if err := cfg.Client().Resources().Get(ctx, "kyma-binding", namespace, bindingSecret); err != nil {
+		return "", "", nil, fmt.Errorf("failed to get KymaEnvironmentBinding kubeconfig secret: %w", err)
+	}
+
+	kubeconfig := bindingSecret.Data[v1alpha1.KymaEnvironmentBindingKey]
+	if len(kubeconfig) == 0 {
+		return "", "", nil, fmt.Errorf("KymaEnvironmentBinding secret has no %q key", v1alpha1.KymaEnvironmentBindingKey)
+	}
+
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeconfig)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to parse KymaEnvironmentBinding kubeconfig: %w", err)
+	}
+
+	remoteClient, err := client.New(restConfig, client.Options{})
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to connect to the remote Kyma cluster: %w", err)
+	}
+
+	kyma := &unstructured.Unstructured{}
+	kyma.SetGroupVersionKind(kymaModuleClient.GVKKyma)
+	if err := remoteClient.Get(ctx, types.NamespacedName{Name: kymaModuleClient.DefaultKymaName, Namespace: kymaModuleClient.DefaultKymaNamespace}, kyma); err != nil {
+		return "", "", nil, fmt.Errorf("failed to get Kyma CR from the remote cluster: %w", err)
+	}
+
+	spec, _, err := unstructured.NestedMap(kyma.Object, "spec")
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to read spec from the remote Kyma CR: %w", err)
+	}
+	specModules, _, err := unstructured.NestedSlice(kyma.Object, "spec", "modules")
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to read spec.modules from the remote Kyma CR: %w", err)
+	}
+	specChannel, err := findKymaModuleChannel(specModules, kymaModuleExternalName)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to find the module in remote Kyma spec: %w", err)
+	}
+
+	statusModules, _, err := unstructured.NestedSlice(kyma.Object, "status", "modules")
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to read status.modules from the remote Kyma CR: %w", err)
+	}
+	statusChannel, err := findKymaModuleChannel(statusModules, kymaModuleExternalName)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to find the module in remote Kyma status: %w", err)
+	}
+
+	return specChannel, statusChannel, spec, nil
+}
+
+func kymaSpecWithModuleChannel(spec map[string]interface{}, moduleName, channel string) (map[string]interface{}, error) {
+	expected := runtime.DeepCopyJSONValue(spec).(map[string]interface{})
+	modules, found, err := unstructured.NestedSlice(expected, "modules")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("Kyma spec has no modules field")
+	}
+	for _, rawModule := range modules {
+		module, ok := rawModule.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := module["name"].(string)
+		if name == moduleName {
+			module["channel"] = channel
+			if err := unstructured.SetNestedSlice(expected, modules, "modules"); err != nil {
+				return nil, err
+			}
+			return expected, nil
+		}
+	}
+	return nil, fmt.Errorf("module %q was not found in Kyma spec", moduleName)
+}
+
+func findKymaModuleChannel(modules []interface{}, moduleName string) (string, error) {
+	for _, rawModule := range modules {
+		module, ok := rawModule.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := module["name"].(string)
+		if name != moduleName {
+			continue
+		}
+		channel, ok := module["channel"].(string)
+		if !ok {
+			return "", fmt.Errorf("module %q has no string channel", moduleName)
+		}
+		return channel, nil
+	}
+	return "", fmt.Errorf("module %q was not found", moduleName)
+}
+
+func waitForManagedKymaModuleChannel(ctx context.Context, cfg *envconf.Config, expected string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	clusterScope := ""
+	var lastChannel string
+	var lastErr error
+
+	for {
+		module, err := GetResource(cfg, kymaModuleName, &clusterScope, &v1alpha1.KymaModule{})
+		lastErr = err
+		if err == nil {
+			lastChannel = module.Status.AtProvider.Channel
+			if lastChannel == expected {
+				return nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timed out waiting for KymaModule status channel %q (last channel: %q, last error: %v)", expected, lastChannel, lastErr)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(15 * time.Second):
+		}
+	}
 }
 
 func TestKymaEnvironmentImportFlow(t *testing.T) {
