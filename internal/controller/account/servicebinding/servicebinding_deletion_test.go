@@ -13,7 +13,7 @@ import (
 	"time"
 
 	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -309,7 +309,7 @@ func bindingDeletionCR() *v1alpha1.ServiceBinding {
 	cr := &v1alpha1.ServiceBinding{
 		ObjectMeta: metav1.ObjectMeta{Name: "active-binding", UID: "test-uid"},
 		Spec: v1alpha1.ServiceBindingSpec{
-			ResourceSpec: xpv1.ResourceSpec{ProviderConfigReference: &xpv1.Reference{Name: "test-provider"}},
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{ProviderConfigReference: &xpv1.Reference{Name: "test-provider"}},
 			ForProvider: v1alpha1.ServiceBindingParameters{
 				Name: "active-binding", SubaccountID: internal.Ptr(deletionTestAccountID),
 				ServiceInstanceID: internal.Ptr(deletionTestInstanceID),
