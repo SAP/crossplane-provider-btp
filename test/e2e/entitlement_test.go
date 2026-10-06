@@ -176,8 +176,9 @@ func TestEntitlements(t *testing.T) {
 		).
 		Assess(
 			"Check Entitlements are managed", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				crudFeatures := []features.Feature{}
+				crudFeatures := map[string][]features.Feature{}
 				for _, entitlement := range entitlements.Items {
+					serviceName := entitlement.Spec.ForProvider.ServiceName
 					entitlementName := strings.Clone(entitlement.Name)
 					crudFeature := features.New(fmt.Sprintf("Entitlement %s", entitlementName)).
 						Assess(
@@ -226,9 +227,17 @@ func TestEntitlements(t *testing.T) {
 								return ctx
 							},
 						).Feature()
-					crudFeatures = append(crudFeatures, crudFeature)
+					crudFeatures[serviceName] = append(crudFeatures[serviceName], crudFeature)
 				}
-				testenv.Test(t, crudFeatures...)
+
+				t.Run("by service", func(t *testing.T) {
+					for serviceName, serviceFeatures := range crudFeatures {
+						t.Run(serviceName, func(t *testing.T) {
+							t.Parallel()
+							testenv.Test(t, serviceFeatures...)
+						})
+					}
+				})
 				return ctx
 			},
 		).Teardown(
