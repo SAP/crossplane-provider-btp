@@ -18,6 +18,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	"github.com/crossplane/upjet/v2/pkg/terraform"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
@@ -168,5 +169,25 @@ func TestWorkloadBackendUnauthorizedEvicts(t *testing.T) {
 	_, err := transport.RoundTrip(req)
 	if err != nil || evicted != "test-ga" {
 		t.Fatal("backend401 did not evict session")
+	}
+}
+
+func TestBothTerraformPathsRejectWorkloadKeysInLegacySecret(t *testing.T) {
+	pc := fakeProviderConfig(testProviderName, "manual-cis", testSecretNS, testGlobalAccount, testCliServerURL)
+	kube := &test.MockClient{MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+		switch out := obj.(type) {
+		case *v1alpha1.ProviderConfig:
+			*out = *pc
+		case *corev1.Secret:
+			out.Data = map[string][]byte{pc.Spec.ServiceAccountSecret.SecretRef.Key: []byte(`{"Username":"legacy","Password":"secret","tOkEnFiLe":"/should-not-read","IASURL":"https://should-not-call.example"}`)}
+		}
+		return nil
+	}, MockList: test.NewMockListFn(nil)}
+	mg := &fake.LegacyManaged{}
+	mg.SetProviderConfigReference(&xpv1.Reference{Name: testProviderName})
+	for _, setup := range []terraform.SetupFn{TerraformSetupBuilder(), TerraformSetupBuilderNoTracking()} {
+		if _, err := setup(context.Background(), kube, mg); err == nil {
+			t.Fatal("legacy Secret workload keys accepted")
+		}
 	}
 }

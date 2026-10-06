@@ -76,7 +76,7 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 	}))
 	defer server.Close()
 	org := &btp.CloudFoundryOrg{Name: "org", Id: "guid", ApiEndpoint: server.URL}
-	user := &btp.UserCredential{Email: "workload@example.com", Idp: "origin-test", TokenFile: file}
+	user := &btp.WorkloadIdentityConfiguration{UserEmail: "workload@example.com", IdentityProvider: "origin-test", TokenFile: file}
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {
 		wg.Add(1)

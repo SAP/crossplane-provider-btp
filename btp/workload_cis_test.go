@@ -52,7 +52,7 @@ func TestNativeCISWorkloadExchangeRefreshAndPrincipal(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]interface{}{"access_token": cisTestJWT(claims), "token_type": "bearer", "expires_in": 3600})
 	}))
 	defer server.Close()
-	credentials := &Credentials{UserCredential: &UserCredential{Email: "workload@example.com", Idp: "test-origin", TokenFile: file, IASURL: server.URL, IASClientID: "consumer", IASResource: "test-dependency"}, CISCredential: &CISCredential{GrantType: "user_token"}}
+	credentials := &Credentials{WorkloadIdentity: &WorkloadIdentityConfiguration{UserEmail: "workload@example.com", IdentityProvider: "test-origin", TokenFile: file, IASURL: server.URL, IASClientID: "consumer", IASResource: "test-dependency"}, CISCredential: &CISCredential{GrantType: "user_token"}}
 	credentials.CISCredential.Uaa.Url = server.URL
 	credentials.CISCredential.Uaa.Clientid = "manual"
 	credentials.CISCredential.Uaa.Clientsecret = "manual-binding-secret"

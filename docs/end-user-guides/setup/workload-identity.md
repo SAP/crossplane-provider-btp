@@ -450,7 +450,12 @@ Use the Secret namespace from step 3. All three IAS fields must be provided toge
 For **service-client** native mode, use `client_credentials` CIS bindings and omit
 all three IAS fields together. Both modes keep `tokenFile`, `identityProvider` and
 `userEmail` for CLI/CF. Omit `serviceAccountSecret`: workload mode rejects mixed
-password credential inputs. Never put the JWT itself in a CR or Secret.
+password credential inputs. Never put the JWT itself in a CR or Secret. Workload
+settings are accepted only from `spec.workloadIdentity`. Legacy user credential
+JSON rejects `TokenFile`, `IASURL`, `IASClientID`, `IASResource` and
+`workloadIdentity` keys regardless of casing; they cannot enable workload
+assertion reads or exchanges through a Secret. Other legacy credential fields
+and unrelated unknown metadata retain their existing parsing behavior.
 
 Apply the configuration after substituting the placeholders:
 

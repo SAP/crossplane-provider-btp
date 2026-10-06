@@ -5,13 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
-	trackingtest "github.com/sap/crossplane-provider-btp/internal/tracking/test"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestWorkloadNativeMetadata(t *testing.T) {
@@ -24,6 +19,13 @@ func TestWorkloadNativeMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var fields map[string]any
+	json.Unmarshal(data, &fields)
+	for _, key := range []string{"TokenFile", "IASURL", "IASClientID", "IASResource"} {
+		if _, exists := fields[key]; exists {
+			t.Fatal("workload config serialized as user credentials")
+		}
+	}
 	var user btp.UserCredential
 	json.Unmarshal(data, &user)
 	if user.Email != "workload@example.com" || user.Idp != "test-origin" || user.Password != "" {
@@ -31,44 +33,36 @@ func TestWorkloadNativeMetadata(t *testing.T) {
 	}
 }
 
-func TestWorkloadUsesManualCISSecret(t *testing.T) {
+func TestExplicitWorkloadClientBypassesLegacyFactory(t *testing.T) {
 	for _, grant := range []string{"client_credentials", "user_token"} {
-		t.Run(grant, func(t *testing.T) {
-			kube := &test.MockClient{MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
-				switch out := obj.(type) {
-				case *v1alpha1.ProviderConfig:
-					out.Spec = v1alpha1.ProviderConfigSpec{GlobalAccount: "test-ga", WorkloadIdentity: &v1alpha1.WorkloadIdentityConfiguration{TokenFile: "/token", IdentityProvider: "test-origin", UserEmail: "workload@example.com"}}
-					out.Spec.CISSecret = v1alpha1.ProviderCredentials{Source: "Secret", CommonCredentialSelectors: xpv1.CommonCredentialSelectors{SecretRef: &xpv1.SecretKeySelector{SecretReference: xpv1.SecretReference{Name: "manual-cis", Namespace: "test"}, Key: "credentials"}}}
-				case *corev1.Secret:
-					if key.Name != "manual-cis" {
-						t.Fatal("read user credentials")
-					}
-					out.Data = map[string][]byte{"credentials": []byte(`{"grant_type":"` + grant + `"}`)}
-				}
-				return nil
-			}, MockList: test.NewMockListFn(nil)}
-			called := false
-			svc := func(cis, user []byte) (*btp.Client, error) {
-				called = true
-				var metadata btp.UserCredential
-				json.Unmarshal(user, &metadata)
-				if metadata.Email != "workload@example.com" || metadata.Password != "" {
-					t.Fatal("incorrect native metadata")
-				}
-				var binding btp.CISCredential
-				json.Unmarshal(cis, &binding)
-				if binding.GrantType != "client_credentials" {
-					t.Fatal("password grant reached native client")
-				}
-				return &btp.Client{}, nil
-			}
-			_, err := CreateClient(context.Background(), fakeResource(), kube, &tracker{}, svc, trackingtest.NoOpReferenceResolverTracker{})
-			if grant == "client_credentials" && (err != nil || !called) {
-				t.Fatalf("manual CIS coexistence failed: %v", err)
-			}
-			if grant == "user_token" && (err == nil || called) {
-				t.Fatal("accepted native password grant")
-			}
-		})
+		pc := &v1alpha1.ProviderConfig{Spec: v1alpha1.ProviderConfigSpec{GlobalAccount: "ga", WorkloadIdentity: &v1alpha1.WorkloadIdentityConfiguration{TokenFile: "/no-file-read-at-construction", UserEmail: "workload@example.com", IdentityProvider: "origin", IASURL: "https://ias.example", IASClientID: "consumer", IASResource: "dependency"}}}
+		cis := []byte(`{"grant_type":"` + grant + `","uaa":{"clientid":"client","clientsecret":"secret","url":"https://uaa.example"},"endpoints":{"accounts_service_url":"https://api.example","entitlements_service_url":"https://api.example","provisioning_service_url":"https://api.example"}}`)
+		legacy := func([]byte, []byte) (*btp.Client, error) {
+			t.Fatal("workload configuration passed through legacy Secret factory")
+			return nil, nil
+		}
+		got, err := NewConfiguredClient(pc, cis, nil, legacy)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Credential.WorkloadIdentity == nil || got.Credential.WorkloadIdentity.TokenFile != pc.Spec.WorkloadIdentity.TokenFile {
+			t.Fatal("explicit workload metadata missing")
+		}
+	}
+}
+
+func TestLegacyClientRejectsWorkloadKeysBeforeFactory(t *testing.T) {
+	pc := &v1alpha1.ProviderConfig{}
+	legacy := func([]byte, []byte) (*btp.Client, error) {
+		t.Fatal("invalid Secret reached client construction")
+		return nil, nil
+	}
+	if _, err := NewConfiguredClient(pc, nil, []byte(`{"tokenFile":"/should-not-read","iasUrl":"https://should-not-call.example"}`), legacy); err == nil {
+		t.Fatal("accepted workload keys")
+	}
+	called := false
+	legacy = func(cis, user []byte) (*btp.Client, error) { called = true; return &btp.Client{}, nil }
+	if _, err := NewConfiguredClient(pc, nil, []byte(`{"email":"user@example.com","password":"secret"}`), legacy); err != nil || !called {
+		t.Fatalf("legacy path changed: %v", err)
 	}
 }
