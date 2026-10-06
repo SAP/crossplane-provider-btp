@@ -22,14 +22,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 type SubaccountServiceBrokerInitParameters struct {
 
 	// encoded client certificate. cert and key must be supplied together.
 	// PEM-encoded client certificate. cert and key must be supplied together.
-	CertSecretRef *v1.SecretKeySelector `json:"certSecretRef,omitempty" tf:"-"`
+	CertSecretRef *v2.SecretKeySelector `json:"certSecretRef,omitempty" tf:"-"`
 
 	// (String) The description of the service broker.
 	// The description of the service broker.
@@ -37,7 +37,7 @@ type SubaccountServiceBrokerInitParameters struct {
 
 	// encoded private key matching the client certificate. cert and key must be supplied together.
 	// PEM-encoded private key matching the client certificate. cert and key must be supplied together.
-	KeySecretRef *v1.SecretKeySelector `json:"keySecretRef,omitempty" tf:"-"`
+	KeySecretRef *v2.SecretKeySelector `json:"keySecretRef,omitempty" tf:"-"`
 
 	// Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
 	// Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
@@ -49,7 +49,7 @@ type SubaccountServiceBrokerInitParameters struct {
 
 	// (String, Sensitive) The password for basic authentication against the service broker.
 	// The password for basic authentication against the service broker.
-	PasswordSecretRef *v1.SecretKeySelector `json:"passwordSecretRef,omitempty" tf:"-"`
+	PasswordSecretRef *v2.SecretKeySelector `json:"passwordSecretRef,omitempty" tf:"-"`
 
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
@@ -61,11 +61,11 @@ type SubaccountServiceBrokerInitParameters struct {
 
 	// Reference to a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+	SubaccountRef *v2.Reference `json:"subaccountRef,omitempty" tf:"-"`
 
 	// Selector for a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+	SubaccountSelector *v2.Selector `json:"subaccountSelector,omitempty" tf:"-"`
 
 	// (String) The URL of the service broker.
 	// The URL of the service broker.
@@ -123,7 +123,7 @@ type SubaccountServiceBrokerParameters struct {
 	// encoded client certificate. cert and key must be supplied together.
 	// PEM-encoded client certificate. cert and key must be supplied together.
 	// +kubebuilder:validation:Optional
-	CertSecretRef *v1.SecretKeySelector `json:"certSecretRef,omitempty" tf:"-"`
+	CertSecretRef *v2.SecretKeySelector `json:"certSecretRef,omitempty" tf:"-"`
 
 	// (String) The description of the service broker.
 	// The description of the service broker.
@@ -133,7 +133,7 @@ type SubaccountServiceBrokerParameters struct {
 	// encoded private key matching the client certificate. cert and key must be supplied together.
 	// PEM-encoded private key matching the client certificate. cert and key must be supplied together.
 	// +kubebuilder:validation:Optional
-	KeySecretRef *v1.SecretKeySelector `json:"keySecretRef,omitempty" tf:"-"`
+	KeySecretRef *v2.SecretKeySelector `json:"keySecretRef,omitempty" tf:"-"`
 
 	// Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
 	// Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
@@ -148,7 +148,7 @@ type SubaccountServiceBrokerParameters struct {
 	// (String, Sensitive) The password for basic authentication against the service broker.
 	// The password for basic authentication against the service broker.
 	// +kubebuilder:validation:Optional
-	PasswordSecretRef *v1.SecretKeySelector `json:"passwordSecretRef,omitempty" tf:"-"`
+	PasswordSecretRef *v2.SecretKeySelector `json:"passwordSecretRef,omitempty" tf:"-"`
 
 	// (String) The ID of the subaccount.
 	// The ID of the subaccount.
@@ -161,11 +161,11 @@ type SubaccountServiceBrokerParameters struct {
 
 	// Reference to a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+	SubaccountRef *v2.Reference `json:"subaccountRef,omitempty" tf:"-"`
 
 	// Selector for a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+	SubaccountSelector *v2.Selector `json:"subaccountSelector,omitempty" tf:"-"`
 
 	// (String) The URL of the service broker.
 	// The URL of the service broker.
@@ -180,8 +180,8 @@ type SubaccountServiceBrokerParameters struct {
 
 // SubaccountServiceBrokerSpec defines the desired state of SubaccountServiceBroker
 type SubaccountServiceBrokerSpec struct {
-	v1.ResourceSpec `json:",inline"`
-	ForProvider     SubaccountServiceBrokerParameters `json:"forProvider"`
+	v2.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                   SubaccountServiceBrokerParameters `json:"forProvider"`
 	// THIS IS A BETA FIELD. It will be honored
 	// unless the Management Policies feature flag is disabled.
 	// InitProvider holds the same fields as ForProvider, with the exception
@@ -197,8 +197,8 @@ type SubaccountServiceBrokerSpec struct {
 
 // SubaccountServiceBrokerStatus defines the observed state of SubaccountServiceBroker.
 type SubaccountServiceBrokerStatus struct {
-	v1.ResourceStatus `json:",inline"`
-	AtProvider        SubaccountServiceBrokerObservation `json:"atProvider,omitempty"`
+	v2.ManagedResourceStatus `json:",inline"`
+	AtProvider               SubaccountServiceBrokerObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

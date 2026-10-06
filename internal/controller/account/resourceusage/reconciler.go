@@ -8,16 +8,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -156,8 +157,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 	if resource.IgnoreNotFound(err) != nil {
 		return reconcile.Result{}, err
 	}
-	// target has already been deleted
-	if kerrors.IsNotFound(err) && target == nil {
+	// Tracking records the target's UID in this label, including for usages
+	// whose targetRef has no UID. A replacement with the same name must not
+	// keep a deleting usage alive. Missing or invalid identity stays protected.
+	targetUID := ru.GetLabels()[v1alpha1.LabelKeyTargetUid]
+	targetReplaced := meta.WasDeleted(ru) && target != nil && target.GetUID() != "" &&
+		targetUID != "" && len(validation.IsValidLabelValue(targetUID)) == 0 && targetUID != string(target.GetUID())
+	// The original target has already been deleted.
+	if (kerrors.IsNotFound(err) && target == nil) || targetReplaced {
 		meta.RemoveFinalizer(ru, v1alpha1.Finalizer)
 		if err := r.client.Update(ctx, ru); err != nil {
 			if terminal(err) {

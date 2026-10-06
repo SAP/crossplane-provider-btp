@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	cp_xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
 	test2 "github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	cp_xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
 	trackingtest "github.com/sap/crossplane-provider-btp/internal/tracking/test"

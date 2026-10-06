@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 )

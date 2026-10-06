@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/SAP/xp-clifford/yaml"
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -58,7 +58,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 						},
 					},
 					Spec: v1alpha1.ServiceBindingSpec{
-						ResourceSpec: v1.ResourceSpec{
+						ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 							ManagementPolicies: []v1.ManagementAction{
 								v1.ManagementActionObserve,
 							},
@@ -101,7 +101,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceBindingSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -149,7 +149,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceBindingSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -196,7 +196,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceBindingSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -241,7 +241,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceBindingSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -288,7 +288,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceBindingSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -329,7 +329,7 @@ func TestConvertServiceBindingResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceBindingSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
