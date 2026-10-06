@@ -2,7 +2,9 @@ package servicemanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/sap/crossplane-provider-btp/internal"
 	accountsserviceclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-accounts-service-api-go/pkg"
@@ -10,6 +12,8 @@ import (
 )
 
 const ServiceManagerOfferingName = "service-manager"
+
+const adminBindingCleanupTimeout = 30 * time.Second
 
 func NewServiceManagerInstanceProxyClient(apiClient *accountsserviceclient.APIClient) ServiceManagerInstanceProxyClient {
 	return ServiceManagerInstanceProxyClient{
@@ -33,7 +37,8 @@ type ServiceManagerInstanceProxyClient struct {
 }
 
 func (t ServiceManagerInstanceProxyClient) ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string) (string, error) {
-	// if binding exists we use it to resolve serviceplan
+	// Reuse the permanent V1 singleton binding when it already exists — creating
+	// a second one would 409 and we must not delete the real binding.
 	binding, err := t.describeAdminBinding(ctx, subaccountId)
 	if err != nil {
 		return "", err
@@ -41,27 +46,44 @@ func (t ServiceManagerInstanceProxyClient) ServiceManagerPlanIDByName(ctx contex
 	if binding != nil {
 		return t.resolveServicePlan(ctx, servicePlanName)(binding)
 	}
-	// otherwise we dynamically create and delete an instance and resolve the serviceplan using its credentials
+	// No permanent binding yet; mint one temporarily for the lookup.
 	return t.dynamicServiceInstance(ctx, subaccountId, t.resolveServicePlan(ctx, servicePlanName))
 }
 
-func (t ServiceManagerInstanceProxyClient) dynamicServiceInstance(ctx context.Context, subaccountId string, resolvalFn func(binding *BindingCredentials) (string, error)) (string, error) {
+// DeleteAdminBinding retries deletion of the V1 admin binding, detached from
+// the reconcile context so a cancelled reconcile doesn't skip the cleanup.
+func (t ServiceManagerInstanceProxyClient) DeleteAdminBinding(ctx context.Context, subaccountId string) error {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), adminBindingCleanupTimeout)
+	defer cancel()
+	return t.deleteAdminBinding(cleanupCtx, subaccountId)
+}
+
+func (t ServiceManagerInstanceProxyClient) dynamicServiceInstance(ctx context.Context, subaccountId string, resolvalFn func(binding *BindingCredentials) (string, error)) (id string, err error) {
 	binding, err := t.createAdminBinding(ctx, subaccountId)
 	if err != nil {
 		return "", err
 	}
 
-	id, err := resolvalFn(binding)
-	if err != nil {
-		return "", err
-	}
+	// Only clean up the binding created by this call. Lookup failures and
+	// reconcile cancellation must not leave its temporary instance behind.
+	defer func() {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), adminBindingCleanupTimeout)
+		defer cancel()
+		if cleanupErr := t.deleteAdminBinding(cleanupCtx, subaccountId); cleanupErr != nil {
+			cleanupErr = fmt.Errorf("delete temporary service-manager admin binding: %w", cleanupErr)
+			if err == nil {
+				err = cleanupErr
+			} else {
+				err = errors.Join(err, cleanupErr)
+			}
+		}
+	}()
 
-	err = t.deleteAdminBinding(ctx, subaccountId)
+	id, err = resolvalFn(binding)
 	if err != nil {
-		return "", err
+		id = ""
 	}
-
-	return id, nil
+	return id, err
 }
 
 func (t ServiceManagerInstanceProxyClient) resolveServicePlan(ctx context.Context, servicePlanName string) func(binding *BindingCredentials) (string, error) {
@@ -136,7 +158,8 @@ func (t ServiceManagerInstanceProxyClient) EnsureSemanticLookuper(ctx context.Co
 		// caller defers cleanup(). Also log the error instead of dropping it on
 		// the floor so a persistent failure is at least visible.
 		cleanup = func() {
-			delCtx := context.WithoutCancel(ctx)
+			delCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), adminBindingCleanupTimeout)
+			defer cancel()
 			if dErr := t.deleteAdminBinding(delCtx, subaccountGuid); dErr != nil {
 				ctrl.Log.Info("EnsureSemanticLookuper cleanup: failed to delete temporary admin binding",
 					"subaccountGuid", subaccountGuid, "error", dErr.Error())

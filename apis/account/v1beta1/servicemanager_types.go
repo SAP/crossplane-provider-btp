@@ -88,6 +88,9 @@ type ServiceManagerParameters struct {
 
 type DataSourceLookup struct {
 	ServiceManagerPlanID string `json:"serviceManagerPlanID,omitempty"`
+	// PendingAdminBindingCleanup indicates that the temporary admin binding used
+	// during plan-ID lookup could not be deleted. The next reconcile will retry.
+	PendingAdminBindingCleanup bool `json:"pendingAdminBindingCleanup,omitempty"`
 }
 
 // ServiceManagerObservation are the observable fields of a ServiceManager.
