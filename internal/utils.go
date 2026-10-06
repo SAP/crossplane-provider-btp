@@ -20,7 +20,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 )
 

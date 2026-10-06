@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/SAP/xp-clifford/yaml"
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -24,7 +24,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 	instanceName := "service-manager-instance"
 	subAccountGuid := "x123e4567-e89b-12d3-a456-42661417400"
 	smExternalName := fmt.Sprintf("%s/%s", instanceID, bindingID)
-	siExternalName := fmt.Sprintf("%s,%s", subAccountGuid, instanceID)
+	siExternalName := instanceID
 	resourceName := fmt.Sprintf("%s.%s", instanceName, instanceID)
 	siResourceName := fmt.Sprintf("%s-%s", instanceName, instanceID)
 
@@ -59,7 +59,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 						},
 					},
 					Spec: v1beta1.ServiceManagerSpec{
-						ResourceSpec: v1.ResourceSpec{
+						ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 							ManagementPolicies: []v1.ManagementAction{
 								v1.ManagementActionObserve,
 							},
@@ -102,7 +102,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -148,7 +148,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -196,7 +196,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -242,7 +242,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -289,7 +289,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -336,7 +336,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -382,7 +382,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -429,7 +429,7 @@ func TestConvertServiceManagerResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -505,7 +505,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 						Name: resourceName,
 					},
 					Spec: v1beta1.ServiceManagerSpec{
-						ResourceSpec: v1.ResourceSpec{
+						ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &v1.SecretReference{
 								Name:      resourceName,
 								Namespace: resources.DefaultSecretNamespace,
@@ -531,7 +531,7 @@ func TestDefaultServiceManagerResource(t *testing.T) {
 							Name: resources.UndefinedName,
 						},
 						Spec: v1beta1.ServiceManagerSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
 									Namespace: resources.DefaultSecretNamespace,

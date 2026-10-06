@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 // RoleCollectionAssignmentParameters are the configurable fields of a RoleCollectionAssignment.
@@ -32,16 +32,16 @@ type RoleCollectionAssignmentObservation struct {
 
 // A RoleCollectionAssignmentSpec defines the desired state of a RoleCollectionAssignment.
 type RoleCollectionAssignmentSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       RoleCollectionAssignmentParameters `json:"forProvider"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     RoleCollectionAssignmentParameters `json:"forProvider"`
 
 	XSUAACredentialsReference `json:",inline"`
 }
 
 // A RoleCollectionAssignmentStatus represents the observed state of a RoleCollectionAssignment.
 type RoleCollectionAssignmentStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          RoleCollectionAssignmentObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 RoleCollectionAssignmentObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -179,6 +179,15 @@ func (s *SubscriptionTypeMapper) IsDeletable(cr *v1alpha1.Subscription) bool {
 
 func (s *SubscriptionTypeMapper) SyncStatus(get *SubscriptionGet, crStatus *v1alpha1.SubscriptionObservation) {
 	crStatus.State = get.State
+	crStatus.AutomationStateMessage = get.AutomationStateMessage
+	if get.SubscriptionError != nil {
+		crStatus.SubscriptionError = &v1alpha1.SubscriptionError{
+			AppError:     get.SubscriptionError.AppError,
+			ErrorMessage: get.SubscriptionError.ErrorMessage,
+		}
+	} else {
+		crStatus.SubscriptionError = nil
+	}
 }
 
 func (s *SubscriptionTypeMapper) ConvertToCreatePayload(cr *v1alpha1.Subscription) SubscriptionPost {

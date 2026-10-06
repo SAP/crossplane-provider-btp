@@ -1,8 +1,8 @@
 package kubeconfiggenerator
 
 import (
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +48,7 @@ func crResource(name string, fns ...func(generator *v1alpha1.KubeConfigGenerator
 				OIDCToken:          crToken(oidcSecretName),
 				KubeconfigTemplate: crKubeConfigTemplate(kubeConfigSecretName),
 			},
-			ResourceSpec: xpv1.ResourceSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 				WriteConnectionSecretToReference: &xpv1.SecretReference{
 					Name: generatedKubeConfigSecret,
 				},

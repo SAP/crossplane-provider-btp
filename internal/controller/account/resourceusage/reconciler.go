@@ -8,16 +8,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal/tracking"
@@ -120,6 +121,14 @@ func NewReconciler(m manager.Manager, o ...ReconcilerOption) *Reconciler {
 	return r
 }
 
+// terminal reports whether an error on a write to the ResourceUsage we are
+// reconciling means the object is simply gone. There is nothing left to write
+// and nothing a retry could achieve, so the reconcile must end cleanly instead
+// of being requeued with backoff forever.
+func terminal(err error) bool {
+	return kerrors.IsNotFound(err)
+}
+
 // Reconcile a ResourceUsage by accounting for the managed resources that are
 // using it, and ensuring it cannot be deleted until it is no longer in use.
 func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
@@ -148,14 +157,26 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 	if resource.IgnoreNotFound(err) != nil {
 		return reconcile.Result{}, err
 	}
-	// target has already been deleted
-	if kerrors.IsNotFound(err) && target == nil {
+	// Tracking records the target's UID in this label, including for usages
+	// whose targetRef has no UID. A replacement with the same name must not
+	// keep a deleting usage alive. Missing or invalid identity stays protected.
+	targetUID := ru.GetLabels()[v1alpha1.LabelKeyTargetUid]
+	targetReplaced := meta.WasDeleted(ru) && target != nil && target.GetUID() != "" &&
+		targetUID != "" && len(validation.IsValidLabelValue(targetUID)) == 0 && targetUID != string(target.GetUID())
+	// The original target has already been deleted.
+	if (kerrors.IsNotFound(err) && target == nil) || targetReplaced {
 		meta.RemoveFinalizer(ru, v1alpha1.Finalizer)
 		if err := r.client.Update(ctx, ru); err != nil {
+			if terminal(err) {
+				return reconcile.Result{}, nil
+			}
 			r.log.Debug(errUpdate, "error", err)
 			return reconcile.Result{RequeueAfter: shortWait}, nil
 		}
 		if err := r.client.Delete(ctx, ru); err != nil {
+			if terminal(err) {
+				return reconcile.Result{}, nil
+			}
 			r.log.Debug(errDeletePU, "error", err)
 			return reconcile.Result{RequeueAfter: shortWait}, nil
 		}
@@ -170,7 +191,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 			r.record.Event(ru, event.Warning(reasonAccount, errors.New(msg)))
 
 			// We're watching our usages, so we'll be requeued when they go.
-			return reconcile.Result{Requeue: false}, errors.Wrap(r.client.Status().Update(ctx, ru), errUpdateStatus)
+			// A NotFound here means the ResourceUsage was removed while this
+			// reconcile was in flight; there is no status left to write.
+			return reconcile.Result{Requeue: false}, errors.Wrap(resource.IgnoreNotFound(r.client.Status().Update(ctx, ru)), errUpdateStatus)
 		}
 		// Deletion and removal of finalizer must happen before
 		return reconcile.Result{Requeue: true}, errors.New("inconsistent state, do requeue")
@@ -178,6 +201,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 	if !meta.FinalizerExists(ru, v1alpha1.Finalizer) {
 		meta.AddFinalizer(ru, v1alpha1.Finalizer)
 		if err := r.client.Update(ctx, ru); err != nil {
+			if terminal(err) {
+				return reconcile.Result{}, nil
+			}
 			r.log.Debug(errUpdate, "error", err)
 			return reconcile.Result{RequeueAfter: shortWait}, nil
 		}

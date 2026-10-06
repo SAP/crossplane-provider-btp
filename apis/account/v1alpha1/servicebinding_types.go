@@ -3,7 +3,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -142,7 +142,7 @@ type RetiredSBResource struct {
 
 // A ServiceBindingSpec defines the desired state of a ServiceBinding.
 type ServiceBindingSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
 
 	ForProvider ServiceBindingParameters `json:"forProvider"`
 
@@ -169,8 +169,8 @@ type ServiceBindingSpec struct {
 
 // A ServiceBindingStatus represents the observed state of a ServiceBinding.
 type ServiceBindingStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          ServiceBindingObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 ServiceBindingObservation `json:"atProvider,omitempty"`
 
 	// If the binding is rotated, `retiredBindings` stores resources that have been rotated out but are still transitionally retained due to `rotation.ttl` setting
 	// +kubebuilder:validation:Optional

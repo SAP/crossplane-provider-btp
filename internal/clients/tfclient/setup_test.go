@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
 	"github.com/crossplane/upjet/v2/pkg/terraform"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
