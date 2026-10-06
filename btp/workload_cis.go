@@ -118,7 +118,7 @@ func (s *workloadCISTokenSource) exchange(endpoint string, params url.Values, st
 	if err != nil {
 		return nil, fmt.Errorf("%s workload token request failed", stage)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("%s workload token request returned HTTP %d", stage, resp.StatusCode)
 	}
