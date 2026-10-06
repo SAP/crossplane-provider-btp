@@ -13,8 +13,8 @@ package cccache
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
-	"strings"
 	"sync"
 
 	"golang.org/x/oauth2/clientcredentials"
@@ -31,7 +31,8 @@ var (
 // once per reconcile. config.Client builds lazily (no login until first request),
 // so caching it is cheap and safe.
 func HTTPClient(ctx context.Context, cfg *clientcredentials.Config) *http.Client {
-	key := strings.Join([]string{cfg.ClientID, cfg.ClientSecret, cfg.TokenURL, strings.Join(cfg.Scopes, ",")}, "\x00")
+	b, _ := json.Marshal(cfg)
+	key := string(b)
 
 	mu.Lock()
 	defer mu.Unlock()

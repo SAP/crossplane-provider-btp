@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 )
 
@@ -105,6 +106,25 @@ func TestCCCache_DistinctCredsDistinctLogins(t *testing.T) {
 	_, _ = c2.Get(u2 + "/r")
 	if l1.Load() != 1 || l2.Load() != 1 {
 		t.Errorf("distinct-credential logins = (%d,%d), want (1,1)", l1.Load(), l2.Load())
+	}
+}
+
+// Configs differing only in EndpointParams or AuthStyle must not share a client.
+func TestCCCache_KeyIncludesEndpointParamsAndAuthStyle(t *testing.T) {
+	resetCache()
+	ctx := context.Background()
+	base := HTTPClient(ctx, cfgFor("http://x"))
+
+	withParams := cfgFor("http://x")
+	withParams.EndpointParams = map[string][]string{"resource": {"r"}}
+	if HTTPClient(ctx, withParams) == base {
+		t.Error("distinct EndpointParams must not share a client")
+	}
+
+	withStyle := cfgFor("http://x")
+	withStyle.AuthStyle = oauth2.AuthStyleInParams
+	if HTTPClient(ctx, withStyle) == base {
+		t.Error("distinct AuthStyle must not share a client")
 	}
 }
 
