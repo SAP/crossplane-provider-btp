@@ -41,7 +41,7 @@ const (
 
 // ServiceManagerPlanIdInitializer is will provide implementation of service plan id lookup by name
 type ServiceManagerPlanIdInitializer interface {
-	ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string) (string, error)
+	ServiceManagerPlanIDByName(ctx context.Context, subaccountId, servicePlanName, bindingName string) (string, error)
 }
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -105,7 +105,7 @@ func (c *connector) InitializeServicePlanId(ctx context.Context, cr *apisv1beta1
 		return errors.Wrap(err, errGetPlanID)
 	}
 
-	id, err := planIdInitializer.ServiceManagerPlanIDByName(ctx, cr.Spec.ForProvider.SubaccountGuid, c.ServicePlanName(cr))
+	id, err := planIdInitializer.ServiceManagerPlanIDByName(ctx, cr.Spec.ForProvider.SubaccountGuid, c.ServicePlanName(cr), sm.TempBindingName(cr.Name, cr.Namespace))
 	if err != nil {
 		return errors.Wrap(err, errGetServicePlan)
 	}

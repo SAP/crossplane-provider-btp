@@ -73,7 +73,7 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 						return nil, func() {}, err
 					}
 					proxy := servicemanager.NewServiceManagerInstanceProxyClient(btpclient.AccountsServiceClient)
-					return proxy.EnsureSemanticLookuper(ctx, cr.Spec.ForProvider.SubaccountGuid)
+					return proxy.EnsureSemanticLookuper(ctx, cr.Spec.ForProvider.SubaccountGuid, servicemanager.TempBindingName(cr.Name, cr.Namespace))
 				},
 				recorder: recorder,
 			}

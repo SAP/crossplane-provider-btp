@@ -15,6 +15,16 @@ const ServiceManagerOfferingName = "service-manager"
 
 const adminBindingCleanupTimeout = 30 * time.Second
 
+// TempBindingName builds a deterministic, BTP-safe binding name for a CR.
+// Format: "crossplane-tmp-<crName>-<namespace>", truncated to 63 chars.
+func TempBindingName(crName, namespace string) string {
+	full := "crossplane-tmp-" + crName + "-" + namespace
+	if len(full) > 63 {
+		return full[:63]
+	}
+	return full
+}
+
 func NewServiceManagerInstanceProxyClient(apiClient *accountsserviceclient.APIClient) ServiceManagerInstanceProxyClient {
 	return ServiceManagerInstanceProxyClient{
 		SubaccountOperationsAPI: apiClient.SubaccountOperationsAPI,
@@ -36,32 +46,32 @@ type ServiceManagerInstanceProxyClient struct {
 	smServiceFn func(ctx context.Context, credentials *BindingCredentials) (PlanIdResolver, error)
 }
 
-func (t ServiceManagerInstanceProxyClient) ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string) (string, error) {
-	// if binding exists we use it to resolve serviceplan
-	binding, err := t.describeAdminBinding(ctx, subaccountId)
+func (t ServiceManagerInstanceProxyClient) ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string, bindingName string) (string, error) {
+	// if a named binding already exists (e.g. orphan from previous reconcile) reuse it
+	binding, err := t.describeAdminBindingV2(ctx, subaccountId, bindingName)
 	if err != nil {
 		return "", err
 	}
 	if binding != nil {
 		return t.resolveServicePlan(ctx, servicePlanName)(binding)
 	}
-	// otherwise we dynamically create and delete an instance and resolve the serviceplan using its credentials
-	return t.dynamicServiceInstance(ctx, subaccountId, t.resolveServicePlan(ctx, servicePlanName))
+	// otherwise dynamically create, resolve, and defer-delete the named binding
+	return t.dynamicServiceInstance(ctx, subaccountId, bindingName, t.resolveServicePlan(ctx, servicePlanName))
 }
 
-func (t ServiceManagerInstanceProxyClient) dynamicServiceInstance(ctx context.Context, subaccountId string, resolvalFn func(binding *BindingCredentials) (string, error)) (id string, err error) {
-	binding, err := t.createAdminBinding(ctx, subaccountId)
+func (t ServiceManagerInstanceProxyClient) dynamicServiceInstance(ctx context.Context, subaccountId, bindingName string, resolvalFn func(binding *BindingCredentials) (string, error)) (id string, err error) {
+	binding, err := t.createAdminBindingV2(ctx, subaccountId, bindingName)
 	if err != nil {
 		return "", err
 	}
 
-	// Only clean up the binding created by this call. Lookup failures and
-	// reconcile cancellation must not leave its temporary instance behind.
+	// Always clean up the named binding after use. Lookup failures and
+	// reconcile cancellation must not leave it behind.
 	defer func() {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), adminBindingCleanupTimeout)
 		defer cancel()
-		if cleanupErr := t.deleteAdminBinding(cleanupCtx, subaccountId); cleanupErr != nil {
-			cleanupErr = fmt.Errorf("delete temporary service-manager admin binding: %w", cleanupErr)
+		if cleanupErr := t.deleteAdminBindingV2(cleanupCtx, subaccountId, bindingName); cleanupErr != nil {
+			cleanupErr = fmt.Errorf("delete temporary service-manager admin binding %q: %w", bindingName, cleanupErr)
 			if err == nil {
 				err = cleanupErr
 			} else {
@@ -103,6 +113,42 @@ func (t ServiceManagerInstanceProxyClient) describeAdminBinding(ctx context.Cont
 	return mapBindingCredentialTypes(response), specifyAccountsAPIError(err)
 }
 
+func (t ServiceManagerInstanceProxyClient) describeAdminBindingV2(ctx context.Context, subaccountGuid, bindingName string) (*BindingCredentials, error) {
+	result, raw, err := t.GetServiceManagerBindingV2(ctx, subaccountGuid, bindingName).Execute()
+	if raw != nil && raw.StatusCode == 404 {
+		return nil, nil
+	}
+	return mapV2BindingCredentialTypes(result), specifyAccountsAPIError(err)
+}
+
+func (t ServiceManagerInstanceProxyClient) createAdminBindingV2(ctx context.Context, subaccountGuid, bindingName string) (*BindingCredentials, error) {
+	payload := accountsserviceclient.NewCreateServiceManagerBindingRequestPayload(bindingName)
+	result, _, err := t.CreateServiceManagerBindingV2(ctx, subaccountGuid).
+		CreateServiceManagerBindingRequestPayload(*payload).Execute()
+	if err != nil {
+		return nil, specifyAccountsAPIError(err)
+	}
+	return mapV2BindingCredentialTypes(result), nil
+}
+
+func (t ServiceManagerInstanceProxyClient) deleteAdminBindingV2(ctx context.Context, subaccountGuid, bindingName string) error {
+	_, err := t.DeleteServiceManagerBindingV2(ctx, subaccountGuid, bindingName).Execute()
+	return specifyAccountsAPIError(err)
+}
+
+func mapV2BindingCredentialTypes(in *accountsserviceclient.ServiceManagerBindingExtendedResponseObject) *BindingCredentials {
+	if in == nil {
+		return nil
+	}
+	out := new(BindingCredentials)
+	out.Clientid = in.Clientid
+	out.Clientsecret = in.Clientsecret
+	out.Url = in.Url
+	out.SmUrl = in.SmUrl
+	out.Xsappname = in.Xsappname
+	return out
+}
+
 // SemanticLookuper returns a SemanticLookuper backed by the subaccount's
 // existing service-manager admin binding, used by the orphaned-external-name
 // adoption heal path for the ServiceManager resource. It returns (nil, nil)
@@ -120,40 +166,39 @@ func (t ServiceManagerInstanceProxyClient) SemanticLookuper(ctx context.Context,
 }
 
 // EnsureSemanticLookuper returns a SemanticLookuper with full subaccount
-// visibility, backed by the subaccount-admin service-manager binding. Unlike
-// SemanticLookuper it MINTS a temporary admin binding via the accounts-service
-// when none exists yet, and returns a cleanup function that removes that
-// temporary binding again (no-op when an existing binding was reused).
+// visibility, backed by a named temporary service-manager admin binding. Unlike
+// SemanticLookuper it MINTS a temporary named binding via the accounts-service V2
+// API when none exists yet, and returns a cleanup function that removes it.
+// If the named binding already exists (orphan from a previous reconcile) it is
+// reused directly — no-op when an existing binding was reused.
 //
 // This is the credential source the SI/SB/CM adoption heal must use: the
 // per-resource serviceManagerSecret bindings are platform-scoped and do not
 // list instances created via the btp terraform provider, whereas the
 // subaccount-admin binding sees the whole subaccount.
-func (t ServiceManagerInstanceProxyClient) EnsureSemanticLookuper(ctx context.Context, subaccountGuid string) (SemanticLookuper, func(), error) {
+func (t ServiceManagerInstanceProxyClient) EnsureSemanticLookuper(ctx context.Context, subaccountGuid, bindingName string) (SemanticLookuper, func(), error) {
 	noop := func() {}
 
-	binding, err := t.describeAdminBinding(ctx, subaccountGuid)
+	binding, err := t.describeAdminBindingV2(ctx, subaccountGuid, bindingName)
 	if err != nil {
 		return nil, noop, err
 	}
 	cleanup := noop
 	if binding == nil {
-		// mint a temporary admin binding; caller must call cleanup to remove it.
-		binding, err = t.createAdminBinding(ctx, subaccountGuid)
+		// mint a temporary named binding; caller must call cleanup to remove it.
+		binding, err = t.createAdminBindingV2(ctx, subaccountGuid, bindingName)
 		if err != nil {
 			return nil, noop, err
 		}
 		// Detach the cleanup delete from ctx so that a reconcile timeout /
-		// cancellation — the common case that motivates cleanup in the first
-		// place — does not silently orphan the temporary admin binding when the
-		// caller defers cleanup(). Also log the error instead of dropping it on
-		// the floor so a persistent failure is at least visible.
+		// cancellation does not silently orphan the temporary admin binding when
+		// the caller defers cleanup().
 		cleanup = func() {
 			delCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), adminBindingCleanupTimeout)
 			defer cancel()
-			if dErr := t.deleteAdminBinding(delCtx, subaccountGuid); dErr != nil {
+			if dErr := t.deleteAdminBindingV2(delCtx, subaccountGuid, bindingName); dErr != nil {
 				ctrl.Log.Info("EnsureSemanticLookuper cleanup: failed to delete temporary admin binding",
-					"subaccountGuid", subaccountGuid, "error", dErr.Error())
+					"subaccountGuid", subaccountGuid, "bindingName", bindingName, "error", dErr.Error())
 			}
 		}
 	}

@@ -55,7 +55,7 @@ func Setup(mgr ctrl.Manager, o internalopts.CrossplaneOptions) error {
 					return nil, noop, err
 				}
 				proxy := smClient.NewServiceManagerInstanceProxyClient(btpClient.AccountsServiceClient)
-				return proxy.EnsureSemanticLookuper(ctx, cr.Spec.ForProvider.SubaccountGuid)
+				return proxy.EnsureSemanticLookuper(ctx, cr.Spec.ForProvider.SubaccountGuid, smClient.TempBindingName(cr.Name, cr.Namespace))
 			},
 			recorder: recorder,
 		}

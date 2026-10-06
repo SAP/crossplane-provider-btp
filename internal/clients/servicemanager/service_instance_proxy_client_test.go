@@ -15,9 +15,9 @@ import (
 
 func TestLookup(t *testing.T) {
 	type args struct {
-		CreateMockFn func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error)
-		DeleteMockFn func() (*http.Response, error)
-		GetMockFn    func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error)
+		CreateV2MockFn func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error)
+		DeleteV2MockFn func(name string) (*http.Response, error)
+		GetV2MockFn    func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error)
 
 		PlanLookupMockFn func() (string, error)
 	}
@@ -35,7 +35,7 @@ func TestLookup(t *testing.T) {
 		{
 			name: "BindingLookupFailure",
 			args: args{
-				GetMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
+				GetV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
 					return nil, response(500), errors.New("GetBindingError")
 				},
 			},
@@ -46,10 +46,10 @@ func TestLookup(t *testing.T) {
 		{
 			name: "BindingCreateFailure",
 			args: args{
-				GetMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
+				GetV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
 					return nil, response(404), errors.New("GetBindingError")
 				},
-				CreateMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
+				CreateV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
 					return nil, response(500), errors.New("CreateBindingError")
 				},
 			},
@@ -60,16 +60,16 @@ func TestLookup(t *testing.T) {
 		{
 			name: "ServicePlanLookupFailure",
 			args: args{
-				GetMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
+				GetV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
 					return nil, response(404), errors.New("GetBindingError")
 				},
-				CreateMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
-					return adminBinding(), response(200), nil
+				CreateV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
+					return adminBindingV2(), response(200), nil
 				},
 				PlanLookupMockFn: func() (string, error) {
 					return "", errors.New("PlanLookupError")
 				},
-				DeleteMockFn: func() (*http.Response, error) {
+				DeleteV2MockFn: func(name string) (*http.Response, error) {
 					return response(200), nil
 				},
 			}, want: want{
@@ -80,16 +80,16 @@ func TestLookup(t *testing.T) {
 		{
 			name: "BindingDeleteFailure",
 			args: args{
-				GetMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
+				GetV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
 					return nil, response(404), errors.New("GetBindingError")
 				},
-				CreateMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
-					return adminBinding(), response(200), nil
+				CreateV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
+					return adminBindingV2(), response(200), nil
 				},
 				PlanLookupMockFn: func() (string, error) {
 					return "someId", nil
 				},
-				DeleteMockFn: func() (*http.Response, error) {
+				DeleteV2MockFn: func(name string) (*http.Response, error) {
 					return response(500), errors.New("DeleteBindingError")
 				},
 			},
@@ -102,8 +102,8 @@ func TestLookup(t *testing.T) {
 		{
 			name: "SuccessFromFoundSMInstance",
 			args: args{
-				GetMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
-					return adminBinding(), response(200), nil
+				GetV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
+					return adminBindingV2(), response(200), nil
 				},
 				PlanLookupMockFn: func() (string, error) {
 					return "someId", nil
@@ -118,16 +118,16 @@ func TestLookup(t *testing.T) {
 		{
 			name: "SuccessFromCreatedSMInstance",
 			args: args{
-				GetMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
+				GetV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
 					return nil, response(404), errors.New("GetBindingError")
 				},
-				CreateMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
-					return adminBinding(), response(200), nil
+				CreateV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
+					return adminBindingV2(), response(200), nil
 				},
 				PlanLookupMockFn: func() (string, error) {
 					return "someId", nil
 				},
-				DeleteMockFn: func() (*http.Response, error) {
+				DeleteV2MockFn: func(name string) (*http.Response, error) {
 					return response(200), nil
 				},
 			},
@@ -141,9 +141,9 @@ func TestLookup(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			accountService := &SubaccountServiceFake{
-				CreateMockFn: tc.args.CreateMockFn,
-				DeleteMockFn: tc.args.DeleteMockFn,
-				GetMockFn:    tc.args.GetMockFn,
+				CreateV2MockFn: tc.args.CreateV2MockFn,
+				DeleteV2MockFn: tc.args.DeleteV2MockFn,
+				GetV2MockFn:    tc.args.GetV2MockFn,
 			}
 
 			smClient := ServiceManagerInstanceProxyClient{
@@ -154,7 +154,7 @@ func TestLookup(t *testing.T) {
 					}, nil
 				},
 			}
-			planID, err := smClient.ServiceManagerPlanIDByName(context.TODO(), "", "")
+			planID, err := smClient.ServiceManagerPlanIDByName(context.TODO(), "", "", "test-binding")
 
 			if tc.want.err != (err != nil) {
 				t.Errorf("Unexpected error return; Expected error: %v, Returned: %v", tc.want.err, err)
@@ -162,8 +162,8 @@ func TestLookup(t *testing.T) {
 			if tc.want.id != planID {
 				t.Errorf("Unexpected returned PlanID; Expected: %s, Returned: %s", tc.want.id, planID)
 			}
-			if tc.want.deleteCalled != accountService.AdminBindingDeleteCalled {
-				t.Errorf("Unexpected delete call attempts: Expected call: %v, Was Called: %v", tc.want.deleteCalled, accountService.AdminBindingDeleteCalled)
+			if tc.want.deleteCalled != accountService.AdminBindingV2DeleteCalled {
+				t.Errorf("Unexpected delete call attempts: Expected call: %v, Was Called: %v", tc.want.deleteCalled, accountService.AdminBindingV2DeleteCalled)
 			}
 		})
 	}
@@ -197,11 +197,14 @@ func TestDynamicServiceInstanceCleanup(t *testing.T) {
 			deleteCalls := 0
 			api := &cleanupContextSubaccountService{
 				SubaccountServiceFake: SubaccountServiceFake{
-					CreateMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
-						return adminBinding(), response(200), nil
+					CreateV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
+						return adminBindingV2(), response(200), nil
+					},
+					GetV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
+						return nil, response(404), nil
 					},
 				},
-				deleteFn: func(deleteCtx context.Context) (*http.Response, error) {
+				deleteFn: func(deleteCtx context.Context, name string) (*http.Response, error) {
 					deleteCalls++
 					if deleteCtx.Err() != nil {
 						t.Errorf("cleanup context is canceled: %v", deleteCtx.Err())
@@ -217,7 +220,7 @@ func TestDynamicServiceInstanceCleanup(t *testing.T) {
 				},
 			}
 			client := ServiceManagerInstanceProxyClient{SubaccountOperationsAPI: api}
-			id, err := client.dynamicServiceInstance(ctx, "subaccount", func(*BindingCredentials) (string, error) {
+			id, err := client.dynamicServiceInstance(ctx, "subaccount", "test-binding", func(*BindingCredentials) (string, error) {
 				if tc.cancelLookup {
 					cancel()
 				}
@@ -254,17 +257,18 @@ func TestDynamicServiceInstanceCleanup(t *testing.T) {
 	}
 }
 
-// Override the request builder to inspect the context supplied to deletion;
-// generated request fields are private and the shared fake drops the context.
+// Override the V2 delete request builder to inspect the context supplied to
+// deletion; generated request fields are private and the shared fake drops the context.
 type cleanupContextSubaccountService struct {
 	SubaccountServiceFake
-	deleteFn func(context.Context) (*http.Response, error)
+	deleteFn func(context.Context, string) (*http.Response, error)
 }
 
-func (s *cleanupContextSubaccountService) DeleteServiceManagementBindingOfSubaccount(ctx context.Context, _ string) saops.ApiDeleteServiceManagementBindingOfSubaccountRequest {
-	result, err := s.deleteFn(ctx)
-	s.DeleteMockFn = func() (*http.Response, error) { return result, err }
-	return saops.ApiDeleteServiceManagementBindingOfSubaccountRequest{ApiService: &s.SubaccountServiceFake}
+func (s *cleanupContextSubaccountService) DeleteServiceManagerBindingV2(ctx context.Context, _ string, bindingName string) saops.ApiDeleteServiceManagerBindingV2Request {
+	result, err := s.deleteFn(ctx, bindingName)
+	s.DeleteV2MockFn = func(name string) (*http.Response, error) { return result, err }
+	s.LastV2BindingName = bindingName
+	return saops.ApiDeleteServiceManagerBindingV2Request{ApiService: &s.SubaccountServiceFake}
 }
 
 func response(code int) *http.Response {
@@ -272,8 +276,20 @@ func response(code int) *http.Response {
 }
 
 func adminBinding() *saops.ServiceManagerBindingResponseObject {
-	// since we mock all other components, this only needs to be != nil
 	return saops.NewServiceManagerBindingResponseObject()
+}
+
+func adminBindingV2() *saops.ServiceManagerBindingExtendedResponseObject {
+	obj := saops.NewServiceManagerBindingExtendedResponseObject()
+	clientid := "clientid"
+	clientsecret := "secret"
+	url := "https://accounts.example.com"
+	smUrl := "https://sm.example.com"
+	obj.Clientid = &clientid
+	obj.Clientsecret = &clientsecret
+	obj.Url = &url
+	obj.SmUrl = &smUrl
+	return obj
 }
 
 var _ PlanIdResolver = &PlanIdResolverFake{}
@@ -286,15 +302,15 @@ func (p *PlanIdResolverFake) PlanIDByName(ctx context.Context, offeringName, pla
 	return p.PlanLookupMockFn()
 }
 
-// TestCreateAdminBindingSurfacesAPIBody asserts that createAdminBinding routes
+// TestCreateAdminBindingSurfacesAPIBody asserts that createAdminBindingV2 routes
 // transport errors through specifyAccountsAPIError so the BTP API body is surfaced
 // instead of the opaque "<status> <reason>" string.
 func TestCreateAdminBindingSurfacesAPIBody(t *testing.T) {
 	accountService := &SubaccountServiceFake{
-		GetMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
+		GetV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
 			return nil, response(404), errors.New("not found")
 		},
-		CreateMockFn: func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error) {
+		CreateV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
 			return nil, response(500), create500Error()
 		},
 	}
@@ -305,7 +321,7 @@ func TestCreateAdminBindingSurfacesAPIBody(t *testing.T) {
 		},
 	}
 
-	_, err := smClient.ServiceManagerPlanIDByName(context.TODO(), "", "")
+	_, err := smClient.ServiceManagerPlanIDByName(context.TODO(), "", "", "test-binding")
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -336,4 +352,69 @@ func create500Error() error {
 			Elem().SetString("500 Internal Server Error")
 	}
 	return err
+}
+
+func TestTempBindingName(t *testing.T) {
+	tests := []struct {
+		crName    string
+		namespace string
+		wantValue string
+	}{
+		{crName: "my-sm", namespace: "default", wantValue: "crossplane-tmp-my-sm-default"},
+		{crName: "a", namespace: "b", wantValue: "crossplane-tmp-a-b"},
+		// long name must be truncated to 63 chars
+		{crName: strings.Repeat("x", 40), namespace: strings.Repeat("y", 40), wantValue: "crossplane-tmp-" + strings.Repeat("x", 40) + "-" + strings.Repeat("y", 7)},
+	}
+	for _, tc := range tests {
+		got := TempBindingName(tc.crName, tc.namespace)
+		if len(got) > 63 {
+			t.Errorf("TempBindingName(%q, %q): result too long: %d chars", tc.crName, tc.namespace, len(got))
+		}
+		if got != tc.wantValue {
+			t.Errorf("TempBindingName(%q, %q): got %q, want %q", tc.crName, tc.namespace, got, tc.wantValue)
+		}
+		if !strings.HasPrefix(got, "crossplane-tmp-") {
+			t.Errorf("TempBindingName(%q, %q): missing prefix, got %q", tc.crName, tc.namespace, got)
+		}
+	}
+}
+
+func TestOrphanedBindingReuse(t *testing.T) {
+	// Simulate: named binding already exists in BTP (orphan from previous reconcile).
+	// ServiceManagerPlanIDByName must reuse it without calling Create (which would 409).
+	createCalled := false
+
+	accountService := &SubaccountServiceFake{
+		GetV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
+			return adminBindingV2(), response(200), nil
+		},
+		CreateV2MockFn: func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
+			createCalled = true
+			return nil, response(409), errors.New("binding already exists")
+		},
+		DeleteV2MockFn: func(name string) (*http.Response, error) {
+			t.Errorf("delete must not be called when existing binding is reused")
+			return response(200), nil
+		},
+	}
+
+	smClient := ServiceManagerInstanceProxyClient{
+		accountService,
+		func(ctx context.Context, credentials *BindingCredentials) (PlanIdResolver, error) {
+			return &PlanIdResolverFake{
+				PlanLookupMockFn: func() (string, error) { return "plan-id", nil },
+			}, nil
+		},
+	}
+
+	planID, err := smClient.ServiceManagerPlanIDByName(context.Background(), "subaccount", "standard", "crossplane-tmp-my-sm-default")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if planID != "plan-id" {
+		t.Errorf("expected plan-id, got %q", planID)
+	}
+	if createCalled {
+		t.Error("Create must not be called when binding already exists")
+	}
 }

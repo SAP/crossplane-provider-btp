@@ -14,7 +14,13 @@ type SubaccountServiceFake struct {
 	GetMockFn    func() (*saops.ServiceManagerBindingResponseObject, *http.Response, error)
 	DeleteMockFn func() (*http.Response, error)
 
-	AdminBindingDeleteCalled bool
+	CreateV2MockFn func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error)
+	GetV2MockFn    func(name string) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error)
+	DeleteV2MockFn func(name string) (*http.Response, error)
+
+	AdminBindingDeleteCalled   bool
+	AdminBindingV2DeleteCalled bool
+	LastV2BindingName          string
 }
 
 func (s *SubaccountServiceFake) CloneNeoSubaccount(ctx context.Context, sourceSubaccountGUID string) saops.ApiCloneNeoSubaccountRequest {
@@ -46,13 +52,13 @@ func (s *SubaccountServiceFake) CreateServiceManagementBindingExecute(r saops.Ap
 }
 
 func (s *SubaccountServiceFake) CreateServiceManagerBindingV2(ctx context.Context, subaccountGUID string) saops.ApiCreateServiceManagerBindingV2Request {
-	//TODO implement me
-	panic("implement me")
+	return saops.ApiCreateServiceManagerBindingV2Request{ApiService: s}
 }
 
 func (s *SubaccountServiceFake) CreateServiceManagerBindingV2Execute(r saops.ApiCreateServiceManagerBindingV2Request) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
-	//TODO implement me
-	panic("implement me")
+	// Name is captured via the payload setter intercepted in the proxy client test helper.
+	// For the default fake path, LastV2BindingName is set by Get/Delete factory calls.
+	return s.CreateV2MockFn(s.LastV2BindingName)
 }
 
 func (s *SubaccountServiceFake) CreateSubaccount(ctx context.Context) saops.ApiCreateSubaccountRequest {
@@ -85,13 +91,13 @@ func (s *SubaccountServiceFake) DeleteServiceManagementBindingOfSubaccountExecut
 }
 
 func (s *SubaccountServiceFake) DeleteServiceManagerBindingV2(ctx context.Context, subaccountGUID string, bindingName string) saops.ApiDeleteServiceManagerBindingV2Request {
-	//TODO implement me
-	panic("implement me")
+	s.LastV2BindingName = bindingName
+	return saops.ApiDeleteServiceManagerBindingV2Request{ApiService: s}
 }
 
 func (s *SubaccountServiceFake) DeleteServiceManagerBindingV2Execute(r saops.ApiDeleteServiceManagerBindingV2Request) (*http.Response, error) {
-	//TODO implement me
-	panic("implement me")
+	s.AdminBindingV2DeleteCalled = true
+	return s.DeleteV2MockFn(s.LastV2BindingName)
 }
 
 func (s *SubaccountServiceFake) DeleteSubaccount(ctx context.Context, subaccountGUID string) saops.ApiDeleteSubaccountRequest {
@@ -143,13 +149,12 @@ func (s *SubaccountServiceFake) GetServiceManagementBindingExecute(r saops.ApiGe
 }
 
 func (s *SubaccountServiceFake) GetServiceManagerBindingV2(ctx context.Context, subaccountGUID string, bindingName string) saops.ApiGetServiceManagerBindingV2Request {
-	//TODO implement me
-	panic("implement me")
+	s.LastV2BindingName = bindingName
+	return saops.ApiGetServiceManagerBindingV2Request{ApiService: s}
 }
 
 func (s *SubaccountServiceFake) GetServiceManagerBindingV2Execute(r saops.ApiGetServiceManagerBindingV2Request) (*saops.ServiceManagerBindingExtendedResponseObject, *http.Response, error) {
-	//TODO implement me
-	panic("implement me")
+	return s.GetV2MockFn(s.LastV2BindingName)
 }
 
 func (s *SubaccountServiceFake) GetSubaccount(ctx context.Context, subaccountGUID string) saops.ApiGetSubaccountRequest {

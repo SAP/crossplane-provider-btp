@@ -689,7 +689,7 @@ type PlanIdInitializerMock struct {
 	err    error
 }
 
-func (p *PlanIdInitializerMock) ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string) (string, error) {
+func (p *PlanIdInitializerMock) ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string, bindingName string) (string, error) {
 	if p.err != nil {
 		return "", p.err
 	}
