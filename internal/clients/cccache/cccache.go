@@ -16,7 +16,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+	"time"
 
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 )
 
@@ -40,8 +42,14 @@ func HTTPClient(ctx context.Context, cfg *clientcredentials.Config) *http.Client
 		return c
 	}
 	// The client outlives this call; a reconcile ctx would be cancelled and break
-	// every later token refresh. WithoutCancel keeps values (oauth2.HTTPClient).
-	c := cfg.Client(context.WithoutCancel(ctx))
+	// every later token refresh. WithoutCancel keeps values (oauth2.HTTPClient) but
+	// also drops the deadline, so add a client with timeout for token fetches unless
+	// a client was already provided in the context
+	base := context.WithoutCancel(ctx)
+	if _, ok := base.Value(oauth2.HTTPClient).(*http.Client); !ok {
+		base = context.WithValue(base, oauth2.HTTPClient, &http.Client{Timeout: 30 * time.Second})
+	}
+	c := cfg.Client(base)
 	cache[key] = c
 	return c
 }
