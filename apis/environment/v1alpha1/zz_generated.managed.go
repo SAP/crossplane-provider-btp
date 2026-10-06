@@ -18,204 +18,204 @@ limitations under the License.
 
 package v1alpha1
 
-import xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+import xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 // GetCondition of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+func (mg *CloudFoundryEnvironment) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
 	return mg.Status.GetCondition(ct)
 }
 
 // GetDeletionPolicy of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) GetDeletionPolicy() xpv1.DeletionPolicy {
+func (mg *CloudFoundryEnvironment) GetDeletionPolicy() xpv2.DeletionPolicy {
 	return mg.Spec.DeletionPolicy
 }
 
 // GetManagementPolicies of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) GetManagementPolicies() xpv1.ManagementPolicies {
+func (mg *CloudFoundryEnvironment) GetManagementPolicies() xpv2.ManagementPolicies {
 	return mg.Spec.ManagementPolicies
 }
 
 // GetProviderConfigReference of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) GetProviderConfigReference() *xpv1.Reference {
+func (mg *CloudFoundryEnvironment) GetProviderConfigReference() *xpv2.Reference {
 	return mg.Spec.ProviderConfigReference
 }
 
 // GetWriteConnectionSecretToReference of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
+func (mg *CloudFoundryEnvironment) GetWriteConnectionSecretToReference() *xpv2.SecretReference {
 	return mg.Spec.WriteConnectionSecretToReference
 }
 
 // SetConditions of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) SetConditions(c ...xpv1.Condition) {
+func (mg *CloudFoundryEnvironment) SetConditions(c ...xpv2.Condition) {
 	mg.Status.SetConditions(c...)
 }
 
 // SetDeletionPolicy of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) SetDeletionPolicy(r xpv1.DeletionPolicy) {
+func (mg *CloudFoundryEnvironment) SetDeletionPolicy(r xpv2.DeletionPolicy) {
 	mg.Spec.DeletionPolicy = r
 }
 
 // SetManagementPolicies of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) SetManagementPolicies(r xpv1.ManagementPolicies) {
+func (mg *CloudFoundryEnvironment) SetManagementPolicies(r xpv2.ManagementPolicies) {
 	mg.Spec.ManagementPolicies = r
 }
 
 // SetProviderConfigReference of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) SetProviderConfigReference(r *xpv1.Reference) {
+func (mg *CloudFoundryEnvironment) SetProviderConfigReference(r *xpv2.Reference) {
 	mg.Spec.ProviderConfigReference = r
 }
 
 // SetWriteConnectionSecretToReference of this CloudFoundryEnvironment.
-func (mg *CloudFoundryEnvironment) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
+func (mg *CloudFoundryEnvironment) SetWriteConnectionSecretToReference(r *xpv2.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
 }
 
 // GetCondition of this KymaEnvironment.
-func (mg *KymaEnvironment) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+func (mg *KymaEnvironment) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
 	return mg.Status.GetCondition(ct)
 }
 
 // GetDeletionPolicy of this KymaEnvironment.
-func (mg *KymaEnvironment) GetDeletionPolicy() xpv1.DeletionPolicy {
+func (mg *KymaEnvironment) GetDeletionPolicy() xpv2.DeletionPolicy {
 	return mg.Spec.DeletionPolicy
 }
 
 // GetManagementPolicies of this KymaEnvironment.
-func (mg *KymaEnvironment) GetManagementPolicies() xpv1.ManagementPolicies {
+func (mg *KymaEnvironment) GetManagementPolicies() xpv2.ManagementPolicies {
 	return mg.Spec.ManagementPolicies
 }
 
 // GetProviderConfigReference of this KymaEnvironment.
-func (mg *KymaEnvironment) GetProviderConfigReference() *xpv1.Reference {
+func (mg *KymaEnvironment) GetProviderConfigReference() *xpv2.Reference {
 	return mg.Spec.ProviderConfigReference
 }
 
 // GetWriteConnectionSecretToReference of this KymaEnvironment.
-func (mg *KymaEnvironment) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
+func (mg *KymaEnvironment) GetWriteConnectionSecretToReference() *xpv2.SecretReference {
 	return mg.Spec.WriteConnectionSecretToReference
 }
 
 // SetConditions of this KymaEnvironment.
-func (mg *KymaEnvironment) SetConditions(c ...xpv1.Condition) {
+func (mg *KymaEnvironment) SetConditions(c ...xpv2.Condition) {
 	mg.Status.SetConditions(c...)
 }
 
 // SetDeletionPolicy of this KymaEnvironment.
-func (mg *KymaEnvironment) SetDeletionPolicy(r xpv1.DeletionPolicy) {
+func (mg *KymaEnvironment) SetDeletionPolicy(r xpv2.DeletionPolicy) {
 	mg.Spec.DeletionPolicy = r
 }
 
 // SetManagementPolicies of this KymaEnvironment.
-func (mg *KymaEnvironment) SetManagementPolicies(r xpv1.ManagementPolicies) {
+func (mg *KymaEnvironment) SetManagementPolicies(r xpv2.ManagementPolicies) {
 	mg.Spec.ManagementPolicies = r
 }
 
 // SetProviderConfigReference of this KymaEnvironment.
-func (mg *KymaEnvironment) SetProviderConfigReference(r *xpv1.Reference) {
+func (mg *KymaEnvironment) SetProviderConfigReference(r *xpv2.Reference) {
 	mg.Spec.ProviderConfigReference = r
 }
 
 // SetWriteConnectionSecretToReference of this KymaEnvironment.
-func (mg *KymaEnvironment) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
+func (mg *KymaEnvironment) SetWriteConnectionSecretToReference(r *xpv2.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
 }
 
 // GetCondition of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+func (mg *KymaEnvironmentBinding) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
 	return mg.Status.GetCondition(ct)
 }
 
 // GetDeletionPolicy of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) GetDeletionPolicy() xpv1.DeletionPolicy {
+func (mg *KymaEnvironmentBinding) GetDeletionPolicy() xpv2.DeletionPolicy {
 	return mg.Spec.DeletionPolicy
 }
 
 // GetManagementPolicies of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) GetManagementPolicies() xpv1.ManagementPolicies {
+func (mg *KymaEnvironmentBinding) GetManagementPolicies() xpv2.ManagementPolicies {
 	return mg.Spec.ManagementPolicies
 }
 
 // GetProviderConfigReference of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) GetProviderConfigReference() *xpv1.Reference {
+func (mg *KymaEnvironmentBinding) GetProviderConfigReference() *xpv2.Reference {
 	return mg.Spec.ProviderConfigReference
 }
 
 // GetWriteConnectionSecretToReference of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
+func (mg *KymaEnvironmentBinding) GetWriteConnectionSecretToReference() *xpv2.SecretReference {
 	return mg.Spec.WriteConnectionSecretToReference
 }
 
 // SetConditions of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) SetConditions(c ...xpv1.Condition) {
+func (mg *KymaEnvironmentBinding) SetConditions(c ...xpv2.Condition) {
 	mg.Status.SetConditions(c...)
 }
 
 // SetDeletionPolicy of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) SetDeletionPolicy(r xpv1.DeletionPolicy) {
+func (mg *KymaEnvironmentBinding) SetDeletionPolicy(r xpv2.DeletionPolicy) {
 	mg.Spec.DeletionPolicy = r
 }
 
 // SetManagementPolicies of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) SetManagementPolicies(r xpv1.ManagementPolicies) {
+func (mg *KymaEnvironmentBinding) SetManagementPolicies(r xpv2.ManagementPolicies) {
 	mg.Spec.ManagementPolicies = r
 }
 
 // SetProviderConfigReference of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) SetProviderConfigReference(r *xpv1.Reference) {
+func (mg *KymaEnvironmentBinding) SetProviderConfigReference(r *xpv2.Reference) {
 	mg.Spec.ProviderConfigReference = r
 }
 
 // SetWriteConnectionSecretToReference of this KymaEnvironmentBinding.
-func (mg *KymaEnvironmentBinding) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
+func (mg *KymaEnvironmentBinding) SetWriteConnectionSecretToReference(r *xpv2.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
 }
 
 // GetCondition of this KymaModule.
-func (mg *KymaModule) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+func (mg *KymaModule) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
 	return mg.Status.GetCondition(ct)
 }
 
 // GetDeletionPolicy of this KymaModule.
-func (mg *KymaModule) GetDeletionPolicy() xpv1.DeletionPolicy {
+func (mg *KymaModule) GetDeletionPolicy() xpv2.DeletionPolicy {
 	return mg.Spec.DeletionPolicy
 }
 
 // GetManagementPolicies of this KymaModule.
-func (mg *KymaModule) GetManagementPolicies() xpv1.ManagementPolicies {
+func (mg *KymaModule) GetManagementPolicies() xpv2.ManagementPolicies {
 	return mg.Spec.ManagementPolicies
 }
 
 // GetProviderConfigReference of this KymaModule.
-func (mg *KymaModule) GetProviderConfigReference() *xpv1.Reference {
+func (mg *KymaModule) GetProviderConfigReference() *xpv2.Reference {
 	return mg.Spec.ProviderConfigReference
 }
 
 // GetWriteConnectionSecretToReference of this KymaModule.
-func (mg *KymaModule) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
+func (mg *KymaModule) GetWriteConnectionSecretToReference() *xpv2.SecretReference {
 	return mg.Spec.WriteConnectionSecretToReference
 }
 
 // SetConditions of this KymaModule.
-func (mg *KymaModule) SetConditions(c ...xpv1.Condition) {
+func (mg *KymaModule) SetConditions(c ...xpv2.Condition) {
 	mg.Status.SetConditions(c...)
 }
 
 // SetDeletionPolicy of this KymaModule.
-func (mg *KymaModule) SetDeletionPolicy(r xpv1.DeletionPolicy) {
+func (mg *KymaModule) SetDeletionPolicy(r xpv2.DeletionPolicy) {
 	mg.Spec.DeletionPolicy = r
 }
 
 // SetManagementPolicies of this KymaModule.
-func (mg *KymaModule) SetManagementPolicies(r xpv1.ManagementPolicies) {
+func (mg *KymaModule) SetManagementPolicies(r xpv2.ManagementPolicies) {
 	mg.Spec.ManagementPolicies = r
 }
 
 // SetProviderConfigReference of this KymaModule.
-func (mg *KymaModule) SetProviderConfigReference(r *xpv1.Reference) {
+func (mg *KymaModule) SetProviderConfigReference(r *xpv2.Reference) {
 	mg.Spec.ProviderConfigReference = r
 }
 
 // SetWriteConnectionSecretToReference of this KymaModule.
-func (mg *KymaModule) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
+func (mg *KymaModule) SetWriteConnectionSecretToReference(r *xpv2.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
 }

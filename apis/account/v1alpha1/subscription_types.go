@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 const (
@@ -66,8 +66,8 @@ type SubscriptionError struct {
 
 // A SubscriptionSpec defines the desired state of a Subscription.
 type SubscriptionSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       SubscriptionParameters `json:"forProvider"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     SubscriptionParameters `json:"forProvider"`
 
 	// +kubebuilder:validation:Optional
 	CloudManagementSelector *xpv1.Selector `json:"cloudManagementSelector,omitempty"`
@@ -96,8 +96,8 @@ type SubscriptionSpec struct {
 
 // A SubscriptionStatus represents the observed state of a Subscription.
 type SubscriptionStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          SubscriptionObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 SubscriptionObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

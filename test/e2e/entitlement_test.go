@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	xpmeta "github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	meta "github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -107,7 +107,7 @@ func TestEntitlements(t *testing.T) {
 						Namespace: cfg.Namespace(),
 					},
 					Spec: v1alpha1.EntitlementSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							ProviderConfigReference: &xpv1.Reference{Name: "default"},
 						},
 						ForProvider: v1alpha1.EntitlementParameters{
@@ -176,8 +176,9 @@ func TestEntitlements(t *testing.T) {
 		).
 		Assess(
 			"Check Entitlements are managed", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				crudFeatures := []features.Feature{}
+				crudFeatures := map[string][]features.Feature{}
 				for _, entitlement := range entitlements.Items {
+					serviceName := entitlement.Spec.ForProvider.ServiceName
 					entitlementName := strings.Clone(entitlement.Name)
 					crudFeature := features.New(fmt.Sprintf("Entitlement %s", entitlementName)).
 						Assess(
@@ -226,9 +227,17 @@ func TestEntitlements(t *testing.T) {
 								return ctx
 							},
 						).Feature()
-					crudFeatures = append(crudFeatures, crudFeature)
+					crudFeatures[serviceName] = append(crudFeatures[serviceName], crudFeature)
 				}
-				testenv.Test(t, crudFeatures...)
+
+				t.Run("by service", func(t *testing.T) {
+					for serviceName, serviceFeatures := range crudFeatures {
+						t.Run(serviceName, func(t *testing.T) {
+							t.Parallel()
+							testenv.Test(t, serviceFeatures...)
+						})
+					}
+				})
 				return ctx
 			},
 		).Teardown(
@@ -295,7 +304,7 @@ func requireEntitlementCreateRejected(
 			Namespace: cfg.Namespace(),
 		},
 		Spec: v1alpha1.EntitlementSpec{
-			ResourceSpec: xpv1.ResourceSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{Name: "default"},
 			},
 			ForProvider: v1alpha1.EntitlementParameters{

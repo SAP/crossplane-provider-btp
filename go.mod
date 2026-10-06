@@ -1,6 +1,6 @@
 module github.com/sap/crossplane-provider-btp
 
-go 1.26.5
+go 1.26.8
 
 tool golang.org/x/tools/cmd/goimports
 
@@ -12,9 +12,10 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-beta.1
 	github.com/crossplane-contrib/xp-testing v1.10.0
-	github.com/crossplane/crossplane-runtime/v2 v2.2.4
+	github.com/crossplane/crossplane-runtime/v2 v2.4.2
 	github.com/crossplane/crossplane-tools v0.0.0-20260719180100-659f1dc036c5
-	github.com/crossplane/upjet/v2 v2.4.2
+	github.com/crossplane/crossplane/apis/v2 v2.4.1
+	github.com/crossplane/upjet/v2 v2.5.1
 	github.com/go-logr/logr v1.4.4
 	github.com/go-openapi/runtime v0.33.2
 	github.com/golang-jwt/jwt/v4 v4.5.2
@@ -234,10 +235,9 @@ require (
 	go.opentelemetry.io/otel v1.46.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.45.0 // indirect
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.45.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.1 // indirect
+	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.57.0 // indirect

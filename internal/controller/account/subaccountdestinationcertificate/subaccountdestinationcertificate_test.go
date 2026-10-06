@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -64,8 +64,8 @@ func newCertCR(externalName string, params v1alpha1.SubaccountDestinationCertifi
 			Annotations: map[string]string{},
 		},
 		Spec: v1alpha1.SubaccountDestinationCertificateSpec{
-			ResourceSpec: xpv1.ResourceSpec{},
-			ForProvider:  params,
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{},
+			ForProvider:                params,
 		},
 	}
 	if externalName != "" {
