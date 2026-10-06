@@ -4,15 +4,16 @@ import (
 	"context"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	ujresource "github.com/crossplane/upjet/v2/pkg/resource"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -44,7 +45,7 @@ type TfProxyControllerI interface {
 	GetTfResource() resource.Managed
 }
 
-type SaveConditionsFn func(ctx context.Context, kube client.Client, name string, conditions ...xpv1.Condition) error
+type SaveConditionsFn func(ctx context.Context, kube client.Client, name types.NamespacedName, conditions ...xpv1.Condition) error
 
 // ObservationData is the bridge struct that carries data from the Terraform resource to the Crossplane CR.
 // It is filled by QueryAsyncData() and then saved to the CR status by saveInstanceData().

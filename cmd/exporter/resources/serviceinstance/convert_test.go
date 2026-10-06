@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/SAP/xp-clifford/yaml"
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -24,7 +24,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 	serviceName := "test-service"
 	planName := "standard"
 	subAccountGuid := "x123e4567-e89b-12d3-a456-42661417400"
-	externalName := fmt.Sprintf("%s,%s", subAccountGuid, instanceID)
+	externalName := instanceID
 	smName := "service-manager-resource"
 	resourceName := fmt.Sprintf("%s-%s", instanceName, instanceID)
 
@@ -60,7 +60,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 						},
 					},
 					Spec: v1alpha1.ServiceInstanceSpec{
-						ResourceSpec: v1.ResourceSpec{
+						ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 							ManagementPolicies: []v1.ManagementAction{
 								v1.ManagementActionObserve,
 							},
@@ -105,7 +105,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceInstanceSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -152,7 +152,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceInstanceSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -196,11 +196,11 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: resourceName,
 							Annotations: map[string]string{
-								"crossplane.io/external-name": resources.UndefinedExternalName,
+								"crossplane.io/external-name": instanceID,
 							},
 						},
 						Spec: v1alpha1.ServiceInstanceSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -217,7 +217,6 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 						},
 					})
 				rwc.AddComment(resources.WarnMissingSubaccountGuid)
-				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),
 		},
@@ -249,7 +248,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceInstanceSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -299,7 +298,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceInstanceSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -348,7 +347,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceInstanceSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -396,7 +395,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceInstanceSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},
@@ -445,7 +444,7 @@ func TestConvertServiceInstanceResource(t *testing.T) {
 							},
 						},
 						Spec: v1alpha1.ServiceInstanceSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{
 									v1.ManagementActionObserve,
 								},

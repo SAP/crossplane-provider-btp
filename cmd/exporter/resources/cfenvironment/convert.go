@@ -3,7 +3,7 @@ package cfenvironment
 import (
 	"context"
 
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -46,7 +46,7 @@ func convertCloudFoundryEnvResource(ctx context.Context, btpClient *btpcli.BtpCl
 				CloudManagementRef: &v1.Reference{
 					Name: cmName,
 				},
-				ResourceSpec: v1.ResourceSpec{
+				ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 					ManagementPolicies: []v1.ManagementAction{
 						v1.ManagementActionObserve,
 					},

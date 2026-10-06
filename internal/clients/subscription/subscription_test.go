@@ -375,6 +375,66 @@ func TestSubscriptionTypeMapper_SyncStatus(t *testing.T) {
 				},
 			),
 		},
+		"SyncsFailureDetails": {
+			cr: NewSubscription("someName", "name1", "plan2", raw),
+			apiRes: &SubscriptionGet{
+				AppName:                internal.Ptr("name1"),
+				PlanName:               internal.Ptr("plan2"),
+				State:                  internal.Ptr(v1alpha1.SubscriptionStateSubscribeFailed),
+				AutomationStateMessage: internal.Ptr("automation failed"),
+				SubscriptionError: &saas_client.EntitledApplicationsErrorResponseObject{
+					AppError:     internal.Ptr("APP_ERR"),
+					ErrorMessage: internal.Ptr("Subscribe failed. Please open a support case."),
+				},
+			},
+			expectedCr: NewSubscriptionWithStatus("someName", "name1", "plan2",
+				v1alpha1.SubscriptionObservation{
+					State:                  internal.Ptr(v1alpha1.SubscriptionStateSubscribeFailed),
+					AutomationStateMessage: internal.Ptr("automation failed"),
+					SubscriptionError: &v1alpha1.SubscriptionError{
+						AppError:     internal.Ptr("APP_ERR"),
+						ErrorMessage: internal.Ptr("Subscribe failed. Please open a support case."),
+					},
+				},
+			),
+		},
+		"SyncsAutomationStateMessageOnly": {
+			cr: NewSubscription("someName", "name1", "plan2", raw),
+			apiRes: &SubscriptionGet{
+				AppName:                internal.Ptr("name1"),
+				PlanName:               internal.Ptr("plan2"),
+				State:                  internal.Ptr(v1alpha1.SubscriptionStateInProcess),
+				AutomationStateMessage: internal.Ptr("in process"),
+			},
+			expectedCr: NewSubscriptionWithStatus("someName", "name1", "plan2",
+				v1alpha1.SubscriptionObservation{
+					State:                  internal.Ptr(v1alpha1.SubscriptionStateInProcess),
+					AutomationStateMessage: internal.Ptr("in process"),
+				},
+			),
+		},
+		"ClearsFailureDetailsWhenResolved": {
+			cr: NewSubscriptionWithStatus("someName", "name1", "plan2",
+				v1alpha1.SubscriptionObservation{
+					State:                  internal.Ptr(v1alpha1.SubscriptionStateSubscribeFailed),
+					AutomationStateMessage: internal.Ptr("automation failed"),
+					SubscriptionError: &v1alpha1.SubscriptionError{
+						AppError:     internal.Ptr("APP_ERR"),
+						ErrorMessage: internal.Ptr("Subscribe failed. Please open a support case."),
+					},
+				},
+			),
+			apiRes: &SubscriptionGet{
+				AppName:  internal.Ptr("name1"),
+				PlanName: internal.Ptr("plan2"),
+				State:    internal.Ptr(v1alpha1.SubscriptionStateSubscribed),
+			},
+			expectedCr: NewSubscriptionWithStatus("someName", "name1", "plan2",
+				v1alpha1.SubscriptionObservation{
+					State: internal.Ptr(v1alpha1.SubscriptionStateSubscribed),
+				},
+			),
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
