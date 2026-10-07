@@ -150,6 +150,212 @@ func TestConnect_ResourceTracking(t *testing.T) {
 }
 
 // ====================================================================================
+// InitializeServicePlanId / PendingAdminBindingCleanup Tests
+// ====================================================================================
+
+func TestInitializeServicePlanId(t *testing.T) {
+	errCleanup := errors.New("delete binding failed")
+	errInitializer := errors.New("initializer build failed")
+
+	statusUpdateOK := test.NewMockSubResourceUpdateFn(nil)
+	statusUpdateErr := test.NewMockSubResourceUpdateFn(errors.New("status update failed"))
+
+	cases := map[string]struct {
+		reason         string
+		cr             *apisv1beta1.ServiceManager
+		mock           *PlanIdInitializerMock
+		initializerErr error
+		statusUpdateFn func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error
+		wantErr        bool
+		wantPending    bool
+		wantPlanID     string
+	}{
+		"FreshLookupSucceeds": {
+			reason: "no prior DataSourceLookup: creates binding, resolves plan ID, deletes binding, saves without pending flag",
+			cr: &apisv1beta1.ServiceManager{
+				Spec: apisv1beta1.ServiceManagerSpec{
+					ForProvider: apisv1beta1.ServiceManagerParameters{SubaccountGuid: "sub-1"},
+				},
+			},
+			mock:           &PlanIdInitializerMock{planID: "plan-abc"},
+			statusUpdateFn: statusUpdateOK,
+			wantErr:        false,
+			wantPending:    false,
+			wantPlanID:     "plan-abc",
+		},
+		"FreshLookupDeleteFails_SetsPendingFlag": {
+			reason: "plan ID resolved but binding delete fails: saves plan ID with pendingAdminBindingCleanup=true, returns nil (CR stays healthy)",
+			cr: &apisv1beta1.ServiceManager{
+				Spec: apisv1beta1.ServiceManagerSpec{
+					ForProvider: apisv1beta1.ServiceManagerParameters{SubaccountGuid: "sub-1"},
+				},
+			},
+			mock:           &PlanIdInitializerMock{planID: "plan-abc", cleanupErr: errCleanup},
+			statusUpdateFn: statusUpdateOK,
+			wantErr:        false,
+			wantPending:    true,
+			wantPlanID:     "plan-abc",
+		},
+		"FreshLookupBothFail_ReturnsError": {
+			reason: "plan ID lookup fails and id is empty: returns error, no status saved",
+			cr: &apisv1beta1.ServiceManager{
+				Spec: apisv1beta1.ServiceManagerSpec{
+					ForProvider: apisv1beta1.ServiceManagerParameters{SubaccountGuid: "sub-1"},
+				},
+			},
+			mock:           &PlanIdInitializerMock{err: errors.New("lookup failed")},
+			statusUpdateFn: statusUpdateOK,
+			wantErr:        true,
+		},
+		"AlreadyInitialized_NoPendingFlag_Noop": {
+			reason: "DataSourceLookup already set and pendingAdminBindingCleanup=false: no-op",
+			cr: &apisv1beta1.ServiceManager{
+				Spec: apisv1beta1.ServiceManagerSpec{
+					ForProvider: apisv1beta1.ServiceManagerParameters{SubaccountGuid: "sub-1"},
+				},
+				Status: apisv1beta1.ServiceManagerStatus{
+					AtProvider: apisv1beta1.ServiceManagerObservation{
+						DataSourceLookup: &apisv1beta1.DataSourceLookup{
+							ServiceManagerPlanID:       "existing-plan",
+							PendingAdminBindingCleanup: false,
+						},
+					},
+				},
+			},
+			mock:           &PlanIdInitializerMock{},
+			statusUpdateFn: statusUpdateOK,
+			wantErr:        false,
+			wantPending:    false,
+			wantPlanID:     "existing-plan",
+		},
+		"AlreadyInitialized_PendingFlag_DeleteSucceeds_ClearsFlag": {
+			reason: "pendingAdminBindingCleanup=true and delete succeeds: clears flag, updates status",
+			cr: &apisv1beta1.ServiceManager{
+				Spec: apisv1beta1.ServiceManagerSpec{
+					ForProvider: apisv1beta1.ServiceManagerParameters{SubaccountGuid: "sub-1"},
+				},
+				Status: apisv1beta1.ServiceManagerStatus{
+					AtProvider: apisv1beta1.ServiceManagerObservation{
+						DataSourceLookup: &apisv1beta1.DataSourceLookup{
+							ServiceManagerPlanID:       "existing-plan",
+							PendingAdminBindingCleanup: true,
+						},
+					},
+				},
+			},
+			mock:           &PlanIdInitializerMock{deleteBindErr: nil},
+			statusUpdateFn: statusUpdateOK,
+			wantErr:        false,
+			wantPending:    false,
+			wantPlanID:     "existing-plan",
+		},
+		"AlreadyInitialized_PendingFlag_DeleteFails_StaysHealthy": {
+			reason: "pendingAdminBindingCleanup=true and delete still fails: returns nil, flag unchanged",
+			cr: &apisv1beta1.ServiceManager{
+				Spec: apisv1beta1.ServiceManagerSpec{
+					ForProvider: apisv1beta1.ServiceManagerParameters{SubaccountGuid: "sub-1"},
+				},
+				Status: apisv1beta1.ServiceManagerStatus{
+					AtProvider: apisv1beta1.ServiceManagerObservation{
+						DataSourceLookup: &apisv1beta1.DataSourceLookup{
+							ServiceManagerPlanID:       "existing-plan",
+							PendingAdminBindingCleanup: true,
+						},
+					},
+				},
+			},
+			mock:           &PlanIdInitializerMock{deleteBindErr: errCleanup},
+			statusUpdateFn: statusUpdateOK,
+			wantErr:        false,
+			wantPending:    true,
+			wantPlanID:     "existing-plan",
+		},
+		"AlreadyInitialized_PendingFlag_StatusUpdateFails_ReturnsError": {
+			reason: "delete succeeds but status update fails: returns error",
+			cr: &apisv1beta1.ServiceManager{
+				Spec: apisv1beta1.ServiceManagerSpec{
+					ForProvider: apisv1beta1.ServiceManagerParameters{SubaccountGuid: "sub-1"},
+				},
+				Status: apisv1beta1.ServiceManagerStatus{
+					AtProvider: apisv1beta1.ServiceManagerObservation{
+						DataSourceLookup: &apisv1beta1.DataSourceLookup{
+							ServiceManagerPlanID:       "existing-plan",
+							PendingAdminBindingCleanup: true,
+						},
+					},
+				},
+			},
+			mock:           &PlanIdInitializerMock{deleteBindErr: nil},
+			statusUpdateFn: statusUpdateErr,
+			wantErr:        true,
+			wantPending:    false,
+			wantPlanID:     "existing-plan",
+		},
+		"AlreadyInitialized_PendingFlag_InitializerFails_ReturnsError": {
+			reason: "pendingAdminBindingCleanup=true but building the initializer fails: returns error (reconcile fails, CR unhealthy until resolved)",
+			cr: &apisv1beta1.ServiceManager{
+				Spec: apisv1beta1.ServiceManagerSpec{
+					ForProvider: apisv1beta1.ServiceManagerParameters{SubaccountGuid: "sub-1"},
+				},
+				Status: apisv1beta1.ServiceManagerStatus{
+					AtProvider: apisv1beta1.ServiceManagerObservation{
+						DataSourceLookup: &apisv1beta1.DataSourceLookup{
+							ServiceManagerPlanID:       "existing-plan",
+							PendingAdminBindingCleanup: true,
+						},
+					},
+				},
+			},
+			mock:           &PlanIdInitializerMock{},
+			initializerErr: errInitializer,
+			statusUpdateFn: statusUpdateOK,
+			wantErr:        true,
+			wantPending:    true,
+			wantPlanID:     "existing-plan",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			kube := &test.MockClient{
+				MockStatusUpdate: tc.statusUpdateFn,
+			}
+			c := &connector{
+				kube: kube,
+				newPlanIdInitializerFn: func(ctx context.Context, cr *apisv1beta1.ServiceManager) (ServiceManagerPlanIdInitializer, error) {
+					if tc.initializerErr != nil {
+						return nil, tc.initializerErr
+					}
+					return tc.mock, nil
+				},
+			}
+
+			err := c.InitializeServicePlanId(context.Background(), tc.cr)
+
+			if tc.wantErr && err == nil {
+				t.Errorf("%s: expected error, got nil", tc.reason)
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("%s: unexpected error: %v", tc.reason, err)
+			}
+
+			if tc.wantPlanID != "" {
+				if tc.cr.Status.AtProvider.DataSourceLookup == nil {
+					t.Errorf("%s: expected DataSourceLookup to be set", tc.reason)
+				} else {
+					if diff := cmp.Diff(tc.wantPlanID, tc.cr.Status.AtProvider.DataSourceLookup.ServiceManagerPlanID); diff != "" {
+						t.Errorf("%s: plan ID mismatch (-want +got):\n%s", tc.reason, diff)
+					}
+					if diff := cmp.Diff(tc.wantPending, tc.cr.Status.AtProvider.DataSourceLookup.PendingAdminBindingCleanup); diff != "" {
+						t.Errorf("%s: pending flag mismatch (-want +got):\n%s", tc.reason, diff)
+					}
+				}
+			}
+		})
+	}
+}
+
+// ====================================================================================
 // Deletion Blocking Tests
 // ====================================================================================
 
@@ -685,18 +891,25 @@ func (t *TfClientInitializerMock) ConnectResources(ctx context.Context, cr *apis
 var _ ServiceManagerPlanIdInitializer = &PlanIdInitializerMock{}
 
 type PlanIdInitializerMock struct {
-	planID string
-	err    error
+	planID        string
+	err           error
+	cleanupErr    error // returned alongside a valid planID (delete-succeeded-but-failed-to-cleanup scenario)
+	deleteBindErr error
 }
 
 func (p *PlanIdInitializerMock) ServiceManagerPlanIDByName(ctx context.Context, subaccountId string, servicePlanName string) (string, error) {
 	if p.err != nil {
 		return "", p.err
 	}
-	if p.planID != "" {
-		return p.planID, nil
+	id := p.planID
+	if id == "" {
+		id = "default-plan-id"
 	}
-	return "default-plan-id", nil
+	return id, p.cleanupErr
+}
+
+func (p *PlanIdInitializerMock) DeleteAdminBinding(ctx context.Context, subaccountId string) error {
+	return p.deleteBindErr
 }
 
 // ====================================================================================

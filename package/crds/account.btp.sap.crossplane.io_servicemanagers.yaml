@@ -592,6 +592,11 @@ spec:
                 properties:
                   dataSourceLookup:
                     properties:
+                      pendingAdminBindingCleanup:
+                        description: |-
+                          PendingAdminBindingCleanup indicates that the temporary admin binding used
+                          during plan-ID lookup could not be deleted. The next reconcile will retry.
+                        type: boolean
                       serviceManagerPlanID:
                         type: string
                     type: object
