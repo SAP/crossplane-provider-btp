@@ -6,7 +6,7 @@ tool golang.org/x/tools/cmd/goimports
 
 require (
 	dario.cat/mergo v1.0.2
-	github.com/SAP/terraform-provider-btp v1.26.0
+	github.com/SAP/terraform-provider-btp v1.27.0
 	github.com/SAP/xp-clifford v0.0.0-20260817093517-35e452c3c837
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/blang/semver/v4 v4.0.0
@@ -145,7 +145,7 @@ require (
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/go-plugin v1.7.0 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
-	github.com/hashicorp/go-uuid v1.0.3 // indirect
+	github.com/hashicorp/go-uuid v1.0.4 // indirect
 	github.com/hashicorp/go-version v1.9.0 // indirect
 	github.com/hashicorp/hcl/v2 v2.24.0 // indirect
 	github.com/hashicorp/logutils v1.0.0 // indirect
