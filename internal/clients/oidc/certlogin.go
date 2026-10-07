@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	jwt "github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/int128/kubelogin/pkg/infrastructure/clock"
 	"github.com/int128/kubelogin/pkg/infrastructure/logger"
 	"github.com/int128/kubelogin/pkg/oidc"
@@ -99,7 +99,7 @@ func (cLogin *CertLogin) IsExpired(idToken string) bool {
 	if err != nil {
 		return false
 	}
-	return claims.Valid() != nil
+	return jwt.NewValidator(jwt.WithIssuedAt()).Validate(claims) != nil
 }
 
 func (cLogin *CertLogin) Refresh(ctx context.Context, refreshToken string) (*oidc.TokenSet, error) {
