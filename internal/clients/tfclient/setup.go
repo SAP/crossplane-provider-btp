@@ -183,15 +183,32 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	res := config.GetProvider().Resources[resourceName]
 
+	var inner managed.ExternalConnector
 	if useAsync {
 		eventHandler := handler.NewEventHandler(handler.WithLogger(log.WithValues("gvk", gvk)))
-		return tjcontroller.NewTerraformPluginFrameworkAsyncConnector(client, tjcontroller.NewOperationStore(log), setupFn, res,
+		inner = tjcontroller.NewTerraformPluginFrameworkAsyncConnector(client, tjcontroller.NewOperationStore(log), setupFn, res,
 			tjcontroller.WithTerraformPluginFrameworkAsyncLogger(log),
 			tjcontroller.WithTerraformPluginFrameworkAsyncConnectorEventHandler(eventHandler),
 			tjcontroller.WithTerraformPluginFrameworkAsyncCallbackProvider(callbackProvider),
 		)
+	} else {
+		inner = tjcontroller.NewTerraformPluginFrameworkConnector(client, setupFn, res, tjcontroller.NewOperationStore(log),
+			tjcontroller.WithTerraformPluginFrameworkLogger(log),
+		)
 	}
-	return tjcontroller.NewTerraformPluginFrameworkConnector(client, setupFn, res, tjcontroller.NewOperationStore(log),
-		tjcontroller.WithTerraformPluginFrameworkLogger(log),
-	)
+	return &tracingConnector{inner: inner, kind: gvk.Kind}
+}
+
+// tracingConnector wraps an ExternalConnector and injects the managed-resource
+// identity into the context before delegating to the inner connector. The trace
+// string ends up in every HTTP log line emitted by cliTransport for this
+// reconcile, making it straightforward to see which resource caused a timeout.
+type tracingConnector struct {
+	inner managed.ExternalConnector
+	kind  string
+}
+
+func (c *tracingConnector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
+	trace := c.kind + "/" + mg.GetName()
+	return c.inner.Connect(WithReconcileTrace(ctx, trace), mg)
 }

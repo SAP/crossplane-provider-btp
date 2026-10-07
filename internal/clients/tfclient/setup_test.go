@@ -634,8 +634,15 @@ func TestNewInternalTfConnectorSelectsClientByResourceConfig(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.reason, func(t *testing.T) {
 			got := NewInternalTfConnector(nil, tc.resource, schema.GroupVersionKind{}, tc.useAsync, nil)
-			if reflect.TypeOf(got) != reflect.TypeOf(tc.want) {
-				t.Errorf("%s\nNewInternalTfConnector(...): want %T, got %T", tc.reason, tc.want, got)
+			// NewInternalTfConnector always wraps the inner connector in a
+			// tracingConnector; the test pins the *inner* connector type.
+			wrapper, ok := got.(*tracingConnector)
+			if !ok {
+				t.Errorf("%s\nNewInternalTfConnector(...): want *tracingConnector wrapper, got %T", tc.reason, got)
+				return
+			}
+			if reflect.TypeOf(wrapper.inner) != reflect.TypeOf(tc.want) {
+				t.Errorf("%s\ntracingConnector.inner: want %T, got %T", tc.reason, tc.want, wrapper.inner)
 			}
 		})
 	}

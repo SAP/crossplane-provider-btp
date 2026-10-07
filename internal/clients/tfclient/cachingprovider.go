@@ -22,11 +22,33 @@ import (
 // btpcli sets these on every data request once a session exists; eviction reads
 // them off a 401'd request. Hard-coded because btpcli is internal/ and unimportable.
 const (
-	headerCLISessionId = "X-Cpcli-Sessionid"
-	headerCLISubdomain = "X-Cpcli-Subdomain"
-	headerCorrelationID = "X-Correlationid"
+	headerCLISessionId     = "X-Cpcli-Sessionid"
+	headerCLISubdomain     = "X-Cpcli-Subdomain"
+	headerCorrelationID    = "X-Correlationid"
 	headerCLIBackendStatus = "X-Cpcli-Backend-Status"
 )
+
+// reconcileTraceKey is the context key for the reconcile trace string set by
+// TerraformSetupBuilder so every HTTP log line carries the managed-resource
+// identity (kind/name) without needing the cliTransport singleton to know about
+// Crossplane types.
+type reconcileTraceKeyType struct{}
+
+var reconcileTraceKey reconcileTraceKeyType
+
+// WithReconcileTrace returns a child context that carries the resource trace
+// string (e.g. "ServiceInstance/octoroute-01a0c329"). The cliTransport reads it
+// in RoundTrip and attaches it to every log line for that reconcile.
+func WithReconcileTrace(ctx context.Context, trace string) context.Context {
+	return context.WithValue(ctx, reconcileTraceKey, trace)
+}
+
+func reconcileTraceFrom(ctx context.Context) string {
+	if v, ok := ctx.Value(reconcileTraceKey).(string); ok {
+		return v
+	}
+	return ""
+}
 
 // cachingProvider caches Configure so upjet's per-reconcile ConfigureProvider RPC does not
 // log in to BTP on every reconcile (#702). Evicts on 401 by subdomain so a session expiry
@@ -154,7 +176,7 @@ type cliTransport struct {
 func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	start := time.Now()
 	resp, err := t.base.RoundTrip(r)
-	t.logResult(r, resp, err, time.Since(start))
+	t.logResult(r, resp, err, time.Since(start), reconcileTraceFrom(r.Context()))
 	// The session-id check skips login POSTs (no session headers), so a bad-creds
 	// login 401 can't evict a valid entry.
 	if resp != nil && resp.StatusCode == http.StatusUnauthorized && r.Header.Get(headerCLISessionId) != "" {
@@ -167,11 +189,13 @@ func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-// logResult logs failed CLI calls at Info; success is silent and allocation-free.
-// The CLI proxy almost always returns HTTP 200 - the real status is in X-Cpcli-Backend-Status
-// Both transport status and that header are checked.
-// The body carries the CLI server's human-readable error, which upjet's newTFError swallows.
-func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error, d time.Duration) {
+// logResult logs every CLI call: failures at Info (always visible), successes at
+// Debug (visible only with --debug). The CLI proxy almost always returns HTTP 200
+// — the real status is in X-Cpcli-Backend-Status; both are checked. The body on
+// failures carries the CLI server's human-readable error, which upjet's newTFError
+// swallows without logging it — we capture it here so the full error reason is
+// visible in provider logs.
+func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error, d time.Duration, trace string) {
 	if t.log == nil {
 		return
 	}
@@ -183,25 +207,30 @@ func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error
 			status = b
 		}
 	}
-	if err == nil && status < 400 {
-		return
-	}
+
 	kv := []interface{}{
 		"method", r.Method,
-		"url", r.URL.Host + r.URL.Path,
+		"path", r.URL.Path,
 		"cliServerURL", r.URL.Host,
 		"durationMs", d.Milliseconds(),
+		"resource", trace,
 	}
 	if err != nil {
 		kv = append(kv, "error", err.Error())
-	} else {
-		kv = append(kv,
-			"status", status,
-			"httpStatus", resp.StatusCode,
-			"correlationID", resp.Header.Get(headerCorrelationID),
-			"body", peekBody(resp))
+		t.log.Info("cli request failed", kv...)
+		return
 	}
-	t.log.Info("cli request failed", kv...)
+	kv = append(kv,
+		"status", status,
+		"httpStatus", resp.StatusCode,
+		"correlationID", resp.Header.Get(headerCorrelationID),
+	)
+	if status >= 400 {
+		kv = append(kv, "body", peekBody(resp))
+		t.log.Info("cli request failed", kv...)
+		return
+	}
+	t.log.Debug("cli request ok", kv...)
 }
 
 // peekBody reads up to 1KiB for logging without consuming the stream, so
