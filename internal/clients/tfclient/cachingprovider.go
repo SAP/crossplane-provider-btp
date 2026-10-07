@@ -176,8 +176,10 @@ type cliTransport struct {
 	// we can log the attempt number on retries. retryablehttp reuses the same
 	// correlationID across all retry attempts of one logical call, so the
 	// counter increments once per RoundTrip for that ID. Entries are never
-	// deleted: correlationIDs are UUIDs (collision-free) and each entry's
-	// lifetime ends with the last retry of its call, so the map stays small.
+	// explicitly deleted: correlationIDs are UUIDs so collisions are impossible,
+	// and each ID is generated fresh per logical BTP call (RetryMax+1 entries
+	// maximum per in-flight reconcile). The map is effectively bounded by the
+	// number of concurrent reconciles × (RetryMax+1).
 	attempts sync.Map // map[correlationID string]int
 }
 

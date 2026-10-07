@@ -253,21 +253,32 @@ func TestEvictTransportOn401(t *testing.T) {
 	}
 }
 
-// capLogger records the last Info call's message and key/values.
+// capLogger records the last Info and Debug call's message and key/values
+// separately so tests can assert on both log levels.
 type capLogger struct {
-	msg string
-	kv  map[string]interface{}
+	msg      string
+	kv       map[string]interface{}
+	debugMsg string
+	debugKV  map[string]interface{}
 }
 
 func (l *capLogger) Info(msg string, kv ...interface{}) {
 	l.msg = msg
-	l.kv = map[string]interface{}{}
-	for i := 0; i+1 < len(kv); i += 2 {
-		l.kv[fmt.Sprint(kv[i])] = kv[i+1]
-	}
+	l.kv = kvToMap(kv)
 }
-func (l *capLogger) Debug(string, ...interface{}) {}
+func (l *capLogger) Debug(msg string, kv ...interface{}) {
+	l.debugMsg = msg
+	l.debugKV = kvToMap(kv)
+}
 func (l *capLogger) WithValues(...interface{}) logging.Logger { return l }
+
+func kvToMap(kv []interface{}) map[string]interface{} {
+	m := map[string]interface{}{}
+	for i := 0; i+1 < len(kv); i += 2 {
+		m[fmt.Sprint(kv[i])] = kv[i+1]
+	}
+	return m
+}
 
 func TestEvictTransportLogsFailures(t *testing.T) {
 	cases := []struct {
@@ -275,15 +286,16 @@ func TestEvictTransportLogsFailures(t *testing.T) {
 		status     int
 		backend    string // X-Cpcli-Backend-Status
 		rtErr      error
-		wantLog    bool
+		wantInfo   bool
+		wantDebug  bool
 		wantStatus int
 		wantCorr   string
 	}{
-		{name: "200 proxy wrapping backend 429 logs the backend status", status: 200, backend: "429", wantLog: true, wantStatus: 429, wantCorr: "corr-429"},
-		{name: "transport 500 logs", status: 500, wantLog: true, wantStatus: 500, wantCorr: "corr-123"},
-		{name: "transport error logs", status: 0, rtErr: errors.New("dial fail"), wantLog: true},
-		{name: "200 with healthy backend stays silent", status: 200, backend: "200", wantLog: false},
-		{name: "plain 200 stays silent", status: 200, wantLog: false},
+		{name: "200 proxy wrapping backend 429 logs the backend status", status: 200, backend: "429", wantInfo: true, wantStatus: 429, wantCorr: "corr-429"},
+		{name: "transport 500 logs", status: 500, wantInfo: true, wantStatus: 500, wantCorr: "corr-123"},
+		{name: "transport error logs", status: 0, rtErr: errors.New("dial fail"), wantInfo: true},
+		{name: "200 with healthy backend logs at debug only", status: 200, backend: "200", wantDebug: true},
+		{name: "plain 200 logs at debug only", status: 200, wantDebug: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -307,21 +319,31 @@ func TestEvictTransportLogsFailures(t *testing.T) {
 			req, _ := http.NewRequest("POST", "https://cli.example/command", nil)
 			tr.RoundTrip(req) //nolint:errcheck
 
-			if tc.wantLog != (log.msg != "") {
-				t.Fatalf("logged=%v, want %v", log.msg != "", tc.wantLog)
+			if tc.wantInfo != (log.msg != "") {
+				t.Fatalf("Info logged=%v, want %v", log.msg != "", tc.wantInfo)
 			}
-			if !tc.wantLog {
-				return
+			if tc.wantDebug != (log.debugMsg != "") {
+				t.Fatalf("Debug logged=%v, want %v", log.debugMsg != "", tc.wantDebug)
 			}
-			if got := log.kv["cliServerURL"]; got != "cli.example" {
-				t.Fatalf("cliServerURL=%v, want cli.example", got)
-			}
-			if tc.rtErr == nil {
-				if got := log.kv["status"]; got != tc.wantStatus {
-					t.Fatalf("status=%v, want %d", got, tc.wantStatus)
+			if tc.wantInfo {
+				if got := log.kv["cliServerURL"]; got != "cli.example" {
+					t.Fatalf("cliServerURL=%v, want cli.example", got)
 				}
-				if got := log.kv["correlationID"]; got != tc.wantCorr {
-					t.Fatalf("correlationID=%v, want %q", got, tc.wantCorr)
+				if tc.rtErr == nil {
+					if got := log.kv["status"]; got != tc.wantStatus {
+						t.Fatalf("status=%v, want %d", got, tc.wantStatus)
+					}
+					if got := log.kv["correlationID"]; got != tc.wantCorr {
+						t.Fatalf("correlationID=%v, want %q", got, tc.wantCorr)
+					}
+				}
+			}
+			if tc.wantDebug {
+				if got := log.debugMsg; got != "cli request ok" {
+					t.Fatalf("debugMsg=%q, want %q", got, "cli request ok")
+				}
+				if got := log.debugKV["cliServerURL"]; got != "cli.example" {
+					t.Fatalf("debug cliServerURL=%v, want cli.example", got)
 				}
 			}
 		})
@@ -354,5 +376,92 @@ func TestCLITransportPeeksBodyWithoutConsumingIt(t *testing.T) {
 	got, _ := io.ReadAll(resp.Body)
 	if string(got) != msg {
 		t.Fatalf("downstream body=%q, want full %q", got, msg)
+	}
+}
+
+func TestNextAttempt(t *testing.T) {
+	t.Run("empty correlationID always returns 1", func(t *testing.T) {
+		tr := &cliTransport{}
+		for i := 0; i < 5; i++ {
+			if got := tr.nextAttempt(""); got != 1 {
+				t.Fatalf("empty id attempt %d: got %d, want 1", i, got)
+			}
+		}
+	})
+
+	t.Run("same ID increments sequentially", func(t *testing.T) {
+		tr := &cliTransport{}
+		for want := 1; want <= 4; want++ {
+			if got := tr.nextAttempt("uuid-abc"); got != want {
+				t.Fatalf("attempt %d: got %d", want, got)
+			}
+		}
+	})
+
+	t.Run("different IDs are independent", func(t *testing.T) {
+		tr := &cliTransport{}
+		tr.nextAttempt("id-A") // id-A → 1
+		tr.nextAttempt("id-A") // id-A → 2
+		if got := tr.nextAttempt("id-B"); got != 1 {
+			t.Fatalf("id-B first call: got %d, want 1", got)
+		}
+		if got := tr.nextAttempt("id-A"); got != 3 {
+			t.Fatalf("id-A third call: got %d, want 3", got)
+		}
+	})
+
+	t.Run("concurrent increments on same ID reach expected total", func(t *testing.T) {
+		tr := &cliTransport{}
+		const n = 100
+		var wg sync.WaitGroup
+		results := make([]int, n)
+		for i := 0; i < n; i++ {
+			i := i
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				results[i] = tr.nextAttempt("concurrent-id")
+			}()
+		}
+		wg.Wait()
+		// Every value 1..n must appear exactly once.
+		seen := make(map[int]bool, n)
+		for _, v := range results {
+			if v < 1 || v > n {
+				t.Fatalf("out-of-range attempt value %d", v)
+			}
+			if seen[v] {
+				t.Fatalf("duplicate attempt value %d", v)
+			}
+			seen[v] = true
+		}
+	})
+}
+
+func TestCLITransportLogsResourceAndAttempt(t *testing.T) {
+	log := &capLogger{}
+	tr := &cliTransport{
+		base: rtFunc(func(r *http.Request) (*http.Response, error) {
+			return nil, errors.New("timeout")
+		}),
+		evictSub: func(string) {},
+		evictAll: func() {},
+		log:      log,
+	}
+	ctx := WithReconcileTrace(context.Background(), "ServiceManager/sm-01a0c329")
+	req, _ := http.NewRequestWithContext(ctx, "GET", "https://cli.example/command", nil)
+	req.Header.Set(headerCorrelationID, "corr-xyz")
+
+	tr.RoundTrip(req) //nolint:errcheck // first attempt
+	if got := log.kv["resource"]; got != "ServiceManager/sm-01a0c329" {
+		t.Fatalf("resource=%v, want ServiceManager/sm-01a0c329", got)
+	}
+	if got := log.kv["attempt"]; got != 1 {
+		t.Fatalf("attempt=%v, want 1", got)
+	}
+
+	tr.RoundTrip(req) //nolint:errcheck // second attempt (same correlationID = retry)
+	if got := log.kv["attempt"]; got != 2 {
+		t.Fatalf("attempt=%v on retry, want 2", got)
 	}
 }

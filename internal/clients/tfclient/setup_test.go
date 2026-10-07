@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
@@ -645,5 +646,31 @@ func TestNewInternalTfConnectorSelectsClientByResourceConfig(t *testing.T) {
 				t.Errorf("%s\ntracingConnector.inner: want %T, got %T", tc.reason, tc.want, wrapper.inner)
 			}
 		})
+	}
+}
+
+// fakeConnector captures the context passed to Connect so tests can inspect it.
+type fakeConnector struct {
+	receivedCtx context.Context
+}
+
+func (f *fakeConnector) Connect(ctx context.Context, _ resource.Managed) (managed.ExternalClient, error) {
+	f.receivedCtx = ctx
+	return nil, nil
+}
+
+func TestTracingConnectorInjectsTrace(t *testing.T) {
+	inner := &fakeConnector{}
+	c := &tracingConnector{inner: inner, kind: "ServiceManager"}
+
+	mg := &fake.Managed{}
+	mg.SetName("sm-01a0c329")
+
+	_, _ = c.Connect(context.Background(), mg)
+
+	got := reconcileTraceFrom(inner.receivedCtx)
+	want := "ServiceManager/sm-01a0c329"
+	if got != want {
+		t.Errorf("reconcileTraceFrom(ctx) = %q, want %q", got, want)
 	}
 }
