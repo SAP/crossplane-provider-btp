@@ -16,15 +16,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/list"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // btpcli sets these on every data request once a session exists; eviction reads
 // them off a 401'd request. Hard-coded because btpcli is internal/ and unimportable.
 const (
-	headerCLISessionId = "X-Cpcli-Sessionid"
-	headerCLISubdomain = "X-Cpcli-Subdomain"
-	headerCorrelationID = "X-Correlationid"
+	headerCLISessionId     = "X-Cpcli-Sessionid"
+	headerCLISubdomain     = "X-Cpcli-Subdomain"
+	headerCorrelationID    = "X-Correlationid"
 	headerCLIBackendStatus = "X-Cpcli-Backend-Status"
 )
 
@@ -50,6 +51,25 @@ func newCachingProvider(inner fwprovider.Provider) *cachingProvider {
 		Provider: inner,
 		entries:  map[string]*cacheEntry{},
 	}
+}
+
+// Resources preserves the Terraform implementation except for service-instance
+// parameter observation, which must use broker readback for Upjet planning.
+func (p *cachingProvider) Resources(ctx context.Context) []func() resource.Resource {
+	constructors := p.Provider.Resources(ctx)
+	result := make([]func() resource.Resource, 0, len(constructors))
+	for _, constructor := range constructors {
+		result = append(result, func() resource.Resource {
+			inner := constructor()
+			var metadata resource.MetadataResponse
+			inner.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "btp"}, &metadata)
+			if metadata.TypeName == "btp_subaccount_service_instance" {
+				return &serviceInstanceReadback{Resource: inner}
+			}
+			return inner
+		})
+	}
+	return result
 }
 
 func (p *cachingProvider) Configure(ctx context.Context, req fwprovider.ConfigureRequest, resp *fwprovider.ConfigureResponse) {

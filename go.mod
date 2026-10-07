@@ -22,6 +22,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
+	github.com/hashicorp/terraform-plugin-framework-jsontypes v0.2.0
 	github.com/hashicorp/terraform-plugin-go v0.31.0
 	github.com/int128/kubelogin v1.36.4
 	github.com/json-iterator/go v1.1.12
@@ -150,7 +151,6 @@ require (
 	github.com/hashicorp/hcl/v2 v2.24.0 // indirect
 	github.com/hashicorp/logutils v1.0.0 // indirect
 	github.com/hashicorp/terraform-json v0.27.2 // indirect
-	github.com/hashicorp/terraform-plugin-framework-jsontypes v0.2.0 // indirect
 	github.com/hashicorp/terraform-plugin-framework-timeouts v0.7.0 // indirect
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0 // indirect
 	github.com/hashicorp/terraform-plugin-log v0.11.0 // indirect
