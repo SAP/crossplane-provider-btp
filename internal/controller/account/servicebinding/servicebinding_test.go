@@ -188,15 +188,16 @@ func (f *MockServiceBindingClientFactory) Reset() {
 }
 
 type MockServiceBindingClient struct {
-	observation managed.ExternalObservation
-	creation    managed.ExternalCreation
-	update      managed.ExternalUpdate
-	deletion    managed.ExternalDelete
-	tfResource  *v1alpha1.SubaccountServiceBinding
-	observeErr  error
-	createErr   error
-	updateErr   error
-	deleteErr   error
+	observation  managed.ExternalObservation
+	observations []managed.ExternalObservation
+	creation     managed.ExternalCreation
+	update       managed.ExternalUpdate
+	deletion     managed.ExternalDelete
+	tfResource   *v1alpha1.SubaccountServiceBinding
+	observeErr   error
+	createErr    error
+	updateErr    error
+	deleteErr    error
 }
 
 func (m *MockServiceBindingClient) Create(ctx context.Context) (string, managed.ExternalCreation, error) {
@@ -225,6 +226,11 @@ func (m *MockServiceBindingClient) Update(ctx context.Context) (managed.External
 func (m *MockServiceBindingClient) Observe(ctx context.Context) (managed.ExternalObservation, *v1alpha1.SubaccountServiceBinding, error) {
 	if m.observeErr != nil {
 		return managed.ExternalObservation{}, nil, m.observeErr
+	}
+	if len(m.observations) > 0 {
+		observation := m.observations[0]
+		m.observations = m.observations[1:]
+		return observation, m.tfResource, nil
 	}
 	return m.observation, m.tfResource, nil
 }
@@ -1843,7 +1849,8 @@ func TestDelete(t *testing.T) {
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
 					Client: &MockServiceBindingClient{
-						deleteErr: errors.New("client delete error"),
+						deleteErr:   errors.New("client delete error"),
+						observation: managed.ExternalObservation{ResourceExists: true},
 					},
 				},
 				keyRotator: &MockKeyRotator{},
@@ -2025,8 +2032,9 @@ func TestDeleteBinding(t *testing.T) {
 				clientFactory: &MockServiceBindingClientFactory{
 					Client: &MockServiceBindingClient{
 						deletion: managed.ExternalDelete{},
-						// verify read-back reports the binding is gone
-						observation: managed.ExternalObservation{ResourceExists: false},
+						observations: []managed.ExternalObservation{
+							{ResourceExists: true}, {ResourceExists: false},
+						},
 					},
 				},
 			},
@@ -2074,7 +2082,8 @@ func TestDeleteBinding(t *testing.T) {
 			fields: fields{
 				clientFactory: &MockServiceBindingClientFactory{
 					Client: &MockServiceBindingClient{
-						deleteErr: errors.New("delete error"),
+						deleteErr:   errors.New("delete error"),
+						observation: managed.ExternalObservation{ResourceExists: true},
 					},
 				},
 			},

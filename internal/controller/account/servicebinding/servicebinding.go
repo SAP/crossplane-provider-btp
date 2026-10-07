@@ -541,14 +541,22 @@ func (e *external) emit(cr resource.Managed, ev event.Event) {
 
 // DeleteBinding implements the BindingDeleter interface for the key rotator.
 //
-// The no-fork client reconstructs TF state from the CR's status.atProvider at
-// Connect time, so a cold client (e.g. after a pod restart) still holds the real
-// state before Delete runs. Delete, then verify by re-Observe: a positive read-back
-// means the destroy did not take, so we error and the caller keeps the key.
+// The no-fork client reconstructs TF state for the target at Connect time.
+// Observe first to confirm whether it is already absent and refresh the state
+// used by Delete, including after a pod restart. After Delete, verify by
+// re-Observe: a positive read-back means the destroy did not take, so we error
+// and the caller keeps the key.
 func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBinding, targetName string, targetExternalName string) error {
 	client, err := e.clientFactory.CreateClient(ctx, cr, targetName, targetExternalName)
 	if err != nil {
 		return errors.Wrap(err, errDestroyBinding)
+	}
+	observation, _, err := client.Observe(ctx)
+	if err != nil {
+		return errors.Wrap(err, errGetBinding)
+	}
+	if !observation.ResourceExists {
+		return nil
 	}
 	if _, err = client.Delete(ctx); err != nil {
 		return errors.Wrap(err, errDestroyBinding)
@@ -558,7 +566,7 @@ func (e *external) DeleteBinding(ctx context.Context, cr *v1alpha1.ServiceBindin
 	if err != nil {
 		return errors.Wrap(err, errVerifyBinding)
 	}
-	observation, _, err := verifyClient.Observe(ctx)
+	observation, _, err = verifyClient.Observe(ctx)
 	if err != nil {
 		// The read-back itself failed transiently; this does not prove the
 		// binding still exists, so retry.
