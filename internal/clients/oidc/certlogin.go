@@ -65,7 +65,7 @@ func configureOIDCProvider(ctx context.Context, issuerURL string, clientID strin
 		IssuerURL:   issuerURL,
 		ClientID:    clientID,
 		ExtraScopes: scopes,
-		UsePKCE:     true,
+		PKCEMethod:  oidc.PKCEMethodS256,
 	}
 	tlsc := tlsclientconfig.Config{
 		CACertFilename: []string{},
@@ -116,7 +116,7 @@ func (cLogin *CertLogin) doLoginWithCertificate(ctx context.Context, oidcClient 
 	if err != nil {
 		return nil, fmt.Errorf("could not generate a nonce: %w", err)
 	}
-	p, err := pkce.New(oidcClient.SupportedPKCEMethods())
+	p, err := pkce.New(oidcClient.NegotiatedPKCEMethod())
 	if err != nil {
 		return nil, fmt.Errorf("could not generate PKCE parameters: %w", err)
 	}
