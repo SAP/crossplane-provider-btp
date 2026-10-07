@@ -174,6 +174,9 @@ type cliTransport struct {
 func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	start := time.Now()
 	resp, err := t.base.RoundTrip(r)
+	if readback, ok := r.Context().Value(parameterReadbackKey{}).(*parameterReadback); ok {
+		readback.capture(r, resp, err)
+	}
 	t.logResult(r, resp, err, time.Since(start))
 	// The session-id check skips login POSTs (no session headers), so a bad-creds
 	// login 401 can't evict a valid entry.

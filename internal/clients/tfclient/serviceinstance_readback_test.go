@@ -28,11 +28,14 @@ import (
 func TestServiceInstanceReadbackAfterCacheLoss(t *testing.T) {
 	ctx := context.Background()
 	const id = "11111111-1111-4111-8111-111111111111"
-	const desired = `{"policy":{"enabled":true},"count":2}`
-	brokerParameters := map[string]any{"policy": map[string]any{}, "count": 2}
+	const desired = `{"consumer_approval_policy":{"pipelines":{"metrics":{"auto_approve":true},"traces":{"auto_approve":true},"logs":{"auto_approve":true}}},"metadata":{"display_name":"12345678"},"count":2}`
+	brokerParameters := map[string]any{"consumer_approval_policy": map[string]any{}, "metadata": map[string]any{"display_name": "BTP_AT_11111111-1111-4111-8111-111111111111"}, "count": 2}
 	reads := 0
 	updates := 0
 	retrievable := true
+	wrapped := false
+	failureStatus := ""
+	malformed := false
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set(headerCLIBackendStatus, "200")
 		if strings.HasPrefix(r.URL.Path, "/login") {
@@ -64,10 +67,24 @@ func TestServiceInstanceReadbackAfterCacheLoss(t *testing.T) {
 		if command.Args["parameters"] == "true" {
 			reads++
 			if !retrievable {
-				_, _ = w.Write([]byte(`{}`))
+				w.Header().Set(headerCLIBackendStatus, "400")
+				_, _ = w.Write([]byte(`{"error":"parameters are not retrievable"}`))
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"data": brokerParameters})
+			if failureStatus != "" {
+				w.Header().Set(headerCLIBackendStatus, failureStatus)
+				_, _ = w.Write([]byte(`{"error":"unavailable"}`))
+				return
+			}
+			if malformed {
+				_, _ = w.Write([]byte(`not JSON`))
+				return
+			}
+			if wrapped {
+				_ = json.NewEncoder(w).Encode(map[string]any{"data": brokerParameters})
+			} else {
+				_ = json.NewEncoder(w).Encode(brokerParameters)
+			}
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -77,10 +94,11 @@ func TestServiceInstanceReadbackAfterCacheLoss(t *testing.T) {
 		})
 	}))
 	defer srv.Close()
-	p := newCachingProvider(tfprovider.NewWithClient(srv.Client()))
+	transport := &cliTransport{base: srv.Client().Transport, evictSub: func(string) {}, evictAll: func() {}}
+	p := newCachingProvider(tfprovider.NewWithClient(&http.Client{Transport: transport}))
 	// Each connector has an empty operation store, just as a new provider
 	// process does. The proxy object has desired parameters and no observation.
-	observe := func(provider fwprovider.Provider, heal bool) bool {
+	observe := func(provider fwprovider.Provider, heal bool) (bool, error) {
 		t.Helper()
 		cr := &v1alpha1.SubaccountServiceInstance{
 			ObjectMeta: metav1.ObjectMeta{Name: "example", UID: "stable-uid", Annotations: map[string]string{"crossplane.io/external-name": id}},
@@ -98,47 +116,87 @@ func TestServiceInstanceReadbackAfterCacheLoss(t *testing.T) {
 			upcontroller.WithTerraformPluginFrameworkMetricRecorder(metrics.NewMetricRecorder(schema.GroupVersionKind{}, nil, time.Minute)))
 		external, err := connector.Connect(ctx, cr)
 		if err != nil {
-			t.Fatal(err)
+			return false, err
 		}
 		observation, err := external.Observe(ctx, cr)
 		if err != nil {
-			t.Fatal(err)
+			return false, err
 		}
 		if heal && !observation.ResourceUpToDate {
 			if _, err := external.Update(ctx, cr); err != nil {
 				t.Fatal(err)
 			}
 		}
-		return observation.ResourceUpToDate
+		return observation.ResourceUpToDate, nil
 	}
-	// Control: the unchanged Terraform Read falsely reports convergence after
-	// reconstructing desired parameters, even with successful broker retrieval.
-	if !observe(tfprovider.NewWithClient(srv.Client()), false) {
-		t.Fatal("control must reproduce the original false convergence")
+	// Control reproduces the production failure with a successful plain response.
+	if ok, err := observe(tfprovider.NewWithClient(srv.Client()), false); err != nil || !ok {
+		t.Fatalf("control: upToDate=%v err=%v", ok, err)
 	}
-	if observe(p, true) {
-		t.Fatal("cache loss must not hide the unapplied broker parameter")
+	if ok, err := observe(p, true); err != nil || ok {
+		t.Fatalf("plain drift/update: upToDate=%v err=%v", ok, err)
 	}
-	if updates != 1 || brokerParameters["policy"].(map[string]any)["enabled"] != true {
-		t.Fatal("ordinary Update must heal broker drift")
+	if updates != 1 || brokerParameters["metadata"].(map[string]any)["display_name"] != "12345678" {
+		t.Fatal("ordinary Update must heal the display name and policy")
 	}
-	if !observe(p, false) {
-		t.Fatal("fresh connector must verify the applied update")
+	assertPipelinePolicy(t, brokerParameters)
+	if ok, err := observe(p, false); err != nil || !ok {
+		t.Fatalf("verify after restart: %v %v", ok, err)
 	}
-	brokerParameters = map[string]any{"policy": map[string]any{"enabled": true, "broker_default": "retained"}, "count": 2, "extra": true}
-	if !observe(p, false) {
-		t.Fatal("fresh readback must converge when configured fields match, including broker defaults")
+	brokerParameters["extra"] = true
+	brokerParameters["metadata"].(map[string]any)["broker_default"] = "retained"
+	wrapped = true
+	if ok, err := observe(p, false); err != nil || !ok {
+		t.Fatalf("wrapped defaults: %v %v", ok, err)
 	}
-	brokerParameters["count"] = 3
-	if observe(p, false) {
-		t.Fatal("external drift must be detected after another restart")
+	wrapped = false
+	brokerParameters["consumer_approval_policy"] = map[string]any{}
+	if ok, err := observe(p, true); err != nil || ok {
+		t.Fatalf("policy-only repair: %v %v", ok, err)
+	}
+	if updates != 2 {
+		t.Fatalf("policy update count %d", updates)
+	}
+	assertPipelinePolicy(t, brokerParameters)
+	if ok, err := observe(p, false); err != nil || !ok {
+		t.Fatalf("policy verified: %v %v", ok, err)
+	}
+	brokerParameters = map[string]any{}
+	if ok, err := observe(p, false); err != nil || ok {
+		t.Fatalf("empty object is actual drift: %v %v", ok, err)
+	}
+	for _, status := range []string{"403", "429", "500"} {
+		failureStatus = status
+		if ok, err := observe(p, false); err == nil || ok {
+			t.Fatalf("backend %s must not converge: %v %v", status, ok, err)
+		}
+	}
+	failureStatus = ""
+	malformed = true
+	if ok, err := observe(p, false); err == nil || ok {
+		t.Fatalf("malformed readback must not converge: %v %v", ok, err)
+	}
+	malformed = false
+	retrievable = false
+	if ok, err := observe(p, false); err == nil || ok {
+		t.Fatalf("unavailable readback must not converge: %v %v", ok, err)
+	}
+	if ok, err := observe(&writeOnlyProvider{cachingProvider: p}, false); err != nil || !ok {
+		t.Fatalf("explicit write-only mode: %v %v", ok, err)
 	}
 	if reads < 4 {
-		t.Fatalf("expected broker readback on each fresh connector, got %d", reads)
+		t.Fatalf("missing readbacks: %d", reads)
 	}
-	retrievable = false
-	if !observe(p, false) {
-		t.Fatal("non-retrievable offerings must preserve existing parameter behavior")
+
+}
+
+func assertPipelinePolicy(t *testing.T, parameters map[string]any) {
+	t.Helper()
+	pipelines := parameters["consumer_approval_policy"].(map[string]any)["pipelines"].(map[string]any)
+	for _, pipeline := range []string{"metrics", "traces", "logs"} {
+		if pipelines[pipeline].(map[string]any)["auto_approve"] != true {
+			t.Fatalf("pipeline %s not applied", pipeline)
+		}
 	}
 }
 
@@ -187,6 +245,28 @@ func TestConfiguredParametersMatch(t *testing.T) {
 				t.Fatal("unexpected comparison")
 			}
 		})
+	}
+}
+
+func TestParameterNumberComparison(t *testing.T) {
+	for _, tc := range []struct {
+		a, b  string
+		equal bool
+	}{
+		{"2", "2.0", true},
+		{"2e0", "2", true},
+		{"9007199254740992", "9007199254740993", false},
+	} {
+		var a, b map[string]any
+		if err := decodeParameterObject(`{"number":`+tc.a+`}`, &a); err != nil {
+			t.Fatal(err)
+		}
+		if err := decodeParameterObject(`{"number":`+tc.b+`}`, &b); err != nil {
+			t.Fatal(err)
+		}
+		if configuredParametersMatch(a, b) != tc.equal {
+			t.Fatalf("%s vs %s", tc.a, tc.b)
+		}
 	}
 }
 

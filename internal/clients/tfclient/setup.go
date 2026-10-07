@@ -129,10 +129,12 @@ func TerraformSetupBuilderNoTracking() terraform.SetupFn {
 		ps := terraform.Setup{
 			FrameworkProvider: frameworkProvider(),
 		}
-
 		lm, ok := mg.(providerconfig.LegacyManaged)
 		if !ok {
 			return ps, errors.New(errNoProviderConfig)
+		}
+		if mg.GetAnnotations()[ParameterReadbackAnnotation] == "false" {
+			ps.FrameworkProvider = &writeOnlyProvider{cachingProvider: frameworkProvider().(*cachingProvider)}
 		}
 		pc, err := providerconfig.ResolveProviderConfig(ctx, lm, client)
 		if err != nil {
