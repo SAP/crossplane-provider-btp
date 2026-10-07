@@ -171,12 +171,21 @@ type cliTransport struct {
 	evictSub func(subdomain string)
 	evictAll func()
 	log      logging.Logger
+
+	// attempts tracks how many times a given correlationID has been seen so
+	// we can log the attempt number on retries. retryablehttp reuses the same
+	// correlationID across all retry attempts of one logical call, so the
+	// counter increments once per RoundTrip for that ID. Entries are never
+	// deleted: correlationIDs are UUIDs (collision-free) and each entry's
+	// lifetime ends with the last retry of its call, so the map stays small.
+	attempts sync.Map // map[correlationID string]int
 }
 
 func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	attempt := t.nextAttempt(r.Header.Get(headerCorrelationID))
 	start := time.Now()
 	resp, err := t.base.RoundTrip(r)
-	t.logResult(r, resp, err, time.Since(start), reconcileTraceFrom(r.Context()))
+	t.logResult(r, resp, err, time.Since(start), reconcileTraceFrom(r.Context()), attempt)
 	// The session-id check skips login POSTs (no session headers), so a bad-creds
 	// login 401 can't evict a valid entry.
 	if resp != nil && resp.StatusCode == http.StatusUnauthorized && r.Header.Get(headerCLISessionId) != "" {
@@ -189,13 +198,35 @@ func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
+// nextAttempt returns the 1-based attempt number for correlationID and
+// increments the counter for the next call. Requests without a correlationID
+// (e.g. login POSTs) always return 1. The counter is never reset: each
+// correlationID is a UUID generated once per logical BTP call, so collisions
+// are not possible and the map stays small.
+func (t *cliTransport) nextAttempt(correlationID string) int {
+	if correlationID == "" {
+		return 1
+	}
+	for {
+		v, loaded := t.attempts.LoadOrStore(correlationID, 1)
+		if !loaded {
+			return 1 // first time seen
+		}
+		old := v.(int)
+		if t.attempts.CompareAndSwap(correlationID, old, old+1) {
+			return old + 1
+		}
+		// lost the CAS race — retry the read
+	}
+}
+
 // logResult logs every CLI call: failures at Info (always visible), successes at
 // Debug (visible only with --debug). The CLI proxy almost always returns HTTP 200
 // — the real status is in X-Cpcli-Backend-Status; both are checked. The body on
 // failures carries the CLI server's human-readable error, which upjet's newTFError
 // swallows without logging it — we capture it here so the full error reason is
 // visible in provider logs.
-func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error, d time.Duration, trace string) {
+func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error, d time.Duration, trace string, attempt int) {
 	if t.log == nil {
 		return
 	}
@@ -214,6 +245,7 @@ func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error
 		"cliServerURL", r.URL.Host,
 		"durationMs", d.Milliseconds(),
 		"resource", trace,
+		"attempt", attempt,
 	}
 	if err != nil {
 		kv = append(kv, "error", err.Error())
