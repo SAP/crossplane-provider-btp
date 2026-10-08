@@ -18,7 +18,7 @@ require (
 	github.com/crossplane-contrib/xp-testing v1.9.2
 	github.com/crossplane/crossplane-runtime v1.20.11
 	github.com/crossplane/crossplane-tools v0.0.0-20260719174105-143db97a7fb5
-	github.com/crossplane/upjet v1.11.1
+	github.com/crossplane/upjet v1.11.2
 	github.com/go-logr/logr v1.4.4
 	github.com/go-openapi/runtime v0.29.3
 	github.com/golang-jwt/jwt/v4 v4.5.2
