@@ -58,7 +58,7 @@ go.lint: export GOFLAGS = -overlay=$(DIAGNOSTIC_OVERLAY)
 .PHONY: diagnostic-overlay
 diagnostic-overlay:
 	@GOFLAGS= $(GO) mod vendor
-	@GOFLAGS= GOOS=$(HOSTOS) GOARCH=$(HOSTARCH) $(GO) run ./hack/diagnostic-overlay .work/diagnostic-overlay
+	@GOFLAGS= GOOS=$(HOSTOS) GOARCH=$(SAFEHOSTARCH) $(GO) run ./hack/diagnostic-overlay .work/diagnostic-overlay
 
 go.build go.test.unit go.test.integration go.lint: diagnostic-overlay
 
