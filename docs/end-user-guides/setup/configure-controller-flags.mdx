@@ -18,6 +18,15 @@ These flags are passed as arguments to the provider's container process and can 
 | `--backoff-max` | `60s` | Maximum duration for exponential backoff. The wait time will never exceed this value, regardless of how many failures have occurred. |
 | `--leader-election` / `-l` | `false` | Enable leader election for the controller manager. Used to ensure only one instance of the controller is active at a time while allowing multiple replicas to run simultaneously for failover. Can also be set via the `LEADER_ELECTION` environment variable. |
 | `--debug` / `-d` | `false` | Run with debug logging. |
+| `--enable-terraform-session-reuse` | `false` | Reuse configured Terraform BTP clients and sessions across reconciliations with identical configuration. Can also be set via `ENABLE_TERRAFORM_SESSION_REUSE=true`. |
+
+### Terraform BTP Session Reuse
+
+By default, each Terraform connector setup creates a separate configured client and logs in to BTP. This applies to generated Terraform controllers and the internal Terraform connectors used by native controllers. Calls within a client retain the Terraform provider’s session mutex, while separate clients can make requests concurrently. The Terraform dependency is unchanged.
+
+Set `--enable-terraform-session-reuse` (or `ENABLE_TERRAFORM_SESSION_REUSE=true`) to share configured clients for identical configuration. This reduces login requests, but requests using a shared session are serialized by the Terraform provider. Cached clients are evicted on HTTP 401 so a subsequent setup can authenticate again.
+
+Disabling reuse increases login traffic and can encounter authentication rate limits or concurrent-session limits. Each setup authenticates again; this mode does not create a bounded session pool or explicitly log out old sessions. A native reconciliation with multiple internal Terraform connectors may therefore create multiple sessions. This flag does not change the separate OAuth client caches used by native BTP API clients.
 
 ### Exponential Backoff Details
 

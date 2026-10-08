@@ -1,6 +1,6 @@
 package tfclient
 
-// Login-count test over the real tfprovider.New() wrapped in newCachingProvider,
+// Login-count test over the real tfprovider.New() wrapped in newTerraformProvider,
 // as opposed to the stubProvider in cachingprovider_test.go.
 
 import (
@@ -19,7 +19,7 @@ func TestCachingWrapper_ConcurrentReconciles_OneLogin(t *testing.T) {
 	const N = 100
 	fake := &fakeBTPCLI{password: "correct-pw"}
 	srv := fake.start(t)
-	p := newCachingProvider(tfprovider.New())
+	p := newTerraformProvider(tfprovider.New(), true)
 	ctx := context.Background()
 
 	var wg sync.WaitGroup
@@ -50,7 +50,7 @@ func TestCachingWrapper_TwoCredentials_TwoLogins(t *testing.T) {
 	const N = 50
 	fake := &fakeBTPCLI{password: "correct-pw"}
 	srv := fake.start(t)
-	p := newCachingProvider(tfprovider.New())
+	p := newTerraformProvider(tfprovider.New(), true)
 	ctx := context.Background()
 
 	var wg sync.WaitGroup

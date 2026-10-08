@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -17,22 +18,26 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/sap/crossplane-provider-btp/btp"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 // btpcli sets these on every data request once a session exists; eviction reads
 // them off a 401'd request. Hard-coded because btpcli is internal/ and unimportable.
 const (
-	headerCLISessionId = "X-Cpcli-Sessionid"
-	headerCLISubdomain = "X-Cpcli-Subdomain"
-	headerCorrelationID = "X-Correlationid"
+	headerCLISessionId     = "X-Cpcli-Sessionid"
+	headerCLISubdomain     = "X-Cpcli-Subdomain"
+	headerCorrelationID    = "X-Correlationid"
 	headerCLIBackendStatus = "X-Cpcli-Backend-Status"
 )
 
-// cachingProvider caches Configure so upjet's per-reconcile ConfigureProvider RPC does not
-// log in to BTP on every reconcile (#702). Evicts on 401 by subdomain so a session expiry
-// doesn't get stuck.
-type cachingProvider struct {
+// terraformProvider integrates the Terraform BTP provider with Crossplane.
+// It forwards framework capabilities and optionally reuses configured clients.
+// Its CLI transport provides request logging and evicts shared sessions on 401.
+type terraformProvider struct {
 	fwprovider.Provider // forwards Metadata/Schema/Resources/DataSources
+
+	reuseSessions bool
 
 	mu      sync.Mutex
 	entries map[string]*cacheEntry
@@ -45,14 +50,39 @@ type cacheEntry struct {
 	subdomain string // globalaccount from config; eviction index
 }
 
-func newCachingProvider(inner fwprovider.Provider) *cachingProvider {
-	return &cachingProvider{
-		Provider: inner,
-		entries:  map[string]*cacheEntry{},
+func newTerraformProvider(inner fwprovider.Provider, reuseSessions bool) *terraformProvider {
+	return &terraformProvider{
+		Provider:      inner,
+		reuseSessions: reuseSessions,
+		entries:       map[string]*cacheEntry{},
 	}
 }
 
-func (p *cachingProvider) Configure(ctx context.Context, req fwprovider.ConfigureRequest, resp *fwprovider.ConfigureResponse) {
+// newBTPFrameworkProvider always uses the integration wrapper and logging transport.
+func newBTPFrameworkProvider(reuseSessions bool) fwprovider.Provider {
+	p := newTerraformProvider(nil, reuseSessions)
+	base := http.DefaultTransport
+	if btp.IsDebug() {
+		base = btp.DebugPrintHTTPClient().Transport
+	}
+	hc := &http.Client{Transport: &cliTransport{
+		base:     base,
+		evictSub: p.evictBySubdomain,
+		evictAll: p.evictAll,
+		log:      logging.NewLogrLogger(zap.New(zap.UseDevMode(btp.IsDebug())).WithName("crossplane-provider-btp-cli")),
+	}}
+	p.Provider = tfprovider.NewWithClient(hc)
+	return p
+}
+
+func (p *terraformProvider) Configure(ctx context.Context, req fwprovider.ConfigureRequest, resp *fwprovider.ConfigureResponse) {
+	if !p.reuseSessions {
+		// Terraform Configure creates a new client/session in response data.
+		// Each connector keeps its own response; nothing enters the shared cache.
+		p.Provider.Configure(ctx, req, resp)
+		return
+	}
+
 	// Raw config as key: schema-agnostic, so it can't drift when the provider
 	// adds an attribute, and it covers every field a login branches on.
 	key := fmt.Sprintf("%v", req.Config.Raw)
@@ -97,7 +127,7 @@ func (p *cachingProvider) Configure(ctx context.Context, req fwprovider.Configur
 }
 
 // Functions forwards to the inner provider
-func (p *cachingProvider) Functions(ctx context.Context) []func() function.Function {
+func (p *terraformProvider) Functions(ctx context.Context) []func() function.Function {
 	if wf, ok := p.Provider.(fwprovider.ProviderWithFunctions); ok {
 		return wf.Functions(ctx)
 	}
@@ -105,7 +135,7 @@ func (p *cachingProvider) Functions(ctx context.Context) []func() function.Funct
 }
 
 // ListResources forwards to the inner provider
-func (p *cachingProvider) ListResources(ctx context.Context) []func() list.ListResource {
+func (p *terraformProvider) ListResources(ctx context.Context) []func() list.ListResource {
 	if pl, ok := p.Provider.(fwprovider.ProviderWithListResources); ok {
 		return pl.ListResources(ctx)
 	}
@@ -113,7 +143,7 @@ func (p *cachingProvider) ListResources(ctx context.Context) []func() list.ListR
 }
 
 // Actions forwards to the inner provider
-func (p *cachingProvider) Actions(ctx context.Context) []func() action.Action {
+func (p *terraformProvider) Actions(ctx context.Context) []func() action.Action {
 	if pa, ok := p.Provider.(fwprovider.ProviderWithActions); ok {
 		return pa.Actions(ctx)
 	}
@@ -121,7 +151,7 @@ func (p *cachingProvider) Actions(ctx context.Context) []func() action.Action {
 }
 
 // evictBySubdomain drops cached sessions for a subdomain so the next reconcile re-authenticates.
-func (p *cachingProvider) evictBySubdomain(subdomain string) {
+func (p *terraformProvider) evictBySubdomain(subdomain string) {
 	if subdomain == "" {
 		return
 	}
@@ -135,7 +165,7 @@ func (p *cachingProvider) evictBySubdomain(subdomain string) {
 }
 
 // evictAll is the fallback when a 401 carries a session ID but no subdomain header.
-func (p *cachingProvider) evictAll() {
+func (p *terraformProvider) evictAll() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.entries = map[string]*cacheEntry{}

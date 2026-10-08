@@ -3,10 +3,9 @@ package tfclient
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"sync"
+	"sync/atomic"
 
-	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -36,23 +35,17 @@ const (
 	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
 )
 
-// frameworkProvider returns the BTP plugin-framework provider for upjet's no-fork
-// client. Lazy because btp.SetDebug() runs in main(), after init. It always
-// injects an http.Client so cliTransport can drop a cached session on a 401.
+// enableTerraformSessionReuse is configured once at startup before clients exist.
+var enableTerraformSessionReuse atomic.Bool
+
+// SetEnableTerraformSessionReuse opts into sharing configured Terraform clients.
+// Call before creating any connectors. Session reuse is disabled by default.
+func SetEnableTerraformSessionReuse(enable bool) { enableTerraformSessionReuse.Store(enable) }
+
+// frameworkProvider is initialized after startup flags and logging are configured.
+// Configure owns the reuse decision; both modes retain the integration wrapper.
 var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
-	cp := &cachingProvider{entries: map[string]*cacheEntry{}}
-	base := http.DefaultTransport
-	if btp.IsDebug() {
-		base = btp.DebugPrintHTTPClient().Transport
-	}
-	hc := &http.Client{Transport: &cliTransport{
-		base:     base,
-		evictSub: cp.evictBySubdomain,
-		evictAll: cp.evictAll,
-		log:      logging.NewLogrLogger(zap.New(zap.UseDevMode(btp.IsDebug())).WithName("crossplane-provider-btp-cli")),
-	}}
-	cp.Provider = tfprovider.NewWithClient(hc)
-	return cp
+	return newBTPFrameworkProvider(enableTerraformSessionReuse.Load())
 })
 
 // TerraformSetupBuilder builds a terraform.SetupFn for the generated upjet
