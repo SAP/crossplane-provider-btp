@@ -494,6 +494,15 @@ func TestObserveResources(t *testing.T) {
 				cr = defaultCR
 			}
 
+			instanceCalls := 0
+			observeInstance := tc.args.siExternal.observeFn
+			tc.args.siExternal.observeFn = func() (managed.ExternalObservation, error) {
+				instanceCalls++
+				if instanceCalls > 1 {
+					t.Fatal("instance must be observed only once per reconciliation")
+				}
+				return observeInstance()
+			}
 			uua := &TfClient{
 				siExternal: tc.args.siExternal,
 				sbExternal: tc.args.sbExternal,

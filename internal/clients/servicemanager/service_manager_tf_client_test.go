@@ -324,7 +324,7 @@ func TestObserveResources(t *testing.T) {
 			},
 		},
 		{
-			// The second instance Observe reports NotUpToDate, but the only difference
+			// The instance Observe reports NotUpToDate, but the only difference
 			// is the immutable serviceplan_id (desired != observed live plan). We must
 			// report ResourceUpToDate:true so no in-place update fires - BTP rejects a
 			// plan change with "update_instance is not supported". ObservedPlanID
@@ -370,7 +370,7 @@ func TestObserveResources(t *testing.T) {
 			},
 		},
 		{
-			// desired plan == live plan (the CRD pins planName), and the second Observe
+			// desired plan == live plan (the CRD pins planName), and the instance Observe
 			// reports NotUpToDate for a real, non-plan reason. The plan check must not
 			// short-circuit here: ResourceUpToDate stays false so the update still runs.
 			name: "InstanceNonPlanDiffStillNeedsUpdate",
@@ -568,6 +568,15 @@ func TestObserveResources(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			instanceCalls := 0
+			observeInstance := tc.args.siExternal.observeFn
+			tc.args.siExternal.observeFn = func() (managed.ExternalObservation, error) {
+				instanceCalls++
+				if instanceCalls > 1 {
+					t.Fatal("instance must be observed only once per reconciliation")
+				}
+				return observeInstance()
+			}
 			uua := &TfClient{
 				siExternal: tc.args.siExternal,
 				sbExternal: tc.args.sbExternal,

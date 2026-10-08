@@ -264,10 +264,9 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 		return ResourcesStatus{}, errors.Wrap(err, "Unexpected format of returned connectionDetails")
 	}
 
-	// the way the reconciler is implemented we need to do another observe run to actually retrieve if updates are nessecary,
-	// the first one is just used to set ready state for any reason, should be rechecked when we have the in-memory clients in place
-	// since they reimplement Observe()
-	resourceUpToDate := tf.resourcesUpToDate(ctx)
+	// The in-process instance client calculates drift and refreshes its state in
+	// the first Observe. Reuse that result; observing the binding does not change it.
+	resourceUpToDate := tf.resourcesUpToDate(siObs)
 
 	return ResourcesStatus{
 		ExternalObservation: managed.ExternalObservation{
@@ -281,13 +280,9 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 	}, nil
 }
 
-// resourcesUpToDate runs another observe on the instance and returns whether it
-// is up to date. Binding updates are not supported.
-func (tf *TfClient) resourcesUpToDate(ctx context.Context) bool {
-	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
-	if err != nil {
-		return true
-	}
+// resourcesUpToDate applies instance compatibility rules to the observed drift.
+// Binding updates are not supported.
+func (tf *TfClient) resourcesUpToDate(siObs managed.ExternalObservation) bool {
 	if siObs.ResourceUpToDate {
 		return true
 	}
