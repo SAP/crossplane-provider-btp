@@ -3,10 +3,14 @@ package tfclient
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,14 +21,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // btpcli sets these on every data request once a session exists; eviction reads
 // them off a 401'd request. Hard-coded because btpcli is internal/ and unimportable.
 const (
-	headerCLISessionId = "X-Cpcli-Sessionid"
-	headerCLISubdomain = "X-Cpcli-Subdomain"
-	headerCorrelationID = "X-Correlationid"
+	headerCLISessionId     = "X-Cpcli-Sessionid"
+	headerCLISubdomain     = "X-Cpcli-Subdomain"
+	headerCorrelationID    = "X-Correlationid"
 	headerCLIBackendStatus = "X-Cpcli-Backend-Status"
 )
 
@@ -43,6 +48,7 @@ type cacheEntry struct {
 	once      sync.Once
 	resp      *fwprovider.ConfigureResponse
 	subdomain string // globalaccount from config; eviction index
+	created   time.Time
 }
 
 func newCachingProvider(inner fwprovider.Provider) *cachingProvider {
@@ -55,17 +61,40 @@ func newCachingProvider(inner fwprovider.Provider) *cachingProvider {
 func (p *cachingProvider) Configure(ctx context.Context, req fwprovider.ConfigureRequest, resp *fwprovider.ConfigureResponse) {
 	// Raw config as key: schema-agnostic, so it can't drift when the provider
 	// adds an attribute, and it covers every field a login branches on.
-	key := fmt.Sprintf("%v", req.Config.Raw)
+	key := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%v", req.Config.Raw))))
+	var assertion types.String
+	req.Config.GetAttribute(ctx, path.Root("assertion"), &assertion)
+	workload := !assertion.IsNull() && !assertion.IsUnknown() && assertion.ValueString() != ""
+	if workload {
+		var sd, server, idp types.String
+		req.Config.GetAttribute(ctx, path.Root("globalaccount"), &sd)
+		req.Config.GetAttribute(ctx, path.Root("cli_server_url"), &server)
+		req.Config.GetAttribute(ctx, path.Root("idp"), &idp)
+		key = fmt.Sprintf("workload:%x", sha256.Sum256([]byte(sd.ValueString()+"\x00"+server.ValueString()+"\x00"+idp.ValueString()+"\x00"+assertionIdentity(assertion.ValueString()))))
+	}
 
 	p.mu.Lock()
 	e, ok := p.entries[key]
-	if !ok {
-		e = &cacheEntry{}
+	if !ok || workload && time.Since(e.created) >= 15*time.Minute {
+		e = &cacheEntry{created: time.Now()}
 		p.entries[key] = e
 	}
 	p.mu.Unlock()
 
 	e.once.Do(func() {
+		if workload {
+			var claims struct {
+				IssuedAt int64 `json:"iat"`
+				Expires  int64 `json:"exp"`
+			}
+			parts := strings.Split(assertion.ValueString(), ".")
+			if len(parts) == 3 {
+				payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+				if err == nil && json.Unmarshal(payload, &claims) == nil {
+					log.FromContext(ctx).Info("Configuring Terraform workload assertion login", "assertionIssuedAt", claims.IssuedAt, "assertionExpiresAt", claims.Expires)
+				}
+			}
+		}
 		p.Provider.Configure(ctx, req, resp)
 		if resp.Diagnostics.HasError() {
 			// Drop the entry so the next reconcile retries instead of caching an error.
@@ -157,7 +186,7 @@ func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	t.logResult(r, resp, err, time.Since(start))
 	// The session-id check skips login POSTs (no session headers), so a bad-creds
 	// login 401 can't evict a valid entry.
-	if resp != nil && resp.StatusCode == http.StatusUnauthorized && r.Header.Get(headerCLISessionId) != "" {
+	if resp != nil && (resp.StatusCode == http.StatusUnauthorized || resp.Header.Get(headerCLIBackendStatus) == "401") && r.Header.Get(headerCLISessionId) != "" {
 		if sd := r.Header.Get(headerCLISubdomain); sd != "" {
 			t.evictSub(sd)
 		} else {
@@ -199,7 +228,7 @@ func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error
 			"status", status,
 			"httpStatus", resp.StatusCode,
 			"correlationID", resp.Header.Get(headerCorrelationID),
-			"body", peekBody(resp))
+			"body", safeFailureBody(r, resp))
 	}
 	t.log.Info("cli request failed", kv...)
 }
@@ -225,3 +254,29 @@ type peekedBody struct {
 }
 
 func (b *peekedBody) Close() error { return b.body.Close() }
+
+func safeFailureBody(r *http.Request, resp *http.Response) string {
+	if strings.HasPrefix(r.URL.Path, "/login/") || strings.HasPrefix(r.URL.Path, "/idtoken/") {
+		return "authentication response omitted"
+	}
+	return peekBody(resp)
+}
+
+// Claims distinguish principals in the cache, not authorize them. IAS validates
+// the assertion during login. Malformed tokens never share a principal entry.
+func assertionIdentity(token string) string {
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var claims struct {
+				Issuer  string `json:"iss"`
+				Subject string `json:"sub"`
+			}
+			if json.Unmarshal(payload, &claims) == nil && claims.Issuer != "" && claims.Subject != "" {
+				return claims.Issuer + "\x00" + claims.Subject
+			}
+		}
+	}
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(token)))
+}

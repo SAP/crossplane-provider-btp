@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	errCouldNotParseCISSecret      = "CIS Secret seems malformed"
-	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
-	errCISBindingCredentialIsNil        = "CIS binding credential is nil"
-	errCISBindingMissingRequiredFields  = "CIS binding is missing required fields: %s"
+	errCouldNotParseCISSecret          = "CIS Secret seems malformed"
+	errCouldNotParseUserCredential     = "error while parsing sa-provider-secret JSON"
+	errCISBindingCredentialIsNil       = "CIS binding credential is nil"
+	errCISBindingMissingRequiredFields = "CIS binding is missing required fields: %s"
 )
 
 type InstanceParameters = map[string]interface{}
@@ -42,8 +42,9 @@ type Client struct {
 	Credential                *Credentials
 }
 type Credentials struct {
-	UserCredential *UserCredential
-	CISCredential  *CISCredential
+	UserCredential   *UserCredential
+	CISCredential    *CISCredential
+	WorkloadIdentity *WorkloadIdentityConfiguration
 }
 
 type UserCredential struct {
@@ -51,6 +52,37 @@ type UserCredential struct {
 	Username string
 	Password string
 	Idp      string
+}
+
+// WorkloadIdentityConfiguration is passed explicitly by ProviderConfig connectors,
+// never decoded from a legacy user credential Secret.
+type WorkloadIdentityConfiguration struct {
+	TokenFile        string
+	IdentityProvider string
+	UserEmail        string
+	IASURL           string
+	IASClientID      string
+	IASResource      string
+}
+
+// ParseUserCredential preserves legacy JSON decoding while rejecting workload
+// configuration keys. Other unknown keys remain ignored for compatibility.
+func ParseUserCredential(data []byte) (*UserCredential, error) {
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(data, &keys); err != nil {
+		return nil, err
+	}
+	for key := range keys {
+		switch strings.ToLower(key) {
+		case "tokenfile", "iasurl", "iasclientid", "iasresource", "workloadidentity":
+			return nil, errors.New("workload configuration is not allowed in serviceAccountSecret; use ProviderConfig.spec.workloadIdentity")
+		}
+	}
+	var user UserCredential
+	if err := json.Unmarshal(data, &user); err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 type CISCredential struct {
@@ -144,8 +176,8 @@ var buildClientFn = createClient
 // Credential rotation produces a new key automatically; old entries leak
 // until process restart. Add a TTL/LRU if rotation churn becomes an issue.
 var (
-	clientCache       sync.Map
-	clientBuildGroup  singleflight.Group
+	clientCache      sync.Map
+	clientBuildGroup singleflight.Group
 )
 
 // credentialCacheKey builds a stable string key from the credential bundle.
@@ -173,6 +205,9 @@ func credentialCacheKey(c *Credentials) string {
 			c.UserCredential.Password,
 			c.UserCredential.Idp,
 		)
+	}
+	if w := c.WorkloadIdentity; w != nil {
+		parts = append(parts, "workload", w.TokenFile, w.IdentityProvider, w.UserEmail, w.IASURL, w.IASClientID, w.IASResource)
 	}
 	return strings.Join(parts, "\x00")
 }
@@ -212,6 +247,9 @@ func createClient(credential *Credentials, config *clientcredentials.Config) Cli
 	// own *http.Client → 3 independent token caches → extra token POSTs per
 	// Observe.
 	sharedHTTPClient := sharedOAuthClient(config)
+	if credential.WorkloadIdentity != nil && !isGrantTypeClientCredentials(credential) {
+		sharedHTTPClient = workloadCISHTTPClient(credential)
+	}
 	client := Client{
 		AccountsServiceClient:     createAccountsServiceClient(credential, sharedHTTPClient),
 		EntitlementsServiceClient: createEntitlementsServiceClient(credential, sharedHTTPClient),
@@ -324,17 +362,29 @@ func ServiceClientFromSecret(cisSecret []byte, userSecret []byte) (Client, error
 		return Client{}, err
 	}
 
-	var userCredential UserCredential
-
-	if err := json.Unmarshal(userSecret, &userCredential); err != nil {
+	userCredential, err := ParseUserCredential(userSecret)
+	if err != nil {
 		return Client{}, errors.Wrap(err, errCouldNotParseUserCredential)
-
 	}
-
-	credential := &Credentials{
-		UserCredential: &userCredential,
-		CISCredential:  &cisCredential,
-	}
-
+	credential := &Credentials{UserCredential: userCredential, CISCredential: &cisCredential}
 	return NewServiceClientWithCisCredential(credential), nil
+}
+
+func ServiceClientWithWorkloadIdentity(cisSecret []byte, w *WorkloadIdentityConfiguration) (Client, error) {
+	if w == nil || w.TokenFile == "" || w.UserEmail == "" || w.IdentityProvider == "" {
+		return Client{}, errors.New("explicit workload identity configuration is incomplete")
+	}
+	var cis CISCredential
+	if err := json.Unmarshal(cisSecret, &cis); err != nil {
+		return Client{}, errors.Wrap(err, errCouldNotParseCISSecret)
+	}
+	if err := validateCISCredential(&cis); err != nil {
+		return Client{}, err
+	}
+	if cis.GrantType != "client_credentials" && (cis.GrantType != "user_token" || w.IASURL == "" || w.IASClientID == "" || w.IASResource == "") {
+		return Client{}, errors.New("workload user CIS binding requires explicit IAS federation configuration")
+	}
+	workload := *w
+	credentials := &Credentials{UserCredential: &UserCredential{Email: w.UserEmail, Username: w.UserEmail, Idp: w.IdentityProvider}, CISCredential: &cis, WorkloadIdentity: &workload}
+	return NewServiceClientWithCisCredential(credentials), nil
 }

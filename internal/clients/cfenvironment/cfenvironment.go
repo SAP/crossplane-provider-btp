@@ -122,22 +122,30 @@ func (c CloudFoundryOrganization) createClient(environment *provisioningclient.B
 	*organizationClient,
 	error,
 ) {
+	if err := c.requireUserAuthentication(); err != nil {
+		return nil, err
+	}
 	org, err := c.btp.ExtractOrg(environment)
 	if err != nil {
 		return nil, err
 	}
 
-	cloudFoundryClient, err := newOrganizationClient(
-		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
-		c.btp.Credential.UserCredential.Password, c.btp.Credential.UserCredential.Idp,
-	)
-	return cloudFoundryClient, err
+	return c.createClientWithType(org)
 }
 
 func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg) (
 	*organizationClient,
 	error,
 ) {
+	if err := c.requireUserAuthentication(); err != nil {
+		return nil, err
+	}
+	if org == nil {
+		return nil, fmt.Errorf("missing Cloud Foundry organization metadata")
+	}
+	if c.btp.Credential.WorkloadIdentity != nil {
+		return newWorkloadOrganizationClient(org, c.btp.Credential.WorkloadIdentity)
+	}
 	cloudFoundryClient, err := newOrganizationClient(
 		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
 		c.btp.Credential.UserCredential.Password, c.btp.Credential.UserCredential.Idp,
@@ -272,4 +280,14 @@ func newOrganizationClient(organizationName string, url string, orgId string, us
 		organizationName: organizationName,
 		orgGuid:          orgId,
 	}, nil
+}
+
+func (c CloudFoundryOrganization) requireUserAuthentication() error {
+	if c.btp.Credential != nil && c.btp.Credential.UserCredential != nil && c.btp.Credential.WorkloadIdentity != nil {
+		return nil
+	}
+	if c.btp.Credential == nil || c.btp.Credential.UserCredential == nil || c.btp.Credential.UserCredential.Username == "" || c.btp.Credential.UserCredential.Password == "" {
+		return fmt.Errorf("cloud foundry organization manager operations require username/password or workload assertion credentials")
+	}
+	return nil
 }

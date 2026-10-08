@@ -31,11 +31,37 @@ type ProviderConfigSpec struct {
 	//    }
 	ServiceAccountSecret ProviderCredentials `json:"serviceAccountSecret,omitempty"`
 
+	// WorkloadIdentity replaces user/password authentication with projected assertions.
+	// Native clients still require manually provisioned CIS credentials.
+	// +optional
+	WorkloadIdentity *WorkloadIdentityConfiguration `json:"workloadIdentity,omitempty"`
+
 	CliServerUrl string `json:"cliServerUrl,omitempty"`
 
 	// GlobalAccount is the Global Account Subdomain. It must be the subdomain
 	// of the same global account that the cisCredentials binding points at.
 	GlobalAccount string `json:"globalAccount,omitempty"`
+}
+
+// WorkloadIdentityConfiguration identifies a rotating projected workload assertion.
+type WorkloadIdentityConfiguration struct {
+	// TokenFile is the mounted projected ServiceAccount JWT path.
+	// +kubebuilder:validation:MinLength=1
+	TokenFile string `json:"tokenFile"`
+	// IdentityProvider is the BTP platform trust origin.
+	// +kubebuilder:validation:MinLength=1
+	IdentityProvider string `json:"identityProvider"`
+	// UserEmail supplies non-secret identity metadata required by native operations.
+	// +kubebuilder:validation:MinLength=1
+	UserEmail string `json:"userEmail"`
+	// IASURL, IASClientID and IASResource enable user-preserving native CIS JWT exchange.
+	// The confidential IAS client authenticates with the projected JWT; CIS bindings remain manual.
+	// +optional
+	IASURL string `json:"iasUrl,omitempty"`
+	// +optional
+	IASClientID string `json:"iasClientId,omitempty"`
+	// +optional
+	IASResource string `json:"iasResource,omitempty"`
 }
 
 // ProviderCredentials required to authenticate.

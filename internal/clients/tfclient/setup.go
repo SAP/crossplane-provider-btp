@@ -2,8 +2,9 @@ package tfclient
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 
 	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
@@ -86,35 +87,9 @@ func TerraformSetupBuilder() terraform.SetupFn {
 			return ps, errors.Wrap(err, errTrackRUsage)
 		}
 
-		cd := pc.Spec.ServiceAccountSecret
-		ServiceAccountSecretData, err := resource.CommonCredentialExtractor(
-			ctx,
-			cd.Source,
-			client,
-			cd.CommonCredentialSelectors,
-		)
+		ps.Configuration, err = terraformConfiguration(ctx, client, pc)
 		if err != nil {
-			return ps, errors.Wrap(err, errGetServiceAccountCreds)
-		}
-		if ServiceAccountSecretData == nil {
-			return ps, errors.New(errGetServiceAccountCreds)
-		}
-
-		var userCredential btp.UserCredential
-		if err := json.Unmarshal(ServiceAccountSecretData, &userCredential); err != nil {
-			return ps, errors.Wrap(err, errCouldNotParseUserCredential)
-		}
-
-		ps.Configuration = map[string]any{
-			"username":       userCredential.Username,
-			"password":       userCredential.Password,
-			"globalaccount":  pc.Spec.GlobalAccount,
-			"cli_server_url": pc.Spec.CliServerUrl,
-		}
-
-		// Set custom idp if provided
-		if userCredential.Idp != "" {
-			ps.Configuration["idp"] = userCredential.Idp
+			return ps, err
 		}
 
 		return ps, nil
@@ -139,35 +114,9 @@ func TerraformSetupBuilderNoTracking() terraform.SetupFn {
 			return ps, errors.Wrap(err, errGetProviderConfig)
 		}
 
-		cd := pc.Spec.ServiceAccountSecret
-		ServiceAccountSecretData, err := resource.CommonCredentialExtractor(
-			ctx,
-			cd.Source,
-			client,
-			cd.CommonCredentialSelectors,
-		)
+		ps.Configuration, err = terraformConfiguration(ctx, client, pc)
 		if err != nil {
-			return ps, errors.Wrap(err, errGetServiceAccountCreds)
-		}
-		if ServiceAccountSecretData == nil {
-			return ps, errors.New(errGetServiceAccountCreds)
-		}
-
-		var userCredential btp.UserCredential
-		if err := json.Unmarshal(ServiceAccountSecretData, &userCredential); err != nil {
-			return ps, errors.Wrap(err, errCouldNotParseUserCredential)
-		}
-
-		ps.Configuration = map[string]any{
-			"username":       userCredential.Username,
-			"password":       userCredential.Password,
-			"globalaccount":  pc.Spec.GlobalAccount,
-			"cli_server_url": pc.Spec.CliServerUrl,
-		}
-
-		// Set custom idp if provided
-		if userCredential.Idp != "" {
-			ps.Configuration["idp"] = userCredential.Idp
+			return ps, err
 		}
 
 		return ps, nil
@@ -194,4 +143,43 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	return tjcontroller.NewTerraformPluginFrameworkConnector(client, setupFn, res, tjcontroller.NewOperationStore(log),
 		tjcontroller.WithTerraformPluginFrameworkLogger(log),
 	)
+}
+
+// Both connector paths read the current token at setup time; neither consults CIS.
+func terraformConfiguration(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig) (map[string]any, error) {
+	configuration := map[string]any{"globalaccount": pc.Spec.GlobalAccount, "cli_server_url": pc.Spec.CliServerUrl}
+	if w := pc.Spec.WorkloadIdentity; w != nil {
+		if err := providerconfig.ValidateWorkloadIdentity(pc); err != nil {
+			return nil, err
+		}
+		assertion, err := os.ReadFile(w.TokenFile)
+		if err != nil {
+			return nil, errors.New("cannot read projected workload token")
+		}
+		token := strings.TrimSpace(string(assertion))
+		if token == "" {
+			return nil, errors.New("projected workload token is empty")
+		}
+		configuration["assertion"] = token
+		configuration["idp"] = w.IdentityProvider
+		return configuration, nil
+	}
+	cd := pc.Spec.ServiceAccountSecret
+	data, err := resource.CommonCredentialExtractor(ctx, cd.Source, kube, cd.CommonCredentialSelectors)
+	if err != nil {
+		return nil, errors.Wrap(err, errGetServiceAccountCreds)
+	}
+	if data == nil {
+		return nil, errors.New(errGetServiceAccountCreds)
+	}
+	user, err := btp.ParseUserCredential(data)
+	if err != nil {
+		return nil, errors.Wrap(err, errCouldNotParseUserCredential)
+	}
+	configuration["username"] = user.Username
+	configuration["password"] = user.Password
+	if user.Idp != "" {
+		configuration["idp"] = user.Idp
+	}
+	return configuration, nil
 }
