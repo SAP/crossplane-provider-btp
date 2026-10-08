@@ -58,6 +58,9 @@ func (s *ServiceInstanceMapper) TfResource(ctx context.Context, si *v1alpha1.Ser
 
 	// transfer external name
 	meta.SetExternalName(sInstance, meta.GetExternalName(si))
+	if value := si.GetAnnotations()[tfclient.ParameterReadbackAnnotation]; value != "" {
+		meta.AddAnnotations(sInstance, map[string]string{tfclient.ParameterReadbackAnnotation: value})
+	}
 
 	if si.Status.AtProvider.ServiceplanID != "" {
 		sInstance.Spec.ForProvider.ServiceplanID = &si.Status.AtProvider.ServiceplanID
