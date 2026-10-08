@@ -76,6 +76,11 @@ spec:
                 type: string
               forProvider:
                 properties:
+                  autoCreateShadowUsers:
+                    description: |-
+                      (Boolean) Indicates whether shadow users are automatically created.
+                      Indicates whether shadow users are automatically created.
+                    type: boolean
                   description:
                     description: |-
                       (String) Description of the trust configuration.
@@ -115,6 +120,11 @@ spec:
                   for example because of an external controller is managing them, like an
                   autoscaler.
                 properties:
+                  autoCreateShadowUsers:
+                    description: |-
+                      (Boolean) Indicates whether shadow users are automatically created.
+                      Indicates whether shadow users are automatically created.
+                    type: boolean
                   description:
                     description: |-
                       (String) Description of the trust configuration.
@@ -238,6 +248,11 @@ spec:
             properties:
               atProvider:
                 properties:
+                  autoCreateShadowUsers:
+                    description: |-
+                      (Boolean) Indicates whether shadow users are automatically created.
+                      Indicates whether shadow users are automatically created.
+                    type: boolean
                   description:
                     description: |-
                       (String) Description of the trust configuration.
