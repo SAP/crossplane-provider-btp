@@ -565,6 +565,30 @@ func TestObserveResources(t *testing.T) {
 				err: nil,
 			},
 		},
+		{
+			// SM CR has no external-name yet (pre-Create or failed Create with pending
+			// annotation). Upjet would POST GetById with empty id → BTP CLI returns 400,
+			// retryablehttp retries 6×, exhausting the reconcile context and causing
+			// "context deadline exceeded" on setStatus. Short-circuit before TF observe.
+			name: "EmptyExternalName_SkipsTFObserve",
+			args: args{
+				cr: testSMCr("subaccountId", "planId", "cr-name", "", "", ""),
+				siExternal: ExternalClientFake{
+					observeFn: func() (managed.ExternalObservation, error) {
+						return managed.ExternalObservation{}, errors.New("should not be called")
+					},
+				},
+				sbExternal: ExternalClientFake{},
+				sInstance:  testServiceInstance(""),
+				sBinding:   testServiceBinding(""),
+			},
+			want: want{
+				obs: ResourcesStatus{
+					ExternalObservation: managed.ExternalObservation{ResourceExists: false},
+				},
+				err: nil,
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

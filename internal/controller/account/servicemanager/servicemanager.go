@@ -199,9 +199,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 
+	observeStart := time.Now()
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
+	log.FromContext(ctx).Info("Observe: ObserveResources done", "duration", time.Since(observeStart))
 
+	t := time.Now()
 	statusErr := c.setStatus(ctx, resStatus, cr)
+	log.FromContext(ctx).Info("Observe: setStatus done", "duration", time.Since(t), "totalElapsed", time.Since(observeStart))
 	if statusErr != nil {
 		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
