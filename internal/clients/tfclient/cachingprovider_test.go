@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/sap/crossplane-provider-btp/pkg/diagnostics"
 	"io"
 	"net/http"
 	"runtime"
@@ -317,6 +318,7 @@ func TestEvictTransportLogsFailures(t *testing.T) {
 				log:      log,
 			}
 			req, _ := http.NewRequest("POST", "https://cli.example/command", nil)
+			req.Header.Set(headerCorrelationID, tc.wantCorr)
 			tr.RoundTrip(req) //nolint:errcheck
 
 			if tc.wantInfo != (log.msg != "") {
@@ -379,65 +381,6 @@ func TestCLITransportPeeksBodyWithoutConsumingIt(t *testing.T) {
 	}
 }
 
-func TestNextAttempt(t *testing.T) {
-	t.Run("empty correlationID always returns 1", func(t *testing.T) {
-		tr := &cliTransport{}
-		for i := 0; i < 5; i++ {
-			if got := tr.nextAttempt(""); got != 1 {
-				t.Fatalf("empty id attempt %d: got %d, want 1", i, got)
-			}
-		}
-	})
-
-	t.Run("same ID increments sequentially", func(t *testing.T) {
-		tr := &cliTransport{}
-		for want := 1; want <= 4; want++ {
-			if got := tr.nextAttempt("uuid-abc"); got != want {
-				t.Fatalf("attempt %d: got %d", want, got)
-			}
-		}
-	})
-
-	t.Run("different IDs are independent", func(t *testing.T) {
-		tr := &cliTransport{}
-		tr.nextAttempt("id-A") // id-A → 1
-		tr.nextAttempt("id-A") // id-A → 2
-		if got := tr.nextAttempt("id-B"); got != 1 {
-			t.Fatalf("id-B first call: got %d, want 1", got)
-		}
-		if got := tr.nextAttempt("id-A"); got != 3 {
-			t.Fatalf("id-A third call: got %d, want 3", got)
-		}
-	})
-
-	t.Run("concurrent increments on same ID reach expected total", func(t *testing.T) {
-		tr := &cliTransport{}
-		const n = 100
-		var wg sync.WaitGroup
-		results := make([]int, n)
-		for i := 0; i < n; i++ {
-			i := i
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				results[i] = tr.nextAttempt("concurrent-id")
-			}()
-		}
-		wg.Wait()
-		// Every value 1..n must appear exactly once.
-		seen := make(map[int]bool, n)
-		for _, v := range results {
-			if v < 1 || v > n {
-				t.Fatalf("out-of-range attempt value %d", v)
-			}
-			if seen[v] {
-				t.Fatalf("duplicate attempt value %d", v)
-			}
-			seen[v] = true
-		}
-	})
-}
-
 func TestCLITransportLogsResourceAndAttempt(t *testing.T) {
 	log := &capLogger{}
 	tr := &cliTransport{
@@ -448,7 +391,7 @@ func TestCLITransportLogsResourceAndAttempt(t *testing.T) {
 		evictAll: func() {},
 		log:      log,
 	}
-	ctx := WithReconcileTrace(context.Background(), "ServiceManager/sm-01a0c329")
+	ctx := diagnostics.BeginRequest(WithReconcileTrace(context.Background(), "ServiceManager/sm-01a0c329"))
 	req, _ := http.NewRequestWithContext(ctx, "GET", "https://cli.example/command", nil)
 	req.Header.Set(headerCorrelationID, "corr-xyz")
 

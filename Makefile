@@ -46,9 +46,22 @@ GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.Version=$(VERSION)
 # this version will eventually be passed to the terraform provider
 GO_LDFLAGS += -X $(GO_PROJECT)/internal/version.ProviderVersion=$(VERSION)
 
-GO_SUBDIRS += cmd internal apis
+GO_SUBDIRS += cmd internal apis pkg hack/diagnostic-overlay
 GO111MODULE = on
 GOTOOLCHAIN = local
+# Reproducible diagnostic hooks in pinned dependencies, including vendored RC builds.
+DIAGNOSTIC_OVERLAY := $(abspath .work/diagnostic-overlay/overlay.json)
+go.test.unit go.test.integration: GO_TAGS += diagnostic
+go.build go.test.unit go.test.integration: GO_BUILDFLAGS += -overlay=$(DIAGNOSTIC_OVERLAY)
+go.lint: export GOFLAGS = -overlay=$(DIAGNOSTIC_OVERLAY)
+
+.PHONY: diagnostic-overlay
+diagnostic-overlay:
+	@GOFLAGS= $(GO) mod vendor
+	@GOFLAGS= GOOS=$(HOSTOS) GOARCH=$(HOSTARCH) $(GO) run ./hack/diagnostic-overlay .work/diagnostic-overlay
+
+go.build go.test.unit go.test.integration go.lint: diagnostic-overlay
+
 -include build/makelib/golang.mk
 
 # Override the GO_LINT_ARGS from golang.mk to use updated golangci-lint parameters

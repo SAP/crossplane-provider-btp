@@ -3,9 +3,11 @@ package tfclient
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"strconv"
 	"sync"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/sap/crossplane-provider-btp/pkg/diagnostics"
 )
 
 // btpcli sets these on every data request once a session exists; eviction reads
@@ -28,27 +31,12 @@ const (
 	headerCLIBackendStatus = "X-Cpcli-Backend-Status"
 )
 
-// reconcileTraceKey is the context key for the reconcile trace string set by
-// TerraformSetupBuilder so every HTTP log line carries the managed-resource
-// identity (kind/name) without needing the cliTransport singleton to know about
-// Crossplane types.
-type reconcileTraceKeyType struct{}
-
-var reconcileTraceKey reconcileTraceKeyType
-
-// WithReconcileTrace returns a child context that carries the resource trace
-// string (e.g. "ServiceInstance/octoroute-01a0c329"). The cliTransport reads it
-// in RoundTrip and attaches it to every log line for that reconcile.
+// WithReconcileTrace is retained for callers that supply a resource name directly.
 func WithReconcileTrace(ctx context.Context, trace string) context.Context {
-	return context.WithValue(ctx, reconcileTraceKey, trace)
+	return diagnostics.WithResource(ctx, trace)
 }
 
-func reconcileTraceFrom(ctx context.Context) string {
-	if v, ok := ctx.Value(reconcileTraceKey).(string); ok {
-		return v
-	}
-	return ""
-}
+func reconcileTraceFrom(ctx context.Context) string { return diagnostics.Resource(ctx) }
 
 // cachingProvider caches Configure so upjet's per-reconcile ConfigureProvider RPC does not
 // log in to BTP on every reconcile (#702). Evicts on 401 by subdomain so a session expiry
@@ -171,22 +159,18 @@ type cliTransport struct {
 	evictSub func(subdomain string)
 	evictAll func()
 	log      logging.Logger
-
-	// attempts tracks how many times a given correlationID has been seen so
-	// we can log the attempt number on retries. retryablehttp reuses the same
-	// correlationID across all retry attempts of one logical call, so the
-	// counter increments once per RoundTrip for that ID. Entries are never
-	// explicitly deleted: correlationIDs are UUIDs so collisions are impossible,
-	// and each ID is generated fresh per logical BTP call (RetryMax+1 entries
-	// maximum per in-flight reconcile). The map is effectively bounded by the
-	// number of concurrent reconciles × (RetryMax+1).
-	attempts sync.Map // map[correlationID string]int
 }
 
 func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	attempt := t.nextAttempt(r.Header.Get(headerCorrelationID))
+	attempt := diagnostics.NextAttempt(r.Context())
 	start := time.Now()
+	timing := &requestTiming{start: start, connectionMs: -1, tlsMs: -1, firstByteMs: -1}
+	r = r.WithContext(httptrace.WithClientTrace(r.Context(), timing.trace()))
 	resp, err := t.base.RoundTrip(r)
+	diagnostics.Record(r.Context(), "btp HTTP attempt finished", err, append(timing.fields(), "durationMs", time.Since(start).Milliseconds(), "correlationID", r.Header.Get(headerCorrelationID), "attempt", attempt, "path", r.URL.Path, "action", r.URL.RawQuery)...)
+	if resp != nil && resp.Body != nil {
+		resp.Body = &observedBody{ReadCloser: resp.Body, ctx: r.Context(), start: time.Now(), request: r}
+	}
 	t.logResult(r, resp, err, time.Since(start), reconcileTraceFrom(r.Context()), attempt)
 	// The session-id check skips login POSTs (no session headers), so a bad-creds
 	// login 401 can't evict a valid entry.
@@ -198,28 +182,6 @@ func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 	}
 	return resp, err
-}
-
-// nextAttempt returns the 1-based attempt number for correlationID and
-// increments the counter for the next call. Requests without a correlationID
-// (e.g. login POSTs) always return 1. The counter is never reset: each
-// correlationID is a UUID generated once per logical BTP call, so collisions
-// are not possible and the map stays small.
-func (t *cliTransport) nextAttempt(correlationID string) int {
-	if correlationID == "" {
-		return 1
-	}
-	for {
-		v, loaded := t.attempts.LoadOrStore(correlationID, 1)
-		if !loaded {
-			return 1 // first time seen
-		}
-		old := v.(int)
-		if t.attempts.CompareAndSwap(correlationID, old, old+1) {
-			return old + 1
-		}
-		// lost the CAS race — retry the read
-	}
 }
 
 // logResult logs every CLI call: failures at Info (always visible), successes at
@@ -246,7 +208,14 @@ func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error
 		"path", r.URL.Path,
 		"cliServerURL", r.URL.Host,
 		"durationMs", d.Milliseconds(),
+		"action", r.URL.RawQuery,
+		"correlationID", r.Header.Get(headerCorrelationID),
+		"reconcileID", diagnostics.ReconcileID(r.Context()),
+		"stage", diagnostics.StageName(r.Context()),
+		"remainingMs", diagnostics.Remaining(r.Context()),
+		"contextError", diagnostics.ContextError(r.Context()),
 		"resource", trace,
+		"session", sessionFingerprint(r.Header.Get(headerCLISessionId)),
 		"attempt", attempt,
 	}
 	if err != nil {
@@ -257,7 +226,6 @@ func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error
 	kv = append(kv,
 		"status", status,
 		"httpStatus", resp.StatusCode,
-		"correlationID", resp.Header.Get(headerCorrelationID),
 	)
 	if status >= 400 {
 		kv = append(kv, "body", peekBody(resp))
@@ -288,3 +256,10 @@ type peekedBody struct {
 }
 
 func (b *peekedBody) Close() error { return b.body.Close() }
+
+func sessionFingerprint(id string) string {
+	if id == "" {
+		return ""
+	}
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(id)))[:12]
+}

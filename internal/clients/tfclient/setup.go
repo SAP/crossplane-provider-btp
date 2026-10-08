@@ -42,9 +42,7 @@ const (
 var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
 	cp := &cachingProvider{entries: map[string]*cacheEntry{}}
 	base := http.DefaultTransport
-	if btp.IsDebug() {
-		base = btp.DebugPrintHTTPClient().Transport
-	}
+	// Use metadata-only diagnostics; full body logging changes stream consumption.
 	hc := &http.Client{Transport: &cliTransport{
 		base:     base,
 		evictSub: cp.evictBySubdomain,
@@ -196,19 +194,5 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 			tjcontroller.WithTerraformPluginFrameworkLogger(log),
 		)
 	}
-	return &tracingConnector{inner: inner, kind: gvk.Kind}
-}
-
-// tracingConnector wraps an ExternalConnector and injects the managed-resource
-// identity into the context before delegating to the inner connector. The trace
-// string ends up in every HTTP log line emitted by cliTransport for this
-// reconcile, making it straightforward to see which resource caused a timeout.
-type tracingConnector struct {
-	inner managed.ExternalConnector
-	kind  string
-}
-
-func (c *tracingConnector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	trace := c.kind + "/" + mg.GetName()
-	return c.inner.Connect(WithReconcileTrace(ctx, trace), mg)
+	return &tracingConnector{Inner: inner, Kind: gvk.Kind, Log: log}
 }

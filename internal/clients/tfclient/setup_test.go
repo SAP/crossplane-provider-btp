@@ -642,8 +642,8 @@ func TestNewInternalTfConnectorSelectsClientByResourceConfig(t *testing.T) {
 				t.Errorf("%s\nNewInternalTfConnector(...): want *tracingConnector wrapper, got %T", tc.reason, got)
 				return
 			}
-			if reflect.TypeOf(wrapper.inner) != reflect.TypeOf(tc.want) {
-				t.Errorf("%s\ntracingConnector.inner: want %T, got %T", tc.reason, tc.want, wrapper.inner)
+			if reflect.TypeOf(wrapper.Inner) != reflect.TypeOf(tc.want) {
+				t.Errorf("%s\ntracingConnector.inner: want %T, got %T", tc.reason, tc.want, wrapper.Inner)
 			}
 		})
 	}
@@ -661,7 +661,7 @@ func (f *fakeConnector) Connect(ctx context.Context, _ resource.Managed) (manage
 
 func TestTracingConnectorInjectsTrace(t *testing.T) {
 	inner := &fakeConnector{}
-	c := &tracingConnector{inner: inner, kind: "ServiceManager"}
+	c := &tracingConnector{Inner: inner, Kind: "ServiceManager"}
 
 	mg := &fake.Managed{}
 	mg.SetName("sm-01a0c329")

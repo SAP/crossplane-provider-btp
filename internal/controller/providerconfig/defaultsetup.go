@@ -9,6 +9,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	internalopts "github.com/sap/crossplane-provider-btp/internal/controller/options"
 	"github.com/sap/crossplane-provider-btp/internal/features"
+	"github.com/sap/crossplane-provider-btp/pkg/diagnostics"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,7 +50,7 @@ func DefaultSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions, object cli
 		)
 
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
+		managed.WithExternalConnector(&diagnostics.Connector{Inner: connectorFn(mgr.GetClient(), usageTracker, referenceTracker), Kind: gvk.Kind, Log: o.Logger}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		managed.WithPollInterval(o.PollInterval),
@@ -83,7 +84,7 @@ func DefaultSetupWithoutDefaultInitializer(mgr ctrl.Manager, o internalopts.Cros
 		)
 
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
+		managed.WithExternalConnector(&diagnostics.Connector{Inner: connectorFn(mgr.GetClient(), usageTracker, referenceTracker), Kind: gvk.Kind, Log: o.Logger}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		managed.WithPollInterval(o.PollInterval),

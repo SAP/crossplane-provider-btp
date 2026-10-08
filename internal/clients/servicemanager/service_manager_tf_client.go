@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/sap/crossplane-provider-btp/pkg/diagnostics"
+
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
@@ -206,7 +208,9 @@ func (tf *TfClient) CreateResources(ctx context.Context, cr *apisv1beta1.Service
 }
 
 func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.ServiceManager) (ResourcesStatus, error) {
-	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
+	instanceCtx, finishInstance := diagnostics.Stage(ctx, "instance-observe")
+	siObs, err := tf.siExternal.Observe(instanceCtx, tf.sInstance)
+	finishInstance(err)
 	if err != nil {
 		return ResourcesStatus{}, err
 	}
@@ -248,7 +252,9 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 			ExternalObservation: managed.ExternalObservation{ResourceExists: false},
 		}, nil
 	}
-	sbObs, err := tf.sbExternal.Observe(ctx, tf.sBinding)
+	bindingCtx, finishBinding := diagnostics.Stage(ctx, "binding-observe")
+	sbObs, err := tf.sbExternal.Observe(bindingCtx, tf.sBinding)
+	finishBinding(err)
 	if err != nil {
 		return ResourcesStatus{}, err
 	}
@@ -284,7 +290,9 @@ func (tf *TfClient) ObserveResources(ctx context.Context, cr *apisv1beta1.Servic
 // resourcesUpToDate runs another observe on the instance and returns whether it
 // is up to date. Binding updates are not supported.
 func (tf *TfClient) resourcesUpToDate(ctx context.Context) bool {
-	siObs, err := tf.siExternal.Observe(ctx, tf.sInstance)
+	instanceCtx, finishInstance := diagnostics.Stage(ctx, "instance-observe-repeat")
+	siObs, err := tf.siExternal.Observe(instanceCtx, tf.sInstance)
+	finishInstance(err)
 	if err != nil {
 		return true
 	}
