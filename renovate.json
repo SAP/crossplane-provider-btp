@@ -74,6 +74,16 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
+        "/(^|/)Dockerfile$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s*\\nARG \\w+_DIGEST=\"?(?<currentDigest>sha256:[a-f0-9]{64})\"?"
+      ],
+      "currentValueTemplate": "latest"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
         "/(^|/)Makefile$/",
         "/(^|/)Dockerfile$/",
         "/(^|/)config.yml$/"
