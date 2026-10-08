@@ -3,9 +3,11 @@ package tfclient
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"strconv"
 	"sync"
 	"time"
@@ -17,16 +19,24 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/sap/crossplane-provider-btp/pkg/diagnostics"
 )
 
 // btpcli sets these on every data request once a session exists; eviction reads
 // them off a 401'd request. Hard-coded because btpcli is internal/ and unimportable.
 const (
-	headerCLISessionId = "X-Cpcli-Sessionid"
-	headerCLISubdomain = "X-Cpcli-Subdomain"
-	headerCorrelationID = "X-Correlationid"
+	headerCLISessionId     = "X-Cpcli-Sessionid"
+	headerCLISubdomain     = "X-Cpcli-Subdomain"
+	headerCorrelationID    = "X-Correlationid"
 	headerCLIBackendStatus = "X-Cpcli-Backend-Status"
 )
+
+// WithReconcileTrace is retained for callers that supply a resource name directly.
+func WithReconcileTrace(ctx context.Context, trace string) context.Context {
+	return diagnostics.WithResource(ctx, trace)
+}
+
+func reconcileTraceFrom(ctx context.Context) string { return diagnostics.Resource(ctx) }
 
 // cachingProvider caches Configure so upjet's per-reconcile ConfigureProvider RPC does not
 // log in to BTP on every reconcile (#702). Evicts on 401 by subdomain so a session expiry
@@ -152,9 +162,16 @@ type cliTransport struct {
 }
 
 func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	attempt := diagnostics.NextAttempt(r.Context())
 	start := time.Now()
+	timing := &requestTiming{start: start, connectionMs: -1, tlsMs: -1, firstByteMs: -1}
+	r = r.WithContext(httptrace.WithClientTrace(r.Context(), timing.trace()))
 	resp, err := t.base.RoundTrip(r)
-	t.logResult(r, resp, err, time.Since(start))
+	diagnostics.Record(r.Context(), "btp HTTP attempt finished", err, append(timing.fields(), "durationMs", time.Since(start).Milliseconds(), "correlationID", r.Header.Get(headerCorrelationID), "attempt", attempt, "path", r.URL.Path, "action", r.URL.RawQuery)...)
+	if resp != nil && resp.Body != nil {
+		resp.Body = &observedBody{ReadCloser: resp.Body, ctx: r.Context(), start: time.Now(), request: r}
+	}
+	t.logResult(r, resp, err, time.Since(start), reconcileTraceFrom(r.Context()), attempt)
 	// The session-id check skips login POSTs (no session headers), so a bad-creds
 	// login 401 can't evict a valid entry.
 	if resp != nil && resp.StatusCode == http.StatusUnauthorized && r.Header.Get(headerCLISessionId) != "" {
@@ -167,11 +184,13 @@ func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-// logResult logs failed CLI calls at Info; success is silent and allocation-free.
-// The CLI proxy almost always returns HTTP 200 - the real status is in X-Cpcli-Backend-Status
-// Both transport status and that header are checked.
-// The body carries the CLI server's human-readable error, which upjet's newTFError swallows.
-func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error, d time.Duration) {
+// logResult logs every CLI call: failures at Info (always visible), successes at
+// Debug (visible only with --debug). The CLI proxy almost always returns HTTP 200
+// — the real status is in X-Cpcli-Backend-Status; both are checked. The body on
+// failures carries the CLI server's human-readable error, which upjet's newTFError
+// swallows without logging it — we capture it here so the full error reason is
+// visible in provider logs.
+func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error, d time.Duration, trace string, attempt int) {
 	if t.log == nil {
 		return
 	}
@@ -183,25 +202,37 @@ func (t *cliTransport) logResult(r *http.Request, resp *http.Response, err error
 			status = b
 		}
 	}
-	if err == nil && status < 400 {
-		return
-	}
+
 	kv := []interface{}{
 		"method", r.Method,
-		"url", r.URL.Host + r.URL.Path,
+		"path", r.URL.Path,
 		"cliServerURL", r.URL.Host,
 		"durationMs", d.Milliseconds(),
+		"action", r.URL.RawQuery,
+		"correlationID", r.Header.Get(headerCorrelationID),
+		"reconcileID", diagnostics.ReconcileID(r.Context()),
+		"stage", diagnostics.StageName(r.Context()),
+		"remainingMs", diagnostics.Remaining(r.Context()),
+		"contextError", diagnostics.ContextError(r.Context()),
+		"resource", trace,
+		"session", sessionFingerprint(r.Header.Get(headerCLISessionId)),
+		"attempt", attempt,
 	}
 	if err != nil {
 		kv = append(kv, "error", err.Error())
-	} else {
-		kv = append(kv,
-			"status", status,
-			"httpStatus", resp.StatusCode,
-			"correlationID", resp.Header.Get(headerCorrelationID),
-			"body", peekBody(resp))
+		t.log.Info("cli request failed", kv...)
+		return
 	}
-	t.log.Info("cli request failed", kv...)
+	kv = append(kv,
+		"status", status,
+		"httpStatus", resp.StatusCode,
+	)
+	if status >= 400 {
+		kv = append(kv, "body", peekBody(resp))
+		t.log.Info("cli request failed", kv...)
+		return
+	}
+	t.log.Debug("cli request ok", kv...)
 }
 
 // peekBody reads up to 1KiB for logging without consuming the stream, so
@@ -225,3 +256,10 @@ type peekedBody struct {
 }
 
 func (b *peekedBody) Close() error { return b.body.Close() }
+
+func sessionFingerprint(id string) string {
+	if id == "" {
+		return ""
+	}
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(id)))[:12]
+}

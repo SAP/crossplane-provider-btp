@@ -42,9 +42,7 @@ const (
 var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
 	cp := &cachingProvider{entries: map[string]*cacheEntry{}}
 	base := http.DefaultTransport
-	if btp.IsDebug() {
-		base = btp.DebugPrintHTTPClient().Transport
-	}
+	// Use metadata-only diagnostics; full body logging changes stream consumption.
 	hc := &http.Client{Transport: &cliTransport{
 		base:     base,
 		evictSub: cp.evictBySubdomain,
@@ -183,15 +181,18 @@ func NewInternalTfConnector(client client.Client, resourceName string, gvk schem
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	res := config.GetProvider().Resources[resourceName]
 
+	var inner managed.ExternalConnector
 	if useAsync {
 		eventHandler := handler.NewEventHandler(handler.WithLogger(log.WithValues("gvk", gvk)))
-		return tjcontroller.NewTerraformPluginFrameworkAsyncConnector(client, tjcontroller.NewOperationStore(log), setupFn, res,
+		inner = tjcontroller.NewTerraformPluginFrameworkAsyncConnector(client, tjcontroller.NewOperationStore(log), setupFn, res,
 			tjcontroller.WithTerraformPluginFrameworkAsyncLogger(log),
 			tjcontroller.WithTerraformPluginFrameworkAsyncConnectorEventHandler(eventHandler),
 			tjcontroller.WithTerraformPluginFrameworkAsyncCallbackProvider(callbackProvider),
 		)
+	} else {
+		inner = tjcontroller.NewTerraformPluginFrameworkConnector(client, setupFn, res, tjcontroller.NewOperationStore(log),
+			tjcontroller.WithTerraformPluginFrameworkLogger(log),
+		)
 	}
-	return tjcontroller.NewTerraformPluginFrameworkConnector(client, setupFn, res, tjcontroller.NewOperationStore(log),
-		tjcontroller.WithTerraformPluginFrameworkLogger(log),
-	)
+	return &tracingConnector{Inner: inner, Kind: gvk.Kind, Log: log}
 }

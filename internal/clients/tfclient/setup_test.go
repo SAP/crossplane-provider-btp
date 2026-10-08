@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
@@ -634,9 +635,42 @@ func TestNewInternalTfConnectorSelectsClientByResourceConfig(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.reason, func(t *testing.T) {
 			got := NewInternalTfConnector(nil, tc.resource, schema.GroupVersionKind{}, tc.useAsync, nil)
-			if reflect.TypeOf(got) != reflect.TypeOf(tc.want) {
-				t.Errorf("%s\nNewInternalTfConnector(...): want %T, got %T", tc.reason, tc.want, got)
+			// NewInternalTfConnector always wraps the inner connector in a
+			// tracingConnector; the test pins the *inner* connector type.
+			wrapper, ok := got.(*tracingConnector)
+			if !ok {
+				t.Errorf("%s\nNewInternalTfConnector(...): want *tracingConnector wrapper, got %T", tc.reason, got)
+				return
+			}
+			if reflect.TypeOf(wrapper.Inner) != reflect.TypeOf(tc.want) {
+				t.Errorf("%s\ntracingConnector.inner: want %T, got %T", tc.reason, tc.want, wrapper.Inner)
 			}
 		})
+	}
+}
+
+// fakeConnector captures the context passed to Connect so tests can inspect it.
+type fakeConnector struct {
+	receivedCtx context.Context
+}
+
+func (f *fakeConnector) Connect(ctx context.Context, _ resource.Managed) (managed.ExternalClient, error) {
+	f.receivedCtx = ctx
+	return nil, nil
+}
+
+func TestTracingConnectorInjectsTrace(t *testing.T) {
+	inner := &fakeConnector{}
+	c := &tracingConnector{Inner: inner, Kind: "ServiceManager"}
+
+	mg := &fake.Managed{}
+	mg.SetName("sm-01a0c329")
+
+	_, _ = c.Connect(context.Background(), mg)
+
+	got := reconcileTraceFrom(inner.receivedCtx)
+	want := "ServiceManager/sm-01a0c329"
+	if got != want {
+		t.Errorf("reconcileTraceFrom(ctx) = %q, want %q", got, want)
 	}
 }

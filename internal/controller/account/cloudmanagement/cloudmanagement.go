@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sap/crossplane-provider-btp/pkg/diagnostics"
+
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
@@ -214,9 +216,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 
-	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
+	observeCtx, finishObserve := diagnostics.Stage(ctx, "observe-resources")
+	resStatus, err := c.tfClient.ObserveResources(observeCtx, cr)
+	finishObserve(err)
 
-	statusErr := c.setStatus(ctx, resStatus, cr)
+	statusCtx, finishStatus := diagnostics.Stage(ctx, "status-write")
+	statusErr := c.setStatus(statusCtx, resStatus, cr)
+	finishStatus(statusErr)
+	if err != nil && statusErr != nil {
+		diagnostics.Record(ctx, "observation and status write failed", err, "statusError", statusErr.Error())
+	}
 	if statusErr != nil {
 		return managed.ExternalObservation{}, errors.Wrap(statusErr, errSetStatus)
 	}
