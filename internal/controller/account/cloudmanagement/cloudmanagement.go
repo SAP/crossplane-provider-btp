@@ -215,6 +215,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	resStatus, err := c.tfClient.ObserveResources(ctx, cr)
+	if err != nil {
+		// A failed observation can contain zero or partial state. Preserve the
+		// last successful status and report the external error, not a secondary
+		// status-write failure using the same exhausted context.
+		return managed.ExternalObservation{}, errors.Wrap(err, errObserve)
+	}
 
 	statusErr := c.setStatus(ctx, resStatus, cr)
 	if statusErr != nil {
@@ -399,6 +405,11 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) setStatus(ctx context.Context, status cmclient.ResourcesStatus, cr *apisv1beta1.CloudManagement) error {
+	// Observe only receives the external-operation context. Keep its deadline
+	// and parent cancellation; do not detach writes from the reconcile budget.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	switch {
 	case meta.WasDeleted(cr) && status.ResourceExists:
 		// Mid-deletion, external instance still present. Status-only cosmetic:

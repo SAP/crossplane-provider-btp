@@ -342,12 +342,7 @@ func TestObserve(t *testing.T) {
 			want: want{
 				obs: managed.ExternalObservation{},
 				err: errors.Wrap(errors.New("observeError"), "while observing resources"),
-				cr: NewCloudManagement("test",
-					WithExternalName(testUUID),
-					WithStatus(v1beta1.CloudManagementObservation{
-						Status: v1alpha1.CisStatusUnbound,
-					}),
-					WithConditions(xpv1.Unavailable())),
+				cr:  NewCloudManagement("test", WithExternalName(testUUID)),
 			},
 		},
 		{

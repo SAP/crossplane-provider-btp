@@ -519,11 +519,7 @@ func TestObserve(t *testing.T) {
 			want: want{
 				obs: managed.ExternalObservation{},
 				err: errors.New("observeError"),
-				cr: NewServiceManager("test",
-					WithStatus(apisv1beta1.ServiceManagerObservation{
-						Status: apisv1beta1.ServiceManagerUnbound,
-					}),
-					WithConditions(xpv1.Unavailable())),
+				cr:  NewServiceManager("test"),
 			},
 		},
 		{
