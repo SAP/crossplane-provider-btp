@@ -27,6 +27,10 @@ import (
 
 type GlobalaccountTrustConfigurationInitParameters struct {
 
+	// (Boolean) Indicates whether shadow users are automatically created.
+	// Indicates whether shadow users are automatically created.
+	AutoCreateShadowUsers *bool `json:"autoCreateShadowUsers,omitempty" tf:"auto_create_shadow_users,omitempty"`
+
 	// (String) Description of the trust configuration.
 	// Description of the trust configuration.
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
@@ -49,6 +53,10 @@ type GlobalaccountTrustConfigurationInitParameters struct {
 }
 
 type GlobalaccountTrustConfigurationObservation struct {
+
+	// (Boolean) Indicates whether shadow users are automatically created.
+	// Indicates whether shadow users are automatically created.
+	AutoCreateShadowUsers *bool `json:"autoCreateShadowUsers,omitempty" tf:"auto_create_shadow_users,omitempty"`
 
 	// (String) Description of the trust configuration.
 	// Description of the trust configuration.
@@ -91,6 +99,11 @@ type GlobalaccountTrustConfigurationObservation struct {
 }
 
 type GlobalaccountTrustConfigurationParameters struct {
+
+	// (Boolean) Indicates whether shadow users are automatically created.
+	// Indicates whether shadow users are automatically created.
+	// +kubebuilder:validation:Optional
+	AutoCreateShadowUsers *bool `json:"autoCreateShadowUsers,omitempty" tf:"auto_create_shadow_users,omitempty"`
 
 	// (String) Description of the trust configuration.
 	// Description of the trust configuration.

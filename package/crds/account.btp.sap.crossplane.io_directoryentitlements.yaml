@@ -80,8 +80,8 @@ spec:
                 properties:
                   amount:
                     description: |-
-                      (Number) The quota assigned to the directory.
-                      The quota assigned to the directory.
+                      (Number) The quota assigned to the directory. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
+                      The quota assigned to the directory. Only applicable for plans with a numeric quota (category `SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, or `ENVIRONMENT`). Setting this attribute for plans that do not support numeric quota (category `ELASTIC_SERVICE`, `ELASTIC_LIMITED`, or `APPLICATION`) will result in an error.
                     type: number
                   autoAssign:
                     description: |-
@@ -208,8 +208,8 @@ spec:
                 properties:
                   amount:
                     description: |-
-                      (Number) The quota assigned to the directory.
-                      The quota assigned to the directory.
+                      (Number) The quota assigned to the directory. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
+                      The quota assigned to the directory. Only applicable for plans with a numeric quota (category `SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, or `ENVIRONMENT`). Setting this attribute for plans that do not support numeric quota (category `ELASTIC_SERVICE`, `ELASTIC_LIMITED`, or `APPLICATION`) will result in an error.
                     type: number
                   autoAssign:
                     description: |-
@@ -424,8 +424,8 @@ spec:
                 properties:
                   amount:
                     description: |-
-                      (Number) The quota assigned to the directory.
-                      The quota assigned to the directory.
+                      (Number) The quota assigned to the directory. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
+                      The quota assigned to the directory. Only applicable for plans with a numeric quota (category `SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, or `ENVIRONMENT`). Setting this attribute for plans that do not support numeric quota (category `ELASTIC_SERVICE`, `ELASTIC_LIMITED`, or `APPLICATION`) will result in an error.
                     type: number
                   autoAssign:
                     description: |-
