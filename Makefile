@@ -54,6 +54,8 @@ DIAGNOSTIC_OVERLAY := $(abspath .work/diagnostic-overlay/overlay.json)
 go.test.unit go.test.integration: GO_TAGS += diagnostic
 go.build go.test.unit go.test.integration: GO_BUILDFLAGS += -overlay=$(DIAGNOSTIC_OVERLAY)
 go.lint: export GOFLAGS = -overlay=$(DIAGNOSTIC_OVERLAY)
+# Generator tools are intentionally absent from the application vendor tree.
+go.generate: export GOFLAGS = -mod=mod
 
 .PHONY: diagnostic-overlay
 diagnostic-overlay:
