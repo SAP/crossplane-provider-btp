@@ -63,6 +63,11 @@ func main() {
 			"Timeout for a single reconcile cycle (externalCtx budget). The reconciler adds a 30s grace period on top for status writes. Default is 1m.",
 		).Default("1m").Envar("RECONCILE_TIMEOUT").Duration()
 
+		enableTerraformSessionReuse = app.Flag(
+			"enable-terraform-session-reuse",
+			"Share configured Terraform BTP sessions across reconciliations. Disabled by default.",
+		).Default("false").Envar("ENABLE_TERRAFORM_SESSION_REUSE").Bool()
+
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 	)
 
@@ -73,6 +78,7 @@ func main() {
 	ctrl.SetLogger(zl)
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
+	tfclient.SetEnableTerraformSessionReuse(*enableTerraformSessionReuse)
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")

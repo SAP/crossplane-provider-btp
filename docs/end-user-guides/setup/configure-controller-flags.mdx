@@ -18,6 +18,15 @@ These flags are passed as arguments to the provider's container process and can 
 | `--backoff-max` | `60s` | Maximum duration for exponential backoff. The wait time will never exceed this value, regardless of how many failures have occurred. |
 | `--leader-election` / `-l` | `false` | Enable leader election for the controller manager. Used to ensure only one instance of the controller is active at a time while allowing multiple replicas to run simultaneously for failover. Can also be set via the `LEADER_ELECTION` environment variable. |
 | `--debug` / `-d` | `false` | Run with debug logging. |
+| `--enable-terraform-session-reuse` | `false` | Reuse configured Terraform BTP clients and sessions across reconciliations with identical configuration. Can also be set via `ENABLE_TERRAFORM_SESSION_REUSE=true`. |
+
+### Terraform BTP Session Reuse
+
+Session reuse is disabled by default: each Terraform connector setup creates a separate configured client and logs in to BTP.
+
+Set `--enable-terraform-session-reuse` or `ENABLE_TERRAFORM_SESSION_REUSE=true` to reuse configured clients and sessions across reconciliations with identical configuration. Cached sessions are evicted on HTTP 401, allowing a subsequent setup to authenticate again.
+
+The flag applies to generated Terraform controllers and internal Terraform connectors used by native controllers. It does not affect the OAuth client caches used by native BTP API clients.
 
 ### Exponential Backoff Details
 
