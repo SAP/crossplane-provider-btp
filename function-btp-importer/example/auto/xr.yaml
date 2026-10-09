@@ -1,0 +1,12 @@
+---
+# XR representing a BTP workload. crossplane.io/claim-name and
+# crossplane.io/claim-namespace are set by Crossplane when a claim creates
+# the XR — they must be present for the function to locate the CIS secret.
+apiVersion: example.crossplane.io/v1
+kind: XBTPResources
+metadata:
+  name: my-workload-xr
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+spec: {}

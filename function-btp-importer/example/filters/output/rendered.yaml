@@ -1,0 +1,104 @@
+---
+apiVersion: example.crossplane.io/v1
+kind: XBTPResources
+metadata:
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+  name: my-workload-xr
+spec:
+  crossplane:
+    resourceRefs:
+      - apiVersion: account.btp.sap.crossplane.io/v1alpha1
+        kind: ServiceInstance
+        name: my-workload-xr-dev-instance
+      - apiVersion: account.btp.sap.crossplane.io/v1alpha1
+        kind: ServiceInstance
+        name: my-workload-xr-prod-instance
+      - apiVersion: account.btp.sap.crossplane.io/v1alpha1
+        kind: ServiceInstance
+        name: my-workload-xr-test-skip-instance
+status:
+  conditions:
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      reason: WatchCircuitClosed
+      status: "True"
+      type: Responsive
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      message: 1 existing BTP resource(s) adopted
+      reason: ResourcesImported
+      status: "True"
+      type: ImportsVerified
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      reason: ReconcileSuccess
+      status: "True"
+      type: Synced
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      message: 'Unready resources: dev-instance, prod-instance, and test-skip-instance'
+      reason: Creating
+      status: "False"
+      type: Ready
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: dev-instance
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+    crossplane.io/composite: my-workload-xr
+  name: my-workload-xr-dev-instance
+  ownerReferences:
+    - apiVersion: example.crossplane.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XBTPResources
+      name: my-workload-xr
+      uid: e6275119-0e0a-5841-bf76-1ef0c4e2cf03
+spec:
+  forProvider:
+    name: dev-instance
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: prod-instance
+    crossplane.io/external-name: si-uuid-ffff-6666
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+    crossplane.io/composite: my-workload-xr
+  name: my-workload-xr-prod-instance
+  ownerReferences:
+    - apiVersion: example.crossplane.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XBTPResources
+      name: my-workload-xr
+      uid: e6275119-0e0a-5841-bf76-1ef0c4e2cf03
+spec:
+  forProvider:
+    name: prod-instance
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: test-skip-instance
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+    crossplane.io/composite: my-workload-xr
+  name: my-workload-xr-test-skip-instance
+  ownerReferences:
+    - apiVersion: example.crossplane.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XBTPResources
+      name: my-workload-xr
+      uid: e6275119-0e0a-5841-bf76-1ef0c4e2cf03
+spec:
+  forProvider:
+    name: test-skip-instance
