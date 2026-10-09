@@ -55,6 +55,23 @@ To entitle the SAP HANA Cloud service to your subaccount, apply the `Entitlement
     kubectl create -f hana-cloud-entitlement.yaml
     ```
 
+### Check entitlement readiness
+
+When BTP reports an assignment as `PROCESSING_FAILED`, the `Entitlement` reports
+`Ready=False` with reason `ExternalResourceFailed`. Its condition message includes
+BTP's `stateMessage`, limited to 4096 bytes. A successful observation still reports
+`Synced=True`.
+
+This readiness policy surfaces BTP's last failed operation even if the currently
+assigned quota matches the desired quota. For example, a rejected quota reduction
+can leave an assignment usable while BTP retains `PROCESSING_FAILED`. Check
+`status.atProvider.assigned` and the `Drift` condition to distinguish that historical
+failure from a current quota mismatch. Workflows that require `Ready=True` will wait
+until BTP reports `OK`; `Ready=False` alone does not establish service unavailability.
+
+Failed assignments with zero or unset quota continue retrying through creation and
+report `Ready=False` with reason `Creating` while a new assignment is attempted.
+
 ### Create a `ServiceInstance`
 
 Once the SAP HANA Cloud service is entitled, you can create your first managed service instance. The steps below show how to create a SAP HANA Cloud service instance using our `ServiceInstance` custom resource.

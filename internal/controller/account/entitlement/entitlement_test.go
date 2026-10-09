@@ -233,7 +233,7 @@ func TestObserve(t *testing.T) {
 				err: nil,
 			},
 		},
-		"Simple Case, All up-to-date, unavailable condition": {
+		"Simple Case, All up-to-date, last operation failed": {
 			args: args{
 				kube: &test.MockClient{
 					MockStatusUpdate: noopStatusUpdate,
@@ -253,7 +253,7 @@ func TestObserve(t *testing.T) {
 			want: want{
 				o: managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true},
 				comparefn: func(v *v1alpha1.Entitlement) string {
-					return cmp.Diff(v.Status.GetCondition(xpv1.Available().Type).Status, xpv1.Available().Status)
+					return cmp.Diff(v.Status.GetCondition(xpv1.TypeReady).Status, xpv1.Unavailable().Status)
 				},
 				err: nil,
 			},
