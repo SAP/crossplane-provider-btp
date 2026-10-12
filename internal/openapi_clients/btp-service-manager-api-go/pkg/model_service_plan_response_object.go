@@ -36,6 +36,11 @@ type ServicePlanResponseObject struct {
 	Id *string `json:"id,omitempty"`
 	// The metadata associated with the service plan.
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Schemas *ServicePlanSchemas `json:"schemas,omitempty"`
+	// Whether provisioned instances of this plan can be updated (OSB plan_updateable). Returned live but absent from SAP's published OpenAPI.
+	PlanUpdateable *bool `json:"plan_updateable,omitempty"`
+	// Maximum duration in seconds the platform should poll an async operation for this plan before timing out. Returned live but absent from SAP's published OpenAPI.
+	MaximumPollingDuration *int32 `json:"maximum_polling_duration,omitempty"`
 	// The name of the service plan.
 	Name *string `json:"name,omitempty"`
 	// Whether the service plan is ready.
@@ -319,6 +324,102 @@ func (o *ServicePlanResponseObject) SetMetadata(v map[string]interface{}) {
 	o.Metadata = v
 }
 
+// GetSchemas returns the Schemas field value if set, zero value otherwise.
+func (o *ServicePlanResponseObject) GetSchemas() ServicePlanSchemas {
+	if o == nil || IsNil(o.Schemas) {
+		var ret ServicePlanSchemas
+		return ret
+	}
+	return *o.Schemas
+}
+
+// GetSchemasOk returns a tuple with the Schemas field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ServicePlanResponseObject) GetSchemasOk() (*ServicePlanSchemas, bool) {
+	if o == nil || IsNil(o.Schemas) {
+		return nil, false
+	}
+	return o.Schemas, true
+}
+
+// HasSchemas returns a boolean if a field has been set.
+func (o *ServicePlanResponseObject) HasSchemas() bool {
+	if o != nil && !IsNil(o.Schemas) {
+		return true
+	}
+
+	return false
+}
+
+// SetSchemas gets a reference to the given ServicePlanSchemas and assigns it to the Schemas field.
+func (o *ServicePlanResponseObject) SetSchemas(v ServicePlanSchemas) {
+	o.Schemas = &v
+}
+
+// GetPlanUpdateable returns the PlanUpdateable field value if set, zero value otherwise.
+func (o *ServicePlanResponseObject) GetPlanUpdateable() bool {
+	if o == nil || IsNil(o.PlanUpdateable) {
+		var ret bool
+		return ret
+	}
+	return *o.PlanUpdateable
+}
+
+// GetPlanUpdateableOk returns a tuple with the PlanUpdateable field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ServicePlanResponseObject) GetPlanUpdateableOk() (*bool, bool) {
+	if o == nil || IsNil(o.PlanUpdateable) {
+		return nil, false
+	}
+	return o.PlanUpdateable, true
+}
+
+// HasPlanUpdateable returns a boolean if a field has been set.
+func (o *ServicePlanResponseObject) HasPlanUpdateable() bool {
+	if o != nil && !IsNil(o.PlanUpdateable) {
+		return true
+	}
+
+	return false
+}
+
+// SetPlanUpdateable gets a reference to the given bool and assigns it to the PlanUpdateable field.
+func (o *ServicePlanResponseObject) SetPlanUpdateable(v bool) {
+	o.PlanUpdateable = &v
+}
+
+// GetMaximumPollingDuration returns the MaximumPollingDuration field value if set, zero value otherwise.
+func (o *ServicePlanResponseObject) GetMaximumPollingDuration() int32 {
+	if o == nil || IsNil(o.MaximumPollingDuration) {
+		var ret int32
+		return ret
+	}
+	return *o.MaximumPollingDuration
+}
+
+// GetMaximumPollingDurationOk returns a tuple with the MaximumPollingDuration field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ServicePlanResponseObject) GetMaximumPollingDurationOk() (*int32, bool) {
+	if o == nil || IsNil(o.MaximumPollingDuration) {
+		return nil, false
+	}
+	return o.MaximumPollingDuration, true
+}
+
+// HasMaximumPollingDuration returns a boolean if a field has been set.
+func (o *ServicePlanResponseObject) HasMaximumPollingDuration() bool {
+	if o != nil && !IsNil(o.MaximumPollingDuration) {
+		return true
+	}
+
+	return false
+}
+
+// SetMaximumPollingDuration gets a reference to the given int32 and assigns it to the MaximumPollingDuration field.
+func (o *ServicePlanResponseObject) SetMaximumPollingDuration(v int32) {
+	o.MaximumPollingDuration = &v
+}
+
 // GetName returns the Name field value if set, zero value otherwise.
 func (o *ServicePlanResponseObject) GetName() string {
 	if o == nil || IsNil(o.Name) {
@@ -480,6 +581,15 @@ func (o ServicePlanResponseObject) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
+	}
+	if !IsNil(o.Schemas) {
+		toSerialize["schemas"] = o.Schemas
+	}
+	if !IsNil(o.PlanUpdateable) {
+		toSerialize["plan_updateable"] = o.PlanUpdateable
+	}
+	if !IsNil(o.MaximumPollingDuration) {
+		toSerialize["maximum_polling_duration"] = o.MaximumPollingDuration
 	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name

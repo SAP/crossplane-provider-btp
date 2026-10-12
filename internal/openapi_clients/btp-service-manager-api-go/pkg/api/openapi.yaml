@@ -4191,30 +4191,52 @@ components:
       example:
         num_items: 1
         items:
-        - catalog_id: id1234
-          bindable: true
-          catalog_name: name1
+        - catalog_name: name1
           metadata: "{}"
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          name: my-service-plan
           created_at: 2000-01-23T04:56:07.000+00:00
           description: This service plan is on a monthly basis.
+          catalog_id: id1234
+          bindable: true
+          plan_updateable: true
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          ready: true
+          schemas:
+            service_binding:
+              create:
+                parameters: "{}"
+            service_instance:
+              create:
+                parameters: "{}"
+              update:
+                parameters: "{}"
+          name: my-service-plan
           service_offering_id: "1234"
           id: my-service-plan-123-id
           free: true
-        - catalog_id: id1234
-          bindable: true
-          catalog_name: name1
+          maximum_polling_duration: 0
+        - catalog_name: name1
           metadata: "{}"
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          ready: true
-          name: my-service-plan
           created_at: 2000-01-23T04:56:07.000+00:00
           description: This service plan is on a monthly basis.
+          catalog_id: id1234
+          bindable: true
+          plan_updateable: true
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          ready: true
+          schemas:
+            service_binding:
+              create:
+                parameters: "{}"
+            service_instance:
+              create:
+                parameters: "{}"
+              update:
+                parameters: "{}"
+          name: my-service-plan
           service_offering_id: "1234"
           id: my-service-plan-123-id
           free: true
+          maximum_polling_duration: 0
         token: wcxdX
       properties:
         items:
@@ -4238,20 +4260,81 @@ components:
           example: wcxdX
           type: string
       type: object
+    ServicePlanSchemas:
+      description: OSB per-plan JSON Schemas for service instance and binding create/update
+        parameters. Returned live by the Service Manager but omitted from SAP's published
+        OpenAPI.
+      example:
+        service_binding:
+          create:
+            parameters: "{}"
+        service_instance:
+          create:
+            parameters: "{}"
+          update:
+            parameters: "{}"
+      properties:
+        service_instance:
+          $ref: '#/components/schemas/ServiceInstanceSchema'
+        service_binding:
+          $ref: '#/components/schemas/ServiceBindingSchema'
+      type: object
+    ServiceInstanceSchema:
+      description: JSON Schemas for service instance create and update parameters.
+      example:
+        create:
+          parameters: "{}"
+        update:
+          parameters: "{}"
+      properties:
+        create:
+          $ref: '#/components/schemas/SchemaParameters'
+        update:
+          $ref: '#/components/schemas/SchemaParameters'
+      type: object
+    ServiceBindingSchema:
+      description: JSON Schemas for service binding create parameters.
+      example:
+        create:
+          parameters: "{}"
+      properties:
+        create:
+          $ref: '#/components/schemas/SchemaParameters'
+      type: object
+    SchemaParameters:
+      description: Wraps the JSON Schema for a set of parameters.
+      example:
+        parameters: "{}"
+      properties:
+        parameters:
+          description: The JSON Schema (draft v4+) describing the allowed parameters.
+          type: object
+      type: object
     ServicePlanResponseObject:
       example:
-        catalog_id: id1234
-        bindable: true
         catalog_name: name1
         metadata: "{}"
-        updated_at: 2000-01-23T04:56:07.000+00:00
-        ready: true
-        name: my-service-plan
         created_at: 2000-01-23T04:56:07.000+00:00
         description: This service plan is on a monthly basis.
+        catalog_id: id1234
+        bindable: true
+        plan_updateable: true
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        ready: true
+        schemas:
+          service_binding:
+            create:
+              parameters: "{}"
+          service_instance:
+            create:
+              parameters: "{}"
+            update:
+              parameters: "{}"
+        name: my-service-plan
         service_offering_id: "1234"
         id: my-service-plan-123-id
         free: true
+        maximum_polling_duration: 0
       properties:
         bindable:
           description: Whether the service plan is bindable.
@@ -4283,6 +4366,17 @@ components:
         metadata:
           description: The metadata associated with the service plan.
           type: object
+        schemas:
+          $ref: '#/components/schemas/ServicePlanSchemas'
+        plan_updateable:
+          description: Whether provisioned instances of this plan can be updated (OSB
+            plan_updateable). Returned live but absent from SAP's published OpenAPI.
+          type: boolean
+        maximum_polling_duration:
+          description: Maximum duration in seconds the platform should poll an async
+            operation for this plan before timing out. Returned live but absent from
+            SAP's published OpenAPI.
+          type: integer
         name:
           description: The name of the service plan.
           example: my-service-plan
