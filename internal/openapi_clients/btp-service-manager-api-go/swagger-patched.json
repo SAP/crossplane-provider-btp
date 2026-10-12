@@ -1308,6 +1308,49 @@
         },
         "type": "object"
       },
+      "ServicePlanSchemas": {
+        "description": "OSB per-plan JSON Schemas for service instance and binding create/update parameters. Returned live by the Service Manager but omitted from SAP's published OpenAPI.",
+        "properties": {
+          "service_instance": {
+            "$ref": "#/components/schemas/ServiceInstanceSchema"
+          },
+          "service_binding": {
+            "$ref": "#/components/schemas/ServiceBindingSchema"
+          }
+        },
+        "type": "object"
+      },
+      "ServiceInstanceSchema": {
+        "description": "JSON Schemas for service instance create and update parameters.",
+        "properties": {
+          "create": {
+            "$ref": "#/components/schemas/SchemaParameters"
+          },
+          "update": {
+            "$ref": "#/components/schemas/SchemaParameters"
+          }
+        },
+        "type": "object"
+      },
+      "ServiceBindingSchema": {
+        "description": "JSON Schemas for service binding create parameters.",
+        "properties": {
+          "create": {
+            "$ref": "#/components/schemas/SchemaParameters"
+          }
+        },
+        "type": "object"
+      },
+      "SchemaParameters": {
+        "description": "Wraps the JSON Schema for a set of parameters.",
+        "properties": {
+          "parameters": {
+            "description": "The JSON Schema (draft v4+) describing the allowed parameters.",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
       "ServicePlanResponseObject": {
         "properties": {
           "bindable": {
@@ -1346,6 +1389,17 @@
           "metadata": {
             "description": "The metadata associated with the service plan.",
             "type": "object"
+          },
+          "schemas": {
+            "$ref": "#/components/schemas/ServicePlanSchemas"
+          },
+          "plan_updateable": {
+            "description": "Whether provisioned instances of this plan can be updated (OSB plan_updateable). Returned live but absent from SAP's published OpenAPI.",
+            "type": "boolean"
+          },
+          "maximum_polling_duration": {
+            "description": "Maximum duration in seconds the platform should poll an async operation for this plan before timing out. Returned live but absent from SAP's published OpenAPI.",
+            "type": "integer"
           },
           "name": {
             "description": "The name of the service plan.",

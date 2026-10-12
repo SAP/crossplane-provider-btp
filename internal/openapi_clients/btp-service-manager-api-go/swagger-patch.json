@@ -38,5 +38,77 @@
       "type": "object",
       "description": "The configuration parameters of the service instance, as arbitrary JSON."
     }
+  },
+  {
+    "op": "add",
+    "path": "/components/schemas/SchemaParameters",
+    "value": {
+      "type": "object",
+      "description": "Wraps the JSON Schema for a set of parameters.",
+      "properties": {
+        "parameters": {
+          "type": "object",
+          "description": "The JSON Schema (draft v4+) describing the allowed parameters."
+        }
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/components/schemas/ServiceInstanceSchema",
+    "value": {
+      "type": "object",
+      "description": "JSON Schemas for service instance create and update parameters.",
+      "properties": {
+        "create": { "$ref": "#/components/schemas/SchemaParameters" },
+        "update": { "$ref": "#/components/schemas/SchemaParameters" }
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/components/schemas/ServiceBindingSchema",
+    "value": {
+      "type": "object",
+      "description": "JSON Schemas for service binding create parameters.",
+      "properties": {
+        "create": { "$ref": "#/components/schemas/SchemaParameters" }
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/components/schemas/ServicePlanSchemas",
+    "value": {
+      "type": "object",
+      "description": "OSB per-plan JSON Schemas for service instance and binding create/update parameters. Returned live by the Service Manager but omitted from SAP's published OpenAPI.",
+      "properties": {
+        "service_instance": { "$ref": "#/components/schemas/ServiceInstanceSchema" },
+        "service_binding": { "$ref": "#/components/schemas/ServiceBindingSchema" }
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/components/schemas/ServicePlanResponseObject/properties/schemas",
+    "value": {
+      "$ref": "#/components/schemas/ServicePlanSchemas"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/components/schemas/ServicePlanResponseObject/properties/plan_updateable",
+    "value": {
+      "type": "boolean",
+      "description": "Whether provisioned instances of this plan can be updated (OSB plan_updateable). Returned live but absent from SAP's published OpenAPI."
+    }
+  },
+  {
+    "op": "add",
+    "path": "/components/schemas/ServicePlanResponseObject/properties/maximum_polling_duration",
+    "value": {
+      "type": "integer",
+      "description": "Maximum duration in seconds the platform should poll an async operation for this plan before timing out. Returned live but absent from SAP's published OpenAPI."
+    }
   }
 ]
