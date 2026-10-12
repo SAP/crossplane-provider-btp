@@ -879,6 +879,85 @@ func TestDeleteInstanceSoleNumericSendsZero(t *testing.T) {
 	}
 }
 
+// TestDeleteFallsBackToEntitledUniqueIdentifier verifies DeleteInstance
+// fills in the ServicePlanUniqueIdentifier from
+// Status.AtProvider.Entitled.UniqueIdentifier when the key leaves it nil
+// (issue #1100): without it, the BTP API returns error 30001 for plans
+// whose serviceName+servicePlanName are not unique in the region. An
+// explicit key identifier must still win and never be overridden.
+func TestDeleteFallsBackToEntitledUniqueIdentifier(t *testing.T) {
+	cases := map[string]struct {
+		keyIdentifier      *string
+		entitledIdentifier string
+		wantIdentifier     *string
+	}{
+		"nil key identifier falls back to entitled": {
+			keyIdentifier:      nil,
+			entitledIdentifier: "entitled-unique-id",
+			wantIdentifier:     internal.Ptr("entitled-unique-id"),
+		},
+		"explicit key identifier wins over entitled": {
+			keyIdentifier:      internal.Ptr("key-unique-id"),
+			entitledIdentifier: "entitled-unique-id",
+			wantIdentifier:     internal.Ptr("key-unique-id"),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(
+			name, func(t *testing.T) {
+				var gotPayload entclient.SubaccountServicePlansRequestPayloadCollection
+				handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+						t.Errorf("decoding SetServicePlans request body: %v", err)
+					}
+					w.WriteHeader(http.StatusOK)
+				})
+				c, closeServer := newTestEntitlementsClient(t, handler)
+				defer closeServer()
+
+				cr := &v1alpha1.Entitlement{
+					Spec: v1alpha1.EntitlementSpec{
+						ForProvider: v1alpha1.EntitlementParameters{
+							Amount: internal.Ptr(5),
+						},
+					},
+					Status: v1alpha1.EntitlementStatus{
+						AtProvider: &v1alpha1.EntitlementObservation{
+							Required: &v1alpha1.EntitlementSummary{
+								Amount: internal.Ptr(0),
+							},
+							Assigned: &v1alpha1.Assignable{
+								Amount: internal.Ptr(5),
+							},
+							Entitled: v1alpha1.Entitled{
+								UniqueIdentifier: tc.entitledIdentifier,
+							},
+						},
+					},
+				}
+				key := ExternalNameKey{
+					SubaccountGUID:              "sa",
+					ServiceName:                 "svc",
+					ServicePlanName:             "plan",
+					ServicePlanUniqueIdentifier: tc.keyIdentifier,
+				}
+
+				if err := c.DeleteInstance(context.Background(), key, cr); err != nil {
+					t.Fatalf("DeleteInstance(...): unexpected error: %v", err)
+				}
+
+				if len(gotPayload.SubaccountServicePlans) != 1 {
+					t.Fatalf("SetServicePlans payload: want 1 assignment, got %d", len(gotPayload.SubaccountServicePlans))
+				}
+				if diff := cmp.Diff(tc.wantIdentifier, gotPayload.SubaccountServicePlans[0].ServicePlanUniqueIdentifier); diff != "" {
+					t.Errorf("SetServicePlans payload ServicePlanUniqueIdentifier: -want, +got:\n%s", diff)
+				}
+			},
+		)
+	}
+}
+
 // TestDeleteEnableMultiSiblingNoOp verifies DeleteInstance is a no-op for
 // an enable-based entitlement when more than one sibling CR still shares
 // the plan: nothing needs reducing while another sibling still needs it

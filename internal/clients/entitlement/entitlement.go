@@ -217,6 +217,13 @@ func (c EntitlementsClient) DeleteInstance(ctx context.Context, key ExternalName
 		enabled := false
 		cr.Status.AtProvider.Required.Enable = &enabled
 	}
+
+	// Issue #1100: when serviceName+servicePlanName are not unique in the region
+	// and no explicit plan identifier was set, fall back to the known entitled
+	// unique identifier so the API can resolve the ambiguous plan on delete.
+	if key.ServicePlanUniqueIdentifier == nil && cr.Status.AtProvider.Entitled.UniqueIdentifier != "" {
+		key.ServicePlanUniqueIdentifier = internal.Ptr(cr.Status.AtProvider.Entitled.UniqueIdentifier)
+	}
 	return c.UpdateInstance(ctx, key, cr)
 }
 
