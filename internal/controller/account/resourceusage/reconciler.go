@@ -180,7 +180,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 			r.log.Debug(errDeletePU, "error", err)
 			return reconcile.Result{RequeueAfter: shortWait}, nil
 		}
-		return reconcile.Result{Requeue: false}, nil
+		return reconcile.Result{}, nil
 	}
 
 	if meta.WasDeleted(ru) {
@@ -193,10 +193,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 			// We're watching our usages, so we'll be requeued when they go.
 			// A NotFound here means the ResourceUsage was removed while this
 			// reconcile was in flight; there is no status left to write.
-			return reconcile.Result{Requeue: false}, errors.Wrap(resource.IgnoreNotFound(r.client.Status().Update(ctx, ru)), errUpdateStatus)
+			return reconcile.Result{}, errors.Wrap(resource.IgnoreNotFound(r.client.Status().Update(ctx, ru)), errUpdateStatus)
 		}
 		// Deletion and removal of finalizer must happen before
-		return reconcile.Result{Requeue: true}, errors.New("inconsistent state, do requeue")
+		return reconcile.Result{}, errors.New("inconsistent state, do requeue")
 	}
 	if !meta.FinalizerExists(ru, v1alpha1.Finalizer) {
 		meta.AddFinalizer(ru, v1alpha1.Finalizer)
@@ -209,5 +209,5 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 		}
 	}
 
-	return reconcile.Result{Requeue: false}, nil
+	return reconcile.Result{}, nil
 }
