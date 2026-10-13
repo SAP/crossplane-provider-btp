@@ -4,6 +4,8 @@ package upgrade
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -13,6 +15,7 @@ import (
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/e2e-framework/klient/wait"
@@ -157,10 +160,72 @@ func Test_SubaccountApiCredential_External_Name(t *testing.T) {
 					t.Fatalf("legacy connection Secret was not preserved after upgrade: %v", err)
 				}
 				if !reflect.DeepEqual(wantSecretData, secret.Data) {
-					t.Errorf("legacy connection Secret data changed during identity normalization: want keys/data preserved")
+					t.Fatalf("legacy connection Secret data changed during identity normalization")
 				}
 
-				klog.V(4).Info("External name migrated; legacy ownership remains uncertain and connection Secret is preserved")
+				lifecycle := sac.Status.Lifecycle
+				if lifecycle.ManagedResourceUID != string(sac.UID) {
+					t.Fatalf("uncertain lifecycle is not bound to current MR UID: receipt=%q UID=%q", lifecycle.ManagedResourceUID, sac.UID)
+				}
+				// Legacy classification intentionally leaves lifecycle identity unset.
+				// Resolve against the verified compound external-name above.
+				// This isolated upgrade fixture was created by v1.3.0 in a dedicated
+				// test subaccount. The marker below is test evidence only; production
+				// resolution must use independently retained provisioning/audit records.
+				resolvedAt := metav1.NewTime(time.Now().UTC())
+				resolvedLifecycle := &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{
+					ManagedResourceUID: string(sac.UID),
+					SubaccountID:       parts[0],
+					Name:               parts[1],
+					Phase:              securityv1alpha1.SubaccountApiCredentialPhaseOwned,
+					Reason:             "administrator-resolved-legacy",
+					ResolvedBy:         "upgrade-test-administrator",
+					ResolvedAt:         &resolvedAt,
+					ResolutionEvidence: fmt.Sprintf("test-fixture:v1.3.0-create:%s:%s", sac.UID, externalName),
+				}
+				patchData, err := json.Marshal(map[string]interface{}{"status": map[string]interface{}{"lifecycle": resolvedLifecycle}})
+				if err != nil {
+					t.Fatalf("marshal audited legacy-resolution test patch: %v", err)
+				}
+				if err := r.PatchSubresource(ctx, sac, "status", k8s.Patch{PatchType: types.MergePatchType, Data: patchData}); err != nil {
+					t.Fatalf("apply audited legacy-resolution status patch: %v", err)
+				}
+
+				if err := wait.For(conditions.New(r).ResourceMatch(sac, func(object k8s.Object) bool {
+					got, ok := object.(*securityv1alpha1.SubaccountApiCredential)
+					return ok && got.Status.Lifecycle != nil &&
+						got.Status.Lifecycle.Phase == securityv1alpha1.SubaccountApiCredentialPhaseOwned &&
+						got.GetCondition(xpv1.TypeReady).Status == corev1.ConditionTrue &&
+						got.GetCondition(xpv1.TypeSynced).Status == corev1.ConditionTrue
+				}), wait.WithTimeout(5*time.Minute), wait.WithContext(ctx)); err != nil {
+					t.Fatalf("wait for legacy resolution to resume healthy management: %v", err)
+				}
+				if err := r.Get(ctx, sacName, cfg.Namespace(), sac); err != nil {
+					t.Fatalf("get resolved legacy credential: %v", err)
+				}
+				resolved := sac.Status.Lifecycle
+				if resolved == nil || resolved.Phase != securityv1alpha1.SubaccountApiCredentialPhaseOwned ||
+					resolved.ManagedResourceUID != string(sac.UID) || resolved.SubaccountID != parts[0] || resolved.Name != parts[1] ||
+					resolved.Reason != "administrator-resolved-legacy" ||
+					resolved.ResolvedBy != resolvedLifecycle.ResolvedBy || resolved.ResolvedAt == nil ||
+					resolved.ResolutionEvidence != resolvedLifecycle.ResolutionEvidence {
+					t.Fatalf("resolved lifecycle receipt did not persist as submitted: %#v", resolved)
+				}
+				if delta := resolved.ResolvedAt.Time.Sub(resolvedLifecycle.ResolvedAt.Time); delta < -time.Second || delta > time.Second {
+					t.Fatalf("resolvedAt changed by more than API timestamp precision: got=%s want=%s", resolved.ResolvedAt, resolvedLifecycle.ResolvedAt)
+				}
+				if got := sac.GetAnnotations()["crossplane.io/external-name"]; got != externalName {
+					t.Fatalf("external-name changed during legacy resolution: got %q, want %q", got, externalName)
+				}
+				secret = &corev1.Secret{}
+				if err := r.Get(ctx, secretName, secretNamespace, secret); err != nil {
+					t.Fatalf("legacy connection Secret was not preserved after resolution: %v", err)
+				}
+				if !reflect.DeepEqual(wantSecretData, secret.Data) {
+					t.Fatalf("legacy connection Secret data changed during resolution")
+				}
+
+				klog.V(4).Info("Legacy resolution restored healthy management; identity and connection Secret were preserved")
 				return ctx
 			},
 		)
