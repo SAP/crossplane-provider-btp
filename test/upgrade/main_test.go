@@ -43,6 +43,7 @@ const (
 
 	verifyTimeoutEnvVar = "UPGRADE_TEST_VERIFY_TIMEOUT"
 	waitForPauseEnvVar  = "UPGRADE_TEST_WAIT_FOR_PAUSE"
+	kindNodeImageTagEnv = "KIND_NODE_IMAGE_TAG"
 
 	defaultProviderRepository   = "ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp"
 	defaultControllerRepository = "ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp-controller"
@@ -165,7 +166,11 @@ func setupClusterWithCrossplane(fromTag, providerPackage, controllerPackage stri
 		}
 	})
 
-	_ = cfg.Configure(testenv, &kind.Cluster{})
+	cluster := &kind.Cluster{}
+	if tag := os.Getenv(kindNodeImageTagEnv); tag != "" {
+		kind.WithImage("kindest/node:" + tag)(cluster)
+	}
+	_ = cfg.Configure(testenv, cluster)
 
 	testenv.Setup(
 		test.ApplySecretInCrossplaneNamespace(cisSecretName, bindingSecretData),
