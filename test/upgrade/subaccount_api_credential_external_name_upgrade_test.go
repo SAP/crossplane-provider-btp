@@ -12,6 +12,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/e2e-framework/klient/wait"
@@ -47,7 +48,10 @@ func Test_SubaccountApiCredential_External_Name(t *testing.T) {
 		WithCustomPreUpgradeAssessment(
 			"verify external name before upgrade",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				sac := &securityv1alpha1.SubaccountApiCredential{}
+				sac := &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{
+					Name:      sacName,
+					Namespace: cfg.Namespace(),
+				}}
 				r := cfg.Client().Resources()
 				if err := wait.For(conditions.New(r).ResourceMatch(sac, func(object k8s.Object) bool {
 					got, ok := object.(*securityv1alpha1.SubaccountApiCredential)
@@ -95,7 +99,10 @@ func Test_SubaccountApiCredential_External_Name(t *testing.T) {
 		WithCustomPostUpgradeAssessment(
 			"verify external name after upgrade",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				sac := &securityv1alpha1.SubaccountApiCredential{}
+				sac := &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{
+					Name:      sacName,
+					Namespace: cfg.Namespace(),
+				}}
 				r := cfg.Client().Resources()
 				if err := wait.For(conditions.New(r).ResourceMatch(sac, func(object k8s.Object) bool {
 					got, ok := object.(*securityv1alpha1.SubaccountApiCredential)
