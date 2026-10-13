@@ -11,12 +11,36 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 )
 
 func ptr(s string) *string { return &s }
+
+func TestLifecycleInitializerPersistsFreshClassificationBeforeReconciliationErrors(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	if err := securityv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cr := &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: "fresh-credential", UID: types.UID("fresh-credential-uid")}}
+	kube := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(cr).WithObjects(cr).Build()
+	initializer := &LifecycleInitializer{Kube: kube}
+	if err := initializer.Initialize(ctx, cr); err != nil {
+		t.Fatalf("initialize fresh resource: %v", err)
+	}
+	persisted := &securityv1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(ctx, client.ObjectKeyFromObject(cr), persisted); err != nil {
+		t.Fatal(err)
+	}
+	if persisted.Status.Lifecycle == nil || persisted.Status.Lifecycle.Phase != securityv1alpha1.SubaccountApiCredentialPhaseEligible || persisted.Status.Lifecycle.ManagedResourceUID != string(cr.UID) {
+		t.Fatalf("fresh classification not persisted: %#v", persisted.Status.Lifecycle)
+	}
+}
 
 func TestCredentialNameFromExternalName(t *testing.T) {
 	cases := map[string]struct {

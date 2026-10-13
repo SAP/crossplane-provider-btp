@@ -104,6 +104,41 @@ func TestAbsentAnnotatedTargetRemainsEligibleForCreation(t *testing.T) {
 	}
 }
 
+func TestOwnedTargetAbsenceInvalidatesDeletionAuthority(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	if err := securityv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	subaccountID, credentialName := "subaccount-owned-absence", "credential-owned-absence"
+	cr := &securityv1alpha1.SubaccountApiCredential{
+		ObjectMeta: metav1.ObjectMeta{Name: "owned-absence", UID: types.UID("owned-absence-uid")},
+		Spec:       securityv1alpha1.SubaccountApiCredentialSpec{ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{SubaccountID: &subaccountID, Name: &credentialName}},
+		Status: securityv1alpha1.SubaccountApiCredentialStatus{Lifecycle: &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{
+			ManagedResourceUID: "owned-absence-uid", SubaccountID: subaccountID, Name: credentialName,
+			Phase: securityv1alpha1.SubaccountApiCredentialPhaseOwned, Reason: "provider-create-succeeded", AttemptID: "attempt", AttemptedAt: &metav1.Time{Time: metav1.Now().Time},
+		}},
+	}
+	kube := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(cr).WithObjects(cr).Build()
+	base := managed.ExternalClientFns{ObserveFn: func(context.Context, resource.Managed) (managed.ExternalObservation, error) {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}}
+	guarded := &lifecycleExternalClient{kube: kube, base: base}
+	if _, err := guarded.Observe(ctx, cr); err != nil {
+		t.Fatalf("observe absent owned target: %v", err)
+	}
+	persisted := &securityv1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(ctx, client.ObjectKeyFromObject(cr), persisted); err != nil {
+		t.Fatal(err)
+	}
+	if persisted.Status.Lifecycle.Phase != securityv1alpha1.SubaccountApiCredentialPhaseUncertain || persisted.Status.Lifecycle.Reason != "owned-target-observed-absent" {
+		t.Fatalf("absence did not invalidate ownership receipt: %#v", persisted.Status.Lifecycle)
+	}
+	if err := validateOwnedIdentity(persisted); err == nil {
+		t.Fatal("stale ownership receipt still authorizes a replacement target")
+	}
+}
+
 func TestLegacyObservationIsClassifiedUncertain(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
@@ -155,6 +190,20 @@ func TestIdentityUsesConfiguredAndDefaultCredentialNames(t *testing.T) {
 				t.Fatalf("credential name = %q, want %q", got.name, tc.want)
 			}
 		})
+	}
+}
+
+func TestIdentityIncludesInitProviderParameters(t *testing.T) {
+	subaccountID, credentialName := "init-subaccount", "init-credential"
+	cr := &securityv1alpha1.SubaccountApiCredential{Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+		InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{SubaccountID: &subaccountID, Name: &credentialName},
+	}}
+	identity, err := identityFor(cr)
+	if err != nil {
+		t.Fatalf("identityFor initProvider-only spec: %v", err)
+	}
+	if identity.subaccount != subaccountID || identity.name != credentialName {
+		t.Fatalf("effective initProvider identity = %#v, want %q/%q", identity, subaccountID, credentialName)
 	}
 }
 

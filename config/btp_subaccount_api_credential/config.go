@@ -2,6 +2,7 @@ package btp_subaccount_api_credential
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"unicode"
@@ -71,6 +72,12 @@ func Configure(p *config.Provider) {
 			RefFieldName:      "SubaccountRef",
 			SelectorFieldName: "SubaccountSelector",
 		}
+
+		// Persist fresh-resource eligibility before any initializer can fail and
+		// Crossplane can record a condition that would make the resource appear legacy.
+		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
+			return &LifecycleInitializer{Kube: kube}
+		})
 
 		// ADR(external-name): migrate legacy name-only annotations to
 		// "<subaccount-id>/<name>" without deleting the existing connection secret.
@@ -181,6 +188,46 @@ func subaccountIDForLegacyMigration(cr *securityv1alpha1.SubaccountApiCredential
 		return *cr.Status.AtProvider.SubaccountID
 	}
 	return ""
+}
+
+// LifecycleInitializer durably classifies a new credential before later
+// initializers can fail and cause Crossplane to record reconciliation conditions.
+type LifecycleInitializer struct {
+	Kube client.Client
+}
+
+func (i *LifecycleInitializer) Initialize(ctx context.Context, mg resource.Managed) error {
+	cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
+	if !ok {
+		return errors.New(errTypeAssertion)
+	}
+	if cr.Status.Lifecycle != nil {
+		return nil
+	}
+	legacy := len(cr.Status.Conditions) != 0
+	for _, key := range []string{meta.AnnotationKeyExternalCreatePending, meta.AnnotationKeyExternalCreateSucceeded, meta.AnnotationKeyExternalCreateFailed} {
+		if _, exists := cr.GetAnnotations()[key]; exists {
+			legacy = true
+		}
+	}
+	data, _ := json.Marshal(cr.Status.AtProvider)
+	legacy = legacy || strings.Trim(string(data), "{} \n\t") != ""
+	if legacy {
+		cr.Status.Lifecycle = &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{
+			ManagedResourceUID: string(cr.UID), Phase: securityv1alpha1.SubaccountApiCredentialPhaseUncertain,
+			Reason: "legacy-resource-requires-audited-ownership-resolution",
+		}
+		if err := i.Kube.Status().Update(ctx, cr); err != nil {
+			return errors.Wrap(err, "cannot persist legacy credential ownership uncertainty")
+		}
+		return errors.New("SubaccountApiCredential ownership is uncertain; external operations are blocked until an administrator resolves ownership")
+	}
+	// Resolve identity later in the connector, after Crossplane's reference
+	// resolution has populated any subaccount_id reference.
+	cr.Status.Lifecycle = &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{
+		ManagedResourceUID: string(cr.UID), Phase: securityv1alpha1.SubaccountApiCredentialPhaseEligible,
+	}
+	return errors.Wrap(i.Kube.Status().Update(ctx, cr), "cannot persist initial credential lifecycle classification")
 }
 
 // CompoundExternalNameInitializer migrates legacy name-only external-name annotations

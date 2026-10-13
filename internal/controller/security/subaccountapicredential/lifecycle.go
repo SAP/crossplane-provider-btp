@@ -113,6 +113,18 @@ func (c *lifecycleExternalClient) Observe(ctx context.Context, mg resource.Manag
 			restorePreObserveState(cr, before)
 			return managed.ExternalObservation{}, err
 		}
+		if !observed.ResourceExists {
+			// The receipt authorizes only the incarnation created by this MR. Once
+			// BTP confirms absence, it cannot authorize deleting a later same-name
+			// replacement. Require audited ownership resolution before any retry.
+			restorePreObserveState(cr, before)
+			cr.Status.Lifecycle.Phase = securityv1alpha1.SubaccountApiCredentialPhaseUncertain
+			cr.Status.Lifecycle.Reason = "owned-target-observed-absent"
+			if err := persistLifecycle(ctx, c.kube, cr); err != nil {
+				return managed.ExternalObservation{}, err
+			}
+			return observed, nil
+		}
 	}
 	return observed, nil
 }
@@ -221,14 +233,13 @@ func (*rejectedExternalClient) Disconnect(context.Context) error { return nil }
 type credentialIdentity struct{ subaccount, name string }
 
 func identityFor(cr *securityv1alpha1.SubaccountApiCredential) (credentialIdentity, error) {
+	params, err := cr.GetMergedParameters(true)
+	if err != nil {
+		return credentialIdentity{}, errors.Wrap(err, "cannot resolve effective credential parameters")
+	}
 	id := credentialIdentity{}
-	if cr.Spec.ForProvider.SubaccountID != nil {
-		id.subaccount = *cr.Spec.ForProvider.SubaccountID
-	}
-	name := ""
-	if cr.Spec.ForProvider.Name != nil {
-		name = *cr.Spec.ForProvider.Name
-	}
+	id.subaccount, _ = params["subaccount_id"].(string)
+	name, _ := params["name"].(string)
 	if externalName := meta.GetExternalName(cr); externalName != "" {
 		if subaccount, credentialName, ok := splitCredentialExternalName(externalName); ok {
 			if id.subaccount != "" && id.subaccount != subaccount {
@@ -328,7 +339,12 @@ func (c *lifecycleConnector) ensureLifecycle(ctx context.Context, cr *securityv1
 		if err != nil {
 			return "", err
 		}
-		if identity.subaccount != lifecycle.SubaccountID || identity.name != lifecycle.Name {
+		if lifecycle.SubaccountID == "" && lifecycle.Name == "" {
+			lifecycle.SubaccountID, lifecycle.Name = identity.subaccount, identity.name
+			if err := persistLifecycle(ctx, c.kube, cr); err != nil {
+				return "", err
+			}
+		} else if identity.subaccount != lifecycle.SubaccountID || identity.name != lifecycle.Name {
 			return "", errors.New(errCredentialRetargeted)
 		}
 	}

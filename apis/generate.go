@@ -37,10 +37,10 @@ limitations under the License.
 //go:generate go run ../cmd/generator/main.go ..
 
 // Extend the generated SubaccountApiCredential status with its handwritten lifecycle receipt.
-//go:generate go run ../scripts/extend-subaccount-api-credential-status.go -- security/v1alpha1/zz_subaccountapicredential_types.go
+//go:generate go run ../scripts/extend-subaccount-api-credential-status/main.go -- security/v1alpha1/zz_subaccountapicredential_types.go
 
 // Use the resource-specific ownership-aware connector for SubaccountApiCredential.
-//go:generate go run ../scripts/patch-subaccount-api-credential-controller.go -- ../internal/controller/security/subaccountapicredential/zz_controller.go
+//go:generate go run ../scripts/patch-subaccount-api-credential-controller/main.go -- ../internal/controller/security/subaccountapicredential/zz_controller.go
 
 // Inject custom backoff settings on top of generated controllers
 //go:generate ../hack/helpers/ctrl_inject_backoff.sh
