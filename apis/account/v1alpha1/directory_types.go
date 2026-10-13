@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 var DirectoryEntityStateOk = "OK"
@@ -88,14 +88,14 @@ type DirectoryObservation struct {
 
 // A DirectorySpec defines the desired state of a Directory.
 type DirectorySpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       DirectoryParameters `json:"forProvider"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     DirectoryParameters `json:"forProvider"`
 }
 
 // A DirectoryStatus represents the observed state of a Directory.
 type DirectoryStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          DirectoryObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 DirectoryObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

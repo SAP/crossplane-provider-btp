@@ -22,6 +22,12 @@
       "enabled": false
     },
     {
+      "description": "Digest bumps of these modules drag k8s.io past v0.35 / controller-runtime past v0.20 via go mod tidy, which the v1 line can't take",
+      "matchBaseBranches": ["release/v1_10_x"],
+      "matchPackageNames": ["github.com/crossplane/crossplane-tools", "github.com/SAP/xp-clifford"],
+      "enabled": false
+    },
+    {
       "matchBaseBranches": ["release/v1_10_x"],
       "matchUpdateTypes": ["patch", "digest"],
       "groupName": "release/v1_10_x dependencies"
@@ -68,13 +74,22 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
+        "/(^|/)Dockerfile$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s*\\nARG \\w+_DIGEST=\"?(?<currentDigest>sha256:[a-f0-9]{64})\"?"
+      ],
+      "currentValueTemplate": "latest"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
         "/(^|/)Makefile$/",
         "/(^|/)Dockerfile$/",
         "/(^|/)config.yml$/"
       ],
       "matchStrings": [
-        "(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)",
-        "TERRAFORM_NATIVE_PROVIDER_BINARY *\\?= *terraform-provider-btp_v(?<currentValue>\\d+\\.\\d+\\.\\d+)_x5"
+        "(export|ARG|--build-arg=) *TERRAFORM_PROVIDER_VERSION *[:|\\?]?= *(?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
       "datasourceTemplate": "terraform-provider",
       "versioningTemplate": "hashicorp",

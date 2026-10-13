@@ -4,7 +4,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 // SubaccountDestinationCertificateInitParameters holds reference-resolver fields.
@@ -115,15 +115,15 @@ type SubaccountDestinationCertificateObservation struct {
 
 // SubaccountDestinationCertificateSpec defines the desired state.
 type SubaccountDestinationCertificateSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       SubaccountDestinationCertificateParameters     `json:"forProvider"`
-	InitProvider      SubaccountDestinationCertificateInitParameters `json:"initProvider,omitempty"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     SubaccountDestinationCertificateParameters     `json:"forProvider"`
+	InitProvider                    SubaccountDestinationCertificateInitParameters `json:"initProvider,omitempty"`
 }
 
 // SubaccountDestinationCertificateStatus defines the observed state.
 type SubaccountDestinationCertificateStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          SubaccountDestinationCertificateObservation `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 SubaccountDestinationCertificateObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

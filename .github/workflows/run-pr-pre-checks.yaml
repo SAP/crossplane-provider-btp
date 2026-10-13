@@ -17,4 +17,4 @@ permissions:
 
 jobs:
   run-pre-checks:
-    uses: ./.github/workflows/check-all-pre-checks.lib.yaml
+    uses: SAP/crossplane-shared-workflows/.github/workflows/check-all-pre-checks.lib.yaml@main

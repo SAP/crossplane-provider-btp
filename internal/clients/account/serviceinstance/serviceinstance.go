@@ -8,9 +8,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/internal"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
@@ -101,6 +101,10 @@ func BuildComplexParameterJson(ctx context.Context, kube client.Client, secretRe
 	return parameterJson, nil
 }
 
+// TfNamePrefix prevents mapped Terraform resource names from starting with
+// a digit. Callbacks strip it to locate the native ServiceInstance.
+const TfNamePrefix = "TF-"
+
 func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServiceInstance {
 	sInstance := &v1alpha1.SubaccountServiceInstance{
 		TypeMeta: metav1.TypeMeta{
@@ -108,14 +112,13 @@ func buildBaseTfResource(si *v1alpha1.ServiceInstance) *v1alpha1.SubaccountServi
 			APIVersion: v1alpha1.CRDGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// since terraform resources are not allowed to start with a number we ensure it by prefixing them with "TF-"
-			Name: "TF-" + si.Name,
+			Name: TfNamePrefix + si.Name,
 			// make sure no naming conflicts are there for upjet tmp folder creation
 			UID:               si.UID + "-service-instance",
 			DeletionTimestamp: si.DeletionTimestamp,
 		},
 		Spec: v1alpha1.SubaccountServiceInstanceSpec{
-			ResourceSpec: xpv1.ResourceSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
 					Name: pcName(si),
 				},

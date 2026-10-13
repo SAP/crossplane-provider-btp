@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
@@ -121,7 +121,7 @@ func TestCloudManagementImport(t *testing.T) {
 						Namespace: cfg.Namespace(),
 					},
 					Spec: v1beta1.CloudManagementSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							ManagementPolicies: []xpv1.ManagementAction{
 								xpv1.ManagementActionObserve,
 								xpv1.ManagementActionCreate,
@@ -173,7 +173,7 @@ func TestCloudManagementImport(t *testing.T) {
 						},
 					},
 					Spec: v1beta1.CloudManagementSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							ManagementPolicies: []xpv1.ManagementAction{xpv1.ManagementActionObserve},
 							WriteConnectionSecretToReference: &xpv1.SecretReference{
 								Name:      cmImportName,
@@ -211,7 +211,7 @@ func TestCloudManagementImport(t *testing.T) {
 			MustGetResource(t, cfg, cmImportName, nil, cm)
 
 			// Allow resource to be deleted for teardown
-			cm.Spec.ResourceSpec.ManagementPolicies = []xpv1.ManagementAction{xpv1.ManagementActionDelete, xpv1.ManagementActionObserve}
+			cm.Spec.ClusterManagedResourceSpec.ManagementPolicies = []xpv1.ManagementAction{xpv1.ManagementActionDelete, xpv1.ManagementActionObserve}
 			if err := cfg.Client().Resources().Update(ctx, cm); err != nil {
 				t.Errorf("Failed to update CloudManagement deletion policy: %v", err)
 			}

@@ -18,104 +18,104 @@ limitations under the License.
 
 package v1beta1
 
-import xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+import xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 // GetCondition of this CloudManagement.
-func (mg *CloudManagement) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+func (mg *CloudManagement) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
 	return mg.Status.GetCondition(ct)
 }
 
 // GetDeletionPolicy of this CloudManagement.
-func (mg *CloudManagement) GetDeletionPolicy() xpv1.DeletionPolicy {
+func (mg *CloudManagement) GetDeletionPolicy() xpv2.DeletionPolicy {
 	return mg.Spec.DeletionPolicy
 }
 
 // GetManagementPolicies of this CloudManagement.
-func (mg *CloudManagement) GetManagementPolicies() xpv1.ManagementPolicies {
+func (mg *CloudManagement) GetManagementPolicies() xpv2.ManagementPolicies {
 	return mg.Spec.ManagementPolicies
 }
 
 // GetProviderConfigReference of this CloudManagement.
-func (mg *CloudManagement) GetProviderConfigReference() *xpv1.Reference {
+func (mg *CloudManagement) GetProviderConfigReference() *xpv2.Reference {
 	return mg.Spec.ProviderConfigReference
 }
 
 // GetWriteConnectionSecretToReference of this CloudManagement.
-func (mg *CloudManagement) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
+func (mg *CloudManagement) GetWriteConnectionSecretToReference() *xpv2.SecretReference {
 	return mg.Spec.WriteConnectionSecretToReference
 }
 
 // SetConditions of this CloudManagement.
-func (mg *CloudManagement) SetConditions(c ...xpv1.Condition) {
+func (mg *CloudManagement) SetConditions(c ...xpv2.Condition) {
 	mg.Status.SetConditions(c...)
 }
 
 // SetDeletionPolicy of this CloudManagement.
-func (mg *CloudManagement) SetDeletionPolicy(r xpv1.DeletionPolicy) {
+func (mg *CloudManagement) SetDeletionPolicy(r xpv2.DeletionPolicy) {
 	mg.Spec.DeletionPolicy = r
 }
 
 // SetManagementPolicies of this CloudManagement.
-func (mg *CloudManagement) SetManagementPolicies(r xpv1.ManagementPolicies) {
+func (mg *CloudManagement) SetManagementPolicies(r xpv2.ManagementPolicies) {
 	mg.Spec.ManagementPolicies = r
 }
 
 // SetProviderConfigReference of this CloudManagement.
-func (mg *CloudManagement) SetProviderConfigReference(r *xpv1.Reference) {
+func (mg *CloudManagement) SetProviderConfigReference(r *xpv2.Reference) {
 	mg.Spec.ProviderConfigReference = r
 }
 
 // SetWriteConnectionSecretToReference of this CloudManagement.
-func (mg *CloudManagement) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
+func (mg *CloudManagement) SetWriteConnectionSecretToReference(r *xpv2.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
 }
 
 // GetCondition of this ServiceManager.
-func (mg *ServiceManager) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+func (mg *ServiceManager) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
 	return mg.Status.GetCondition(ct)
 }
 
 // GetDeletionPolicy of this ServiceManager.
-func (mg *ServiceManager) GetDeletionPolicy() xpv1.DeletionPolicy {
+func (mg *ServiceManager) GetDeletionPolicy() xpv2.DeletionPolicy {
 	return mg.Spec.DeletionPolicy
 }
 
 // GetManagementPolicies of this ServiceManager.
-func (mg *ServiceManager) GetManagementPolicies() xpv1.ManagementPolicies {
+func (mg *ServiceManager) GetManagementPolicies() xpv2.ManagementPolicies {
 	return mg.Spec.ManagementPolicies
 }
 
 // GetProviderConfigReference of this ServiceManager.
-func (mg *ServiceManager) GetProviderConfigReference() *xpv1.Reference {
+func (mg *ServiceManager) GetProviderConfigReference() *xpv2.Reference {
 	return mg.Spec.ProviderConfigReference
 }
 
 // GetWriteConnectionSecretToReference of this ServiceManager.
-func (mg *ServiceManager) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
+func (mg *ServiceManager) GetWriteConnectionSecretToReference() *xpv2.SecretReference {
 	return mg.Spec.WriteConnectionSecretToReference
 }
 
 // SetConditions of this ServiceManager.
-func (mg *ServiceManager) SetConditions(c ...xpv1.Condition) {
+func (mg *ServiceManager) SetConditions(c ...xpv2.Condition) {
 	mg.Status.SetConditions(c...)
 }
 
 // SetDeletionPolicy of this ServiceManager.
-func (mg *ServiceManager) SetDeletionPolicy(r xpv1.DeletionPolicy) {
+func (mg *ServiceManager) SetDeletionPolicy(r xpv2.DeletionPolicy) {
 	mg.Spec.DeletionPolicy = r
 }
 
 // SetManagementPolicies of this ServiceManager.
-func (mg *ServiceManager) SetManagementPolicies(r xpv1.ManagementPolicies) {
+func (mg *ServiceManager) SetManagementPolicies(r xpv2.ManagementPolicies) {
 	mg.Spec.ManagementPolicies = r
 }
 
 // SetProviderConfigReference of this ServiceManager.
-func (mg *ServiceManager) SetProviderConfigReference(r *xpv1.Reference) {
+func (mg *ServiceManager) SetProviderConfigReference(r *xpv2.Reference) {
 	mg.Spec.ProviderConfigReference = r
 }
 
 // SetWriteConnectionSecretToReference of this ServiceManager.
-func (mg *ServiceManager) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
+func (mg *ServiceManager) SetWriteConnectionSecretToReference(r *xpv2.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
 }

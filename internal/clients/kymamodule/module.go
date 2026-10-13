@@ -27,6 +27,7 @@ const (
 type Client interface {
 	ObserveModule(ctx context.Context, moduleName string) (*v1alpha1.ModuleStatus, error)
 	CreateModule(ctx context.Context, moduleName string, moduleChannel string, customResourcePolicy string) error
+	UpdateModule(ctx context.Context, moduleName string, moduleChannel string) error
 	DeleteModule(ctx context.Context, moduleName string) error
 }
 
@@ -86,6 +87,20 @@ func (c *KymaModuleClient) CreateModule(ctx context.Context, moduleName string, 
 	}
 
 	kymaCR = enableModule(kymaCR, moduleName, moduleChannel, customResourcePolicy)
+
+	return updateDefaultKyma(ctx, c, kymaCR)
+}
+
+// UpdateModule changes the channel of a module already configured in the default Kyma CR.
+func (c *KymaModuleClient) UpdateModule(ctx context.Context, moduleName string, moduleChannel string) error {
+	kymaCR, err := getDefaultKyma(ctx, c)
+	if err != nil {
+		return err
+	}
+
+	if err := setModuleChannel(kymaCR, moduleName, moduleChannel); err != nil {
+		return err
+	}
 
 	return updateDefaultKyma(ctx, c, kymaCR)
 }
@@ -169,6 +184,17 @@ func enableModule(kymaCR *KymaCr, moduleName string, moduleChannel string, custo
 	})
 
 	return kymaCR
+}
+
+func setModuleChannel(kymaCR *KymaCr, moduleName string, moduleChannel string) error {
+	for i, module := range kymaCR.Spec.Modules {
+		if module.Name == moduleName {
+			kymaCR.Spec.Modules[i].Channel = moduleChannel
+			return nil
+		}
+	}
+
+	return errors.Errorf("module %q is not configured in the default Kyma CR", moduleName)
 }
 
 // Removes the specified module from the Kyma CR.

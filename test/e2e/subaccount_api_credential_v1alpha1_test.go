@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	xpmeta "github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 
@@ -128,7 +128,7 @@ func TestSubaccountApiCredentialExternalNameADRCompliance(t *testing.T) {
 				sac := &v1alpha1.SubaccountApiCredential{
 					ObjectMeta: metav1.ObjectMeta{Name: sacName, Namespace: cfg.Namespace()},
 					Spec: v1alpha1.SubaccountApiCredentialSpec{
-						ResourceSpec: xpv1.ResourceSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{
 								Name:      sacName + "-secret",
 								Namespace: cfg.Namespace(),

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"

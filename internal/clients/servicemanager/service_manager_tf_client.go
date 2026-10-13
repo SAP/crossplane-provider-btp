@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"strings"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	apisv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	apisv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
@@ -104,7 +104,7 @@ func (tfI *TfClientInitializer) serviceInstanceCr(sm *apisv1beta1.ServiceManager
 			DeletionTimestamp: sm.DeletionTimestamp,
 		},
 		Spec: apisv1alpha1.SubaccountServiceInstanceSpec{
-			ResourceSpec: xpv1.ResourceSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
 					Name: sm.GetProviderConfigReference().Name,
 				},
@@ -142,7 +142,7 @@ func (tfI *TfClientInitializer) serviceBindingCr(sm *apisv1beta1.ServiceManager)
 			DeletionTimestamp: sm.DeletionTimestamp,
 		},
 		Spec: apisv1alpha1.SubaccountServiceBindingSpec{
-			ResourceSpec: xpv1.ResourceSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
 					Name: sm.GetProviderConfigReference().Name,
 				},

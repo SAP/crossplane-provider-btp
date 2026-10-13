@@ -3,7 +3,7 @@ package rolecollectionassignment
 import (
 	"context"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"

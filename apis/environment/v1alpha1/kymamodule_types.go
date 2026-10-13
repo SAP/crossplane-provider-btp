@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 const (
@@ -36,8 +36,8 @@ type KymaModuleParameters struct {
 
 // A KymaModuleSpec defines the desired state of a KymaModule.
 type KymaModuleSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       KymaModuleParameters `json:"forProvider"`
+	xpv1.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                     KymaModuleParameters `json:"forProvider"`
 	// Deprecated: This id is not required anymore, will be ignored
 	// +kubebuilder:validation:Optional
 	KymaEnvironmentBindingId string `json:"kymaEnvironmentBindingId,omitempty"`
@@ -60,8 +60,8 @@ type KymaModuleSpec struct {
 
 // A KymaModuleStatus represents the observed state of a KymaModule.
 type KymaModuleStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          ModuleStatus `json:"atProvider,omitempty"`
+	xpv1.ManagedResourceStatus `json:",inline"`
+	AtProvider                 ModuleStatus `json:"atProvider,omitempty"`
 }
 
 // ref https://github.com/kyma-project/cli/blob/838d9b9e8506489da336bf790e4814fbe1caba0b/internal/kube/kyma/types.go#L125

@@ -6,7 +6,7 @@ import (
 	"github.com/SAP/xp-clifford/cli/export"
 	"github.com/SAP/xp-clifford/erratt"
 	"github.com/SAP/xp-clifford/yaml"
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -39,7 +39,7 @@ func convertServiceInstanceResource(ctx context.Context, btpClient *btpcli.BtpCl
 				},
 			},
 			Spec: v1alpha1.ServiceInstanceSpec{
-				ResourceSpec: v1.ResourceSpec{
+				ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 					ManagementPolicies: []v1.ManagementAction{
 						v1.ManagementActionObserve,
 					},

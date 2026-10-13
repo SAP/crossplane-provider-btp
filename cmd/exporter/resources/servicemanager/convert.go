@@ -7,7 +7,7 @@ import (
 	"github.com/SAP/xp-clifford/cli/export"
 	"github.com/SAP/xp-clifford/erratt"
 	"github.com/SAP/xp-clifford/yaml"
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
@@ -37,7 +37,7 @@ func convertServiceManagerResource(ctx context.Context, btpClient *btpcli.BtpCli
 				},
 			},
 			Spec: v1beta1.ServiceManagerSpec{
-				ResourceSpec: v1.ResourceSpec{
+				ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 					ManagementPolicies: []v1.ManagementAction{
 						v1.ManagementActionObserve,
 					},
@@ -113,7 +113,7 @@ func convertDefaultServiceManagerResource(ctx context.Context, btpClient *btpcli
 				Name: resourceName,
 			},
 			Spec: v1beta1.ServiceManagerSpec{
-				ResourceSpec: v1.ResourceSpec{
+				ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 					WriteConnectionSecretToReference: &v1.SecretReference{
 						Name:      resourceName,
 						Namespace: resources.DefaultSecretNamespace,

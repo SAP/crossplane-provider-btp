@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	cfv3 "github.com/cloudfoundry/go-cfclient/v3/client"
-	"github.com/cloudfoundry/go-cfclient/v3/config"
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
@@ -248,12 +247,6 @@ func (o organizationClient) getManagerUsernames(ctx context.Context) ([]v1alpha1
 func newOrganizationClient(organizationName string, url string, orgId string, username string, password string, origin string) (
 	*organizationClient, error,
 ) {
-	configOpts := []config.Option{config.UserPassword(username, password)}
-	if origin != "" {
-		configOpts = append(configOpts, config.Origin(origin))
-	}
-	cfv3config, err := config.New(url, configOpts...)
-
 	if organizationName == "" {
 		return nil, fmt.Errorf("missing or empty organization name")
 	}
@@ -261,6 +254,9 @@ func newOrganizationClient(organizationName string, url string, orgId string, us
 		return nil, fmt.Errorf("missing or empty orgGuid")
 	}
 
+	// Reuse an authenticated config per credential so we do not log in on every
+	// Observe (see cf_auth_cache.go).
+	cfv3config, err := cachedCFConfig(url, username, password, origin)
 	if err != nil {
 		return nil, errors.Wrap(err, errLogin)
 	}

@@ -5,9 +5,12 @@ import (
 	"net/http"
 	"net/url"
 
+	"golang.org/x/oauth2/clientcredentials"
+
 	"github.com/sap/crossplane-provider-btp/internal/clients/security"
 	xsuaa "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-xsuaa-service-api-go/pkg"
-	"golang.org/x/oauth2/clientcredentials"
+
+	"github.com/sap/crossplane-provider-btp/internal/clients/cccache"
 )
 
 func NewXsuaaUserRoleAssigner(ctx context.Context, clientId, clientSecret, tokenUrl, apiUrl string) *XsusaaUserRoleAssigner {
@@ -22,7 +25,7 @@ func NewXsuaaUserRoleAssigner(ctx context.Context, clientId, clientSecret, token
 	apiClientConfig := xsuaa.NewConfiguration()
 	apiClientConfig.Host = smURL.Host
 	apiClientConfig.Scheme = smURL.Scheme
-	apiClientConfig.HTTPClient = config.Client(ctx)
+	apiClientConfig.HTTPClient = cccache.HTTPClient(ctx, &config)
 
 	userApi := xsuaa.NewAPIClient(apiClientConfig).UsercontrollerAPI
 

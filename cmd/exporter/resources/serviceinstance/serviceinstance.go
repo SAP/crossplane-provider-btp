@@ -22,7 +22,7 @@ const (
 var (
 	instanceCache resources.ResourceCache[*serviceinstancebase.ServiceInstance]
 	instanceParam = configparam.StringSlice(KindName, "Service instance ID or regex expression for name.").
-		WithFlagName(KindName)
+			WithFlagName(KindName)
 	registry = resources.NewRegistry()
 )
 
@@ -42,8 +42,8 @@ func (e exporter) KindName() string {
 	return KindName
 }
 
-func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, resolveReferences bool) error {
-	cache, err := Get(ctx, btpClient)
+func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, options resources.Options) error {
+	cache, err := Get(ctx, btpClient, options)
 	if err != nil {
 		return fmt.Errorf("failed to get cache with service instances: %w", err)
 	}
@@ -55,13 +55,13 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 	}
 
 	for _, si := range cache.All() {
-		convert(ctx, btpClient, si, eventHandler, resolveReferences)
+		convert(ctx, btpClient, si, eventHandler, options.ResolveReferences)
 	}
 
 	return nil
 }
 
-func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache[*serviceinstancebase.ServiceInstance], error) {
+func Get(ctx context.Context, btpClient *btpcli.BtpCli, options resources.Options) (resources.ResourceCache[*serviceinstancebase.ServiceInstance], error) {
 	if instanceCache != nil {
 		return instanceCache, nil
 	}
@@ -79,20 +79,9 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 		cache.Set(si)
 	}
 
-	// Let the user select service instances that have to be exported.
-	widgetValues := cache.ValuesForSelection()
-	instanceParam.WithPossibleValuesFn(func() ([]string, error) {
-		return widgetValues.Values(), nil
-	})
-
-	selectedInstances, err := instanceParam.ValueOrAsk(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get parameter value: %s, %w", instanceParam.GetName(), err)
+	if err := resources.SelectCache(ctx, cache, instanceParam, options); err != nil {
+		return nil, err
 	}
-	slog.DebugContext(ctx, "Selected service instances", "instances", selectedInstances)
-
-	// Keep only selected service instances in the cache.
-	cache.KeepSelectedOnly(selectedInstances)
 	instanceCache = cache
 
 	return instanceCache, nil

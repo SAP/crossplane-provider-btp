@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"

@@ -18,104 +18,104 @@ limitations under the License.
 
 package v1alpha1
 
-import xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+import xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 // GetCondition of this CertBasedOIDCLogin.
-func (mg *CertBasedOIDCLogin) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+func (mg *CertBasedOIDCLogin) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
 	return mg.Status.GetCondition(ct)
 }
 
 // GetDeletionPolicy of this CertBasedOIDCLogin.
-func (mg *CertBasedOIDCLogin) GetDeletionPolicy() xpv1.DeletionPolicy {
+func (mg *CertBasedOIDCLogin) GetDeletionPolicy() xpv2.DeletionPolicy {
 	return mg.Spec.DeletionPolicy
 }
 
 // GetManagementPolicies of this CertBasedOIDCLogin.
-func (mg *CertBasedOIDCLogin) GetManagementPolicies() xpv1.ManagementPolicies {
+func (mg *CertBasedOIDCLogin) GetManagementPolicies() xpv2.ManagementPolicies {
 	return mg.Spec.ManagementPolicies
 }
 
 // GetProviderConfigReference of this CertBasedOIDCLogin.
-func (mg *CertBasedOIDCLogin) GetProviderConfigReference() *xpv1.Reference {
+func (mg *CertBasedOIDCLogin) GetProviderConfigReference() *xpv2.Reference {
 	return mg.Spec.ProviderConfigReference
 }
 
 // GetWriteConnectionSecretToReference of this CertBasedOIDCLogin.
-func (mg *CertBasedOIDCLogin) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
+func (mg *CertBasedOIDCLogin) GetWriteConnectionSecretToReference() *xpv2.SecretReference {
 	return mg.Spec.WriteConnectionSecretToReference
 }
 
 // SetConditions of this CertBasedOIDCLogin.
-func (mg *CertBasedOIDCLogin) SetConditions(c ...xpv1.Condition) {
+func (mg *CertBasedOIDCLogin) SetConditions(c ...xpv2.Condition) {
 	mg.Status.SetConditions(c...)
 }
 
 // SetDeletionPolicy of this CertBasedOIDCLogin.
-func (mg *CertBasedOIDCLogin) SetDeletionPolicy(r xpv1.DeletionPolicy) {
+func (mg *CertBasedOIDCLogin) SetDeletionPolicy(r xpv2.DeletionPolicy) {
 	mg.Spec.DeletionPolicy = r
 }
 
 // SetManagementPolicies of this CertBasedOIDCLogin.
-func (mg *CertBasedOIDCLogin) SetManagementPolicies(r xpv1.ManagementPolicies) {
+func (mg *CertBasedOIDCLogin) SetManagementPolicies(r xpv2.ManagementPolicies) {
 	mg.Spec.ManagementPolicies = r
 }
 
 // SetProviderConfigReference of this CertBasedOIDCLogin.
-func (mg *CertBasedOIDCLogin) SetProviderConfigReference(r *xpv1.Reference) {
+func (mg *CertBasedOIDCLogin) SetProviderConfigReference(r *xpv2.Reference) {
 	mg.Spec.ProviderConfigReference = r
 }
 
 // SetWriteConnectionSecretToReference of this CertBasedOIDCLogin.
-func (mg *CertBasedOIDCLogin) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
+func (mg *CertBasedOIDCLogin) SetWriteConnectionSecretToReference(r *xpv2.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
 }
 
 // GetCondition of this KubeConfigGenerator.
-func (mg *KubeConfigGenerator) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
+func (mg *KubeConfigGenerator) GetCondition(ct xpv2.ConditionType) xpv2.Condition {
 	return mg.Status.GetCondition(ct)
 }
 
 // GetDeletionPolicy of this KubeConfigGenerator.
-func (mg *KubeConfigGenerator) GetDeletionPolicy() xpv1.DeletionPolicy {
+func (mg *KubeConfigGenerator) GetDeletionPolicy() xpv2.DeletionPolicy {
 	return mg.Spec.DeletionPolicy
 }
 
 // GetManagementPolicies of this KubeConfigGenerator.
-func (mg *KubeConfigGenerator) GetManagementPolicies() xpv1.ManagementPolicies {
+func (mg *KubeConfigGenerator) GetManagementPolicies() xpv2.ManagementPolicies {
 	return mg.Spec.ManagementPolicies
 }
 
 // GetProviderConfigReference of this KubeConfigGenerator.
-func (mg *KubeConfigGenerator) GetProviderConfigReference() *xpv1.Reference {
+func (mg *KubeConfigGenerator) GetProviderConfigReference() *xpv2.Reference {
 	return mg.Spec.ProviderConfigReference
 }
 
 // GetWriteConnectionSecretToReference of this KubeConfigGenerator.
-func (mg *KubeConfigGenerator) GetWriteConnectionSecretToReference() *xpv1.SecretReference {
+func (mg *KubeConfigGenerator) GetWriteConnectionSecretToReference() *xpv2.SecretReference {
 	return mg.Spec.WriteConnectionSecretToReference
 }
 
 // SetConditions of this KubeConfigGenerator.
-func (mg *KubeConfigGenerator) SetConditions(c ...xpv1.Condition) {
+func (mg *KubeConfigGenerator) SetConditions(c ...xpv2.Condition) {
 	mg.Status.SetConditions(c...)
 }
 
 // SetDeletionPolicy of this KubeConfigGenerator.
-func (mg *KubeConfigGenerator) SetDeletionPolicy(r xpv1.DeletionPolicy) {
+func (mg *KubeConfigGenerator) SetDeletionPolicy(r xpv2.DeletionPolicy) {
 	mg.Spec.DeletionPolicy = r
 }
 
 // SetManagementPolicies of this KubeConfigGenerator.
-func (mg *KubeConfigGenerator) SetManagementPolicies(r xpv1.ManagementPolicies) {
+func (mg *KubeConfigGenerator) SetManagementPolicies(r xpv2.ManagementPolicies) {
 	mg.Spec.ManagementPolicies = r
 }
 
 // SetProviderConfigReference of this KubeConfigGenerator.
-func (mg *KubeConfigGenerator) SetProviderConfigReference(r *xpv1.Reference) {
+func (mg *KubeConfigGenerator) SetProviderConfigReference(r *xpv2.Reference) {
 	mg.Spec.ProviderConfigReference = r
 }
 
 // SetWriteConnectionSecretToReference of this KubeConfigGenerator.
-func (mg *KubeConfigGenerator) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
+func (mg *KubeConfigGenerator) SetWriteConnectionSecretToReference(r *xpv2.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 	tjcontroller "github.com/crossplane/upjet/v2/pkg/controller"
-	"github.com/crossplane/upjet/v2/pkg/terraform"
 	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/config"
 	"github.com/sap/crossplane-provider-btp/internal/clients/tfclient"
@@ -59,22 +58,18 @@ func main() {
 			"backoff-max",
 			"Maximum duration for exponential backoff for reconciling resources in error cases. Default is 60s",
 		).Default("60s").Duration()
+		reconcileTimeout = app.Flag(
+			"reconcile-timeout",
+			"Timeout for a single reconcile cycle (externalCtx budget). The reconciler adds a 30s grace period on top for status writes. Default is 1m.",
+		).Default("1m").Envar("RECONCILE_TIMEOUT").Duration()
+
+		enableTerraformSessionReuse = app.Flag(
+			"enable-terraform-session-reuse",
+			"Share configured Terraform BTP sessions across reconciliations. Disabled by default.",
+		).Default("false").Envar("ENABLE_TERRAFORM_SESSION_REUSE").Bool()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
-
-		terraformVersion = app.Flag("terraform-version", "Terraform version.").Required().Envar("TERRAFORM_VERSION").String()
-		providerSource   = app.Flag("terraform-provider-source", "Terraform provider source.").Required().Envar("TERRAFORM_PROVIDER_SOURCE").String()
-		providerVersion  = app.Flag("terraform-provider-version", "Terraform provider version.").Required().Envar("TERRAFORM_PROVIDER_VERSION").String()
 	)
-
-	tfclient.TF_VERSION_CALLBACK = func() tfclient.TfEnvVersion {
-		return tfclient.TfEnvVersion{
-			Version:         *terraformVersion,
-			Providerversion: *providerVersion,
-			ProviderSource:  *providerSource,
-			DebugLogs:       *debug,
-		}
-	}
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 
@@ -83,6 +78,7 @@ func main() {
 	ctrl.SetLogger(zl)
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
+	tfclient.SetEnableTerraformSessionReuse(*enableTerraformSessionReuse)
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
@@ -112,13 +108,13 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
-	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, backoffBase, backoffMax, enableManagementPolicies, terraformVersion, providerSource, providerVersion)
-	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, backoffBase, backoffMax, enableManagementPolicies)
+	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, backoffBase, backoffMax, enableManagementPolicies)
+	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
 
-func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool, terraformVersion *string, providerSource *string, providerVersion *string) {
+func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	o := internalopts.UpjetOptions{
 		Options: tjcontroller.Options{
 			Options: controller.Options{
@@ -128,12 +124,9 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 				MaxConcurrentReconciles: 1,
 				Features:                &feature.Flags{},
 			},
-			Provider: config.GetProvider(),
-			// use the following WorkspaceStoreOption to enable the shared gRPC mode
-			// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
-			WorkspaceStore:        terraform.NewWorkspaceStore(log),
+			Provider:              config.GetProvider(),
 			OperationTrackerStore: tjcontroller.NewOperationStore(log),
-			SetupFn:               tfclient.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
+			SetupFn:               tfclient.TerraformSetupBuilder(),
 		},
 		BackoffBase: *backoffBase,
 		BackoffMax:  *backoffMax,
@@ -146,7 +139,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
-func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
+func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	co := internalopts.CrossplaneOptions{
 		Options: controller.Options{
 			Logger:                  log,
@@ -155,8 +148,9 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
 			Features:                &feature.Flags{},
 		},
-		BackoffBase: *backoffBase,
-		BackoffMax:  *backoffMax,
+		BackoffBase:      *backoffBase,
+		BackoffMax:       *backoffMax,
+		ReconcileTimeout: *reconcileTimeout,
 	}
 
 	if *enableManagementPolicies {
