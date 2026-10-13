@@ -61,6 +61,11 @@ func (c *lifecycleConnector) Connect(ctx context.Context, mg resource.Managed) (
 			return &rejectedExternalClient{}, nil
 		}
 		return nil, errors.New(errAdoptionUnsupported)
+	case securityv1alpha1.SubaccountApiCredentialPhaseAbsent:
+		if meta.WasDeleted(cr) {
+			return &rejectedExternalClient{}, nil
+		}
+		return nil, errors.New(errOwnershipUncertain)
 	case securityv1alpha1.SubaccountApiCredentialPhaseUncertain, securityv1alpha1.SubaccountApiCredentialPhaseCreatePending:
 		return nil, errors.New(errOwnershipUncertain)
 	case securityv1alpha1.SubaccountApiCredentialPhaseOwned:
@@ -118,7 +123,7 @@ func (c *lifecycleExternalClient) Observe(ctx context.Context, mg resource.Manag
 			// BTP confirms absence, it cannot authorize deleting a later same-name
 			// replacement. Require audited ownership resolution before any retry.
 			restorePreObserveState(cr, before)
-			cr.Status.Lifecycle.Phase = securityv1alpha1.SubaccountApiCredentialPhaseUncertain
+			cr.Status.Lifecycle.Phase = securityv1alpha1.SubaccountApiCredentialPhaseAbsent
 			cr.Status.Lifecycle.Reason = "owned-target-observed-absent"
 			if err := persistLifecycle(ctx, c.kube, cr); err != nil {
 				return managed.ExternalObservation{}, err
@@ -380,7 +385,7 @@ func persistLifecycle(ctx context.Context, kube client.Client, cr *securityv1alp
 	}
 	if current.ResourceVersion != cr.ResourceVersion {
 		if reflect.DeepEqual(current.Status.Lifecycle, cr.Status.Lifecycle) {
-			cr.Status.Lifecycle = cloneLifecycleStatus(current.Status.Lifecycle)
+			syncPersistedObject(cr, current)
 			return nil
 		}
 		if !safeConcurrentLifecycleTransition(current.Status.Lifecycle, cr.Status.Lifecycle) {
@@ -394,9 +399,32 @@ func persistLifecycle(ctx context.Context, kube client.Client, cr *securityv1alp
 		}
 		return errors.Wrap(err, "cannot persist lifecycle status")
 	}
-	cr.ResourceVersion = current.ResourceVersion
-	cr.Status.Lifecycle = cloneLifecycleStatus(current.Status.Lifecycle)
+	syncPersistedObject(cr, current)
 	return nil
+}
+
+// syncPersistedObject refreshes the caller's whole object after status persistence,
+// so subsequent metadata writes retain concurrent spec edits. Only the provider's
+// external-create annotations are carried forward from the stale working object.
+func syncPersistedObject(cr, persisted *securityv1alpha1.SubaccountApiCredential) {
+	pending := map[string]string{}
+	annotations := cr.GetAnnotations()
+	for _, key := range []string{meta.AnnotationKeyExternalCreatePending, meta.AnnotationKeyExternalCreateSucceeded, meta.AnnotationKeyExternalCreateFailed} {
+		if value, ok := annotations[key]; ok {
+			pending[key] = value
+		}
+	}
+	*cr = *persisted.DeepCopy()
+	if len(pending) != 0 {
+		merged := cr.GetAnnotations()
+		if merged == nil {
+			merged = make(map[string]string, len(pending))
+		}
+		for key, value := range pending {
+			merged[key] = value
+		}
+		cr.SetAnnotations(merged)
+	}
 }
 
 func persistOwnedReceiptAfterCreate(ctx context.Context, kube client.Client, cr *securityv1alpha1.SubaccountApiCredential) error {

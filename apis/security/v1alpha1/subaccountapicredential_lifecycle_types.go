@@ -12,6 +12,7 @@ const (
 	SubaccountApiCredentialPhaseOwned         SubaccountApiCredentialLifecyclePhase = "Owned"
 	SubaccountApiCredentialPhaseRejected      SubaccountApiCredentialLifecyclePhase = "Rejected"
 	SubaccountApiCredentialPhaseUncertain     SubaccountApiCredentialLifecyclePhase = "Uncertain"
+	SubaccountApiCredentialPhaseAbsent        SubaccountApiCredentialLifecyclePhase = "Absent"
 )
 
 // SubaccountApiCredentialLifecycleStatus is a UID-bound acquisition receipt.
@@ -23,7 +24,7 @@ type SubaccountApiCredentialLifecycleStatus struct {
 	// SubaccountID and Name identify the established or attempted BTP credential.
 	SubaccountID string `json:"subaccountID,omitempty"`
 	Name         string `json:"name,omitempty"`
-	// +kubebuilder:validation:Enum=Eligible;CreatePending;Owned;Rejected;Uncertain
+	// +kubebuilder:validation:Enum=Eligible;CreatePending;Owned;Rejected;Uncertain;Absent
 	Phase       SubaccountApiCredentialLifecyclePhase `json:"phase"`
 	AttemptID   string                                `json:"attemptID,omitempty"`
 	AttemptedAt *metav1.Time                          `json:"attemptedAt,omitempty"`

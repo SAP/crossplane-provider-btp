@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
@@ -70,6 +71,41 @@ func TestCreatePersistsIntentBeforeProviderCallAndOwnershipAfterSuccess(t *testi
 	}
 }
 
+func TestPersistLifecycleRefreshesConcurrentSpecEdits(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	if err := securityv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	subaccountID, credentialName := "subaccount-concurrent", "credential-concurrent"
+	cr := &securityv1alpha1.SubaccountApiCredential{
+		ObjectMeta: metav1.ObjectMeta{Name: "concurrent-edit", UID: types.UID("concurrent-edit-uid"), Annotations: map[string]string{meta.AnnotationKeyExternalCreatePending: "true"}},
+		Spec:       securityv1alpha1.SubaccountApiCredentialSpec{ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{DeletionPolicy: xpv1.DeletionDelete}, ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{SubaccountID: &subaccountID, Name: &credentialName}},
+		Status:     securityv1alpha1.SubaccountApiCredentialStatus{Lifecycle: &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{ManagedResourceUID: "concurrent-edit-uid", SubaccountID: subaccountID, Name: credentialName, Phase: securityv1alpha1.SubaccountApiCredentialPhaseEligible}},
+	}
+	kube := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(cr).WithObjects(cr).Build()
+	stale := cr.DeepCopy()
+	latest := &securityv1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(ctx, client.ObjectKeyFromObject(cr), latest); err != nil {
+		t.Fatal(err)
+	}
+	latest.Spec.DeletionPolicy = xpv1.DeletionOrphan
+	if err := kube.Update(ctx, latest); err != nil {
+		t.Fatalf("apply concurrent user edit: %v", err)
+	}
+	stale.Status.Lifecycle.Phase = securityv1alpha1.SubaccountApiCredentialPhaseCreatePending
+	stale.Status.Lifecycle.AttemptID = "attempt"
+	if err := persistLifecycle(ctx, kube, stale); err != nil {
+		t.Fatalf("persist lifecycle status: %v", err)
+	}
+	if stale.Spec.DeletionPolicy != xpv1.DeletionOrphan {
+		t.Fatalf("stale object did not refresh concurrent deletionPolicy edit: got %q", stale.Spec.DeletionPolicy)
+	}
+	if stale.GetAnnotations()[meta.AnnotationKeyExternalCreatePending] != "true" {
+		t.Fatal("refresh discarded provider's pending external-create annotation")
+	}
+}
+
 func TestAbsentAnnotatedTargetRemainsEligibleForCreation(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
@@ -112,7 +148,7 @@ func TestOwnedTargetAbsenceInvalidatesDeletionAuthority(t *testing.T) {
 	}
 	subaccountID, credentialName := "subaccount-owned-absence", "credential-owned-absence"
 	cr := &securityv1alpha1.SubaccountApiCredential{
-		ObjectMeta: metav1.ObjectMeta{Name: "owned-absence", UID: types.UID("owned-absence-uid")},
+		ObjectMeta: metav1.ObjectMeta{Name: "owned-absence", UID: types.UID("owned-absence-uid"), DeletionTimestamp: &metav1.Time{Time: metav1.Now().Time}, Finalizers: []string{"test-finalizer"}},
 		Spec:       securityv1alpha1.SubaccountApiCredentialSpec{ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{SubaccountID: &subaccountID, Name: &credentialName}},
 		Status: securityv1alpha1.SubaccountApiCredentialStatus{Lifecycle: &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{
 			ManagedResourceUID: "owned-absence-uid", SubaccountID: subaccountID, Name: credentialName,
@@ -131,11 +167,23 @@ func TestOwnedTargetAbsenceInvalidatesDeletionAuthority(t *testing.T) {
 	if err := kube.Get(ctx, client.ObjectKeyFromObject(cr), persisted); err != nil {
 		t.Fatal(err)
 	}
-	if persisted.Status.Lifecycle.Phase != securityv1alpha1.SubaccountApiCredentialPhaseUncertain || persisted.Status.Lifecycle.Reason != "owned-target-observed-absent" {
-		t.Fatalf("absence did not invalidate ownership receipt: %#v", persisted.Status.Lifecycle)
+	if persisted.Status.Lifecycle.Phase != securityv1alpha1.SubaccountApiCredentialPhaseAbsent || persisted.Status.Lifecycle.Reason != "owned-target-observed-absent" {
+		t.Fatalf("absence did not persist deletion terminal state: %#v", persisted.Status.Lifecycle)
 	}
 	if err := validateOwnedIdentity(persisted); err == nil {
 		t.Fatal("stale ownership receipt still authorizes a replacement target")
+	}
+	connector := &lifecycleConnector{kube: kube}
+	external, err := connector.Connect(ctx, persisted)
+	if err != nil {
+		t.Fatalf("connect for local finalization retry: %v", err)
+	}
+	observation, err := external.Observe(ctx, persisted)
+	if err != nil || observation.ResourceExists {
+		t.Fatalf("absent target could not retry local finalization: observation=%#v err=%v", observation, err)
+	}
+	if _, err := external.Delete(ctx, persisted); err != nil {
+		t.Fatalf("local finalization must not require external ownership: %v", err)
 	}
 }
 

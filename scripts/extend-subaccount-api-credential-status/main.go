@@ -24,9 +24,17 @@ func main() {
 	path := args[0]
 	src, err := os.ReadFile(path)
 	must(err)
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, path, src, parser.ParseComments)
+	out, err := extend(src, path)
 	must(err)
+	must(os.WriteFile(path, out, 0o644))
+}
+
+func extend(src []byte, filename string) ([]byte, error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, filename, src, parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
 	found := false
 	for _, decl := range file.Decls {
 		gen, ok := decl.(*ast.GenDecl)
@@ -40,29 +48,35 @@ func main() {
 			}
 			st, ok := typeSpec.Type.(*ast.StructType)
 			if !ok {
-				panic("SubaccountApiCredentialStatus is not a struct")
+				return nil, fmt.Errorf("SubaccountApiCredentialStatus is not a struct")
 			}
 			found = true
 			for _, field := range st.Fields.List {
 				for _, name := range field.Names {
 					if name.Name == "Lifecycle" {
-						return
+						return src, nil
 					}
 				}
 			}
+			// AST nodes must carry source positions. Positionless nodes sort ahead
+			// of trailing Kubebuilder comments when go/format prints the file,
+			// accidentally attaching resource markers to the new struct field.
+			pos := st.Fields.Closing - 1
 			st.Fields.List = append(st.Fields.List, &ast.Field{
-				Names: []*ast.Ident{ast.NewIdent("Lifecycle")},
-				Type:  &ast.StarExpr{X: ast.NewIdent("SubaccountApiCredentialLifecycleStatus")},
-				Tag:   &ast.BasicLit{Kind: token.STRING, Value: "`json:\"lifecycle,omitempty\"`"},
+				Names: []*ast.Ident{{NamePos: pos, Name: "Lifecycle"}},
+				Type:  &ast.StarExpr{Star: pos, X: &ast.Ident{NamePos: pos, Name: "SubaccountApiCredentialLifecycleStatus"}},
+				Tag:   &ast.BasicLit{ValuePos: pos, Kind: token.STRING, Value: "`json:\"lifecycle,omitempty\"`"},
 			})
 		}
 	}
 	if !found {
-		panic("generated SubaccountApiCredentialStatus type not found")
+		return nil, fmt.Errorf("generated SubaccountApiCredentialStatus type not found")
 	}
 	var out bytes.Buffer
-	must(format.Node(&out, fset, file))
-	must(os.WriteFile(path, out.Bytes(), 0o644))
+	if err := format.Node(&out, fset, file); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
 }
 
 func must(err error) {
