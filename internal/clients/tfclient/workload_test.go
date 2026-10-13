@@ -22,6 +22,7 @@ import (
 	"github.com/crossplane/upjet/v2/pkg/terraform"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
 	"github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -136,6 +137,26 @@ func TestRealTerraformAssertionLoginAndCacheRecovery(t *testing.T) {
 	if len(assertions) != 3 || assertions[2] != testAssertion("third") {
 		t.Fatal("bounded session cache did not reauthenticate")
 	}
+}
+
+// Workload authentication must respect the default-off session reuse setting.
+func TestWorkloadSessionReuseDisabled(t *testing.T) {
+	stub := &stubProvider{}
+	p := newTerraformProvider(stub, false)
+	ctx := context.Background()
+	var schema fwprovider.SchemaResponse
+	tfprovider.New().Schema(ctx, fwprovider.SchemaRequest{}, &schema)
+	for _, token := range []string{testAssertion("first"), testAssertion("second")} {
+		raw, err := protov5DynamicValueFromMap(map[string]any{"assertion": token, "idp": "test-origin", "globalaccount": "test-ga", "cli_server_url": "https://cli.example"}, schema.Schema.Type().TerraformType(ctx))
+		require.NoError(t, err)
+		value, err := raw.Unmarshal(schema.Schema.Type().TerraformType(ctx))
+		require.NoError(t, err)
+		var resp fwprovider.ConfigureResponse
+		p.Configure(ctx, fwprovider.ConfigureRequest{Config: tfsdk.Config{Raw: value, Schema: schema.Schema}}, &resp)
+		require.False(t, resp.Diagnostics.HasError())
+	}
+	require.Equal(t, int64(2), stub.calls.Load())
+	require.Empty(t, p.entries)
 }
 
 func testAssertion(generation string) string {

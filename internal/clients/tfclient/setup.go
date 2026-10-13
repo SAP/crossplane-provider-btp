@@ -2,7 +2,6 @@ package tfclient
 
 import (
 	"context"
-
 	"os"
 	"strings"
 	"sync"

@@ -92,8 +92,11 @@ are a separate validation item.
 
 ## Token lifecycle and verification
 
-Terraform sessions reuse issuer/subject identity across JWT rotation and recycle
-at 15 minutes; HTTP/backend 401 evicts them for reconciliation retry. CF sessions
+Terraform session reuse is disabled by default. When enabled with
+`--enable-terraform-session-reuse`, sessions reuse issuer/subject identity across
+JWT rotation and recycle at 15 minutes; HTTP/backend 401 evicts them for
+reconciliation retry. Without reuse, each Configure call authenticates using the
+current projected token. CF sessions
 rebuild from the mounted token after refresh/authentication failure or 15 minutes;
 access/refresh tokens remain in memory. Native CIS user tokens reread the mounted
 JWT on token expiry/15-minute replacement; backend 401 invalidates the cached token
