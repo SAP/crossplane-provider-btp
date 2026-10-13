@@ -141,6 +141,7 @@ type SubaccountApiCredentialSpec struct {
 type SubaccountApiCredentialStatus struct {
 	v2.ManagedResourceStatus `json:",inline"`
 	AtProvider               SubaccountApiCredentialObservation `json:"atProvider,omitempty"`
+	Lifecycle                *SubaccountApiCredentialLifecycleStatus `json:"lifecycle,omitempty"`
 }
 
 // +kubebuilder:object:root=true

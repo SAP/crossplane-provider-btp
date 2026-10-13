@@ -18,6 +18,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
@@ -62,6 +63,26 @@ func testSubaccountApiCredentialExternalNameRejectsAdoption(t *testing.T, restar
 
 	feature := features.New("SubaccountApiCredential supplied external-name rejects adoption "+scenario).
 		Setup(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+			// Register before setup creates anything: Fatal/FailNow, including
+			// setup failures, must not skip best-effort external cleanup.
+			t.Cleanup(func() {
+				cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 24*time.Minute)
+				defer cancel()
+				kube := cfg.Client().Resources().GetControllerRuntimeClient()
+				credentials := []client.Object{
+					&v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: firstName}},
+					&v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: secondName}},
+					&v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: probeName}},
+				}
+				credentialErr := deleteCredentialAdoptionTestResources(cleanupCtx, kube, credentials, t.Logf, wait.WithTimeout(5*time.Minute))
+				// Always attempt the dedicated subaccount, even if an MR is stuck.
+				// Normal deletion preserves the provider's ownership safeguards.
+				subaccount := &accountv1alpha1.Subaccount{ObjectMeta: metav1.ObjectMeta{Name: subaccountResourceName}}
+				subaccountErr := deleteCredentialAdoptionTestResources(cleanupCtx, kube, []client.Object{subaccount}, t.Logf, wait.WithTimeout(8*time.Minute))
+				if credentialErr != nil || subaccountErr != nil {
+					t.Errorf("BTP cleanup unconfirmed: credentials=%v; subaccount=%v; subaccount MR=%q credential name=%q identity=%q. Cluster destruction does not remove BTP resources; confirm external cleanup before rerunning", credentialErr, subaccountErr, subaccountResourceName, credentialName, externalName)
+				}
+			})
 			resources.ImportResources(ctx, t, cfg, manifestDir)
 			waitForResource(&accountv1alpha1.Subaccount{
 				ObjectMeta: metav1.ObjectMeta{Name: subaccountResourceName},
@@ -105,6 +126,8 @@ func testSubaccountApiCredentialExternalNameRejectsAdoption(t *testing.T, restar
 			// may publish incomplete data, then get stuck in the missing-secret
 			// initializer without ever persisting Ready=True. The assertions below
 			// must fail in that case, rather than waiting eight minutes for Ready.
+			// Collision/missing-secret errors terminate the wait for diagnostics;
+			// only the explicit adoption error satisfies the assertion below.
 			err = wait.For(conditions.New(cfg.Client().Resources()).ResourceMatch(second, func(object k8s.Object) bool {
 				got := object.(*v1alpha1.SubaccountApiCredential)
 				secret := &corev1.Secret{}
@@ -147,10 +170,10 @@ func testSubaccountApiCredentialExternalNameRejectsAdoption(t *testing.T, restar
 			MustGetResource(t, cfg, secondName, nil, second)
 			AwaitResourceDeletionOrFail(ctx, t, cfg, second, wait.WithTimeout(5*time.Minute))
 
-			// Unlike a generic Synced=False assertion, require a duplicate-name
-			// collision here: unrelated reconciliation failures do not prove the
-			// original BTP credential survived cleanup. Ready means cleanup lost
-			// the credential and the probe was able to create a replacement.
+			// Require direct evidence that the BTP target still exists. Depending
+			// on the provider path, the guarded Read may reject it before Create,
+			// or Create may return a duplicate-name error. A generic Synced=False
+			// is insufficient; Ready means cleanup lost it and created a replacement.
 			probe := newOrphanRedeployCredential(probeName, probeSecret, cfg.Namespace(), credentialName, subaccountResourceName, xpv1.DeletionOrphan)
 			if err := cfg.Client().Resources().Create(ctx, probe); err != nil {
 				t.Fatalf("create post-cleanup collision probe: %v", err)
@@ -160,30 +183,19 @@ func testSubaccountApiCredentialExternalNameRejectsAdoption(t *testing.T, restar
 				synced := got.GetCondition(xpv1.TypeSynced)
 				return got.GetCondition(xpv1.TypeReady).Status == corev1.ConditionTrue ||
 					(synced.Status == corev1.ConditionFalse && synced.ObservedGeneration >= got.Generation &&
-						strings.Contains(strings.ToLower(synced.Message), "already exists"))
+						credentialExistenceProof(synced.Message))
 			}), wait.WithTimeout(8*time.Minute), wait.WithContext(ctx))
 			if err != nil {
-				t.Fatalf("post-cleanup probe neither became Ready nor confirmed a duplicate-name collision: %v", err)
+				t.Fatalf("post-cleanup probe neither became Ready nor confirmed the existing target: %v", err)
 			}
-			assertCredentialAdoptionRejected(t, ctx, cfg, probeName, probeSecret)
+			assertCredentialCollisionRejected(t, ctx, cfg, probeName, probeSecret)
 			MustGetResource(t, cfg, probeName, nil, probe)
-			if !strings.Contains(strings.ToLower(probe.GetCondition(xpv1.TypeSynced).Message), "already exists") {
-				t.Error("post-cleanup probe did not confirm that the original credential still exists")
+			if !credentialExistenceProof(probe.GetCondition(xpv1.TypeSynced).Message) {
+				t.Errorf("post-cleanup probe did not confirm the original credential still exists; got %q", probe.GetCondition(xpv1.TypeSynced).Message)
 			}
 			AwaitResourceDeletionOrFail(ctx, t, cfg, probe, wait.WithTimeout(5*time.Minute))
 			return ctx
-		}).Teardown(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-		for _, name := range []string{firstName, secondName, probeName} {
-			cr := &v1alpha1.SubaccountApiCredential{}
-			if err := cfg.Client().Resources().Get(ctx, name, "", cr); err == nil {
-				AwaitResourceDeletionOrFail(ctx, t, cfg, cr, wait.WithTimeout(5*time.Minute))
-			}
-		}
-		// The dedicated subaccount teardown also removes any orphaned test
-		// credential. No independently owned BTP credential is targeted.
-		DeleteResourcesIgnoreMissing(ctx, t, cfg, manifestDir, wait.WithTimeout(8*time.Minute))
-		return ctx
-	}).Feature()
+		}).Feature()
 
 	testenv.Test(t, feature)
 }
@@ -280,9 +292,15 @@ func newOrphanRedeployCredential(resourceName, secretName, namespace, credential
 	}
 }
 
-func assertCredentialAdoptionRejected(t *testing.T, ctx context.Context, cfg *envconf.Config, name, secretName string) {
+func assertCredentialCollisionRejected(t *testing.T, ctx context.Context, cfg *envconf.Config, name, secretName string) {
 	t.Helper()
-	assertCredentialAdoptionRejectedWithExternalName(t, ctx, cfg, name, secretName, "")
+	assertCredentialRejected(t, ctx, cfg, name, secretName, "", false)
+	cr := &v1alpha1.SubaccountApiCredential{}
+	if err := cfg.Client().Resources().Get(ctx, name, "", cr); err != nil {
+		t.Errorf("get post-cleanup collision probe %q: %v", name, err)
+	} else if synced := cr.GetCondition(xpv1.TypeSynced); !credentialExistenceProof(synced.Message) {
+		t.Errorf("post-cleanup probe did not confirm the original credential still exists; got Synced=%s/%s message=%q", synced.Status, synced.Reason, synced.Message)
+	}
 }
 
 // A supplied annotation may remain on a rejected MR; its presence alone is not
@@ -290,16 +308,16 @@ func assertCredentialAdoptionRejected(t *testing.T, ctx context.Context, cfg *en
 // still be rejected, and the provider must not retarget the annotation.
 func assertCredentialAdoptionRejectedWithExternalName(t *testing.T, ctx context.Context, cfg *envconf.Config, name, secretName, suppliedExternalName string) {
 	t.Helper()
+	assertCredentialRejected(t, ctx, cfg, name, secretName, suppliedExternalName, true)
+}
+
+func assertCredentialRejected(t *testing.T, ctx context.Context, cfg *envconf.Config, name, secretName, suppliedExternalName string, requireAdoptionError bool) {
+	t.Helper()
 	cr := &v1alpha1.SubaccountApiCredential{}
-	MustGetResource(t, cfg, name, nil, cr)
-	if ready := cr.GetCondition(xpv1.TypeReady); ready.Status == corev1.ConditionTrue {
-		t.Errorf("resource %q silently adopted the existing credential and became Ready", name)
-	}
-	if synced := cr.GetCondition(xpv1.TypeSynced); synced.Status != corev1.ConditionFalse {
-		t.Errorf("resource %q should report the unsupported collision as a reconcile error, got Synced=%s/%s", name, synced.Status, synced.Reason)
-	}
-	if got := xpmeta.GetExternalName(cr); got != "" && got != suppliedExternalName {
-		t.Errorf("rejected resource %q must not set a new external-name, got %q (supplied %q)", name, got, suppliedExternalName)
+	if err := cfg.Client().Resources().Get(ctx, name, "", cr); err != nil {
+		t.Errorf("get rejected resource %q: %v", name, err)
+	} else if err := credentialRejectionError(cr, suppliedExternalName, requireAdoptionError); err != nil {
+		t.Errorf("resource %q: %v", name, err)
 	}
 
 	secret := &corev1.Secret{}

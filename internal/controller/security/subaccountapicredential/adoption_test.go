@@ -143,6 +143,7 @@ func TestRejectsUserSuppliedExternalNameAdoption(t *testing.T) {
 	credentialName := adoptionTestName
 	suppliedExternalName := subaccountID + "/" + credentialName
 	cr := &v1alpha1.SubaccountApiCredential{
+		TypeMeta: metav1.TypeMeta{APIVersion: v1alpha1.CRDGroupVersion.String(), Kind: "SubaccountApiCredential"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "new-resource-868",
 			UID:  types.UID("new-resource-868-uid"),
@@ -169,15 +170,16 @@ func TestRejectsUserSuppliedExternalNameAdoption(t *testing.T) {
 	}
 
 	// Only the new MR exists in Kubernetes; the Secret destination is fresh.
-	kube := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cr).Build()
+	kube := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cr).WithStatusSubresource(cr).Build()
 	cfg := providerconfig.GetProvider().Resources["btp_subaccount_api_credential"]
-	connector := ujcontroller.NewTerraformPluginFrameworkConnector(
+	connector := NewGuardedConnector(
 		kube,
 		setup,
 		cfg,
 		ujcontroller.NewOperationStore(logging.NewNopLogger()),
-		ujcontroller.WithTerraformPluginFrameworkMetricRecorder(&metrics.MetricRecorder{}),
-		ujcontroller.WithTerraformPluginFrameworkLogger(logging.NewNopLogger()),
+		logging.NewNopLogger(),
+		&metrics.MetricRecorder{},
+		false,
 	)
 	ctx := context.Background()
 	observation, err := func() (managed.ExternalObservation, error) {
@@ -200,6 +202,9 @@ func TestRejectsUserSuppliedExternalNameAdoption(t *testing.T) {
 	if observation.ResourceExists {
 		t.Error("rejected adoption must not be reported as managed")
 	}
+	if diff := cmp.Diff(v1alpha1.SubaccountApiCredentialObservation{}, cr.Status.AtProvider); diff != "" {
+		t.Errorf("rejected adoption must not retain public fields from the existing credential (-want +got):\n%s", diff)
+	}
 	if len(observation.ConnectionDetails) != 0 {
 		t.Errorf("rejected adoption must not return connection details (got %d keys)", len(observation.ConnectionDetails))
 	}
@@ -213,6 +218,31 @@ func TestRejectsUserSuppliedExternalNameAdoption(t *testing.T) {
 	}
 	if transport.creates != 0 || transport.deletes != 0 {
 		t.Errorf("adoption rejection must not create/delete credentials: creates=%d deletes=%d", transport.creates, transport.deletes)
+	}
+	if cr.Status.Lifecycle == nil || cr.Status.Lifecycle.Phase != v1alpha1.SubaccountApiCredentialPhaseRejected {
+		t.Fatalf("expected persisted terminal Rejected lifecycle state, got %#v", cr.Status.Lifecycle)
+	}
+	// Reconstruct from persisted status and use a fresh external client to prove
+	// normal Delete-policy finalization takes the local no-external-resource path.
+	reloaded := &v1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(ctx, client.ObjectKeyFromObject(cr), reloaded); err != nil {
+		t.Fatalf("reload rejected MR: %v", err)
+	}
+	now := metav1.Now()
+	reloaded.DeletionTimestamp = &now
+	cleanup, err := connector.Connect(ctx, reloaded)
+	if err != nil {
+		t.Fatalf("connect rejected resource during deletion: %v", err)
+	}
+	cleanupObservation, err := cleanup.Observe(ctx, reloaded)
+	if err != nil || cleanupObservation.ResourceExists {
+		t.Errorf("rejected-resource cleanup should report local absence (observation=%#v, err=%v)", cleanupObservation, err)
+	}
+	if _, err := cleanup.Delete(ctx, reloaded); err != nil {
+		t.Errorf("rejected-resource local Delete should succeed: %v", err)
+	}
+	if transport.deletes != 0 {
+		t.Errorf("rejected-resource cleanup called BTP Delete %d times", transport.deletes)
 	}
 	// An early guard may reject before reading. If Observe does reach BTP,
 	// verify both components of the annotated identity, not the default name.

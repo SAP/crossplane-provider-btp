@@ -419,11 +419,40 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 		err error
 	}
 
+	now := metav1.Now()
+	rejectedDeletionKube := test.NewMockClient()
+	rejectedDeletionKube.MockGet = test.NewMockGetFn(nil, func(obj client.Object) error {
+		if secret, ok := obj.(*corev1.Secret); ok {
+			secret.Data = map[string][]byte{"attribute.client_id": []byte("id"), "attribute.token_url": []byte("token"), "attribute.api_url": []byte("api")}
+		}
+		return nil
+	})
 	cases := map[string]struct {
 		cr   *securityv1alpha1.SubaccountApiCredential
 		kube client.Client
 		want want
 	}{
+		"uncertain ownership reports through lifecycle guard, not secret-health initializer": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec:   securityv1alpha1.SubaccountApiCredentialSpec{ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"}}},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{Lifecycle: &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{Phase: securityv1alpha1.SubaccountApiCredentialPhaseUncertain}},
+			},
+			kube: rejectedDeletionKube,
+			want: want{err: nil},
+		},
+		"rejected deletion skips missing-secret health check": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &now},
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
+						WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"},
+					},
+				},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{Lifecycle: &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{Phase: securityv1alpha1.SubaccountApiCredentialPhaseRejected}},
+			},
+			kube: rejectedDeletionKube,
+			want: want{err: nil},
+		},
 		"no secret ref": {
 			cr:   &securityv1alpha1.SubaccountApiCredential{},
 			kube: &test.MockClient{},

@@ -269,7 +269,10 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 	// "if the certificate is omitted". Certificate-based credentials never have a
 	// client_secret, so this check must be skipped for them to avoid false positives.
 	// See: https://registry.terraform.io/providers/SAP/btp/latest/docs/resources/subaccount_api_credential
-	if cr.Spec.ForProvider.CertificatePassed == nil {
+	skipSecretHealth := cr.Status.Lifecycle != nil && (cr.Status.Lifecycle.Phase == securityv1alpha1.SubaccountApiCredentialPhaseUncertain ||
+		cr.Status.Lifecycle.Phase == securityv1alpha1.SubaccountApiCredentialPhaseCreatePending ||
+		(meta.WasDeleted(cr) && cr.Status.Lifecycle.Phase == securityv1alpha1.SubaccountApiCredentialPhaseRejected))
+	if cr.Spec.ForProvider.CertificatePassed == nil && !skipSecretHealth {
 		secretRef := cr.GetWriteConnectionSecretToReference()
 		if secretRef != nil && secretRef.Name != "" {
 			secret := &corev1.Secret{}

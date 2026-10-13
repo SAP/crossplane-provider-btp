@@ -21,15 +21,15 @@ This guide shows how to use Crossplane to configure user access to your global a
 ## Enable XSUAA
 :::warning
 
-The `SubaccountApiCredentials` can not be imported from an existing BTP landscape. Its generated secret is only correct when Crossplane initially creates the resource from scratch.
+A `SubaccountApiCredential` cannot import or adopt an existing BTP credential. Its `client_secret` is write-once and is not returned by BTP Read, so the provider cannot reconstruct the connection Secret or infer ownership from a matching external name.
 
-To fix the issue, use the BTP CLI to delete the previously generated credentials:
+If a request collides with an existing credential, delete the rejected managed resource and choose a different credential name. To reuse the same name, first intentionally remove the existing external credential, for example:
 
 ```sh
-btp delete security/api-credential managed-subaccount-api-credential --subaccount [ID]
+btp delete security/api-credential CREDENTIAL-NAME --subaccount SUBACCOUNT-ID
 ```
 
-Once deleted, `SubaccountApiCredentials` will generate a new, correct secret.
+Then create a new managed resource. Clearing the external-name annotation or changing the spec on a rejected MR does not reset its terminal rejection. See the [external-name guidance](../import-landscape/external-name.md#subaccountapicredential) for legacy upgrade and recovery details.
 
 :::
 To orchestrate users and roles in BTP, you need to have access to the underlying XSUAA. The role collections can be managed on **subaccount, global-account, and directory** level.
