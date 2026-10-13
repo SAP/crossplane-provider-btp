@@ -36,8 +36,8 @@ export BUILD_REGISTRY := index.docker.io/build-$(shell echo $(HOSTNAME)-$(ROOT_D
 -include build/makelib/output.mk
 
 # Setup Versions
-GO_REQUIRED_VERSION=1.25
-GOLANGCILINT_VERSION ?= 2.12.2
+GO_REQUIRED_VERSION=1.27
+GOLANGCILINT_VERSION ?= 2.14.0
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))
