@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/SAP/xp-clifford/cli/export"
@@ -38,7 +38,7 @@ func convertCloudManagementResource(ctx context.Context, btpClient *btpcli.BtpCl
 				},
 			},
 			Spec: v1beta1.CloudManagementSpec{
-				ResourceSpec: v1.ResourceSpec{
+				ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 					ManagementPolicies: []v1.ManagementAction{
 						v1.ManagementActionObserve,
 					},
@@ -121,7 +121,7 @@ func convertDefaultCloudManagementResource(ctx context.Context, btpClient *btpcl
 				Name: resourceName,
 			},
 			Spec: v1beta1.CloudManagementSpec{
-				ResourceSpec: v1.ResourceSpec{
+				ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 					WriteConnectionSecretToReference: &v1.SecretReference{
 						Name:      resourceName,
 						Namespace: resources.DefaultSecretNamespace,

@@ -22,13 +22,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 type DirectoryEntitlementInitParameters struct {
 
-	// (Number) The quota assigned to the directory.
-	// The quota assigned to the directory.
+	// (Number) The quota assigned to the directory. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
+	// The quota assigned to the directory. Only applicable for plans with a numeric quota (category `SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, or `ENVIRONMENT`). Setting this attribute for plans that do not support numeric quota (category `ELASTIC_SERVICE`, `ELASTIC_LIMITED`, or `APPLICATION`) will result in an error.
 	Amount *float64 `json:"amount,omitempty" tf:"amount,omitempty"`
 
 	// (Boolean) Determines whether the plans of entitlements that have a numeric quota with the amount specified in auto_distribute_amount are automatically allocated to any new subaccount that is added to the directory in the future. For entitlements without a numeric quota, it shows if the plan are assigned to any new subaccount that is added to the directory in the future (auto_distribute_amount is not needed). If the distribute parameter is set, the same assignment is also made to all subaccounts currently in the directory. Entitlements are subject to available quota in the directory.
@@ -49,11 +49,11 @@ type DirectoryEntitlementInitParameters struct {
 
 	// Reference to a Directory in account to populate directoryId.
 	// +kubebuilder:validation:Optional
-	DirectoryRef *v1.Reference `json:"directoryRef,omitempty" tf:"-"`
+	DirectoryRef *v2.Reference `json:"directoryRef,omitempty" tf:"-"`
 
 	// Selector for a Directory in account to populate directoryId.
 	// +kubebuilder:validation:Optional
-	DirectorySelector *v1.Selector `json:"directorySelector,omitempty" tf:"-"`
+	DirectorySelector *v2.Selector `json:"directorySelector,omitempty" tf:"-"`
 
 	// (Boolean) Defines the assignment of the plan with the quota specified in auto_distribute_amount to subaccounts currently located in the specified directory. For entitlements without a numeric quota, the plan is assigned to the subaccounts currently located in the directory (auto_distribute_amount is not needed). When applying this option, auto_assign must also be set.
 	// Defines the assignment of the plan with the quota specified in `auto_distribute_amount` to subaccounts currently located in the specified directory. For entitlements without a numeric quota, the plan is assigned to the subaccounts currently located in the directory (`auto_distribute_amount` is not needed). When applying this option, `auto_assign` must also be set.
@@ -74,8 +74,8 @@ type DirectoryEntitlementInitParameters struct {
 
 type DirectoryEntitlementObservation struct {
 
-	// (Number) The quota assigned to the directory.
-	// The quota assigned to the directory.
+	// (Number) The quota assigned to the directory. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
+	// The quota assigned to the directory. Only applicable for plans with a numeric quota (category `SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, or `ENVIRONMENT`). Setting this attribute for plans that do not support numeric quota (category `ELASTIC_SERVICE`, `ELASTIC_LIMITED`, or `APPLICATION`) will result in an error.
 	Amount *float64 `json:"amount,omitempty" tf:"amount,omitempty"`
 
 	// (Boolean) Determines whether the plans of entitlements that have a numeric quota with the amount specified in auto_distribute_amount are automatically allocated to any new subaccount that is added to the directory in the future. For entitlements without a numeric quota, it shows if the plan are assigned to any new subaccount that is added to the directory in the future (auto_distribute_amount is not needed). If the distribute parameter is set, the same assignment is also made to all subaccounts currently in the directory. Entitlements are subject to available quota in the directory.
@@ -130,8 +130,8 @@ type DirectoryEntitlementObservation struct {
 
 type DirectoryEntitlementParameters struct {
 
-	// (Number) The quota assigned to the directory.
-	// The quota assigned to the directory.
+	// (Number) The quota assigned to the directory. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
+	// The quota assigned to the directory. Only applicable for plans with a numeric quota (category `SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, or `ENVIRONMENT`). Setting this attribute for plans that do not support numeric quota (category `ELASTIC_SERVICE`, `ELASTIC_LIMITED`, or `APPLICATION`) will result in an error.
 	// +kubebuilder:validation:Optional
 	Amount *float64 `json:"amount,omitempty" tf:"amount,omitempty"`
 
@@ -156,11 +156,11 @@ type DirectoryEntitlementParameters struct {
 
 	// Reference to a Directory in account to populate directoryId.
 	// +kubebuilder:validation:Optional
-	DirectoryRef *v1.Reference `json:"directoryRef,omitempty" tf:"-"`
+	DirectoryRef *v2.Reference `json:"directoryRef,omitempty" tf:"-"`
 
 	// Selector for a Directory in account to populate directoryId.
 	// +kubebuilder:validation:Optional
-	DirectorySelector *v1.Selector `json:"directorySelector,omitempty" tf:"-"`
+	DirectorySelector *v2.Selector `json:"directorySelector,omitempty" tf:"-"`
 
 	// (Boolean) Defines the assignment of the plan with the quota specified in auto_distribute_amount to subaccounts currently located in the specified directory. For entitlements without a numeric quota, the plan is assigned to the subaccounts currently located in the directory (auto_distribute_amount is not needed). When applying this option, auto_assign must also be set.
 	// Defines the assignment of the plan with the quota specified in `auto_distribute_amount` to subaccounts currently located in the specified directory. For entitlements without a numeric quota, the plan is assigned to the subaccounts currently located in the directory (`auto_distribute_amount` is not needed). When applying this option, `auto_assign` must also be set.
@@ -185,8 +185,8 @@ type DirectoryEntitlementParameters struct {
 
 // DirectoryEntitlementSpec defines the desired state of DirectoryEntitlement
 type DirectoryEntitlementSpec struct {
-	v1.ResourceSpec `json:",inline"`
-	ForProvider     DirectoryEntitlementParameters `json:"forProvider"`
+	v2.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                   DirectoryEntitlementParameters `json:"forProvider"`
 	// THIS IS A BETA FIELD. It will be honored
 	// unless the Management Policies feature flag is disabled.
 	// InitProvider holds the same fields as ForProvider, with the exception
@@ -202,8 +202,8 @@ type DirectoryEntitlementSpec struct {
 
 // DirectoryEntitlementStatus defines the observed state of DirectoryEntitlement.
 type DirectoryEntitlementStatus struct {
-	v1.ResourceStatus `json:",inline"`
-	AtProvider        DirectoryEntitlementObservation `json:"atProvider,omitempty"`
+	v2.ManagedResourceStatus `json:",inline"`
+	AtProvider               DirectoryEntitlementObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -1,6 +1,6 @@
 package v1alpha1
 
-import xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+import xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 // CredentialsReference contains the credentials needed to access the xsuaa api
 type XSUAACredentialsReference struct {

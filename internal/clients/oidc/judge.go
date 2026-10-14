@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	jwt "github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/oidc/v1alpha1"
@@ -49,7 +49,7 @@ func (judge *JwtJudge) EstimateRotationDuration() (*time.Duration, error) {
 
 // IsInRenewPeriod returns if a jwt should be rotated
 func (judge *JwtJudge) IsInRenewPeriod(duration time.Duration) bool {
-	if judge.claims.Valid() != nil {
+	if jwt.NewValidator(jwt.WithIssuedAt()).Validate(judge.claims) != nil {
 		return true
 	}
 

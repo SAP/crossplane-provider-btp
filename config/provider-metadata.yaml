@@ -146,7 +146,7 @@ resources:
                 | APPLICATION | A multitenant application to which consumers can subscribe. As opposed to applications defined as a 'QUOTA_BASED_APPLICATION', these applications do not have a numeric quota and are simply enabled or disabled as entitlements per subaccount. |
                 | QUOTA_BASED_APPLICATION | A multitenant application to which consumers can subscribe. As opposed to applications defined as 'APPLICATION', these applications have an numeric quota that limits consumer usage of the subscribed application per subaccount. |
                 | ENVIRONMENT |  An environment service; for example, Cloud Foundry. |
-            amount: (Number) The quota assigned to the directory.
+            amount: (Number) The quota assigned to the directory. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
             auto_assign: (Boolean) Determines whether the plans of entitlements that have a numeric quota with the amount specified in auto_distribute_amount are automatically allocated to any new subaccount that is added to the directory in the future. For entitlements without a numeric quota, it shows if the plan are assigned to any new subaccount that is added to the directory in the future (auto_distribute_amount is not needed). If the distribute parameter is set, the same assignment is also made to all subaccounts currently in the directory. Entitlements are subject to available quota in the directory.
             auto_distribute_amount: (Number) The quota of the specified plan automatically allocated to any new subaccount that is created in the future in the directory. When applying this option, auto_assign and/or distribute must also be set. Applies only to entitlements that have a numeric quota.
             category: '(String) The current state of the entitlement. Possible values are:'
@@ -463,6 +463,7 @@ resources:
                   "origin": "my-own-origin-platform"
                 }
         argumentDocs:
+            auto_create_shadow_users: (Boolean) Indicates whether shadow users are automatically created.
             description: (String) Description of the trust configuration.
             domain: (String) The tenant's domain which should be used for user logon.
             id: (String, Deprecated) The origin of the identity provider.
@@ -630,7 +631,7 @@ resources:
             - name: destination-with-additional-configuration
               manifest: |-
                 {
-                  "additional_configuration": "${jsonencode({\n    ClientID            = \"\u003cclientid\u003e\"\n    ClientSecret        = \"\u003cclientsecret\u003e\"\n    TokenServiceURL     = \"https://tokenurl\"\n    TokenServiceURLType = \"dedicated\"\n  })}",
+                  "additional_configuration": "${jsonencode({\n    clientId            = \"\u003cclientid\u003e\"\n    clientSecret        = \"\u003cclientsecret\u003e\"\n    tokenServiceURL     = \"https://tokenurl\"\n    tokenServiceURLType = \"Dedicated\"\n  })}",
                   "authentication": "OAuth2ClientCredentials",
                   "description": "resource",
                   "name": "destination-with-additional-configuration",
@@ -863,7 +864,7 @@ resources:
                 | APPLICATION | A multitenant application to which consumers can subscribe. As opposed to applications defined as a 'QUOTA_BASED_APPLICATION', these applications do not have a numeric quota and are simply enabled or disabled as entitlements per subaccount. |
                 | QUOTA_BASED_APPLICATION | A multitenant application to which consumers can subscribe. As opposed to applications defined as 'APPLICATION', these applications have an numeric quota that limits consumer usage of the subscribed application per subaccount. |
                 | ENVIRONMENT |  An environment service; for example, Cloud Foundry. |
-            amount: (Number) The quota assigned to the subaccount.
+            amount: (Number) The quota assigned to the subaccount. Only applicable for plans with a numeric quota (category SERVICE, QUOTA_BASED_APPLICATION, PLATFORM, or ENVIRONMENT). Setting this attribute for plans that do not support numeric quota (category ELASTIC_SERVICE, ELASTIC_LIMITED, or APPLICATION) will result in an error.
             category: '(String) The current state of the entitlement. Possible values are:'
             created_date: (String) The date and time when the resource was created in RFC3339 format.
             id: (String) The ID of the entitled service plan.

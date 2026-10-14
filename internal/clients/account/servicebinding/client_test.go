@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +48,7 @@ func TestServiceBindingClient_CreateInstance(t *testing.T) {
 			UID: "test-uid-123",
 		},
 		Spec: v1alpha1.ServiceBindingSpec{
-			ResourceSpec: xpv1.ResourceSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
 					Name: "test-provider-config",
 				},
@@ -185,7 +185,7 @@ func TestServiceBindingClient_DeleteInstance(t *testing.T) {
 			UID: "test-uid-123",
 		},
 		Spec: v1alpha1.ServiceBindingSpec{
-			ResourceSpec: xpv1.ResourceSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
 					Name: "test-provider-config",
 				},
@@ -312,7 +312,7 @@ func TestServiceBindingClient_ObserveInstance(t *testing.T) {
 			UID: "test-uid-123",
 		},
 		Spec: v1alpha1.ServiceBindingSpec{
-			ResourceSpec: xpv1.ResourceSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
 					Name: "test-provider-config",
 				},
@@ -465,7 +465,7 @@ func TestServiceBindingClient_buildSubaccountServiceBinding(t *testing.T) {
 			DeletionTimestamp: &metav1.Time{Time: time.Now()},
 		},
 		Spec: v1alpha1.ServiceBindingSpec{
-			ResourceSpec: xpv1.ResourceSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 				ProviderConfigReference: &xpv1.Reference{
 					Name: "test-provider-config",
 				},

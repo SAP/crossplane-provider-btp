@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -61,7 +61,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 						},
 					},
 					Spec: v1beta1.CloudManagementSpec{
-						ResourceSpec: v1.ResourceSpec{
+						ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 							ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 							WriteConnectionSecretToReference: &v1.SecretReference{
 								Name:      resourceName,
@@ -104,11 +104,11 @@ func TestConvertCloudManagementResource(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: siResourceName,
 							Annotations: map[string]string{
-								"crossplane.io/external-name": subaccountID + "," + instanceID, // service instance format
+								"crossplane.io/external-name": instanceID, // service instance format
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      siResourceName,
@@ -156,7 +156,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
@@ -203,7 +203,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
@@ -254,7 +254,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
@@ -303,7 +303,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
@@ -353,7 +353,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
@@ -402,7 +402,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
@@ -451,7 +451,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
@@ -491,7 +491,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
@@ -551,7 +551,7 @@ func TestConvertCloudManagementResource(t *testing.T) {
 							},
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								ManagementPolicies: []v1.ManagementAction{v1.ManagementActionObserve},
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
@@ -628,7 +628,7 @@ func TestConvertDefaultCloudManagementResource(t *testing.T) {
 						Name: resourceName,
 					},
 					Spec: v1beta1.CloudManagementSpec{
-						ResourceSpec: v1.ResourceSpec{
+						ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &v1.SecretReference{
 								Name:      resourceName,
 								Namespace: resources.DefaultSecretNamespace,
@@ -661,7 +661,7 @@ func TestConvertDefaultCloudManagementResource(t *testing.T) {
 							Name: resources.UndefinedName,
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resources.UndefinedName,
 									Namespace: resources.DefaultSecretNamespace,
@@ -693,7 +693,7 @@ func TestConvertDefaultCloudManagementResource(t *testing.T) {
 							Name: resourceName,
 						},
 						Spec: v1beta1.CloudManagementSpec{
-							ResourceSpec: v1.ResourceSpec{
+							ClusterManagedResourceSpec: v1.ClusterManagedResourceSpec{
 								WriteConnectionSecretToReference: &v1.SecretReference{
 									Name:      resourceName,
 									Namespace: resources.DefaultSecretNamespace,

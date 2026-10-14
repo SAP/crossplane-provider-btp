@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"sync/atomic"
 
-	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -35,24 +35,21 @@ const (
 	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
 )
 
-// frameworkProvider returns the BTP provider's plugin-framework implementation,
-// called in-process by upjet's no-fork client. terraform.Setup.FrameworkProvider
-// must be non-nil for framework-reconciled resources; upjet otherwise fails with
-// "cannot retrieve framework provider".
-//
-// Lazy on purpose: btp.SetDebug() runs in main(), so an init-time btp.IsDebug()
-// would always read false and debug HTTP tracing would never reach the provider.
+// enableTerraformSessionReuse is configured once at startup before clients exist.
+var enableTerraformSessionReuse atomic.Bool
+
+// SetEnableTerraformSessionReuse opts into sharing configured Terraform clients.
+// Call before creating any connectors. Session reuse is disabled by default.
+func SetEnableTerraformSessionReuse(enable bool) { enableTerraformSessionReuse.Store(enable) }
+
+// frameworkProvider is initialized after startup flags and logging are configured.
+// Configure owns the reuse decision; both modes retain the integration wrapper.
 var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
-	if btp.IsDebug() {
-		return tfprovider.NewWithClient(btp.DebugPrintHTTPClient())
-	}
-	return tfprovider.New()
+	return newBTPFrameworkProvider(enableTerraformSessionReuse.Load())
 })
 
-// TerraformSetupBuilder builds a terraform.SetupFn for the generated
-// (standalone) upjet controllers. It resolves the ProviderConfig and tracks
-// its usage. The returned Setup only carries FrameworkProvider + Configuration:
-// no-fork calls the provider in-process, so Version/Requirement are unused.
+// TerraformSetupBuilder builds a terraform.SetupFn for the generated upjet
+// controllers: it resolves the ProviderConfig and tracks its usage.
 func TerraformSetupBuilder() terraform.SetupFn {
 	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
 		ps := terraform.Setup{
@@ -117,10 +114,9 @@ func TerraformSetupBuilder() terraform.SetupFn {
 	}
 }
 
-// TerraformSetupBuilderNoTracking is the setup builder for the hybrid
-// (class-2) internal connectors. It skips ProviderConfigUsage / reference
-// tracking because the outer native controller already tracks the
-// user-facing CR.
+// TerraformSetupBuilderNoTracking is the setup builder for the hybrid internal
+// connectors; it skips usage tracking because the outer native controller
+// already tracks the user-facing CR.
 func TerraformSetupBuilderNoTracking() terraform.SetupFn {
 	return func(ctx context.Context, client client.Client, mg resource.Managed) (terraform.Setup, error) {
 		ps := terraform.Setup{
@@ -173,10 +169,7 @@ func TerraformSetupBuilderNoTracking() terraform.SetupFn {
 
 // NewInternalTfConnector creates the internal Terraform connector for
 // resourceName. callbackProvider may be nil where async completion is not
-// routed back to a CR. Every configured resource is framework-reconciled
-// (no-fork): the provider's Go functions are called in-process, no workspace on
-// disk, no terraform binary, and no identity injection — the framework client
-// threads resource identity itself via the operation tracker.
+// routed back to a CR.
 func NewInternalTfConnector(client client.Client, resourceName string, gvk schema.GroupVersionKind, useAsync bool, callbackProvider tjcontroller.CallbackProvider) managed.ExternalConnector {
 	zl := zap.New(zap.UseDevMode(btp.IsDebug()))
 	setupFn := TerraformSetupBuilderNoTracking()

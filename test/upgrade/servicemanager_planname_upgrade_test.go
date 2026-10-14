@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	accountv1beta1 "github.com/sap/crossplane-provider-btp/apis/account/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,7 +32,7 @@ var (
 // default planName changed from service-operator-access to subaccount-admin
 // (#925), and the two versions resolve planName differently:
 //
-//   - v1alpha1 has no planName field, so the plan resolves to the runtime
+//   - v1alpha1 had no planName field in v1.13.0, so the plan resolves to the runtime
 //     DefaultPlanName. An instance created on the old default must not be updated
 //     to the new one on upgrade: the service plan is immutable in BTP, so an
 //     in-place update calls update_instance and BTP rejects it with

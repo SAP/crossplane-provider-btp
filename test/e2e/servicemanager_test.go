@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	xpmeta "github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"

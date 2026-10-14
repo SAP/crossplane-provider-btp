@@ -9,7 +9,7 @@ PROJECT_REPO := github.com/sap/$(PROJECT_NAME)
 export TERRAFORM_VERSION ?= 1.16.2
 export TERRAFORM_PROVIDER_SOURCE ?= SAP/btp
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/SAP/terraform-provider-btp
-export TERRAFORM_PROVIDER_VERSION ?= 1.26.0
+export TERRAFORM_PROVIDER_VERSION ?= 1.27.0
 export TERRAFORM_DOCS_PATH ?= docs/resources
 
 # set BUILD_ID if its not running in an action
@@ -36,8 +36,8 @@ export BUILD_REGISTRY := index.docker.io/build-$(shell echo $(HOSTNAME)-$(ROOT_D
 -include build/makelib/output.mk
 
 # Setup Versions
-GO_REQUIRED_VERSION=1.25
-GOLANGCILINT_VERSION ?= 2.12.2
+GO_REQUIRED_VERSION=1.27
+GOLANGCILINT_VERSION ?= 2.14.0
 
 NPROCS ?= 1
 GO_TEST_PARALLEL := $(shell echo $$(( $(NPROCS) / 2 )))

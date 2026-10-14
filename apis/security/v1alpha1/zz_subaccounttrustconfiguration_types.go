@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	v2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 )
 
 type SubaccountTrustConfigurationInitParameters struct {
@@ -73,11 +73,11 @@ type SubaccountTrustConfigurationInitParameters struct {
 
 	// Reference to a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+	SubaccountRef *v2.Reference `json:"subaccountRef,omitempty" tf:"-"`
 
 	// Selector for a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+	SubaccountSelector *v2.Selector `json:"subaccountSelector,omitempty" tf:"-"`
 }
 
 type SubaccountTrustConfigurationObservation struct {
@@ -196,17 +196,17 @@ type SubaccountTrustConfigurationParameters struct {
 
 	// Reference to a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountRef *v1.Reference `json:"subaccountRef,omitempty" tf:"-"`
+	SubaccountRef *v2.Reference `json:"subaccountRef,omitempty" tf:"-"`
 
 	// Selector for a Subaccount in account to populate subaccountId.
 	// +kubebuilder:validation:Optional
-	SubaccountSelector *v1.Selector `json:"subaccountSelector,omitempty" tf:"-"`
+	SubaccountSelector *v2.Selector `json:"subaccountSelector,omitempty" tf:"-"`
 }
 
 // SubaccountTrustConfigurationSpec defines the desired state of SubaccountTrustConfiguration
 type SubaccountTrustConfigurationSpec struct {
-	v1.ResourceSpec `json:",inline"`
-	ForProvider     SubaccountTrustConfigurationParameters `json:"forProvider"`
+	v2.ClusterManagedResourceSpec `json:",inline"`
+	ForProvider                   SubaccountTrustConfigurationParameters `json:"forProvider"`
 	// THIS IS A BETA FIELD. It will be honored
 	// unless the Management Policies feature flag is disabled.
 	// InitProvider holds the same fields as ForProvider, with the exception
@@ -222,8 +222,8 @@ type SubaccountTrustConfigurationSpec struct {
 
 // SubaccountTrustConfigurationStatus defines the observed state of SubaccountTrustConfiguration.
 type SubaccountTrustConfigurationStatus struct {
-	v1.ResourceStatus `json:",inline"`
-	AtProvider        SubaccountTrustConfigurationObservation `json:"atProvider,omitempty"`
+	v2.ManagedResourceStatus `json:",inline"`
+	AtProvider               SubaccountTrustConfigurationObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

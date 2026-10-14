@@ -38,8 +38,9 @@ jobs:
   # Approval job detects user's author association and bypasses the manual approval step for certain users.
   approve:
     needs: [detect-only-doc-changes]
-    # need the always so that this job is not skipped if detect-only fails for any reason
-    if: always() && needs.detect-only-doc-changes.outputs.has-only-doc-changes != 'true'
+    # !cancelled() so that this job is not skipped if detect-only fails for any reason,
+    # but (unlike always()) still lets a run cancel stop it. See run-e2e-test below.
+    if: ${{ !cancelled() && needs.detect-only-doc-changes.outputs.has-only-doc-changes != 'true' }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR') && 'pr-e2e-no-approval' || 'pr-e2e-approval' }}
@@ -48,7 +49,10 @@ jobs:
       - run: echo "Approved"
   run-e2e-test:
     needs: [approve, detect-only-doc-changes]
-    if: always() && (needs.approve.result == 'success' || needs.approve.result == 'skipped')
+    # Must not be always(): on cancel GitHub re-evaluates this condition and does not
+    # cancel jobs where it is still true, which would defeat cancel-in-progress above.
+    # The condition applies to every job in the reusable workflow, matrix legs included.
+    if: ${{ !cancelled() && (needs.approve.result == 'success' || needs.approve.result == 'skipped') }}
     uses: SAP/crossplane-shared-workflows/.github/workflows/check-e2e-tests.lib.yaml@main
     with:
       checkout-ref: ${{ github.event.pull_request.head.sha }}
