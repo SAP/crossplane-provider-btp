@@ -34,6 +34,25 @@ type ServiceManagerParameters struct {
 	SubaccountSelector *xpv1.Selector `json:"subaccountSelector,omitempty"`
 	// +kubebuilder:validation:Optional
 	SubaccountRef *xpv1.Reference `json:"subaccountRef,omitempty" reference-group:"account.btp.sap.crossplane.io" reference-kind:"Subaccount" reference-apiversion:"v1alpha1"`
+
+	// Mirrored from v1beta1: with conversion strategy None, every served version
+	// must declare the fields the storage version defaults (crd_versions_test.go).
+
+	// Planname for service manager instance
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Enum=subaccount-admin;service-operator-access;container;subaccount-audit
+	// +kubebuilder:default:=subaccount-admin
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="planName can't be updated once set"
+	PlanName string `json:"planName,omitempty"`
+
+	// Name of created service instance, Defaults to "managed-service-manager"
+	// +kubebuilder:default:=managed-service-manager
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serviceInstanceName can't be updated once set"
+	ServiceInstanceName string `json:"serviceInstanceName,omitempty"`
+	// Name of created service binding, Defaults to "managed-service-manager-binding"
+	// +kubebuilder:default:=managed-service-manager-binding
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serviceBindingName can't be updated once set"
+	ServiceBindingName string `json:"serviceBindingName,omitempty"`
 }
 
 // ServiceManagerObservation are the observable fields of a ServiceManager.
