@@ -71,6 +71,24 @@ func TestCreatePersistsIntentBeforeProviderCallAndOwnershipAfterSuccess(t *testi
 	}
 }
 
+func TestPersistLifecyclePreservesCreateReturnedExternalName(t *testing.T) {
+	cr := &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{meta.AnnotationKeyExternalName: "subaccount/created-name"}}}
+	persisted := &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
+	syncPersistedObject(cr, persisted)
+	if got := meta.GetExternalName(cr); got != "subaccount/created-name" {
+		t.Fatalf("Create-produced external-name was lost while refreshing object: got %q", got)
+	}
+}
+
+func TestPersistLifecycleDoesNotOverwriteConcurrentExternalName(t *testing.T) {
+	cr := &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{meta.AnnotationKeyExternalName: "subaccount/created-name"}}}
+	persisted := &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{meta.AnnotationKeyExternalName: "concurrent/user-value"}}}
+	syncPersistedObject(cr, persisted)
+	if got := meta.GetExternalName(cr); got != "concurrent/user-value" {
+		t.Fatalf("concurrent external-name was overwritten: got %q", got)
+	}
+}
+
 func TestPersistLifecycleRefreshesConcurrentSpecEdits(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()

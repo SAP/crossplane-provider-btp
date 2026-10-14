@@ -109,9 +109,24 @@ func Test_SubaccountApiCredential_External_Name(t *testing.T) {
 				r := cfg.Client().Resources()
 				if err := wait.For(conditions.New(r).ResourceMatch(sac, func(object k8s.Object) bool {
 					got, ok := object.(*securityv1alpha1.SubaccountApiCredential)
-					return ok && got.Status.Lifecycle != nil && got.Status.Lifecycle.Phase == securityv1alpha1.SubaccountApiCredentialPhaseUncertain
+					if !ok || got.Status.Lifecycle == nil || got.Status.Lifecycle.Phase != securityv1alpha1.SubaccountApiCredentialPhaseUncertain {
+						return false
+					}
+					externalName := got.GetAnnotations()["crossplane.io/external-name"]
+					parts := strings.SplitN(externalName, "/", 2)
+					if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+						return false
+					}
+					subaccountID := ""
+					if got.Spec.ForProvider.SubaccountID != nil {
+						subaccountID = *got.Spec.ForProvider.SubaccountID
+					}
+					if subaccountID == "" && got.Status.AtProvider.SubaccountID != nil {
+						subaccountID = *got.Status.AtProvider.SubaccountID
+					}
+					return subaccountID != "" && parts[0] == subaccountID
 				}), wait.WithTimeout(5*time.Minute), wait.WithContext(ctx)); err != nil {
-					t.Fatalf("wait for legacy ownership-uncertain classification: %v", err)
+					t.Fatalf("wait for legacy ownership classification and normalized compound external-name: %v", err)
 				}
 
 				if err := r.Get(ctx, sacName, cfg.Namespace(), sac); err != nil {

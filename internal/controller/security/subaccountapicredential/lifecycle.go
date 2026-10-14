@@ -404,24 +404,29 @@ func persistLifecycle(ctx context.Context, kube client.Client, cr *securityv1alp
 }
 
 // syncPersistedObject refreshes the caller's whole object after status persistence,
-// so subsequent metadata writes retain concurrent spec edits. Only the provider's
-// external-create annotations are carried forward from the stale working object.
+// so subsequent metadata writes retain concurrent spec edits. Provider-generated
+// external-create annotations are carried forward, as is a Create-produced
+// external-name when the persisted object does not yet have one.
 func syncPersistedObject(cr, persisted *securityv1alpha1.SubaccountApiCredential) {
-	pending := map[string]string{}
 	annotations := cr.GetAnnotations()
+	providerAnnotations := map[string]string{}
 	for _, key := range []string{meta.AnnotationKeyExternalCreatePending, meta.AnnotationKeyExternalCreateSucceeded, meta.AnnotationKeyExternalCreateFailed} {
 		if value, ok := annotations[key]; ok {
-			pending[key] = value
+			providerAnnotations[key] = value
 		}
 	}
+	returnedExternalName, returnedExternalNameSet := annotations[meta.AnnotationKeyExternalName]
 	*cr = *persisted.DeepCopy()
-	if len(pending) != 0 {
-		merged := cr.GetAnnotations()
+	merged := cr.GetAnnotations()
+	if len(providerAnnotations) != 0 || (returnedExternalNameSet && meta.GetExternalName(cr) == "") {
 		if merged == nil {
-			merged = make(map[string]string, len(pending))
+			merged = make(map[string]string, len(providerAnnotations)+1)
 		}
-		for key, value := range pending {
+		for key, value := range providerAnnotations {
 			merged[key] = value
+		}
+		if returnedExternalNameSet && meta.GetExternalName(cr) == "" {
+			merged[meta.AnnotationKeyExternalName] = returnedExternalName
 		}
 		cr.SetAnnotations(merged)
 	}

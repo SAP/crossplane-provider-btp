@@ -42,6 +42,40 @@ func TestLifecycleInitializerPersistsFreshClassificationBeforeReconciliationErro
 	}
 }
 
+func TestLifecycleInitializerClearsPendingCreateForKnownRejectedResource(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	if err := securityv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cr := &securityv1alpha1.SubaccountApiCredential{
+		ObjectMeta: metav1.ObjectMeta{Name: "rejected-credential", UID: types.UID("rejected-credential-uid"), Annotations: map[string]string{
+			meta.AnnotationKeyExternalCreatePending: "2026-10-14T00:00:00Z",
+			"crossplane.io/external-name":           "subaccount/existing-credential",
+		}},
+		Status: securityv1alpha1.SubaccountApiCredentialStatus{Lifecycle: &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{
+			ManagedResourceUID: "rejected-credential-uid", Phase: securityv1alpha1.SubaccountApiCredentialPhaseRejected, Reason: "create-collision",
+		}},
+	}
+	kube := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(cr).WithObjects(cr).Build()
+	if err := (&LifecycleInitializer{Kube: kube}).Initialize(ctx, cr); err != nil {
+		t.Fatalf("initialize known-rejected resource: %v", err)
+	}
+	persisted := &securityv1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(ctx, client.ObjectKeyFromObject(cr), persisted); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := persisted.GetAnnotations()[meta.AnnotationKeyExternalCreatePending]; ok {
+		t.Fatal("known-rejected resource retained external-create-pending and will be blocked before connector finalization")
+	}
+	if meta.GetExternalName(persisted) != "subaccount/existing-credential" {
+		t.Fatal("clearing the pending marker modified the target identity")
+	}
+	if persisted.Status.Lifecycle.Phase != securityv1alpha1.SubaccountApiCredentialPhaseRejected {
+		t.Fatalf("clearing the marker changed rejection receipt: %#v", persisted.Status.Lifecycle)
+	}
+}
+
 func TestCredentialNameFromExternalName(t *testing.T) {
 	cases := map[string]struct {
 		externalName string

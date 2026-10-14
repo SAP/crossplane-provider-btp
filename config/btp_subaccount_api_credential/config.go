@@ -202,6 +202,18 @@ func (i *LifecycleInitializer) Initialize(ctx context.Context, mg resource.Manag
 		return errors.New(errTypeAssertion)
 	}
 	if cr.Status.Lifecycle != nil {
+		// Crossplane checks external-create-pending immediately after initialization,
+		// before the connector can provide local finalization. A durable Rejected
+		// receipt proves this MR did not acquire the collided target, so clear the
+		// incomplete-create marker and let the connector finalize locally.
+		if cr.Status.Lifecycle.Phase == securityv1alpha1.SubaccountApiCredentialPhaseRejected {
+			if _, pending := cr.GetAnnotations()[meta.AnnotationKeyExternalCreatePending]; pending {
+				annotations := cr.GetAnnotations()
+				delete(annotations, meta.AnnotationKeyExternalCreatePending)
+				cr.SetAnnotations(annotations)
+				return errors.Wrap(i.Kube.Update(ctx, cr), "cannot clear pending-create marker for known-rejected credential")
+			}
+		}
 		return nil
 	}
 	legacy := len(cr.Status.Conditions) != 0
