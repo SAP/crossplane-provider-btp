@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crossplane-contrib/xp-testing/pkg/resources"
+	"github.com/crossplane-contrib/xp-testing/pkg/envvar"
 	"github.com/crossplane-contrib/xp-testing/pkg/xpenvfuncs"
 	xpmeta "github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
@@ -44,14 +44,15 @@ func TestSubaccountApiCredentialExternalNameRejectsAdoptionWithoutRestart(t *tes
 
 func testSubaccountApiCredentialExternalNameRejectsAdoption(t *testing.T, restartProvider bool) {
 	t.Helper()
-	const subaccountResourceName = "sac-orphan-subaccount"
-	manifestDir := crsPath("SubaccountApiCredentialOrphanImport")
 	prefix := "sac-868-ann-"
 	scenario := "with provider restart"
+	subaccountScenario := "restart"
 	if !restartProvider {
 		prefix = "sac-868-ann-nr-"
 		scenario = "without provider restart"
+		subaccountScenario = "no-restart"
 	}
+	subaccountResourceName := "sac-orphan-subaccount-" + subaccountScenario
 	credentialName := prefix + BUILD_ID
 	firstName := prefix + "first-" + BUILD_ID
 	secondName := prefix + "adopt-" + BUILD_ID
@@ -83,10 +84,22 @@ func testSubaccountApiCredentialExternalNameRejectsAdoption(t *testing.T, restar
 					t.Errorf("BTP cleanup unconfirmed: credentials=%v; subaccount=%v; subaccount MR=%q credential name=%q identity=%q. Cluster destruction does not remove BTP resources; confirm external cleanup before rerunning", credentialErr, subaccountErr, subaccountResourceName, credentialName, externalName)
 				}
 			})
-			resources.ImportResources(ctx, t, cfg, manifestDir)
-			waitForResource(&accountv1alpha1.Subaccount{
+			subaccount := &accountv1alpha1.Subaccount{
 				ObjectMeta: metav1.ObjectMeta{Name: subaccountResourceName},
-			}, cfg, t, wait.WithTimeout(12*time.Minute))
+				Spec: accountv1alpha1.SubaccountSpec{
+					ForProvider: accountv1alpha1.SubaccountParameters{
+						DisplayName:      BUILD_ID + "-subaccount-sac-orphan-import-" + subaccountScenario,
+						Region:           "eu10",
+						Subdomain:        BUILD_ID + "-e2e-sac-orphan-import-" + subaccountScenario,
+						Labels:           map[string]accountv1alpha1.SubaccountLabelValueList{"safe-to-delete": {"yes"}, "BUILD_ID": {BUILD_ID}},
+						SubaccountAdmins: []string{envvar.GetOrPanic(TECHNICAL_USER_EMAIL_ENV_KEY)},
+					},
+				},
+			}
+			if err := cfg.Client().Resources().Create(ctx, subaccount); err != nil {
+				t.Fatalf("create scenario-specific subaccount: %v", err)
+			}
+			waitForResource(subaccount, cfg, t, wait.WithTimeout(12*time.Minute))
 
 			first := newOrphanRedeployCredential(firstName, firstSecret, cfg.Namespace(), credentialName, subaccountResourceName, xpv1.DeletionOrphan)
 			if err := cfg.Client().Resources().Create(ctx, first); err != nil {
