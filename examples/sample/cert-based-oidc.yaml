@@ -22,5 +22,17 @@ spec:
   writeConnectionSecretToRef:
     name: oidc-token
     namespace: crossplane-system
-# To generate cert secret from downloaded cert:
-# kubectl create secret generic example-login-cert-secret --namespace=crossplane-system --from-file=cert=/tmp/personal.p12
+# The certificate secret may hold EITHER a PKCS#12 keystore OR a PEM bundle;
+# the provider auto-detects the format.
+#
+# PKCS#12 (as downloaded from SAP IAS) — a password is required:
+# kubectl create secret generic example-login-cert-secret --namespace=crossplane-system \
+#   --from-file=cert=/tmp/personal.p12 --from-literal=password=<p12-password>
+#
+# PEM — recommended for FIPS deployments. The PKCS#12 is unlocked once, by hand,
+# so the provider never performs PKCS#12 key derivation or MAC verification
+# (no cryptography outside Go's FIPS-validated standard library). The private
+# key must be unencrypted, and `password.source` can be set to `None`:
+# openssl pkcs12 -in /tmp/personal.p12 -nodes -out /tmp/personal.pem
+# kubectl create secret generic example-login-cert-secret --namespace=crossplane-system \
+#   --from-file=cert=/tmp/personal.pem

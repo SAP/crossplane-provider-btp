@@ -80,6 +80,27 @@ func Test_parseCert(t *testing.T) {
 				return true
 			},
 		})
+
+		// Same key material supplied as an (unencrypted) PEM bundle must be
+		// auto-detected and produce the identical tls.Certificate, without
+		// touching the PKCS#12 code path.
+		combinedPEM := append(append([]byte{}, store.cert...), append([]byte("\n"), store.key...)...)
+		tests = append(tests, certLoginTest{
+			name: store.name + "-pem",
+			args: certLoginTestArgs{
+				data:                     combinedPEM,
+				password:                 "",
+				containsCertificateChain: containsCertificateChain,
+			},
+			want: certificate,
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				if err != nil {
+					t.Errorf("%s", err.Error())
+					return false
+				}
+				return true
+			},
+		})
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -91,6 +112,32 @@ func Test_parseCert(t *testing.T) {
 			assert.Equalf(t, tt.want.PrivateKey, got.PrivateKey, "check private key")
 		})
 	}
+}
+
+func Test_isPEM(t *testing.T) {
+	stores, err := lookupTestKeyStores()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	for _, store := range stores {
+		assert.Truef(t, isPEM(store.cert), "%s cert.pem should be detected as PEM", store.name)
+		assert.Falsef(t, isPEM(store.p12), "%s keystore.p12 (binary DER) must not be detected as PEM", store.name)
+	}
+}
+
+func Test_parsePEMCertificate_errors(t *testing.T) {
+	stores, err := lookupTestKeyStores()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	store := stores[0]
+
+	// A PEM bundle with a certificate but no private key cannot form a
+	// tls.Certificate and must return an error rather than a zero value.
+	_, err = parseCert(store.cert, "", false)
+	assert.Error(t, err, "cert-only PEM (no private key) should error")
 }
 
 func lookupTestKeyStores() ([]testKeyStoreData, error) {

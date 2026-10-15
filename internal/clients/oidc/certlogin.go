@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -181,6 +182,21 @@ func (cLogin *CertLogin) callAuthorizeEndpoint(cert tls.Certificate, authorizeUr
 
 func parseCert(data []byte, password string, containsCertificateChain bool) (tls.Certificate, error) {
 
+	// The credential may be provided either as a PKCS#12 keystore (the format
+	// SAP IAS hands out) or as a PEM bundle that an operator has already
+	// unlocked (e.g. `openssl pkcs12 -in cert.p12 -nodes -out cert.pem`). We
+	// auto-detect PEM by the presence of a PEM block header; PKCS#12 is binary
+	// DER and never contains it.
+	//
+	// The PEM path is preferable in FIPS deployments: it performs no PKCS#12
+	// key derivation or MAC verification, so no cryptography runs outside Go's
+	// standard-library (FIPS-validated) path. The private key must be
+	// unencrypted; an encrypted PEM key would reintroduce a key-derivation step
+	// and is rejected by tls.X509KeyPair.
+	if isPEM(data) {
+		return parsePEMCertificate(data)
+	}
+
 	privKey, leafCert, caCerts, err := pkcs12.DecodeChain(data, password)
 	if err != nil {
 		return tls.Certificate{}, err
@@ -200,6 +216,28 @@ func parseCert(data []byte, password string, containsCertificateChain bool) (tls
 		PrivateKey:  privKey,
 	}
 	return pair, nil
+}
+
+// isPEM reports whether data looks like a PEM-encoded bundle. PKCS#12 keystores
+// are binary DER and never contain a PEM block header, so this is sufficient to
+// distinguish the two credential formats.
+func isPEM(data []byte) bool {
+	return bytes.Contains(data, []byte("-----BEGIN"))
+}
+
+// parsePEMCertificate builds a tls.Certificate from a PEM bundle containing the
+// certificate (optionally with its chain) and an unencrypted private key, in
+// either order. tls.X509KeyPair collects every CERTIFICATE block from the first
+// argument and the key block from the second, so a single combined blob can be
+// passed as both. For PEM the file content is authoritative: whichever
+// certificates it contains are presented, so the containsCertificateChain flag
+// (a PKCS#12-only concern) does not apply.
+func parsePEMCertificate(data []byte) (tls.Certificate, error) {
+	cert, err := tls.X509KeyPair(data, data)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("parsing PEM certificate (the private key must be unencrypted): %w", err)
+	}
+	return cert, nil
 }
 
 func parseClaims(idToken string) (jwt.MapClaims, error) {
