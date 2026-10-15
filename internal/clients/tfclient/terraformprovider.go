@@ -104,7 +104,7 @@ func (p *terraformProvider) Configure(ctx context.Context, req fwprovider.Config
 
 	p.mu.Lock()
 	e, ok := p.entries[key]
-	if !ok || workload && time.Since(e.created) >= 15*time.Minute {
+	if !ok || workload && time.Since(e.created) >= btp.WorkloadSessionRefreshInterval {
 		e = &cacheEntry{created: time.Now()}
 		p.entries[key] = e
 	}

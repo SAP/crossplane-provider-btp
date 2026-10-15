@@ -15,6 +15,9 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// WorkloadSessionRefreshInterval bounds reuse before authenticating with a fresh projection.
+const WorkloadSessionRefreshInterval = 15 * time.Minute
+
 // Every replacement token starts with the current projection. No user password,
 // static IAS secret, refresh-token dependency or change to CIS binding ownership.
 type workloadCISTokenSource struct {
@@ -34,7 +37,7 @@ func workloadCISHTTPClient(credentials *Credentials) *http.Client {
 func (s *workloadCISTokenSource) Token() (*oauth2.Token, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.token != nil && s.token.Valid() && time.Since(s.acquired) < 15*time.Minute {
+	if s.token != nil && s.token.Valid() && time.Since(s.acquired) < WorkloadSessionRefreshInterval {
 		return s.token, nil
 	}
 	u := s.credentials.WorkloadIdentity

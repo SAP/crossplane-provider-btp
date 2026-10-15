@@ -125,7 +125,7 @@ func (t *workloadCFTransport) renew() error {
 func (t *workloadCFTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if time.Since(t.created) >= 15*time.Minute {
+	if time.Since(t.created) >= btp.WorkloadSessionRefreshInterval {
 		if err := t.renew(); err != nil {
 			return nil, err
 		}
