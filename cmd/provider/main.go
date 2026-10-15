@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/fips140"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,6 +77,16 @@ func main() {
 	zl := zap.New(zap.UseDevMode(*debug))
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	ctrl.SetLogger(zl)
+
+	// Log FIPS 140-3 status at startup so the running pod self-evidences whether
+	// the Go Cryptographic Module (CMVP #5247) is active in approved mode.
+	// With GOFIPS140=certified at build time this will always be true; the log line
+	// provides an auditable artifact. See https://go.dev/doc/security/fips140
+	log.Info("FIPS 140-3 status",
+		"enabled", fips140.Enabled(),
+		"module_version", fips140.Version(),
+	)
+
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
 	tfclient.SetEnableTerraformSessionReuse(*enableTerraformSessionReuse)
