@@ -17,6 +17,10 @@
   "prHourlyLimit": 0,
   "packageRules": [
     {
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
+    {
       "matchBaseBranches": ["release/v1_10_x"],
       "matchUpdateTypes": ["major", "minor", "pin", "replacement", "rollback", "bump"],
       "enabled": false
