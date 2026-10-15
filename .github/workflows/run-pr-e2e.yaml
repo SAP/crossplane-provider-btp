@@ -33,7 +33,7 @@ concurrency:
 
 jobs:
   detect-only-doc-changes:
-    uses: SAP/crossplane-shared-workflows/.github/workflows/detect-only-doc-changes.lib.yaml@main
+    uses: SAP/crossplane-shared-workflows/.github/workflows/detect-only-doc-changes.lib.yaml@29ddbec3a9647a0101129e9f82343da13300fac4 # main
 
   # Approval job detects user's author association and bypasses the manual approval step for certain users.
   approve:
@@ -53,7 +53,7 @@ jobs:
     # cancel jobs where it is still true, which would defeat cancel-in-progress above.
     # The condition applies to every job in the reusable workflow, matrix legs included.
     if: ${{ !cancelled() && (needs.approve.result == 'success' || needs.approve.result == 'skipped') }}
-    uses: SAP/crossplane-shared-workflows/.github/workflows/check-e2e-tests.lib.yaml@main
+    uses: SAP/crossplane-shared-workflows/.github/workflows/check-e2e-tests.lib.yaml@29ddbec3a9647a0101129e9f82343da13300fac4 # main
     with:
       checkout-ref: ${{ github.event.pull_request.head.sha }}
       skip: ${{ needs.detect-only-doc-changes.outputs.has-only-doc-changes == 'true' }}
