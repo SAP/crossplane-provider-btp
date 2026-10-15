@@ -18,4 +18,4 @@ permissions:
 
 jobs:
   run-codeql:
-    uses: SAP/crossplane-shared-workflows/.github/workflows/check-codeql.lib.yaml@main
+    uses: SAP/crossplane-shared-workflows/.github/workflows/check-codeql.lib.yaml@29ddbec3a9647a0101129e9f82343da13300fac4 # main

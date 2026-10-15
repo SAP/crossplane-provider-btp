@@ -13,4 +13,4 @@ permissions:
 
 jobs:
   call-reusable-workflow:
-    uses: openmcp-project/.github/workflows/addRefinedIssuesToBacklog.yml@0c5001308949dd70b18f57fc98af36490e6d1e0e # main
+    uses: openmcp-project/.github/workflows/addRefinedIssuesToBacklog.yml@1ac28bcc2f3073406d528708f5026645422f0f39 # main

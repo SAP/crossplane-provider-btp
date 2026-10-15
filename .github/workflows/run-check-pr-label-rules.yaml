@@ -9,6 +9,6 @@ permissions: {}
 
 jobs:
   check-pr-label-rules:
-    uses: SAP/crossplane-shared-workflows/.github/workflows/check-pr-label-rules.lib.yaml@main
+    uses: SAP/crossplane-shared-workflows/.github/workflows/check-pr-label-rules.lib.yaml@29ddbec3a9647a0101129e9f82343da13300fac4 # main
     with:
       labels: ${{ toJSON(github.event.pull_request.labels.*.name) }}
