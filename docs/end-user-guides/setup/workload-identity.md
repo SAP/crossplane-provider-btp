@@ -96,7 +96,7 @@ Keep the quotes around the dotted `kubernetes.io` property. The result must equa
 can run pods as that SA or request its tokens. The outgoing application subject
 can remain IAS **User ID**, with `mail` sourced from **Email**.
 
-Use an appropriate JWKS refresh interval and verify the saved settings. A
+Use an appropriate JWKS refresh interval. A
 Kubernetes issuer may lack browser authorization/token endpoints; do not invent
 endpoints or add a secret to suppress a browser-SSO warning. For this setup,
 **Apply Application Configurations** was off; review your tenant/application
@@ -117,8 +117,8 @@ collections under that exact origin.
   In the cockpit select the IAS origin; in CLI assignments include
   `--of-idp BTP_ORIGIN`. Omitting it selects a different identity (`sap.default`).
 - In IAS, open **SAP Business Technology Platform → Trust → Trust Corporate
-  Identity Providers → Edit**. Select the specific cluster IdP, save, and reopen
-  to verify its checkbox. Keep **Allow logon with all configured corporate
+  Identity Providers → Edit**. Select the specific cluster IdP and save.
+  Keep **Allow logon with all configured corporate
   identity providers** off. A visible IdP row alone is not selected trust.
 
 BTP role assignment can create its shadow user; it does not create the IAS user.
@@ -130,26 +130,118 @@ Skip this section for native **service-client** mode. CLI/CF assertion login use
 the BTP integration; native **user-preserving CIS** additionally requires a
 confidential OpenID Connect consumer application in IAS.
 
-Use the official [JWT client authentication](https://help.sap.com/docs/cloud-identity-services/cloud-identity-services/auth-configure-jwt-for-oauth-client-authentication?locale=en-US)
-and [API consumption/dependency](https://help.sap.com/docs/cloud-identity-services/cloud-identity-services/consume-api-from-provider-application)
-guides to create the consumer. Its required configuration is:
+In the **IAS administration console**, under **Applications & Resources →
+Applications**, configure these two applications:
 
-| Consumer setting | Required value |
+- **Target application:** the existing **SAP Business Technology Platform**
+  application under **Bundled Applications**, associated with your BTP platform
+  trust. It provides the API and determines the BTP token audience.
+- **Consumer application:** a separate OpenID Connect application that you create
+  for the BTP provider workload. It trusts the cluster JWT and consumes that API.
+
+### 3.1. Enable the API on the target BTP application
+
+1. In the IAS administration console, open **Applications & Resources → Applications**.
+2. In the application list, expand **Bundled Applications** and select **SAP
+   Business Technology Platform**. If several BTP applications are listed, use
+   the one associated with the platform trust from step 2.
+3. In that application's **Trust** tab, select **Provided APIs** under
+   **Application APIs**.
+4. Enable **Allow all APIs for principal propagation** and select **Save**.
+
+The target permission and consumer dependency are separate settings. The
+dependency selects the target/API; it does not enable API exposure on the target.
+Without this permission, IAS rejects the exchange with `invalid_target` and
+`doesn't provide the requested api: principal-propagation`, even when workload
+authentication succeeds and the consumer dependency exists.
+
+Use the actual BTP application: its client ID must be the audience trusted by the
+CIS binding's XSUAA service. This API permission is separate from **Allow logon
+with all configured corporate identity providers**; keep that logon setting off
+and retain the selected cluster IdP trust from step 2. BTP roles are still required.
+
+### 3.2. Create the workload consumer application
+
+1. Return to **Applications & Resources → Applications** and select **Create**.
+2. Create an application with protocol **OpenID Connect** and a descriptive
+   display name, for example **BTP provider workload**. This is a new consumer;
+   keep the existing bundled BTP application as the target.
+3. Select the newly created application in the list. In its **Trust** tab, open
+   **OpenID Connect Configuration → Configure** and set a stable application
+   name, for example `btp-provider-workload`.
+4. Within **OpenID Connect Configuration**, open **Authentication → Grant Types
+   → Edit**. Enable **JWT Bearer** and disable grants unused by this workload
+   flow. Save the configuration. Browser redirect URLs are unnecessary for the
+   JWT-bearer flow.
+
+Keep this **consumer application selected** for sections 3.3–3.5. Their Trust-tab
+settings belong to the consumer, not the bundled BTP application.
+
+### 3.3. Configure JWT client authentication on the consumer
+
+1. In the consumer's **Trust** tab, select **Client Authentication** under
+   **Application APIs**.
+2. Open **JSON Web Tokens → Configure Trust by Issuer → Add** and choose
+   **Manual Configuration**.
+3. Enter the following values:
+
+| JWT client trust field | Value |
 |---|---|
-| OpenID Connect Configuration | Stable application name; **JWT Bearer** grant enabled; unused grants disabled |
-| Client Authentication → JSON Web Tokens → Configure Trust by Issuer | Issuer `CLUSTER_ISSUER`, JWKS `CLUSTER_JWKS_URI` |
-| JWT client trust Subject | `system:serviceaccount:PROVIDER_NAMESPACE:SERVICEACCOUNT_NAME` |
-| JWT client trust Audience | Exact `IAS_ISSUER`, matching the projected token audience |
-| Enable Public Client Flows | Disabled; generate no IAS client secret or private signing key |
-| Trust Corporate Identity Providers | Explicitly select the cluster IdP, save and reopen; keep allow-all disabled |
-| Dependencies → APIs | Dependency Name `btp-principal-propagation`, Application **SAP Business Technology Platform**, its **All APIs / Allow all APIs for principal propagation** entry |
-| Provider `iasClientId` | Generated consumer Client ID, not the BTP application's ID or display name |
-| Provider `iasResource` | `urn:sap:identity:application:provider:name:btp-principal-propagation` |
+| Issuer | `CLUSTER_ISSUER` |
+| JWKS URI | `CLUSTER_JWKS_URI` |
+| Subject | `system:serviceaccount:PROVIDER_NAMESPACE:SERVICEACCOUNT_NAME` |
+| Audience | Exact `IAS_ISSUER`, matching the projected token audience |
 
-Choose an appropriate JWKS refresh interval and verify both the dialog and parent
-editor were saved. Client JWT trust and Corporate IdP user trust are separate:
-client authentication can succeed while user exchange fails. Select actual API
-dropdown entries and reopen the dependency to verify it persisted.
+4. Choose an appropriate JWKS refresh interval. Save the issuer-trust dialog and
+   then save the parent **Client Authentication** editor.
+5. Keep **Enable Public Client Flows** disabled. Generate no IAS client secret or
+   private signing key: the cluster's projected JWT authenticates this client.
+6. Record the consumer's generated **Client ID** shown in **Client
+   Authentication** as `IAS_CONSUMER_CLIENT_ID`.
+
+See the official [JWT client authentication guide](https://help.sap.com/docs/cloud-identity-services/cloud-identity-services/auth-configure-jwt-for-oauth-client-authentication?locale=en-US)
+for details of this editor.
+
+### 3.4. Select the cluster IdP for user federation on the consumer
+
+1. In the consumer's **Trust** tab, select **Trust Corporate Identity Providers**
+   under **Conditional Authentication**, then select **Edit**.
+2. Select the specific cluster Corporate IdP created in step 1. Keep **Allow
+   logon with all configured corporate identity providers** off.
+3. Select **Save**.
+
+This user-federation trust is separate from JWT client authentication in section
+3.3. Client authentication can succeed while user exchange fails if this IdP is
+not selected.
+
+### 3.5. Add the BTP API dependency on the consumer
+
+1. In the consumer's **Trust** tab, select **Dependencies** under **Application
+   APIs**.
+2. Select the **APIs** tab and then **Add**.
+3. Enter a **Dependency Name**, for example `btp-principal-propagation`; record it
+   as `DEPENDENCY_NAME`.
+4. In the **Application** dropdown, select the existing **SAP Business Technology
+   Platform** target configured in section 3.1.
+5. In the **API** dropdown, select **All APIs / Allow all APIs for principal
+   propagation**, as advertised by that target. Select the actual dropdown entry.
+6. Select **Save**.
+
+See the official [API consumption/dependency guide](https://help.sap.com/docs/cloud-identity-services/cloud-identity-services/consume-api-from-provider-application)
+for details of this editor.
+
+### 3.6. Transfer the consumer identifiers to ProviderConfig
+
+Use these values in the **Kubernetes ProviderConfig** shown in step 4:
+
+| ProviderConfig field | Value |
+|---|---|
+| `spec.workloadIdentity.iasUrl` | `IAS_TOKEN_BASE_URL` |
+| `spec.workloadIdentity.iasClientId` | `IAS_CONSUMER_CLIENT_ID` from the consumer's Client Authentication view |
+| `spec.workloadIdentity.iasResource` | `urn:sap:identity:application:provider:name:DEPENDENCY_NAME`, for example `urn:sap:identity:application:provider:name:btp-principal-propagation` |
+
+The consumer's client ID differs from its application ID and from the bundled
+BTP application's client ID. Use the value recorded in section 3.3.
 
 The provider submits the projected JWT as both user and client assertion. It
 requests an IAS **access JWT addressed to BTP**, then exchanges it at the manual
@@ -290,6 +382,7 @@ require a restart.
 | Cannot read assertion / expired claims | Token mount/path, SA identity, kubelet rotation and clock |
 | IAS client authentication fails | Exact issuer/JWKS/subject/audience in consumer JWT client trust; confidential client ID |
 | `Invalid trust configured for token issuer` | Consumer's Corporate IdP checkbox is actually selected and saved; client auth may succeed independently |
+| IAS `invalid_target`: target does not provide `principal-propagation` | On the target BTP application, enable and save **Trust → Provided APIs → Allow all APIs for principal propagation**; then verify the consumer dependency targets that application/API |
 | XSUAA says parties are missing from audience | Saved BTP dependency and `iasResource`; use IAS access JWT addressed to BTP |
 | Provider rejects email/origin mismatch | IAS NameID lookup, user mail mapping, configured email and exact BTP origin |
 | Native API 401/403 | Binding central/local plan, token tenant/audience, user's target roles; token issuance alone is not authorization proof |
