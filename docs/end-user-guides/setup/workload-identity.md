@@ -570,6 +570,18 @@ setup, complete all managed deletion first, then remove obsolete Kubernetes
 Secrets, service bindings/instances and the dedicated IAS consumer through their
 own administration processes.
 
+## Changing the workload principal
+
+Restart the provider after changing the trusted workload's issuer, ServiceAccount
+subject, audience, or its IAS/BTP identity mapping. Update the IAS trust, BTP role
+assignments and ProviderConfig together before the restart. Native CIS pins the
+principal of a cached token source and rejects a different principal with
+`native CIS workload principal changed; restart required`. Restarting clears the
+in-memory clients and authenticates the new identity.
+
+Normal kubelet token rotation for the same issuer, subject and audience does not
+require a restart.
+
 ## Troubleshooting
 
 | Symptom | Check |

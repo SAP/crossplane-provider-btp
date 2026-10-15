@@ -103,6 +103,11 @@ JWT on token expiry/15-minute replacement; backend 401 invalidates the cached to
 for the next reconcile without replaying a potentially mutating native API call.
 Server session policy, revocation and long-duration expiry are separate gates.
 
+Operators must restart the provider when changing the workload issuer, subject,
+audience or IAS/BTP identity mapping. Native CIS pins the cached token source's
+principal and rejects a different principal until restart clears the in-memory
+clients. Ordinary projection rotation for the same principal needs no restart.
+
 Tests cover existing password paths, both Terraform builders, manual CIS metadata,
 real CF/JWT protocol, concurrent login, rotation/principal isolation, access-token
 expiry, rejected/absent refresh tokens and 401 invalidation. Live tests must record
