@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	stdlog "log"
 	"net/http"
 	"net/url"
 	"os"
@@ -86,7 +85,9 @@ func (s *workloadCISTokenSource) Token() (*oauth2.Token, error) {
 	s.principal = principal
 	s.token = native
 	s.acquired = time.Now()
-	stdlog.Printf("Native CIS workload user login succeeded assertion_iat=%.0f assertion_exp=%.0f", claims["iat"], claims["exp"])
+	if log != nil {
+		log.Info("Native CIS workload user login succeeded", "assertionIssuedAt", claims["iat"], "assertionExpiresAt", claims["exp"])
+	}
 	return native, nil
 }
 
