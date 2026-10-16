@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
@@ -35,17 +36,27 @@ const (
 	errCouldNotParseUserCredential = "error while parsing sa-provider-secret JSON"
 )
 
-// enableTerraformSessionReuse is configured once at startup before clients exist.
-var enableTerraformSessionReuse atomic.Bool
+// Pool sizing/TTL are configured once at startup before clients exist.
+var (
+	tfPoolSize atomic.Int64
+	tfPoolTTL  atomic.Int64 // nanoseconds
+)
 
-// SetEnableTerraformSessionReuse opts into sharing configured Terraform clients.
-// Call before creating any connectors. Session reuse is disabled by default.
-func SetEnableTerraformSessionReuse(enable bool) { enableTerraformSessionReuse.Store(enable) }
+// SetTerraformSessionPool configures the warmed session pool. size 0 disables the
+// pool (fresh client per reconcile), 1 is a single shared session, >=2 is the pool.
+// Call before creating any connectors.
+func SetTerraformSessionPool(size int, ttl time.Duration) {
+	tfPoolSize.Store(int64(size))
+	tfPoolTTL.Store(int64(ttl))
+}
 
 // frameworkProvider is initialized after startup flags and logging are configured.
-// Configure owns the reuse decision; both modes retain the integration wrapper.
+// Configure owns the pooling; all sizes retain the integration wrapper.
 var frameworkProvider = sync.OnceValue(func() fwprovider.Provider {
-	return newBTPFrameworkProvider(enableTerraformSessionReuse.Load())
+	return newBTPFrameworkProvider(poolConfig{
+		size: int(tfPoolSize.Load()),
+		ttl:  time.Duration(tfPoolTTL.Load()),
+	})
 })
 
 // TerraformSetupBuilder builds a terraform.SetupFn for the generated upjet
