@@ -25,7 +25,7 @@ Based on this definition, common assumptions are:
 ## Our Approach
 
 ### Definition
-The external-name (string) identifies the external resource in the external system. 
+The external-name (string) identifies the external resource in the external system.
 A provider can adopt two qualities:
 
 1. The existance of the external-name express that there should be an external resource it identifies. So if the user creates a MR with the external-name set, the user explicitly states that this resource should exists in the external system (to its best knowledge) and should be adopted/matched. This prevents unintended adoption/matching of existing resources. This is also an advantage over capturing user intent via managment policies, as they would not prevent unintended matching of existing resources.
@@ -38,7 +38,7 @@ This is easy in the case of a unique identifier. If we have a compound key, we d
 #### Compound-Key External Name Format
 
 If we have an external name that requires multiple values from the spec as key, the delimiter is `/`. The advantage is that this is part of the url path and therefore unlikely to be used in the identifying fields.
-The key should be case-sensitive, in the sense that the values from the compound keys are used directly for the API calls. By treating it case-sensitive, we cover APIs that are case-sensitive and insensitive. 
+The key should be case-sensitive, in the sense that the values from the compound keys are used directly for the API calls. By treating it case-sensitive, we cover APIs that are case-sensitive and insensitive.
 Trailing/leading spaces are not allowed. Length limit for the external-name is 512 characters.
 
 ### Special Case: defaulting of external-name
@@ -179,8 +179,8 @@ a `PROCESSING_FAILED` assignment with a nil `Amount` satisfies both.
 
 
 #### Create()
-We know that the resource does not exist so we perform the Create API Request. 
-If the request is sucessful, set the external-name with the necessary GUID or compound key from the API response/spec.ForProvider. 
+We know that the resource does not exist so we perform the Create API Request.
+If the request is sucessful, set the external-name with the necessary GUID or compound key from the API response/spec.ForProvider.
 It might be possible that the API works asynchronous and the final external-name is not available after the request. This is a possible szenario but out of scope here.
 
 If the response is `creation failed – resource already exist`, we treat it as an error. We do NOT set the external-name. In the next reconcile Observe(), the resource will be shown as resourceExist: False since the external name is not set and we intend to stay in an error loop. The error documents that the resource could not be created because it already exists. To resume, the user needs to set the external-name properly.
@@ -206,6 +206,42 @@ If the response is 404 – not found (or the equivalent API response for this AP
 If our delete request is successful, we return EVEN IF the deletion operation is performed async by the external system (in the next reconcile Observe(), the resourceExist field will be checked by crossplane-runtime and Delete() is called again if the resource still exists). Should the resource still exist in next reconcile, Delete() is triggered again but we check for the deletion state in the external system (= status.observation being something like `DELETING` or so) so we don’t perform another Delete(). If this is not possible, we have to perform another DELETE API call, treat a possible error response as error and return it. Once the resource is deleted in the external system, the Observe() function will determine resourceExist: false and crossplane-runtime removed the MR.
 
 Else, if we have an error in our request, return with error.
+
+### SubaccountApiCredential acquisition ownership
+
+`SubaccountApiCredential` is a resource-specific exception to the import flow above. Its compound external-name is an identity selector, not proof of ownership. The BTP read response cannot return the write-once `client_secret`, and successful observation must never establish the `Owned` lifecycle receipt.
+
+The controller persists a UID-bound `status.lifecycle` receipt outside `status.atProvider`:
+
+- `Eligible` means the MR has been conservatively classified as new and may perform a read-only existence check followed by a native Create if absent.
+- `CreatePending` records a persisted intent before the external Create. After restart, an unresolved pending attempt is `Uncertain`; it must not be retried or promoted from a matching Read.
+- `Owned` is written only after a successful provider-issued Create, or via the restricted legacy resolution below.
+- `Rejected` is terminal for this MR. Existing-target adoption and definitive create collisions are rejected. Spec or annotation edits do not reset it; deletion observes local absence and must not call BTP Delete.
+- `Uncertain` blocks management and destructive operations until a restricted resolution is completed.
+
+An MR without a receipt is enrolled as fresh only when it has no prior observed `atProvider` state, Crossplane conditions, or Crossplane external-create history annotations. Existing objects with any of these signals are marked `Uncertain`; external-name, historical creation annotations, and Secret data are never backfilled as ownership evidence. This conservative bootstrap can require operator intervention for old resources, but avoids silently adopting legacy objects.
+
+#### Restricted legacy ownership resolution
+
+This procedure is for a cluster administrator only, not an import/adoption interface. Enable API audit logging for status updates and use an identity allowed to update this resource's status. Before resolving, independently establish from trustworthy provider-side provisioning records or control-plane audit records that this exact credential was created by this provider for this exact MR. A matching name, external-name, current BTP Read, connection Secret, Secret hash, or reconstructed Terraform state is not acceptable evidence. If independent evidence is unavailable or ambiguous, leave the MR `Uncertain` and do not request external deletion.
+
+Resolve only an `Uncertain` legacy MR; never change a `Rejected` MR. Bind the receipt to the current UID and established compound identity, and retain the audit record for the resolution. For example, after independently verifying all values and the resolver identity, an administrator can patch the status subresource (replace placeholders, do not use this for a new/imported resource):
+
+```sh
+kubectl patch subaccountapicredentials.security.btp.sap.crossplane.io NAME \
+  --subresource=status --type=merge -p '{"status":{"lifecycle":{
+    "managedResourceUID":"CURRENT-UID",
+    "subaccountID":"SUBACCOUNT-ID",
+    "name":"CREDENTIAL-NAME",
+    "phase":"Owned",
+    "reason":"administrator-resolved-legacy",
+    "resolvedBy":"ADMINISTRATOR-IDENTITY",
+    "resolvedAt":"2026-01-01T00:00:00Z",
+    "resolutionEvidence":"AUDIT-RECORD-REFERENCE"
+  }}}'
+```
+
+The resolver identity and evidence reference must identify the real audited action; the example is not evidence by itself. Rejected resources must be deleted and recreated under a new name after intentional external cleanup. BTP does not expose a stable credential-incarnation identifier in the observation used here, so replacement of a credential at the same compound identity cannot be distinguished automatically; uncertain histories therefore remain fail-safe.
 
 ## Documentation generation
 
