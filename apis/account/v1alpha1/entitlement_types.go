@@ -117,6 +117,9 @@ type Assignable struct {
 	UnlimitedAmountAssigned bool `json:"unlimitedAmountAssigned,omitempty"`
 	//resource details
 	Resources []*Resource `json:"resources"`
+
+	// The unique identifier of the service plan actually assigned to this subaccount; used to disambiguate delete when serviceName+servicePlanName are not unique (issue #1100).
+	UniqueIdentifier string `json:"uniqueIdentifier,omitempty"`
 }
 
 type Entitled struct {
