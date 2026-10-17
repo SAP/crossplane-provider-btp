@@ -1,0 +1,12 @@
+---
+# Fake CIS credentials secret for local rendering with --mock-btp.
+# All URLs point to the in-process mock BTP server on port 18888.
+# Start the server with:
+#   go run . --insecure --debug --mock-btp=example/auto/mock.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-namespace-btp-provider-config
+  namespace: my-namespace
+data:
+  cisCredentials: eyJ1YWEiOnsiY2xpZW50aWQiOiJtb2NrLWNpZCIsImNsaWVudHNlY3JldCI6Im1vY2stY3NlY3JldCIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6MTg4ODgiLCJzdWJhY2NvdW50aWQiOiI3YjNmOWEyZS00ZDFjLTRmOGEtYjVlNi0yYzlkOGYwYTFiM2UifSwiZW5kcG9pbnRzIjp7ImFjY291bnRzX3NlcnZpY2VfdXJsIjoiaHR0cDovLzEyNy4wLjAuMToxODg4OCIsInByb3Zpc2lvbmluZ19zZXJ2aWNlX3VybCI6Imh0dHA6Ly8xMjcuMC4wLjE6MTg4ODgifX0=
