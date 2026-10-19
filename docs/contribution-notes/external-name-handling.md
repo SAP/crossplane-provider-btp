@@ -54,6 +54,12 @@ Consequently, we have to remove this initializer from running. We will have our 
 
 Upjet resources are an exception as we dont control how the external-name is defined and set by Upjet.
 
+### SubaccountApiCredential: unsupported adoption
+
+`SubaccountApiCredential` is an explicit exception to the general import/adoption flow above. Its external name is the compound identity `<subaccount-id>/<credential-name>`. For a newly-created MR, a successful external Read of an existing credential is not acquisition: reconciliation reports an unsupported-adoption error and does not proceed as a healthy managed resource. Public connection fields returned by the read may be observed or published; their presence is not proof of acquisition or credential ownership. If the compound identity does not exist, normal creation may proceed using it.
+
+Users must choose a distinct credential name, or intentionally remove the old credential and verify that it is absent before recreating it with the same identity. This restriction protects the write-once `client_secret`, which BTP Read cannot recover. Secret-integrity-gated cleanup and immediate configuration immutability are tracked separately; this exception does not promise that deleting an MR will delete or preserve the external credential in every state.
+
 In general, all exceptions should be noted in the appropriate location: for user in the docs and for developer in the appropriate code location (Observe/Create/Update/Delete functions or API definition).
 
 ### Orphaned external-name recovery (always-on bug-fix)
