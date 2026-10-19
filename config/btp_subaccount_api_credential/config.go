@@ -13,6 +13,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/upjet/v2/pkg/config"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	accountsv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -25,6 +26,7 @@ const (
 	errTrackRUsage                     = "cannot track ResourceUsage"
 	errTypeAssertion                   = "managed resource is not of type SubaccountApiCredential"
 	errMissingClientSecret             = "cannot read client_secret from source, please delete external resource and re-create Crossplane resource"
+	errReadConnectionSecret            = "cannot read connection Secret for SubaccountApiCredential"
 	errUpdateExternalName              = "cannot update external-name annotation"
 	errMissingNameFromState            = "cannot reconstruct external-name: name missing from tfstate"
 	errMissingSubaccountIDFromState    = "cannot reconstruct external-name: subaccount_id missing from tfstate"
@@ -277,6 +279,9 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 				Name:      secretRef.Name,
 				Namespace: secretRef.Namespace,
 			}, secret)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return errors.Wrap(err, errReadConnectionSecret)
+			}
 			if err == nil {
 				_, hasClientID := secret.Data["attribute.client_id"]
 				_, hasTokenURL := secret.Data["attribute.token_url"]
