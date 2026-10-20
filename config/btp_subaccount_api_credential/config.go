@@ -11,6 +11,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/crossplane/upjet/v2/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -287,7 +288,7 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 				_, hasTokenURL := secret.Data["attribute.token_url"]
 				_, hasAPIURL := secret.Data["attribute.api_url"]
 				_, hasClientSecret := secret.Data["attribute.client_secret"]
-				if hasClientID && hasTokenURL && hasAPIURL && !hasClientSecret {
+				if hasClientID && hasTokenURL && hasAPIURL && !hasClientSecret && !(meta.WasDeleted(mg) && strings.Contains(cr.GetCondition(xpv1.TypeReady).Message, "adoption of an existing SubaccountApiCredential is not supported")) {
 					return errors.New(errMissingClientSecret)
 				}
 			}
