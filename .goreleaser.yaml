@@ -6,6 +6,8 @@ builds:
   - id: binary-build
     env:
       - CGO_ENABLED=0
+      # FIPS 140-3: link Go Cryptographic Module CMVP #5247 in approved mode.
+      - GOFIPS140=certified
     mod_timestamp: "{{ .CommitTimestamp }}"
     main: ./cmd/provider
     flags:
@@ -23,6 +25,8 @@ builds:
   - id: exporter-build
     env:
       - CGO_ENABLED=0
+      # FIPS 140-3: link Go Cryptographic Module CMVP #5247 in approved mode.
+      - GOFIPS140=certified
     mod_timestamp: "{{ .CommitTimestamp }}"
     main: ./cmd/exporter
     flags:
