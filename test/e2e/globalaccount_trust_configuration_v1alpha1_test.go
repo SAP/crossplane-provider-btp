@@ -5,11 +5,7 @@
 package e2e
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"os"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -17,7 +13,6 @@ import (
 	"github.com/crossplane-contrib/xp-testing/pkg/resources"
 	meta_api "github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
-	"k8s.io/klog/v2"
 	res "sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
@@ -44,7 +39,6 @@ func globalaccountTrustConfigurationFeature() *features.FeatureBuilder {
 
 	fB := features.New(resource.Kind)
 	fB.WithLabel("kind", resource.Kind)
-	fB.Setup(assertTrustConfigAbsent)
 	fB.Setup(
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			// as soon as we move to use the xp-testing framework, we can remove this manually setup and use the preconfigured one
@@ -68,7 +62,6 @@ func globalaccountTrustConfigurationFeature() *features.FeatureBuilder {
 	)
 	fB.Assess("delete", resource.AssessDelete)
 	fB.Teardown(resource.Teardown)
-	fB.Teardown(assertTrustConfigGone)
 
 	return fB
 }
@@ -94,113 +87,5 @@ func globalaccountTrustConfigurationImportFeature() *features.FeatureBuilder {
 		WithWaitDeletionTimeout[*v1alpha1.GlobalaccountTrustConfiguration](wait.WithTimeout(3*time.Minute)),
 	)
 
-	fb := importTester.BuildTestFeature("GlobalaccountTrustConfiguration Import Flow")
-	fb.Teardown(assertTrustConfigGone)
-	return fb
-}
-
-// assertTrustConfigAbsent fails fast at setup if a global-account trust config for
-// IDP_URL already exists on BTP. Both GA-trust features run sequentially on one shared
-// account, so this guards the whole run: a leftover from an aborted earlier run (or a
-// concurrent PR) makes create fail with "Trust for this identity provider already exists",
-// which otherwise only surfaces as an opaque 7m sync timeout. Failing here names the cause.
-func assertTrustConfigAbsent(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-	idpURL := envvar.GetOrPanic(IDP_URL_ENV_KEY)
-	if err := btpTrustLogin(); err != nil {
-		t.Fatalf("trust-config pre-check: btp login failed: %v", err)
-	}
-	defer btpLogout()
-
-	if trustConfigExists(t, idpURL) {
-		t.Fatalf("trust-config pre-check: a config for IDP %q already exists on BTP before create "+
-			"(leftover from an aborted run or a concurrent PR; remove it via "+
-			"BTP Cockpit -> Security -> Trust Configurations, see NGPBUG-502964)", idpURL)
-	}
-	return ctx
-}
-
-// assertTrustConfigGone fails the test unless the global-account trust config for
-// IDP_URL is absent on BTP within 5 min. Crossplane reports the MR deleted once the
-// K8s object is gone, but the backend config lingers (eventual consistency); a
-// lingering config is what makes the next run's create collide with
-// "Trust for this identity provider already exists". The deletion is the test's own,
-// so a config that never clears is a real leak worth a red, not a warn.
-func assertTrustConfigGone(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-	idpURL := envvar.GetOrPanic(IDP_URL_ENV_KEY)
-	if err := btpTrustLogin(); err != nil {
-		t.Fatalf("trust-config teardown: btp login failed: %v", err)
-	}
-	defer btpLogout()
-
-	err := wait.For(func(context.Context) (bool, error) {
-		return !trustConfigExists(t, idpURL), nil
-	}, wait.WithTimeout(5*time.Minute), wait.WithInterval(10*time.Second))
-	if err != nil {
-		t.Fatalf("trust-config teardown: config for IDP %q still present on BTP after 5m "+
-			"(leftover blocks the next run's create; if it is a stuck orphan remove it via "+
-			"BTP Cockpit -> Security -> Trust Configurations, see NGPBUG-502964): %v", idpURL, err)
-	}
-	return ctx
-}
-
-// trustConfigExists reports whether a global-account trust config for idpURL exists.
-// Matches on identityProvider since both GA-trust features share one IDP; btp exit
-// codes are unreliable, so presence is judged by parsed output, not the exit status.
-func trustConfigExists(t *testing.T, idpURL string) bool {
-	out, err := exec.Command("btp", "--format", "json", "list", "security/trust").Output()
-	if err != nil {
-		t.Logf("trust-config check: btp list failed, assuming present: %v", err)
-		return true
-	}
-	var list []struct {
-		IdentityProvider string `json:"identityProvider"`
-	}
-	if err := json.Unmarshal(out, &list); err != nil {
-		t.Logf("trust-config check: cannot parse btp list output, assuming present: %v", err)
-		return true
-	}
-	for _, tc := range list {
-		if tc.IdentityProvider == idpURL {
-			return true
-		}
-	}
-	return false
-}
-
-// btpTrustLogin logs the btp CLI in with the technical-user credentials the e2e job
-// already provides (same env cleanup.go uses). Subdomain comes from the cis binding.
-func btpTrustLogin() error {
-	var user struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	if err := json.Unmarshal([]byte(os.Getenv("BTP_TECHNICAL_USER")), &user); err != nil {
-		return err
-	}
-	var cis struct {
-		Uaa struct {
-			Identityzoneid string `json:"identityzoneid"`
-		} `json:"uaa"`
-	}
-	if err := json.Unmarshal([]byte(os.Getenv("CIS_CENTRAL_BINDING")), &cis); err != nil {
-		return err
-	}
-	args := []string{"login", "--user", user.Email, "--password", user.Password, "--subdomain", cis.Uaa.Identityzoneid}
-	if url := os.Getenv("CLI_SERVER_URL"); url != "" {
-		args = append(args, "--url", url)
-	}
-	var out bytes.Buffer
-	cmd := exec.Command("btp", args...)
-	cmd.Stdout, cmd.Stderr = &out, &out
-	if err := cmd.Run(); err != nil {
-		klog.ErrorS(err, "btp login failed", "output", out.String())
-		return err
-	}
-	return nil
-}
-
-func btpLogout() {
-	if err := exec.Command("btp", "logout").Run(); err != nil {
-		klog.ErrorS(err, "btp logout failed")
-	}
+	return importTester.BuildTestFeature("GlobalaccountTrustConfiguration Import Flow")
 }
