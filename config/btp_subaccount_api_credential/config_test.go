@@ -480,6 +480,34 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 			},
 			want: want{err: errors.New(errMissingClientSecret)},
 		},
+		"deleting failed-adoption resource with incomplete secret can reach cleanup": {
+			cr: func() *securityv1alpha1.SubaccountApiCredential {
+				cr := &securityv1alpha1.SubaccountApiCredential{
+					ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: func() *metav1.Time { now := metav1.Now(); return &now }()},
+					Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
+							WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"},
+						},
+					},
+				}
+				cr.SetConditions(xpv1.Unavailable().WithMessage("adoption of an existing SubaccountApiCredential is not supported"))
+				return cr
+			}(),
+			kube: func() *test.MockClient {
+				kube := test.NewMockClient()
+				kube.MockGet = test.NewMockGetFn(nil, func(obj client.Object) error {
+					if secret, ok := obj.(*corev1.Secret); ok {
+						secret.Data = map[string][]byte{
+							"attribute.client_id": []byte("some-id"),
+							"attribute.token_url": []byte("https://token-url"),
+							"attribute.api_url":   []byte("https://api-url"),
+						}
+					}
+					return nil
+				})
+				return kube
+			}(),
+		},
 		"secret read permission error is actionable": {
 			cr: &securityv1alpha1.SubaccountApiCredential{
 				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: func() *metav1.Time { now := metav1.Now(); return &now }()},

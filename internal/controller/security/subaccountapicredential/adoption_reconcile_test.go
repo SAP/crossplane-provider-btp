@@ -13,12 +13,75 @@ import (
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/sap/crossplane-provider-btp/apis"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
+	credentialconfig "github.com/sap/crossplane-provider-btp/config/btp_subaccount_api_credential"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kubefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+func TestReconcileFinalizesFailedAdoptionWithoutExternalDelete(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := apis.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	now := metav1.Now()
+	cr := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{
+		Name:              "credential",
+		UID:               types.UID("fresh-uid"),
+		Finalizers:        []string{managed.FinalizerName},
+		DeletionTimestamp: &now,
+	}}
+	cr.SetConditions(xpv1.Unavailable().WithMessage(errUnsupportedAdoption))
+	cr.Spec.WriteConnectionSecretToReference = &xpv1.SecretReference{Name: "credential-secret", Namespace: "default"}
+	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "credential-secret", Namespace: "default"}, Data: map[string][]byte{
+		"attribute.client_id": []byte("public-id"),
+		"attribute.api_url":   []byte("https://api.example.test"),
+		"attribute.token_url": []byte("https://token.example.test"),
+	}}
+	kube := kubefake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&v1alpha1.SubaccountApiCredential{}).WithObjects(cr, secret).Build()
+	connectCalls, deleteCalls := 0, 0
+	inner := managed.ExternalClientFns{
+		DeleteFn: func(context.Context, resource.Managed) (managed.ExternalDelete, error) {
+			deleteCalls++
+			return managed.ExternalDelete{}, nil
+		},
+		DisconnectFn: func(context.Context) error { return nil },
+	}
+	connector := managed.ExternalConnectorFn(func(context.Context, resource.Managed) (managed.ExternalClient, error) {
+		connectCalls++
+		return inner, nil
+	})
+	r := managed.NewReconciler(
+		&resourcefake.Manager{Client: kube, Scheme: scheme},
+		resource.ManagedKind(v1alpha1.SubaccountApiCredential_GroupVersionKind),
+		managed.WithExternalConnector(&adoptionRejectingConnector{ExternalConnector: connector}),
+		managed.WithInitializers(managed.InitializerChain{
+			&credentialconfig.DeletionProtectionInitializer{Kube: kube},
+		}),
+		managed.WithFinalizer(resource.NewAPIFinalizer(kube, managed.FinalizerName)),
+		managed.WithRecorder(event.NewNopRecorder()),
+	)
+	key := types.NamespacedName{Name: cr.Name}
+	for range 5 {
+		if _, err := r.Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
+			t.Fatalf("Reconcile() error = %v", err)
+		}
+	}
+	got := &v1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(context.Background(), key, got); !apierrors.IsNotFound(err) {
+		t.Fatalf("failed-adoption MR should be finalized locally; Get() error = %v", err)
+	}
+	if connectCalls != 0 || deleteCalls != 0 {
+		t.Fatalf("cleanup must not connect to or delete BTP credential: connects=%d deletes=%d", connectCalls, deleteCalls)
+	}
+}
 
 func TestReconcileRejectsAdoptionWithoutMutation(t *testing.T) {
 	scheme := runtime.NewScheme()

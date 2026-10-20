@@ -16,6 +16,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func TestAdoptionRejectingConnectorFinalizesRejectedAdoptionLocally(t *testing.T) {
+	now := metav1.Now()
+	cr := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &now}}
+	cr.SetConditions(xpv1.Unavailable().WithMessage(errUnsupportedAdoption))
+	connected := false
+	connector := &adoptionRejectingConnector{ExternalConnector: managed.ExternalConnectorFn(func(context.Context, resource.Managed) (managed.ExternalClient, error) {
+		connected = true
+		return nil, nil
+	})}
+	client, err := connector.Connect(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if connected {
+		t.Fatal("underlying connector was called for failed-adoption cleanup")
+	}
+	observation, err := client.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe() error = %v", err)
+	}
+	if observation.ResourceExists {
+		t.Fatal("failed adoption must be treated as locally absent during cleanup")
+	}
+}
+
 func TestAdoptionRejectingClientCreateCollision(t *testing.T) {
 	cr := &v1alpha1.SubaccountApiCredential{}
 	inner := managed.ExternalClientFns{
