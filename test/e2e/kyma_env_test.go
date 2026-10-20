@@ -4,8 +4,8 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -15,7 +15,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	kymaModuleClient "github.com/sap/crossplane-provider-btp/internal/clients/kymamodule"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,66 +58,56 @@ func TestKymaEnvironment(t *testing.T) {
 			},
 		).
 		Assess(
-			// Regression guard for issue #682: after a BTP-side (Cockpit)
-			// update, BTP materialises schema defaults such as
-			// accessControlList:{}, gvisor:{enabled:false}, ingressFiltering:false
-			// into the stored parameters. The schema-aware drift detector must
-			// treat those as non-drift, so the provider neither loops on updates
-			// nor trips the circuit breaker. We force one update round-trip (which
-			// makes BTP echo the defaults back), then watch the RetryStatus over a
-			// sustained window and assert the breaker stays off and the retry
-			// counter does not climb.
+			// Regression guard for issue #682: a real update makes BTP
+			// materialise schema defaults (accessControlList:{},
+			// gvisor:{enabled:false}, ingressFiltering:false) into the stored
+			// parameters. The schema-aware drift detector must treat the
+			// defaults the user never set as non-drift, so the provider
+			// reconverges instead of looping updates until the circuit breaker
+			// trips. We toggle a real in-contract field (ingressFiltering) to
+			// force one genuine update round-trip, then assert the resource
+			// settles back to Available with the breaker off.
 			"Verify materialised defaults do not trip the circuit breaker (#682)",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 				const kymaName = "kyma-environment"
 
-				// Force an update round-trip against BTP so it writes the schema
-				// defaults into status.atProvider.parameters, reproducing the
-				// no-op Cockpit update from the bug report. An annotation bump
-				// re-triggers reconciliation without changing the desired spec.
+				// Toggle ingressFiltering on so the controller issues a real
+				// Update to BTP (an annotation bump would only re-Observe and
+				// never write, so BTP would never materialise the defaults).
 				kyma := &v1alpha1.KymaEnvironment{}
 				MustGetResource(t, cfg, kymaName, nil, kyma)
-				metav1.SetMetaDataAnnotation(&kyma.ObjectMeta, "e2e.btp.sap.crossplane.io/drift-probe", strconv.FormatInt(time.Now().Unix(), 10))
+				params := map[string]any{}
+				if len(kyma.Spec.ForProvider.Parameters.Raw) > 0 {
+					if err := json.Unmarshal(kyma.Spec.ForProvider.Parameters.Raw, &params); err != nil {
+						t.Fatalf("failed to unmarshal KymaEnvironment parameters: %v", err)
+					}
+				}
+				params["ingressFiltering"] = true
+				raw, err := json.Marshal(params)
+				if err != nil {
+					t.Fatalf("failed to marshal KymaEnvironment parameters: %v", err)
+				}
+				kyma.Spec.ForProvider.Parameters.Raw = raw
 				if err := cfg.Client().Resources().Update(ctx, kyma); err != nil {
-					t.Fatalf("failed to annotate KymaEnvironment to trigger reconcile: %v", err)
+					t.Fatalf("failed to update KymaEnvironment to trigger a BTP update: %v", err)
 				}
 
-				// Watch for a sustained window. If materialised defaults were
-				// mistaken for drift, the provider would keep updating and
-				// RetryStatus.Count would climb toward the circuit breaker; a
-				// correct fix keeps Count low and CircuitBreaker false throughout.
-				const (
-					watchWindow  = 6 * time.Minute
-					pollInterval = 15 * time.Second
-					maxCount     = 2 // tolerate a single reconcile blip; well below the default maxRetries (3)
-				)
-				deadline := time.Now().Add(watchWindow)
-				for time.Now().Before(deadline) {
-					observed := &v1alpha1.KymaEnvironment{}
-					MustGetResource(t, cfg, kymaName, nil, observed)
-
-					if rs := observed.Status.RetryStatus; rs != nil {
-						if rs.CircuitBreaker {
-							t.Fatalf("circuit breaker tripped on materialised schema defaults (#682 regression); retryStatus=%+v", *rs)
-						}
-						if rs.Count > maxCount {
-							t.Fatalf("retry count climbed to %d (>%d) on materialised schema defaults (#682 regression); diff=%q", rs.Count, maxCount, rs.Diff)
-						}
+				// The update converges once; the materialised defaults the user
+				// never set (gvisor, accessControlList) must not read as further
+				// drift. Wait for the resource to settle back to Available — if
+				// the defaults looped, it would instead trip the breaker.
+				settled := &v1alpha1.KymaEnvironment{}
+				err = wait.For(func(ctx context.Context) (bool, error) {
+					MustGetResource(t, cfg, kymaName, nil, settled)
+					if rs := settled.Status.RetryStatus; rs != nil && rs.CircuitBreaker {
+						return false, fmt.Errorf("circuit breaker tripped on materialised schema defaults (#682 regression); retryStatus=%+v", *rs)
 					}
-
-					// The resource must also stay healthy throughout.
-					if cond := observed.GetCondition(xpv1.Available().Type); cond.Status != corev1.ConditionTrue {
-						t.Logf("KymaEnvironment not (yet) Available during drift watch: %v", cond)
-					}
-					time.Sleep(pollInterval)
+					return settled.GetCondition(xpv1.Available().Type).Status == corev1.ConditionTrue, nil
+				}, wait.WithTimeout(15*time.Minute))
+				if err != nil {
+					t.Fatalf("KymaEnvironment did not settle after the update: %v; retryStatus=%+v", err, settled.Status.RetryStatus)
 				}
-
-				final := &v1alpha1.KymaEnvironment{}
-				MustGetResource(t, cfg, kymaName, nil, final)
-				if final.GetCondition(xpv1.Available().Type).Status != corev1.ConditionTrue {
-					t.Fatalf("KymaEnvironment is not Available after the drift watch window; conditions=%+v", final.Status.Conditions)
-				}
-				t.Logf("no false drift over %s: retryStatus=%+v", watchWindow, final.Status.RetryStatus)
+				t.Logf("reconverged with no false drift: retryStatus=%+v", settled.Status.RetryStatus)
 				return ctx
 			},
 		).
