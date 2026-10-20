@@ -22,6 +22,17 @@ type adoptionRejectingConnector struct {
 }
 
 func (c *adoptionRejectingConnector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
+	if cr, ok := mg.(*v1alpha1.SubaccountApiCredential); ok && meta.WasDeleted(cr) && adoptionWasRejected(cr) {
+		// Failed adoption never acquired the existing credential. Avoid Connect,
+		// which may require the incomplete write-once Secret, and let the normal
+		// managed reconciler finalize this MR as externally absent.
+		return managed.ExternalClientFns{
+			ObserveFn: func(context.Context, resource.Managed) (managed.ExternalObservation, error) {
+				return managed.ExternalObservation{ResourceExists: false}, nil
+			},
+			DisconnectFn: func(context.Context) error { return nil },
+		}, nil
+	}
 	client, err := c.ExternalConnector.Connect(ctx, mg)
 	if err != nil {
 		return nil, err
@@ -31,6 +42,10 @@ func (c *adoptionRejectingConnector) Connect(ctx context.Context, mg resource.Ma
 
 type adoptionRejectingClient struct {
 	managed.ExternalClient
+}
+
+func adoptionWasRejected(cr *v1alpha1.SubaccountApiCredential) bool {
+	return strings.Contains(cr.GetCondition(xpv1.TypeReady).Message, errUnsupportedAdoption)
 }
 
 func (c *adoptionRejectingClient) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
