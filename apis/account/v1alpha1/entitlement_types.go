@@ -118,7 +118,7 @@ type Assignable struct {
 	//resource details
 	Resources []*Resource `json:"resources"`
 
-	// The unique identifier of the service plan actually assigned to this subaccount; used to disambiguate delete when serviceName+servicePlanName are not unique (issue #1100).
+	// The unique identifier of the service plan actually assigned to this subaccount; used to disambiguate delete when serviceName+servicePlanName are not unique.
 	UniqueIdentifier string `json:"uniqueIdentifier,omitempty"`
 }
 

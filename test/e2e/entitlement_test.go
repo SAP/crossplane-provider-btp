@@ -488,6 +488,17 @@ func TestEntitlementImportFlow(t *testing.T) {
 					t.Fatalf("expected status.atProvider.assigned to be non-nil on the imported entitlement")
 				}
 
+				// The assigned plan's unique identifier must surface in status so the
+				// delete path can fall back to it when serviceName+servicePlanName are
+				// ambiguous (issue #1100). An empty value means the status field is not
+				// actually populated from the assigned plan.
+				if imported.Status.AtProvider.Assigned.UniqueIdentifier == "" {
+					t.Fatalf(
+						"expected status.atProvider.assigned.uniqueIdentifier to be populated " +
+							"on the imported entitlement, got empty string",
+					)
+				}
+
 				readyCondition := imported.GetCondition(xpv1.Available().Type)
 				if readyCondition.Status != v1.ConditionTrue {
 					t.Fatalf(
