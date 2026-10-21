@@ -20,9 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/e2e-framework/klient/k8s"
 	"sigs.k8s.io/e2e-framework/klient/wait"
-	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
 )
@@ -48,7 +46,8 @@ func testCredentialExternalNameAdoption(t *testing.T, restartProvider bool) {
 	if !restartProvider {
 		suffix = "no-restart"
 	}
-	base := "sac-868-" + suffix + "-" + BUILD_ID
+	basePrefix := "sac-868-" + suffix + "-" + BUILD_ID
+	base := envconf.RandomName(basePrefix, len(basePrefix)+7)
 	subaccountName := base + "-subaccount"
 	credentialName := base + "-credential"
 	firstName, secondName, probeName := base+"-first", base+"-adopt", base+"-probe"
@@ -89,14 +88,19 @@ func testCredentialExternalNameAdoption(t *testing.T, restartProvider bool) {
 			waitForResource(subaccount, cfg, t, wait.WithTimeout(12*time.Minute))
 
 			first := newAdoptionTestCredential(firstName, firstSecret, cfg.Namespace(), credentialName, subaccountName, xpv1.DeletionOrphan)
+			t.Logf("creating initial credential MR %q for requested name %q in subaccount MR %q", firstName, credentialName, subaccountName)
 			if err := cfg.Client().Resources().Create(ctx, first); err != nil {
 				t.Fatalf("create initial credential: %v", err)
 			}
-			waitForResource(first, cfg, t, wait.WithTimeout(8*time.Minute))
+			if err := waitForCredentialReady(ctx, t, cfg, first, 8*time.Minute); err != nil {
+				logCredentialDiagnostics(t, ctx, cfg, firstName)
+				t.Fatalf("initial credential was not successfully created; refusing to treat an existing BTP credential as test setup: %v", err)
+			}
 			created := &v1alpha1.SubaccountApiCredential{}
 			MustGetResource(t, cfg, firstName, nil, created)
 			assertAdoptionTestSecret(t, ctx, cfg, created, firstSecret)
 			externalName = xpmeta.GetExternalName(created)
+			t.Logf("initial credential is Ready: MR=%q externalIdentity=%q subaccountID=%q", firstName, externalName, valueOrEmpty(created.Spec.ForProvider.SubaccountID))
 			if created.Spec.ForProvider.SubaccountID == nil || externalName != *created.Spec.ForProvider.SubaccountID+"/"+credentialName {
 				t.Fatalf("created external-name %q does not match requested credential identity", externalName)
 			}
@@ -105,6 +109,7 @@ func testCredentialExternalNameAdoption(t *testing.T, restartProvider bool) {
 		first := &v1alpha1.SubaccountApiCredential{}
 		MustGetResource(t, cfg, firstName, nil, first)
 		AwaitResourceDeletionOrFail(ctx, t, cfg, first, wait.WithTimeout(5*time.Minute))
+		t.Logf("initial MR %q finalized with Orphan policy; external identity %q should remain in BTP", firstName, externalName)
 		if restartProvider {
 			restartCredentialTestProvider(t, ctx, cfg)
 		}
@@ -114,11 +119,12 @@ func testCredentialExternalNameAdoption(t *testing.T, restartProvider bool) {
 		}
 		second := newAdoptionTestCredential(secondName, secondSecret, cfg.Namespace(), credentialName, subaccountName, xpv1.DeletionDelete)
 		xpmeta.SetExternalName(second, externalName)
+		t.Logf("creating annotated adoption MR %q targeting external identity %q", secondName, externalName)
 		if err := cfg.Client().Resources().Create(ctx, second); err != nil {
 			t.Fatalf("create annotated adoption MR: %v", err)
 		}
 
-		if err := waitForAdoptionFailure(ctx, cfg, secondName, 8*time.Minute); err != nil {
+		if err := waitForAdoptionFailure(ctx, t, cfg, secondName, 8*time.Minute); err != nil {
 			logCredentialDiagnostics(t, ctx, cfg, secondName)
 			t.Errorf("expected explicit unsupported-adoption diagnostic: %v", err)
 		}
@@ -139,6 +145,7 @@ func testCredentialExternalNameAdoption(t *testing.T, restartProvider bool) {
 			restartCredentialTestProvider(t, ctx, cfg)
 		}
 		AwaitResourceDeletionOrFail(ctx, t, cfg, adopted, wait.WithTimeout(5*time.Minute))
+		t.Logf("rejected adoption MR %q finalized; starting independent BTP existence probe for %q", secondName, externalName)
 
 		// A new MR performs a real provider Observe against the compound
 		// identity. Its explicit rejection proves the original target still
@@ -148,7 +155,7 @@ func testCredentialExternalNameAdoption(t *testing.T, restartProvider bool) {
 		if err := cfg.Client().Resources().Create(ctx, probe); err != nil {
 			t.Fatalf("create independent BTP existence probe: %v", err)
 		}
-		if err := waitForAdoptionFailure(ctx, cfg, probeName, 8*time.Minute); err != nil {
+		if err := waitForAdoptionFailure(ctx, t, cfg, probeName, 8*time.Minute); err != nil {
 			logCredentialDiagnostics(t, ctx, cfg, probeName)
 			t.Fatalf("probe did not independently confirm that the original credential still exists: %v", err)
 		}
@@ -174,13 +181,96 @@ func newAdoptionTestCredential(resourceName, secretName, namespace, credentialNa
 	}
 }
 
-func waitForAdoptionFailure(ctx context.Context, cfg *envconf.Config, name string, timeout time.Duration) error {
-	resource := &v1alpha1.SubaccountApiCredential{}
-	return wait.For(conditions.New(cfg.Client().Resources()).ResourceMatch(resource, func(object k8s.Object) bool {
-		got := object.(*v1alpha1.SubaccountApiCredential)
-		synced := got.GetCondition(xpv1.TypeSynced)
-		return synced.Status == corev1.ConditionFalse && synced.ObservedGeneration >= got.Generation && strings.Contains(strings.ToLower(synced.Message), strings.ToLower(unsupportedCredentialAdoption))
-	}), wait.WithTimeout(timeout), wait.WithContext(ctx))
+func waitForCredentialReady(ctx context.Context, t *testing.T, cfg *envconf.Config, resource *v1alpha1.SubaccountApiCredential, timeout time.Duration) error {
+	t.Helper()
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	lastTrace := ""
+	for {
+		got := &v1alpha1.SubaccountApiCredential{}
+		err := cfg.Client().Resources().Get(waitCtx, resource.Name, "", got)
+		if err == nil {
+			trace := credentialReconcileTrace(got)
+			if trace != lastTrace {
+				t.Logf("initial credential reconciliation changed: %s", trace)
+				lastTrace = trace
+			}
+			ready, synced := got.GetCondition(xpv1.TypeReady), got.GetCondition(xpv1.TypeSynced)
+			if ready.Status == corev1.ConditionTrue && synced.Status == corev1.ConditionTrue && synced.ObservedGeneration >= got.Generation {
+				return nil
+			}
+		} else if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("read initial credential MR %q while waiting for Ready: %w", resource.Name, err)
+		}
+
+		select {
+		case <-waitCtx.Done():
+			if lastTrace == "" {
+				lastTrace = "MR not yet visible"
+			}
+			return fmt.Errorf("timed out waiting for Ready=True; last observed state: %s: %w", lastTrace, waitCtx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+// credentialReconcileTrace intentionally logs only identity and reconciliation
+// metadata. It never logs connection details, client IDs, certificates, keys,
+// tokens, or Secret contents.
+func credentialReconcileTrace(cr *v1alpha1.SubaccountApiCredential) string {
+	ready, synced := cr.GetCondition(xpv1.TypeReady), cr.GetCondition(xpv1.TypeSynced)
+	return fmt.Sprintf(
+		"name=%q generation=%d observedGeneration=%d externalName=%q specName=%q specSubaccountID=%q hasAtProviderID=%t observedName=%q observedSubaccountID=%q Ready=%s/%s ReadyObservedGeneration=%d Synced=%s/%s SyncedObservedGeneration=%d adoptionDiagnostic=%t finalizers=%v",
+		cr.Name, cr.Generation, cr.Status.ObservedGeneration, xpmeta.GetExternalName(cr), valueOrEmpty(cr.Spec.ForProvider.Name), valueOrEmpty(cr.Spec.ForProvider.SubaccountID),
+		cr.Status.AtProvider.ID != nil && *cr.Status.AtProvider.ID != "", valueOrEmpty(cr.Status.AtProvider.Name), valueOrEmpty(cr.Status.AtProvider.SubaccountID),
+		ready.Status, ready.Reason, ready.ObservedGeneration, synced.Status, synced.Reason, synced.ObservedGeneration, strings.Contains(strings.ToLower(synced.Message), strings.ToLower(unsupportedCredentialAdoption)), cr.Finalizers,
+	)
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func waitForAdoptionFailure(ctx context.Context, t *testing.T, cfg *envconf.Config, name string, timeout time.Duration) error {
+	t.Helper()
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	lastTrace := ""
+	for {
+		got := &v1alpha1.SubaccountApiCredential{}
+		err := cfg.Client().Resources().Get(waitCtx, name, "", got)
+		if err == nil {
+			trace := credentialReconcileTrace(got)
+			if trace != lastTrace {
+				t.Logf("adoption reconciliation changed: %s", trace)
+				lastTrace = trace
+			}
+			synced := got.GetCondition(xpv1.TypeSynced)
+			if synced.Status == corev1.ConditionFalse && synced.ObservedGeneration >= got.Generation && strings.Contains(strings.ToLower(synced.Message), strings.ToLower(unsupportedCredentialAdoption)) {
+				return nil
+			}
+		} else if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("read adoption MR %q while waiting for explicit rejection: %w", name, err)
+		}
+
+		select {
+		case <-waitCtx.Done():
+			if lastTrace == "" {
+				lastTrace = "MR not yet visible"
+			}
+			return fmt.Errorf("timed out waiting for explicit unsupported-adoption diagnostic; last observed state: %s: %w", lastTrace, waitCtx.Err())
+		case <-ticker.C:
+		}
+	}
 }
 
 func assertAdoptionTestSecret(t *testing.T, ctx context.Context, cfg *envconf.Config, cr *v1alpha1.SubaccountApiCredential, name string) {

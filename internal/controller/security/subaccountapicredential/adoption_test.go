@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
@@ -64,26 +65,39 @@ func TestAdoptionRejectingClientObserve(t *testing.T) {
 	}
 	cases := map[string]struct {
 		exists             bool
-		alreadyOwned       bool
+		createSucceeded    bool
+		pendingSuperseded  bool
+		failedSuperseded   bool
 		previouslyRejected bool
 		deleting           bool
 		observeErr         error
 		wantAdoption       bool
 	}{
-		"existing target on fresh MR": {exists: true, wantAdoption: true},
-		"target absent":               {},
-		"previously acquired target":  {exists: true, alreadyOwned: true},
-		"repeated rejected adoption":  {exists: true, alreadyOwned: true, previouslyRejected: true, wantAdoption: true},
-		"deleting MR":                 {exists: true, deleting: true},
-		"read failure":                {exists: true, observeErr: context.DeadlineExceeded},
+		"existing target on fresh MR":                       {exists: true, wantAdoption: true},
+		"target absent":                                     {},
+		"successful provider Create":                        {exists: true, createSucceeded: true},
+		"successful Create followed by rejection condition": {exists: true, createSucceeded: true, previouslyRejected: true},
+		"stale success superseded by pending Create":        {exists: true, createSucceeded: true, pendingSuperseded: true, wantAdoption: true},
+		"stale success superseded by failed Create":         {exists: true, createSucceeded: true, failedSuperseded: true, wantAdoption: true},
+		"repeated rejected adoption":                        {exists: true, previouslyRejected: true, wantAdoption: true},
+		"deleting MR":                                       {exists: true, deleting: true},
+		"read failure":                                      {exists: true, observeErr: context.DeadlineExceeded},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			cr := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: "credential"}}
 			meta.SetExternalName(cr, "subaccount-guid/credential-name")
-			if tc.alreadyOwned {
-				cr.Status.AtProvider.ID = internal.Ptr("provider-resource-id")
+			if tc.createSucceeded {
+				base := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+				meta.SetExternalCreatePending(cr, base)
+				meta.SetExternalCreateSucceeded(cr, base.Add(time.Second))
+				if tc.pendingSuperseded {
+					meta.SetExternalCreatePending(cr, base.Add(2*time.Second))
+				}
+				if tc.failedSuperseded {
+					meta.SetExternalCreateFailed(cr, base.Add(2*time.Second))
+				}
 			}
 			if tc.previouslyRejected {
 				cr.SetConditions(xpv1.Unavailable().WithMessage(errUnsupportedAdoption))
