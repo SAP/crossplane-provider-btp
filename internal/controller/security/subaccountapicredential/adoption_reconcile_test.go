@@ -140,6 +140,74 @@ func TestReconcileAllowsObserveAfterSuccessfulCreate(t *testing.T) {
 	}
 }
 
+func TestReconcileSuccessfulCreateSupersedesAdoptionRejectionBeforeDelete(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := apis.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cr := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: "credential", UID: types.UID("fresh-uid")}}
+	meta.SetExternalName(cr, "subaccount-guid/credential-name")
+	cr.SetConditions(xpv1.Condition{Type: conditionAdoptionRejected, Status: "True", Message: lifecycleEvidenceMessage(cr)})
+	kube := kubefake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&v1alpha1.SubaccountApiCredential{}).WithObjects(cr).Build()
+	created, deleted := false, 0
+	inner := managed.ExternalClientFns{
+		ObserveFn: func(context.Context, resource.Managed) (managed.ExternalObservation, error) {
+			return managed.ExternalObservation{ResourceExists: created, ResourceUpToDate: true}, nil
+		},
+		CreateFn: func(context.Context, resource.Managed) (managed.ExternalCreation, error) {
+			created = true
+			return managed.ExternalCreation{}, nil
+		},
+		DeleteFn: func(context.Context, resource.Managed) (managed.ExternalDelete, error) {
+			deleted++
+			created = false
+			return managed.ExternalDelete{}, nil
+		},
+		DisconnectFn: func(context.Context) error { return nil },
+	}
+	connector := managed.ExternalConnectorFn(func(context.Context, resource.Managed) (managed.ExternalClient, error) {
+		return &adoptionRejectingClient{ExternalClient: inner, Kube: kube}, nil
+	})
+	r := managed.NewReconciler(
+		&resourcefake.Manager{Client: kube, Scheme: scheme},
+		resource.ManagedKind(v1alpha1.SubaccountApiCredential_GroupVersionKind),
+		managed.WithExternalConnector(connector),
+		managed.WithInitializers(),
+		managed.WithFinalizer(resource.NewAPIFinalizer(kube, managed.FinalizerName)),
+		managed.WithRecorder(event.NewNopRecorder()),
+	)
+	key := types.NamespacedName{Name: cr.Name}
+	for range 6 {
+		if _, err := r.Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
+			t.Fatalf("Reconcile() before deletion: %v", err)
+		}
+	}
+	got := &v1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(context.Background(), key, got); err != nil {
+		t.Fatal(err)
+	}
+	if !credentialCreatedByThisMR(got) || adoptionWasRejected(got) {
+		t.Fatalf("successful Create did not supersede rejection evidence: conditions=%#v", got.Status.Conditions)
+	}
+	if err := kube.Delete(context.Background(), got); err != nil {
+		t.Fatal(err)
+	}
+	for range 10 {
+		if _, err := r.Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
+			t.Fatalf("Reconcile() during deletion: %v", err)
+		}
+	}
+	if deleted != 1 {
+		t.Fatalf("expected newly created credential to be deleted externally, got %d Delete calls", deleted)
+	}
+	if err := kube.Get(context.Background(), key, got); err != nil {
+		t.Fatalf("MR unexpectedly disappeared during external cleanup: %v", err)
+	}
+	if adoptionWasRejected(got) {
+		t.Fatalf("stale adoption rejection still authorizes local finalization: %#v", got.Status.Conditions)
+	}
+}
+
 func TestReconcileRejectsAdoptionWithoutMutation(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := apis.AddToScheme(scheme); err != nil {
