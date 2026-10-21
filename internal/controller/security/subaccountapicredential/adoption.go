@@ -75,19 +75,21 @@ func lifecycleEvidenceMessage(cr *v1alpha1.SubaccountApiCredential) string {
 
 func adoptionWasRejected(cr *v1alpha1.SubaccountApiCredential) bool {
 	condition := cr.GetCondition(xpv1.ConditionType(conditionAdoptionRejected))
-	return condition.Status == "True" && strings.HasPrefix(condition.Message, string(cr.UID)+":")
+	return condition.Status == "True" && strings.HasPrefix(condition.Message, string(cr.UID)+":") && !credentialCreatedByThisMR(cr)
 }
 
 func credentialCreatedByThisMR(cr *v1alpha1.SubaccountApiCredential) bool {
 	return lifecycleEvidenceMatches(cr, conditionCredentialCreated)
 }
 
-func (c *adoptionRejectingClient) persistEvidence(ctx context.Context, cr *v1alpha1.SubaccountApiCredential, condition xpv1.Condition) error {
+func (c *adoptionRejectingClient) persistEvidence(ctx context.Context, cr *v1alpha1.SubaccountApiCredential, conditions ...xpv1.Condition) error {
 	before := cr.DeepCopy()
-	if condition.LastTransitionTime.IsZero() {
-		condition.LastTransitionTime = metav1.Now()
+	for _, condition := range conditions {
+		if condition.LastTransitionTime.IsZero() {
+			condition.LastTransitionTime = metav1.Now()
+		}
+		cr.SetConditions(condition)
 	}
-	cr.SetConditions(condition)
 	if c.Kube == nil {
 		return nil
 	}
@@ -102,7 +104,13 @@ func (c *adoptionRejectingClient) Create(ctx context.Context, mg resource.Manage
 	cr, ok := mg.(*v1alpha1.SubaccountApiCredential)
 	if !ok || usesCertificate(cr) || err == nil || !strings.Contains(strings.ToLower(err.Error()), "already exists") {
 		if ok && err == nil {
-			if persistErr := c.persistEvidence(ctx, cr, xpv1.Condition{Type: conditionCredentialCreated, Status: "True", Reason: "ExternalCreateSucceeded", Message: lifecycleEvidenceMessage(cr)}); persistErr != nil {
+			// Record successful creation and invalidate any earlier rejection in
+			// the same status patch. A prior collision must not authorize local
+			// finalization after this MR has since created the credential.
+			if persistErr := c.persistEvidence(ctx, cr,
+				xpv1.Condition{Type: conditionCredentialCreated, Status: "True", Reason: "ExternalCreateSucceeded", Message: lifecycleEvidenceMessage(cr)},
+				xpv1.Condition{Type: conditionAdoptionRejected, Status: "False", Reason: "ExternalCreateSucceeded", Message: "A credential was successfully created by this managed resource"},
+			); persistErr != nil {
 				return created, persistErr
 			}
 		}
