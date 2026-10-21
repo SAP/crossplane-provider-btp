@@ -21,10 +21,15 @@ func Configure(p *config.Provider) {
 		r.ShortGroup = "security"
 		r.Kind = "GlobalaccountTrustConfiguration"
 
-		// The provider's Read keys off state.origin, not id, so set origin from the external-name.
-		// Without it import/observe reads an empty origin -> 404 -> Create -> 409 "already exists".
+		// If an external-name is present, set the origin as it is required for TF's read call used in Read /
+		// refresh / import but is optional in the spec.
+		//
+		// external-name is set from id which is documented to be equal to origin:
+		// https://registry.terraform.io/providers/SAP/btp/latest/docs/resources/globalaccount_trust_configuration#id-1
 		r.ExternalName.SetIdentifierArgumentFn = func(base map[string]any, externalName string) {
-			base["origin"] = externalName
+			if externalName != "" {
+				base["origin"] = externalName
+			}
 		}
 
 		// Sets status.atProvider.origin from the external-name so a refresh with existing TF state
