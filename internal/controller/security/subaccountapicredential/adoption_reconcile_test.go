@@ -23,6 +23,35 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+func TestPersistEvidencePreservesPendingCreateMutations(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := apis.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cr := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: "credential", UID: types.UID("created-uid")}}
+	kube := kubefake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&v1alpha1.SubaccountApiCredential{}).WithObjects(cr).Build()
+	// Model Upjet's pending changes before the evidence status patch.
+	meta.SetExternalName(cr, "subaccount-guid/configured-name")
+	cr.Status.AtProvider.Name = func() *string { value := "observed-name"; return &value }()
+	client := &adoptionRejectingClient{Kube: kube}
+	if err := client.persistEvidence(context.Background(), cr, xpv1.Condition{
+		Type: conditionCredentialCreated, Status: "True", Message: lifecycleEvidenceMessage(cr),
+	}); err != nil {
+		t.Fatalf("persistEvidence() error = %v", err)
+	}
+	if meta.GetExternalName(cr) != "subaccount-guid/configured-name" || cr.Status.AtProvider.Name == nil || *cr.Status.AtProvider.Name != "observed-name" {
+		t.Fatalf("pending Create mutations were lost: externalName=%q observation=%#v", meta.GetExternalName(cr), cr.Status.AtProvider)
+	}
+	got := &v1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(context.Background(), types.NamespacedName{Name: cr.Name}, got); err != nil {
+		t.Fatal(err)
+	}
+	condition := got.GetCondition(xpv1.ConditionType(conditionCredentialCreated))
+	if condition.Status != "True" || condition.Message != lifecycleEvidenceMessage(cr) {
+		t.Fatalf("creation evidence was not persisted for pending identity: %#v", condition)
+	}
+}
+
 func TestReconcileFinalizesFailedAdoptionWithoutExternalDelete(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := apis.AddToScheme(scheme); err != nil {

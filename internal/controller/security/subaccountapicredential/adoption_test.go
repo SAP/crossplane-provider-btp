@@ -44,6 +44,27 @@ func TestAdoptionRejectingConnectorFinalizesRejectedAdoptionLocally(t *testing.T
 	}
 }
 
+func TestDeletionWithoutCreationEvidenceFinalizesLocally(t *testing.T) {
+	now := metav1.Now()
+	cr := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{UID: "legacy-uid", DeletionTimestamp: &now}}
+	connected := false
+	connector := &adoptionRejectingConnector{ExternalConnector: managed.ExternalConnectorFn(func(context.Context, resource.Managed) (managed.ExternalClient, error) {
+		connected = true
+		return nil, nil
+	})}
+	client, err := connector.Connect(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if connected {
+		t.Fatal("unproven acquisition must not reach external Delete path")
+	}
+	observation, err := client.Observe(context.Background(), cr)
+	if err != nil || observation.ResourceExists {
+		t.Fatalf("unproven acquisition should be finalized locally: observation=%#v err=%v", observation, err)
+	}
+}
+
 func TestAdoptionRejectingClientCreateCollision(t *testing.T) {
 	cr := &v1alpha1.SubaccountApiCredential{}
 	inner := managed.ExternalClientFns{
@@ -93,6 +114,20 @@ func TestCertificateCredentialsKeepExistingLifecycle(t *testing.T) {
 	}
 	if !connected {
 		t.Fatal("certificate cleanup must retain its existing connector path")
+	}
+}
+
+func TestCertificateInInitProviderIsRecognized(t *testing.T) {
+	certificate := "certificate-material"
+	cr := &v1alpha1.SubaccountApiCredential{Spec: v1alpha1.SubaccountApiCredentialSpec{
+		InitProvider: v1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: &certificate},
+	}}
+	if !usesCertificate(cr) {
+		t.Fatal("initProvider-only certificate should use certificate lifecycle")
+	}
+	cr.Spec.ForProvider.CertificatePassed = internal.Ptr("effective-certificate")
+	if !usesCertificate(cr) {
+		t.Fatal("forProvider certificate should take precedence")
 	}
 }
 

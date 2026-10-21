@@ -29,10 +29,10 @@ type adoptionRejectingConnector struct {
 }
 
 func (c *adoptionRejectingConnector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	if cr, ok := mg.(*v1alpha1.SubaccountApiCredential); ok && !usesCertificate(cr) && meta.WasDeleted(cr) && adoptionWasRejected(cr) {
-		// Failed adoption never acquired the existing credential. Avoid Connect,
-		// which may require the incomplete write-once Secret, and let the normal
-		// managed reconciler finalize this MR as externally absent.
+	if cr, ok := mg.(*v1alpha1.SubaccountApiCredential); ok && !usesCertificate(cr) && meta.WasDeleted(cr) && !credentialCreatedByThisMR(cr) {
+		// Without trusted provider Create evidence, external deletion is not
+		// authorized (this includes failed adoption and legacy resources without
+		// provenance). Avoid Connect and finalize non-destructively.
 		return managed.ExternalClientFns{
 			ObserveFn: func(context.Context, resource.Managed) (managed.ExternalObservation, error) {
 				return managed.ExternalObservation{ResourceExists: false}, nil
@@ -53,7 +53,12 @@ type adoptionRejectingClient struct {
 }
 
 func usesCertificate(cr *v1alpha1.SubaccountApiCredential) bool {
-	return cr.Spec.ForProvider.CertificatePassed != nil
+	// forProvider takes precedence because it is the effective managed value;
+	// initProvider is consulted when the field has not yet been late-initialized.
+	if cr.Spec.ForProvider.CertificatePassed != nil {
+		return true
+	}
+	return cr.Spec.InitProvider.CertificatePassed != nil
 }
 
 func lifecycleEvidenceMatches(cr *v1alpha1.SubaccountApiCredential, conditionType string) bool {
@@ -84,18 +89,28 @@ func credentialCreatedByThisMR(cr *v1alpha1.SubaccountApiCredential) bool {
 
 func (c *adoptionRejectingClient) persistEvidence(ctx context.Context, cr *v1alpha1.SubaccountApiCredential, conditions ...xpv1.Condition) error {
 	before := cr.DeepCopy()
+	updated := cr.DeepCopy()
 	for _, condition := range conditions {
 		if condition.LastTransitionTime.IsZero() {
 			condition.LastTransitionTime = metav1.Now()
 		}
-		cr.SetConditions(condition)
+		updated.SetConditions(condition)
 	}
 	if c.Kube == nil {
+		for _, condition := range conditions {
+			cr.SetConditions(condition)
+		}
 		return nil
 	}
-	if err := c.Kube.Status().Patch(ctx, cr, client.MergeFrom(before)); err != nil {
+	if err := c.Kube.Status().Patch(ctx, updated, client.MergeFrom(before)); err != nil {
 		return fmt.Errorf("persist SubaccountApiCredential lifecycle evidence: %w", err)
 	}
+	// Copy only the persisted lifecycle conditions and resource version back.
+	// Keep pending Upjet mutations (external name, observation, etc.) on cr.
+	for _, condition := range conditions {
+		cr.SetConditions(condition)
+	}
+	cr.ResourceVersion = updated.ResourceVersion
 	return nil
 }
 
