@@ -61,23 +61,37 @@ func (c *adoptionRejectingClient) Create(ctx context.Context, mg resource.Manage
 	return created, fmt.Errorf("%s: external Create reported an existing credential: %w", errUnsupportedAdoption, err)
 }
 
+func hasSuccessfulExternalCreate(cr *v1alpha1.SubaccountApiCredential) bool {
+	succeeded := meta.GetExternalCreateSucceeded(cr)
+	if succeeded.IsZero() {
+		return false
+	}
+
+	// A newer pending or failed attempt supersedes an older success. The
+	// managed reconciler normally blocks Observe while creation is incomplete;
+	// checking timestamps here also fails closed for stale tracking annotations.
+	return !meta.GetExternalCreatePending(cr).After(succeeded) && !meta.GetExternalCreateFailed(cr).After(succeeded)
+}
+
 func (c *adoptionRejectingClient) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.SubaccountApiCredential)
 	if !ok {
 		return c.ExternalClient.Observe(ctx, mg)
 	}
 
-	// Snapshot acquisition evidence before Upjet Observe mutates status from the
-	// remote object. A fresh MR with no observed ID has not created this object.
-	wasUnacquired := cr.Status.AtProvider.ID == nil || *cr.Status.AtProvider.ID == ""
-	previouslyRejected := strings.Contains(cr.GetCondition(xpv1.TypeReady).Message, errUnsupportedAdoption)
+	// Snapshot creation evidence before Upjet Observe mutates status from the
+	// remote object. This resource has no Terraform ID attribute, so AtProvider.ID
+	// cannot distinguish a resource created by this MR from an existing one.
+	hasSuccessfulCreate := hasSuccessfulExternalCreate(cr)
 	observation, err := c.ExternalClient.Observe(ctx, mg)
-	if err != nil || !observation.ResourceExists || (!wasUnacquired && !previouslyRejected) || meta.WasDeleted(cr) {
+	if err != nil || !observation.ResourceExists || hasSuccessfulCreate || meta.WasDeleted(cr) {
 		return observation, err
 	}
 
 	// Keep any public connection fields returned by Observe, but never allow a
-	// read of an existing credential to become successful acquisition.
+	// read of an existing credential to become successful acquisition. Repeated
+	// observations remain rejected unless the managed reconciler records a
+	// successful Create on this resource.
 	cr.SetConditions(xpv1.Unavailable().WithMessage(fmt.Sprintf(
 		"%s; use a distinct credential name, or remove the existing BTP credential and verify it is absent before recreating this resource",
 		errUnsupportedAdoption,

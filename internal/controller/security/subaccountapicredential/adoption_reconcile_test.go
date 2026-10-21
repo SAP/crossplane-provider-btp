@@ -83,6 +83,61 @@ func TestReconcileFinalizesFailedAdoptionWithoutExternalDelete(t *testing.T) {
 	}
 }
 
+func TestReconcileAllowsObserveAfterSuccessfulCreate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := apis.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cr := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: "credential", UID: types.UID("created-uid")}}
+	meta.SetExternalName(cr, "subaccount-guid/credential-name")
+	kube := kubefake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&v1alpha1.SubaccountApiCredential{}).WithObjects(cr).Build()
+	observeCalls, createCalls := 0, 0
+	inner := managed.ExternalClientFns{
+		ObserveFn: func(context.Context, resource.Managed) (managed.ExternalObservation, error) {
+			observeCalls++
+			return managed.ExternalObservation{ResourceExists: observeCalls > 1, ResourceUpToDate: true}, nil
+		},
+		CreateFn: func(context.Context, resource.Managed) (managed.ExternalCreation, error) {
+			createCalls++
+			return managed.ExternalCreation{}, nil
+		},
+		DisconnectFn: func(context.Context) error { return nil },
+	}
+	connector := managed.ExternalConnectorFn(func(context.Context, resource.Managed) (managed.ExternalClient, error) {
+		return &adoptionRejectingClient{ExternalClient: inner}, nil
+	})
+	r := managed.NewReconciler(
+		&resourcefake.Manager{Client: kube, Scheme: scheme},
+		resource.ManagedKind(v1alpha1.SubaccountApiCredential_GroupVersionKind),
+		managed.WithExternalConnector(connector),
+		managed.WithInitializers(),
+		managed.WithFinalizer(resource.NewAPIFinalizer(kube, managed.FinalizerName)),
+		managed.WithRecorder(event.NewNopRecorder()),
+	)
+	key := types.NamespacedName{Name: cr.Name}
+	for range 5 {
+		if _, err := r.Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
+			t.Fatalf("Reconcile() error = %v", err)
+		}
+	}
+	got := &v1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(context.Background(), key, got); err != nil {
+		t.Fatal(err)
+	}
+	if createCalls != 1 || observeCalls < 2 {
+		t.Fatalf("expected one Create followed by Observe, got creates=%d observes=%d", createCalls, observeCalls)
+	}
+	if meta.GetExternalCreateSucceeded(got).IsZero() {
+		t.Fatal("managed reconciler did not persist external-create-succeeded after Create")
+	}
+	if ready := got.GetCondition(xpv1.TypeReady); strings.Contains(ready.Message, errUnsupportedAdoption) {
+		t.Fatalf("provider-created credential was falsely rejected as adoption: %#v", ready)
+	}
+	if synced := got.GetCondition(xpv1.TypeSynced); strings.Contains(synced.Message, errUnsupportedAdoption) {
+		t.Fatalf("provider-created credential was falsely rejected as adoption: %#v", synced)
+	}
+}
+
 func TestReconcileRejectsAdoptionWithoutMutation(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := apis.AddToScheme(scheme); err != nil {
