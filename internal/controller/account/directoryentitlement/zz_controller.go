@@ -78,9 +78,7 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 		managed.WithInitializers(initializers),
 		managed.WithPollInterval(o.PollInterval),
 	}
-	if o.PollJitter != 0 {
-		opts = append(opts, managed.WithPollJitterHook(o.PollJitter))
-	}
+	opts = append(opts, o.PollReconcilerOptions()...)
 	if o.Features.Enabled(features.EnableBetaManagementPolicies) {
 		opts = append(opts, managed.WithManagementPolicies())
 	}
