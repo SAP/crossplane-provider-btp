@@ -1,16 +1,32 @@
 #!/usr/bin/env bash
-# This script injects using custom backoff settings into upjet based controllers
-# since the controller generation is part of upjet we can't do that while generating,
-# so we amend this code afterwards
+# This script injects custom backoff settings and the provider-wide poll
+# interval hook into upjet based controllers. Since the controller generation
+# is part of upjet we can't do that while generating, so we amend this code
+# afterwards.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Only generated controllers. Searching REPO_ROOT would also rewrite
+# zz_controller.go files in nested git worktrees (.kilo/, .scratch/, ...).
+CONTROLLER_ROOT="${REPO_ROOT}/internal/controller"
 
-find "${REPO_ROOT}" -name "zz_controller.go" -print0 | xargs -0 perl -i -0777 -pe \
+find "${CONTROLLER_ROOT}" -name "zz_controller.go" -print0 | xargs -0 perl -i -0777 -pe \
   's/o tjcontroller\.Options/o internalopts.UpjetOptions/g;
    s/o\.ForControllerRuntime\(\)/o.ForControllerRuntimeWithBackoff()/g;
+   s/\tif o\.PollJitter != 0 \{\n\t\topts = append\(opts, managed\.WithPollJitterHook\(o\.PollJitter\)\)\n\t\}\n/\topts = append(opts, o.PollReconcilerOptions()...)\n/g;
    s/(ctrl "sigs\.k8s\.io\/controller-runtime")/$1\n\tinternalopts "github.com\/sap\/crossplane-provider-btp\/internal\/controller\/options"/ unless /internalopts "github\.com\/sap\/crossplane-provider-btp\/internal\/controller\/options"/;'
 
+# Fail loudly if upjet changed the generated PollJitter block and the
+# substitution above no longer matched: otherwise upjet controllers would
+# silently lose jitter and the poll-interval floor.
+# `|| true`: GNU grep >= 3.5 exits 1 from -L when it lists no file, which
+# would trip `set -e` in the success case.
+missing="$(find "${CONTROLLER_ROOT}" -name "zz_controller.go" -exec grep -L 'o.PollReconcilerOptions()' {} + || true)"
+if [ -n "${missing}" ]; then
+  echo "ctrl_inject_backoff.sh: poll hook not injected into:" >&2
+  echo "${missing}" >&2
+  exit 1
+fi
 
 perl -i -0777 -pe \
   's/controller\.Options/internalopts.UpjetOptions/g;
@@ -18,5 +34,5 @@ perl -i -0777 -pe \
   "${REPO_ROOT}/internal/controller/zz_setup.go"
 
 # Fix import ordering after injection
-find "${REPO_ROOT}" -name "zz_controller.go" -print0 | xargs -0 goimports -w
+find "${CONTROLLER_ROOT}" -name "zz_controller.go" -print0 | xargs -0 goimports -w
 goimports -w "${REPO_ROOT}/internal/controller/zz_setup.go"
