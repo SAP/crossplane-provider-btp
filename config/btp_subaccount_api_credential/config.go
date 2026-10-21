@@ -11,7 +11,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
-	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/crossplane/upjet/v2/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -235,6 +234,11 @@ type DeletionProtectionInitializer struct {
 	Kube client.Client
 }
 
+func rejectedAdoptionEvidence(cr *securityv1alpha1.SubaccountApiCredential) bool {
+	condition := cr.GetCondition("AdoptionRejected")
+	return condition.Status == "True" && strings.HasPrefix(condition.Message, string(cr.UID)+":")
+}
+
 // Implement the managed.Initializer interface
 func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resource.Managed) error {
 
@@ -288,7 +292,7 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 				_, hasTokenURL := secret.Data["attribute.token_url"]
 				_, hasAPIURL := secret.Data["attribute.api_url"]
 				_, hasClientSecret := secret.Data["attribute.client_secret"]
-				if hasClientID && hasTokenURL && hasAPIURL && !hasClientSecret && !(meta.WasDeleted(mg) && strings.Contains(cr.GetCondition(xpv1.TypeReady).Message, "adoption of an existing SubaccountApiCredential is not supported")) {
+				if hasClientID && hasTokenURL && hasAPIURL && !hasClientSecret && !(meta.WasDeleted(mg) && rejectedAdoptionEvidence(cr)) {
 					return errors.New(errMissingClientSecret)
 				}
 			}

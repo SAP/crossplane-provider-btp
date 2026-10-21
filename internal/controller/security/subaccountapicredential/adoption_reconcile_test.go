@@ -38,6 +38,8 @@ func TestReconcileFinalizesFailedAdoptionWithoutExternalDelete(t *testing.T) {
 		Finalizers:        []string{managed.FinalizerName},
 		DeletionTimestamp: &now,
 	}}
+	meta.SetExternalName(cr, "subaccount-guid/credential-name")
+	cr.SetConditions(xpv1.Condition{Type: conditionAdoptionRejected, Status: "True", Message: lifecycleEvidenceMessage(cr)})
 	cr.SetConditions(xpv1.Unavailable().WithMessage(errUnsupportedAdoption))
 	cr.Spec.WriteConnectionSecretToReference = &xpv1.SecretReference{Name: "credential-secret", Namespace: "default"}
 	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "credential-secret", Namespace: "default"}, Data: map[string][]byte{
@@ -104,7 +106,7 @@ func TestReconcileAllowsObserveAfterSuccessfulCreate(t *testing.T) {
 		DisconnectFn: func(context.Context) error { return nil },
 	}
 	connector := managed.ExternalConnectorFn(func(context.Context, resource.Managed) (managed.ExternalClient, error) {
-		return &adoptionRejectingClient{ExternalClient: inner}, nil
+		return &adoptionRejectingClient{ExternalClient: inner, Kube: kube}, nil
 	})
 	r := managed.NewReconciler(
 		&resourcefake.Manager{Client: kube, Scheme: scheme},
@@ -131,7 +133,7 @@ func TestReconcileAllowsObserveAfterSuccessfulCreate(t *testing.T) {
 		t.Fatal("managed reconciler did not persist external-create-succeeded after Create")
 	}
 	if ready := got.GetCondition(xpv1.TypeReady); strings.Contains(ready.Message, errUnsupportedAdoption) {
-		t.Fatalf("provider-created credential was falsely rejected as adoption: %#v", ready)
+		t.Fatalf("provider-created credential was falsely rejected as adoption: Ready=%#v conditions=%#v", ready, got.Status.Conditions)
 	}
 	if synced := got.GetCondition(xpv1.TypeSynced); strings.Contains(synced.Message, errUnsupportedAdoption) {
 		t.Fatalf("provider-created credential was falsely rejected as adoption: %#v", synced)

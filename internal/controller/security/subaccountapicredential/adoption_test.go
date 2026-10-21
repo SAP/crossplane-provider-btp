@@ -19,8 +19,10 @@ import (
 
 func TestAdoptionRejectingConnectorFinalizesRejectedAdoptionLocally(t *testing.T) {
 	now := metav1.Now()
-	cr := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &now}}
-	cr.SetConditions(xpv1.Unavailable().WithMessage(errUnsupportedAdoption))
+	cr := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{UID: "fresh-uid", DeletionTimestamp: &now}}
+	meta.SetExternalName(cr, "subaccount-guid/credential")
+	cr.SetConditions(xpv1.Condition{Type: conditionAdoptionRejected, Status: "True", Message: lifecycleEvidenceMessage(cr)})
+	cr.SetConditions(xpv1.Deleting()) // Ready may change during finalizer retries.
 	connected := false
 	connector := &adoptionRejectingConnector{ExternalConnector: managed.ExternalConnectorFn(func(context.Context, resource.Managed) (managed.ExternalClient, error) {
 		connected = true
@@ -56,6 +58,42 @@ func TestAdoptionRejectingClientCreateCollision(t *testing.T) {
 	if ready := cr.GetCondition(xpv1.TypeReady); ready.Status != corev1.ConditionFalse || !strings.Contains(ready.Message, errUnsupportedAdoption) {
 		t.Errorf("expected explicit unavailable condition, got %#v", ready)
 	}
+	if !adoptionWasRejected(cr) {
+		t.Fatal("Create collision must leave durable, identity-bound rejection evidence")
+	}
+}
+
+func TestCertificateCredentialsKeepExistingLifecycle(t *testing.T) {
+	certificate := "certificate-material"
+	cr := &v1alpha1.SubaccountApiCredential{Spec: v1alpha1.SubaccountApiCredentialSpec{ForProvider: v1alpha1.SubaccountApiCredentialParameters{CertificatePassed: &certificate}}}
+	observed := false
+	inner := managed.ExternalClientFns{
+		ObserveFn: func(context.Context, resource.Managed) (managed.ExternalObservation, error) {
+			observed = true
+			return managed.ExternalObservation{ResourceExists: true}, nil
+		},
+		DisconnectFn: func(context.Context) error { return nil },
+	}
+	got, err := (&adoptionRejectingClient{ExternalClient: inner}).Observe(context.Background(), cr)
+	if err != nil || !observed || !got.ResourceExists {
+		t.Fatalf("certificate Observe should retain existing behavior: observation=%#v observed=%t err=%v", got, observed, err)
+	}
+
+	now := metav1.Now()
+	cr.UID = "certificate-uid"
+	cr.DeletionTimestamp = &now
+	cr.SetConditions(xpv1.Condition{Type: conditionAdoptionRejected, Status: "True", Message: lifecycleEvidenceMessage(cr)})
+	connected := false
+	connector := &adoptionRejectingConnector{ExternalConnector: managed.ExternalConnectorFn(func(context.Context, resource.Managed) (managed.ExternalClient, error) {
+		connected = true
+		return inner, nil
+	})}
+	if _, err := connector.Connect(context.Background(), cr); err != nil {
+		t.Fatal(err)
+	}
+	if !connected {
+		t.Fatal("certificate cleanup must retain its existing connector path")
+	}
 }
 
 func TestAdoptionRejectingClientObserve(t *testing.T) {
@@ -64,21 +102,23 @@ func TestAdoptionRejectingClientObserve(t *testing.T) {
 		"attribute.api_url":   []byte("https://api.example.test"),
 	}
 	cases := map[string]struct {
-		exists             bool
-		createSucceeded    bool
-		pendingSuperseded  bool
-		failedSuperseded   bool
-		previouslyRejected bool
-		deleting           bool
-		observeErr         error
-		wantAdoption       bool
+		exists                 bool
+		createSucceeded        bool
+		copiedCreateAnnotation bool
+		pendingSuperseded      bool
+		failedSuperseded       bool
+		previouslyRejected     bool
+		deleting               bool
+		observeErr             error
+		wantAdoption           bool
 	}{
 		"existing target on fresh MR":                       {exists: true, wantAdoption: true},
+		"copied create tracking annotation":                 {exists: true, copiedCreateAnnotation: true, wantAdoption: true},
 		"target absent":                                     {},
 		"successful provider Create":                        {exists: true, createSucceeded: true},
 		"successful Create followed by rejection condition": {exists: true, createSucceeded: true, previouslyRejected: true},
-		"stale success superseded by pending Create":        {exists: true, createSucceeded: true, pendingSuperseded: true, wantAdoption: true},
-		"stale success superseded by failed Create":         {exists: true, createSucceeded: true, failedSuperseded: true, wantAdoption: true},
+		"tracking annotation is not creation evidence":      {exists: true, pendingSuperseded: true, wantAdoption: true},
+		"copied create tracking annotation is not trusted":  {exists: true, failedSuperseded: true, wantAdoption: true},
 		"repeated rejected adoption":                        {exists: true, previouslyRejected: true, wantAdoption: true},
 		"deleting MR":                                       {exists: true, deleting: true},
 		"read failure":                                      {exists: true, observeErr: context.DeadlineExceeded},
@@ -88,7 +128,11 @@ func TestAdoptionRejectingClientObserve(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cr := &v1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: "credential"}}
 			meta.SetExternalName(cr, "subaccount-guid/credential-name")
+			if tc.copiedCreateAnnotation {
+				meta.SetExternalCreateSucceeded(cr, time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC))
+			}
 			if tc.createSucceeded {
+				cr.SetConditions(xpv1.Condition{Type: conditionCredentialCreated, Status: "True", Message: lifecycleEvidenceMessage(cr)})
 				base := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 				meta.SetExternalCreatePending(cr, base)
 				meta.SetExternalCreateSucceeded(cr, base.Add(time.Second))
@@ -100,6 +144,7 @@ func TestAdoptionRejectingClientObserve(t *testing.T) {
 				}
 			}
 			if tc.previouslyRejected {
+				cr.SetConditions(xpv1.Condition{Type: conditionAdoptionRejected, Status: "True", Message: lifecycleEvidenceMessage(cr)})
 				cr.SetConditions(xpv1.Unavailable().WithMessage(errUnsupportedAdoption))
 			}
 			if tc.deleting {
