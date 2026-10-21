@@ -483,14 +483,15 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 		"deleting failed-adoption resource with incomplete secret can reach cleanup": {
 			cr: func() *securityv1alpha1.SubaccountApiCredential {
 				cr := &securityv1alpha1.SubaccountApiCredential{
-					ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: func() *metav1.Time { now := metav1.Now(); return &now }()},
+					ObjectMeta: metav1.ObjectMeta{UID: "adoption-uid", DeletionTimestamp: func() *metav1.Time { now := metav1.Now(); return &now }()},
 					Spec: securityv1alpha1.SubaccountApiCredentialSpec{
 						ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 							WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"},
 						},
 					},
 				}
-				cr.SetConditions(xpv1.Unavailable().WithMessage("adoption of an existing SubaccountApiCredential is not supported"))
+				meta.SetExternalName(cr, "subaccount-guid/credential")
+				cr.SetConditions(xpv1.Condition{Type: "AdoptionRejected", Status: "True", Message: string(cr.UID) + ":" + meta.GetExternalName(cr)})
 				return cr
 			}(),
 			kube: func() *test.MockClient {
