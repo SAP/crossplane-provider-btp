@@ -61,9 +61,6 @@ func SetupGated(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	name := managed.ControllerName(v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind.String())
 	var initializers managed.InitializerChain
-	for _, i := range o.Provider.Resources["btp_globalaccount_trust_configuration"].InitializerFns {
-		initializers = append(initializers, i(mgr.GetClient()))
-	}
 	eventHandler := handler.NewEventHandler(handler.WithLogger(o.Logger.WithValues("gvk", v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind)))
 	ac := tjcontroller.NewAPICallbacks(mgr, xpresource.ManagedKind(v1alpha1.GlobalaccountTrustConfiguration_GroupVersionKind), tjcontroller.WithEventHandler(eventHandler), tjcontroller.WithStatusUpdates(false))
 	opts := []managed.ReconcilerOption{
