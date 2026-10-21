@@ -34,7 +34,7 @@ limitations under the License.
 //go:generate go run github.com/crossplane/upjet/v2/cmd/scraper -n ${TERRAFORM_PROVIDER_SOURCE} -r ../.work/${TERRAFORM_PROVIDER_SOURCE}/${TERRAFORM_DOCS_PATH} -o ../config/provider-metadata.yaml
 
 // Run Upjet generator
-//go:generate go run ../cmd/generator/main.go ..
+//go:generate go run ../cmd/generator ..
 
 // Inject custom backoff settings on top of generated controllers
 //go:generate ../hack/helpers/ctrl_inject_backoff.sh

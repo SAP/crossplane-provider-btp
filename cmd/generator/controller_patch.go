@@ -17,7 +17,7 @@ const (
 			&adoptionRejectingConnector{ExternalConnector: tjcontroller.NewTerraformPluginFrameworkConnector(mgr.GetClient(), o.SetupFn, o.Provider.Resources["btp_subaccount_api_credential"], o.OperationTrackerStore,
 				tjcontroller.WithTerraformPluginFrameworkLogger(o.Logger),
 				tjcontroller.WithTerraformPluginFrameworkMetricRecorder(metrics.NewMetricRecorder(v1alpha1.SubaccountApiCredential_GroupVersionKind, mgr, o.PollInterval)),
-				tjcontroller.WithTerraformPluginFrameworkManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies)))}),`
+				tjcontroller.WithTerraformPluginFrameworkManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies))), Kube: mgr.GetClient()}),`
 )
 
 // patchSubaccountApiCredentialController applies the handwritten adoption guard
