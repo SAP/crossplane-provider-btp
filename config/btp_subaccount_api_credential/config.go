@@ -463,7 +463,7 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 				_, hasTokenURL := secret.Data["attribute.token_url"]
 				_, hasAPIURL := secret.Data["attribute.api_url"]
 				_, hasClientSecret := secret.Data["attribute.client_secret"]
-				if hasClientID && hasTokenURL && hasAPIURL && !hasClientSecret && !(meta.WasDeleted(mg) && rejectedAdoptionEvidence(cr)) {
+				if hasClientID && hasTokenURL && hasAPIURL && !hasClientSecret && (!meta.WasDeleted(mg) || !rejectedAdoptionEvidence(cr)) {
 					return errors.New(errMissingClientSecret)
 				}
 			}
