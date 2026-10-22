@@ -4,7 +4,7 @@
     "config:best-practices",
     ":dependencyDashboard"
   ],
-  "schedule": ["10 9 1,15 * *"],
+  "schedule": ["* 9 1,15 * *"],
   "minimumReleaseAge": "7 days",
   "internalChecksFilter": "strict",
   "baseBranchPatterns": ["main", "release/v1_10_x"],
