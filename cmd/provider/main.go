@@ -85,14 +85,13 @@ func main() {
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	ctrl.SetLogger(zl)
 
-	// Log FIPS 140-3 status at startup so the running pod self-evidences whether
-	// the Go Cryptographic Module (CMVP #5247) is active in approved mode.
-	// With GOFIPS140=certified at build time this will always be true; the log line
-	// provides an auditable artifact. See https://go.dev/doc/security/fips140
-	log.Info("FIPS 140-3 status",
-		"enabled", fips140.Enabled(),
-		"module_version", fips140.Version(),
-	)
+	// Record FIPS 140-3 status at startup as runtime compliance evidence. When
+	// built with GOFIPS140=certified this reports the linked CMVP-validated Go
+	// Cryptographic Module version and approved-mode status.
+	log.Info("FIPS 140-3 mode", "enabled", fips140.Enabled(), "module", fips140.Version())
+	if !fips140.Enabled() {
+		kingpin.Fatalf("FIPS 140-3 approved mode is not enabled; this binary must be built with GOFIPS140=certified and must not be run with GODEBUG=fips140=off")
+	}
 
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
