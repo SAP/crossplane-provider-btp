@@ -66,7 +66,7 @@ func Setup(mgr ctrl.Manager, o internalopts.UpjetOptions) error {
 	}
 	eventHandler := handler.NewEventHandler(handler.WithLogger(o.Logger.WithValues("gvk", v1alpha1.SubaccountApiCredential_GroupVersionKind)))
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnecter(
+		o.WithExternalConnector(
 			tjcontroller.NewTerraformPluginFrameworkConnector(mgr.GetClient(), o.SetupFn, o.Provider.Resources["btp_subaccount_api_credential"], o.OperationTrackerStore,
 				tjcontroller.WithTerraformPluginFrameworkLogger(o.Logger),
 				tjcontroller.WithTerraformPluginFrameworkMetricRecorder(metrics.NewMetricRecorder(v1alpha1.SubaccountApiCredential_GroupVersionKind, mgr, o.PollInterval)),

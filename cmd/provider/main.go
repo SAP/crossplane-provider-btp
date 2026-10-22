@@ -51,6 +51,14 @@ func main() {
 			"poll-jitter-percentage",
 			"Random jitter applied to each resource's poll interval on every poll requeue, as a percentage of that interval. 0 disables jitter; must be below 100.",
 		).Default("10").Envar("POLL_JITTER_PERCENTAGE").Uint()
+		pollMax = app.Flag(
+			"poll-max",
+			"Upper bound for the poll interval of resources that stay Ready and Synced; it is also the worst-case drift-detection latency. 0 or a value equal to --poll disables the backoff.",
+		).Default("0").Envar("POLL_MAX").Duration()
+		pollMaxAfter = app.Flag(
+			"poll-max-after",
+			"How long a resource must stay unchanged before its poll interval reaches --poll-max.",
+		).Default("30m").Envar("POLL_MAX_AFTER").Duration()
 		maxReconcileRate = app.Flag(
 			"max-reconcile-rate",
 			"The global maximum rate per second at which resources may checked for drift from the desired state.",
@@ -79,6 +87,12 @@ func main() {
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 	if *pollJitterPercentage >= 100 {
 		kingpin.Fatalf("--poll-jitter-percentage must be below 100, got %d", *pollJitterPercentage)
+	}
+	if *pollMax != 0 && *pollMax < *pollInterval {
+		kingpin.Fatalf("--poll-max (%s) must not be below --poll (%s)", *pollMax, *pollInterval)
+	}
+	if *pollMax > *pollInterval && *pollMaxAfter <= 0 {
+		kingpin.Fatalf("--poll-max-after must be positive when --poll-max is above --poll, got %s", *pollMaxAfter)
 	}
 
 	zl := zap.New(zap.UseDevMode(*debug))
@@ -125,13 +139,13 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
-	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, *pollJitterPercentage, backoffBase, backoffMax, enableManagementPolicies)
-	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, *pollJitterPercentage, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)
+	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, *pollJitterPercentage, *pollMax, *pollMaxAfter, backoffBase, backoffMax, enableManagementPolicies)
+	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, *pollJitterPercentage, *pollMax, *pollMaxAfter, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
 
-func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, pollJitterPercentage uint, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
+func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, pollJitterPercentage uint, pollMax, pollMaxAfter time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	o := internalopts.UpjetOptions{
 		Options: tjcontroller.Options{
 			Options: controller.Options{
@@ -148,6 +162,8 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 		BackoffBase:          *backoffBase,
 		BackoffMax:           *backoffMax,
 		PollJitterPercentage: pollJitterPercentage,
+		PollMax:              pollMax,
+		PollMaxAfter:         pollMaxAfter,
 	}
 
 	if *enableManagementPolicies {
@@ -157,7 +173,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
-func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, pollJitterPercentage uint, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
+func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, pollJitterPercentage uint, pollMax, pollMaxAfter time.Duration, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	co := internalopts.CrossplaneOptions{
 		Options: controller.Options{
 			Logger:                  log,
@@ -170,6 +186,8 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 		BackoffMax:           *backoffMax,
 		ReconcileTimeout:     *reconcileTimeout,
 		PollJitterPercentage: pollJitterPercentage,
+		PollMax:              pollMax,
+		PollMaxAfter:         pollMaxAfter,
 	}
 
 	if *enableManagementPolicies {

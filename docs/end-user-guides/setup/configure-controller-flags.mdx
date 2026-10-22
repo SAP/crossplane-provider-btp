@@ -13,7 +13,9 @@ These flags are passed as arguments to the provider's container process and can 
 |---|---|---|
 | `--sync` / `-s` | `1h` | How often **all** resources are re-checked for drift from the desired state (full sync interval). |
 | `--poll` | `1m` | How often **individual** resources are checked for drift from the desired state. |
-| `--poll-jitter-percentage` | `10` | Random offset of up to ±N% applied to each resource's effective poll interval (the `crossplane.io/poll-interval` annotation if set, else `--poll`) on every poll requeue. `0` disables jitter; must be below `100`. Can also be set via the `POLL_JITTER_PERCENTAGE` environment variable. |
+| `--poll-jitter-percentage` | `10` | Random offset of up to ±N% applied to each resource's poll interval (the `crossplane.io/poll-interval` annotation if set, else the interval picked by [Adaptive Polling](#adaptive-polling)) on every poll requeue. `0` disables jitter; must be below `100`. Can also be set via the `POLL_JITTER_PERCENTAGE` environment variable. |
+| `--poll-max` | `0` (same as `--poll`) | Ceiling for the poll interval of resources that stay `Ready` and `Synced`; also the worst-case drift-detection latency for them. `0` or a value equal to `--poll` disables the backoff; must not be below `--poll`. Can also be set via the `POLL_MAX` environment variable. See [Adaptive Polling](#adaptive-polling). |
+| `--poll-max-after` | `30m` | How long a resource must stay unchanged before its poll interval reaches `--poll-max`. Must be positive when the backoff is enabled. Can also be set via the `POLL_MAX_AFTER` environment variable. |
 | `--max-reconcile-rate` | `3` | Global maximum number of resources reconciled concurrently (parallel reconcile goroutines) |
 | `--backoff-base` | `1s` | Base duration for exponential backoff when a reconcile fails. The wait time after the first failure. |
 | `--backoff-max` | `60s` | Maximum duration for exponential backoff. The wait time will never exceed this value, regardless of how many failures have occurred. |
@@ -33,7 +35,7 @@ The flag applies to generated Terraform controllers and internal Terraform conne
 
 Each poll is scheduled relative to when that resource last finished reconciling, so resources that were reconciled together (for example the first wave after a provider restart, which `--max-reconcile-rate` admits in bursts) keep polling together and produce periodic bursts against the BTP APIs. `--poll-jitter-percentage` breaks this alignment: each poll requeue is scheduled at the effective poll interval ± a random offset of up to that percentage. It does not spread the first wave itself; `--max-reconcile-rate` bounds that.
 
-- The percentage applies to the **effective** interval: the `crossplane.io/poll-interval` annotation when set, otherwise `--poll`. With `--poll=1m` and the default `10`, polls land between 54s and 66s.
+- The percentage applies to the interval the provider picked for that poll: the `crossplane.io/poll-interval` annotation when set, otherwise `--poll`, the fast-adoption interval, or the backed-off interval (see [Adaptive Polling](#adaptive-polling)). With `--poll=1m` and the default `10`, polls land between 54s and 66s.
 - `crossplane.io/poll-interval` values below `1s` are raised to `1s` before jitter is applied. This floor applies even when jitter is disabled.
 - Jitter applies to poll requeues. Failed reconciles keep using `--backoff-base` / `--backoff-max`.
 
@@ -45,6 +47,47 @@ Suggested spread by landscape size, expressed for `--poll=1m`:
 | 100–500 | about ±10s | `17` |
 | 500–2000 | about ±30s | `50` |
 | 2000+ | about ±1m | raise `--poll` instead (e.g. `--poll=2m` with `50`); at `--poll=1m` this would need `99`, which can schedule polls about 0.6s apart |
+
+### Adaptive Polling
+
+Each poll requeue picks its interval with the first matching rule:
+
+| # | When | Interval |
+|---|---|---|
+| 1 | The `crossplane.io/poll-interval` annotation is set | The annotation (floored at `1s`) |
+| 2 | `Synced` is not `True`, or does not yet reflect the latest spec | `--poll` |
+| 3 | `Ready` has reason `Creating` and changed less than 10 minutes ago | `15s`, or `--poll` if shorter |
+| 4 | Backoff is enabled (`--poll-max` above `--poll`) and `Ready` and `Synced` are `True` | Grows from `--poll` to `--poll-max` (see below) |
+| 5 | Anything else | `--poll` |
+
+Jitter is applied on top of every rule.
+
+**Fast adoption (rule 3) is always on.** A newly created resource is re-observed every 15 seconds until BTP reports it ready, so it becomes `Available` without waiting a full `--poll` cycle. After 10 minutes, for example during an outage, it falls back to `--poll`.
+
+**Stable-resource backoff (rule 4) is off by default.** When enabled, the interval doubles at a fixed rate since `Ready` or `Synced` last changed, whichever is later:
+
+```text
+interval = min(poll * 2^(t / T), poll-max)
+T        = poll-max-after / log2(poll-max / poll)
+```
+
+where `t` is the time since that change.
+
+For `--poll=1m --poll-max=10m --poll-max-after=30m`:
+
+| Unchanged for | Poll interval |
+|---|---|
+| 0 | 1m |
+| ~9m | 2m |
+| ~18m | 4m |
+| ~27m | 8m |
+| 30m or more | 10m |
+
+- **Reset:** anything that moves `Ready` or `Synced` restarts the curve at `--poll`: an error, a spec change, the resource becoming unavailable, or drift that the provider corrected with an update.
+- **Drift latency:** drift on a backed-off resource is detected after at most `--poll-max` plus jitter. Changes to Secrets that a resource references are also seen only on that resource's next poll.
+- **Credential rotation:** `ServiceBinding`, `KymaEnvironmentBinding` and `CertBasedOIDCLogin` act on time deadlines (key rotation and expiry, binding rotation and TTL, token renewal) during polls. Their backoff is capped at the next such deadline, so rotation happens no later than without the backoff. `KubeConfigGenerator` always polls at `--poll`, so it picks up renewed OIDC tokens promptly; it makes no BTP calls.
+- **Per-resource override:** the `crossplane.io/poll-interval` annotation always wins over rules 2–5.
+- Errors keep using `--backoff-base` / `--backoff-max`.
 
 ### Exponential Backoff Details
 
@@ -68,7 +111,7 @@ Crossplane manages the provider's `Deployment` directly. To pass custom argument
 
 ### Example
 
-The following example configures a slower poll interval and a more conservative backoff strategy, which is useful when the provider manages a large number of resources or when the BTP API enforces strict rate limits.
+The following example configures a slower poll interval, a stable-resource backoff and a more conservative error backoff strategy, which is useful when the provider manages a large number of resources or when the BTP API enforces strict rate limits.
 
 1. Create and apply `DeploymentRuntimeConfig`:
 
@@ -89,6 +132,8 @@ The following example configures a slower poll interval and a more conservative 
                   args:
                     - --sync=2h
                     - --poll=5m
+                    - --poll-max=30m
+                    - --poll-max-after=2h
                     - --max-reconcile-rate=5
                     - --backoff-base=5s
                     - --backoff-max=90s

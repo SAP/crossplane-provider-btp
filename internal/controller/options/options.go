@@ -30,6 +30,8 @@ type CrossplaneOptions struct {
 	BackoffMax           time.Duration
 	ReconcileTimeout     time.Duration
 	PollJitterPercentage uint
+	PollMax              time.Duration
+	PollMaxAfter         time.Duration
 }
 
 // ForControllerRuntime returns default controller-runtime options. Its basically just an alias.
@@ -51,6 +53,8 @@ type UpjetOptions struct {
 	BackoffBase          time.Duration
 	BackoffMax           time.Duration
 	PollJitterPercentage uint
+	PollMax              time.Duration
+	PollMaxAfter         time.Duration
 }
 
 // ForControllerRuntime returns default controller-runtime options. Its basically just an alias.
@@ -65,12 +69,30 @@ func (co UpjetOptions) ForControllerRuntimeWithBackoff() crcontroller.Options {
 
 // PollReconcilerOptions returns the provider-wide poll-interval floor and hook.
 func (co CrossplaneOptions) PollReconcilerOptions() []managed.ReconcilerOption {
-	return pollReconcilerOptions(co.PollJitterPercentage)
+	return pollReconcilerOptions(co.pollConfig())
 }
 
 // PollReconcilerOptions returns the provider-wide poll-interval floor and hook.
 func (co UpjetOptions) PollReconcilerOptions() []managed.ReconcilerOption {
-	return pollReconcilerOptions(co.PollJitterPercentage)
+	return pollReconcilerOptions(co.pollConfig())
+}
+
+// WithExternalConnector installs c with the poll-backoff drift reset.
+func (co CrossplaneOptions) WithExternalConnector(c managed.ExternalConnector) managed.ReconcilerOption {
+	return withExternalConnector(co.pollConfig(), c)
+}
+
+// WithExternalConnector installs c with the poll-backoff drift reset.
+func (co UpjetOptions) WithExternalConnector(c managed.ExternalConnector) managed.ReconcilerOption {
+	return withExternalConnector(co.pollConfig(), c)
+}
+
+func (co CrossplaneOptions) pollConfig() pollinterval.Config {
+	return pollinterval.Config{Poll: co.PollInterval, PollMax: co.PollMax, PollMaxAfter: co.PollMaxAfter, JitterPercentage: co.PollJitterPercentage}
+}
+
+func (co UpjetOptions) pollConfig() pollinterval.Config {
+	return pollinterval.Config{Poll: co.PollInterval, PollMax: co.PollMax, PollMaxAfter: co.PollMaxAfter, JitterPercentage: co.PollJitterPercentage}
 }
 
 // withBackoff replicates xp's default ForControllerRuntime(), adding back an exponential backoff rate limiter.
@@ -86,10 +108,19 @@ func withBackoff(maxConcurrentReconciles int, backoffBase, backoffMax time.Durat
 }
 
 // pollReconcilerOptions floors the poll-interval annotation and installs the
-// jitter hook. It is the single source of poll behaviour for all controllers.
-func pollReconcilerOptions(jitterPct uint) []managed.ReconcilerOption {
+// adaptive poll hook.
+func pollReconcilerOptions(c pollinterval.Config) []managed.ReconcilerOption {
 	return []managed.ReconcilerOption{
 		managed.WithMinPollInterval(pollinterval.MinPollInterval),
-		managed.WithPollIntervalHook(pollinterval.NewHook(jitterPct)),
+		managed.WithPollIntervalHook(pollinterval.NewHook(c)),
 	}
+}
+
+// withExternalConnector adds the drift reset only when backoff is enabled, so
+// default flags leave Synced timestamps exactly as before.
+func withExternalConnector(c pollinterval.Config, ec managed.ExternalConnector) managed.ReconcilerOption {
+	if c.BackoffEnabled() {
+		ec = pollinterval.WithDriftReset(ec)
+	}
+	return managed.WithExternalConnector(ec)
 }
