@@ -10,6 +10,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
+	credentialconfig "github.com/sap/crossplane-provider-btp/config/btp_subaccount_api_credential"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -29,7 +30,7 @@ type adoptionRejectingConnector struct {
 }
 
 func (c *adoptionRejectingConnector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	if cr, ok := mg.(*v1alpha1.SubaccountApiCredential); ok && !usesCertificate(cr) && meta.WasDeleted(cr) && !credentialCreatedByThisMR(cr) {
+	if cr, ok := mg.(*v1alpha1.SubaccountApiCredential); ok && !usesCertificate(cr) && meta.WasDeleted(cr) && !credentialCreatedByThisMR(cr) && !credentialconfig.LegacyManagementApproved(cr) {
 		// Without trusted provider Create evidence, external deletion is not
 		// authorized (this includes failed adoption and legacy resources without
 		// provenance). Avoid Connect and finalize non-destructively.
@@ -39,6 +40,9 @@ func (c *adoptionRejectingConnector) Connect(ctx context.Context, mg resource.Ma
 			},
 			DisconnectFn: func(context.Context) error { return nil },
 		}, nil
+	}
+	if cr, ok := mg.(*v1alpha1.SubaccountApiCredential); ok && !usesCertificate(cr) && credentialconfig.IsLegacyManagementUnresolved(cr) && !credentialconfig.LegacyManagementApproved(cr) && !meta.WasDeleted(cr) {
+		return nil, fmt.Errorf("%s", credentialconfig.LegacyManagementApprovalDiagnostic())
 	}
 	client, err := c.ExternalConnector.Connect(ctx, mg)
 	if err != nil {
@@ -146,12 +150,16 @@ func (c *adoptionRejectingClient) Observe(ctx context.Context, mg resource.Manag
 		return c.ExternalClient.Observe(ctx, mg)
 	}
 
+	if credentialconfig.IsLegacyManagementUnresolved(cr) && !credentialconfig.LegacyManagementApproved(cr) {
+		return managed.ExternalObservation{}, fmt.Errorf("%s", credentialconfig.LegacyManagementApprovalDiagnostic())
+	}
+
 	// Provider-written status evidence is bound to this MR incarnation and its
 	// current external identity. Crossplane's user-writable tracking annotations
 	// are not authorization to adopt an existing credential.
 	hasSuccessfulCreate := credentialCreatedByThisMR(cr)
 	observation, err := c.ExternalClient.Observe(ctx, mg)
-	if err != nil || !observation.ResourceExists || hasSuccessfulCreate || meta.WasDeleted(cr) {
+	if err != nil || !observation.ResourceExists || hasSuccessfulCreate || credentialconfig.LegacyManagementApproved(cr) || meta.WasDeleted(cr) {
 		return observation, err
 	}
 
