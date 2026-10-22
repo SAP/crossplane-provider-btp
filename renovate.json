@@ -71,7 +71,8 @@
     },
     {
       "groupName": "docker images",
-      "matchManagers": ["dockerfile"]
+      "matchManagers": ["dockerfile", "custom.regex"],
+      "matchDatasources": ["docker"]
     }
   ],
   "customManagers": [
