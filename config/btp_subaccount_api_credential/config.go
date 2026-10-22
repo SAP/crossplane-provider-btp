@@ -3,6 +3,7 @@ package btp_subaccount_api_credential
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode"
 
@@ -11,9 +12,11 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/crossplane/upjet/v2/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	accountsv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
@@ -32,6 +35,11 @@ const (
 	errMissingSubaccountIDFromState    = "cannot reconstruct external-name: subaccount_id missing from tfstate"
 	errInvalidExternalName             = "invalid external-name annotation for SubaccountApiCredential: expected \"<subaccount-id>/<name>\" or legacy \"<name>\"; segments must be non-empty and must not contain \"/\" or whitespace"
 	defaultSubaccountApiCredentialName = "managed-subaccount-api-credential"
+	// LegacyManagementApprovalAnnotation is the UID- and identity-bound legacy recovery annotation.
+	LegacyManagementApprovalAnnotation = "btp.sap.crossplane.io/legacy-management-approval"
+	conditionLegacyManagement          = "LegacyManagementUnresolved"
+	conditionFreshManagement           = "FreshManagementEnrollment"
+	errLegacyManagementApproval        = "legacy SubaccountApiCredential provenance is unresolved; verify historical provisioning and approve this MR with the UID- and identity-bound legacy-management-approval annotation"
 )
 
 // Configure configures individual resources by adding custom ResourceConfigurators.
@@ -78,8 +86,15 @@ func Configure(p *config.Provider) {
 		// "<subaccount-id>/<name>" without deleting the existing connection secret.
 		// New resources are created without pre-setting external-name; after Create,
 		// GetExternalNameFn reconstructs the compound annotation from Terraform state.
+		// Enroll before other initializers mutate the MR or reject incomplete Secrets.
+		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
+			return &LegacyManagementEnrollmentInitializer{Kube: kube}
+		})
 		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
 			return &CompoundExternalNameInitializer{Kube: kube}
+		})
+		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
+			return &LegacyManagementApprovalInitializer{}
 		})
 		r.InitializerFns = append(r.InitializerFns, func(kube client.Client) managed.Initializer {
 			return &DeletionProtectionInitializer{Kube: kube}
@@ -166,6 +181,156 @@ func compoundExternalNameFromState(tfstate map[string]any) (string, error) {
 		return "", errors.New(errMissingNameFromState)
 	}
 	return compoundExternalName(subaccountID, credentialName), nil
+}
+
+// LegacyManagementEnrollmentInitializer records a durable, UID-bound classification
+// before any framework initializer or observation can add historical-looking state.
+type LegacyManagementEnrollmentInitializer struct {
+	Kube client.Client
+}
+
+func (e *LegacyManagementEnrollmentInitializer) Initialize(ctx context.Context, mg resource.Managed) error {
+	cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
+	if !ok {
+		return errors.New(errTypeAssertion)
+	}
+	if cr.Spec.ForProvider.CertificatePassed != nil || cr.Spec.InitProvider.CertificatePassed != nil {
+		return nil
+	}
+	if lifecycleConditionMatches(cr, conditionFreshManagement) || rejectedAdoptionEvidence(cr) {
+		return nil
+	}
+	if lifecycleConditionMatches(cr, conditionLegacyManagement) {
+		return nil
+	}
+
+	legacy := !reflect.DeepEqual(cr.Status.AtProvider, securityv1alpha1.SubaccountApiCredentialObservation{}) || len(cr.Status.Conditions) > 0
+	if cr.Annotations != nil && (cr.Annotations[meta.AnnotationKeyExternalCreatePending] != "" || cr.Annotations[meta.AnnotationKeyExternalCreateSucceeded] != "" || cr.Annotations[meta.AnnotationKeyExternalCreateFailed] != "") {
+		legacy = true
+	}
+	typeName, reason, message := conditionFreshManagement, "NewManagedResource", "This managed resource was enrolled as fresh for this Kubernetes incarnation"
+	if legacy {
+		typeName, reason, message = conditionLegacyManagement, "HistoricalProvenanceUnresolved", errLegacyManagementApproval
+	}
+	condition := xpv1.Condition{Type: xpv1.ConditionType(typeName), Status: "True", LastTransitionTime: metav1.Now(), Reason: xpv1.ConditionReason(reason), Message: string(cr.UID) + ":" + message}
+	if e.Kube == nil {
+		return errors.New("cannot persist SubaccountApiCredential management classification: Kubernetes client is unavailable")
+	}
+	before, updated := cr.DeepCopy(), cr.DeepCopy()
+	updated.SetConditions(condition)
+	if err := e.Kube.Status().Patch(ctx, updated, client.MergeFrom(before)); err != nil {
+		return errors.Wrap(err, "cannot persist SubaccountApiCredential management classification")
+	}
+	cr.SetConditions(condition)
+	cr.ResourceVersion = updated.ResourceVersion
+	return nil
+}
+
+// LegacyManagementApprovalInitializer blocks external reconciliation after
+// identity normalization, but before connection-Secret validation or Connect.
+type LegacyManagementApprovalInitializer struct{}
+
+func (*LegacyManagementApprovalInitializer) Initialize(_ context.Context, mg resource.Managed) error {
+	cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
+	if !ok {
+		return errors.New(errTypeAssertion)
+	}
+	if !meta.WasDeleted(cr) && lifecycleConditionMatches(cr, conditionLegacyManagement) && !LegacyManagementApproved(cr) {
+		return errors.New(errLegacyManagementApproval)
+	}
+	return nil
+}
+
+func lifecycleConditionMatches(cr *securityv1alpha1.SubaccountApiCredential, conditionType string) bool {
+	condition := cr.GetCondition(xpv1.ConditionType(conditionType))
+	return condition.Status == "True" && strings.HasPrefix(condition.Message, string(cr.UID)+":")
+}
+
+// LegacyManagementApproved validates the transient annotation against the current
+// MR UID and its established, non-conflicting compound identity.
+// LegacyManagementApprovalDiagnostic returns the actionable unresolved-provenance message.
+func LegacyManagementApprovalDiagnostic() string { return errLegacyManagementApproval }
+
+// IsLegacyManagementUnresolved reports whether this MR has a current-UID legacy classification.
+func IsLegacyManagementUnresolved(cr *securityv1alpha1.SubaccountApiCredential) bool {
+	return lifecycleConditionMatches(cr, conditionLegacyManagement)
+}
+
+func LegacyManagementApproved(cr *securityv1alpha1.SubaccountApiCredential) bool {
+	if cr == nil || cr.UID == "" || !lifecycleConditionMatches(cr, conditionLegacyManagement) || adoptionRejectedForCurrentUID(cr) {
+		return false
+	}
+	subaccountID, name, ok := EstablishedCredentialIdentity(cr)
+	if !ok || strings.Contains(subaccountID+name, ":") {
+		return false
+	}
+	return cr.Annotations[LegacyManagementApprovalAnnotation] == string(cr.UID)+":"+subaccountID+"/"+name
+}
+
+// EstablishedCredentialIdentity returns the normalized external identity only
+// when external-name and effective forProvider/initProvider configuration agree.
+// EstablishedCredentialIdentity resolves a normalized identity only when all supplied identity sources agree.
+func EstablishedCredentialIdentity(cr *securityv1alpha1.SubaccountApiCredential) (subaccountID, name string, ok bool) {
+	if cr == nil {
+		return "", "", false
+	}
+	externalName := meta.GetExternalName(cr)
+	if externalName != "" {
+		if sid, cname, compound := splitCompoundExternalName(externalName); compound {
+			subaccountID, name = sid, cname
+		} else {
+			name = externalName
+		}
+	}
+	fpSID := specSubaccountID(cr)
+	initSID := ""
+	if cr.Spec.InitProvider.SubaccountID != nil {
+		initSID = *cr.Spec.InitProvider.SubaccountID
+	}
+	if fpSID != "" && initSID != "" && fpSID != initSID {
+		return "", "", false
+	}
+	if fpSID == "" && initSID != "" {
+		fpSID = *cr.Spec.InitProvider.SubaccountID
+	}
+	if fpSID == "" && cr.Status.AtProvider.SubaccountID != nil {
+		fpSID = *cr.Status.AtProvider.SubaccountID
+	}
+	fpName := ""
+	if cr.Spec.ForProvider.Name != nil {
+		fpName = *cr.Spec.ForProvider.Name
+	}
+	initName := ""
+	if cr.Spec.InitProvider.Name != nil {
+		initName = *cr.Spec.InitProvider.Name
+	}
+	if fpName != "" && initName != "" && fpName != initName {
+		return "", "", false
+	}
+	if fpName == "" {
+		fpName = initName
+	}
+	if subaccountID == "" {
+		subaccountID = fpSID
+	}
+	if name == "" {
+		name = fpName
+	}
+	if name == "" {
+		name = defaultSubaccountApiCredentialName
+	}
+	if subaccountID == "" || !validExternalNameSegment(subaccountID) || !validExternalNameSegment(name) {
+		return "", "", false
+	}
+	if fpSID != "" && fpSID != subaccountID || fpName != "" && fpName != name {
+		return "", "", false
+	}
+	return subaccountID, name, true
+}
+
+func adoptionRejectedForCurrentUID(cr *securityv1alpha1.SubaccountApiCredential) bool {
+	condition := cr.GetCondition(xpv1.ConditionType("AdoptionRejected"))
+	return condition.Status == "True" && strings.HasPrefix(condition.Message, string(cr.UID)+":")
 }
 
 func specSubaccountID(cr *securityv1alpha1.SubaccountApiCredential) string {
@@ -270,6 +435,12 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 		if blocked := referenceTracker.DeleteShouldBeBlocked(mg); blocked {
 			return errors.New(providerv1alpha1.ErrResourceInUse)
 		}
+	}
+
+	// Unapproved legacy resources finalize locally; incomplete legacy Secret data
+	// must not prevent the connector from choosing its non-destructive path.
+	if meta.WasDeleted(mg) && lifecycleConditionMatches(cr, conditionLegacyManagement) && !LegacyManagementApproved(cr) {
+		return nil
 	}
 
 	// According to the Terraform BTP provider docs, client_secret is only generated
