@@ -22,16 +22,16 @@ import (
 )
 
 const (
-	errGetPC                   = "cannot get ProviderConfig"
-	errGetCISCreds             = "cannot get CIS credentials"
-	errGetSACreds              = "cannot get Service Account credentials"
-	errTrackRUsage             = "cannot track ResourceUsage"
-	errTrackPCUsage            = "cannot track ProviderConfig usage"
-	errNewClient               = "cannot create new Service"
-	errCisSecretEmpty          = "CIS Secret is empty or nil, please check config & secrets referenced in provider config"
-	errSaSecretEmpty           = "Service Account Secret is empty or nil, please check config & secrets referenced in provider config"
-	errSecretKeyNotFound       = "%s: %v key not found in secret data"
-	errCisSecretCorrupted      = "CIS Secret does not match expected format"
+	errGetPC              = "cannot get ProviderConfig"
+	errGetCISCreds        = "cannot get CIS credentials"
+	errGetSACreds         = "cannot get Service Account credentials"
+	errTrackRUsage        = "cannot track ResourceUsage"
+	errTrackPCUsage       = "cannot track ProviderConfig usage"
+	errNewClient          = "cannot create new Service"
+	errCisSecretEmpty     = "CIS Secret is empty or nil, please check config & secrets referenced in provider config"
+	errSaSecretEmpty      = "Service Account Secret is empty or nil, please check config & secrets referenced in provider config"
+	errSecretKeyNotFound  = "%s: %v key not found in secret data"
+	errCisSecretCorrupted = "CIS Secret does not match expected format"
 )
 
 // Setup adds a controller that reconciles ProviderConfigs by accounting for
@@ -101,17 +101,26 @@ func CreateClient(
 		return nil, errors.Wrap(err, errTrackRUsage)
 	}
 
+	if err := ValidateWorkloadIdentity(pc); err != nil {
+		return nil, err
+	}
 	CISSecretData, cisErr := loadCisCredentials(ctx, kube, pc)
 	if cisErr != nil {
 		return nil, cisErr
 	}
 
+	if pc.Spec.WorkloadIdentity != nil {
+		var cis btp.CISCredential
+		if err := json.Unmarshal(CISSecretData, &cis); err != nil || !allowedWorkloadCISGrant(pc, cis.GrantType) {
+			return nil, errors.New("workload identity requires client_credentials CIS or configured IAS user exchange")
+		}
+	}
 	ServiceAccountSecretData, saErr := loadSaCredentials(ctx, kube, pc)
 	if saErr != nil {
 		return nil, saErr
 	}
 
-	svc, err := newServiceFn(CISSecretData, ServiceAccountSecretData)
+	svc, err := NewConfiguredClient(pc, CISSecretData, ServiceAccountSecretData, newServiceFn)
 	return svc, errors.Wrap(err, errNewClient)
 }
 
@@ -164,6 +173,9 @@ func loadCisCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.Pr
 
 // loadSaCredentials loads Service Account credentials from secret
 func loadSaCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig) ([]byte, error) {
+	if pc.Spec.WorkloadIdentity != nil {
+		return json.Marshal(btp.UserCredential{Email: pc.Spec.WorkloadIdentity.UserEmail, Username: pc.Spec.WorkloadIdentity.UserEmail, Idp: pc.Spec.WorkloadIdentity.IdentityProvider})
+	}
 	cd := pc.Spec.ServiceAccountSecret
 
 	ServiceAccountSecretData, err := resource.CommonCredentialExtractor(
@@ -179,6 +191,9 @@ func loadSaCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.Pro
 		return nil, fmt.Errorf(errSecretKeyNotFound, errSaSecretEmpty, cd.SecretRef.Key)
 	}
 
+	if _, err := btp.ParseUserCredential(ServiceAccountSecretData); err != nil {
+		return nil, errors.Wrap(err, errGetSACreds)
+	}
 	return ServiceAccountSecretData, nil
 }
 
@@ -207,4 +222,61 @@ func mapKeys(data map[string][]byte) []string {
 		i++
 	}
 	return keys
+}
+
+// CIS credentials are independent; only conflicting user credential inputs fail.
+func ValidateWorkloadIdentity(pc *v1alpha1.ProviderConfig) error {
+	w := pc.Spec.WorkloadIdentity
+	if w == nil {
+		return nil
+	}
+	if w.TokenFile == "" || w.IdentityProvider == "" || w.UserEmail == "" || pc.Spec.GlobalAccount == "" {
+		return errors.New("workload identity requires tokenFile, identityProvider, userEmail and globalAccount")
+	}
+	if w.IASURL != "" || w.IASClientID != "" || w.IASResource != "" {
+		if w.IASURL == "" || w.IASClientID == "" || w.IASResource == "" {
+			return errors.New("native IAS exchange requires iasUrl, iasClientId and iasResource")
+		}
+	}
+	cd := pc.Spec.ServiceAccountSecret
+	if cd.Source != "" && cd.Source != "None" || cd.SecretRef != nil {
+		return errors.New("workload identity cannot be combined with serviceAccountSecret credentials")
+	}
+	return nil
+}
+
+// LoadEnvironmentUserCredentials keeps manual local CIS credentials independent of user authentication.
+func LoadEnvironmentUserCredentials(ctx context.Context, kube client.Client, pc *v1alpha1.ProviderConfig, cisBinding []byte) ([]byte, error) {
+	if err := ValidateWorkloadIdentity(pc); err != nil {
+		return nil, err
+	}
+	if pc.Spec.WorkloadIdentity != nil {
+		var cis btp.CISCredential
+		if err := json.Unmarshal(cisBinding, &cis); err != nil || !allowedWorkloadCISGrant(pc, cis.GrantType) {
+			return nil, errors.New("workload identity requires local client_credentials CIS or configured IAS user exchange")
+		}
+	}
+	return loadSaCredentials(ctx, kube, pc)
+}
+
+func allowedWorkloadCISGrant(pc *v1alpha1.ProviderConfig, grant string) bool {
+	return grant == "client_credentials" || grant == "user_token" && pc.Spec.WorkloadIdentity.IASURL != "" && pc.Spec.WorkloadIdentity.IASClientID != "" && pc.Spec.WorkloadIdentity.IASResource != ""
+}
+
+// NewConfiguredClient makes the authentication mode an explicit ProviderConfig choice.
+func NewConfiguredClient(pc *v1alpha1.ProviderConfig, cis, user []byte, legacy func([]byte, []byte) (*btp.Client, error)) (*btp.Client, error) {
+	if err := ValidateWorkloadIdentity(pc); err != nil {
+		return nil, err
+	}
+	if w := pc.Spec.WorkloadIdentity; w != nil {
+		c, err := btp.ServiceClientWithWorkloadIdentity(cis, &btp.WorkloadIdentityConfiguration{TokenFile: w.TokenFile, IdentityProvider: w.IdentityProvider, UserEmail: w.UserEmail, IASURL: w.IASURL, IASClientID: w.IASClientID, IASResource: w.IASResource})
+		if err != nil {
+			return nil, err
+		}
+		return &c, nil
+	}
+	if _, err := btp.ParseUserCredential(user); err != nil {
+		return nil, err
+	}
+	return legacy(cis, user)
 }
