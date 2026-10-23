@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"unicode/utf8"
 
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
@@ -450,6 +451,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 
+	// BTP reports the last operation's outcome independently of current quota.
+	// Surface a rejection even when quota matches or needsUpdate retries it.
+	if cr.Status.AtProvider.Assigned.EntityState == apisv1alpha1.EntitlementStatusProcessingFailed {
+		cr.Status.SetConditions(entitlementFailedCondition(cr))
+	}
+
 	// Needs Update?
 	if c.needsUpdate(cr) {
 		return managed.ExternalObservation{
@@ -461,16 +468,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	switch cr.Status.AtProvider.Assigned.EntityState { //nolint:exhaustive
 	case apisv1alpha1.EntitlementStatusOk:
 		cr.Status.SetConditions(xpv1.Available())
-	// PROCESSING_FAILED reflects the *last operation*, not whether
-	// something is assigned now: a still-assigned entitlement that failed
-	// on delete/update stays Available; the branch below is a defensive
-	// fallback for an assign-time failure already handled by needsCreate.
 	case apisv1alpha1.EntitlementStatusProcessingFailed:
-		if assignFailedNoQuota(cr) {
-			cr.Status.SetConditions(xpv1.Unavailable())
-		} else {
-			cr.Status.SetConditions(xpv1.Available())
-		}
+		// The failure condition was set before the needsUpdate early return.
 	case apisv1alpha1.EntitlementStatusProcessing:
 		cr.Status.SetConditions(xpv1.Creating())
 	case apisv1alpha1.EntitlementStatusStarted:
@@ -739,6 +738,29 @@ func (c *external) needsUpdate(cr *apisv1alpha1.Entitlement) bool {
 	}
 
 	return false
+}
+
+// entitlementFailedCondition reports BTP's last-operation failure, which may
+// persist while an assignment remains usable. It does not change quota retries.
+func entitlementFailedCondition(cr *apisv1alpha1.Entitlement) xpv1.Condition {
+	message := "BTP reports the entitlement assignment as PROCESSING_FAILED"
+	if detail := cr.Status.AtProvider.Assigned.StateMessage; detail != "" {
+		message += ": " + detail
+	}
+	// Bound platform-controlled condition text without splitting a UTF-8 rune.
+	const maxMessageBytes = 4096
+	if len(message) > maxMessageBytes {
+		end := maxMessageBytes - len("...")
+		for !utf8.RuneStart(message[end]) {
+			end--
+		}
+		message = message[:end] + "..."
+	}
+	condition := xpv1.Unavailable()
+	condition.Reason = "ExternalResourceFailed"
+	condition.Message = message
+	condition.ObservedGeneration = cr.Generation
+	return condition
 }
 
 // assignFailedNoQuota returns true when BTP reports a PROCESSING_FAILED
