@@ -54,6 +54,33 @@ Consequently, we have to remove this initializer from running. We will have our 
 
 Upjet resources are an exception as we dont control how the external-name is defined and set by Upjet.
 
+### SubaccountApiCredential: unsupported adoption
+
+`SubaccountApiCredential` is an explicit exception to the general import/adoption flow above. Its external name is the compound identity `<subaccount-id>/<credential-name>`. For a newly-created MR, a successful external Read of an existing credential is not acquisition: reconciliation reports an unsupported-adoption error and does not proceed as a healthy managed resource. Public connection fields returned by the read may be observed or published; their presence is not proof of acquisition or credential ownership. If the compound identity does not exist, normal creation may proceed using it.
+
+A fresh MR that selects an existing credential is explicitly rejected. Users must choose a distinct credential name, or intentionally remove the old credential and verify that it is absent before recreating it with the same identity. This protects the write-once `client_secret`, which BTP Read cannot recover.
+
+After a successful credential Create, the provider records a `CredentialCreatedByThisMR` status condition bound to the MR's UID and credential identity. Older MRs may lack this record, even if the provider created their credentials. The controller marks them `LegacyManagementUnresolved` and pauses management rather than guessing. This classification does not prove who created the credential or authorize adoption. A person with permission to edit the MR's annotations may approve continued management only after independently verifying historical provisioning for this exact MR and credential. The accepted trust boundary is MR-edit permission; this is not restricted to cluster administrators and is not cryptographically audited by the controller.
+
+After verifying the MR's current UID and normalized `<subaccount-id>/<credential-name>` identity, apply the single binding annotation (replace every placeholder):
+
+```sh
+kubectl annotate subaccountapicredentials.security.btp.sap.crossplane.io NAME \
+  'btp.sap.crossplane.io/legacy-management-approval=CURRENT-UID:SUBACCOUNT-ID/CREDENTIAL-NAME' \
+  --overwrite
+```
+
+The controller checks that the value exactly matches the current MR UID and established identity. This prevents accidental reuse after MR recreation or retargeting, but a permitted editor can deliberately forge it. The annotation is transient authorization: remove it to withdraw approval on subsequent reconciliation:
+
+```sh
+kubectl annotate subaccountapicredentials.security.btp.sap.crossplane.io NAME \
+  btp.sap.crossplane.io/legacy-management-approval-
+```
+
+Approval permits ordinary management, including external deletion when applicable policies request it. It cannot recover a missing write-once secret or force health. Do not put credentials, Secret values, or private keys in annotations or operational evidence. A recorded failed-adoption rejection is never overridden by this annotation; an actually rejected MR must be deleted and recreated after intentional external cleanup. If historical provenance is ambiguous, do not approve.
+
+An unapproved legacy MR reports unresolved provenance and performs no external management. Deleting it finalizes locally without deleting BTP. Approval has no atomic revocation guarantee for an external operation already issued. Certificate credentials retain their separate existing lifecycle.
+
 In general, all exceptions should be noted in the appropriate location: for user in the docs and for developer in the appropriate code location (Observe/Create/Update/Delete functions or API definition).
 
 ### Orphaned external-name recovery (always-on bug-fix)
