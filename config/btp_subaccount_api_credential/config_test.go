@@ -11,12 +11,70 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 )
 
 func ptr(s string) *string { return &s }
+
+func TestLifecycleInitializerPersistsFreshClassificationBeforeReconciliationErrors(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	if err := securityv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cr := &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{Name: "fresh-credential", UID: types.UID("fresh-credential-uid")}}
+	kube := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(cr).WithObjects(cr).Build()
+	initializer := &LifecycleInitializer{Kube: kube}
+	if err := initializer.Initialize(ctx, cr); err != nil {
+		t.Fatalf("initialize fresh resource: %v", err)
+	}
+	persisted := &securityv1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(ctx, client.ObjectKeyFromObject(cr), persisted); err != nil {
+		t.Fatal(err)
+	}
+	if persisted.Status.Lifecycle == nil || persisted.Status.Lifecycle.Phase != securityv1alpha1.SubaccountApiCredentialPhaseEligible || persisted.Status.Lifecycle.ManagedResourceUID != string(cr.UID) {
+		t.Fatalf("fresh classification not persisted: %#v", persisted.Status.Lifecycle)
+	}
+}
+
+func TestLifecycleInitializerClearsPendingCreateForKnownRejectedResource(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	if err := securityv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cr := &securityv1alpha1.SubaccountApiCredential{
+		ObjectMeta: metav1.ObjectMeta{Name: "rejected-credential", UID: types.UID("rejected-credential-uid"), Annotations: map[string]string{
+			meta.AnnotationKeyExternalCreatePending: "2026-10-14T00:00:00Z",
+			"crossplane.io/external-name":           "subaccount/existing-credential",
+		}},
+		Status: securityv1alpha1.SubaccountApiCredentialStatus{Lifecycle: &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{
+			ManagedResourceUID: "rejected-credential-uid", Phase: securityv1alpha1.SubaccountApiCredentialPhaseRejected, Reason: "create-collision",
+		}},
+	}
+	kube := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(cr).WithObjects(cr).Build()
+	if err := (&LifecycleInitializer{Kube: kube}).Initialize(ctx, cr); err != nil {
+		t.Fatalf("initialize known-rejected resource: %v", err)
+	}
+	persisted := &securityv1alpha1.SubaccountApiCredential{}
+	if err := kube.Get(ctx, client.ObjectKeyFromObject(cr), persisted); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := persisted.GetAnnotations()[meta.AnnotationKeyExternalCreatePending]; ok {
+		t.Fatal("known-rejected resource retained external-create-pending and will be blocked before connector finalization")
+	}
+	if meta.GetExternalName(persisted) != "subaccount/existing-credential" {
+		t.Fatal("clearing the pending marker modified the target identity")
+	}
+	if persisted.Status.Lifecycle.Phase != securityv1alpha1.SubaccountApiCredentialPhaseRejected {
+		t.Fatalf("clearing the marker changed rejection receipt: %#v", persisted.Status.Lifecycle)
+	}
+}
 
 func TestCredentialNameFromExternalName(t *testing.T) {
 	cases := map[string]struct {
@@ -419,11 +477,40 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 		err error
 	}
 
+	now := metav1.Now()
+	rejectedDeletionKube := test.NewMockClient()
+	rejectedDeletionKube.MockGet = test.NewMockGetFn(nil, func(obj client.Object) error {
+		if secret, ok := obj.(*corev1.Secret); ok {
+			secret.Data = map[string][]byte{"attribute.client_id": []byte("id"), "attribute.token_url": []byte("token"), "attribute.api_url": []byte("api")}
+		}
+		return nil
+	})
 	cases := map[string]struct {
 		cr   *securityv1alpha1.SubaccountApiCredential
 		kube client.Client
 		want want
 	}{
+		"uncertain ownership reports through lifecycle guard, not secret-health initializer": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec:   securityv1alpha1.SubaccountApiCredentialSpec{ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"}}},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{Lifecycle: &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{Phase: securityv1alpha1.SubaccountApiCredentialPhaseUncertain}},
+			},
+			kube: rejectedDeletionKube,
+			want: want{err: nil},
+		},
+		"rejected deletion skips missing-secret health check": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &now},
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
+						WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"},
+					},
+				},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{Lifecycle: &securityv1alpha1.SubaccountApiCredentialLifecycleStatus{Phase: securityv1alpha1.SubaccountApiCredentialPhaseRejected}},
+			},
+			kube: rejectedDeletionKube,
+			want: want{err: nil},
+		},
 		"no secret ref": {
 			cr:   &securityv1alpha1.SubaccountApiCredential{},
 			kube: &test.MockClient{},
