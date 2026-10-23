@@ -1,0 +1,72 @@
+---
+sidebar_position: 5
+---
+
+# Advanced: Sizing and Service Manager Rate Limits
+
+The provider reads every `ServiceInstance` and `ServiceBinding` from SAP Service Manager on each reconcile. Service Manager rate-limits these reads per authenticated identity. Past that limit, reads return `HTTP 429` and resources go `Synced=False`.
+
+This bounds how many service resources one `ProviderConfig` credential can manage. Tune it with controller flags, or split across credentials once one credential can no longer hold the fleet.
+
+## The limits
+
+Limits are per authenticated identity: the username or OAuth client ID in the `ProviderConfig` `serviceAccountSecret`. Not per session, per IP, or per subaccount. Two `ProviderConfig`s using the same credential share one bucket. Distinct credentials get distinct buckets.
+
+| Bucket | Limit | Applies to |
+|---|---|---|
+| `/v1/service_instances` | 600/min, 6,000/hr | `ServiceInstance` reads |
+| `/v1/service_bindings` | 600/min, 6,000/hr | `ServiceBinding` reads |
+| Global (all SM APIs) | 1,000/min, 10,000/hr | everything, on top of the per-endpoint buckets |
+| `POST /v1/service_instances` | 5/min | resource creation |
+
+On exceed, Service Manager returns `HTTP 429` with a `Retry-After` header.
+
+Source: [SAP Service Manager - Rate Limiting](https://help.sap.com/docs/service-manager/sap-service-manager/rate-limiting?locale=en-US).
+
+## Requests per reconcile
+
+`ServiceInstance` and `ServiceBinding` are Terraform-backed. Each reconcile runs the SAP Terraform provider's read path against Service Manager through the CLI server, and that path decides how many requests hit the endpoint bucket.
+
+A `ServiceInstance` read makes up to 3 requests: one for the instance, then up to two more for its parameters. Service Manager returns instance parameters only when the service offering has `instances_retrievable: TRUE`. When it does not - the common case - the parameter fetch runs twice and returns nothing, so most instances cost 3 requests. Size on 3.
+
+A `ServiceBinding` read makes 1 request. Bindings do not return parameters, so there is no second call.
+
+Sweeping the whole fleet on a poll cycle hits the hourly limit before the per-minute one.
+
+## Sizing
+
+Reading the fleet once costs `objects × req_per_read` requests, where `req_per_read` is 3 for instances and 1 for bindings. To stay under 6,000/hr per endpoint:
+
+```
+sweeps_per_hour × objects × req_per_read  ≤  6,000
+```
+
+`sweeps_per_hour` comes from `--poll`. Per-endpoint ceilings per credential:
+
+| Poll interval | Max `ServiceInstance`s (3 req) | Max `ServiceBinding`s (1 req) |
+|---|---|---|
+| 60 min | ~2,000 | ~6,000 |
+| 30 min | ~1,000 | ~3,000 |
+
+The global 10,000/hr cap applies on top of the per-endpoint buckets, so when `ServiceInstance`s and `ServiceBinding`s share one credential both limits bind and the tighter one wins. At 3 requests per instance the `/v1/service_instances` bucket runs out first, before the global cap, so the `ServiceInstance` ceilings above still hold. A roughly equal number of `ServiceBinding`s rides along under its own bucket.
+
+## Recommended flag values
+
+`--poll` sets how often the fleet is swept. `--max-reconcile-rate` caps concurrent reconciles. Pick `--poll` by `ServiceInstance` count, since instances cost the most per read:
+
+| `ServiceInstance`s per credential | `--poll` | `--max-reconcile-rate` |
+|---|---|---|
+| up to ~1,000 | `5m` | `10` |
+| ~1,000-2,000 | `30m` | `10` |
+| ~2,000-3,000 | `60m` | `15` |
+| more than ~3,000 | [split credentials](#when-one-credential-isnt-enough) | - |
+
+As the fleet grows, lengthen `--poll`. Once a single sweep exceeds the hour bucket, split credentials.
+
+See [Configure Controller Flags](./configure-controller-flags.mdx) for how to apply these via a `DeploymentRuntimeConfig`.
+
+## When one credential isn't enough
+
+Once a single sweep exceeds 6,000 requests, no poll interval helps: one sweep alone is over the hour bucket. At 3 requests per instance, ~2,000 `ServiceInstance`s on one credential is that limit. Split them across multiple credentials.
+
+Each distinct OAuth client ID or technical user gets its own 6,000/hr bucket. Use several `ProviderConfig`s, each with a distinct `serviceAccountSecret`, and point resources at them via `spec.providerConfigRef`. Distinct `ProviderConfig`s on the same credential do not help: same identity, same bucket. Service Manager credentials are usually per-subaccount, so splitting resources across subaccounts usually splits the identity too.
