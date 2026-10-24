@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -70,8 +71,18 @@ func main() {
 
 		enableTerraformSessionReuse = app.Flag(
 			"enable-terraform-session-reuse",
-			"Share configured Terraform BTP sessions across reconciliations. Disabled by default.",
+			"DEPRECATED: use --terraform-session-pool-size. true maps to pool size 1; otherwise ignored.",
 		).Default("false").Envar("ENABLE_TERRAFORM_SESSION_REUSE").Bool()
+
+		terraformSessionPoolSize = app.Flag(
+			"terraform-session-pool-size",
+			"Warmed Terraform BTP sessions kept per global account. 'auto' = max-reconcile-rate + 2. 0 = a fresh client per reconcile; 1 = a single shared session.",
+		).Default("auto").Envar("TERRAFORM_SESSION_POOL_SIZE").String()
+
+		terraformSessionTTL = app.Flag(
+			"terraform-session-ttl",
+			"Lifetime of a warmed Terraform BTP session before it is re-authenticated on next use.",
+		).Default("2h").Envar("TERRAFORM_SESSION_TTL").Duration()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 	)
@@ -95,7 +106,10 @@ func main() {
 
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
-	tfclient.SetEnableTerraformSessionReuse(*enableTerraformSessionReuse)
+	tfclient.SetTerraformSessionPool(
+		resolveTerraformSessionPoolSize(*terraformSessionPoolSize, *maxReconcileRate, *enableTerraformSessionReuse, log),
+		*terraformSessionTTL,
+	)
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
@@ -138,7 +152,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 				Logger:                  log,
 				GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
 				PollInterval:            pollInterval,
-				MaxConcurrentReconciles: 1,
+				MaxConcurrentReconciles: *maxReconcileRate,
 				Features:                &feature.Flags{},
 			},
 			Provider:              config.GetProvider(),
@@ -178,4 +192,23 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 	}
 
 	kingpin.FatalIfError(template.CustomSetup(mgr, co), "Cannot setup controllers")
+}
+
+// resolveTerraformSessionPoolSize turns the --terraform-session-pool-size flag into
+// a concrete size. "auto" = max-reconcile-rate + 2. The deprecated reuse flag is
+// honoured only when it opts in (true -> 1); otherwise it is ignored.
+func resolveTerraformSessionPoolSize(flag string, maxReconcileRate int, deprecatedReuse bool, log logging.Logger) int {
+	if flag != "auto" {
+		n, err := strconv.Atoi(flag)
+		kingpin.FatalIfError(err, "Invalid --terraform-session-pool-size (want 'auto' or an integer >= 0)")
+		if n < 0 {
+			kingpin.Fatalf("--terraform-session-pool-size must be >= 0, got %d", n)
+		}
+		return n
+	}
+	if deprecatedReuse {
+		log.Info("--enable-terraform-session-reuse is deprecated; mapping to --terraform-session-pool-size=1")
+		return 1
+	}
+	return maxReconcileRate + 2
 }
