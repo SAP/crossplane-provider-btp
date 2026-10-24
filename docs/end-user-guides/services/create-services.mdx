@@ -188,6 +188,10 @@ Once the entitlement is in place, you can subscribe to SAP HANA Cloud Administra
     kubectl create -f hana-cloud-tools-subscription.yaml
     ```
 
+:::note Subaccount-level IAS trust is required
+Before subscribing, establish trust between your **Identity Authentication Service (IAS) tenant** and your BTP **subaccount**. See [Subscribing to SAP HANA Cloud Administration Tools](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/subscribing-to-sap-hana-cloud-administration-tools?locale=en-US).
+:::
+
 :::tip
 SAP HANA Cloud Administration Tools provides [multiple role collections](https://help.sap.com/docs/hana-cloud/sap-hana-cloud-administration-guide/role-collections-for-sap-hana-cloud?locale=en-US&version=LATEST). To assign these to users or user groups, see [Configure user access](../account/usermanagement.mdx).
 :::
