@@ -1,0 +1,55 @@
+# ──────────────────────────────────────────────────────────────────
+# account.btp.sap.crossplane.io — Entitlements
+# ──────────────────────────────────────────────────────────────────
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: ManagedMetric
+metadata:
+  name: btp-entitlements
+spec:
+  name: btp_entitlement_count
+  description: "Count of SAP BTP Entitlement managed resources per service plan, labelled by ready/synced state"
+  kind: Entitlement
+  group: account.btp.sap.crossplane.io
+  version: v1alpha1
+  interval: "1m"
+  dimensions:
+    - name: name
+      fieldPath: "metadata.name"
+    - name: service_name
+      fieldPath: "spec.forProvider.serviceName"
+    - name: plan_name
+      fieldPath: "spec.forProvider.planName"
+    - name: condition_ready
+      fieldPath: "status.conditions[?(@.type=='Ready')]"
+      type: slice
+    - name: condition_synced
+      fieldPath: "status.conditions[?(@.type=='Synced')]"
+      type: slice
+---
+# ──────────────────────────────────────────────────────────────────
+# account.btp.sap.crossplane.io — Subscriptions
+# ──────────────────────────────────────────────────────────────────
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: ManagedMetric
+metadata:
+  name: btp-subscriptions
+spec:
+  name: btp_subscription_count
+  description: "Count of SAP BTP Subscription managed resources per SaaS application"
+  kind: Subscription
+  group: account.btp.sap.crossplane.io
+  version: v1alpha1
+  interval: "1m"
+  dimensions:
+    - name: name
+      fieldPath: "metadata.name"
+    - name: app_name
+      fieldPath: "spec.forProvider.appName"
+    - name: plan_name
+      fieldPath: "spec.forProvider.planName"
+    - name: condition_ready
+      fieldPath: "status.conditions[?(@.type=='Ready')]"
+      type: slice
+    - name: condition_synced
+      fieldPath: "status.conditions[?(@.type=='Synced')]"
+      type: slice
