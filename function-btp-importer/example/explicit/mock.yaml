@@ -1,0 +1,6 @@
+---
+serviceInstances:
+  - name: my-annotated-instance
+    id: si-uuid-eeee-5555
+subaccounts: []
+environments: []

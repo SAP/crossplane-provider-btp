@@ -1,0 +1,11 @@
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: my-service-instance
+  name: my-workload-xr-my-service-instance
+spec:
+  forProvider:
+    name: my-service-instance
+    subaccountId: 7b3f9a2e-4d1c-4f8a-b5e6-2c9d8f0a1b3e

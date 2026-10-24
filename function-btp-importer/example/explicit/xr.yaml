@@ -1,0 +1,13 @@
+---
+# XR representing a BTP workload with mode=explicit.
+# In this mode the function only attempts import for composed resources that
+# carry the annotation: import.btp.sap.crossplane.io/lookup: "true"
+# Resources without the annotation are skipped entirely.
+apiVersion: example.crossplane.io/v1
+kind: XBTPResources
+metadata:
+  name: my-workload-xr
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+spec: {}
