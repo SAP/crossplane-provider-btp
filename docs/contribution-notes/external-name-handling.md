@@ -25,7 +25,7 @@ Based on this definition, common assumptions are:
 ## Our Approach
 
 ### Definition
-The external-name (string) identifies the external resource in the external system. 
+The external-name (string) identifies the external resource in the external system.
 A provider can adopt two qualities:
 
 1. The existance of the external-name express that there should be an external resource it identifies. So if the user creates a MR with the external-name set, the user explicitly states that this resource should exists in the external system (to its best knowledge) and should be adopted/matched. This prevents unintended adoption/matching of existing resources. This is also an advantage over capturing user intent via managment policies, as they would not prevent unintended matching of existing resources.
@@ -38,7 +38,7 @@ This is easy in the case of a unique identifier. If we have a compound key, we d
 #### Compound-Key External Name Format
 
 If we have an external name that requires multiple values from the spec as key, the delimiter is `/`. The advantage is that this is part of the url path and therefore unlikely to be used in the identifying fields.
-The key should be case-sensitive, in the sense that the values from the compound keys are used directly for the API calls. By treating it case-sensitive, we cover APIs that are case-sensitive and insensitive. 
+The key should be case-sensitive, in the sense that the values from the compound keys are used directly for the API calls. By treating it case-sensitive, we cover APIs that are case-sensitive and insensitive.
 Trailing/leading spaces are not allowed. Length limit for the external-name is 512 characters.
 
 ### Special Case: defaulting of external-name
@@ -53,6 +53,8 @@ Consequently, we have to remove this initializer from running. We will have our 
 ## Exceptions
 
 Upjet resources are an exception as we dont control how the external-name is defined and set by Upjet.
+
+In general, all exceptions should be noted in the appropriate location: for user in the docs and for developer in the appropriate code location (Observe/Create/Update/Delete functions or API definition).
 
 ### SubaccountApiCredential: unsupported adoption
 
@@ -80,8 +82,6 @@ kubectl annotate subaccountapicredentials.security.btp.sap.crossplane.io NAME \
 Approval permits ordinary management, including external deletion when applicable policies request it. It cannot recover a missing write-once secret or force health. Do not put credentials, Secret values, or private keys in annotations or operational evidence. A recorded failed-adoption rejection is never overridden by this annotation; an actually rejected MR must be deleted and recreated after intentional external cleanup. If historical provenance is ambiguous, do not approve.
 
 An unapproved legacy MR reports unresolved provenance and performs no external management. Deleting it finalizes locally without deleting BTP. Approval has no atomic revocation guarantee for an external operation already issued. Certificate credentials retain their separate existing lifecycle.
-
-In general, all exceptions should be noted in the appropriate location: for user in the docs and for developer in the appropriate code location (Observe/Create/Update/Delete functions or API definition).
 
 ### Orphaned external-name recovery (always-on bug-fix)
 
@@ -206,8 +206,8 @@ a `PROCESSING_FAILED` assignment with a nil `Amount` satisfies both.
 
 
 #### Create()
-We know that the resource does not exist so we perform the Create API Request. 
-If the request is sucessful, set the external-name with the necessary GUID or compound key from the API response/spec.ForProvider. 
+We know that the resource does not exist so we perform the Create API Request.
+If the request is sucessful, set the external-name with the necessary GUID or compound key from the API response/spec.ForProvider.
 It might be possible that the API works asynchronous and the final external-name is not available after the request. This is a possible szenario but out of scope here.
 
 If the response is `creation failed – resource already exist`, we treat it as an error. We do NOT set the external-name. In the next reconcile Observe(), the resource will be shown as resourceExist: False since the external name is not set and we intend to stay in an error loop. The error documents that the resource could not be created because it already exists. To resume, the user needs to set the external-name properly.
