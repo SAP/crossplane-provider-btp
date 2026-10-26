@@ -185,7 +185,8 @@ Instead of importing, create a new KymaEnvironmentBinding resource.
 
 - Follows Standard: no (compound key; credentials are identified by subaccount ID and credential name)
 - Format: `<subaccount-id>/<name>` (e.g. "abc-123-def-456/my-credential")
-- Note: Existing name-only annotations are migrated automatically to the compound-key format; importing/adopting existing credentials is unsupported.
+- Note: Existing name-only annotations are migrated automatically to the compound-key format. Setting this annotation does not enable import: if the identified credential already exists for a new managed resource, reconciliation reports unsupported adoption and does not acquire it. An annotation targeting an absent credential may still be used for normal creation.
+- Note: Older resources with unresolved historical provenance require independent verification and a UID/identity-bound `btp.sap.crossplane.io/legacy-management-approval` annotation to resume management. MR annotation-edit permission is the approval boundary; approval permits ordinary external deletion under applicable policies. See the credential recovery instructions in the user-management guide and the resource-specific ADR exception.
 - How to find:
 
   - UI: BTP Cockpit → Subaccount → Security → OAuth Clients → [Client Name]
