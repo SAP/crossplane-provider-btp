@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -53,6 +54,60 @@ func TestKymaEnvironment(t *testing.T) {
 				if err := resources.WaitForResourcesToBeSynced(ctx, cfg, manifestDir, nil, wait.WithTimeout(time.Minute*50)); err != nil {
 					t.Fatal(err)
 				}
+				return ctx
+			},
+		).
+		Assess(
+			// Regression guard for issue #682: a real update makes BTP
+			// materialise schema defaults (accessControlList:{},
+			// gvisor:{enabled:false}, ingressFiltering:false) into the stored
+			// parameters. The schema-aware drift detector must treat the
+			// defaults the user never set as non-drift, so the provider
+			// reconverges instead of looping updates until the circuit breaker
+			// trips. We toggle a real in-contract field (ingressFiltering) to
+			// force one genuine update round-trip, then assert the resource
+			// settles back to Available with the breaker off.
+			"Verify materialised defaults do not trip the circuit breaker (#682)",
+			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+				const kymaName = "kyma-environment"
+
+				// Toggle ingressFiltering on so the controller issues a real
+				// Update to BTP (an annotation bump would only re-Observe and
+				// never write, so BTP would never materialise the defaults).
+				kyma := &v1alpha1.KymaEnvironment{}
+				MustGetResource(t, cfg, kymaName, nil, kyma)
+				params := map[string]any{}
+				if len(kyma.Spec.ForProvider.Parameters.Raw) > 0 {
+					if err := json.Unmarshal(kyma.Spec.ForProvider.Parameters.Raw, &params); err != nil {
+						t.Fatalf("failed to unmarshal KymaEnvironment parameters: %v", err)
+					}
+				}
+				params["ingressFiltering"] = true
+				raw, err := json.Marshal(params)
+				if err != nil {
+					t.Fatalf("failed to marshal KymaEnvironment parameters: %v", err)
+				}
+				kyma.Spec.ForProvider.Parameters.Raw = raw
+				if err := cfg.Client().Resources().Update(ctx, kyma); err != nil {
+					t.Fatalf("failed to update KymaEnvironment to trigger a BTP update: %v", err)
+				}
+
+				// The update converges once; the materialised defaults the user
+				// never set (gvisor, accessControlList) must not read as further
+				// drift. Wait for the resource to settle back to Available — if
+				// the defaults looped, it would instead trip the breaker.
+				settled := &v1alpha1.KymaEnvironment{}
+				err = wait.For(func(ctx context.Context) (bool, error) {
+					MustGetResource(t, cfg, kymaName, nil, settled)
+					if rs := settled.Status.RetryStatus; rs != nil && rs.CircuitBreaker {
+						return false, fmt.Errorf("circuit breaker tripped on materialised schema defaults (#682 regression); retryStatus=%+v", *rs)
+					}
+					return settled.GetCondition(xpv1.Available().Type).Status == corev1.ConditionTrue, nil
+				}, wait.WithTimeout(15*time.Minute))
+				if err != nil {
+					t.Fatalf("KymaEnvironment did not settle after the update: %v; retryStatus=%+v", err, settled.Status.RetryStatus)
+				}
+				t.Logf("reconverged with no false drift: retryStatus=%+v", settled.Status.RetryStatus)
 				return ctx
 			},
 		).
