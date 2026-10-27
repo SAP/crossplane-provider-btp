@@ -47,6 +47,10 @@ func main() {
 			"poll",
 			"How often individual resources will be checked for drift from the desired state",
 		).Default("1m").Duration()
+		pollJitterPercentage = app.Flag(
+			"poll-jitter-percentage",
+			"Random jitter applied to each resource's poll interval on every poll requeue, as a percentage of that interval. 0 disables jitter; must be below 100.",
+		).Default("10").Envar("POLL_JITTER_PERCENTAGE").Uint()
 		maxReconcileRate = app.Flag(
 			"max-reconcile-rate",
 			"The global maximum rate per second at which resources may checked for drift from the desired state.",
@@ -73,19 +77,21 @@ func main() {
 	)
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
+	if *pollJitterPercentage >= 100 {
+		kingpin.Fatalf("--poll-jitter-percentage must be below 100, got %d", *pollJitterPercentage)
+	}
 
 	zl := zap.New(zap.UseDevMode(*debug))
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	ctrl.SetLogger(zl)
 
-	// Log FIPS 140-3 status at startup so the running pod self-evidences whether
-	// the Go Cryptographic Module (CMVP #5247) is active in approved mode.
-	// With GOFIPS140=certified at build time this will always be true; the log line
-	// provides an auditable artifact. See https://go.dev/doc/security/fips140
-	log.Info("FIPS 140-3 status",
-		"enabled", fips140.Enabled(),
-		"module_version", fips140.Version(),
-	)
+	// Record FIPS 140-3 status at startup as runtime compliance evidence. When
+	// built with GOFIPS140=certified this reports the linked CMVP-validated Go
+	// Cryptographic Module version and approved-mode status.
+	log.Info("FIPS 140-3 mode", "enabled", fips140.Enabled(), "module", fips140.Version())
+	if !fips140.Enabled() {
+		kingpin.Fatalf("FIPS 140-3 approved mode is not enabled; this binary must be built with GOFIPS140=certified and must not be run with GODEBUG=fips140=off")
+	}
 
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
@@ -119,13 +125,13 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
-	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, backoffBase, backoffMax, enableManagementPolicies)
-	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)
+	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, *pollJitterPercentage, backoffBase, backoffMax, enableManagementPolicies)
+	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, *pollJitterPercentage, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
 
-func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
+func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, pollJitterPercentage uint, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	o := internalopts.UpjetOptions{
 		Options: tjcontroller.Options{
 			Options: controller.Options{
@@ -139,8 +145,9 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 			OperationTrackerStore: tjcontroller.NewOperationStore(log),
 			SetupFn:               tfclient.TerraformSetupBuilder(),
 		},
-		BackoffBase: *backoffBase,
-		BackoffMax:  *backoffMax,
+		BackoffBase:          *backoffBase,
+		BackoffMax:           *backoffMax,
+		PollJitterPercentage: pollJitterPercentage,
 	}
 
 	if *enableManagementPolicies {
@@ -150,7 +157,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
-func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
+func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, pollJitterPercentage uint, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	co := internalopts.CrossplaneOptions{
 		Options: controller.Options{
 			Logger:                  log,
@@ -159,9 +166,10 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
 			Features:                &feature.Flags{},
 		},
-		BackoffBase:      *backoffBase,
-		BackoffMax:       *backoffMax,
-		ReconcileTimeout: *reconcileTimeout,
+		BackoffBase:          *backoffBase,
+		BackoffMax:           *backoffMax,
+		ReconcileTimeout:     *reconcileTimeout,
+		PollJitterPercentage: pollJitterPercentage,
 	}
 
 	if *enableManagementPolicies {

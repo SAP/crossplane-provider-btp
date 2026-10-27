@@ -13,6 +13,7 @@ These flags are passed as arguments to the provider's container process and can 
 |---|---|---|
 | `--sync` / `-s` | `1h` | How often **all** resources are re-checked for drift from the desired state (full sync interval). |
 | `--poll` | `1m` | How often **individual** resources are checked for drift from the desired state. |
+| `--poll-jitter-percentage` | `10` | Random offset of up to ±N% applied to each resource's effective poll interval (the `crossplane.io/poll-interval` annotation if set, else `--poll`) on every poll requeue. `0` disables jitter; must be below `100`. Can also be set via the `POLL_JITTER_PERCENTAGE` environment variable. |
 | `--max-reconcile-rate` | `3` | Global maximum number of resources reconciled concurrently (parallel reconcile goroutines) |
 | `--backoff-base` | `1s` | Base duration for exponential backoff when a reconcile fails. The wait time after the first failure. |
 | `--backoff-max` | `60s` | Maximum duration for exponential backoff. The wait time will never exceed this value, regardless of how many failures have occurred. |
@@ -27,6 +28,23 @@ Session reuse is disabled by default: each Terraform connector setup creates a s
 Set `--enable-terraform-session-reuse` or `ENABLE_TERRAFORM_SESSION_REUSE=true` to reuse configured clients and sessions across reconciliations with identical configuration. Cached sessions are evicted on HTTP 401, allowing a subsequent setup to authenticate again.
 
 The flag applies to generated Terraform controllers and internal Terraform connectors used by native controllers. It does not affect the OAuth client caches used by native BTP API clients.
+
+### Poll Jitter
+
+Each poll is scheduled relative to when that resource last finished reconciling, so resources that were reconciled together (for example the first wave after a provider restart, which `--max-reconcile-rate` admits in bursts) keep polling together and produce periodic bursts against the BTP APIs. `--poll-jitter-percentage` breaks this alignment: each poll requeue is scheduled at the effective poll interval ± a random offset of up to that percentage. It does not spread the first wave itself; `--max-reconcile-rate` bounds that.
+
+- The percentage applies to the **effective** interval: the `crossplane.io/poll-interval` annotation when set, otherwise `--poll`. With `--poll=1m` and the default `10`, polls land between 54s and 66s.
+- `crossplane.io/poll-interval` values below `1s` are raised to `1s` before jitter is applied. This floor applies even when jitter is disabled.
+- Jitter applies to poll requeues. Failed reconciles keep using `--backoff-base` / `--backoff-max`.
+
+Suggested spread by landscape size, expressed for `--poll=1m`:
+
+| Managed resources | Suggested spread | `--poll-jitter-percentage` |
+|---|---|---|
+| < 100 | none | `0` |
+| 100–500 | about ±10s | `17` |
+| 500–2000 | about ±30s | `50` |
+| 2000+ | about ±1m | raise `--poll` instead (e.g. `--poll=2m` with `50`); at `--poll=1m` this would need `99`, which can schedule polls about 0.6s apart |
 
 ### Exponential Backoff Details
 

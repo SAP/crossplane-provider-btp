@@ -384,6 +384,11 @@ spec:
                       stateMessage:
                         description: Information about the current state.
                         type: string
+                      uniqueIdentifier:
+                        description: The unique identifier of the service plan actually
+                          assigned to this subaccount; used to disambiguate delete
+                          when serviceName+servicePlanName are not unique.
+                        type: string
                       unlimitedAmountAssigned:
                         description: True, if an unlimited quota of this service plan
                           assigned to the directory or subaccount in the global account.
