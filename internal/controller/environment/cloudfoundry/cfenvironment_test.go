@@ -60,8 +60,10 @@ func TestObserve(t *testing.T) {
 		},
 		"EmptyExternalName_NoResourceExists": {
 			args: args{
-				client: fake.MockClient{},
-				cr:     environment(), // No external-name annotation
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return nil, nil, nil
+				}},
+				cr: environment(), // No external-name annotation
 			},
 			want: want{
 				o: managed.ExternalObservation{
@@ -69,6 +71,39 @@ func TestObserve(t *testing.T) {
 				},
 				err: nil,
 				cr:  environment(),
+			},
+		},
+		"EmptyExternalName_ExistingInstanceIsAdopted": {
+			args: args{
+				client: fake.MockClient{MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+					return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+						Id:     internal.Ptr(mockGuid),
+						State:  internal.Ptr("OK"),
+						Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
+					}, []v1alpha1.User{}, nil
+				}},
+				// A previous create reached CIS but the instance ID was not recorded
+				cr: environment(),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  true,
+					ConnectionDetails: managed.ConnectionDetails{"__raw": []byte("{\"Org Name\":\"test-org\"}"), "orgName": []byte("test-org")},
+				},
+				err: nil,
+				cr: environment(
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
+					withConditions(xpv1.Available()),
+					withStatus(v1alpha1.CfEnvironmentObservation{
+						EnvironmentObservation: v1alpha1.EnvironmentObservation{
+							ID:     internal.Ptr(mockGuid),
+							State:  internal.Ptr("OK"),
+							Labels: internal.Ptr("{\"Org Name\":\"test-org\"}"),
+						},
+						Managers: []v1alpha1.User{},
+					}),
+				),
 			},
 		},
 		"ValidGUID_ResourceNotFound_Drift": {
@@ -286,8 +321,9 @@ func TestObserve(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	type args struct {
-		cr     resource.Managed
-		client environments.Client
+		cr      resource.Managed
+		client  environments.Client
+		kubeErr error
 	}
 
 	type want struct {
@@ -340,6 +376,33 @@ func TestCreate(t *testing.T) {
 					})),
 			},
 		},
+		"CreateError_InstanceIDIsKept": {
+			args: args{
+				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
+					return mockGuid, errors.New("manager assignment failed")
+				}},
+				cr: environment(),
+			},
+			want: want{
+				o:   managed.ExternalCreation{},
+				err: errors.Wrap(errors.New("manager assignment failed"), errCreate),
+				cr:  environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
+			},
+		},
+		"CreateError_InstanceIDKept_UpdateFails": {
+			args: args{
+				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
+					return mockGuid, errors.New("manager assignment failed")
+				}},
+				cr:      environment(),
+				kubeErr: errors.New("update failed"),
+			},
+			want: want{
+				o:   managed.ExternalCreation{},
+				err: errors.Wrap(errors.Wrap(errors.New("update failed"), "manager assignment failed"), "failed to update external-name with created instance id"),
+				cr:  environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
+			},
+		},
 		"CreateError_AlreadyExists_DoesNotSetExternalName": {
 			args: args{
 				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
@@ -356,7 +419,7 @@ func TestCreate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client, kube: &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)}}
+			e := external{client: tc.args.client, kube: &test.MockClient{MockUpdate: test.NewMockUpdateFn(tc.args.kubeErr)}}
 			got, err := e.Create(context.Background(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Observe(...): -want error, +got error:\n%s\n", diff)

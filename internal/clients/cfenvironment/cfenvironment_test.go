@@ -3,6 +3,7 @@ package environments
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -52,27 +53,129 @@ func TestFormOrgName(t *testing.T) {
 	}
 }
 
-// TestExternalNameEmptyCheck verifies that empty external-name returns nil
-// This is part of the external-name convention: empty external-name means resource doesn't exist yet
+// An empty external-name means the instance ID may not have been recorded after a create that reached CIS,
+// so the environment is looked up by the resource UID stored at create time.
 func TestCloudFoundryOrganization_getEnvironmentByExternalNameWithLegacyHandling_EmptyExternalName(t *testing.T) {
-	c := CloudFoundryOrganization{
-		btp: btp.Client{},
+	existing := provisioningclient.BusinessEnvironmentInstanceResponseObject{
+		EnvironmentType: internal.Ptr("cloudfoundry"),
+		Parameters:      internal.Ptr(`{"instance_name":"sub-test","orchestrate.cloud.sap/subaccount-operator":"uid-1"}`),
+		Id:              internal.Ptr("1234"),
+	}
+	cr := v1alpha1.CloudFoundryEnvironment{
+		// No external-name annotation
+		ObjectMeta: v1.ObjectMeta{Name: "test", UID: "uid-1"},
+		Spec:       v1alpha1.CfEnvironmentSpec{SubaccountGuid: "sub"},
 	}
 
-	cr := v1alpha1.CloudFoundryEnvironment{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "test",
-			// No external-name annotation
+	tests := map[string]struct {
+		client  *fakes.MockProvisioningServiceClient
+		want    *provisioningclient.BusinessEnvironmentInstanceResponseObject
+		wantErr bool
+	}{
+		"ExistingEnvironmentIsFoundByOrgName": {
+			client: &fakes.MockProvisioningServiceClient{ApiResponse: &provisioningclient.BusinessEnvironmentInstancesResponseCollection{
+				EnvironmentInstances: []provisioningclient.BusinessEnvironmentInstanceResponseObject{existing},
+			}},
+			want: &existing,
+		},
+		"EnvironmentOfOtherResourceIsNotAdopted": {
+			client: &fakes.MockProvisioningServiceClient{ApiResponse: &provisioningclient.BusinessEnvironmentInstancesResponseCollection{
+				EnvironmentInstances: []provisioningclient.BusinessEnvironmentInstanceResponseObject{{
+					EnvironmentType: internal.Ptr("cloudfoundry"),
+					// same org name, created by a different resource
+					Parameters: internal.Ptr(`{"instance_name":"sub-test","orchestrate.cloud.sap/subaccount-operator":"uid-2"}`),
+					Id:         internal.Ptr("5678"),
+				}},
+			}},
+			want: nil,
+		},
+		"NoMatchingEnvironment": {
+			client: &fakes.MockProvisioningServiceClient{ApiResponse: &provisioningclient.BusinessEnvironmentInstancesResponseCollection{}},
+			want:   nil,
+		},
+		"ListError": {
+			client:  &fakes.MockProvisioningServiceClient{Err: errors.New("error")},
+			wantErr: true,
 		},
 	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := CloudFoundryOrganization{btp: btp.Client{ProvisioningServiceClient: tt.client}}
 
-	got, err := c.getEnvironmentByExternalNameWithLegacyHandling(context.TODO(), cr)
-
-	if err != nil {
-		t.Errorf("Expected no error for empty external-name, got: %v", err)
+			got, err := c.getEnvironmentByExternalNameWithLegacyHandling(context.TODO(), cr)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("unexpected error: %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
 	}
-	if got != nil {
-		t.Errorf("Expected nil for empty external-name, got: %v", got)
+}
+
+// createFake simulates CIS accepting the create, followed by a lookup of the new instance.
+type createFake struct {
+	fakes.MockProvisioningServiceClient
+	createdID   string
+	getResponse *provisioningclient.BusinessEnvironmentInstanceResponseObject
+	getErr      error
+}
+
+func (m *createFake) CreateEnvironmentInstance(ctx context.Context) provisioningclient.ApiCreateEnvironmentInstanceRequest {
+	return provisioningclient.ApiCreateEnvironmentInstanceRequest{ApiService: m}
+}
+
+func (m *createFake) CreateEnvironmentInstanceExecute(r provisioningclient.ApiCreateEnvironmentInstanceRequest) (*provisioningclient.CreatedEnvironmentInstanceResponseObject, *http.Response, error) {
+	return &provisioningclient.CreatedEnvironmentInstanceResponseObject{Id: &m.createdID}, &http.Response{}, nil
+}
+
+func (m *createFake) GetEnvironmentInstanceExecute(r provisioningclient.ApiGetEnvironmentInstanceRequest) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, *http.Response, error) {
+	return m.getResponse, &http.Response{}, m.getErr
+}
+
+// Once CIS accepted the create, the instance ID must be returned even if a later step fails.
+func TestCloudFoundryOrganization_CreateInstance_KeepsInstanceID(t *testing.T) {
+	const instanceID = "550e8400-e29b-41d4-a716-446655440000"
+
+	tests := map[string]struct {
+		client *createFake
+	}{
+		"OrgExtractionFails": {
+			client: &createFake{
+				createdID:   instanceID,
+				getResponse: &provisioningclient.BusinessEnvironmentInstanceResponseObject{Id: internal.Ptr(instanceID), Labels: internal.Ptr("")},
+			},
+		},
+		"OrgLookupFails": {
+			client: &createFake{createdID: instanceID, getErr: errors.New("lookup failed")},
+		},
+		"OrgNotFound": {
+			client: &createFake{createdID: instanceID},
+		},
+		"OrgWithoutId": {
+			client: &createFake{
+				createdID: instanceID,
+				getResponse: &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+					Id: internal.Ptr(instanceID), Labels: internal.Ptr(`{"Org Name":"name","API Endpoint":"endpoint"}`),
+				},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := CloudFoundryOrganization{btp: btp.Client{
+				Credential:                &btp.Credentials{UserCredential: &btp.UserCredential{Email: "admin@example.com"}},
+				ProvisioningServiceClient: tt.client,
+			}}
+
+			got, err := c.CreateInstance(context.TODO(), v1alpha1.CloudFoundryEnvironment{})
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			if got != instanceID {
+				t.Errorf("instance ID = %q, want %q", got, instanceID)
+			}
+		})
 	}
 }
 

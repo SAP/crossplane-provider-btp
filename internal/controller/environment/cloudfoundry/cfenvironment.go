@@ -128,13 +128,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotEnvironment)
 	}
 
-	// Check if external-name is empty
 	externalName := meta.GetExternalName(cr)
-	if externalName == "" {
-		return managed.ExternalObservation{
-			ResourceExists: false,
-		}, nil
-	}
 
 	instance, managers, err := c.client.DescribeInstance(ctx, *cr)
 	if err != nil {
@@ -150,8 +144,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Set external-name to GUID format if necessary. This means it migrates from old formats
 	// Backwards compatibility:  > v1.1.0 (orgName) and v1.0.0 (metadata.name)
+	// An empty external-name with an existing instance means a previous create did not record the instance ID.
 	orgName := env.FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
-	if externalName == cr.Name || externalName == orgName {
+	if externalName == "" || externalName == cr.Name || externalName == orgName {
 		meta.SetExternalName(cr, *instance.Id)
 		if err := c.kube.Update(ctx, cr); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, "failed to update external-name to GUID format")
@@ -187,14 +182,19 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	createdInstanceId, err := c.client.CreateInstance(ctx, *cr)
-	if err != nil {
-		// Do not set external-name on error (including "already exists" errors)
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
+	if createdInstanceId != "" {
+		// The instance exists in CIS, so keep its ID even if a later create step failed.
+		// Otherwise the next reconcile would try to create it again and run into a conflict.
+		meta.SetExternalName(cr, createdInstanceId)
+		if updateErr := c.kube.Update(ctx, cr); updateErr != nil {
+			if err != nil {
+				updateErr = errors.Wrap(updateErr, err.Error())
+			}
+			return managed.ExternalCreation{}, errors.Wrap(updateErr, "failed to update external-name with created instance id")
+		}
 	}
-
-	meta.SetExternalName(cr, createdInstanceId)
-	if err := c.kube.Update(ctx, cr); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, "failed to update external-name with created instance id")
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 
 	return managed.ExternalCreation{
