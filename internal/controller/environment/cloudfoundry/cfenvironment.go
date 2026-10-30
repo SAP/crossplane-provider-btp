@@ -34,6 +34,7 @@ const (
 	errCreateConnectionDetails = "Cannot create connection details"
 	errDescribeInstance        = "while describing instance"
 	errCreate                  = "while creating instance"
+	errUpdate                  = "while updating instance"
 	errDelete                  = "while deleting instance"
 
 	errGetPC    = "cannot get ProviderConfig"
@@ -128,13 +129,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotEnvironment)
 	}
 
-	// Check if external-name is empty
 	externalName := meta.GetExternalName(cr)
-	if externalName == "" {
-		return managed.ExternalObservation{
-			ResourceExists: false,
-		}, nil
-	}
 
 	instance, managers, err := c.client.DescribeInstance(ctx, *cr)
 	if err != nil {
@@ -150,8 +145,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Set external-name to GUID format if necessary. This means it migrates from old formats
 	// Backwards compatibility:  > v1.1.0 (orgName) and v1.0.0 (metadata.name)
+	// An empty external-name with an existing instance means a previous create did not record the instance ID.
 	orgName := env.FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
-	if externalName == cr.Name || externalName == orgName {
+	if externalName == "" || externalName == cr.Name || externalName == orgName {
 		meta.SetExternalName(cr, *instance.Id)
 		if err := c.kube.Update(ctx, cr); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, "failed to update external-name to GUID format")
@@ -172,10 +168,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
+	// Not up to date while configured managers are missing, so Update retries a failed manager assignment.
+	// Only checked once the instance is ready, as the org has no managers to compare against before that.
+	upToDate := true
+	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateOk {
+		upToDate = !c.client.NeedsUpdate(*cr)
+	}
+
 	details, err := env.GetConnectionDetails(instance)
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  true,
+		ResourceUpToDate:  upToDate,
 		ConnectionDetails: details,
 	}, errors.Wrap(err, errCreateConnectionDetails)
 }
@@ -187,14 +190,14 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	createdInstanceId, err := c.client.CreateInstance(ctx, *cr)
-	if err != nil {
-		// Do not set external-name on error (including "already exists" errors)
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
+	if createdInstanceId != "" {
+		// The instance exists in CIS, so keep its ID even if a later create step failed.
+		// Otherwise the next reconcile would try to create it again and run into a conflict.
+		// crossplane-runtime persists the external-name annotation after Create, also when Create returns an error.
+		meta.SetExternalName(cr, createdInstanceId)
 	}
-
-	meta.SetExternalName(cr, createdInstanceId)
-	if err := c.kube.Update(ctx, cr); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, "failed to update external-name with created instance id")
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 
 	return managed.ExternalCreation{
@@ -205,12 +208,15 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	_, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
+	cr, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotEnvironment)
 	}
 
-	// Update is not supported
+	// Only retries the manager assignment of a failed create, other changes are not supported
+	if err := c.client.UpdateInstance(ctx, *cr); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
+	}
 	return managed.ExternalUpdate{}, nil
 }
 

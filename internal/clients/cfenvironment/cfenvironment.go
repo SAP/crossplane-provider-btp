@@ -34,14 +34,59 @@ type CloudFoundryOrganization struct {
 	btp btp.Client
 }
 
-// NeedsUpdate not needed anymore (no reconciliation wanted)
+// NeedsUpdate reports whether configured managers are not yet assigned in the Cloud Foundry org. This is the case when
+// a create failed after the instance was created. It relies on the managers observed into the status by Observe.
 func (c CloudFoundryOrganization) NeedsUpdate(cr v1alpha1.CloudFoundryEnvironment) bool {
-	return false
+	return len(c.missingManagers(cr)) > 0
 }
 
-// UpdateInstance not needed anymore (no reconciliation wanted)
+// UpdateInstance assigns the configured managers that are missing in the Cloud Foundry org. Other drift is not reconciled.
 func (c CloudFoundryOrganization) UpdateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
+	missing := c.missingManagers(cr)
+	if len(missing) == 0 {
+		return nil
+	}
+
+	org, err := c.btp.GetCloudFoundryOrg(ctx, meta.GetExternalName(&cr))
+	if err != nil {
+		return err
+	}
+	if org == nil {
+		return errors.New("cloud foundry org not found")
+	}
+	cloudFoundryClient, err := c.createClientWithType(org)
+	if err != nil {
+		return err
+	}
+	for _, managerEntry := range missing {
+		username, origin := parseManagerString(managerEntry)
+		if err := cloudFoundryClient.addManager(ctx, username, origin); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// missingManagers returns the configured managers that are not among the observed managers. The admin user is skipped,
+// as it is assigned by the create itself.
+func (c CloudFoundryOrganization) missingManagers(cr v1alpha1.CloudFoundryEnvironment) []string {
+	var missing []string
+	for _, managerEntry := range filterOutUser(cr.Spec.ForProvider.Managers, c.btp.Credential.UserCredential.Email) {
+		username, origin := parseManagerString(managerEntry)
+		if !hasManager(cr.Status.AtProvider.Managers, username, origin) {
+			missing = append(missing, managerEntry)
+		}
+	}
+	return missing
+}
+
+func hasManager(managers []v1alpha1.User, username, origin string) bool {
+	for _, m := range managers {
+		if strings.EqualFold(m.Username, username) && m.Origin == origin {
+			return true
+		}
+	}
+	return false
 }
 
 func NewCloudFoundryOrganization(btp btp.Client) *CloudFoundryOrganization {
@@ -74,10 +119,14 @@ func (c CloudFoundryOrganization) DescribeInstance(
 func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	externalName := meta.GetExternalName(&cr)
 
-	// Empty external-name check
+	// An empty external-name can also mean that a previous create reached CIS but did not record the instance ID.
+	// Create stores the resource UID in the instance parameters, so an environment carrying it was created by this
+	// resource and gets adopted instead of created a second time.
 	if externalName == "" {
-		return nil, nil
+		return c.btp.GetCFEnvironmentByResourceUID(ctx, string(cr.UID))
 	}
+
+	orgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 
 	// Try GUID lookup first (new standard format)
 	if internal.IsValidUUID(externalName) {
@@ -93,7 +142,6 @@ func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling
 
 	// Backwards compatibility: try legacy lookup by orgName and name. Name was set as external name in v1.1.0
 	// This handles migration from v1.1.0 (orgName) and v1.0.0 (metadata.name)
-	orgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	environment, err := c.btp.GetCFEnvironmentByNameAndOrg(ctx, externalName, orgName)
 	if err != nil {
 		return nil, err
@@ -145,6 +193,8 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 	return cloudFoundryClient, err
 }
 
+// CreateInstance creates the environment and assigns the managers. If a step after the CIS create fails, the instance
+// ID is returned together with the error, so it can still be stored as external-name.
 func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error) {
 	adminServiceAccountEmail := c.btp.Credential.UserCredential.Email
 	orgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
@@ -153,18 +203,22 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName,
 	)
 	if err != nil {
-		return "", errors.Wrap(err, instanceCreateFailed)
+		// instanceId is only set once CIS accepted the create. Return it with the error so the caller can keep it.
+		return instanceId, errors.Wrap(err, instanceCreateFailed)
+	}
+	if org == nil {
+		return instanceId, errors.New(instanceCreateFailed + ": cloud foundry org not found")
 	}
 
 	cloudFoundryClient, err := c.createClientWithType(org)
 	if err != nil {
-		return "", errors.Wrap(err, instanceCreateFailed)
+		return instanceId, errors.Wrap(err, instanceCreateFailed)
 	}
 
 	for _, managerEntry := range filterOutUser(cr.Spec.ForProvider.Managers, adminServiceAccountEmail) {
 		username, origin := parseManagerString(managerEntry)
 		if err := cloudFoundryClient.addManager(ctx, username, origin); err != nil {
-			return "", errors.Wrap(err, instanceCreateFailed)
+			return instanceId, errors.Wrap(err, instanceCreateFailed)
 		}
 	}
 
