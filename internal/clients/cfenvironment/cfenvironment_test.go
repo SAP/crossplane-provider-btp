@@ -89,6 +89,15 @@ func TestCloudFoundryOrganization_getEnvironmentByExternalNameWithLegacyHandling
 			}},
 			want: nil,
 		},
+		"MatchingEnvironmentWithoutIdIsSkipped": {
+			client: &fakes.MockProvisioningServiceClient{ApiResponse: &provisioningclient.BusinessEnvironmentInstancesResponseCollection{
+				EnvironmentInstances: []provisioningclient.BusinessEnvironmentInstanceResponseObject{{
+					EnvironmentType: internal.Ptr("cloudfoundry"),
+					Parameters:      internal.Ptr(`{"instance_name":"sub-test","orchestrate.cloud.sap/subaccount-operator":"uid-1"}`),
+				}},
+			}},
+			want: nil,
+		},
 		"NoMatchingEnvironment": {
 			client: &fakes.MockProvisioningServiceClient{ApiResponse: &provisioningclient.BusinessEnvironmentInstancesResponseCollection{}},
 			want:   nil,
@@ -359,9 +368,9 @@ func TestFilterOutUser(t *testing.T) {
 
 func TestParseManagerString(t *testing.T) {
 	tests := []struct {
-		input          string
-		wantUsername   string
-		wantOrigin     string
+		input        string
+		wantUsername string
+		wantOrigin   string
 	}{
 		{"user@example.com", "user@example.com", defaultOrigin},
 		{"user@example.com|custom.idp", "user@example.com", "custom.idp"},
@@ -488,4 +497,95 @@ func TestCloudFoundryOrganization_getEnvironmentByNameAndOrg_Legacy(t *testing.T
 			}
 		})
 	}
+}
+
+func TestCloudFoundryOrganization_NeedsUpdate(t *testing.T) {
+	const admin = "admin@example.com"
+	crWith := func(configured []string, observed []v1alpha1.User) v1alpha1.CloudFoundryEnvironment {
+		cr := v1alpha1.CloudFoundryEnvironment{}
+		cr.Spec.ForProvider.Managers = configured
+		cr.Status.AtProvider.Managers = observed
+		return cr
+	}
+
+	tests := map[string]struct {
+		cr          v1alpha1.CloudFoundryEnvironment
+		wantMissing []string
+	}{
+		"NoManagersConfigured": {
+			cr: crWith(nil, nil),
+		},
+		"ConfiguredManagerAssigned": {
+			cr: crWith([]string{"a@example.com"}, []v1alpha1.User{{Username: "a@example.com", Origin: "sap.ids"}}),
+		},
+		"ConfiguredManagerAssignedWithDifferentCase": {
+			cr: crWith([]string{"A@example.com"}, []v1alpha1.User{{Username: "a@example.com", Origin: "sap.ids"}}),
+		},
+		"AdminIsNotRequiredToBeObserved": {
+			cr: crWith([]string{admin}, nil),
+		},
+		"ConfiguredManagerMissing": {
+			cr:          crWith([]string{"a@example.com"}, nil),
+			wantMissing: []string{"a@example.com"},
+		},
+		"ManagerWithOtherOriginIsMissing": {
+			cr:          crWith([]string{"a@example.com|custom.idp"}, []v1alpha1.User{{Username: "a@example.com", Origin: "sap.ids"}}),
+			wantMissing: []string{"a@example.com|custom.idp"},
+		},
+		"OnlyUnassignedManagersAreMissing": {
+			cr:          crWith([]string{admin, "a@example.com", "b@example.com"}, []v1alpha1.User{{Username: "a@example.com", Origin: "sap.ids"}}),
+			wantMissing: []string{"b@example.com"},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := CloudFoundryOrganization{btp: btp.Client{
+				Credential: &btp.Credentials{UserCredential: &btp.UserCredential{Email: admin}},
+			}}
+
+			if got := c.NeedsUpdate(tt.cr); got != (len(tt.wantMissing) > 0) {
+				t.Errorf("NeedsUpdate() = %v, want %v", got, len(tt.wantMissing) > 0)
+			}
+			if got := c.missingManagers(tt.cr); !reflect.DeepEqual(got, tt.wantMissing) {
+				t.Errorf("missingManagers() = %v, want %v", got, tt.wantMissing)
+			}
+		})
+	}
+}
+
+func TestCloudFoundryOrganization_UpdateInstance(t *testing.T) {
+	credential := &btp.Credentials{UserCredential: &btp.UserCredential{Email: "admin@example.com"}}
+	cr := v1alpha1.CloudFoundryEnvironment{}
+	cr.Spec.ForProvider.Managers = []string{"a@example.com"}
+
+	t.Run("NothingMissingDoesNotCallCIS", func(t *testing.T) {
+		// the zero value client has no provisioning client, so any CIS call would panic
+		c := CloudFoundryOrganization{btp: btp.Client{Credential: credential}}
+		withManager := cr
+		withManager.Status.AtProvider.Managers = []v1alpha1.User{{Username: "a@example.com", Origin: "sap.ids"}}
+
+		if err := c.UpdateInstance(context.TODO(), withManager); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+	t.Run("OrgNotFoundIsReturned", func(t *testing.T) {
+		c := CloudFoundryOrganization{btp: btp.Client{
+			Credential:                credential,
+			ProvisioningServiceClient: &createFake{},
+		}}
+
+		if err := c.UpdateInstance(context.TODO(), cr); err == nil {
+			t.Error("expected an error")
+		}
+	})
+	t.Run("OrgLookupErrorIsReturned", func(t *testing.T) {
+		c := CloudFoundryOrganization{btp: btp.Client{
+			Credential:                credential,
+			ProvisioningServiceClient: &createFake{getErr: errors.New("lookup failed")},
+		}}
+
+		if err := c.UpdateInstance(context.TODO(), cr); err == nil {
+			t.Error("expected an error")
+		}
+	})
 }

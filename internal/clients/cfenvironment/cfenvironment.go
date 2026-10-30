@@ -34,14 +34,59 @@ type CloudFoundryOrganization struct {
 	btp btp.Client
 }
 
-// NeedsUpdate not needed anymore (no reconciliation wanted)
+// NeedsUpdate reports whether configured managers are not yet assigned in the Cloud Foundry org. This is the case when
+// a create failed after the instance was created. It relies on the managers observed into the status by Observe.
 func (c CloudFoundryOrganization) NeedsUpdate(cr v1alpha1.CloudFoundryEnvironment) bool {
-	return false
+	return len(c.missingManagers(cr)) > 0
 }
 
-// UpdateInstance not needed anymore (no reconciliation wanted)
+// UpdateInstance assigns the configured managers that are missing in the Cloud Foundry org. Other drift is not reconciled.
 func (c CloudFoundryOrganization) UpdateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
+	missing := c.missingManagers(cr)
+	if len(missing) == 0 {
+		return nil
+	}
+
+	org, err := c.btp.GetCloudFoundryOrg(ctx, meta.GetExternalName(&cr))
+	if err != nil {
+		return err
+	}
+	if org == nil {
+		return errors.New("cloud foundry org not found")
+	}
+	cloudFoundryClient, err := c.createClientWithType(org)
+	if err != nil {
+		return err
+	}
+	for _, managerEntry := range missing {
+		username, origin := parseManagerString(managerEntry)
+		if err := cloudFoundryClient.addManager(ctx, username, origin); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// missingManagers returns the configured managers that are not among the observed managers. The admin user is skipped,
+// as it is assigned by the create itself.
+func (c CloudFoundryOrganization) missingManagers(cr v1alpha1.CloudFoundryEnvironment) []string {
+	var missing []string
+	for _, managerEntry := range filterOutUser(cr.Spec.ForProvider.Managers, c.btp.Credential.UserCredential.Email) {
+		username, origin := parseManagerString(managerEntry)
+		if !hasManager(cr.Status.AtProvider.Managers, username, origin) {
+			missing = append(missing, managerEntry)
+		}
+	}
+	return missing
+}
+
+func hasManager(managers []v1alpha1.User, username, origin string) bool {
+	for _, m := range managers {
+		if strings.EqualFold(m.Username, username) && m.Origin == origin {
+			return true
+		}
+	}
+	return false
 }
 
 func NewCloudFoundryOrganization(btp btp.Client) *CloudFoundryOrganization {

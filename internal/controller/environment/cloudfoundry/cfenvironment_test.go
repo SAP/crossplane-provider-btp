@@ -301,6 +301,84 @@ func TestObserve(t *testing.T) {
 					)),
 			},
 		},
+		"ManagerNotAssigned_NotUpToDate": {
+			args: args{
+				client: fake.MockClient{
+					MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+						return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+							Id:     internal.Ptr(mockGuid),
+							State:  internal.Ptr("OK"),
+							Labels: internal.Ptr("{}"),
+						}, []v1alpha1.User{}, nil
+					},
+					// a failed create left the configured manager unassigned
+					MockNeedsUpdate: func(cr v1alpha1.CloudFoundryEnvironment) bool { return true },
+				},
+				cr: environment(
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
+					withData(v1alpha1.CfEnvironmentParameters{Managers: []string{aUser.Username}}),
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  false,
+					ConnectionDetails: managed.ConnectionDetails{"__raw": []byte("{}")},
+				},
+				cr: environment(
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
+					withData(v1alpha1.CfEnvironmentParameters{Managers: []string{aUser.Username}}),
+					withConditions(xpv1.Available()),
+					withStatus(v1alpha1.CfEnvironmentObservation{
+						EnvironmentObservation: v1alpha1.EnvironmentObservation{
+							ID:     internal.Ptr(mockGuid),
+							State:  internal.Ptr("OK"),
+							Labels: internal.Ptr("{}"),
+						},
+						Managers: []v1alpha1.User{},
+					}),
+				),
+			},
+		},
+		"ManagerNotAssignedWhileCreating_UpToDate": {
+			args: args{
+				client: fake.MockClient{
+					MockDescribeCluster: func(cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+						return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+							Id:     internal.Ptr(mockGuid),
+							State:  internal.Ptr("CREATING"),
+							Labels: internal.Ptr("{}"),
+						}, []v1alpha1.User{}, nil
+					},
+					// the org is not ready yet, so missing managers must not trigger an update
+					MockNeedsUpdate: func(cr v1alpha1.CloudFoundryEnvironment) bool { return true },
+				},
+				cr: environment(
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
+					withData(v1alpha1.CfEnvironmentParameters{Managers: []string{aUser.Username}}),
+				),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:    true,
+					ResourceUpToDate:  true,
+					ConnectionDetails: managed.ConnectionDetails{"__raw": []byte("{}")},
+				},
+				cr: environment(
+					withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid}),
+					withData(v1alpha1.CfEnvironmentParameters{Managers: []string{aUser.Username}}),
+					withConditions(xpv1.Unavailable()),
+					withStatus(v1alpha1.CfEnvironmentObservation{
+						EnvironmentObservation: v1alpha1.EnvironmentObservation{
+							ID:     internal.Ptr(mockGuid),
+							State:  internal.Ptr("CREATING"),
+							Labels: internal.Ptr("{}"),
+						},
+						Managers: []v1alpha1.User{},
+					}),
+				),
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -321,9 +399,8 @@ func TestObserve(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	type args struct {
-		cr      resource.Managed
-		client  environments.Client
-		kubeErr error
+		cr     resource.Managed
+		client environments.Client
 	}
 
 	type want struct {
@@ -389,20 +466,6 @@ func TestCreate(t *testing.T) {
 				cr:  environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
 			},
 		},
-		"CreateError_InstanceIDKept_UpdateFails": {
-			args: args{
-				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
-					return mockGuid, errors.New("manager assignment failed")
-				}},
-				cr:      environment(),
-				kubeErr: errors.New("update failed"),
-			},
-			want: want{
-				o:   managed.ExternalCreation{},
-				err: errors.Wrap(errors.Wrap(errors.New("update failed"), "manager assignment failed"), "failed to update external-name with created instance id"),
-				cr:  environment(withAnnotaions(map[string]string{"crossplane.io/external-name": mockGuid})),
-			},
-		},
 		"CreateError_AlreadyExists_DoesNotSetExternalName": {
 			args: args{
 				client: fake.MockClient{MockCreate: func(cr v1alpha1.CloudFoundryEnvironment) (string, error) {
@@ -419,7 +482,7 @@ func TestCreate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{client: tc.args.client, kube: &test.MockClient{MockUpdate: test.NewMockUpdateFn(tc.args.kubeErr)}}
+			e := external{client: tc.args.client, kube: &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)}}
 			got, err := e.Create(context.Background(), tc.args.cr)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Observe(...): -want error, +got error:\n%s\n", diff)
@@ -586,4 +649,47 @@ func environment(m ...environmentModifier) *v1alpha1.CloudFoundryEnvironment {
 		f(cr)
 	}
 	return cr
+}
+
+func TestUpdate(t *testing.T) {
+	type want struct {
+		err error
+	}
+
+	cases := map[string]struct {
+		cr     resource.Managed
+		client environments.Client
+		want   want
+	}{
+		"NotAnEnvironment": {
+			cr:     nil,
+			client: fake.MockClient{},
+			want:   want{err: errors.New(errNotEnvironment)},
+		},
+		"ManagerAssignmentIsRetried": {
+			cr: environment(),
+			client: fake.MockClient{MockUpdate: func(cr v1alpha1.CloudFoundryEnvironment) error {
+				return nil
+			}},
+		},
+		"UpdateError": {
+			cr: environment(),
+			client: fake.MockClient{MockUpdate: func(cr v1alpha1.CloudFoundryEnvironment) error {
+				return errors.New("manager assignment failed")
+			}},
+			want: want{err: errors.Wrap(errors.New("manager assignment failed"), errUpdate)},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{client: tc.client, kube: &test.MockClient{MockUpdate: test.NewMockUpdateFn(nil)}}
+			got, err := e.Update(context.Background(), tc.cr)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\ne.Update(...): -want error, +got error:\n%s\n", diff)
+			}
+			if diff := cmp.Diff(managed.ExternalUpdate{}, got); diff != "" {
+				t.Errorf("\ne.Update(...): -want, +got:\n%s\n", diff)
+			}
+		})
+	}
 }

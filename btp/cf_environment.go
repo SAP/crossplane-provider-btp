@@ -205,7 +205,7 @@ func (c *Client) GetCFEnvironmentByResourceUID(
 		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
 			continue
 		}
-		if instance.Parameters == nil {
+		if instance.Id == nil || instance.Parameters == nil {
 			continue
 		}
 		var parameters map[string]interface{}

@@ -34,6 +34,7 @@ const (
 	errCreateConnectionDetails = "Cannot create connection details"
 	errDescribeInstance        = "while describing instance"
 	errCreate                  = "while creating instance"
+	errUpdate                  = "while updating instance"
 	errDelete                  = "while deleting instance"
 
 	errGetPC    = "cannot get ProviderConfig"
@@ -167,10 +168,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
+	// Not up to date while configured managers are missing, so Update retries a failed manager assignment.
+	// Only checked once the instance is ready, as the org has no managers to compare against before that.
+	upToDate := true
+	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateOk {
+		upToDate = !c.client.NeedsUpdate(*cr)
+	}
+
 	details, err := env.GetConnectionDetails(instance)
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  true,
+		ResourceUpToDate:  upToDate,
 		ConnectionDetails: details,
 	}, errors.Wrap(err, errCreateConnectionDetails)
 }
@@ -185,13 +193,8 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if createdInstanceId != "" {
 		// The instance exists in CIS, so keep its ID even if a later create step failed.
 		// Otherwise the next reconcile would try to create it again and run into a conflict.
+		// crossplane-runtime persists the external-name annotation after Create, also when Create returns an error.
 		meta.SetExternalName(cr, createdInstanceId)
-		if updateErr := c.kube.Update(ctx, cr); updateErr != nil {
-			if err != nil {
-				updateErr = errors.Wrap(updateErr, err.Error())
-			}
-			return managed.ExternalCreation{}, errors.Wrap(updateErr, "failed to update external-name with created instance id")
-		}
 	}
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
@@ -205,12 +208,15 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	_, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
+	cr, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotEnvironment)
 	}
 
-	// Update is not supported
+	// Only retries the manager assignment of a failed create, other changes are not supported
+	if err := c.client.UpdateInstance(ctx, *cr); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
+	}
 	return managed.ExternalUpdate{}, nil
 }
 
