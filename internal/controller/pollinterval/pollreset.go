@@ -10,25 +10,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// WithDriftReset wraps c so that a successful Update restarts the adaptive
-// poll interval at Poll. Drift corrected by Update leaves Synced True,
-// so its lastTransitionTime would not move on its own.
-func WithDriftReset(c managed.ExternalConnector) managed.ExternalConnector {
+// WithPollResetOnUpdate wraps c so that a successful Update restarts the
+// adaptive poll interval at Poll. Drift corrected by Update leaves Synced
+// True, so its lastTransitionTime would not move on its own.
+func WithPollResetOnUpdate(c managed.ExternalConnector) managed.ExternalConnector {
 	return managed.ExternalConnectorFn(func(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 		ec, err := c.Connect(ctx, mg)
 		if err != nil {
 			return nil, err
 		}
-		return driftResetClient{ExternalClient: ec}, nil
+		return pollResetClient{ExternalClient: ec}, nil
 	})
 }
 
-// driftResetClient refreshes Synced's lastTransitionTime after a successful Update.
-type driftResetClient struct {
+// pollResetClient refreshes Synced's lastTransitionTime after a successful Update.
+type pollResetClient struct {
 	managed.ExternalClient
 }
 
-func (c driftResetClient) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
+func (c pollResetClient) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	u, err := c.ExternalClient.Update(ctx, mg)
 	if err != nil {
 		return u, err

@@ -127,7 +127,7 @@ func TestPollReconcilerOptions(t *testing.T) {
 		"JitterAroundPoll":              {pct: 10, ann: "", base: time.Minute},
 		"JitterAroundFlooredAnnotation": {pct: 10, ann: "100ms", base: time.Second},
 		"JitterAroundLongAnnotation":    {pct: 10, ann: "10m", base: 10 * time.Minute},
-		"StableBacksOffToPollMax":       {pct: 0, pollMax: 8 * time.Minute, setup: stableSince(45 * time.Minute), base: 8 * time.Minute},
+		"StableGrowsToPollMax":          {pct: 0, pollMax: 8 * time.Minute, setup: stableSince(45 * time.Minute), base: 8 * time.Minute},
 	}
 	const runs = 20
 	for sname, build := range optionStructs {
@@ -162,10 +162,10 @@ func TestPollReconcilerOptions(t *testing.T) {
 	}
 }
 
-// TestWithExternalConnectorDriftReset runs a full reconcile that corrects
+// TestWithExternalConnectorPollReset runs a full reconcile that corrects
 // drift with Update, so it also proves the refreshed Synced time survives the
 // runtime's own ReconcileSuccess marking.
-func TestWithExternalConnectorDriftReset(t *testing.T) {
+func TestWithExternalConnectorPollReset(t *testing.T) {
 	cases := map[string]struct {
 		pollMax   time.Duration
 		refreshed bool

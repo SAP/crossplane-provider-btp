@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # This script injects the provider's controller options (error backoff rate
-# limiter, poll interval hook and drift-reset connector wrapper) into upjet
+# limiter, poll interval hook and poll-reset connector wrapper) into upjet
 # based controllers. Since the controller generation is part of upjet we can't
 # do that while generating, so we amend this code afterwards.
 set -euo pipefail

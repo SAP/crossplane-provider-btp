@@ -10,9 +10,20 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource/fake"
 	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	environmentv1alpha1 "github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
+	oidcv1alpha1 "github.com/sap/crossplane-provider-btp/apis/oidc/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// The hook finds Deadliners by a runtime type assertion; these keep a
+// signature slip in apis/ from silently disabling the deadline cap.
+var (
+	_ Deadliner = (*accountv1alpha1.ServiceBinding)(nil)
+	_ Deadliner = (*environmentv1alpha1.KymaEnvironmentBinding)(nil)
+	_ Deadliner = (*oidcv1alpha1.CertBasedOIDCLogin)(nil)
+	_ Deadliner = (*oidcv1alpha1.KubeConfigGenerator)(nil)
 )
 
 var t0 = time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
@@ -91,7 +102,7 @@ func TestRules(t *testing.T) {
 			mg:   mr(1, "", synced(time.Hour), cond(xpv2.TypeReady, corev1.ConditionFalse, xpv2.ReasonCreating, 10*time.Minute, 0)),
 			want: time.Minute,
 		},
-		"AdoptionNeverSlowerThanPoll": {
+		"CreatingNeverSlowerThanPoll": {
 			cfg:  &Config{Poll: 10 * time.Second, PollMax: 8 * time.Minute, PollMaxAfter: 30 * time.Minute},
 			mg:   mr(1, "", synced(time.Hour), cond(xpv2.TypeReady, corev1.ConditionFalse, xpv2.ReasonCreating, time.Minute, 0)),
 			base: 10 * time.Second, want: 10 * time.Second,
@@ -121,6 +132,11 @@ func TestRules(t *testing.T) {
 			mg:   mr(1, "", ready(8760*time.Hour), synced(8760*time.Hour)),
 			base: time.Second, want: 24 * time.Hour,
 		},
+		"PollMaxBarelyAbovePoll": {
+			cfg:  &Config{Poll: time.Minute, PollMax: time.Minute + time.Microsecond, PollMaxAfter: 30 * time.Minute},
+			mg:   stable(),
+			want: time.Minute + time.Microsecond,
+		},
 		"DeadlineCapsInterval":          {mg: deadlined{stable(), t0.Add(3 * time.Minute), true}, want: 3 * time.Minute},
 		"DeadlineWithinPollUsesPoll":    {mg: deadlined{stable(), t0.Add(20 * time.Second), true}, want: time.Minute},
 		"DeadlinePastUsesPoll":          {mg: deadlined{stable(), t0.Add(-time.Minute), true}, want: time.Minute},
@@ -145,7 +161,7 @@ func TestRules(t *testing.T) {
 	}
 }
 
-func TestIssueCurve(t *testing.T) {
+func TestDocumentedCurve(t *testing.T) {
 	c := Config{Poll: time.Minute, PollMax: 10 * time.Minute, PollMaxAfter: 30 * time.Minute}
 	tc := time.Duration(float64(30*time.Minute) / math.Log2(10))
 	hook := newHook(c, nowT0, func() float64 { return 0.5 })
@@ -178,6 +194,34 @@ func TestJitterThenCap(t *testing.T) {
 	}
 	if got := hook(deadlined{stable, t0.Add(3 * time.Minute), true}, time.Minute); got != 3*time.Minute {
 		t.Errorf("deadline: hook() = %v, want 3m", got)
+	}
+}
+
+// A deadline within Poll pins the resource at Poll, and that Poll must still
+// be jittered so pinned resources (e.g. every KubeConfigGenerator) don't poll
+// in lockstep.
+func TestPinnedDeadlineKeepsJitter(t *testing.T) {
+	c := cfg
+	c.JitterPercentage = 10
+	stable := mr(1, "", ready(45*time.Minute), synced(45*time.Minute))
+	cases := map[string]struct {
+		at   time.Time
+		rnd  float64
+		want time.Duration
+	}{
+		"PastLowestDraw":         {at: t0.Add(-time.Hour), rnd: 0, want: 54 * time.Second},
+		"PastUpperDraw":          {at: t0.Add(-time.Hour), rnd: 0.75, want: 63 * time.Second},
+		"WithinPollLowestDraw":   {at: t0.Add(20 * time.Second), rnd: 0, want: 54 * time.Second},
+		"WithinPollUpperDraw":    {at: t0.Add(20 * time.Second), rnd: 0.75, want: 63 * time.Second},
+		"JustBeyondPollCapsDraw": {at: t0.Add(61 * time.Second), rnd: 0.75, want: 61 * time.Second},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			hook := newHook(c, nowT0, func() float64 { return tc.rnd })
+			if got := hook(deadlined{stable, tc.at, true}, time.Minute); got != tc.want {
+				t.Errorf("hook() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 

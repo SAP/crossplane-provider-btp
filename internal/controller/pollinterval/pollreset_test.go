@@ -13,7 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func TestDriftReset(t *testing.T) {
+func TestPollResetOnUpdate(t *testing.T) {
 	errBoom := errors.New("boom")
 	notSynced := cond(xpv2.TypeSynced, corev1.ConditionFalse, xpv2.ReasonReconcileError, time.Hour, 1)
 
@@ -36,7 +36,7 @@ func TestDriftReset(t *testing.T) {
 					},
 				}, nil
 			})
-			ec, err := WithDriftReset(inner).Connect(context.Background(), mg)
+			ec, err := WithPollResetOnUpdate(inner).Connect(context.Background(), mg)
 			if err != nil {
 				t.Fatalf("Connect() error = %v", err)
 			}

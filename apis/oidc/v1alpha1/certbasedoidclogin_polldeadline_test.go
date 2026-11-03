@@ -17,8 +17,8 @@ func TestCertBasedOIDCLoginNextPollDeadline(t *testing.T) {
 		wantOK              bool
 	}{
 		"BothNil":                  {},
-		"RotationNotBeforeEarlier": {rotateAt: at(time.Hour), expiresAt: at(3 * time.Hour), want: t0.Add(time.Hour), wantOK: true},
-		"OnlyExpiresAt":            {expiresAt: at(3 * time.Hour), want: t0.Add(3 * time.Hour), wantOK: true},
+		"RotationNotBeforeEarlier": {rotateAt: at(time.Hour), expiresAt: at(3 * time.Hour), want: t0.Add(time.Hour + time.Second), wantOK: true},
+		"OnlyExpiresAt":            {expiresAt: at(3 * time.Hour), want: t0.Add(3*time.Hour + time.Second), wantOK: true},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

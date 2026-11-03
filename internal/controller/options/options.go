@@ -77,12 +77,12 @@ func (co UpjetOptions) PollReconcilerOptions() []managed.ReconcilerOption {
 	return pollReconcilerOptions(co.pollConfig())
 }
 
-// WithExternalConnector installs c with the adaptive-poll drift reset.
+// WithExternalConnector installs c with the adaptive-poll reset on Update.
 func (co CrossplaneOptions) WithExternalConnector(c managed.ExternalConnector) managed.ReconcilerOption {
 	return withExternalConnector(co.pollConfig(), c)
 }
 
-// WithExternalConnector installs c with the adaptive-poll drift reset.
+// WithExternalConnector installs c with the adaptive-poll reset on Update.
 func (co UpjetOptions) WithExternalConnector(c managed.ExternalConnector) managed.ReconcilerOption {
 	return withExternalConnector(co.pollConfig(), c)
 }
@@ -116,11 +116,11 @@ func pollReconcilerOptions(c pollinterval.Config) []managed.ReconcilerOption {
 	}
 }
 
-// withExternalConnector adds the drift reset only when adaptive polling is
+// withExternalConnector adds the poll reset only when adaptive polling is
 // enabled, so default flags leave Synced timestamps exactly as before.
 func withExternalConnector(c pollinterval.Config, ec managed.ExternalConnector) managed.ReconcilerOption {
 	if c.AdaptivePollEnabled() {
-		ec = pollinterval.WithDriftReset(ec)
+		ec = pollinterval.WithPollResetOnUpdate(ec)
 	}
 	return managed.WithExternalConnector(ec)
 }

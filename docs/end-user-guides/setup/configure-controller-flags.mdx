@@ -35,7 +35,7 @@ The flag applies to generated Terraform controllers and internal Terraform conne
 
 Each poll is scheduled relative to when that resource last finished reconciling, so resources that were reconciled together (for example the first wave after a provider restart, which `--max-reconcile-rate` admits in bursts) keep polling together and produce periodic bursts against the BTP APIs. `--poll-jitter-percentage` breaks this alignment: each poll requeue is scheduled at the effective poll interval ± a random offset of up to that percentage. It does not spread the first wave itself; `--max-reconcile-rate` bounds that.
 
-- The percentage applies to the interval the provider picked for that poll: the `crossplane.io/poll-interval` annotation when set, otherwise `--poll`, the fast-adoption interval, or the backed-off interval (see [Adaptive Polling](#adaptive-polling)). With `--poll=1m` and the default `10`, polls land between 54s and 66s.
+- The percentage applies to the interval the provider picked for that poll: the `crossplane.io/poll-interval` annotation when set, otherwise `--poll`, the 15s interval for resources still `Creating`, or the adaptive interval (see [Adaptive Polling](#adaptive-polling)). With `--poll=1m` and the default `10`, polls land between 54s and 66s.
 - `crossplane.io/poll-interval` values below `1s` are raised to `1s` before jitter is applied. This floor applies even when jitter is disabled.
 - Jitter applies to poll requeues. Failed reconciles keep using `--backoff-base` / `--backoff-max`.
 
@@ -62,7 +62,7 @@ Each poll requeue picks its interval with the first matching rule:
 
 Jitter is applied on top of every rule.
 
-**Fast adoption (rule 3) is always on.** A newly created resource is re-observed every 15 seconds until BTP reports it ready, so it becomes `Available` without waiting a full `--poll` cycle. After 10 minutes, for example during an outage, it falls back to `--poll`.
+**Fast polling while `Creating` (rule 3) is always on.** A newly created resource is re-observed every 15 seconds until BTP reports it ready, so it becomes `Available` without waiting a full `--poll` cycle. After 10 minutes, for example during an outage, it falls back to `--poll`.
 
 **Adaptive poll interval for stable resources (rule 4) is off by default.** When enabled, the interval doubles at a fixed rate since `Ready` or `Synced` last changed, whichever is later:
 

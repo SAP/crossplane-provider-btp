@@ -18,10 +18,10 @@ import (
 const MinPollInterval = time.Second
 
 const (
-	// A resource still Creating polls every adoptionInterval, for at most
-	// adoptionWindow after Create so an outage does not pin it there.
-	adoptionWindow   = 10 * time.Minute
-	adoptionInterval = 15 * time.Second
+	// A resource still Creating polls every creatingPollInterval, for at most
+	// creatingWindow after Create so an outage does not pin it there.
+	creatingWindow       = 10 * time.Minute
+	creatingPollInterval = 15 * time.Second
 )
 
 // Config holds the provider-wide poll settings.
@@ -58,14 +58,14 @@ type Deadliner interface {
 //
 //  1. The crossplane.io/poll-interval annotation is set: base.
 //  2. Synced is not True, or lags the generation: Poll.
-//  3. Ready is Creating since less than adoptionWindow: min(adoptionInterval, Poll).
+//  3. Ready is Creating since less than creatingWindow: min(creatingPollInterval, Poll).
 //  4. Adaptive polling is enabled and Ready and Synced are True: Poll doubling every
 //     PollMaxAfter/log2(PollMax/Poll) since either last changed, capped at
 //     PollMax and at the resource's next Deadliner deadline.
 //  5. Otherwise: Poll.
 //
 // Every result is offset by a random ±JitterPercentage% of itself; for rule 4
-// the deadline cap applies after jitter.
+// a deadline beyond Poll caps the jittered interval, so it is never overshot.
 func NewHook(c Config) managed.PollIntervalHook {
 	return newHook(c, time.Now, rand.Float64)
 }
@@ -80,11 +80,11 @@ func newHook(c Config, now func() time.Time, rnd func() float64) managed.PollInt
 		return d + time.Duration(float64(d)*pct*(rnd()*2-1)/100)
 	}
 
-	var doubling time.Duration
-	var maxExp float64
+	var doubling, maxExp float64
 	if c.AdaptivePollEnabled() {
 		maxExp = math.Log2(float64(c.PollMax) / float64(c.Poll))
-		doubling = time.Duration(float64(c.PollMaxAfter) / maxExp)
+		// float64: PollMax barely above Poll makes this exceed int64.
+		doubling = float64(c.PollMaxAfter) / maxExp
 	}
 
 	return func(mg resource.Managed, base time.Duration) time.Duration {
@@ -100,8 +100,8 @@ func newHook(c Config, now func() time.Time, rnd func() float64) managed.PollInt
 
 		t := now()
 		ready := mg.GetCondition(xpv2.TypeReady)
-		if ready.Reason == xpv2.ReasonCreating && t.Sub(ready.LastTransitionTime.Time) < adoptionWindow {
-			return jitter(min(adoptionInterval, c.Poll))
+		if ready.Reason == xpv2.ReasonCreating && t.Sub(ready.LastTransitionTime.Time) < creatingWindow {
+			return jitter(min(creatingPollInterval, c.Poll))
 		}
 
 		if !c.AdaptivePollEnabled() || ready.Status != corev1.ConditionTrue {
@@ -118,21 +118,24 @@ func newHook(c Config, now func() time.Time, rnd func() float64) managed.PollInt
 				d = grow(c, doubling, maxExp, elapsed)
 			}
 		}
-		d = jitter(d)
 
 		if dl, ok := mg.(Deadliner); ok {
 			if at, ok := dl.NextPollDeadline(); ok {
-				d = min(d, max(at.Sub(t), c.Poll))
+				until := at.Sub(t)
+				if until <= c.Poll {
+					return jitter(c.Poll)
+				}
+				return min(jitter(d), until)
 			}
 		}
-		return d
+		return jitter(d)
 	}
 }
 
 // grow returns Poll·2^(elapsed/doubling), clamped to PollMax. Checking the
 // exponent first keeps very long elapsed times from overflowing.
-func grow(c Config, doubling time.Duration, maxExp float64, elapsed time.Duration) time.Duration {
-	x := float64(elapsed) / float64(doubling)
+func grow(c Config, doubling, maxExp float64, elapsed time.Duration) time.Duration {
+	x := float64(elapsed) / doubling
 	if x >= maxExp {
 		return c.PollMax
 	}
