@@ -1,23 +1,21 @@
 package v1alpha1
 
-import "time"
+import (
+	"time"
+
+	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+)
 
 // NextPollDeadline returns when Observe must next run to rotate the active
 // binding or drop an expired one. Keep in sync with validateBindings in
 // internal/controller/kymaenvironmentbinding.
 func (cr *KymaEnvironmentBinding) NextPollDeadline() (time.Time, bool) {
-	var at time.Time
-	ok := false
-	add := func(t time.Time) {
-		if !ok || t.Before(at) {
-			at, ok = t, true
-		}
-	}
+	var ts []time.Time
 	for _, b := range cr.Status.AtProvider.Bindings {
-		add(b.ExpiresAt.Time)
+		ts = append(ts, b.ExpiresAt.Time)
 		if b.IsActive {
-			add(b.CreatedAt.Add(cr.Spec.ForProvider.RotationInterval.Duration))
+			ts = append(ts, b.CreatedAt.Add(cr.Spec.ForProvider.RotationInterval.Duration))
 		}
 	}
-	return at, ok
+	return providerv1alpha1.Earliest(ts...)
 }

@@ -28,7 +28,7 @@ const (
 type Config struct {
 	// Poll is --poll.
 	Poll time.Duration
-	// PollMax is the ceiling of the stable-resource backoff (--poll-max).
+	// PollMax is the ceiling of the adaptive poll interval (--poll-max).
 	PollMax time.Duration
 	// PollMaxAfter is how long a resource must stay unchanged before its
 	// interval reaches PollMax (--poll-max-after).
@@ -37,8 +37,9 @@ type Config struct {
 	JitterPercentage uint
 }
 
-// BackoffEnabled reports whether stable resources back off beyond Poll.
-func (c Config) BackoffEnabled() bool {
+// AdaptivePollEnabled reports whether stable resources may poll less often
+// than Poll. Fast polling of Creating resources does not depend on it.
+func (c Config) AdaptivePollEnabled() bool {
 	return c.PollMax > c.Poll
 }
 
@@ -58,7 +59,7 @@ type Deadliner interface {
 //  1. The crossplane.io/poll-interval annotation is set: base.
 //  2. Synced is not True, or lags the generation: Poll.
 //  3. Ready is Creating since less than adoptionWindow: min(adoptionInterval, Poll).
-//  4. Backoff is enabled and Ready and Synced are True: Poll doubling every
+//  4. Adaptive polling is enabled and Ready and Synced are True: Poll doubling every
 //     PollMaxAfter/log2(PollMax/Poll) since either last changed, capped at
 //     PollMax and at the resource's next Deadliner deadline.
 //  5. Otherwise: Poll.
@@ -81,7 +82,7 @@ func newHook(c Config, now func() time.Time, rnd func() float64) managed.PollInt
 
 	var doubling time.Duration
 	var maxExp float64
-	if c.BackoffEnabled() {
+	if c.AdaptivePollEnabled() {
 		maxExp = math.Log2(float64(c.PollMax) / float64(c.Poll))
 		doubling = time.Duration(float64(c.PollMaxAfter) / maxExp)
 	}
@@ -103,7 +104,7 @@ func newHook(c Config, now func() time.Time, rnd func() float64) managed.PollInt
 			return jitter(min(adoptionInterval, c.Poll))
 		}
 
-		if !c.BackoffEnabled() || ready.Status != corev1.ConditionTrue {
+		if !c.AdaptivePollEnabled() || ready.Status != corev1.ConditionTrue {
 			return jitter(c.Poll)
 		}
 

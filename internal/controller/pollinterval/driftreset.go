@@ -10,8 +10,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// WithDriftReset wraps c so that a successful Update restarts the
-// stable-resource backoff. Drift corrected by Update leaves Synced True,
+// WithDriftReset wraps c so that a successful Update restarts the adaptive
+// poll interval at Poll. Drift corrected by Update leaves Synced True,
 // so its lastTransitionTime would not move on its own.
 func WithDriftReset(c managed.ExternalConnector) managed.ExternalConnector {
 	return managed.ExternalConnectorFn(func(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {

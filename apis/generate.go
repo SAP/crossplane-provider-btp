@@ -36,8 +36,8 @@ limitations under the License.
 // Run Upjet generator
 //go:generate go run ../cmd/generator/main.go ..
 
-// Inject custom backoff settings on top of generated controllers
-//go:generate ../hack/helpers/ctrl_inject_backoff.sh
+// Inject the provider's controller options into generated controllers
+//go:generate ../hack/helpers/ctrl_inject_options.sh
 
 // Run e2e test generator
 //go:generate go run ../test/e2e/generator/main.go ..

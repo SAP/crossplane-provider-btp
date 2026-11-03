@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# This script injects custom backoff settings, the provider-wide poll
-# interval hook and the poll-backoff drift-reset connector wrapper into upjet
+# This script injects the provider's controller options (error backoff rate
+# limiter, poll interval hook and drift-reset connector wrapper) into upjet
 # based controllers. Since the controller generation is part of upjet we can't
 # do that while generating, so we amend this code afterwards.
 set -euo pipefail
@@ -28,7 +28,7 @@ missing="$(
   } | sort -u
 )"
 if [ -n "${missing}" ]; then
-  echo "ctrl_inject_backoff.sh: poll hook or connector wrapper not injected into:" >&2
+  echo "ctrl_inject_options.sh: poll hook or connector wrapper not injected into:" >&2
   echo "${missing}" >&2
   exit 1
 fi

@@ -170,8 +170,8 @@ func TestWithExternalConnectorDriftReset(t *testing.T) {
 		pollMax   time.Duration
 		refreshed bool
 	}{
-		"BackoffOffKeepsSynced":    {pollMax: 0},
-		"BackoffOnRefreshesSynced": {pollMax: 8 * time.Minute, refreshed: true},
+		"AdaptivePollOffKeepsSynced":    {pollMax: 0},
+		"AdaptivePollOnRefreshesSynced": {pollMax: 8 * time.Minute, refreshed: true},
 	}
 	for sname, build := range optionStructs {
 		for name, tc := range cases {

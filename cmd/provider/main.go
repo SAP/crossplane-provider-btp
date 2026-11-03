@@ -53,7 +53,7 @@ func main() {
 		).Default("10").Envar("POLL_JITTER_PERCENTAGE").Uint()
 		pollMax = app.Flag(
 			"poll-max",
-			"Upper bound for the poll interval of resources that stay Ready and Synced; it is also the worst-case drift-detection latency. 0 or a value equal to --poll disables the backoff.",
+			"Upper bound for the poll interval of resources that stay Ready and Synced; it is also the worst-case drift-detection latency. 0 or a value equal to --poll disables adaptive polling of stable resources.",
 		).Default("0").Envar("POLL_MAX").Duration()
 		pollMaxAfter = app.Flag(
 			"poll-max-after",

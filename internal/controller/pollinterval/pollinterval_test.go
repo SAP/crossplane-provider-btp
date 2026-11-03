@@ -100,7 +100,7 @@ func TestRules(t *testing.T) {
 			mg:   mr(1, "", synced(time.Hour), cond(xpv2.TypeReady, corev1.ConditionFalse, xpv2.ReasonUnavailable, time.Hour, 0)),
 			want: time.Minute,
 		},
-		"BackoffOffUsesPoll": {
+		"AdaptivePollOffUsesPoll": {
 			cfg:  &Config{Poll: time.Minute},
 			mg:   mr(1, "", ready(time.Hour), synced(time.Hour)),
 			want: time.Minute,
@@ -121,10 +121,10 @@ func TestRules(t *testing.T) {
 			mg:   mr(1, "", ready(8760*time.Hour), synced(8760*time.Hour)),
 			base: time.Second, want: 24 * time.Hour,
 		},
-		"DeadlineCapsBackoff":           {mg: deadlined{stable(), t0.Add(3 * time.Minute), true}, want: 3 * time.Minute},
+		"DeadlineCapsInterval":          {mg: deadlined{stable(), t0.Add(3 * time.Minute), true}, want: 3 * time.Minute},
 		"DeadlineWithinPollUsesPoll":    {mg: deadlined{stable(), t0.Add(20 * time.Second), true}, want: time.Minute},
 		"DeadlinePastUsesPoll":          {mg: deadlined{stable(), t0.Add(-time.Minute), true}, want: time.Minute},
-		"DeadlineBeyondBackoffNoEffect": {mg: deadlined{stable(), t0.Add(time.Hour), true}, want: 8 * time.Minute},
+		"DeadlineBeyondPollMaxNoEffect": {mg: deadlined{stable(), t0.Add(time.Hour), true}, want: 8 * time.Minute},
 		"NoDeadlineReported":            {mg: deadlined{stable(), time.Time{}, false}, want: 8 * time.Minute},
 	}
 	for name, tc := range cases {
@@ -219,7 +219,7 @@ func TestHookStaysWithinBand(t *testing.T) {
 	}
 }
 
-func TestRealTypeCapsBackoff(t *testing.T) {
+func TestRealTypeCapsAdaptivePoll(t *testing.T) {
 	sb := &accountv1alpha1.ServiceBinding{}
 	sb.SetGeneration(1)
 	sb.SetConditions(ready(45*time.Minute), synced(45*time.Minute))
