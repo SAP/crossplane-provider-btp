@@ -39,6 +39,11 @@ const (
 
 	errGetPC    = "cannot get ProviderConfig"
 	errGetCreds = "cannot get credentials"
+
+	// ManagersPendingKey marks an environment whose create left the initialOrgManagers assignment unfinished.
+	// Update retries the assignment while it is set and removes it once that succeeded. It is metadata, as
+	// crossplane-runtime persists the annotations after a failed Create but resets the status.
+	ManagersPendingKey = "cloudfoundryenvironment.environment.btp.crossplane.io/managers-pending"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -149,6 +154,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	orgName := env.FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	if externalName == "" || externalName == cr.Name || externalName == orgName {
 		meta.SetExternalName(cr, *instance.Id)
+		if externalName == "" {
+			// That create stopped before all managers were assigned, so Update retries them.
+			meta.AddAnnotations(cr, map[string]string{ManagersPendingKey: "true"})
+		}
 		if err := c.kube.Update(ctx, cr); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, "failed to update external-name to GUID format")
 		}
@@ -168,11 +177,11 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
-	// Not up to date while configured managers are missing, so Update retries a failed manager assignment.
-	// Only checked once the instance is ready, as the org has no managers to compare against before that.
+	// Not up to date while a failed create left the manager assignment unfinished, so Update retries it.
+	// Only checked once the instance is ready, as managers cannot be assigned to the org before that.
 	upToDate := true
 	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateOk {
-		upToDate = !c.client.NeedsUpdate(*cr)
+		upToDate = cr.GetAnnotations()[ManagersPendingKey] != "true"
 	}
 
 	details, err := env.GetConnectionDetails(instance)
@@ -193,8 +202,12 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if createdInstanceId != "" {
 		// The instance exists in CIS, so keep its ID even if a later create step failed.
 		// Otherwise the next reconcile would try to create it again and run into a conflict.
-		// crossplane-runtime persists the external-name annotation after Create, also when Create returns an error.
+		// crossplane-runtime persists the annotations after Create, also when Create returns an error.
 		meta.SetExternalName(cr, createdInstanceId)
+		if err != nil {
+			// Not all managers are assigned, so Update retries them.
+			meta.AddAnnotations(cr, map[string]string{ManagersPendingKey: "true"})
+		}
 	}
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
@@ -217,7 +230,24 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err := c.client.UpdateInstance(ctx, *cr); err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
 	}
+	if err := c.clearManagersPending(ctx, cr); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
+	}
 	return managed.ExternalUpdate{}, nil
+}
+
+// clearManagersPending removes the marker once the managers are assigned, so later changes to the org managers are
+// left alone. crossplane-runtime only persists the status after Update, so the marker is removed with an update of a
+// copy, which keeps the observed status for that status update, and the new resourceVersion is carried back.
+func (c *external) clearManagersPending(ctx context.Context, cr *v1alpha1.CloudFoundryEnvironment) error {
+	cleared := cr.DeepCopy()
+	meta.RemoveAnnotations(cleared, ManagersPendingKey)
+	if err := c.kube.Update(ctx, cleared); err != nil {
+		return err
+	}
+	meta.RemoveAnnotations(cr, ManagersPendingKey)
+	cr.SetResourceVersion(cleared.GetResourceVersion())
+	return nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {

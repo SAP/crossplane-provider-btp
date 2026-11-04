@@ -34,13 +34,13 @@ type CloudFoundryOrganization struct {
 	btp btp.Client
 }
 
-// NeedsUpdate reports whether configured managers are not yet assigned in the Cloud Foundry org. This is the case when
-// a create failed after the instance was created. It relies on the managers observed into the status by Observe.
+// NeedsUpdate not needed anymore (no reconciliation wanted)
 func (c CloudFoundryOrganization) NeedsUpdate(cr v1alpha1.CloudFoundryEnvironment) bool {
-	return len(c.missingManagers(cr)) > 0
+	return false
 }
 
-// UpdateInstance assigns the configured managers that are missing in the Cloud Foundry org. Other drift is not reconciled.
+// UpdateInstance assigns the configured managers that are missing in the Cloud Foundry org. It finishes the manager
+// assignment of a failed create, other drift is not reconciled.
 func (c CloudFoundryOrganization) UpdateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
 	missing := c.missingManagers(cr)
 	if len(missing) == 0 {
@@ -123,6 +123,10 @@ func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling
 	// Create stores the resource UID in the instance parameters, so an environment carrying it was created by this
 	// resource and gets adopted instead of created a second time.
 	if externalName == "" {
+		// Without a create attempt there is nothing to adopt, so a new resource does not list the environments.
+		if meta.GetExternalCreateFailed(&cr).IsZero() && meta.GetExternalCreatePending(&cr).IsZero() {
+			return nil, nil
+		}
 		return c.btp.GetCFEnvironmentByResourceUID(ctx, string(cr.UID))
 	}
 
@@ -269,9 +273,22 @@ type organizationClient struct {
 func (o organizationClient) addManager(ctx context.Context, username string, origin string) error {
 
 	_, err := o.c.Roles.CreateOrganizationRoleWithUsername(ctx, o.orgGuid, username, resource.OrganizationRoleManager, origin)
+	if isManagerAlreadyAssigned(err) {
+		// The user is a manager already, even if the observed managers did not list them
+		return nil
+	}
 
 	return err
 
+}
+
+// isManagerAlreadyAssigned reports whether Cloud Foundry rejected the role because the user has it already. It answers
+// with 422 CF-UnprocessableEntity (10008) and "User 'x' already has 'organization_manager' role in organization 'y'.".
+// Other errors with that code, such as an unknown user, are not matched.
+func isManagerAlreadyAssigned(err error) bool {
+	var cfErr resource.CloudFoundryError
+	return errors.As(err, &cfErr) && resource.IsUnprocessableEntityError(cfErr) &&
+		strings.Contains(cfErr.Detail, "already has '"+resource.OrganizationRoleManager.String()+"' role")
 }
 
 func (o organizationClient) getManagerUsernames(ctx context.Context) ([]v1alpha1.User, error) {

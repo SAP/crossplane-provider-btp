@@ -19,9 +19,6 @@ type MockClient struct {
 }
 
 func (m MockClient) NeedsUpdate(cr v1alpha1.CloudFoundryEnvironment) bool {
-	if m.MockNeedsUpdate == nil {
-		return false
-	}
 	return m.MockNeedsUpdate(cr)
 }
 

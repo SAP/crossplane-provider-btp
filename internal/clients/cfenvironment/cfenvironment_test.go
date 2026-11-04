@@ -2,11 +2,16 @@ package environments
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 
+	cfv3 "github.com/cloudfoundry/go-cfclient/v3/client"
+	"github.com/cloudfoundry/go-cfclient/v3/config"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/pkg/errors"
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -53,8 +58,8 @@ func TestFormOrgName(t *testing.T) {
 	}
 }
 
-// An empty external-name means the instance ID may not have been recorded after a create that reached CIS,
-// so the environment is looked up by the resource UID stored at create time.
+// An empty external-name after a create attempt means the instance ID may not have been recorded after the create
+// reached CIS, so the environment is looked up by the resource UID stored at create time.
 func TestCloudFoundryOrganization_getEnvironmentByExternalNameWithLegacyHandling_EmptyExternalName(t *testing.T) {
 	existing := provisioningclient.BusinessEnvironmentInstanceResponseObject{
 		EnvironmentType: internal.Ptr("cloudfoundry"),
@@ -62,9 +67,12 @@ func TestCloudFoundryOrganization_getEnvironmentByExternalNameWithLegacyHandling
 		Id:              internal.Ptr("1234"),
 	}
 	cr := v1alpha1.CloudFoundryEnvironment{
-		// No external-name annotation
-		ObjectMeta: v1.ObjectMeta{Name: "test", UID: "uid-1"},
-		Spec:       v1alpha1.CfEnvironmentSpec{SubaccountGuid: "sub"},
+		// No external-name annotation, but a failed create
+		ObjectMeta: v1.ObjectMeta{
+			Name: "test", UID: "uid-1",
+			Annotations: map[string]string{meta.AnnotationKeyExternalCreateFailed: "2026-11-04T10:00:00Z"},
+		},
+		Spec: v1alpha1.CfEnvironmentSpec{SubaccountGuid: "sub"},
 	}
 
 	tests := map[string]struct {
@@ -117,6 +125,68 @@ func TestCloudFoundryOrganization_getEnvironmentByExternalNameWithLegacyHandling
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// listCountingFake counts how often the environment instances are listed.
+type listCountingFake struct {
+	fakes.MockProvisioningServiceClient
+	lists int
+}
+
+func (m *listCountingFake) GetEnvironmentInstances(ctx context.Context) provisioningclient.ApiGetEnvironmentInstancesRequest {
+	return provisioningclient.ApiGetEnvironmentInstancesRequest{ApiService: m}
+}
+
+func (m *listCountingFake) GetEnvironmentInstancesExecute(r provisioningclient.ApiGetEnvironmentInstancesRequest) (*provisioningclient.BusinessEnvironmentInstancesResponseCollection, *http.Response, error) {
+	m.lists++
+	return m.MockProvisioningServiceClient.GetEnvironmentInstancesExecute(r)
+}
+
+// A new resource has no environment to adopt, so the environments are only listed once a create was attempted.
+func TestCloudFoundryOrganization_getEnvironmentByExternalNameWithLegacyHandling_OnlyAfterCreateAttempt(t *testing.T) {
+	existing := provisioningclient.BusinessEnvironmentInstanceResponseObject{
+		EnvironmentType: internal.Ptr("cloudfoundry"),
+		Parameters:      internal.Ptr(`{"orchestrate.cloud.sap/subaccount-operator":"uid-1"}`),
+		Id:              internal.Ptr("1234"),
+	}
+
+	tests := map[string]struct {
+		annotations map[string]string
+		want        *provisioningclient.BusinessEnvironmentInstanceResponseObject
+		wantLists   int
+	}{
+		"NewResourceDoesNotListEnvironments": {
+			want:      nil,
+			wantLists: 0,
+		},
+		"PendingCreateIsLookedUp": {
+			annotations: map[string]string{meta.AnnotationKeyExternalCreatePending: "2026-11-04T10:00:00Z"},
+			want:        &existing,
+			wantLists:   1,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			client := &listCountingFake{MockProvisioningServiceClient: fakes.MockProvisioningServiceClient{
+				ApiResponse: &provisioningclient.BusinessEnvironmentInstancesResponseCollection{
+					EnvironmentInstances: []provisioningclient.BusinessEnvironmentInstanceResponseObject{existing},
+				},
+			}}
+			c := CloudFoundryOrganization{btp: btp.Client{ProvisioningServiceClient: client}}
+			cr := v1alpha1.CloudFoundryEnvironment{ObjectMeta: v1.ObjectMeta{Name: "test", UID: "uid-1", Annotations: tt.annotations}}
+
+			got, err := c.getEnvironmentByExternalNameWithLegacyHandling(context.TODO(), cr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+			if client.lists != tt.wantLists {
+				t.Errorf("environments listed %d times, want %d", client.lists, tt.wantLists)
 			}
 		})
 	}
@@ -499,7 +569,7 @@ func TestCloudFoundryOrganization_getEnvironmentByNameAndOrg_Legacy(t *testing.T
 	}
 }
 
-func TestCloudFoundryOrganization_NeedsUpdate(t *testing.T) {
+func TestCloudFoundryOrganization_missingManagers(t *testing.T) {
 	const admin = "admin@example.com"
 	crWith := func(configured []string, observed []v1alpha1.User) v1alpha1.CloudFoundryEnvironment {
 		cr := v1alpha1.CloudFoundryEnvironment{}
@@ -543,9 +613,6 @@ func TestCloudFoundryOrganization_NeedsUpdate(t *testing.T) {
 				Credential: &btp.Credentials{UserCredential: &btp.UserCredential{Email: admin}},
 			}}
 
-			if got := c.NeedsUpdate(tt.cr); got != (len(tt.wantMissing) > 0) {
-				t.Errorf("NeedsUpdate() = %v, want %v", got, len(tt.wantMissing) > 0)
-			}
 			if got := c.missingManagers(tt.cr); !reflect.DeepEqual(got, tt.wantMissing) {
 				t.Errorf("missingManagers() = %v, want %v", got, tt.wantMissing)
 			}
@@ -588,4 +655,69 @@ func TestCloudFoundryOrganization_UpdateInstance(t *testing.T) {
 			t.Error("expected an error")
 		}
 	})
+}
+
+// A role the user has already counts as assigned, as the observed managers can miss it. Other errors with the same
+// code, such as an unknown user, are still returned.
+func TestOrganizationClient_addManager(t *testing.T) {
+	tests := map[string]struct {
+		status  int
+		body    string
+		wantErr bool
+	}{
+		"RoleCreated": {
+			status: http.StatusCreated,
+			body:   `{"guid":"role-guid","type":"organization_manager"}`,
+		},
+		"RoleAlreadyAssigned": {
+			status: http.StatusUnprocessableEntity,
+			body:   `{"errors":[{"code":10008,"title":"CF-UnprocessableEntity","detail":"User 'a@example.com' already has 'organization_manager' role in organization 'org'."}]}`,
+		},
+		"UnknownUser": {
+			status:  http.StatusUnprocessableEntity,
+			body:    `{"errors":[{"code":10008,"title":"CF-UnprocessableEntity","detail":"No user exists with the username 'a@example.com' and origin 'sap.ids'."}]}`,
+			wantErr: true,
+		},
+		"NotAuthorized": {
+			status:  http.StatusForbidden,
+			body:    `{"errors":[{"code":10003,"title":"CF-NotAuthorized","detail":"You are not authorized to perform the requested action"}]}`,
+			wantErr: true,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/oauth/token":
+					_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "at", "token_type": "bearer", "expires_in": 3600})
+				case "/v3/roles":
+					w.WriteHeader(tt.status)
+					_, _ = w.Write([]byte(tt.body))
+				default:
+					// discovery: point login and uaa back at this server
+					_ = json.NewEncoder(w).Encode(map[string]any{"links": map[string]any{
+						"login":   map[string]string{"href": "http://" + r.Host},
+						"uaa":     map[string]string{"href": "http://" + r.Host},
+						"app_ssh": map[string]any{"meta": map[string]string{"oauth_client": "ssh"}},
+					}})
+				}
+			}))
+			t.Cleanup(srv.Close)
+
+			cfg, err := config.New(srv.URL, config.UserPassword("u", "pw"))
+			if err != nil {
+				t.Fatalf("config.New: %v", err)
+			}
+			cf, err := cfv3.New(cfg)
+			if err != nil {
+				t.Fatalf("cfv3.New: %v", err)
+			}
+			o := organizationClient{c: *cf, orgGuid: "org-guid"}
+
+			if err := o.addManager(context.TODO(), "a@example.com", defaultOrigin); (err != nil) != tt.wantErr {
+				t.Errorf("addManager() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }
