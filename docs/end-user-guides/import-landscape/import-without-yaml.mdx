@@ -1,0 +1,470 @@
+---
+sidebar_position: 1
+---
+
+import Link from '@docusaurus/Link';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
+import CliExportBadge from '@site/src/components/CliExportBadge.jsx';
+import Checklist from '@site/src/components/Checklist.jsx';
+
+# Import BTP Subaccount
+
+In this guide, we take an assume an 
+> already existing BTP Subaccount with 
+>- numerous _entitlements_
+>- a _service instance_
+>- a worklaod runtime _(Kyma or CloudFroundry)_.
+
+We **want to orchestrate them using the Crossplane BTP Provider** and control plane methodlogy.
+
+We will achieve this by following these 3 steps
+
+#### 1. Generate Yaml with Export CLI
+We will use the CLI Exporter: BTP to **scan & generate the yaml definition** of cloud ressources that alredy exist in our already-running BTP Subaccount.
+
+#### 2. Observe and Review
+We will review the ressources and apply to BTP Crossplane Provider in observe mode. 
+The provider will compare with the actual API in **read-only way and verify correctness of yaml.**
+
+#### 3. Orchestrate from code
+We can now make our yaml files the source of truth to **actively orchestrate** our cloud landscapes using the Crossplane BTP provider.
+
+
+## Before you start
+
+- Install [BTP CLI](https://tools.hana.ondemand.com/#cloud)
+- ControlPlane running [BTP Crossplane Provider](../setup/install-provider-btp.mdx) and [authenticate](../setup/configure-provider-btp.mdx) subaccount
+
+:::warning ensure Access
+
+Make sure BTP provider's ProviderConfig uses a ServiceAccount that has admin access in the subaccount of interesst.
+
+:::
+
+
+
+## 0. Install the exporter
+
+```bash
+git clone https://github.com/SAP/crossplane-provider-btp.git
+cd crossplane-provider-btp
+go build -o btp-exporter ./cmd/exporter
+./btp-exporter --help
+./btp-exporter export --help
+```
+
+:::tip
+
+For shell completion, run `./btp-exporter completion <shell> --help`.
+
+:::
+
+## 1. Generate resources
+
+![import](/img/import-cli-yaml.png)
+
+#### Login to BTP
+
+Log in and target the global account containing your subaccount:
+
+```bash
+btp login --sso
+btp target --global-account <global-account-subdomain>
+```
+
+<details>
+<summary>Where to find <code>global-account-subdomain</code></summary>
+
+1. Open the SAP BTP cockpit and choose **Switch Global Account**.
+2. Find the global account containing your subaccount and copy its **Subdomain**.
+3. Replace `<global-account-subdomain>` in the command above with that value.
+
+See the [SAP BTP CLI reference](https://help.sap.com/docs/btp/btp-cli-command-reference/btp-login?locale=en-US) for more details.
+
+</details>
+
+#### Target subaccount
+
+`btp-exporter` supports targeting your existing subaccount by name, by GUID, or interactively.
+
+<Tabs groupId="btp-export-subaccount">
+<TabItem value="pattern" label="By name" default>
+
+Add `--subaccount '.*dev.*'` to the export command to select subaccounts whose display names contain `dev`. The pattern is a regular expression. 
+
+```bash
+./btp-exporter export \
+  --subaccount '.*dev.*' \
+  --kind subaccount \
+  --output ../landscape.yaml
+```
+
+</TabItem>
+<TabItem value="guid" label="By GUID">
+
+Pass the subaccount GUID to select one specific subaccount. Replace `<subaccount-guid>` with the GUID of your existing subaccount.
+
+```bash
+./btp-exporter export \
+  --subaccount '<subaccount-guid>' \
+  --kind subaccount \
+  --output ../landscape.yaml
+```
+
+</TabItem>
+<TabItem value="interactive" label="Interactive">
+
+Omit `--subaccount` from the export command. The exporter prompts you to choose your subaccount from an interactive list.
+
+```bash
+./btp-exporter export \
+  --kind subaccount \
+  --output ../landscape.yaml
+```
+
+</TabItem>
+</Tabs>
+
+#### Choose resources
+
+Browser all available or only individual resources.
+
+<Tabs groupId="btp-export-resources">
+<TabItem value="all" label="All resources" default>
+
+Use `--all` to export all supported resource kinds and their resources. 
+
+_This only works if one single subaccount is targetted._
+
+```bash {3}
+./btp-exporter export \
+  --subaccount '.*dev.*' \
+  --all \
+  --resolve-references \
+  --output ../landscape.yaml
+```
+
+</TabItem>
+<TabItem value="pick" label="Pick resources">
+
+Use `--kind` to choose the resource kinds to export. This example exports `Subaccounts`, `Entitlements`, and `ServiceInstances`:
+
+```bash {3-5}
+./btp-exporter export \
+  --subaccount '.*dev.*' \
+  --kind subaccount \
+  --kind entitlement \
+  --kind serviceinstance \
+  --resolve-references \
+  --output ../landscape.yaml
+```
+
+</TabItem>
+</Tabs>
+
+:::tip Automatically resolve references
+
+We encourage `--resolve-references` to be used as this uses Crossplane ressoure references, such as `subaccountRef`, instead of technical GUIDs to link the ressources meanignfully.
+
+:::
+
+
+#### CLI export coverage
+
+The exporter is in preview. Copy the selector arguments into your `./btp-exporter export` command and replace the placeholders. Name selectors accept regular expressions; Entitlement matches the service plan name.
+
+Missing a resource? Check out our [contribution guides](../../contribution-notes/overview.mdx).
+
+<details>
+<summary>View CLI export coverage by resource</summary>
+
+| Resource | Supported | Selector | Notes |
+|---|---|---|---|
+| <Link id="cli-export-subaccount" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#subaccount">Subaccount</Link> | <CliExportBadge /> | <CodeBlock language="bash" className="cli-export-selector">{"--kind subaccount --subaccount '<display-name>'"}</CodeBlock> | The admin list is inferred from `createdBy`; verify it before management. |
+| <Link id="cli-export-entitlement" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#entitlement">Entitlement</Link> | <CliExportBadge /> | <CodeBlock language="bash" className="cli-export-selector">{"--kind entitlement --subaccount '<subaccount-guid>' --entitlement '<service-plan-name>'"}</CodeBlock> | Use `--entitlement-auto-assigned` to include auto-assigned plans.<br />The exporter omits the external-name annotation; add the compound key before adoption. |
+| <Link id="cli-export-serviceinstance" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#serviceinstance">ServiceInstance</Link> | <CliExportBadge /> | <CodeBlock language="bash" className="cli-export-selector">{"--kind serviceinstance --subaccount '<subaccount-guid>' --serviceinstance '<instance-name>'"}</CodeBlock> | **Prerequisites:**<ul><li>[ServiceManager](#cli-export-servicemanager)</li></ul> [ServiceManager](#cli-export-servicemanager) and [CloudManagement](#cli-export-cloudmanagement) instances are exported as their dedicated resource kinds.<br />The BTP CLI does not return original `spec.forProvider.parameters` or `spec.forProvider.shared`; fill them from the existing configuration before enabling management.<br />Correct the exported external name from `<subaccount-id>,<instance-id>` to the instance GUID. |
+| <Link id="cli-export-servicebinding" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#servicebinding">ServiceBinding</Link> | <CliExportBadge /> | <CodeBlock language="bash" className="cli-export-selector">{"--kind servicebinding --subaccount '<subaccount-guid>' --serviceinstance '<instance-name>' --servicebinding '<binding-name>'"}</CodeBlock> | **Prerequisites:**<ul><li>[ServiceInstance](#cli-export-serviceinstance), including its prerequisites</li></ul><br />The BTP CLI does not return original `spec.forProvider.parameters`; restore them before enabling management. |
+| <Link id="cli-export-cloudfoundryenvironment" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#cloudfoundryenvironment">CloudFoundryEnvironment</Link> | <CliExportBadge /> | <CodeBlock language="bash" className="cli-export-selector">{"--kind cloudfoundry-environment --subaccount '<subaccount-guid>' --cloudfoundry-environment '<environment-name>'"}</CodeBlock> | **Prerequisites:**<ul><li>[CloudManagement](#cli-export-cloudmanagement), including its prerequisites</li></ul> |
+| <Link id="cli-export-servicemanager" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#servicemanager">ServiceManager</Link> | <CliExportBadge /> | <CodeBlock language="bash" className="cli-export-selector">{"--kind serviceinstance --subaccount '<subaccount-guid>' --serviceinstance '<service-manager-instance-name>'"}</CodeBlock> | No standalone `--kind`; also exported as a prerequisite of [ServiceInstance](#cli-export-serviceinstance).<br />Exporting an existing instance requires exactly one binding; missing or multiple bindings produce commented-out output.<br />A missing required ServiceManager may produce a new prerequisite definition. Review it separately from adoption manifests. |
+| <Link id="cli-export-cloudmanagement" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#cloudmanagement">CloudManagement</Link> | <CliExportBadge /> | <CodeBlock language="bash" className="cli-export-selector">{"--kind serviceinstance --subaccount '<subaccount-guid>' --serviceinstance '<cloud-management-instance-name>'"}</CodeBlock> | No standalone `--kind`; also exported as a prerequisite of [CloudFoundryEnvironment](#cli-export-cloudfoundryenvironment).<br />Exporting an existing instance requires exactly one binding; missing or multiple bindings produce commented-out output.<br />**Prerequisites (as needed):**<ul><li>[Entitlement](#cli-export-entitlement)</li><li>[ServiceManager](#cli-export-servicemanager)</li></ul>Review generated creation definitions separately. |
+| <Link id="cli-export-directory" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#directory">Directory</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1139" target="_blank"><span className="badge badge--secondary">Planned #1139</span></a> | — | — |
+| <Link id="cli-export-directoryentitlement" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#directoryentitlement">DirectoryEntitlement</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1137" target="_blank"><span className="badge badge--secondary">Planned #1137</span></a> | — | — |
+| <Link id="cli-export-globalaccounttrustconfiguration" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#globalaccounttrustconfiguration">GlobalaccountTrustConfiguration</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1142" target="_blank"><span className="badge badge--secondary">Planned #1142</span></a> | — | — |
+| <Link id="cli-export-kymaenvironment" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#kymaenvironment">KymaEnvironment</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1136" target="_blank"><span className="badge badge--secondary">Planned #1136</span></a> | — | — |
+| <Link id="cli-export-kymamodule" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#kymamodule">KymaModule</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1149" target="_blank"><span className="badge badge--secondary">Spike</span></a> | — | — |
+| <Link id="cli-export-rolecollection" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#rolecollection">RoleCollection</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1140" target="_blank"><span className="badge badge--secondary">Planned #1140</span></a> | — | — |
+| <Link id="cli-export-rolecollectionassignment" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#rolecollectionassignment">RoleCollectionAssignment</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1144" target="_blank"><span className="badge badge--secondary">Planned #1144</span></a> | — | — |
+| <Link id="cli-export-subaccountdestination" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#subaccountdestination">SubaccountDestination</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1147" target="_blank"><span className="badge badge--secondary">Planned #1147</span></a> | — | — |
+| <Link id="cli-export-subaccountdestinationcertificate" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#subaccountdestinationcertificate">SubaccountDestinationCertificate</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1148" target="_blank"><span className="badge badge--secondary">Planned #1148</span></a> | — | — |
+| <Link id="cli-export-subaccountservicebroker" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#subaccountservicebroker">SubaccountServiceBroker</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1141" target="_blank"><span className="badge badge--secondary">Planned #1141</span></a> | — | — |
+| <Link id="cli-export-subaccounttrustconfiguration" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#subaccounttrustconfiguration">SubaccountTrustConfiguration</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1143" target="_blank"><span className="badge badge--secondary">Planned #1143</span></a> | — | — |
+| <Link id="cli-export-subscription" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#subscription">Subscription</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1138" target="_blank"><span className="badge badge--secondary">Planned #1138</span></a> | — | — |
+| <Link id="cli-export-subaccountapicredential" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#subaccountapicredential">SubaccountApiCredential</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1145" target="_blank"><span className="badge badge--secondary">Planned #1145</span></a> | — | — |
+| <Link id="cli-export-kymaenvironmentbinding" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#kymaenvironmentbinding">KymaEnvironmentBinding</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1146" target="_blank"><span className="badge badge--secondary">Planned #1146</span></a> | — | — |
+| <Link id="cli-export-certbasedoidclogin" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#certbasedoidclogin">CertBasedOIDCLogin</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1150" target="_blank"><span className="badge badge--secondary">Spike</span></a> | — | — |
+| <Link id="cli-export-kubeconfiggenerator" to="/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview#kubeconfiggenerator">KubeConfigGenerator</Link> | <a href="https://github.com/SAP/crossplane-provider-btp/issues/1151" target="_blank"><span className="badge badge--secondary">Spike</span></a> | — | — |
+
+</details>
+
+
+
+#### Exported resources
+
+The following examples are outcomes of the commands from the section above. 
+
+<Tabs groupId="btp-exported-resources">
+<TabItem value="subaccount" label="Subaccount" default>
+
+```yaml {6,8}
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subaccount
+metadata:
+  name: demo-subaccount
+  annotations:
+    crossplane.io/external-name: "<subaccount-guid>"
+spec:
+  managementPolicies: [Observe]
+  forProvider:
+    displayName: Demo
+    region: eu10
+    subdomain: "<existing-subdomain>"
+    subaccountAdmins:
+      - "<created-by-user>"
+```
+
+</TabItem>
+<TabItem value="entitlement" label="Entitlement">
+
+```yaml {5,7}
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Entitlement
+metadata:
+  name: demo-entitlement
+  # The current exporter omits external-name; add it during review.
+spec:
+  managementPolicies: [Observe]
+  forProvider:
+    serviceName: "<service-name>"
+    servicePlanName: "<service-plan-name>"
+    amount: 1
+    subaccountRef:
+      name: demo-subaccount
+```
+
+</TabItem>
+<TabItem value="serviceinstance" label="ServiceInstance">
+
+```yaml {7,9}
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: demo-service
+  annotations:
+    # Correct this legacy value to the instance GUID during review.
+    crossplane.io/external-name: "<subaccount-guid>,<service-instance-id>"
+spec:
+  managementPolicies: [Observe]
+  forProvider:
+    name: "<existing-service-instance-name>"
+    offeringName: "<service-name>"
+    planName: "<service-plan-name>"
+    parameters: null
+    subaccountRef:
+      name: demo-subaccount
+    serviceManagerRef:
+      name: demo-service-manager
+```
+
+</TabItem>
+<TabItem value="cloudfoundryenvironment" label="CloudFoundryEnvironment">
+
+```yaml {6,8}
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: CloudFoundryEnvironment
+metadata:
+  name: demo-cf-environment
+  annotations:
+    crossplane.io/external-name: "<cloudfoundry-environment-guid>"
+spec:
+  managementPolicies: [Observe]
+  writeConnectionSecretToRef:
+    name: demo-cf-environment
+    namespace: default
+  forProvider:
+    landscape: "<cf-landscape>"
+    environmentName: "<existing-environment-name>"
+    orgName: "<org-name>"
+  subaccountRef:
+    name: demo-subaccount
+  cloudManagementRef:
+    name: demo-cloud-management
+```
+
+</TabItem>
+<TabItem value="kymaenvironment" label="KymaEnvironment">
+
+KymaEnvironment export support is [planned (#1136)](https://github.com/SAP/crossplane-provider-btp/issues/1136); this example shows the expected adoption manifest.
+
+</TabItem>
+<TabItem value="cloudmanagement" label="CloudManagement (auto-gen)">
+
+```yaml {6,8}
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: CloudManagement
+metadata:
+  name: demo-cloud-management
+  annotations:
+    crossplane.io/external-name: "<cloud-management-instance-id>/<cloud-management-binding-id>"
+spec:
+  managementPolicies: [Observe]
+  providerConfigRef:
+    name: default
+  writeConnectionSecretToRef:
+    name: demo-cloud-management
+    namespace: default
+  forProvider:
+    serviceInstanceName: "<existing-cloud-management-name>"
+    subaccountRef:
+      name: demo-subaccount
+    serviceManagerRef:
+      name: demo-service-manager
+```
+
+:::tip Why auto-generated
+
+`CloudManagement` appears in the generated yaml output even though you did not select it. It is inevitable for API orchestration and is therefore generated for you as well.
+
+:::
+
+</TabItem>
+<TabItem value="servicemanager" label="ServiceManager (auto-gen)">
+
+```yaml {6,8}
+apiVersion: account.btp.sap.crossplane.io/v1beta1
+kind: ServiceManager
+metadata:
+  name: demo-service-manager
+  annotations:
+    crossplane.io/external-name: "<service-manager-instance-id>/<service-manager-binding-id>"
+spec:
+  managementPolicies: [Observe]
+  providerConfigRef:
+    name: default
+  writeConnectionSecretToRef:
+    name: demo-service-manager
+    namespace: default
+  forProvider:
+    planName: service-operator-access
+    serviceBindingName: "<existing-service-manager-binding-name>"
+    serviceInstanceName: "<existing-service-manager-name>"
+    subaccountRef:
+      name: demo-subaccount
+```
+
+This example uses `service-operator-access`; use the plan and binding name of your existing ServiceManager instance.
+
+:::tip Why auto-generated
+
+`ServiceManager` appears in the generated yaml output even though you did not select it. It is inevitable for API orchestration and is therefore generated for you as well.
+
+:::
+
+</TabItem>
+</Tabs>
+
+### Review YAMLs
+
+Open the output yaml and check before applying.
+
+<Checklist
+  items={[
+    { title: 'Inventory', text: 'All desired resource kinds are present.' },
+    { title: 'Identity', text: 'Every external name matches the intended BTP resource.' },
+    { title: 'References and credentials', text: 'ProviderConfig and resource references point to the intended account and exported names.' },
+    { title: 'Observe only', text: <>Every imported resource has <code>managementPolicies: [Observe]</code>.</> },
+    { title: 'Clean result', text: 'Export warnings and commented-out definitions have been resolved.' },
+  ]}
+/>
+
+## 2. Apply in observe mode
+
+![observe](/img/import-cli-observe.png)
+
+Apply the reviewed manifests directly to your control plane:
+
+```bash
+kubectl apply -f landscape.yaml
+```
+
+With `Observe`, Crossplane reads the existing resources without creating, updating, or deleting them.
+
+### Verify observation
+
+Check the resources you applied:
+
+```bash
+kubectl get managed
+```
+
+Apply the same gates to the deployed resources before enabling management:
+
+<Checklist
+  items={[
+    { title: 'Ready', text: <>Every imported resource reports <code>READY=True</code>.</> },
+    { title: 'Synced', text: <>Every imported resource reports <code>SYNCED=True</code>.</> },
+    { title: 'No errors', text: 'No unresolved reconciliation errors appear in the resource conditions or events.' },
+  ]}
+/>
+
+## 3. Enable management
+
+![orchestrate](/img/import-cli-observe-1.png)
+
+Change `managementPolicies` from `[Observe]` to `["*"]` for each resource you want Crossplane to manage, keeping the IDs, names, credentials, and configuration verified during observation. The Subaccount example below highlights this change.
+
+```yaml {8-9}
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subaccount
+metadata:
+  name: demo-subaccount
+  annotations:
+    crossplane.io/external-name: "<subaccount-guid>"
+spec:
+  managementPolicies:
+    - "*"
+  providerConfigRef:
+    name: default
+  forProvider:
+    displayName: Demo
+    region: eu10
+    subdomain: "<existing-subdomain>"
+    subaccountAdmins:
+      - "<verified-existing-admin>"
+```
+
+**`"*"` permits all supported actions, including creation, updates, and deletion.**
+
+Re-apply the updated manifests:
+
+```bash
+kubectl apply -f landscape.yaml
+```
+
+After the control plane reconciles, verify the resource conditions and BTP state again before relying on active management.
+
+## Related topics
+
+- **Manage imports with GitOps** — keep the reviewed manifests in a Git repository and roll them out with Flux or Argo CD, using Kustomize overlays to supply environment-specific external names. Covered as a separate topic.
+- [External-name formats](/docs/crossplane-provider-btp/docs/end-user-guides/import-landscape/overview) — identifier lookup and adoption requirements per resource kind.
+
+## Troubleshooting
+
+Rerun the export with `--verbose` for diagnostic output.
+
+| Symptom | Check |
+|---|---|
+| Authentication or permission failure | Renew the session with `btp login --sso`, verify the targeted global account, and check subaccount permissions. The provider's credentials must also have access. |
+| BTP CLI not found | Put `btp` on your `PATH`, or pass `--btp-cli /path/to/btp` to `export` (also configurable with `BTP_EXPORT_BTP_CLI_PATH`). |
+| No resources returned | Check account access and selection patterns; try interactive selection to inspect available resources. |

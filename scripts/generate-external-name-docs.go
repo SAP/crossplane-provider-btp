@@ -1,6 +1,6 @@
 // This tool scans all *_types.go files in the apis directory, extracts External-Name
 // Configuration comments from resource type definitions, and generates comprehensive
-// documentation in docs/end-user-guides/import-landscape/external-name.md.
+// documentation in docs/end-user-guides/import-landscape/overview.mdx.
 //
 // The External-Name Configuration comment format should be:
 //
@@ -32,14 +32,15 @@ import (
 )
 
 const (
-	// marker is the text marker in the docs file after which generated content is inserted
-	marker = "## Generated Data Below"
+	// Markers bound generated content within the hand-written overview.
+	marker    = "{/* BEGIN GENERATED EXTERNAL NAMES */}"
+	endMarker = "{/* END GENERATED EXTERNAL NAMES */}"
 	// File permissions
 	filePermissions = 0644
 	// defaultApisDir is the default directory containing API type definitions
 	defaultApisDir = "apis"
 	// defaultDocsFile is the default path to the external-name documentation file
-	defaultDocsFile = "docs/end-user-guides/import-landscape/external-name.md"
+	defaultDocsFile = "docs/end-user-guides/import-landscape/overview.mdx"
 )
 
 var (
@@ -96,7 +97,10 @@ func run() error {
 	})
 
 	// Generate the documentation content
-	generatedContent := generateDocumentation(configs)
+	generatedContent, err := generateDocumentation(configs)
+	if err != nil {
+		return fmt.Errorf("failed to generate coverage table: %w", err)
+	}
 
 	// Update the documentation file
 	if err := updateDocsFile(generatedContent); err != nil {
@@ -269,20 +273,149 @@ func formatCommentContent(lines []string) string {
 	return strings.Join(result, "\n")
 }
 
-func generateDocumentation(configs []ResourceConfig) string {
-	var sb strings.Builder
-
-	for i, config := range configs {
-		// Add blank line before each resource except the first one
-		if i > 0 {
-			sb.WriteString("\n")
-		}
-		fmt.Fprintf(&sb, "### %s\n\n", config.Name)
-		sb.WriteString(config.Content)
-		sb.WriteString("\n")
+// generateDocumentation preserves curated resource order and
+// separates identifier types, lookup instructions, and notes into dedicated cells.
+func generateDocumentation(configs []ResourceConfig) (string, error) {
+	content, err := os.ReadFile(docsFile)
+	if err != nil {
+		return "", err
+	}
+	_, rest, found := strings.Cut(string(content), marker)
+	if !found {
+		return "", fmt.Errorf("marker '%s' not found in %s", marker, docsFile)
+	}
+	table, _, found := strings.Cut(rest, endMarker)
+	if !found {
+		return "", fmt.Errorf("marker '%s' not found in %s", endMarker, docsFile)
 	}
 
-	return sb.String()
+	byName := make(map[string]ResourceConfig, len(configs))
+	for _, config := range configs {
+		byName[config.Name] = config
+	}
+	resourceLink := regexp.MustCompile(`^\[([A-Za-z0-9_]+)\]\(#[a-z0-9_]+\)$`)
+	resourceAnchor := regexp.MustCompile(`^<Link id="[a-z0-9_]+" to="#[a-z0-9_]+">([A-Za-z0-9_]+)</Link>$`)
+	lookupLabel := regexp.MustCompile(`^(UI|CLI|API)( \([^)]*\))?:\s*`)
+	var sb strings.Builder
+	sb.WriteString("| Resource | External name | Where to find | Notes |\n")
+	sb.WriteString("|---|---|---|---|\n")
+
+	for _, line := range strings.Split(table, "\n") {
+		cells := strings.Split(line, "|")
+		if len(cells) < 5 {
+			continue
+		}
+		name := resourceLink.FindStringSubmatch(strings.TrimSpace(cells[1]))
+		if name == nil {
+			name = resourceAnchor.FindStringSubmatch(strings.TrimSpace(cells[1]))
+		}
+		if name == nil {
+			continue
+		}
+		config, ok := byName[name[1]]
+		if !ok {
+			return "", fmt.Errorf("resource %s has no API external-name configuration", name[1])
+		}
+		delete(byName, name[1])
+
+		var format string
+		var lookup, notes []string
+		inLookup := false
+		for _, text := range strings.Split(config.Content, "\n") {
+			text = strings.TrimPrefix(strings.TrimSpace(text), "- ")
+			if text == "" {
+				continue
+			}
+			text = strings.ReplaceAll(text, "|", "&#124;")
+			if strings.HasPrefix(text, "Format:") {
+				format = strings.TrimSpace(strings.TrimPrefix(text, "Format:"))
+				inLookup = false
+			} else if text == "How to find:" {
+				inLookup = true
+			} else if strings.HasPrefix(text, "Follows Standard:") {
+				inLookup = false
+				// Preserve operational details embedded in nonstandard-handling explanations.
+				if _, explanation, ok := strings.Cut(text, "no - "); ok {
+					if _, detail, ok := strings.Cut(explanation, "; "); ok {
+						notes = append(notes, sentenceCase(detail))
+					} else if _, instruction, ok := strings.Cut(explanation, "Instead of "); ok {
+						notes = append(notes, "Instead of "+instruction)
+					}
+				}
+			} else if strings.HasPrefix(text, "Note:") {
+				inLookup = false
+				notes = append(notes, strings.TrimSpace(strings.TrimPrefix(text, "Note:")))
+			} else if inLookup {
+				lookup = append(lookup, lookupLabel.ReplaceAllString(text, "**$1$2:**<br />"))
+			} else {
+				notes = append(notes, text)
+			}
+		}
+		if format == "" {
+			return "", fmt.Errorf("resource %s has no external-name format", config.Name)
+		}
+		identifier := strings.ToLower(config.Name)
+		if detail := externalNameFormatNote(format); detail != "" {
+			notes = append([]string{detail}, notes...)
+		}
+		note := strings.Join(notes, "<br />")
+		if note == "" {
+			note = "—"
+		}
+		where := strings.Join(lookup, "<br />")
+		if where == "" {
+			where = "—"
+		}
+		fmt.Fprintf(&sb, "| <Link id=\"%s\" to=\"#%s\">%s</Link> | %s | %s | %s |\n",
+			identifier, identifier, config.Name, externalNameBadge(format), where, note)
+	}
+	if len(byName) != 0 {
+		var missing []string
+		for name := range byName {
+			missing = append(missing, name)
+		}
+		sort.Strings(missing)
+		return "", fmt.Errorf("add coverage table rows for: %s", strings.Join(missing, ", "))
+	}
+	return sb.String(), nil
+}
+
+// Keep format exceptions and name examples, omitting what the badge already shows.
+func externalNameFormatNote(format string) string {
+	if strings.Contains(format, ">/<") {
+		key := regexp.MustCompile("^`?<[^>]+>(?:/<[^>]+>)+`?")
+		detail := key.ReplaceAllString(format, "")
+		detail = regexp.MustCompile(`^\s*\(e\.g\.[^)]*\)`).ReplaceAllString(detail, "")
+		return sentenceCase(strings.TrimLeft(detail, " ,;"))
+	}
+	if strings.Contains(format, "(e.g.") {
+		return format
+	}
+	return ""
+}
+
+func sentenceCase(text string) string {
+	if text == "" {
+		return ""
+	}
+	return strings.ToUpper(text[:1]) + text[1:]
+}
+
+// Classify the identifier format independently of the provider's standard-handling flag.
+func externalNameBadge(format string) string {
+	lowerFormat := strings.ToLower(format)
+	label, color := "Name", "warning"
+	switch {
+	case lowerFormat == "not applicable":
+		label, color = "N/A", "secondary"
+	case strings.Contains(format, ">/<"):
+		key := regexp.MustCompile(`<[^>]+>(?:/<[^>]+>)+`).FindString(format)
+		parts := strings.NewReplacer("<", "", ">", "", "/", " / ").Replace(key)
+		label = `Compound: <span className="external-name-key">` + parts + `</span>`
+	case strings.Contains(lowerFormat, "guid") || strings.Contains(lowerFormat, "uuid"):
+		label, color = `<span className="external-name-key">GUID</span>`, "success"
+	}
+	return fmt.Sprintf(`<span className="badge badge--%s">%s</span>`, color, label)
 }
 
 func updateDocsFile(generatedContent string) error {
@@ -292,28 +425,23 @@ func updateDocsFile(generatedContent string) error {
 		return fmt.Errorf("documentation file %s not found: %w", docsFile, err)
 	}
 
-	// Find the marker and extract content before it
-	lines := strings.Split(string(content), "\n")
-	var beforeMarker []string
-	markerFound := false
-
-	for _, line := range lines {
-		beforeMarker = append(beforeMarker, line)
-		if strings.Contains(line, marker) {
-			markerFound = true
-			break
-		}
-	}
-
-	if !markerFound {
+	before, rest, found := strings.Cut(string(content), marker)
+	if !found {
 		return fmt.Errorf("marker '%s' not found in %s", marker, docsFile)
 	}
+	_, after, found := strings.Cut(rest, endMarker)
+	if !found {
+		return fmt.Errorf("marker '%s' not found in %s", endMarker, docsFile)
+	}
 
-	// Combine the content before marker with generated content
 	var result strings.Builder
-	result.WriteString(strings.Join(beforeMarker, "\n"))
+	result.WriteString(before)
+	result.WriteString(marker)
 	result.WriteString("\n\n")
 	result.WriteString(generatedContent)
+	result.WriteString("\n")
+	result.WriteString(endMarker)
+	result.WriteString(after)
 
 	// Write the updated content back to the file
 	if err := os.WriteFile(docsFile, []byte(result.String()), filePermissions); err != nil {

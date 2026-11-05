@@ -213,7 +213,7 @@ Else, if we have an error in our request, return with error.
 
 Comments in this format should be on top of the CRDs which will support external name.
 Script (see below) will use it for the docs generation.
-And append the file [docs/end-user-guides/import-landscape/external-name.md](../end-user-guides/import-landscape/external-name.md)
+The script splits each API comment into dedicated columns in the [Resource coverage](../end-user-guides/import-landscape/externalname.mdx#resource-coverage) table: an identifier-type badge under **External name**, lookup instructions under **Where to find**, and adoption requirements and identifier exceptions under **Notes**. Redundant format descriptions and the **Follows Standard** flag are omitted from the table; operational details embedded in those fields are retained. Badges classify the identifier format independently of the **Follows Standard** flag: GUIDs are green, compound keys and names are yellow, and non-applicable identifiers are gray. GUID labels and compound key parts use a monospace font. Resource order and surrounding content are preserved. Add a table row when introducing a resource; all identifier documentation comes from its API comment. Maintain exporter support, selectors, and limitations separately in the [CLI export coverage table](../end-user-guides/import-landscape/import-without-yaml.mdx#cli-export-coverage).
 
 ```go
 //

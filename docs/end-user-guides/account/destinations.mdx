@@ -237,7 +237,7 @@ Your certificate is now managed in code and visible under **Connectivity → Cer
 
 ### How do I adopt a destination or certificate that already exists in BTP?
 
-Both resources use a compound external-name in the form `<subaccount-id>/<name>`. Set the `crossplane.io/external-name` annotation to that value on your manifest so the provider adopts the existing object instead of creating a new one. See [External name](../import-landscape/external-name.md#subaccountdestination) for the exact format and how to find the IDs in the cockpit or via the API.
+Both resources use a compound external-name in the form `<subaccount-id>/<name>`. Set the `crossplane.io/external-name` annotation to that value on your manifest so the provider adopts the existing object instead of creating a new one. See [Resource coverage](../import-landscape/externalname.mdx#subaccountdestination) for the exact format and how to find the IDs in the cockpit or via the API.
 
 ### Where do the OAuth2 credentials in `destinationServiceBindingSecretRef` come from?
 
