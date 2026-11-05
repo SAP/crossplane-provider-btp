@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
+	"sync"
 	"testing"
 
 	cfv3 "github.com/cloudfoundry/go-cfclient/v3/client"
@@ -653,6 +655,71 @@ func TestCloudFoundryOrganization_UpdateInstance(t *testing.T) {
 
 		if err := c.UpdateInstance(context.TODO(), cr); err == nil {
 			t.Error("expected an error")
+		}
+	})
+	t.Run("FailedManagerDoesNotBlockLaterOnes", func(t *testing.T) {
+		var mu sync.Mutex
+		var assigned []string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/oauth/token":
+				_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "at", "token_type": "bearer", "expires_in": 3600})
+			case "/v3/roles":
+				var role struct {
+					Relationships struct {
+						User struct {
+							Data struct {
+								Username string `json:"username"`
+							} `json:"data"`
+						} `json:"user"`
+					} `json:"relationships"`
+				}
+				_ = json.NewDecoder(r.Body).Decode(&role)
+				username := role.Relationships.User.Data.Username
+				if username == "unknown@example.com" {
+					w.WriteHeader(http.StatusUnprocessableEntity)
+					_, _ = w.Write([]byte(`{"errors":[{"code":10008,"title":"CF-UnprocessableEntity","detail":"No user exists with the username 'unknown@example.com' and origin 'sap.ids'."}]}`))
+					return
+				}
+				mu.Lock()
+				assigned = append(assigned, username)
+				mu.Unlock()
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(`{"guid":"role-guid","type":"organization_manager"}`))
+			default:
+				// discovery: point login and uaa back at this server
+				_ = json.NewEncoder(w).Encode(map[string]any{"links": map[string]any{
+					"login":   map[string]string{"href": "http://" + r.Host},
+					"uaa":     map[string]string{"href": "http://" + r.Host},
+					"app_ssh": map[string]any{"meta": map[string]string{"oauth_client": "ssh"}},
+				}})
+			}
+		}))
+		t.Cleanup(srv.Close)
+
+		labels := fmt.Sprintf(`{"Org Name":"org","Org ID":"org-guid","API Endpoint":%q}`, srv.URL)
+		c := CloudFoundryOrganization{btp: btp.Client{
+			Credential: &btp.Credentials{UserCredential: &btp.UserCredential{
+				Email: "admin@example.com", Username: "u", Password: "pw",
+			}},
+			ProvisioningServiceClient: &fakes.MockProvisioningServiceClient{
+				ApiResponse: &provisioningclient.BusinessEnvironmentInstancesResponseCollection{
+					EnvironmentInstances: []provisioningclient.BusinessEnvironmentInstanceResponseObject{{Labels: &labels}},
+				},
+			},
+		}}
+		withInvalid := cr
+		withInvalid.Spec.ForProvider.Managers = []string{"unknown@example.com", "a@example.com"}
+
+		err := c.UpdateInstance(context.TODO(), withInvalid)
+		if err == nil || !strings.Contains(err.Error(), "unknown@example.com") {
+			t.Errorf("expected an error for unknown@example.com, got %v", err)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if !reflect.DeepEqual(assigned, []string{"a@example.com"}) {
+			t.Errorf("assigned managers = %v, want [a@example.com]", assigned)
 		}
 	})
 }

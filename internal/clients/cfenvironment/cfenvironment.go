@@ -22,6 +22,7 @@ const (
 	errUserFoundMultipleTimes = "user %s found multiple times"
 	errUserNotFound           = "user %s not found"
 	errRoleUpdateFailed       = "role update failed with status code %d"
+	errAddManager             = "could not assign manager %s"
 	errLogin                  = "cloud not login to cloud foundry"
 	errClient                 = "cloud not create cf client"
 
@@ -40,7 +41,8 @@ func (c CloudFoundryOrganization) NeedsUpdate(cr v1alpha1.CloudFoundryEnvironmen
 }
 
 // UpdateInstance assigns the configured managers that are missing in the Cloud Foundry org. It finishes the manager
-// assignment of a failed create, other drift is not reconciled.
+// assignment of a failed create, other drift is not reconciled. Every missing manager is tried, so an invalid entry does
+// not block the valid ones, and the failures are returned together.
 func (c CloudFoundryOrganization) UpdateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
 	missing := c.missingManagers(cr)
 	if len(missing) == 0 {
@@ -58,13 +60,14 @@ func (c CloudFoundryOrganization) UpdateInstance(ctx context.Context, cr v1alpha
 	if err != nil {
 		return err
 	}
+	var errs []error
 	for _, managerEntry := range missing {
 		username, origin := parseManagerString(managerEntry)
 		if err := cloudFoundryClient.addManager(ctx, username, origin); err != nil {
-			return err
+			errs = append(errs, errors.Wrapf(err, errAddManager, managerEntry))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // missingManagers returns the configured managers that are not among the observed managers. The admin user is skipped,
