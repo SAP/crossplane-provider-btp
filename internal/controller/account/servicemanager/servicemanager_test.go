@@ -24,6 +24,9 @@ var (
 	errTracking = errors.New("trackingError")
 )
 
+// ptrTime returns a pointer to a metav1.Time for use as DeletionTimestamp in tests.
+func ptrTime(t metav1.Time) *metav1.Time { return &t }
+
 // ====================================================================================
 // Resource Tracking Tests
 // ====================================================================================
@@ -111,6 +114,45 @@ func TestConnect_ResourceTracking(t *testing.T) {
 			want: want{
 				err:         nil,
 				trackCalled: true,
+			},
+		},
+		"SkipTrackingWhenDeleted": {
+			// Regression: an MR being deleted whose upstream reference has
+			// already been removed used to fail Connect() with a "not found"
+			// from Track(), which prevented Delete() from ever running and
+			// left the BTP-side instance and the finalizer in place forever.
+			reason: "should skip Track when the MR is being deleted, even if Track would error",
+			fields: fields{
+				resourcetracker: testutils.NewResourceTrackerMockWithError(errTracking),
+				newPlanIdInitializerFn: func(ctx context.Context, cr *apisv1beta1.ServiceManager) (ServiceManagerPlanIdInitializer, error) {
+					return &PlanIdInitializerMock{}, nil
+				},
+				newClientInitalizerFn: func() sm.ITfClientInitializer {
+					return &TfClientInitializerMock{}
+				},
+			},
+			args: args{
+				mg: &apisv1beta1.ServiceManager{
+					ObjectMeta: metav1.ObjectMeta{
+						DeletionTimestamp: ptrTime(metav1.Now()),
+					},
+					Spec: apisv1beta1.ServiceManagerSpec{
+						ForProvider: apisv1beta1.ServiceManagerParameters{
+							SubaccountGuid: "test-guid",
+						},
+					},
+					Status: apisv1beta1.ServiceManagerStatus{
+						AtProvider: apisv1beta1.ServiceManagerObservation{
+							DataSourceLookup: &apisv1beta1.DataSourceLookup{
+								ServiceManagerPlanID: "plan-id",
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				err:         nil,
+				trackCalled: false,
 			},
 		},
 	}
