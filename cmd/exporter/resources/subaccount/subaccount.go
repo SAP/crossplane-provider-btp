@@ -94,6 +94,19 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 
 	// Keep only selected subaccounts in the cache.
 	cache.KeepSelectedOnly(selectedSubaccounts)
+
+	// Fetch the current administrators for each selected subaccount from the
+	// "Subaccount Administrator" role collection. A lookup failure for a single
+	// subaccount must not abort the whole export; convert will warn on empty admins.
+	for _, sa := range cache.All() {
+		admins, err := btpClient.GetSubaccountAdmins(ctx, sa.GUID)
+		if err != nil {
+			slog.WarnContext(ctx, "Failed to get subaccount admins", "subaccount", sa.GUID, "error", err)
+			continue
+		}
+		sa.Admins = admins
+	}
+
 	subaccountCache = cache
 
 	return subaccountCache, nil
@@ -120,6 +133,10 @@ func GetK8sResourceNameByID(ctx context.Context, btpClient *btpcli.BtpCli, id st
 type subaccount struct {
 	*btpcli.Subaccount
 	*yaml.ResourceWithComment
+
+	// Admins holds the usernames assigned to the "Subaccount Administrator"
+	// role collection, populated in Get().
+	Admins []string
 }
 
 var _ resources.BtpResource = &subaccount{}
