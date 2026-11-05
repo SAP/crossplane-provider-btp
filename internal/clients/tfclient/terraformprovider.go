@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
@@ -31,54 +32,111 @@ const (
 	headerCLIBackendStatus = "X-Cpcli-Backend-Status"
 )
 
-// terraformProvider integrates the Terraform BTP provider with Crossplane.
-// It forwards framework capabilities and optionally reuses configured clients.
-// Its CLI transport provides request logging and evicts shared sessions on 401.
+// poolConfig is the sizing/expiry policy for the session pool. size is the knob
+// that spans both historical extremes and the new middle:
+//
+//	0  -> pool disabled; a fresh client per reconcile (old reuse=false).
+//	1  -> one shared warmed session funnelling through its mutex (old reuse=true).
+//	>=2 -> the pool.
+type poolConfig struct {
+	size int
+	ttl  time.Duration
+	now  func() time.Time // injectable clock; defaults to time.Now
+}
+
+func (c poolConfig) clock() time.Time {
+	if c.now != nil {
+		return c.now()
+	}
+	return time.Now()
+}
+
+// terraformProvider integrates the Terraform BTP provider with Crossplane. It
+// forwards framework capabilities and keeps a bounded pool of warmed, reusable
+// sessions per global-account key. Its CLI transport logs requests, captures each
+// slot's session id, and marks a slot dirty when its session is terminated (401).
 type terraformProvider struct {
 	fwprovider.Provider // forwards Metadata/Schema/Resources/DataSources
 
-	reuseSessions bool
+	cfg poolConfig
 
-	mu      sync.Mutex
-	entries map[string]*cacheEntry
+	mu       sync.Mutex
+	pools    map[string]*sessionPool // keyed by raw provider config (= GA creds)
+	sessions map[string]*sessionSlot // session id -> slot, for 401 dirty lookup
 }
 
-// cacheEntry: once.Do collapses concurrent reconciles for the same key to one login.
-type cacheEntry struct {
-	once      sync.Once
+// sessionPool is the per-GA ring of warmed sessions handed out round-robin.
+type sessionPool struct {
+	subdomain string
+	next      atomic.Uint64
+	slots     []*sessionSlot
+}
+
+func (p *sessionPool) pick() *sessionSlot {
+	i := p.next.Add(1) - 1
+	return p.slots[int(i%uint64(len(p.slots)))]
+}
+
+// sessionSlot holds one warmed session. once logged in, resp is reused until the
+// slot is dirty (server killed the session) or past its TTL, when it re-warms.
+type sessionSlot struct {
+	subdomain string
+
+	mu        sync.Mutex
 	resp      *fwprovider.ConfigureResponse
-	subdomain string // globalaccount from config; eviction index
+	createdAt time.Time
+	sessionID string
+	dirty     atomic.Bool
 }
 
-func newTerraformProvider(inner fwprovider.Provider, reuseSessions bool) *terraformProvider {
+func newTerraformProvider(inner fwprovider.Provider, cfg poolConfig) *terraformProvider {
 	return &terraformProvider{
-		Provider:      inner,
-		reuseSessions: reuseSessions,
-		entries:       map[string]*cacheEntry{},
+		Provider: inner,
+		cfg:      cfg,
+		pools:    map[string]*sessionPool{},
+		sessions: map[string]*sessionSlot{},
 	}
 }
 
 // newBTPFrameworkProvider always uses the integration wrapper and logging transport.
-func newBTPFrameworkProvider(reuseSessions bool) fwprovider.Provider {
-	p := newTerraformProvider(nil, reuseSessions)
-	base := http.DefaultTransport
+func newBTPFrameworkProvider(cfg poolConfig) fwprovider.Provider {
+	p := newTerraformProvider(nil, cfg)
+	var base http.RoundTripper
 	if btp.IsDebug() {
 		base = btp.DebugPrintHTTPClient().Transport
+	} else {
+		base = tunedTransport(cfg.size)
 	}
 	hc := &http.Client{Transport: &cliTransport{
-		base:     base,
-		evictSub: p.evictBySubdomain,
-		evictAll: p.evictAll,
-		log:      logging.NewLogrLogger(zap.New(zap.UseDevMode(btp.IsDebug())).WithName("crossplane-provider-btp-cli")),
+		base:      instrumentedTransport(base),
+		capture:   p.recordSessionFromCtx,
+		markDirty: p.markDirtyBySession,
+		log:       logging.NewLogrLogger(zap.New(zap.UseDevMode(btp.IsDebug())).WithName("crossplane-provider-btp-cli")),
 	}}
 	p.Provider = tfprovider.NewWithClient(hc)
 	return p
 }
 
+// tunedTransport clones DefaultTransport and lifts MaxIdleConnsPerHost to the pool
+// size so N concurrent sessions keep N keep-alive connections instead of churning
+// TLS handshakes against DefaultTransport's per-host idle cap of 2.
+func tunedTransport(size int) http.RoundTripper {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	n := size
+	if n < 2 {
+		n = 2
+	}
+	t.MaxIdleConnsPerHost = n
+	if t.MaxIdleConns < n {
+		t.MaxIdleConns = n
+	}
+	return t
+}
+
 func (p *terraformProvider) Configure(ctx context.Context, req fwprovider.ConfigureRequest, resp *fwprovider.ConfigureResponse) {
-	if !p.reuseSessions {
-		// Terraform Configure creates a new client/session in response data.
-		// Each connector keeps its own response; nothing enters the shared cache.
+	if p.cfg.size <= 0 {
+		// Pool disabled: Terraform Configure creates a new client/session per
+		// reconcile. Nothing is cached.
 		p.Provider.Configure(ctx, req, resp)
 		return
 	}
@@ -86,44 +144,88 @@ func (p *terraformProvider) Configure(ctx context.Context, req fwprovider.Config
 	// Raw config as key: schema-agnostic, so it can't drift when the provider
 	// adds an attribute, and it covers every field a login branches on.
 	key := fmt.Sprintf("%v", req.Config.Raw)
+	pool := p.poolFor(ctx, req, key)
+	p.warm(ctx, req, pool.pick(), resp)
+}
 
+func (p *terraformProvider) poolFor(ctx context.Context, req fwprovider.ConfigureRequest, key string) *sessionPool {
 	p.mu.Lock()
-	e, ok := p.entries[key]
-	if !ok {
-		e = &cacheEntry{}
-		p.entries[key] = e
+	defer p.mu.Unlock()
+	pool, ok := p.pools[key]
+	if ok {
+		return pool
 	}
-	p.mu.Unlock()
-
-	e.once.Do(func() {
-		p.Provider.Configure(ctx, req, resp)
-		if resp.Diagnostics.HasError() {
-			// Drop the entry so the next reconcile retries instead of caching an error.
-			p.mu.Lock()
-			delete(p.entries, key)
-			p.mu.Unlock()
-			return
-		}
-		// Copy without Diagnostics so a later hit doesn't replay stale warnings.
-		e.resp = &fwprovider.ConfigureResponse{
-			ResourceData:          resp.ResourceData,
-			DataSourceData:        resp.DataSourceData,
-			ListResourceData:      resp.ListResourceData,
-			ActionData:            resp.ActionData,
-			EphemeralResourceData: resp.EphemeralResourceData,
-		}
-		var sd types.String
-		req.Config.GetAttribute(ctx, path.Root("globalaccount"), &sd)
-		e.subdomain = sd.ValueString()
-	})
-
-	if e.resp != nil {
-		resp.ResourceData = e.resp.ResourceData
-		resp.DataSourceData = e.resp.DataSourceData
-		resp.ListResourceData = e.resp.ListResourceData
-		resp.ActionData = e.resp.ActionData
-		resp.EphemeralResourceData = e.resp.EphemeralResourceData
+	var sd types.String
+	req.Config.GetAttribute(ctx, path.Root("globalaccount"), &sd)
+	subdomain := sd.ValueString()
+	pool = &sessionPool{subdomain: subdomain, slots: make([]*sessionSlot, p.cfg.size)}
+	for i := range pool.slots {
+		pool.slots[i] = &sessionSlot{subdomain: subdomain}
 	}
+	p.pools[key] = pool
+	poolSize.WithLabelValues(subdomain).Set(float64(p.cfg.size))
+	return pool
+}
+
+// warm returns the slot's cached session, logging in (or re-logging-in) when the
+// slot is empty, dirty, or past its TTL. The login ctx carries the slot so the CLI
+// transport can bind the new session id to it.
+func (p *terraformProvider) warm(ctx context.Context, req fwprovider.ConfigureRequest, s *sessionSlot, resp *fwprovider.ConfigureResponse) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.resp != nil && !s.dirty.Load() && !p.expired(s) {
+		poolCheckouts.WithLabelValues(s.subdomain).Inc()
+		assignResp(resp, s.resp)
+		return
+	}
+
+	if s.resp != nil { // replacing an existing session: record why
+		reason := "ttl"
+		if s.dirty.Load() {
+			reason = "dirty"
+		}
+		poolEvictions.WithLabelValues(s.subdomain, reason).Inc()
+	}
+	p.forgetSession(s)
+
+	var out fwprovider.ConfigureResponse
+	p.Provider.Configure(withSlot(ctx, s), req, &out)
+	if out.Diagnostics.HasError() {
+		// Surface the error and leave the slot empty so the next reconcile retries.
+		s.resp = nil
+		resp.Diagnostics = out.Diagnostics
+		return
+	}
+	// Copy without Diagnostics so a later hit doesn't replay stale warnings.
+	s.resp = &fwprovider.ConfigureResponse{
+		ResourceData:          out.ResourceData,
+		DataSourceData:        out.DataSourceData,
+		ListResourceData:      out.ListResourceData,
+		ActionData:            out.ActionData,
+		EphemeralResourceData: out.EphemeralResourceData,
+	}
+	s.createdAt = p.cfg.clock()
+	if s.dirty.CompareAndSwap(true, false) {
+		poolDirty.WithLabelValues(s.subdomain).Dec()
+	}
+	poolLogins.WithLabelValues(s.subdomain).Inc()
+	assignResp(resp, s.resp)
+}
+
+func assignResp(dst, src *fwprovider.ConfigureResponse) {
+	dst.ResourceData = src.ResourceData
+	dst.DataSourceData = src.DataSourceData
+	dst.ListResourceData = src.ListResourceData
+	dst.ActionData = src.ActionData
+	dst.EphemeralResourceData = src.EphemeralResourceData
+}
+
+func (p *terraformProvider) expired(s *sessionSlot) bool {
+	if p.cfg.ttl <= 0 {
+		return false
+	}
+	return p.cfg.clock().Sub(s.createdAt) > p.cfg.ttl
 }
 
 // Functions forwards to the inner provider
@@ -150,49 +252,87 @@ func (p *terraformProvider) Actions(ctx context.Context) []func() action.Action 
 	return nil
 }
 
-// evictBySubdomain drops cached sessions for a subdomain so the next reconcile re-authenticates.
-func (p *terraformProvider) evictBySubdomain(subdomain string) {
-	if subdomain == "" {
+// slotCtxKey tags a login ctx with the slot it is warming.
+type slotCtxKey struct{}
+
+func withSlot(ctx context.Context, s *sessionSlot) context.Context {
+	return context.WithValue(ctx, slotCtxKey{}, s)
+}
+
+func slotFromCtx(ctx context.Context) *sessionSlot {
+	s, _ := ctx.Value(slotCtxKey{}).(*sessionSlot)
+	return s
+}
+
+// recordSessionFromCtx binds the session id from a login response to the slot that
+// triggered the login (carried on the request ctx), indexing it for 401 lookup.
+func (p *terraformProvider) recordSessionFromCtx(ctx context.Context, resp *http.Response) {
+	s := slotFromCtx(ctx)
+	if s == nil || resp == nil {
+		return
+	}
+	id := resp.Header.Get(headerCLISessionId)
+	if id == "" {
 		return
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	for k, e := range p.entries {
-		if e.subdomain == subdomain {
-			delete(p.entries, k)
-		}
+	if s.sessionID != "" {
+		delete(p.sessions, s.sessionID)
+	}
+	s.sessionID = id
+	p.sessions[id] = s
+}
+
+func (p *terraformProvider) forgetSession(s *sessionSlot) {
+	if s.sessionID == "" {
+		return
+	}
+	p.mu.Lock()
+	delete(p.sessions, s.sessionID)
+	p.mu.Unlock()
+	s.sessionID = ""
+}
+
+// markDirtyBySession flags the slot owning sessionID so its dead session is dropped
+// and re-warmed on the next checkout. In-flight ops keep their own reference; the
+// session is never logged out here (GC-only reclaim).
+func (p *terraformProvider) markDirtyBySession(sessionID string) {
+	p.mu.Lock()
+	s := p.sessions[sessionID]
+	p.mu.Unlock()
+	if s == nil {
+		return
+	}
+	if s.dirty.CompareAndSwap(false, true) {
+		poolDirty.WithLabelValues(s.subdomain).Inc()
+		poolEvictions.WithLabelValues(s.subdomain, "dirty").Inc()
 	}
 }
 
-// evictAll is the fallback when a 401 carries a session ID but no subdomain header.
-func (p *terraformProvider) evictAll() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.entries = map[string]*cacheEntry{}
-}
-
-// cliTransport is the single injection point for all CLI/TF requests. It evicts the session on
-// 401 (so a transient auth failure can't permanently poison the cache) and logs failures with
-// enough context to diagnose a CLI-server outage
+// cliTransport is the single injection point for all CLI/TF requests. It binds a
+// slot's session id on login, marks a slot dirty on a 401 (so a terminated session
+// can't be reused), and logs failures with enough context to diagnose a CLI-server
+// outage.
 type cliTransport struct {
-	base     http.RoundTripper
-	evictSub func(subdomain string)
-	evictAll func()
-	log      logging.Logger
+	base      http.RoundTripper
+	capture   func(ctx context.Context, resp *http.Response)
+	markDirty func(sessionID string)
+	log       logging.Logger
 }
 
 func (t *cliTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	start := time.Now()
 	resp, err := t.base.RoundTrip(r)
 	t.logResult(r, resp, err, time.Since(start))
+
+	if t.capture != nil {
+		t.capture(r.Context(), resp)
+	}
 	// The session-id check skips login POSTs (no session headers), so a bad-creds
 	// login 401 can't evict a valid entry.
-	if resp != nil && resp.StatusCode == http.StatusUnauthorized && r.Header.Get(headerCLISessionId) != "" {
-		if sd := r.Header.Get(headerCLISubdomain); sd != "" {
-			t.evictSub(sd)
-		} else {
-			t.evictAll()
-		}
+	if t.markDirty != nil && resp != nil && resp.StatusCode == http.StatusUnauthorized && r.Header.Get(headerCLISessionId) != "" {
+		t.markDirty(r.Header.Get(headerCLISessionId))
 	}
 	return resp, err
 }
