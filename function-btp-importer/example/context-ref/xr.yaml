@@ -1,0 +1,9 @@
+---
+apiVersion: example.crossplane.io/v1
+kind: XBTPResources
+metadata:
+  name: my-workload-xr
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+spec: {}
