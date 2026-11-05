@@ -59,6 +59,11 @@ const (
 	// defaultClusterPrefix matches xp-testing's defaultPrefix used for the
 	// reused-cluster name.
 	defaultClusterPrefix = "e2e"
+
+	// kindNodeImageTagEnv is the image tag used for the Kind node image. The
+	// Makefile exports this value so local and CI E2E runs use the same image.
+	kindNodeImageTagEnv     = "KIND_NODE_IMAGE_TAG"
+	defaultKindNodeImageTag = "v1.37.0"
 )
 
 var (
@@ -143,7 +148,11 @@ func SetupClusterWithCrossplane(namespace string) {
 		xpenvfuncs.ValidateTestSetup(xpenvfuncs.ValidateTestSetupOptions{
 			CrossplaneVersion: crossplaneVersion,
 		}),
-		envfuncs.CreateCluster(&kind.Cluster{}, clusterName),
+		envfuncs.CreateClusterWithOpts(
+			&kind.Cluster{},
+			clusterName,
+			kind.WithImage("kindest/node:"+resolveKindNodeImageTag()),
+		),
 		// Conditional matches Configure's behavior: when reusing an existing
 		// cluster we skip the install steps. We always install on a fresh
 		// cluster (firstSetup=true) and skip when reusing. We do not have a
@@ -178,6 +187,16 @@ func SetupClusterWithCrossplane(namespace string) {
 		xpenvfuncs.DumpLogs(clusterName, "post-tests"),
 		xpenvfuncs.Conditional(envfuncs.DestroyCluster(clusterName), !reuseCluster),
 	)
+}
+
+// resolveKindNodeImageTag returns the configured Kind node image tag. Keep a
+// default here for direct `go test -tags=e2e` invocations that do not go
+// through the Makefile.
+func resolveKindNodeImageTag() string {
+	if tag := os.Getenv(kindNodeImageTagEnv); tag != "" {
+		return tag
+	}
+	return defaultKindNodeImageTag
 }
 
 // resolveClusterName mirrors xp-testing's setup.clusterName logic so that the
