@@ -69,11 +69,12 @@ func (c *Client) CreateCloudFoundryEnvironmentAndGetOrg(
 		return "", nil, err
 	}
 
+	// The instance exists in CIS from here on, so the ID is returned even if the org lookup fails.
 	cfOrg, err := c.GetCloudFoundryOrg(ctx, instanceId)
 	if err != nil {
-		return "", nil, err
+		return instanceId, nil, err
 	}
-	return instanceId, cfOrg, err
+	return instanceId, cfOrg, nil
 }
 
 func (c *Client) GetCloudFoundryOrg(
@@ -186,4 +187,34 @@ func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 		Name:        labels["Org Name"],
 		ApiEndpoint: labels["API Endpoint"],
 	}, nil
+}
+
+// GetCFEnvironmentByResourceUID finds the Cloud Foundry environment instance that was created for the resource with the
+// given UID. Create stores the UID in the instance parameters, so it identifies environments created by this resource.
+func (c *Client) GetCFEnvironmentByResourceUID(
+	ctx context.Context, resourceUID string,
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	if resourceUID == "" {
+		return nil, nil
+	}
+	envInstances, err := c.ListCFEnvironments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, instance := range envInstances {
+		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
+			continue
+		}
+		if instance.Id == nil || instance.Parameters == nil {
+			continue
+		}
+		var parameters map[string]interface{}
+		if err := json.Unmarshal([]byte(*instance.Parameters), &parameters); err != nil {
+			continue // skip invalid JSON
+		}
+		if parameters[v1alpha1.SubaccountOperatorLabel] == resourceUID {
+			return &instance, nil
+		}
+	}
+	return nil, nil
 }
