@@ -19,6 +19,7 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
   - [Export Command](#export-command)
 - [Supported Resource Kinds](#supported-resource-kinds)
   - [Subaccount](#subaccount)
+  - [Subscription](#subscription)
   - [Entitlement](#entitlement)
   - [Service Instance](#service-instance)
   - [Cloud Foundry Environment](#cloud-foundry-environment)
@@ -243,6 +244,41 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind subacco
 
 # Export all subaccounts matching a pattern
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind subaccount --subaccount '.*dev.*'
+```
+
+---
+
+### Subscription
+
+Exports existing application subscriptions from selected BTP subaccounts.
+
+**Kind name:** `subscription`
+
+**CLI flag:** `--subscription <value>`
+
+**Selection criteria:**
+- BTP subscription GUID (exact match)
+- Regex expression matching the technical `appName` or `planName`
+
+**Notes:**
+- Applications in `NOT_SUBSCRIBED` state are excluded.
+- For selected applications reporting `supportsGetParameters: true`, the exporter retrieves parameters with `btp get accounts/subscription --show-parameters true` and includes them in `spec.forProvider.parameters`. This requires one additional CLI call per supported subscription.
+- If parameter retrieval is unsupported or fails, parameters remain `null`. Retrieval failures produce a warning and the subscription is still exported.
+
+
+**Example:**
+```bash
+# Export a specific subscription by subscription ID
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind subscription \
+  --subscription <subscription-id> \
+  --resolve-references
+# Export all subscriptions from one subaccount
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind subscription \
+  --subaccount <subaccount-id> 
+  --subscription '.*' \
+  --resolve-references
 ```
 
 ---
