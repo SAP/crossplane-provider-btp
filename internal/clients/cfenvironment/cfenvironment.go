@@ -179,6 +179,14 @@ func (c CloudFoundryOrganization) createClient(environment *provisioningclient.B
 		return nil, err
 	}
 
+	// CF org provisioning is async: CIS accepts the create and returns an instance ID before the org
+	// is fully ready. Until provisioning completes, labels["API Endpoint"] is empty. Passing an empty
+	// URL to newOrganizationClient causes go-cfclient to GET "" → "unsupported protocol scheme """.
+	// Return nil so getManagers skips manager reconciliation until the next reconcile when the org is ready.
+	if org.ApiEndpoint == "" {
+		return nil, nil
+	}
+
 	cloudFoundryClient, err := newOrganizationClient(
 		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
 		c.btp.Credential.UserCredential.Password, c.btp.Credential.UserCredential.Idp,
