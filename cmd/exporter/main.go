@@ -15,6 +15,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/cfenvironment"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directoryentitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebinding"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"
@@ -75,16 +76,6 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 	// Explicit authentication can be done by a separate `login` command or by BTP CLI's `login` command.
 	btpClient := btpcli.NewClient(paramBtpCliPath.Value())
 
-	// Select the source subaccount before asking which resource kinds to export.
-	// Other exporters reuse this cached selection.
-	selectedSubaccountCount, err := getSelectedSubaccountCount(ctx, btpClient)
-	if err != nil {
-		return erratt.Errorf("cannot retrieve and select subaccounts: %w", err)
-	}
-	if err := validateExportAllSubaccountSelection(paramAll.Value(), selectedSubaccountCount); err != nil {
-		return erratt.Errorf("invalid export selection: %w", err)
-	}
-
 	// Determine which kinds the user would like to have exported.
 	var selectedResources []string
 	if paramAll.Value() {
@@ -97,6 +88,22 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 		}
 	}
 	slog.Debug("Kinds selected", "kinds", selectedResources)
+
+	// Directory-only exports have their own source selector and do not need
+	// subaccount access. Other exporters reuse the cached subaccount selection.
+	for _, kind := range selectedResources {
+		if kind == directoryentitlement.KindName {
+			continue
+		}
+		selectedSubaccountCount, err := getSelectedSubaccountCount(ctx, btpClient)
+		if err != nil {
+			return erratt.Errorf("cannot retrieve and select subaccounts: %w", err)
+		}
+		if err := validateExportAllSubaccountSelection(paramAll.Value(), selectedSubaccountCount); err != nil {
+			return erratt.Errorf("invalid export selection: %w", err)
+		}
+		break
+	}
 
 	// Export selected kinds.
 	options := resources.Options{

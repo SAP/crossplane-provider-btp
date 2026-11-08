@@ -17,6 +17,7 @@ const (
 	WarnMissingServiceName            = "WARNING: service name is missing"
 	WarnMissingServicePlanName        = "WARNING: service plan name is missing"
 	WarnMissingSubaccountGuid         = "WARNING: subaccount ID is missing"
+	WarnMissingDirectoryGuid          = "WARNING: directory ID is missing"
 	WarnMissingBindingId              = "WARNING: binding ID is missing"
 	WarnTooManyBindingIDs             = "WARNING: one binding ID expected, got: %d"
 	WarnMissingInstanceId             = "WARNING: service instance ID is missing"
