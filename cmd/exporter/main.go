@@ -15,6 +15,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/cfenvironment"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directory"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebinding"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"

@@ -27,6 +27,7 @@ const (
 	WarnUndefinedExternalName         = "WARNING: could not generate a valid external name"
 	WarnUnsupportedEntityType         = "WARNING: only 'SUBACCOUNT' entity type is supported for Entitlement resources"
 	WarnCannotResolveSubaccount       = "WARNING: cannot resolve subaccount ID to a resource name"
+	WarnCannotResolveDirectory        = "WARNING: cannot resolve directory ID to a resource name"
 	WarnServiceInstanceNotUsable      = "WARNING: service instance is not in a usable state"
 	WarnNotServiceManager             = "WARNING: the service instance is not a service manager instance"
 	WarnNotCloudManagement            = "WARNING: the service instance is not a cloud management instance"
