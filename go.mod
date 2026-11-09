@@ -1,6 +1,6 @@
 module github.com/sap/crossplane-provider-btp
 
-go 1.27.2
+go 1.27.3
 
 tool golang.org/x/tools/cmd/goimports
 
@@ -241,7 +241,7 @@ require (
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260924152758-ed294f943157 // indirect
 	golang.org/x/term v0.47.0 // indirect
