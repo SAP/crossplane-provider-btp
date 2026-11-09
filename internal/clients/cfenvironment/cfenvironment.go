@@ -2,14 +2,18 @@ package environments
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	cfv3 "github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/btp"
@@ -107,6 +111,14 @@ func (c CloudFoundryOrganization) DescribeInstance(
 
 	managers, err := c.getManagers(ctx, environment)
 	if err != nil {
+		labelKeys, labelsJSONValid, apiEndpointLabelRecognized, apiEndpointLabelNonEmpty := cloudFoundryLabelDiagnostics(environment.Labels)
+		log.FromContext(ctx).Info("failed to observe Cloud Foundry environment managers",
+			"labelKeys", labelKeys,
+			"labelsJSONValid", labelsJSONValid,
+			"apiEndpointLabelRecognized", apiEndpointLabelRecognized,
+			"apiEndpointLabelNonEmpty", apiEndpointLabelNonEmpty,
+			"error", err.Error(),
+		)
 		return nil, nil, err
 	}
 
@@ -151,6 +163,33 @@ func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling
 		return nil, err
 	}
 	return environment, nil
+}
+
+// cloudFoundryLabelDiagnostics reports label keys and whether a recognized API endpoint is present,
+// without logging label values that may contain customer data.
+func cloudFoundryLabelDiagnostics(labels *string) (keys []string, jsonValid, apiEndpointRecognized, apiEndpointNonEmpty bool) {
+	if labels == nil {
+		return nil, true, false, false
+	}
+
+	var parsed map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(*labels), &parsed); err != nil {
+		return nil, false, false, false
+	}
+
+	for key, value := range parsed {
+		keys = append(keys, key)
+		if key != "API Endpoint" && key != "API Endpoint:" {
+			continue
+		}
+		apiEndpointRecognized = true
+		var endpoint string
+		if json.Unmarshal(value, &endpoint) == nil && endpoint != "" {
+			apiEndpointNonEmpty = true
+		}
+	}
+	sort.Strings(keys)
+	return keys, true, apiEndpointRecognized, apiEndpointNonEmpty
 }
 
 func (c CloudFoundryOrganization) getManagers(ctx context.Context, environment *provisioningclient.BusinessEnvironmentInstanceResponseObject) ([]v1alpha1.User, error) {

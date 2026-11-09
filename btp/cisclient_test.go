@@ -205,6 +205,30 @@ func TestCloudFoundryOrgByLabel(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Mixed format with legacy Org ID key",
+			args: args{
+				labels: `{"Org ID:":"id", "Org Name":"test-name", "API Endpoint":"api-endpoint"}`,
+			},
+			want: &CloudFoundryOrg{
+				Id:          "id",
+				Name:        "test-name",
+				ApiEndpoint: "api-endpoint",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Mixed format with legacy API Endpoint key",
+			args: args{
+				labels: `{"Org ID":"id", "Org Name":"test-name", "API Endpoint:":"api-endpoint"}`,
+			},
+			want: &CloudFoundryOrg{
+				Id:          "id",
+				Name:        "test-name",
+				ApiEndpoint: "api-endpoint",
+			},
+			wantErr: false,
+		},
+		{
 			name: "Invalid JSON",
 			args: args{
 				labels: `{"Org ID":"id", "Org Name":"test-name", "API Endpoint":}`,
