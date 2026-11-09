@@ -1,0 +1,17 @@
+name: Trivy Scan
+
+on:
+  schedule:
+    - cron: '37 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  run-trivy-scan:
+    # TODO: switch to SAP/crossplane-shared-workflows once check-trivy-scan.lib.yaml lives there
+    uses: ./.github/workflows/check-trivy-scan.lib.yaml
+    with:
+      image-name: provider-btp

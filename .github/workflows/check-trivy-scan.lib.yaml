@@ -1,0 +1,87 @@
+# Reusable workflow: builds the provider image and scans it with Trivy.
+#
+# The image is built with the same `make build` used for releases (linux_amd64
+# only), so the scan covers exactly what ships: the distroless base layer and
+# the Go modules + stdlib embedded in the provider binary.
+#
+# Results are uploaded as SARIF to the repository's code scanning alerts
+# (Security tab), where they are deduplicated and closed automatically once a
+# vulnerability is no longer found.
+#
+# The job does not fail on findings; it is meant for reporting, not gating.
+
+name: check-trivy-scan
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        description: 'Name of the provider image as listed in IMAGES in the Makefile, e.g. provider-btp'
+        type: string
+        required: true
+      severity:
+        description: 'Comma-separated severities to report'
+        type: string
+        default: 'HIGH,CRITICAL'
+      ignore-unfixed:
+        description: 'Skip vulnerabilities that have no fixed version yet'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  check-trivy-scan:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_REF: trivy-scan/${{ inputs.image-name }}-amd64
+    steps:
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      with:
+        version: v0.37.2
+
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        submodules: true
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+
+    - name: Build Image
+      run: make build PLATFORM=linux_amd64 BUILD_REGISTRY=trivy-scan
+
+    - name: Run Trivy
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: image
+        image-ref: ${{ env.IMAGE_REF }}
+        scanners: vuln
+        severity: ${{ inputs.severity }}
+        ignore-unfixed: ${{ inputs.ignore-unfixed }}
+        format: json
+        output: trivy-results.json
+        exit-code: '0'
+      env:
+        # mirror.gcr.io avoids ghcr.io rate limits on the vulnerability DB
+        TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2
+        TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1
+
+    - name: Print Findings
+      run: trivy convert --format table trivy-results.json
+
+    - name: Convert to SARIF
+      run: trivy convert --format sarif --output trivy-results.sarif trivy-results.json
+
+    - name: Upload SARIF
+      uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+      with:
+        sarif_file: trivy-results.sarif
+        category: trivy-image
+
