@@ -25,7 +25,8 @@ func TestConvertKymaEnvResource(t *testing.T) {
 	cmName := "cloud-management-ref"
 	planName := "aws"
 	name := "kyma-name"
-	resourceName := name // See GenerateK8sResourceName - is it enough to just have the name as k8s resource name?
+	resourceName := name + ".x" + envID
+	// note: the "x" comes from parsen, as every label has to start with a letter
 
 	// convertKymaEnvResource always marshals the (empty) EnvironmentInstance
 	// Parameters into ForProvider.Parameters, which yields "{}".
@@ -150,7 +151,7 @@ func TestConvertKymaEnvResource(t *testing.T) {
 							APIVersion: v1alpha1.SchemeGroupVersion.String(),
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: resourceName,
+							Name: resources.UndefinedName,
 							Annotations: map[string]string{
 								"crossplane.io/external-name": resources.UndefinedExternalName,
 							},
@@ -169,12 +170,13 @@ func TestConvertKymaEnvResource(t *testing.T) {
 							ClusterManagedResourceSpec: xpv2.ClusterManagedResourceSpec{
 								ManagementPolicies: []xpv2.ManagementAction{xpv2.ManagementActionObserve},
 								WriteConnectionSecretToReference: &xpv2.SecretReference{
-									Name:      resourceName,
+									Name:      resources.UndefinedName,
 									Namespace: resources.DefaultSecretNamespace,
 								},
 							},
 						},
 					})
+				rwc.AddComment(resources.WarnUndefinedResourceName)
 				rwc.AddComment(resources.WarnUndefinedExternalName)
 				return rwc
 			}(),

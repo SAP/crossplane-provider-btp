@@ -160,10 +160,11 @@ func (e *KymaEnvironment) GetExternalName() string {
 }
 
 func (e *KymaEnvironment) GenerateK8sResourceName() string {
-	if e.GetDisplayName() == "" {
+	if e.GetDisplayName() == "" || e.GetID() == "" {
 		return resources.UndefinedName
 	}
-	resourceName, err := resources.GenerateK8sResourceName("", e.GetDisplayName())
+	name := fmt.Sprintf("%s.%s", e.GetDisplayName(), e.GetID())
+	resourceName, err := resources.GenerateK8sResourceName("", name)
 	if err != nil {
 		e.AddComment(fmt.Sprintf("cannot generate Kyma environment resource name: %s", err))
 	}
