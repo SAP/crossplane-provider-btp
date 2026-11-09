@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: '37 4 * * *'
   workflow_dispatch:
+  # TODO: remove before merge, only here to test the workflow on the PR
+  pull_request:
 
 permissions:
   contents: read
