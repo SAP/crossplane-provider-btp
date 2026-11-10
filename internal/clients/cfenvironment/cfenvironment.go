@@ -24,6 +24,7 @@ const (
 	errRoleUpdateFailed       = "role update failed with status code %d"
 	errLogin                  = "cloud not login to cloud foundry"
 	errClient                 = "cloud not create cf client"
+	errOrgInfo                = "could not parse org info from environment labels, missing: %s"
 
 	defaultOrigin = "sap.ids"
 )
@@ -39,9 +40,54 @@ func (c CloudFoundryOrganization) NeedsUpdate(cr v1alpha1.CloudFoundryEnvironmen
 	return false
 }
 
-// UpdateInstance not needed anymore (no reconciliation wanted)
+// UpdateInstance assigns the configured managers that are missing in the Cloud Foundry org. It finishes the manager
+// assignment of a failed create, other drift is not reconciled.
 func (c CloudFoundryOrganization) UpdateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) error {
+	missing := c.missingManagers(cr)
+	if len(missing) == 0 {
+		return nil
+	}
+
+	org, err := c.btp.GetCloudFoundryOrg(ctx, meta.GetExternalName(&cr))
+	if err != nil {
+		return err
+	}
+	if org == nil {
+		return errors.New("cloud foundry org not found")
+	}
+	cloudFoundryClient, err := c.createClientWithType(org)
+	if err != nil {
+		return err
+	}
+	for _, managerEntry := range missing {
+		username, origin := parseManagerString(managerEntry)
+		if err := cloudFoundryClient.addManager(ctx, username, origin); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// missingManagers returns the configured managers that are not among the observed managers. The admin user is skipped,
+// as it is assigned by the create itself.
+func (c CloudFoundryOrganization) missingManagers(cr v1alpha1.CloudFoundryEnvironment) []string {
+	var missing []string
+	for _, managerEntry := range filterOutUser(cr.Spec.ForProvider.Managers, c.btp.Credential.UserCredential.Email) {
+		username, origin := parseManagerString(managerEntry)
+		if !hasManager(cr.Status.AtProvider.Managers, username, origin) {
+			missing = append(missing, managerEntry)
+		}
+	}
+	return missing
+}
+
+func hasManager(managers []v1alpha1.User, username, origin string) bool {
+	for _, m := range managers {
+		if strings.EqualFold(m.Username, username) && m.Origin == origin {
+			return true
+		}
+	}
+	return false
 }
 
 func NewCloudFoundryOrganization(btp btp.Client) *CloudFoundryOrganization {
@@ -74,10 +120,18 @@ func (c CloudFoundryOrganization) DescribeInstance(
 func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
 	externalName := meta.GetExternalName(&cr)
 
-	// Empty external-name check
+	// An empty external-name can also mean that a previous create reached CIS but did not record the instance ID.
+	// Create stores the resource UID in the instance parameters, so an environment carrying it was created by this
+	// resource and gets adopted instead of created a second time.
 	if externalName == "" {
-		return nil, nil
+		// Without a create attempt there is nothing to adopt, so a new resource does not list the environments.
+		if meta.GetExternalCreateFailed(&cr).IsZero() && meta.GetExternalCreatePending(&cr).IsZero() {
+			return nil, nil
+		}
+		return c.btp.GetCFEnvironmentByResourceUID(ctx, string(cr.UID))
 	}
+
+	orgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 
 	// Try GUID lookup first (new standard format)
 	if internal.IsValidUUID(externalName) {
@@ -93,7 +147,6 @@ func (c CloudFoundryOrganization) getEnvironmentByExternalNameWithLegacyHandling
 
 	// Backwards compatibility: try legacy lookup by orgName and name. Name was set as external name in v1.1.0
 	// This handles migration from v1.1.0 (orgName) and v1.0.0 (metadata.name)
-	orgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
 	environment, err := c.btp.GetCFEnvironmentByNameAndOrg(ctx, externalName, orgName)
 	if err != nil {
 		return nil, err
@@ -126,18 +179,16 @@ func (c CloudFoundryOrganization) createClient(environment *provisioningclient.B
 	if err != nil {
 		return nil, err
 	}
-
-	cloudFoundryClient, err := newOrganizationClient(
-		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
-		c.btp.Credential.UserCredential.Password, c.btp.Credential.UserCredential.Idp,
-	)
-	return cloudFoundryClient, err
+	return c.createClientWithType(org)
 }
 
 func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg) (
 	*organizationClient,
 	error,
 ) {
+	if err := validateOrg(org); err != nil {
+		return nil, err
+	}
 	cloudFoundryClient, err := newOrganizationClient(
 		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
 		c.btp.Credential.UserCredential.Password, c.btp.Credential.UserCredential.Idp,
@@ -145,6 +196,30 @@ func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg)
 	return cloudFoundryClient, err
 }
 
+// validateOrg checks that the org info extracted from the environment labels is complete. Without it a missing label
+// would only surface later as a misleading error from the CF API call, e.g. "unsupported protocol scheme".
+func validateOrg(org *btp.CloudFoundryOrg) error {
+	if org == nil {
+		return errors.Errorf(errOrgInfo, "org")
+	}
+	var missing []string
+	if org.Id == "" {
+		missing = append(missing, "Org ID")
+	}
+	if org.Name == "" {
+		missing = append(missing, "Org Name")
+	}
+	if org.ApiEndpoint == "" {
+		missing = append(missing, "API Endpoint")
+	}
+	if len(missing) > 0 {
+		return errors.Errorf(errOrgInfo, strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+// CreateInstance creates the environment and assigns the managers. If a step after the CIS create fails, the instance
+// ID is returned together with the error, so it can still be stored as external-name.
 func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error) {
 	adminServiceAccountEmail := c.btp.Credential.UserCredential.Email
 	orgName := FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
@@ -153,18 +228,22 @@ func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha
 		cr.Spec.ForProvider.Landscape, orgName, cr.Spec.ForProvider.EnvironmentName,
 	)
 	if err != nil {
-		return "", errors.Wrap(err, instanceCreateFailed)
+		// instanceId is only set once CIS accepted the create. Return it with the error so the caller can keep it.
+		return instanceId, errors.Wrap(err, instanceCreateFailed)
+	}
+	if org == nil {
+		return instanceId, errors.New(instanceCreateFailed + ": cloud foundry org not found")
 	}
 
 	cloudFoundryClient, err := c.createClientWithType(org)
 	if err != nil {
-		return "", errors.Wrap(err, instanceCreateFailed)
+		return instanceId, errors.Wrap(err, instanceCreateFailed)
 	}
 
 	for _, managerEntry := range filterOutUser(cr.Spec.ForProvider.Managers, adminServiceAccountEmail) {
 		username, origin := parseManagerString(managerEntry)
 		if err := cloudFoundryClient.addManager(ctx, username, origin); err != nil {
-			return "", errors.Wrap(err, instanceCreateFailed)
+			return instanceId, errors.Wrap(err, instanceCreateFailed)
 		}
 	}
 
@@ -215,9 +294,22 @@ type organizationClient struct {
 func (o organizationClient) addManager(ctx context.Context, username string, origin string) error {
 
 	_, err := o.c.Roles.CreateOrganizationRoleWithUsername(ctx, o.orgGuid, username, resource.OrganizationRoleManager, origin)
+	if isManagerAlreadyAssigned(err) {
+		// The user is a manager already, even if the observed managers did not list them
+		return nil
+	}
 
 	return err
 
+}
+
+// isManagerAlreadyAssigned reports whether Cloud Foundry rejected the role because the user has it already. It answers
+// with 422 CF-UnprocessableEntity (10008) and "User 'x' already has 'organization_manager' role in organization 'y'.".
+// Other errors with that code, such as an unknown user, are not matched.
+func isManagerAlreadyAssigned(err error) bool {
+	var cfErr resource.CloudFoundryError
+	return errors.As(err, &cfErr) && resource.IsUnprocessableEntityError(cfErr) &&
+		strings.Contains(cfErr.Detail, "already has '"+resource.OrganizationRoleManager.String()+"' role")
 }
 
 func (o organizationClient) getManagerUsernames(ctx context.Context) ([]v1alpha1.User, error) {

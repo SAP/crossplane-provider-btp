@@ -69,11 +69,12 @@ func (c *Client) CreateCloudFoundryEnvironmentAndGetOrg(
 		return "", nil, err
 	}
 
+	// The instance exists in CIS from here on, so the ID is returned even if the org lookup fails.
 	cfOrg, err := c.GetCloudFoundryOrg(ctx, instanceId)
 	if err != nil {
-		return "", nil, err
+		return instanceId, nil, err
 	}
-	return instanceId, cfOrg, err
+	return instanceId, cfOrg, nil
 }
 
 func (c *Client) GetCloudFoundryOrg(
@@ -151,9 +152,15 @@ func (c *Client) ExtractOrg(cfEnvironment *provisioningclient.BusinessEnvironmen
 	return NewCloudFoundryOrgByLabel(label)
 }
 
+// Label keys BTP has been observed to use for the Cloud Foundry org details. Keys may or may not carry a trailing
+// colon (:), and the variants can be mixed within a single labels object, so each key is resolved independently.
+var (
+	cfOrgIdLabelKeys       = []string{"Org ID", "Org ID:"}
+	cfOrgNameLabelKeys     = []string{"Org Name", "Org Name:"}
+	cfApiEndpointLabelKeys = []string{"API Endpoint", "API Endpoint:"}
+)
+
 // NewCloudFoundryOrgByLabel creates a CloudFoundryOrg from a JSON-formatted labels string.
-// In legacy format, the keys have a trailing colon (:), while in the new format they do not.
-// The function handles both formats.
 func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 	if rawLabels == "" {
 		return nil, errors.New("labels string is empty")
@@ -168,22 +175,56 @@ func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 		return nil, errors.New("no labels found in the provided string")
 	}
 
-	oldOrgId, oldOrgIdExists := labels["Org ID:"]
-	oldApiEndpoint, oldApiEndpointExist := labels["API Endpoint:"]
+	//missing values are validated by the callers before the org info is used
+	org := CloudFoundryOrgFromLabels(labels)
+	return &org, nil
+}
 
-	if oldOrgIdExists || oldApiEndpointExist {
-		//labels are in the old format
-		return &CloudFoundryOrg{
-			Id:          oldOrgId,
-			Name:        labels["Org Name"],
-			ApiEndpoint: oldApiEndpoint,
-		}, nil
+// CloudFoundryOrgFromLabels extracts the Cloud Foundry org details from already unmarshalled environment labels.
+// Every field is looked up on its own, accepting all known key variants. Fields without a matching label are empty.
+func CloudFoundryOrgFromLabels(labels map[string]string) CloudFoundryOrg {
+	return CloudFoundryOrg{
+		Id:          lookupLabel(labels, cfOrgIdLabelKeys),
+		Name:        lookupLabel(labels, cfOrgNameLabelKeys),
+		ApiEndpoint: lookupLabel(labels, cfApiEndpointLabelKeys),
 	}
+}
 
-	//use the new format, having empty values will be handled by the caller
-	return &CloudFoundryOrg{
-		Id:          labels["Org ID"],
-		Name:        labels["Org Name"],
-		ApiEndpoint: labels["API Endpoint"],
-	}, nil
+func lookupLabel(labels map[string]string, keys []string) string {
+	for _, key := range keys {
+		if value, ok := labels[key]; ok {
+			return value
+		}
+	}
+	return ""
+}
+
+// GetCFEnvironmentByResourceUID finds the Cloud Foundry environment instance that was created for the resource with the
+// given UID. Create stores the UID in the instance parameters, so it identifies environments created by this resource.
+func (c *Client) GetCFEnvironmentByResourceUID(
+	ctx context.Context, resourceUID string,
+) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+	if resourceUID == "" {
+		return nil, nil
+	}
+	envInstances, err := c.ListCFEnvironments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, instance := range envInstances {
+		if instance.EnvironmentType != nil && *instance.EnvironmentType != CloudFoundryEnvironmentType().Identifier {
+			continue
+		}
+		if instance.Id == nil || instance.Parameters == nil {
+			continue
+		}
+		var parameters map[string]interface{}
+		if err := json.Unmarshal([]byte(*instance.Parameters), &parameters); err != nil {
+			continue // skip invalid JSON
+		}
+		if parameters[v1alpha1.SubaccountOperatorLabel] == resourceUID {
+			return &instance, nil
+		}
+	}
+	return nil, nil
 }

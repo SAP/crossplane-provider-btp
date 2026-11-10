@@ -87,6 +87,35 @@ func TestGenerateObservation(t *testing.T) {
 			}, wantErr: false,
 		},
 		{
+			name: "assigned unique identifier plumbed into Assignable", args: args{
+				instance: &Instance{
+					EntitledServicePlan: &entClient.ServicePlanResponseObject{
+						UniqueIdentifier: internal.Ptr("entitled-uid"),
+					},
+					Assignment: &entClient.AssignedServicePlanSubaccountDTO{
+						EntityId: internal.Ptr("123"),
+					},
+					AssignedUniqueIdentifier: internal.Ptr("assigned-uid"),
+				},
+				relatedEntitlements: &v1alpha1.EntitlementList{
+					Items: entitlementSlice(),
+				},
+			}, want: &v1alpha1.EntitlementObservation{
+				Required: &v1alpha1.EntitlementSummary{
+					EntitlementsCount: internal.Ptr(0),
+				},
+				Entitled: v1alpha1.Entitled{
+					UniqueIdentifier: "entitled-uid",
+					Resources:        []*v1alpha1.Resource{},
+				},
+				Assigned: &v1alpha1.Assignable{
+					EntityID:         "123",
+					UniqueIdentifier: "assigned-uid",
+					Resources:        []*v1alpha1.Resource{},
+				},
+			}, wantErr: false,
+		},
+		{
 			name: "error merging", args: args{
 				instance: nil,
 				relatedEntitlements: &v1alpha1.EntitlementList{

@@ -49,7 +49,7 @@ func DefaultSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions, object cli
 		)
 
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
+		o.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		managed.WithPollInterval(o.PollInterval),
@@ -58,6 +58,7 @@ func DefaultSetup(mgr ctrl.Manager, o internalopts.CrossplaneOptions, object cli
 	if o.ReconcileTimeout > 0 {
 		opts = append(opts, managed.WithTimeout(o.ReconcileTimeout))
 	}
+	opts = append(opts, o.PollReconcilerOptions()...)
 
 	r := managed.NewReconciler(mgr, resource.ManagedKind(gvk), opts...)
 
@@ -83,7 +84,7 @@ func DefaultSetupWithoutDefaultInitializer(mgr ctrl.Manager, o internalopts.Cros
 		)
 
 	opts := []managed.ReconcilerOption{
-		managed.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
+		o.WithExternalConnector(connectorFn(mgr.GetClient(), usageTracker, referenceTracker)),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // NewAPIRecorder requires the legacy event recorder type.
 		managed.WithPollInterval(o.PollInterval),
@@ -93,6 +94,7 @@ func DefaultSetupWithoutDefaultInitializer(mgr ctrl.Manager, o internalopts.Cros
 	if o.ReconcileTimeout > 0 {
 		opts = append(opts, managed.WithTimeout(o.ReconcileTimeout))
 	}
+	opts = append(opts, o.PollReconcilerOptions()...)
 
 	r := managed.NewReconciler(mgr, resource.ManagedKind(gvk), opts...)
 
