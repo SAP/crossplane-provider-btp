@@ -231,6 +231,14 @@ func TestCloudFoundryOrganization_CreateInstance_KeepsInstanceID(t *testing.T) {
 		"OrgNotFound": {
 			client: &createFake{createdID: instanceID},
 		},
+		"OrgWithoutApiEndpoint": {
+			client: &createFake{
+				createdID: instanceID,
+				getResponse: &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+					Id: internal.Ptr(instanceID), Labels: internal.Ptr(`{"Org Name":"name","Org ID":"id"}`),
+				},
+			},
+		},
 		"OrgWithoutId": {
 			client: &createFake{
 				createdID: instanceID,
@@ -617,6 +625,59 @@ func TestCloudFoundryOrganization_missingManagers(t *testing.T) {
 				t.Errorf("missingManagers() = %v, want %v", got, tt.wantMissing)
 			}
 		})
+	}
+}
+
+func TestValidateOrg(t *testing.T) {
+	tests := map[string]struct {
+		org         *btp.CloudFoundryOrg
+		wantErr     bool
+		wantMissing string
+	}{
+		"Complete": {
+			org: &btp.CloudFoundryOrg{Id: "id", Name: "name", ApiEndpoint: "https://api.cf.example.com"},
+		},
+		"Nil": {
+			org:         nil,
+			wantErr:     true,
+			wantMissing: "org",
+		},
+		"MissingApiEndpoint": {
+			org:         &btp.CloudFoundryOrg{Id: "id", Name: "name"},
+			wantErr:     true,
+			wantMissing: "API Endpoint",
+		},
+		"MissingAll": {
+			org:         &btp.CloudFoundryOrg{},
+			wantErr:     true,
+			wantMissing: "Org ID, Org Name, API Endpoint",
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := validateOrg(tt.org)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("validateOrg() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err.Error() != fmt.Sprintf(errOrgInfo, tt.wantMissing) {
+				t.Errorf("validateOrg() error = %q, want %q", err.Error(), fmt.Sprintf(errOrgInfo, tt.wantMissing))
+			}
+		})
+	}
+}
+
+// A missing API endpoint label must surface as an org info error, not as an error from calling the CF API with an
+// empty URL ("unsupported protocol scheme").
+func TestCloudFoundryOrganization_getManagers_MissingApiEndpoint(t *testing.T) {
+	c := CloudFoundryOrganization{btp: btp.Client{Credential: &btp.Credentials{UserCredential: &btp.UserCredential{}}}}
+	environment := &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+		Labels: internal.Ptr(`{"Org Name":"name","Org ID":"id"}`),
+	}
+
+	_, err := c.getManagers(context.TODO(), environment)
+	want := fmt.Sprintf(errOrgInfo, "API Endpoint")
+	if err == nil || err.Error() != want {
+		t.Errorf("getManagers() error = %v, want %q", err, want)
 	}
 }
 
