@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	cfv3 "github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/config"
@@ -24,6 +25,7 @@ const (
 	errRoleUpdateFailed       = "role update failed with status code %d"
 	errLogin                  = "cloud not login to cloud foundry"
 	errClient                 = "cloud not create cf client"
+	errOrgInfo                = "could not parse org info from environment labels, missing: %s"
 
 	defaultOrigin = "sap.ids"
 )
@@ -126,7 +128,16 @@ func (c CloudFoundryOrganization) createClient(environment *provisioningclient.B
 	if err != nil {
 		return nil, err
 	}
+	return c.createClientWithType(org)
+}
 
+func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg) (
+	*organizationClient,
+	error,
+) {
+	if err := validateOrg(org); err != nil {
+		return nil, err
+	}
 	cloudFoundryClient, err := newOrganizationClient(
 		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
 		c.btp.Credential.UserCredential.Password,
@@ -134,15 +145,26 @@ func (c CloudFoundryOrganization) createClient(environment *provisioningclient.B
 	return cloudFoundryClient, err
 }
 
-func (c CloudFoundryOrganization) createClientWithType(org *btp.CloudFoundryOrg) (
-	*organizationClient,
-	error,
-) {
-	cloudFoundryClient, err := newOrganizationClient(
-		org.Name, org.ApiEndpoint, org.Id, c.btp.Credential.UserCredential.Username,
-		c.btp.Credential.UserCredential.Password,
-	)
-	return cloudFoundryClient, err
+// validateOrg checks that the org info extracted from the environment labels is complete. Without it a missing label
+// would only surface later as a misleading error from the CF API call, e.g. "unsupported protocol scheme".
+func validateOrg(org *btp.CloudFoundryOrg) error {
+	if org == nil {
+		return errors.Errorf(errOrgInfo, "org")
+	}
+	var missing []string
+	if org.Id == "" {
+		missing = append(missing, "Org ID")
+	}
+	if org.Name == "" {
+		missing = append(missing, "Org Name")
+	}
+	if org.ApiEndpoint == "" {
+		missing = append(missing, "API Endpoint")
+	}
+	if len(missing) > 0 {
+		return errors.Errorf(errOrgInfo, strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 func (c CloudFoundryOrganization) CreateInstance(ctx context.Context, cr v1alpha1.CloudFoundryEnvironment) (string, error) {

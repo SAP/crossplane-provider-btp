@@ -73,6 +73,19 @@ func TestGetConnectionDetails(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "Labels mixed format - Org ID:, API Endpoint",
+			args: args{
+				instance: instance(withLabels("{\"API Endpoint\":\"https://api.cf.example.com\",\"Org Name\":\"my-org\",\"Org ID:\":\"uuid\"}")),
+			},
+			want: managed.ConnectionDetails{
+				v1alpha1.ResourceOrgName:     []byte("my-org"),
+				v1alpha1.ResourceOrgId:       []byte("uuid"),
+				v1alpha1.ResourceAPIEndpoint: []byte("https://api.cf.example.com"),
+				v1alpha1.ResourceRaw:         []byte("{\"API Endpoint\":\"https://api.cf.example.com\",\"Org Name\":\"my-org\",\"Org ID:\":\"uuid\"}"),
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
