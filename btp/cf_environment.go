@@ -175,7 +175,7 @@ func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 		return nil, errors.New("no labels found in the provided string")
 	}
 
-	//having empty values will be handled by the caller
+	//missing values are validated by the callers before the org info is used
 	org := CloudFoundryOrgFromLabels(labels)
 	return &org, nil
 }
