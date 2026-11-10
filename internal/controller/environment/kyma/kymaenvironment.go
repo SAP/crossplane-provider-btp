@@ -187,11 +187,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	details, readErr := kymaenv.GetConnectionDetails(instance, c.httpClient)
 
-	// Skip the drift check once the CR is being deleted. The check fetches the
-	// updateSchema and fails closed on error (#682); on a cold cache with the
-	// plan missing from availableEnvironments that error would return here
-	// before the reconciler runs Delete, wedging the finalizer. Drift is
-	// irrelevant during teardown anyway.
+	// Skip the drift check during deletion: it fetches the updateSchema and
+	// fails closed (#682), which would return an error here before the
+	// reconciler runs Delete and wedge the finalizer. Drift is irrelevant
+	// during teardown.
 	if meta.WasDeleted(cr) {
 		return managed.ExternalObservation{
 			ResourceExists:    true,
