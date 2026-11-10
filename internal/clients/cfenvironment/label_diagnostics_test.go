@@ -91,3 +91,70 @@ func TestCloudFoundryObservationDiagnostics(t *testing.T) {
 		}
 	}
 }
+
+func TestCloudFoundryObservationDiagnosticsMalformedURL(t *testing.T) {
+	const endpointMarker = "endpoint-marker.example"
+	labels := `{"Org ID":"org-id","Org Name":"org","API Endpoint":"https://` + endpointMarker + `/%zz"}`
+	records, environment, managers, err := observeCloudFoundryLabels(t, labels, &btp.Credentials{UserCredential: &btp.UserCredential{Username: "synthetic-user", Password: "synthetic-password"}})
+	if err == nil || !strings.Contains(err.Error(), "%zz") {
+		t.Fatalf("DescribeInstance error = %v, want malformed URL error", err)
+	}
+	assertObservationFailureDiagnostics(t, records, environment, managers, endpointMarker)
+}
+
+func TestCloudFoundryObservationDiagnosticsNonOAuthResponseBody(t *testing.T) {
+	const errorMarker = "synthetic-api-response-marker"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"synthetic-token","token_type":"bearer","expires_in":3600}`))
+			return
+		}
+		if r.URL.Path == "/v3/roles" {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(errorMarker))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"links": map[string]any{
+			"login":   map[string]string{"href": "http://" + r.Host},
+			"uaa":     map[string]string{"href": "http://" + r.Host},
+			"app_ssh": map[string]any{"meta": map[string]string{"oauth_client": "ssh"}},
+		}})
+	}))
+	t.Cleanup(server.Close)
+	labels := `{"Org ID":"org-id","Org Name":"org","API Endpoint":"` + server.URL + `"}`
+	records, environment, managers, err := observeCloudFoundryLabels(t, labels, &btp.Credentials{UserCredential: &btp.UserCredential{Username: "synthetic-user", Password: "synthetic-password"}})
+	// The CF client deliberately reports only the HTTP status for this failure; it does not propagate the response body.
+	if err == nil || !strings.Contains(err.Error(), "HTTP error (500)") || strings.Contains(err.Error(), errorMarker) {
+		t.Fatalf("DescribeInstance error = %v, want generic HTTP 500 error without response body", err)
+	}
+	assertObservationFailureDiagnostics(t, records, environment, managers, errorMarker)
+}
+
+func observeCloudFoundryLabels(t *testing.T, labels string, credentials *btp.Credentials) ([]string, *provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
+	t.Helper()
+	env := &provisioningclient.BusinessEnvironmentInstanceResponseObject{Labels: &labels}
+	fake := &fakes.MockProvisioningServiceClient{ApiResponse: &provisioningclient.BusinessEnvironmentInstancesResponseCollection{EnvironmentInstances: []provisioningclient.BusinessEnvironmentInstanceResponseObject{*env}}}
+	client := NewCloudFoundryOrganization(btp.Client{Credential: credentials, ProvisioningServiceClient: fake})
+	cr := v1alpha1.CloudFoundryEnvironment{ObjectMeta: metav1.ObjectMeta{}}
+	meta.SetExternalName(&cr, "12345678-1234-1234-1234-123456789012")
+	var records []string
+	ctx := log.IntoContext(context.Background(), funcr.NewJSON(func(record string) { records = append(records, record) }, funcr.Options{}))
+	environment, managers, err := client.DescribeInstance(ctx, cr)
+	return records, environment, managers, err
+}
+
+func assertObservationFailureDiagnostics(t *testing.T, records []string, environment *provisioningclient.BusinessEnvironmentInstanceResponseObject, managers []v1alpha1.User, marker string) {
+	t.Helper()
+	if environment != nil || managers != nil {
+		t.Fatalf("DescribeInstance returned environment/managers on failure: %v / %v", environment, managers)
+	}
+	if len(records) != 1 {
+		t.Fatalf("logged %d records, want 1: %v", len(records), records)
+	}
+	for _, forbidden := range []string{marker, `"error"`} {
+		if strings.Contains(records[0], forbidden) {
+			t.Errorf("diagnostic log leaked %q: %s", forbidden, records[0])
+		}
+	}
+}
