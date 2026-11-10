@@ -131,6 +131,36 @@ func TestCloudFoundryObservationDiagnosticsNonOAuthResponseBody(t *testing.T) {
 	assertObservationFailureDiagnostics(t, records, environment, managers, errorMarker)
 }
 
+func TestCloudFoundryOrganizationDescribeInstanceConflictingLabels(t *testing.T) {
+	tests := []struct {
+		name   string
+		labels string
+		keys   []string
+	}{
+		{name: "organization ID", labels: `{"Org ID":"id-marker-one","Org ID:":"id-marker-two"}`, keys: []string{"Org ID", "Org ID:"}},
+		{name: "API endpoint", labels: `{"API Endpoint":"endpoint-marker-one","API Endpoint:":"endpoint-marker-two"}`, keys: []string{"API Endpoint", "API Endpoint:"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			records, environment, managers, err := observeCloudFoundryLabels(t, tt.labels, nil)
+			if err == nil || !strings.Contains(err.Error(), "conflicting Cloud Foundry label values") {
+				t.Fatalf("DescribeInstance error = %v, want label conflict", err)
+			}
+			for _, key := range tt.keys {
+				if !strings.Contains(err.Error(), key) {
+					t.Errorf("error %q does not identify conflicting key %q", err, key)
+				}
+			}
+			for _, marker := range []string{"id-marker-one", "id-marker-two", "endpoint-marker-one", "endpoint-marker-two"} {
+				if strings.Contains(err.Error(), marker) {
+					t.Errorf("error leaked label value %q: %v", marker, err)
+				}
+			}
+			assertObservationFailureDiagnostics(t, records, environment, managers, "marker")
+		})
+	}
+}
+
 func observeCloudFoundryLabels(t *testing.T, labels string, credentials *btp.Credentials) ([]string, *provisioningclient.BusinessEnvironmentInstanceResponseObject, []v1alpha1.User, error) {
 	t.Helper()
 	env := &provisioningclient.BusinessEnvironmentInstanceResponseObject{Labels: &labels}

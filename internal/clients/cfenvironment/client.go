@@ -8,6 +8,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 
+	"github.com/sap/crossplane-provider-btp/btp"
 	provisioningclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-provisioning-service-api-go/pkg"
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
@@ -92,7 +93,7 @@ func GenerateObservation(
 
 // GetConnectionDetails creates ConnectionDetails from a JSON-formatted labels string.
 // In legacy format, the keys have a trailing colon (:), while in the new format they do not.
-// The function handles both formats.
+// The function handles both formats, accepting identical duplicates and rejecting differing values.
 func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject) (managed.ConnectionDetails, error) {
 	if instance == nil {
 		return managed.ConnectionDetails{}, nil
@@ -105,26 +106,26 @@ func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstan
 	if err := json.Unmarshal(label, &cflabels); err != nil {
 		return managed.ConnectionDetails{}, err
 	}
+	orgID, orgIDPresent, err := btp.ResolveCloudFoundryLabel(cflabels, "Org ID")
+	if err != nil {
+		return managed.ConnectionDetails{}, err
+	}
+	apiEndpoint, apiEndpointPresent, err := btp.ResolveCloudFoundryLabel(cflabels, "API Endpoint")
+	if err != nil {
+		return managed.ConnectionDetails{}, err
+	}
+
 	details := managed.ConnectionDetails{
 		providerv1alpha1.RawBindingKey: label,
 	}
-
 	if orgName, ok := cflabels["Org Name"]; ok {
 		details[v1alpha1.ResourceOrgName] = []byte(orgName)
 	}
-
-	for _, orgIdKey := range []string{"Org ID", "Org ID:"} {
-		if orgID, ok := cflabels[orgIdKey]; ok {
-			details[v1alpha1.ResourceOrgId] = []byte(orgID)
-			break
-		}
+	if orgIDPresent {
+		details[v1alpha1.ResourceOrgId] = []byte(orgID)
 	}
-
-	for _, apiEndpointKey := range []string{"API Endpoint", "API Endpoint:"} {
-		if apiEndpoint, ok := cflabels[apiEndpointKey]; ok {
-			details[v1alpha1.ResourceAPIEndpoint] = []byte(apiEndpoint)
-			break
-		}
+	if apiEndpointPresent {
+		details[v1alpha1.ResourceAPIEndpoint] = []byte(apiEndpoint)
 	}
 
 	return details, nil

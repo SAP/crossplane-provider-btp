@@ -217,6 +217,22 @@ func TestCloudFoundryOrgByLabel(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Identical duplicate key spellings",
+			args: args{
+				labels: `{"Org ID":"id", "Org ID:":"id", "Org Name":"test-name", "API Endpoint":"api-endpoint", "API Endpoint:":"api-endpoint"}`,
+			},
+			want:    &CloudFoundryOrg{Id: "id", Name: "test-name", ApiEndpoint: "api-endpoint"},
+			wantErr: false,
+		},
+		{
+			name: "Identical empty duplicate key spellings",
+			args: args{
+				labels: `{"Org ID":"", "Org ID:":"", "API Endpoint":"", "API Endpoint:":""}`,
+			},
+			want:    &CloudFoundryOrg{},
+			wantErr: false,
+		},
+		{
 			name: "Mixed format with legacy API Endpoint key",
 			args: args{
 				labels: `{"Org ID":"id", "Org Name":"test-name", "API Endpoint:":"api-endpoint"}`,
@@ -269,6 +285,86 @@ func TestCloudFoundryOrgByLabel(t *testing.T) {
 	}
 }
 
+func TestResolveCloudFoundryLabel(t *testing.T) {
+	tests := []struct {
+		name    string
+		labels  map[string]string
+		key     string
+		want    string
+		present bool
+		wantErr bool
+	}{
+		{name: "absent", key: "Org ID"},
+		{name: "colonless only", labels: map[string]string{"Org ID": "id"}, key: "Org ID", want: "id", present: true},
+		{name: "colon only", labels: map[string]string{"Org ID:": "id"}, key: "Org ID", want: "id", present: true},
+		{name: "identical duplicates", labels: map[string]string{"Org ID": "same", "Org ID:": "same"}, key: "Org ID", want: "same", present: true},
+		{name: "identical empty duplicates", labels: map[string]string{"Org ID": "", "Org ID:": ""}, key: "Org ID", present: true},
+		{name: "conflicting duplicates", labels: map[string]string{"Org ID": "value-one", "Org ID:": "value-two"}, key: "Org ID", wantErr: true},
+		{name: "empty primary and non-empty legacy", labels: map[string]string{"Org ID": "", "Org ID:": "value-marker"}, key: "Org ID", wantErr: true},
+		{name: "non-empty primary and empty legacy", labels: map[string]string{"Org ID": "value-marker", "Org ID:": ""}, key: "Org ID", wantErr: true},
+		{name: "endpoint absent", key: "API Endpoint"},
+		{name: "endpoint colonless only", labels: map[string]string{"API Endpoint": "url"}, key: "API Endpoint", want: "url", present: true},
+		{name: "endpoint colon only", labels: map[string]string{"API Endpoint:": "url"}, key: "API Endpoint", want: "url", present: true},
+		{name: "endpoint identical duplicates", labels: map[string]string{"API Endpoint": "url", "API Endpoint:": "url"}, key: "API Endpoint", want: "url", present: true},
+		{name: "endpoint identical empty duplicates", labels: map[string]string{"API Endpoint": "", "API Endpoint:": ""}, key: "API Endpoint", present: true},
+		{name: "endpoint conflicting duplicates", labels: map[string]string{"API Endpoint": "value-one", "API Endpoint:": "value-two"}, key: "API Endpoint", wantErr: true},
+		{name: "endpoint empty primary and non-empty legacy", labels: map[string]string{"API Endpoint": "", "API Endpoint:": "value-marker"}, key: "API Endpoint", wantErr: true},
+		{name: "endpoint non-empty primary and empty legacy", labels: map[string]string{"API Endpoint": "value-marker", "API Endpoint:": ""}, key: "API Endpoint", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, present, err := ResolveCloudFoundryLabel(tt.labels, tt.key)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ResolveCloudFoundryLabel() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil {
+				for _, marker := range []string{"value-one", "value-two", "value-marker"} {
+					if strings.Contains(err.Error(), marker) {
+						t.Errorf("error leaked label value %q: %v", marker, err)
+					}
+				}
+				if !strings.Contains(err.Error(), tt.key) || !strings.Contains(err.Error(), tt.key+":") {
+					t.Errorf("error %q does not name both conflicting keys", err.Error())
+				}
+				return
+			}
+			if got != tt.want || present != tt.present {
+				t.Errorf("ResolveCloudFoundryLabel() = (%q, %v), want (%q, %v)", got, present, tt.want, tt.present)
+			}
+		})
+	}
+}
+
+func TestCloudFoundryOrgByLabelConflictingSpellings(t *testing.T) {
+	tests := []struct {
+		name   string
+		labels string
+	}{
+		{name: "organization ID values differ", labels: `{"Org ID":"id-marker-one","Org ID:":"id-marker-two","Org Name":"org","API Endpoint":"endpoint"}`},
+		{name: "endpoint values differ", labels: `{"Org ID":"id","Org Name":"org","API Endpoint":"endpoint-marker-one","API Endpoint:":"endpoint-marker-two"}`},
+		{name: "empty ID conflicts with value", labels: `{"Org ID":"","Org ID:":"id-marker"}`},
+		{name: "value ID conflicts with empty", labels: `{"Org ID":"id-marker","Org ID:":""}`},
+		{name: "empty endpoint conflicts with value", labels: `{"API Endpoint":"","API Endpoint:":"endpoint-marker"}`},
+		{name: "value endpoint conflicts with empty", labels: `{"API Endpoint":"endpoint-marker","API Endpoint:":""}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewCloudFoundryOrgByLabel(tt.labels)
+			if err == nil {
+				t.Fatalf("NewCloudFoundryOrgByLabel() = %+v, want conflict error", got)
+			}
+			if got != nil {
+				t.Errorf("NewCloudFoundryOrgByLabel() returned partial org: %+v", got)
+			}
+			for _, marker := range []string{"id-marker-one", "id-marker-two", "endpoint-marker-one", "endpoint-marker-two", "id-marker", "endpoint-marker"} {
+				if strings.Contains(err.Error(), marker) {
+					t.Errorf("error leaked label value %q: %v", marker, err)
+				}
+			}
+		})
+	}
+}
+
 func TestValidateCISCredential(t *testing.T) {
 	validCredential := func() *CISCredential {
 		return &CISCredential{
@@ -297,11 +393,11 @@ func TestValidateCISCredential(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		mutate  func(*CISCredential)
-		useNil  bool
-		wantErr bool
-		wantMsg string
+		name     string
+		mutate   func(*CISCredential)
+		useNil   bool
+		wantErr  bool
+		wantMsg  string
 		wantMsg2 string
 	}{
 		{

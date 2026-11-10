@@ -3,6 +3,7 @@ package btp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 
@@ -152,9 +153,27 @@ func (c *Client) ExtractOrg(cfEnvironment *provisioningclient.BusinessEnvironmen
 	return NewCloudFoundryOrgByLabel(label)
 }
 
+// ResolveCloudFoundryLabel resolves a label value that may use either the current key or its legacy
+// trailing-colon spelling. If both spellings are present, their values must be identical.
+func ResolveCloudFoundryLabel(labels map[string]string, key string) (value string, present bool, err error) {
+	legacyKey := key + ":"
+	currentValue, currentPresent := labels[key]
+	legacyValue, legacyPresent := labels[legacyKey]
+	if currentPresent && legacyPresent && currentValue != legacyValue {
+		return "", false, fmt.Errorf("conflicting Cloud Foundry label values for keys %q and %q", key, legacyKey)
+	}
+	if currentPresent {
+		return currentValue, true, nil
+	}
+	if legacyPresent {
+		return legacyValue, true, nil
+	}
+	return "", false, nil
+}
+
 // NewCloudFoundryOrgByLabel creates a CloudFoundryOrg from a JSON-formatted labels string.
 // In legacy format, the keys have a trailing colon (:), while in the new format they do not.
-// The function handles both formats, including labels that mix the two key styles.
+// The function handles both formats, including mixed styles, and rejects differing duplicate spellings.
 func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 	if rawLabels == "" {
 		return nil, errors.New("labels string is empty")
@@ -169,13 +188,13 @@ func NewCloudFoundryOrgByLabel(rawLabels string) (*CloudFoundryOrg, error) {
 		return nil, errors.New("no labels found in the provided string")
 	}
 
-	orgID := labels["Org ID"]
-	if orgID == "" {
-		orgID = labels["Org ID:"]
+	orgID, _, err := ResolveCloudFoundryLabel(labels, "Org ID")
+	if err != nil {
+		return nil, err
 	}
-	apiEndpoint := labels["API Endpoint"]
-	if apiEndpoint == "" {
-		apiEndpoint = labels["API Endpoint:"]
+	apiEndpoint, _, err := ResolveCloudFoundryLabel(labels, "API Endpoint")
+	if err != nil {
+		return nil, err
 	}
 
 	return &CloudFoundryOrg{
