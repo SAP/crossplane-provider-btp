@@ -12,6 +12,7 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/apis/environment/v1alpha1"
 	providerv1alpha1 "github.com/sap/crossplane-provider-btp/apis/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/btp"
 	"github.com/sap/crossplane-provider-btp/internal"
 )
 
@@ -90,9 +91,7 @@ func GenerateObservation(
 	return observation
 }
 
-// GetConnectionDetails creates ConnectionDetails from a JSON-formatted labels string.
-// In legacy format, the keys have a trailing colon (:), while in the new format they do not.
-// The function handles both formats.
+// GetConnectionDetails creates ConnectionDetails from the JSON-formatted labels of the environment instance.
 func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstanceResponseObject) (managed.ConnectionDetails, error) {
 	if instance == nil {
 		return managed.ConnectionDetails{}, nil
@@ -109,22 +108,15 @@ func GetConnectionDetails(instance *provisioningclient.BusinessEnvironmentInstan
 		providerv1alpha1.RawBindingKey: label,
 	}
 
-	if orgName, ok := cflabels["Org Name"]; ok {
-		details[v1alpha1.ResourceOrgName] = []byte(orgName)
+	org := btp.CloudFoundryOrgFromLabels(cflabels)
+	if org.Name != "" {
+		details[v1alpha1.ResourceOrgName] = []byte(org.Name)
 	}
-
-	for _, orgIdKey := range []string{"Org ID", "Org ID:"} {
-		if orgID, ok := cflabels[orgIdKey]; ok {
-			details[v1alpha1.ResourceOrgId] = []byte(orgID)
-			break
-		}
+	if org.Id != "" {
+		details[v1alpha1.ResourceOrgId] = []byte(org.Id)
 	}
-
-	for _, apiEndpointKey := range []string{"API Endpoint", "API Endpoint:"} {
-		if apiEndpoint, ok := cflabels[apiEndpointKey]; ok {
-			details[v1alpha1.ResourceAPIEndpoint] = []byte(apiEndpoint)
-			break
-		}
+	if org.ApiEndpoint != "" {
+		details[v1alpha1.ResourceAPIEndpoint] = []byte(org.ApiEndpoint)
 	}
 
 	return details, nil
