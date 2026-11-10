@@ -1057,6 +1057,41 @@ func TestObserve_CircuitBreakerTripsOnPersistentSchemaDrift(t *testing.T) {
 	}
 }
 
+// TestObserve_DeletedCRSkipsDriftCheck guards against a finalizer deadlock: a
+// CR under deletion must observe cleanly even when the schema fetch fails
+// (cold cache + plan missing from availableEnvironments), so the reconciler
+// can proceed to Delete instead of erroring out before it.
+func TestObserve_DeletedCRSkipsDriftCheck(t *testing.T) {
+	mockClient := fake.MockClient{
+		MockDescribeCluster: func(ctx context.Context, input *v1alpha1.KymaEnvironment) (*provisioningclient.BusinessEnvironmentInstanceResponseObject, error) {
+			return &provisioningclient.BusinessEnvironmentInstanceResponseObject{
+				Id:         internal.Ptr(testUUID),
+				State:      internal.Ptr("OK"),
+				Labels:     internal.Ptr(`{"name": "kyma", "KubeconfigURL": "someUrl"}`),
+				Parameters: internal.Ptr(`{"name":"kyma"}`),
+			}, nil
+		},
+		MockSchemaFetcher: errSchemaFetcher{},
+	}
+
+	e := external{
+		client:     mockClient,
+		httpClient: mockedHttpClient(kubeConfigData),
+		kube:       test.NewMockClient(),
+		record:     event.NewNopRecorder(),
+	}
+
+	cr := environment(withExternalName(testUUID), withUID("1234"), withDeletionTimestamp())
+
+	got, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatalf("Observe on a deleted CR must not error despite the failing schema fetch, got: %v", err)
+	}
+	if !got.ResourceExists || !got.ResourceUpToDate {
+		t.Errorf("deleted CR should observe as existing+up-to-date so Delete can run; got %+v", got)
+	}
+}
+
 // fixtureSchemaFetcher is a tiny SchemaFetcher for tests: always returns the
 // stored schema regardless of arguments.
 type fixtureSchemaFetcher struct{ schema *kyma.Schema }
@@ -1065,7 +1100,22 @@ func (f fixtureSchemaFetcher) GetUpdateSchema(_ context.Context, _, _ string) (*
 	return f.schema, nil
 }
 
+// errSchemaFetcher always fails, simulating a cold cache + a plan missing from
+// availableEnvironments.
+type errSchemaFetcher struct{}
+
+func (errSchemaFetcher) GetUpdateSchema(_ context.Context, _, _ string) (*kyma.Schema, error) {
+	return nil, errors.New("schema fetch failed")
+}
+
 type environmentModifier func(*v1alpha1.KymaEnvironment)
+
+func withDeletionTimestamp() environmentModifier {
+	return func(r *v1alpha1.KymaEnvironment) {
+		t := metav1.Now()
+		r.DeletionTimestamp = &t
+	}
+}
 
 func withConditions(c ...xpv1.Condition) environmentModifier {
 	return func(r *v1alpha1.KymaEnvironment) { r.Status.Conditions = c }
