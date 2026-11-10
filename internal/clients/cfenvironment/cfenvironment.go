@@ -112,12 +112,12 @@ func (c CloudFoundryOrganization) DescribeInstance(
 	managers, err := c.getManagers(ctx, environment)
 	if err != nil {
 		labelKeys, labelsJSONValid, apiEndpointLabelRecognized, apiEndpointLabelNonEmpty := cloudFoundryLabelDiagnostics(environment.Labels)
+		// Wrapped CF client errors may contain endpoint values or authentication response bodies.
 		log.FromContext(ctx).Info("failed to observe Cloud Foundry environment managers",
 			"labelKeys", labelKeys,
 			"labelsJSONValid", labelsJSONValid,
 			"apiEndpointLabelRecognized", apiEndpointLabelRecognized,
 			"apiEndpointLabelNonEmpty", apiEndpointLabelNonEmpty,
-			"error", err.Error(),
 		)
 		return nil, nil, err
 	}
