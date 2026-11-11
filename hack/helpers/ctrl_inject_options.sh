@@ -41,3 +41,26 @@ perl -i -0777 -pe \
 # Fix import ordering after injection
 find "${CONTROLLER_ROOT}" -name "zz_controller.go" -print0 | xargs -0 goimports -w
 goimports -w "${REPO_ROOT}/internal/controller/zz_setup.go"
+
+# SubaccountApiCredential needs a resource-specific adoption guard around the
+# generated Terraform Framework client. Keep this customization reproducible.
+target="${REPO_ROOT}/internal/controller/security/subaccountapicredential/zz_controller.go"
+if [ "$(grep -c 'newCredentialAdoptionConnector(' "${target}" || true)" -eq 0 ]; then
+  perl -i -0777 -pe \
+    's/o\.WithExternalConnector\(\n\s*tjcontroller\.NewTerraformPluginFrameworkConnector\(/o.WithExternalConnector(\n\t\t\tnewCredentialAdoptionConnector(tjcontroller.NewTerraformPluginFrameworkConnector(/; s/(WithTerraformPluginFrameworkManagementPolicies\(o\.Features\.Enabled\(features\.EnableBetaManagementPolicies\)\)\)\)),/$1),/' \
+    "${target}"
+fi
+if [ "$(grep -c 'newCredentialAdoptionConnector(' "${target}" || true)" -ne 1 ]; then
+  echo "ctrl_inject_options.sh: failed to wrap SubaccountApiCredential's generated Framework connector" >&2
+  exit 1
+fi
+if ! perl -0777 -ne 'my $start = index($_, "newCredentialAdoptionConnector(tjcontroller.NewTerraformPluginFrameworkConnector("); my $end = index($_, "WithTerraformPluginFrameworkManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies))), mgr.GetClient())),"); exit($start >= 0 && $end > $start ? 0 : 1)' "${target}"; then
+  perl -i -0777 -pe \
+    's/(WithTerraformPluginFrameworkManagementPolicies\(o\.Features\.Enabled\(features\.EnableBetaManagementPolicies\)\))\)\)\),/$1), mgr.GetClient())),/' \
+    "${target}"
+fi
+if ! perl -0777 -ne 'my $start = index($_, "newCredentialAdoptionConnector(tjcontroller.NewTerraformPluginFrameworkConnector("); my $end = index($_, "WithTerraformPluginFrameworkManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies))), mgr.GetClient())),"); exit($start >= 0 && $end > $start ? 0 : 1)' "${target}"; then
+  echo "ctrl_inject_options.sh: failed to pass the Kubernetes client to the SubaccountApiCredential state decorator" >&2
+  exit 1
+fi
+goimports -w "${target}"
