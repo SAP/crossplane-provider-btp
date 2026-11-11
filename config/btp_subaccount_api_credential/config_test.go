@@ -18,6 +18,8 @@ import (
 
 func ptr(s string) *string { return &s }
 
+func ptrTime(t metav1.Time) *metav1.Time { return &t }
+
 func TestCredentialNameFromExternalName(t *testing.T) {
 	cases := map[string]struct {
 		externalName string
@@ -171,6 +173,49 @@ func TestCompoundExternalNameFromState(t *testing.T) {
 				t.Errorf("compoundExternalNameFromState() mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestCompoundCredentialIdentityIsolation(t *testing.T) {
+	identities := []struct {
+		subaccountID string
+		name         string
+	}{
+		{subaccountID: "subaccount-one", name: "credential-one"},
+		{subaccountID: "subaccount-one", name: "credential-two"},
+		{subaccountID: "subaccount-two", name: "credential-one"},
+	}
+	seen := map[string]struct{}{}
+	for _, identity := range identities {
+		tfState := map[string]any{"subaccount_id": identity.subaccountID, "name": identity.name}
+		externalName, err := compoundExternalNameFromState(tfState)
+		if err != nil {
+			t.Fatalf("compoundExternalNameFromState(%#v): %v", tfState, err)
+		}
+		if _, exists := seen[externalName]; exists {
+			t.Fatalf("distinct subaccount/name identity collided at %q", externalName)
+		}
+		seen[externalName] = struct{}{}
+
+		params := map[string]any{"name": "drifted-spec-name"}
+		setCredentialNameArgument(params, externalName)
+		if got := params["name"]; got != identity.name {
+			t.Errorf("Terraform name for %q = %v, want %q", externalName, got, identity.name)
+		}
+	}
+}
+
+func TestSubaccountIDForLegacyMigrationPrefersObservedIdentity(t *testing.T) {
+	cr := &securityv1alpha1.SubaccountApiCredential{
+		Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+			ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{SubaccountID: ptr("drifted-spec")},
+		},
+		Status: securityv1alpha1.SubaccountApiCredentialStatus{
+			AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{SubaccountID: ptr("established-status")},
+		},
+	}
+	if got := subaccountIDForLegacyMigration(cr); got != "established-status" {
+		t.Fatalf("expected legacy migration to preserve observed subaccount; got %q", got)
 	}
 }
 
@@ -452,8 +497,9 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 			},
 			want: want{err: nil},
 		},
-		"secret missing client_secret with other keys present": {
+		"deleting resource retains existing missing-client-secret check": {
 			cr: &securityv1alpha1.SubaccountApiCredential{
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: ptrTime(metav1.Now())},
 				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
 					ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
 						WriteConnectionSecretToReference: &xpv1.SecretReference{
@@ -474,8 +520,29 @@ func TestDeletionProtectionInitializer_Initialize(t *testing.T) {
 					}
 					return nil
 				}),
+				MockList: test.NewMockListFn(nil),
 			},
 			want: want{err: errors.New(errMissingClientSecret)},
+		},
+		"active partial secret does not block Framework state reconstruction": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
+						WriteConnectionSecretToReference: &xpv1.SecretReference{Name: "my-secret", Namespace: "default"},
+					},
+				},
+			},
+			kube: &test.MockClient{MockGet: test.NewMockGetFn(nil, func(obj client.Object) error {
+				if secret, ok := obj.(*corev1.Secret); ok {
+					secret.Data = map[string][]byte{
+						"attribute.client_id": []byte("some-id"),
+						"attribute.token_url": []byte("https://token-url"),
+						"attribute.api_url":   []byte("https://api-url"),
+					}
+				}
+				return nil
+			})},
+			want: want{err: nil},
 		},
 		"secret incomplete - only client_id present - no error": {
 			cr: &securityv1alpha1.SubaccountApiCredential{

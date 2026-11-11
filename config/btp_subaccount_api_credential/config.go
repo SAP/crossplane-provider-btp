@@ -54,8 +54,9 @@ func Configure(p *config.Provider) {
 		r.ExternalName.SetIdentifierArgumentFn = setCredentialNameArgument
 
 		r.MetaResource.ArgumentDocs["name"] = "- The name if left unset defaults to managed-subaccount-api-credential"
-		if !strings.Contains(r.MetaResource.Description, "Importing or adopting existing API credentials is not supported.") {
-			r.MetaResource.Description += ". Importing or adopting existing API credentials is not supported."
+		const adoptionDescription = "Existing credentials can be adopted only when Terraform state can produce complete connection data, including the client secret."
+		if !strings.Contains(r.MetaResource.Description, adoptionDescription) {
+			r.MetaResource.Description += ". " + adoptionDescription
 		}
 
 		// ADR(external-name): reconstruct the compound key from Terraform state after
@@ -174,13 +175,10 @@ func specSubaccountID(cr *securityv1alpha1.SubaccountApiCredential) string {
 }
 
 func subaccountIDForLegacyMigration(cr *securityv1alpha1.SubaccountApiCredential) string {
-	if subaccountID := specSubaccountID(cr); subaccountID != "" {
-		return subaccountID
-	}
 	if cr.Status.AtProvider.SubaccountID != nil && *cr.Status.AtProvider.SubaccountID != "" {
 		return *cr.Status.AtProvider.SubaccountID
 	}
-	return ""
+	return specSubaccountID(cr)
 }
 
 // CompoundExternalNameInitializer migrates legacy name-only external-name annotations
@@ -269,7 +267,7 @@ func (d *DeletionProtectionInitializer) Initialize(ctx context.Context, mg resou
 	// "if the certificate is omitted". Certificate-based credentials never have a
 	// client_secret, so this check must be skipped for them to avoid false positives.
 	// See: https://registry.terraform.io/providers/SAP/btp/latest/docs/resources/subaccount_api_credential
-	if cr.Spec.ForProvider.CertificatePassed == nil {
+	if meta.WasDeleted(mg) && cr.Spec.ForProvider.CertificatePassed == nil && cr.Spec.InitProvider.CertificatePassed == nil {
 		secretRef := cr.GetWriteConnectionSecretToReference()
 		if secretRef != nil && secretRef.Name != "" {
 			secret := &corev1.Secret{}
