@@ -5,6 +5,9 @@ package upgrade
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -195,6 +198,10 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 			)),
 		).
 		WithSetup(
+			"Wait for source provider runtime",
+			waitForProviderRuntime(fromProviderPackage, fromControllerPackage),
+		).
+		WithSetup(
 			"Apply ProviderConfig",
 			test.CreateProviderConfigFeatureFn(namespace, globalAccount, cliServerUrl, cisSecretName, serviceUserSecretName),
 		).
@@ -217,15 +224,16 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 
 	feature = feature.Assess(
 		"Upgrade provider to version "+b.toTag,
-		upgrade.UpgradeProvider(upgrade.UpgradeProviderOptions{
-			ClusterName: upgradeTest.ClusterName,
-			ProviderOptions: test.InstallProviderOptionsWithController(
-				upgradeTest.ToProviderInstallOptions(),
-				toControllerPackage,
-			),
-			ResourceDirectories: upgradeTest.ResourceDirectories,
-			WaitForPause:        b.waitForPause,
-		}),
+		// Keep the normal pause/apply/resume sequence, then check the controller
+		// before waiting on MR health. Package Healthy alone can be stale.
+		upgrade.Compose(
+			upgrade.PauseResources(upgradeTest.ResourceDirectories, b.waitForPause),
+			upgrade.ApplyProvider(upgradeTest.ClusterName, test.InstallProviderOptionsWithController(
+				upgradeTest.ToProviderInstallOptions(), toControllerPackage,
+			)),
+			upgrade.ResumeResources(upgradeTest.ResourceDirectories),
+			waitForProviderRuntime(toProviderPackage, toControllerPackage),
+		),
 	)
 
 	if !b.skipDefaultResourceVerification {
@@ -241,6 +249,9 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 	}
 
 	feature = feature.WithTeardown(
+		"Capture provider runtime before cleanup",
+		captureProviderRuntime,
+	).WithTeardown(
 		"Delete resources",
 		func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			err := test.DeleteResourcesFromDirsGracefully(
@@ -267,6 +278,78 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 		)
 
 	return feature.Feature()
+}
+
+// Fatal readiness failures stop subsequent assessments, but retain the existing
+// feature teardown. Capture immediately as well: a fatal setup does not reach
+// feature teardown, and framework fail-fast mode may also skip teardown.
+func waitForProviderRuntime(packageImage, controllerImage string) features.Func {
+	return func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+		runtime, err := test.NewProviderRuntime(cfg.Client().RESTConfig())
+		if err == nil {
+			err = runtime.Wait(ctx, providerName, packageImage, controllerImage)
+		}
+		if err != nil {
+			captureProviderRuntime(ctx, t, cfg)
+			t.Fatalf("provider controller readiness failed: %v", err)
+		}
+		return ctx
+	}
+}
+
+func captureProviderRuntime(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+	// Give diagnostics their own bounded budget even if the assessment expired.
+	// Do not print raw logs, Pod specs/env, Secrets, or termination messages.
+	diagnosticCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+	defer cancel()
+	root := filepath.Join("logs", "provider-runtime")
+	if err := os.MkdirAll(root, 0700); err != nil {
+		t.Logf("cannot create private runtime diagnostics directory: %v", err)
+		return ctx
+	}
+	directory, err := os.MkdirTemp(root, providerName+"-")
+	if err != nil {
+		t.Logf("cannot create runtime diagnostics directory: %v", err)
+		return ctx
+	}
+	runtime, err := test.NewProviderRuntime(cfg.Client().RESTConfig())
+	if err == nil {
+		err = runtime.Capture(diagnosticCtx, providerName, directory)
+	}
+	t.Logf("Private provider runtime diagnostics: %s (raw logs may be sensitive; review/redact before sharing)", directory)
+	logRuntimeStatusSummaries(t, directory)
+	if err != nil {
+		// Diagnostics are best-effort; never replace the original test failure.
+		t.Logf("runtime diagnostics incomplete: %v", err)
+	}
+	return ctx
+}
+
+// Emit only the helper's allowlisted JSON summaries; never print raw controller
+// logs, pod specs/environment, condition messages, or Secret data.
+func logRuntimeStatusSummaries(t *testing.T, directory string) {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join(directory, "*.json"))
+	if err != nil {
+		t.Logf("cannot list runtime status summaries: %v", err)
+		return
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Logf("cannot read runtime status summary %s: %v", filepath.Base(path), err)
+			continue
+		}
+		t.Logf("provider runtime status %s: %s", filepath.Base(path), string(data))
+	}
+	logs, err := filepath.Glob(filepath.Join(directory, "*.log"))
+	if err == nil {
+		sort.Strings(logs)
+		for _, path := range logs {
+			t.Logf("provider runtime raw log saved privately: %s", filepath.Base(path))
+		}
+	}
 }
 
 func loadPackages(fromTag, toTag string) (string, string, string, string) {
