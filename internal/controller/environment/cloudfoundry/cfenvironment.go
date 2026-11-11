@@ -34,10 +34,16 @@ const (
 	errCreateConnectionDetails = "Cannot create connection details"
 	errDescribeInstance        = "while describing instance"
 	errCreate                  = "while creating instance"
+	errUpdate                  = "while updating instance"
 	errDelete                  = "while deleting instance"
 
 	errGetPC    = "cannot get ProviderConfig"
 	errGetCreds = "cannot get credentials"
+
+	// ManagersPendingKey marks an environment whose create left the initialOrgManagers assignment unfinished.
+	// Update retries the assignment while it is set and removes it once that succeeded. It is metadata, as
+	// crossplane-runtime persists the annotations after a failed Create but resets the status.
+	ManagersPendingKey = "cloudfoundryenvironment.environment.btp.crossplane.io/managers-pending"
 )
 
 // A connector is expected to produce an ExternalClient when its Connect method
@@ -127,13 +133,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotEnvironment)
 	}
 
-	// Check if external-name is empty
 	externalName := meta.GetExternalName(cr)
-	if externalName == "" {
-		return managed.ExternalObservation{
-			ResourceExists: false,
-		}, nil
-	}
 
 	instance, managers, err := c.client.DescribeInstance(ctx, *cr)
 	if err != nil {
@@ -149,9 +149,14 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// Set external-name to GUID format if necessary. This means it migrates from old formats
 	// Backwards compatibility:  > v1.1.0 (orgName) and v1.0.0 (metadata.name)
+	// An empty external-name with an existing instance means a previous create did not record the instance ID.
 	orgName := env.FormOrgName(cr.Spec.ForProvider.OrgName, cr.Spec.SubaccountGuid, cr.Name)
-	if externalName == cr.Name || externalName == orgName {
+	if externalName == "" || externalName == cr.Name || externalName == orgName {
 		meta.SetExternalName(cr, *instance.Id)
+		if externalName == "" {
+			// That create stopped before all managers were assigned, so Update retries them.
+			meta.AddAnnotations(cr, map[string]string{ManagersPendingKey: "true"})
+		}
 		if err := c.kube.Update(ctx, cr); err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, "failed to update external-name to GUID format")
 		}
@@ -171,10 +176,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}, nil
 	}
 
+	// Not up to date while a failed create left the manager assignment unfinished, so Update retries it.
+	// Only checked once the instance is ready, as managers cannot be assigned to the org before that.
+	upToDate := true
+	if cr.Status.AtProvider.State != nil && *cr.Status.AtProvider.State == v1alpha1.InstanceStateOk {
+		upToDate = cr.GetAnnotations()[ManagersPendingKey] != "true"
+	}
+
 	details, err := env.GetConnectionDetails(instance)
 	return managed.ExternalObservation{
 		ResourceExists:    true,
-		ResourceUpToDate:  true,
+		ResourceUpToDate:  upToDate,
 		ConnectionDetails: details,
 	}, errors.Wrap(err, errCreateConnectionDetails)
 }
@@ -186,14 +198,18 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	createdInstanceId, err := c.client.CreateInstance(ctx, *cr)
-	if err != nil {
-		// Do not set external-name on error (including "already exists" errors)
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
+	if createdInstanceId != "" {
+		// The instance exists in CIS, so keep its ID even if a later create step failed.
+		// Otherwise the next reconcile would try to create it again and run into a conflict.
+		// crossplane-runtime persists the annotations after Create, also when Create returns an error.
+		meta.SetExternalName(cr, createdInstanceId)
+		if err != nil {
+			// Not all managers are assigned, so Update retries them.
+			meta.AddAnnotations(cr, map[string]string{ManagersPendingKey: "true"})
+		}
 	}
-
-	meta.SetExternalName(cr, createdInstanceId)
-	if err := c.kube.Update(ctx, cr); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, "failed to update external-name with created instance id")
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreate)
 	}
 
 	return managed.ExternalCreation{
@@ -204,13 +220,33 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	_, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
+	cr, ok := mg.(*v1alpha1.CloudFoundryEnvironment)
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotEnvironment)
 	}
 
-	// Update is not supported
+	// Only retries the manager assignment of a failed create, other changes are not supported
+	if err := c.client.UpdateInstance(ctx, *cr); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
+	}
+	if err := c.clearManagersPending(ctx, cr); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdate)
+	}
 	return managed.ExternalUpdate{}, nil
+}
+
+// clearManagersPending removes the marker once the managers are assigned, so later changes to the org managers are
+// left alone. crossplane-runtime only persists the status after Update, so the marker is removed with an update of a
+// copy, which keeps the observed status for that status update, and the new resourceVersion is carried back.
+func (c *external) clearManagersPending(ctx context.Context, cr *v1alpha1.CloudFoundryEnvironment) error {
+	cleared := cr.DeepCopy()
+	meta.RemoveAnnotations(cleared, ManagersPendingKey)
+	if err := c.kube.Update(ctx, cleared); err != nil {
+		return err
+	}
+	meta.RemoveAnnotations(cr, ManagersPendingKey)
+	cr.SetResourceVersion(cleared.GetResourceVersion())
+	return nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {

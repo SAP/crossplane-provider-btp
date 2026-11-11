@@ -28,6 +28,10 @@ type Client interface {
 type Instance struct {
 	EntitledServicePlan *entclient.ServicePlanResponseObject
 	Assignment          *entclient.AssignedServicePlanSubaccountDTO
+	// AssignedUniqueIdentifier is the unique identifier of the service plan
+	// actually assigned to this subaccount (from the assigned plan object, not
+	// the entitled catalog). nil when there is no assignment. See issue #1100.
+	AssignedUniqueIdentifier *string
 }
 
 func GenerateObservation(
@@ -125,6 +129,7 @@ func newAssigned(instance Instance) *apisv1alpha1.Assignable {
 		EntityState:             internal.Val(instance.Assignment.EntityState),
 		EntityType:              internal.Val(instance.Assignment.EntityType),
 		EntityID:                internal.Val(instance.Assignment.EntityId),
+		UniqueIdentifier:        internal.Val(instance.AssignedUniqueIdentifier),
 	}
 	return &assignment
 }

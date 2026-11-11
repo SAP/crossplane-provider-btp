@@ -22,6 +22,14 @@ export UPGRADE_TEST_CRS_PATH ?= test/upgrade/testdata
 export UPGRADE_TEST_CRS_GENERATED_PATH ?= $(abspath .work/rendered-crs/upgrade)
 
 PLATFORMS ?= linux_amd64
+
+# FIPS 140-3: link Go Cryptographic Module CMVP #5247 in approved mode.
+# "certified" always resolves to the latest CMVP-certified frozen module
+# (currently v1.0.0). When v1.26.0 certifies, this flag rolls forward
+# automatically. CGO stays off — pure-Go module, no OpenSSL required.
+# Override with GOFIPS140=off to opt out locally.
+export GOFIPS140 ?= certified
+
 #get version from current git release tag
 VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || echo "v0.0.0-$$(git rev-parse HEAD)")
 $(info VERSION is $(VERSION))

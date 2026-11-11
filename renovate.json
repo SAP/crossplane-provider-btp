@@ -4,7 +4,7 @@
     "config:best-practices",
     ":dependencyDashboard"
   ],
-  "schedule": ["* * 1,15 * *"],
+  "schedule": ["* 9 1,15 * *"],
   "minimumReleaseAge": "7 days",
   "internalChecksFilter": "strict",
   "baseBranchPatterns": ["main", "release/v1_10_x"],
@@ -16,6 +16,10 @@
   "prConcurrentLimit": 20,
   "prHourlyLimit": 0,
   "packageRules": [
+    {
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
     {
       "matchBaseBranches": ["release/v1_10_x"],
       "matchUpdateTypes": ["major", "minor", "pin", "replacement", "rollback", "bump"],
@@ -67,7 +71,8 @@
     },
     {
       "groupName": "docker images",
-      "matchManagers": ["dockerfile"]
+      "matchManagers": ["dockerfile", "custom.regex"],
+      "matchDatasources": ["docker"]
     }
   ],
   "customManagers": [
