@@ -285,10 +285,10 @@ type peekedBody struct {
 func (b *peekedBody) Close() error { return b.body.Close() }
 
 func safeFailureBody(r *http.Request, resp *http.Response) string {
-	if strings.HasPrefix(r.URL.Path, "/login/") || strings.HasPrefix(r.URL.Path, "/idtoken/") {
+	if strings.HasPrefix(r.URL.Path, "/login") || strings.HasPrefix(r.URL.Path, "/idtoken") {
 		return "authentication response omitted"
 	}
-	return peekBody(resp)
+	return string(btp.RedactJWTTokensFromBody([]byte(peekBody(resp))))
 }
 
 // Claims distinguish principals in the cache, not authorize them. IAS validates

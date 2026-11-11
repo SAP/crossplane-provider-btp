@@ -18,8 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	tfprovider "github.com/SAP/terraform-provider-btp/btp/provider"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/crossplane/upjet/v2/pkg/terraform"
+	"github.com/go-logr/logr/funcr"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -212,5 +214,32 @@ func TestBothTerraformPathsRejectWorkloadKeysInLegacySecret(t *testing.T) {
 		if _, err := setup(context.Background(), kube, mg); err == nil {
 			t.Fatal("legacy Secret workload keys accepted")
 		}
+	}
+}
+
+func TestCLIFailureLogsRedactAuthenticationResponses(t *testing.T) {
+	jwt := testAssertion("secret")
+	for _, path := range []string{"/login", "/login/", "/login/v2", "/idtoken", "/idtoken/", "/idtoken/v2", "/command/v2"} {
+		t.Run(path, func(t *testing.T) {
+			var output string
+			logger := logging.NewLogrLogger(funcr.NewJSON(func(line string) { output += line }, funcr.Options{}))
+			transport := &cliTransport{log: logger}
+			request, err := http.NewRequest(http.MethodPost, "https://cli.example"+path, nil)
+			require.NoError(t, err)
+			body := "backend rejected assertion " + jwt
+			response := &http.Response{StatusCode: http.StatusOK, Header: http.Header{headerCLIBackendStatus: []string{"401"}}, Body: io.NopCloser(strings.NewReader(body))}
+			transport.logResult(request, response, nil, time.Second)
+			require.NotContains(t, output, jwt)
+			if path == "/command/v2" {
+				require.Contains(t, output, "backend rejected assertion <REDACTED>")
+			} else {
+				require.Contains(t, output, "authentication response omitted")
+				require.NotContains(t, output, "backend rejected assertion")
+			}
+			remaining, err := io.ReadAll(response.Body)
+			require.NoError(t, err)
+			require.Equal(t, body, string(remaining))
+			require.NoError(t, response.Body.Close())
+		})
 	}
 }

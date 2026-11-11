@@ -172,3 +172,15 @@ func TestCFWorkloadLoginRotationAndRecovery(t *testing.T) {
 		t.Fatal("new principal reused old session")
 	}
 }
+
+func TestCFWorkloadRejectsIncompleteOrgBeforeAuthentication(t *testing.T) {
+	c := CloudFoundryOrganization{btp: btp.Client{Credential: &btp.Credentials{
+		UserCredential:   &btp.UserCredential{},
+		WorkloadIdentity: &btp.WorkloadIdentityConfiguration{TokenFile: "/should-not-read"},
+	}}}
+	for _, org := range []*btp.CloudFoundryOrg{nil, {Name: "org", Id: "guid"}} {
+		client, err := c.createClientWithType(org)
+		require.Nil(t, client)
+		require.ErrorContains(t, err, "could not parse org info")
+	}
+}
