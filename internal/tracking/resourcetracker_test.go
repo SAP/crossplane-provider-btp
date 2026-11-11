@@ -10,6 +10,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/samber/lo"
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -187,6 +188,55 @@ func Test_findReferences(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+type cyclicReferenceHelper struct {
+	next *cyclicReferenceHelper
+}
+
+type decoratedManagedResource struct {
+	resource.Managed
+	ctx  context.Context
+	kube kclient.Client
+	help *cyclicReferenceHelper
+}
+
+func (d *decoratedManagedResource) UnwrapManagedResource() resource.Managed {
+	return d.Managed
+}
+
+func Test_TrackUnwrapsDecoratedManagedResource(t *testing.T) {
+	ctx := context.Background()
+	subaccount := newFakeSubaccount()
+	directory := newFakeDirectory()
+	cycle := &cyclicReferenceHelper{}
+	cycle.next = cycle
+	decorated := &decoratedManagedResource{
+		Managed: subaccount,
+		ctx:     ctx,
+		kube:    fake.NewClientBuilder().Build(),
+		help:    cycle,
+	}
+	client, tracker := buildFakeClient([]kclient.Object{directory, subaccount}, t)
+
+	if err := tracker.Track(ctx, decorated); err != nil {
+		t.Fatalf("Track() on decorated resource failed: %v", err)
+	}
+
+	want := newResourceUsage(directory, subaccount)
+	got := &providerv1alpha1.ResourceUsage{}
+	if err := client.Get(ctx, kclient.ObjectKeyFromObject(want), got); err != nil {
+		t.Fatalf("Track() did not create usage for underlying reference: %v", err)
+	}
+	if diff := cmp.Diff(want.Spec.TargetReference, got.Spec.TargetReference); diff != "" {
+		t.Fatalf("usage target mismatch (-want,+got):\n%s", diff)
+	}
+	if got.Spec.SourceReference.Name != directory.Name || got.Spec.SourceReference.UID != directory.UID {
+		t.Fatalf("usage source = %#v, want directory %s/%s", got.Spec.SourceReference, directory.Name, directory.UID)
+	}
+	if gotCondition := subaccount.GetCondition(providerv1alpha1.UseCondition); gotCondition.Status != corev1.ConditionFalse {
+		t.Fatalf("underlying managed resource usage condition = %q, want False", gotCondition.Status)
 	}
 }
 

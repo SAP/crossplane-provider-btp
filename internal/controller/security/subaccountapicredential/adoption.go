@@ -135,6 +135,12 @@ type credentialFrameworkState struct {
 	kube client.Client   `json:"-"`
 }
 
+// UnwrapManagedResource keeps generic reference tracking on the Kubernetes
+// resource, rather than recursively walking this wrapper's runtime helpers.
+func (r *credentialFrameworkState) UnwrapManagedResource() resource.Managed {
+	return r.SubaccountApiCredential
+}
+
 func (r *credentialFrameworkState) GetObservation() (map[string]any, error) {
 	observation, err := r.SubaccountApiCredential.GetObservation()
 	if err != nil {
