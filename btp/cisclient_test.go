@@ -205,6 +205,38 @@ func TestCloudFoundryOrgByLabel(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Mixed Format - Org ID with colon, API Endpoint without",
+			args: args{
+				labels: `{"API Endpoint":"api-endpoint","Org Name":"test-name","Org ID:":"id"}`,
+			},
+			want: &CloudFoundryOrg{
+				Id:          "id",
+				Name:        "test-name",
+				ApiEndpoint: "api-endpoint",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Mixed Format - API Endpoint with colon, Org ID without",
+			args: args{
+				labels: `{"API Endpoint:":"api-endpoint","Org Name":"test-name","Org ID":"id"}`,
+			},
+			want: &CloudFoundryOrg{
+				Id:          "id",
+				Name:        "test-name",
+				ApiEndpoint: "api-endpoint",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Unknown labels only",
+			args: args{
+				labels: `{"foo":"bar"}`,
+			},
+			want:    &CloudFoundryOrg{},
+			wantErr: false,
+		},
+		{
 			name: "Invalid JSON",
 			args: args{
 				labels: `{"Org ID":"id", "Org Name":"test-name", "API Endpoint":}`,
