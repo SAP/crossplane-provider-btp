@@ -22,6 +22,7 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
   - [Entitlement](#entitlement)
   - [Service Instance](#service-instance)
   - [Cloud Foundry Environment](#cloud-foundry-environment)
+  - [Kyma Environment](#kyma-environment)
   - [Service Binding](#service-binding)
 - [Usage Examples](#usage-examples)
   - [Building the Exporter](#building-the-exporter)
@@ -319,6 +320,36 @@ Exports Cloud Foundry environment instances from BTP subaccounts.
 ```bash
 # Export Cloud Foundry environments
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind cloudfoundry-environment
+```
+
+---
+
+### Kyma Environment
+
+Exports Kyma environment instances from BTP subaccounts.
+
+**Kind name:** `kyma-environment`
+
+**CLI flag:** `--kyma-environment <value>`
+
+**Selection criteria:**
+- Kyma environment ID (exact match)
+- Regex expression matching Kyma environment name
+
+**Notes:**
+- When exported, prerequisite resources (Cloud Management etc.) are automatically included
+
+**Example:**
+```bash
+# Export a specific Kyma environment from a subaccount with reference resolution
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+--kind kyma-environment \
+--subaccount <environment-id> \
+--resolve-references
+
+# Export Kyma environments interactively
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+--kind kyma-environment
 ```
 
 ---
