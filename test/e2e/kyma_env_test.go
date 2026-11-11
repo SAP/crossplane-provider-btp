@@ -34,6 +34,7 @@ const (
 	kymaModuleName                 = "cloud-manager-module"
 	kymaModuleExternalName         = "cloud-manager"
 	kymaModuleChannelTimeout       = 15 * time.Minute
+	kymaModuleDeletionTimeout      = 15 * time.Minute
 )
 
 func TestKymaEnvironment(t *testing.T) {
@@ -129,7 +130,14 @@ func TestKymaEnvironment(t *testing.T) {
 		Assess(
 			"Check Resources Delete",
 			func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-				resources.DeleteResources(ctx, t, cfg, manifestDir, wait.WithTimeout(time.Minute*50))
+				// The KymaModule reaches the Kyma cluster through the binding's
+				// kubeconfig secret. Deleting everything at once lets the binding
+				// go first, after which the module can never finish its deletion.
+				clusterScope := ""
+				module := MustGetResource(t, cfg, kymaModuleName, &clusterScope, &v1alpha1.KymaModule{})
+				AwaitResourceDeletionOrFail(ctx, t, cfg, module, wait.WithTimeout(kymaModuleDeletionTimeout))
+
+				DeleteResourcesIgnoreMissing(ctx, t, cfg, manifestDir, wait.WithTimeout(time.Minute*50))
 				return ctx
 			},
 		).Teardown(
