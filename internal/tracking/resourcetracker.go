@@ -67,6 +67,7 @@ func (r *DefaultReferenceResolverTracker) CreateTrackingReference(
 // in-use condition stays current in steady state and is fresh before Observe() and Delete(), instead of
 // only being stamped transiently inside Delete().
 func (r *DefaultReferenceResolverTracker) Track(ctx context.Context, mg resource.Managed) error {
+	mg = unwrapManagedResource(mg)
 	if hasIgnoreAnnotation(mg) {
 		return nil
 	}
@@ -95,6 +96,9 @@ func hasIgnoreAnnotation(mg resource.Managed) bool {
 // findReferences generically finds all references in the given resource.
 // It uses reflection to walk through the resource and find all fields that are of type xpv1.Reference.
 func (r *DefaultReferenceResolverTracker) findReferences(res interface{}) ([]ResolvedReference, error) {
+	if mg, ok := res.(resource.Managed); ok {
+		res = unwrapManagedResource(mg)
+	}
 	w := new(ReferenceWalker)
 	w.Client = r.c
 	w.Ctx = context.Background()
@@ -104,6 +108,24 @@ func (r *DefaultReferenceResolverTracker) findReferences(res interface{}) ([]Res
 	}
 	w.Fields = lo.FindUniques(w.Fields)
 	return w.Fields, err
+}
+
+// ManagedResourceUnwrapper is implemented by decorators that add non-resource
+// helper state to a managed resource. Reference tracking must inspect the actual
+// Kubernetes resource rather than traversing helper object graphs.
+type ManagedResourceUnwrapper interface {
+	UnwrapManagedResource() resource.Managed
+}
+
+func unwrapManagedResource(mg resource.Managed) resource.Managed {
+	decorator, ok := mg.(ManagedResourceUnwrapper)
+	if !ok {
+		return mg
+	}
+	if underlying := decorator.UnwrapManagedResource(); underlying != nil {
+		return underlying
+	}
+	return mg
 }
 
 type ReferenceWalker struct {
