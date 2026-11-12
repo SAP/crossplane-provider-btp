@@ -62,19 +62,21 @@ func (c *failOnceConnectionSecretPatchClient) Patch(ctx context.Context, obj cli
 // only compared in memory and never logged.
 func TestCredentialAdoptionReconcile(t *testing.T) {
 	for _, tc := range []struct {
-		name                 string
-		includeClientSecret  bool
-		coldStart            bool
-		newAdopter           bool
-		emptyConnection      bool
-		driftedSubaccount    bool
-		missingDestination   bool
-		noCreatePolicy       bool
-		failPublicationOnce  bool
-		managementPolicies   xpv2.ManagementPolicies
-		policyFeatureEnabled bool
-		wantReady            corev1.ConditionStatus
-		wantSynced           corev1.ConditionStatus
+		name                    string
+		includeClientSecret     bool
+		coldStart               bool
+		newAdopter              bool
+		emptyConnection         bool
+		driftedSubaccount       bool
+		missingDestination      bool
+		noCreatePolicy          bool
+		failPublicationOnce     bool
+		managementPolicies      xpv2.ManagementPolicies
+		policyFeatureEnabled    bool
+		opaqueDestinationSecret bool
+		wantPublicationFailure  bool
+		wantReady               corev1.ConditionStatus
+		wantSynced              corev1.ConditionStatus
 	}{
 		{name: "complete state retries after publication failure", includeClientSecret: true, failPublicationOnce: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "complete state is accepted with Observe-only policy", includeClientSecret: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
@@ -85,6 +87,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 		{name: "cold state is reconstructed from complete connection Secret", includeClientSecret: true, coldStart: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "cold state without client secret is rejected", includeClientSecret: false, coldStart: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
 		{name: "new Observe-only adopter with only client_secret", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
+		{name: "unowned Opaque Secret refuses adoption publication", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, opaqueDestinationSecret: true, wantPublicationFailure: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionFalse},
 		{name: "new mutation-capable adopter with only client_secret", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionAll}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "new Observe-only adopter with public fields only is rejected", coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
 		{name: "new Observe-only adopter with empty destination is rejected", coldStart: true, newAdopter: true, emptyConnection: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
@@ -154,9 +157,13 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			destinationSecretType := resource.SecretTypeConnection
+			if tc.opaqueDestinationSecret {
+				destinationSecretType = corev1.SecretTypeOpaque
+			}
 			connectionSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: "credential-connection", Namespace: "crossplane-system"},
-				Type:       resource.SecretTypeConnection,
+				Type:       destinationSecretType,
 				Data:       map[string][]byte{"unrelated": []byte("preserved")},
 			}
 			if tc.coldStart {
@@ -375,6 +382,9 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 			if synced.Status != tc.wantSynced {
 				t.Errorf("Synced status = %q, want %q (reason %q, message %q)", synced.Status, tc.wantSynced, synced.Reason, synced.Message)
 			}
+			if tc.wantPublicationFailure && !strings.Contains(synced.Message, "refusing to modify uncontrolled secret") {
+				t.Errorf("publication failure diagnostic %q does not preserve the Secret ownership rejection", synced.Message)
+			}
 			if tc.includeClientSecret {
 				if gotName := meta.GetExternalName(got); gotName != adoptionTestSubaccountID+"/"+adoptionTestCredential {
 					t.Errorf("external identity = %q, want %q", gotName, adoptionTestSubaccountID+"/"+adoptionTestCredential)
@@ -388,7 +398,19 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 			if err := kube.Get(context.Background(), client.ObjectKeyFromObject(connectionSecret), published); err != nil {
 				t.Fatal(err)
 			}
-			if tc.includeClientSecret {
+			if tc.includeClientSecret && tc.wantPublicationFailure {
+				if got := published.Data["attribute.client_secret"]; string(got) != adoptionTestClientSecret {
+					t.Error("failed publication changed the pre-existing client_secret")
+				}
+				for _, key := range []string{"attribute.client_id", "attribute.api_url", "attribute.token_url"} {
+					if _, ok := published.Data[key]; ok {
+						t.Errorf("failed publication unexpectedly changed destination key %q", key)
+					}
+				}
+				if string(published.Data["unrelated"]) != "preserved" {
+					t.Error("failed publication changed unrelated destination data")
+				}
+			} else if tc.includeClientSecret {
 				for key, want := range map[string][]byte{
 					"attribute.client_id":     []byte(adoptionTestClientID),
 					"attribute.client_secret": []byte(adoptionTestClientSecret),
