@@ -276,7 +276,7 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
 # Export all subscriptions from one subaccount
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
   --kind subscription \
-  --subaccount <subaccount-id> 
+  --subaccount <subaccount-id> \
   --subscription '.*' \
   --resolve-references
 ```
