@@ -18,16 +18,15 @@ import (
 	"net/url"
 )
 
-
 type QuotaAssignmentsAPI interface {
 
 	/*
-	GetSubaccountQuota Get subaccount quota assignments
+		GetSubaccountQuota Get subaccount quota assignments
 
-	Get the plans and quota assignments for a subaccount.<br/><br/>Required scope: $XSAPPNAME.subaccount.entitlement.read
+		Get the plans and quota assignments for a subaccount.<br/><br/>Required scope: $XSAPPNAME.subaccount.entitlement.read
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiGetSubaccountQuotaRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiGetSubaccountQuotaRequest
 	*/
 	GetSubaccountQuota(ctx context.Context) ApiGetSubaccountQuotaRequest
 
@@ -40,7 +39,7 @@ type QuotaAssignmentsAPI interface {
 type QuotaAssignmentsAPIService service
 
 type ApiGetSubaccountQuotaRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService QuotaAssignmentsAPI
 }
 
@@ -53,24 +52,25 @@ GetSubaccountQuota Get subaccount quota assignments
 
 Get the plans and quota assignments for a subaccount.<br/><br/>Required scope: $XSAPPNAME.subaccount.entitlement.read
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiGetSubaccountQuotaRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiGetSubaccountQuotaRequest
 */
 func (a *QuotaAssignmentsAPIService) GetSubaccountQuota(ctx context.Context) ApiGetSubaccountQuotaRequest {
 	return ApiGetSubaccountQuotaRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return ServicePlanAssignmentsResponseCollection
+//
+//	@return ServicePlanAssignmentsResponseCollection
 func (a *QuotaAssignmentsAPIService) GetSubaccountQuotaExecute(r ApiGetSubaccountQuotaRequest) (*ServicePlanAssignmentsResponseCollection, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *ServicePlanAssignmentsResponseCollection
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ServicePlanAssignmentsResponseCollection
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "QuotaAssignmentsAPIService.GetSubaccountQuota")
@@ -130,8 +130,8 @@ func (a *QuotaAssignmentsAPIService) GetSubaccountQuotaExecute(r ApiGetSubaccoun
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
@@ -141,8 +141,8 @@ func (a *QuotaAssignmentsAPIService) GetSubaccountQuotaExecute(r ApiGetSubaccoun
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
@@ -152,8 +152,8 @@ func (a *QuotaAssignmentsAPIService) GetSubaccountQuotaExecute(r ApiGetSubaccoun
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}

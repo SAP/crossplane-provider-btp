@@ -25,7 +25,7 @@ type UpdateGlobalAccountRequestPayload struct {
 	// A new display of the global account.
 	Description *string `json:"description,omitempty"`
 	// The new descriptive name of the global account.
-	DisplayName *string `json:"displayName,omitempty" validate:"regexp=^((?![\\/]).)*$"`
+	DisplayName *string `json:"displayName,omitempty" validate:"regexp=^((?![/]).)*$"`
 	// JSON array of up to 10 user-defined labels to assign as key-value pairs to the global account. Each label has a name (key) that you specify, and to which you can assign up to 10 corresponding values or leave empty. Keys and values are each limited to 63 characters.  Label keys and values are case-sensitive. Try to avoid creating duplicate variants of the same keys or values with a different casing (example: \"myValue\" and \"MyValue\").  Example:  {   \"Cost Center\": [\"19700626\"],   \"Department\": [\"Sales\"],   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],   \"EMEA\":[] }  IMPORTANT : The JSON array overwrites any labels that are currently assigned to the global account. In the request, you must include not only new and updated key-value pairs, but also existing ones that you do not want changed. Omit keys/values that you want removed as labels from the global account.   Any labels previously set using the deprecated \"customProperties\" field are also overwritten. 
 	Labels *map[string][]string `json:"labels,omitempty"`
 	AdditionalProperties map[string]interface{}

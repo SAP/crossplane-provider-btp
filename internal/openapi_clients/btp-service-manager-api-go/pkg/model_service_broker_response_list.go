@@ -25,7 +25,10 @@ type ServiceBrokerResponseList struct {
 	NumItems *int32 `json:"num_items,omitempty"`
 	// Use this token when you call the API again to get more service brokers associated with your subaccount.</br> The token field indicates that the total number of service brokers to view in the list (num_items) is larger than the defined maximum number of service brokers to be returned after a single API call (max_items). </br> If the field is not present, either all the service brokers were included in the first response, or you have reached the end of the list.
 	Token *string `json:"token,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServiceBrokerResponseList ServiceBrokerResponseList
 
 // NewServiceBrokerResponseList instantiates a new ServiceBrokerResponseList object
 // This constructor will assign default values to properties that have it defined,
@@ -159,7 +162,35 @@ func (o ServiceBrokerResponseList) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Token) {
 		toSerialize["token"] = o.Token
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServiceBrokerResponseList) UnmarshalJSON(data []byte) (err error) {
+	varServiceBrokerResponseList := _ServiceBrokerResponseList{}
+
+	err = json.Unmarshal(data, &varServiceBrokerResponseList)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServiceBrokerResponseList(varServiceBrokerResponseList)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "items")
+		delete(additionalProperties, "num_items")
+		delete(additionalProperties, "token")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServiceBrokerResponseList struct {

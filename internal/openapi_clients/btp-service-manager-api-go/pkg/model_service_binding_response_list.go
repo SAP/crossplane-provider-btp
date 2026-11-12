@@ -25,7 +25,10 @@ type ServiceBindingResponseList struct {
 	NumItems *int32 `json:"num_items,omitempty"`
 	// Use this token when you call the API again to get more service bindings associated with your subaccount.</br> The token field indicates that the total number of service bindings to view in the list (num_items) is larger than the defined maximum number of service bindings to be returned after a single API call (max_items). </br> If the field is not present, either all the service bindings were included in the first response, or you have reached the end of the list.
 	Token *string `json:"token,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServiceBindingResponseList ServiceBindingResponseList
 
 // NewServiceBindingResponseList instantiates a new ServiceBindingResponseList object
 // This constructor will assign default values to properties that have it defined,
@@ -159,7 +162,35 @@ func (o ServiceBindingResponseList) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Token) {
 		toSerialize["token"] = o.Token
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServiceBindingResponseList) UnmarshalJSON(data []byte) (err error) {
+	varServiceBindingResponseList := _ServiceBindingResponseList{}
+
+	err = json.Unmarshal(data, &varServiceBindingResponseList)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServiceBindingResponseList(varServiceBindingResponseList)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "items")
+		delete(additionalProperties, "num_items")
+		delete(additionalProperties, "token")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServiceBindingResponseList struct {

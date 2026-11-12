@@ -44,7 +44,10 @@ type ServicePlanResponseObject struct {
 	ServiceOfferingId *string `json:"service_offering_id,omitempty"`
 	// The last time the service plan was updated.<br> In ISO 8601 format.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServicePlanResponseObject ServicePlanResponseObject
 
 // NewServicePlanResponseObject instantiates a new ServicePlanResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -300,7 +303,7 @@ func (o *ServicePlanResponseObject) GetMetadata() map[string]interface{} {
 // and a boolean to check if the value has been set.
 func (o *ServicePlanResponseObject) GetMetadataOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Metadata) {
-		return nil, false
+		return map[string]interface{}{}, false
 	}
 	return o.Metadata, true
 }
@@ -493,7 +496,44 @@ func (o ServicePlanResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updated_at"] = o.UpdatedAt
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServicePlanResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varServicePlanResponseObject := _ServicePlanResponseObject{}
+
+	err = json.Unmarshal(data, &varServicePlanResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServicePlanResponseObject(varServicePlanResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "bindable")
+		delete(additionalProperties, "catalog_id")
+		delete(additionalProperties, "catalog_name")
+		delete(additionalProperties, "created_at")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "free")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "metadata")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "ready")
+		delete(additionalProperties, "service_offering_id")
+		delete(additionalProperties, "updated_at")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServicePlanResponseObject struct {
