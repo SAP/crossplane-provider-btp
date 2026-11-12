@@ -35,7 +35,6 @@ const (
 	errConnect              = "while connecting to provider"
 	errObserve              = "while observing subaccount"
 	errMigrateExternalName  = "while migrating external name"
-	errInvalidExternalName  = "external-name is not a valid GUID format"
 	errGenerateObservation  = "while generating observation"
 	errCreate               = "while creating subaccount"
 	errUpdate               = "while updating subaccount"
@@ -130,10 +129,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errMigrateExternalName)
 	}
 
-	// ADR Step 2: External-name is set, check its format (must be valid GUID)
-	if !isValidUUID(meta.GetExternalName(desiredCR)) {
-		return managed.ExternalObservation{}, errors.Wrap(errors.New(fmt.Sprintf("external-name '%s'", meta.GetExternalName(desiredCR))), errInvalidExternalName)
-	}
+	// ADR Step 2: The external-name holds the subaccount GUID. We intentionally do
+	// not validate its format here: some legacy accounts carry a non-GUID string in
+	// the external-name, and validating would break reconciliation for those resources.
 
 	// ADR Step 3: Build the Get API Request from the external-name (using GUID directly)
 	if err := c.generateObservation(ctx, desiredCR); err != nil {

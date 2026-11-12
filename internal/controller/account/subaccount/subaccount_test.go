@@ -1066,16 +1066,17 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
-		"InvalidGUIDFormatError": {
-			reason: "Invalid GUID format in external-name should return error (ADR compliance)",
+		"NonGUIDExternalName404": {
+			reason: "Non-GUID external-name (e.g. legacy accounts) is no longer validated; a 404 from the Get API should return resourceExists: false",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
-					WithExternalName("invalid-guid-format"), // Not a valid UUID
+					WithExternalName("invalid-guid-format"), // Not a valid UUID, allowed for legacy accounts
 					WithData(v1alpha1.SubaccountParameters{
 						Subdomain: "unittest-sa",
 						Region:    "eu10",
 					})),
 				mockAPIClient: &MockSubaccountClient{
+					getSubaccountErr: errors.New("404 not found"),
 					returnSubaccounts: &accountclient.ResponseCollection{
 						Value: []accountclient.SubaccountResponseObject{},
 					},
@@ -1084,12 +1085,19 @@ func TestObserve(t *testing.T) {
 					mockClient := testutils.NewFakeKubeClientBuilder().
 						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
 						Build()
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
 					return mockClient
 				}(),
 			},
 			want: want{
-				o:   managed.ExternalObservation{},
-				err: errors.New("external-name is not a valid GUID format: external-name 'invalid-guid-format'"),
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				crChanges: func(cr *v1alpha1.Subaccount) {
+					cr.Status.AtProvider = v1alpha1.SubaccountObservation{}
+				},
 			},
 		},
 		"ValidGUID404Response": {
@@ -1126,7 +1134,7 @@ func TestObserve(t *testing.T) {
 			},
 		},
 		"ExternalNameMigrationNotFound": {
-			reason: "Resource with name as external-name should fallback to subdomain+region lookup and not find anything, therefore since external-name is not a valid GUID, return error",
+			reason: "Resource with name as external-name is no longer rejected for not being a GUID; the Get API 404s, so it returns resourceExists: false",
 			args: args{
 				cr: NewSubaccount("unittest-sa",
 					WithExternalName("unittest-sa"), // Old behavior: external name = resource name
@@ -1154,7 +1162,12 @@ func TestObserve(t *testing.T) {
 				}(),
 			},
 			want: want{
-				err: errors.New("external-name is not a valid GUID format: external-name 'unittest-sa'"),
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				crChanges: func(cr *v1alpha1.Subaccount) {
+					cr.Status.AtProvider = v1alpha1.SubaccountObservation{}
+				},
 			},
 		},
 	}
