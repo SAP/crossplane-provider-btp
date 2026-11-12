@@ -30,7 +30,7 @@ type CloneNeoSubaccountRequestPayload struct {
 	// A description of the subaccount for customer-facing UIs.
 	Description *string `json:"description,omitempty"`
 	// The display name of the subaccount for customer-facing UIs.
-	DisplayName string `json:"displayName" validate:"regexp=^((?![\\/]).)*$"`
+	DisplayName string `json:"displayName" validate:"regexp=^((?![/]).)*$"`
 	// JSON array of up to 10 user-defined labels to assign as key-value pairs to the subaccount. Each label has a name (key) that you specify, and to which you can assign up to 10 corresponding values or leave empty.  Keys and values are each limited to 63 characters.  The keys and values of labels are case-sensitive. Try to avoid creating duplicate variants of the same keys or values with a different casing (example: \"myValue\" and \"MyValue\").  Example: {   \"Cost Center\": [\"19700626\"],   \"Department\": [\"Sales\"],   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],   \"EMEA\":[] }
 	Labels *map[string][]string `json:"labels,omitempty"`
 	// The origin of the subaccount creation. * <b>API:</b> Subaccount is created/updated by an admin using the REST APIs of the Accounts service.

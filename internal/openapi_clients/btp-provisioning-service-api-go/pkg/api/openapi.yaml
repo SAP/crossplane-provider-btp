@@ -1067,40 +1067,40 @@ components:
     AvailableEnvironmentResponseCollection:
       example:
         availableEnvironments:
-        - serviceDocumentationUrl: serviceDocumentationUrl
-          allowAdditionalEnvironmentInstance: true
-          landscapeLabel: landscapeLabel
-          serviceSupportUrl: serviceSupportUrl
-          environmentType: environmentType
-          serviceLongDescription: serviceLongDescription
-          description: description
-          planName: planName
-          updateSchema: updateSchema
-          createSchema: createSchema
-          serviceDisplayName: serviceDisplayName
-          serviceName: serviceName
-          planUpdatable: true
+        - allowAdditionalEnvironmentInstance: true
           availabilityLevel: availabilityLevel
-          serviceImageUrl: serviceImageUrl
-          technicalKey: technicalKey
-          serviceDescription: serviceDescription
-        - serviceDocumentationUrl: serviceDocumentationUrl
-          allowAdditionalEnvironmentInstance: true
-          landscapeLabel: landscapeLabel
-          serviceSupportUrl: serviceSupportUrl
-          environmentType: environmentType
-          serviceLongDescription: serviceLongDescription
-          description: description
-          planName: planName
-          updateSchema: updateSchema
           createSchema: createSchema
-          serviceDisplayName: serviceDisplayName
-          serviceName: serviceName
+          description: description
+          environmentType: environmentType
+          landscapeLabel: landscapeLabel
+          planName: planName
           planUpdatable: true
-          availabilityLevel: availabilityLevel
-          serviceImageUrl: serviceImageUrl
-          technicalKey: technicalKey
           serviceDescription: serviceDescription
+          serviceDisplayName: serviceDisplayName
+          serviceDocumentationUrl: serviceDocumentationUrl
+          serviceImageUrl: serviceImageUrl
+          serviceLongDescription: serviceLongDescription
+          serviceName: serviceName
+          serviceSupportUrl: serviceSupportUrl
+          technicalKey: technicalKey
+          updateSchema: updateSchema
+        - allowAdditionalEnvironmentInstance: true
+          availabilityLevel: availabilityLevel
+          createSchema: createSchema
+          description: description
+          environmentType: environmentType
+          landscapeLabel: landscapeLabel
+          planName: planName
+          planUpdatable: true
+          serviceDescription: serviceDescription
+          serviceDisplayName: serviceDisplayName
+          serviceDocumentationUrl: serviceDocumentationUrl
+          serviceImageUrl: serviceImageUrl
+          serviceLongDescription: serviceLongDescription
+          serviceName: serviceName
+          serviceSupportUrl: serviceSupportUrl
+          technicalKey: technicalKey
+          updateSchema: updateSchema
       properties:
         availableEnvironments:
           items:
@@ -1109,23 +1109,23 @@ components:
       type: object
     AvailableEnvironmentResponseObject:
       example:
-        serviceDocumentationUrl: serviceDocumentationUrl
         allowAdditionalEnvironmentInstance: true
-        landscapeLabel: landscapeLabel
-        serviceSupportUrl: serviceSupportUrl
-        environmentType: environmentType
-        serviceLongDescription: serviceLongDescription
-        description: description
-        planName: planName
-        updateSchema: updateSchema
-        createSchema: createSchema
-        serviceDisplayName: serviceDisplayName
-        serviceName: serviceName
-        planUpdatable: true
         availabilityLevel: availabilityLevel
-        serviceImageUrl: serviceImageUrl
-        technicalKey: technicalKey
+        createSchema: createSchema
+        description: description
+        environmentType: environmentType
+        landscapeLabel: landscapeLabel
+        planName: planName
+        planUpdatable: true
         serviceDescription: serviceDescription
+        serviceDisplayName: serviceDisplayName
+        serviceDocumentationUrl: serviceDocumentationUrl
+        serviceImageUrl: serviceImageUrl
+        serviceLongDescription: serviceLongDescription
+        serviceName: serviceName
+        serviceSupportUrl: serviceSupportUrl
+        technicalKey: technicalKey
+        updateSchema: updateSchema
       properties:
         allowAdditionalEnvironmentInstance:
           description: Whether the user can use this broker for creating a second
@@ -1184,36 +1184,36 @@ components:
       type: object
     BusinessEnvironmentInstanceResponseObject:
       example:
-        environmentType: cloudfoundry
+        brokerId: brokerId
+        commercialType: commercialType
+        createdBy: createdBy
+        createdDate: 0.8008281904610115
         customLabels:
           key:
           - customLabels
           - customLabels
-        stateMessage: stateMessage
-        description: description
-        planName: planName
-        commercialType: commercialType
-        type: Provision
-        globalAccountGUID: globalAccountGUID
-        modifiedBy: modifiedBy
-        planId: planId
-        id: id
-        state: CREATING
-        serviceId: serviceId
-        landscapeLabel: landscapeLabel
-        brokerId: brokerId
         dashboardUrl: dashboardUrl
-        subaccountGUID: subaccountGUID
-        platformId: platformId
-        serviceName: serviceName
+        description: description
+        environmentType: cloudfoundry
+        globalAccountGUID: globalAccountGUID
+        id: id
         labels: labels
-        createdDate: 0.8008281904610115
-        createdBy: createdBy
+        landscapeLabel: landscapeLabel
+        modifiedBy: modifiedBy
         modifiedDate: 6.027456183070403
         name: name
-        tenantId: tenantId
         operation: operation
         parameters: parameters
+        planId: planId
+        planName: planName
+        platformId: platformId
+        serviceId: serviceId
+        serviceName: serviceName
+        state: CREATING
+        stateMessage: stateMessage
+        subaccountGUID: subaccountGUID
+        tenantId: tenantId
+        type: Provision
       properties:
         brokerId:
           description: The ID of the associated environment broker.
@@ -1358,66 +1358,66 @@ components:
     BusinessEnvironmentInstancesResponseCollection:
       example:
         environmentInstances:
-        - environmentType: cloudfoundry
+        - brokerId: brokerId
+          commercialType: commercialType
+          createdBy: createdBy
+          createdDate: 0.8008281904610115
           customLabels:
             key:
             - customLabels
             - customLabels
-          stateMessage: stateMessage
-          description: description
-          planName: planName
-          commercialType: commercialType
-          type: Provision
-          globalAccountGUID: globalAccountGUID
-          modifiedBy: modifiedBy
-          planId: planId
-          id: id
-          state: CREATING
-          serviceId: serviceId
-          landscapeLabel: landscapeLabel
-          brokerId: brokerId
           dashboardUrl: dashboardUrl
-          subaccountGUID: subaccountGUID
-          platformId: platformId
-          serviceName: serviceName
+          description: description
+          environmentType: cloudfoundry
+          globalAccountGUID: globalAccountGUID
+          id: id
           labels: labels
-          createdDate: 0.8008281904610115
-          createdBy: createdBy
+          landscapeLabel: landscapeLabel
+          modifiedBy: modifiedBy
           modifiedDate: 6.027456183070403
           name: name
-          tenantId: tenantId
           operation: operation
           parameters: parameters
-        - environmentType: cloudfoundry
+          planId: planId
+          planName: planName
+          platformId: platformId
+          serviceId: serviceId
+          serviceName: serviceName
+          state: CREATING
+          stateMessage: stateMessage
+          subaccountGUID: subaccountGUID
+          tenantId: tenantId
+          type: Provision
+        - brokerId: brokerId
+          commercialType: commercialType
+          createdBy: createdBy
+          createdDate: 0.8008281904610115
           customLabels:
             key:
             - customLabels
             - customLabels
-          stateMessage: stateMessage
-          description: description
-          planName: planName
-          commercialType: commercialType
-          type: Provision
-          globalAccountGUID: globalAccountGUID
-          modifiedBy: modifiedBy
-          planId: planId
-          id: id
-          state: CREATING
-          serviceId: serviceId
-          landscapeLabel: landscapeLabel
-          brokerId: brokerId
           dashboardUrl: dashboardUrl
-          subaccountGUID: subaccountGUID
-          platformId: platformId
-          serviceName: serviceName
+          description: description
+          environmentType: cloudfoundry
+          globalAccountGUID: globalAccountGUID
+          id: id
           labels: labels
-          createdDate: 0.8008281904610115
-          createdBy: createdBy
+          landscapeLabel: landscapeLabel
+          modifiedBy: modifiedBy
           modifiedDate: 6.027456183070403
           name: name
-          tenantId: tenantId
           operation: operation
           parameters: parameters
+          planId: planId
+          planName: planName
+          platformId: platformId
+          serviceId: serviceId
+          serviceName: serviceName
+          state: CREATING
+          stateMessage: stateMessage
+          subaccountGUID: subaccountGUID
+          tenantId: tenantId
+          type: Provision
       properties:
         environmentInstances:
           description: List of all the environment instances
@@ -1429,7 +1429,7 @@ components:
       description: JSON object with configuration parameters specific to environment
         instance binding as specified in the OSB API.
       example:
-        parameters: "{}"
+        parameters: {}
       properties:
         parameters:
           type: object
@@ -1438,15 +1438,15 @@ components:
       description: JSON object with configuration parameters specific to environment
         instance binding.
       example:
-        landscapeLabel: landscapeLabel
-        environmentType: environmentType
-        origin: origin
-        technicalKey: technicalKey
-        name: name
         description: description
+        environmentType: environmentType
+        landscapeLabel: landscapeLabel
+        name: name
+        origin: origin
+        parameters: {}
         planName: planName
         serviceName: serviceName
-        parameters: "{}"
+        technicalKey: technicalKey
         user: user
       properties:
         description:
@@ -1514,8 +1514,8 @@ components:
       type: object
     DeleteEnvironmentInstanceBindingResponse:
       example:
-        planId: planId
         bindingId: bindingId
+        planId: planId
         serviceId: serviceId
       properties:
         bindingId:
@@ -1530,11 +1530,11 @@ components:
       type: object
     EnvironmentInstanceBindingMetadata:
       example:
-        createdDate: createdDate
-        instanceId: instanceId
-        createdBy: createdBy
         bindingId: bindingId
+        createdBy: createdBy
+        createdDate: createdDate
         expiresAt: expiresAt
+        instanceId: instanceId
       properties:
         bindingId:
           description: The binding ID for the specified environment instance.
@@ -1554,34 +1554,34 @@ components:
       type: object
     EnvironmentInstanceResponseObject:
       example:
-        environmentType: cloudfoundry
+        brokerId: brokerId
+        commercialType: commercialType
+        createdDate: 0.8008281904610115
         customLabels:
           key:
           - customLabels
           - customLabels
-        stateMessage: stateMessage
-        description: description
-        planName: planName
-        commercialType: commercialType
-        type: Provision
-        globalAccountGUID: globalAccountGUID
-        planId: planId
-        id: id
-        state: CREATING
-        serviceId: serviceId
-        landscapeLabel: landscapeLabel
-        brokerId: brokerId
         dashboardUrl: dashboardUrl
-        subaccountGUID: subaccountGUID
-        platformId: platformId
-        serviceName: serviceName
+        description: description
+        environmentType: cloudfoundry
+        globalAccountGUID: globalAccountGUID
+        id: id
         labels: labels
-        createdDate: 0.8008281904610115
+        landscapeLabel: landscapeLabel
         modifiedDate: 6.027456183070403
         name: name
-        tenantId: tenantId
         operation: operation
         parameters: parameters
+        planId: planId
+        planName: planName
+        platformId: platformId
+        serviceId: serviceId
+        serviceName: serviceName
+        state: CREATING
+        stateMessage: stateMessage
+        subaccountGUID: subaccountGUID
+        tenantId: tenantId
+        type: Provision
       properties:
         brokerId:
           description: The ID of the associated environment broker.
@@ -1719,62 +1719,62 @@ components:
     EnvironmentInstancesResponseCollection:
       example:
         environmentInstances:
-        - environmentType: cloudfoundry
+        - brokerId: brokerId
+          commercialType: commercialType
+          createdDate: 0.8008281904610115
           customLabels:
             key:
             - customLabels
             - customLabels
-          stateMessage: stateMessage
-          description: description
-          planName: planName
-          commercialType: commercialType
-          type: Provision
-          globalAccountGUID: globalAccountGUID
-          planId: planId
-          id: id
-          state: CREATING
-          serviceId: serviceId
-          landscapeLabel: landscapeLabel
-          brokerId: brokerId
           dashboardUrl: dashboardUrl
-          subaccountGUID: subaccountGUID
-          platformId: platformId
-          serviceName: serviceName
+          description: description
+          environmentType: cloudfoundry
+          globalAccountGUID: globalAccountGUID
+          id: id
           labels: labels
-          createdDate: 0.8008281904610115
+          landscapeLabel: landscapeLabel
           modifiedDate: 6.027456183070403
           name: name
-          tenantId: tenantId
           operation: operation
           parameters: parameters
-        - environmentType: cloudfoundry
+          planId: planId
+          planName: planName
+          platformId: platformId
+          serviceId: serviceId
+          serviceName: serviceName
+          state: CREATING
+          stateMessage: stateMessage
+          subaccountGUID: subaccountGUID
+          tenantId: tenantId
+          type: Provision
+        - brokerId: brokerId
+          commercialType: commercialType
+          createdDate: 0.8008281904610115
           customLabels:
             key:
             - customLabels
             - customLabels
-          stateMessage: stateMessage
-          description: description
-          planName: planName
-          commercialType: commercialType
-          type: Provision
-          globalAccountGUID: globalAccountGUID
-          planId: planId
-          id: id
-          state: CREATING
-          serviceId: serviceId
-          landscapeLabel: landscapeLabel
-          brokerId: brokerId
           dashboardUrl: dashboardUrl
-          subaccountGUID: subaccountGUID
-          platformId: platformId
-          serviceName: serviceName
+          description: description
+          environmentType: cloudfoundry
+          globalAccountGUID: globalAccountGUID
+          id: id
           labels: labels
-          createdDate: 0.8008281904610115
+          landscapeLabel: landscapeLabel
           modifiedDate: 6.027456183070403
           name: name
-          tenantId: tenantId
           operation: operation
           parameters: parameters
+          planId: planId
+          planName: planName
+          platformId: platformId
+          serviceId: serviceId
+          serviceName: serviceName
+          state: CREATING
+          stateMessage: stateMessage
+          subaccountGUID: subaccountGUID
+          tenantId: tenantId
+          type: Provision
       properties:
         environmentInstances:
           description: List of all the environment instances
@@ -1785,8 +1785,8 @@ components:
     ErrorResponse:
       example:
         code: 0
-        description: description
         correlationID: correlationID
+        description: description
         details:
         - code: 6
           message: message
@@ -1824,16 +1824,16 @@ components:
       description: The response list of all bindings for a given environment instance.
       example:
         bindings:
-        - createdDate: createdDate
-          instanceId: instanceId
+        - bindingId: bindingId
           createdBy: createdBy
-          bindingId: bindingId
+          createdDate: createdDate
           expiresAt: expiresAt
-        - createdDate: createdDate
           instanceId: instanceId
+        - bindingId: bindingId
           createdBy: createdBy
-          bindingId: bindingId
+          createdDate: createdDate
           expiresAt: expiresAt
+          instanceId: instanceId
       properties:
         bindings:
           items:
@@ -1842,20 +1842,20 @@ components:
       type: object
     GetEnvironmentInstanceBindingResponse:
       example:
-        endpoints:
-        - "{}"
-        - "{}"
-        metadata:
-          key: "{}"
-        route_service_url: route_service_url
         credentials:
-          key: "{}"
+          key: {}
+        endpoints:
+        - {}
+        - {}
+        metadata:
+          key: {}
+        parameters:
+          key: {}
+        route_service_url: route_service_url
         syslog_drain_url: syslog_drain_url
         volume_mounts:
-        - "{}"
-        - "{}"
-        parameters:
-          key: "{}"
+        - {}
+        - {}
       properties:
         credentials:
           additionalProperties:
@@ -1915,7 +1915,7 @@ components:
       example:
         identifying: true
         type: STRING
-        value: "{}"
+        value: {}
       properties:
         identifying:
           type: boolean
@@ -1932,16 +1932,16 @@ components:
     JobStatusResponseObject:
       example:
         customParams:
-          key: "{}"
+          key: {}
         description: description
         jobParams:
           key:
             identifying: true
             type: STRING
-            value: "{}"
-        statusDetails:
-          key: "{}"
+            value: {}
         status: IN_PROGRESS
+        statusDetails:
+          key: {}
       properties:
         customParams:
           additionalProperties:
@@ -1975,7 +1975,7 @@ components:
       description: JSON object with labels as key-value pairs that specify custom
         attributes of the entity.
       example:
-        labels: "{}"
+        labels: {}
       properties:
         labels:
           description: |-
@@ -1995,7 +1995,7 @@ components:
     LabelsResponseObject:
       description: Labels assigned as key-value pairs to the entity.
       example:
-        labels: "{}"
+        labels: {}
       properties:
         labels:
           description: |-
@@ -2027,14 +2027,14 @@ components:
       type: object
     QuotaResourcesResponseObject:
       example:
-        resourceTechnicalName: resourceTechnicalName
+        additionalInfo:
+          key: {}
+        description: description
         displayName: displayName
         resourceData:
-          key: "{}"
-        additionalInfo:
-          key: "{}"
-        description: description
+          key: {}
         resourceProvider: resourceProvider
+        resourceTechnicalName: resourceTechnicalName
         resourceType: resourceType
       properties:
         additionalInfo:
@@ -2071,68 +2071,68 @@ components:
     ServicePlanAssignmentsResponseCollection:
       example:
         quotas:
-        - unlimited: true
-          resources:
-          - resourceTechnicalName: resourceTechnicalName
-            displayName: displayName
-            resourceData:
-              key: "{}"
-            additionalInfo:
-              key: "{}"
-            description: description
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          - resourceTechnicalName: resourceTechnicalName
-            displayName: displayName
-            resourceData:
-              key: "{}"
-            additionalInfo:
-              key: "{}"
-            description: description
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          subaccountGUID: subaccountGUID
-          serviceCategory: PLATFORM
-          provisioningMethod: SERVICE_BROKER
-          consumedQuota: 0
+        - consumedQuota: 0
           globalAccountGUID: globalAccountGUID
-          service: service
-          quota: 6
-          tenantId: tenantId
           globalAccountId: globalAccountId
           plan: plan
-          uniqueIdentifier: uniqueIdentifier
-        - unlimited: true
-          resources:
-          - resourceTechnicalName: resourceTechnicalName
-            displayName: displayName
-            resourceData:
-              key: "{}"
-            additionalInfo:
-              key: "{}"
-            description: description
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          - resourceTechnicalName: resourceTechnicalName
-            displayName: displayName
-            resourceData:
-              key: "{}"
-            additionalInfo:
-              key: "{}"
-            description: description
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          subaccountGUID: subaccountGUID
-          serviceCategory: PLATFORM
           provisioningMethod: SERVICE_BROKER
-          consumedQuota: 0
-          globalAccountGUID: globalAccountGUID
-          service: service
           quota: 6
+          resources:
+          - additionalInfo:
+              key: {}
+            description: description
+            displayName: displayName
+            resourceData:
+              key: {}
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
+          - additionalInfo:
+              key: {}
+            description: description
+            displayName: displayName
+            resourceData:
+              key: {}
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
+          service: service
+          serviceCategory: PLATFORM
+          subaccountGUID: subaccountGUID
           tenantId: tenantId
+          uniqueIdentifier: uniqueIdentifier
+          unlimited: true
+        - consumedQuota: 0
+          globalAccountGUID: globalAccountGUID
           globalAccountId: globalAccountId
           plan: plan
+          provisioningMethod: SERVICE_BROKER
+          quota: 6
+          resources:
+          - additionalInfo:
+              key: {}
+            description: description
+            displayName: displayName
+            resourceData:
+              key: {}
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
+          - additionalInfo:
+              key: {}
+            description: description
+            displayName: displayName
+            resourceData:
+              key: {}
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
+          service: service
+          serviceCategory: PLATFORM
+          subaccountGUID: subaccountGUID
+          tenantId: tenantId
           uniqueIdentifier: uniqueIdentifier
+          unlimited: true
       properties:
         quotas:
           items:
@@ -2141,37 +2141,37 @@ components:
       type: object
     ServicePlanAssignmentsResponseObject:
       example:
-        unlimited: true
-        resources:
-        - resourceTechnicalName: resourceTechnicalName
-          displayName: displayName
-          resourceData:
-            key: "{}"
-          additionalInfo:
-            key: "{}"
-          description: description
-          resourceProvider: resourceProvider
-          resourceType: resourceType
-        - resourceTechnicalName: resourceTechnicalName
-          displayName: displayName
-          resourceData:
-            key: "{}"
-          additionalInfo:
-            key: "{}"
-          description: description
-          resourceProvider: resourceProvider
-          resourceType: resourceType
-        subaccountGUID: subaccountGUID
-        serviceCategory: PLATFORM
-        provisioningMethod: SERVICE_BROKER
         consumedQuota: 0
         globalAccountGUID: globalAccountGUID
-        service: service
-        quota: 6
-        tenantId: tenantId
         globalAccountId: globalAccountId
         plan: plan
+        provisioningMethod: SERVICE_BROKER
+        quota: 6
+        resources:
+        - additionalInfo:
+            key: {}
+          description: description
+          displayName: displayName
+          resourceData:
+            key: {}
+          resourceProvider: resourceProvider
+          resourceTechnicalName: resourceTechnicalName
+          resourceType: resourceType
+        - additionalInfo:
+            key: {}
+          description: description
+          displayName: displayName
+          resourceData:
+            key: {}
+          resourceProvider: resourceProvider
+          resourceTechnicalName: resourceTechnicalName
+          resourceType: resourceType
+        service: service
+        serviceCategory: PLATFORM
+        subaccountGUID: subaccountGUID
+        tenantId: tenantId
         uniqueIdentifier: uniqueIdentifier
+        unlimited: true
       properties:
         consumedQuota:
           description: The quantity of consumed quota. The service owner can provide
@@ -2236,8 +2236,8 @@ components:
       description: JSON object with configuration parameters specific to environment
         instance.
       example:
+        parameters: {}
         planName: planName
-        parameters: "{}"
       properties:
         parameters:
           description: "If needed, you can pass environment-specific configuration\

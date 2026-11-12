@@ -51,7 +51,10 @@ type OperationResponseObject struct {
 	Type *string `json:"type,omitempty"`
 	// The last time the resource was updated. <br/>In ISO 8601 format. <br/>Recommended field if \"state\": \"succeeded\" or \"state\": \"failed\".
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _OperationResponseObject OperationResponseObject
 
 // NewOperationResponseObject instantiates a new OperationResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -640,7 +643,48 @@ func (o OperationResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updated_at"] = o.UpdatedAt
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *OperationResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varOperationResponseObject := _OperationResponseObject{}
+
+	err = json.Unmarshal(data, &varOperationResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = OperationResponseObject(varOperationResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "correlation_id")
+		delete(additionalProperties, "created_at")
+		delete(additionalProperties, "deletion_scheduled")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "errors")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "platform_id")
+		delete(additionalProperties, "ready")
+		delete(additionalProperties, "reschedule")
+		delete(additionalProperties, "resource_id")
+		delete(additionalProperties, "resource_type")
+		delete(additionalProperties, "state")
+		delete(additionalProperties, "transitive_resources")
+		delete(additionalProperties, "type")
+		delete(additionalProperties, "updated_at")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableOperationResponseObject struct {

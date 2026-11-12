@@ -23,7 +23,10 @@ type IdentityProviderMapping struct {
 	AttributeName *string `json:"attributeName,omitempty"`
 	AttributeValue *string `json:"attributeValue,omitempty"`
 	Operator *string `json:"operator,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _IdentityProviderMapping IdentityProviderMapping
 
 // NewIdentityProviderMapping instantiates a new IdentityProviderMapping object
 // This constructor will assign default values to properties that have it defined,
@@ -192,7 +195,36 @@ func (o IdentityProviderMapping) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Operator) {
 		toSerialize["operator"] = o.Operator
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *IdentityProviderMapping) UnmarshalJSON(data []byte) (err error) {
+	varIdentityProviderMapping := _IdentityProviderMapping{}
+
+	err = json.Unmarshal(data, &varIdentityProviderMapping)
+
+	if err != nil {
+		return err
+	}
+
+	*o = IdentityProviderMapping(varIdentityProviderMapping)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "roleCollectionName")
+		delete(additionalProperties, "attributeName")
+		delete(additionalProperties, "attributeValue")
+		delete(additionalProperties, "operator")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableIdentityProviderMapping struct {

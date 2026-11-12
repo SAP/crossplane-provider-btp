@@ -23,7 +23,10 @@ type ScimCore struct {
 	ExternalId *string `json:"externalId,omitempty"`
 	Meta *ScimMeta `json:"meta,omitempty"`
 	Schemas []string `json:"schemas,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ScimCore ScimCore
 
 // NewScimCore instantiates a new ScimCore object
 // This constructor will assign default values to properties that have it defined,
@@ -192,7 +195,36 @@ func (o ScimCore) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Schemas) {
 		toSerialize["schemas"] = o.Schemas
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ScimCore) UnmarshalJSON(data []byte) (err error) {
+	varScimCore := _ScimCore{}
+
+	err = json.Unmarshal(data, &varScimCore)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ScimCore(varScimCore)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "externalId")
+		delete(additionalProperties, "meta")
+		delete(additionalProperties, "schemas")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableScimCore struct {

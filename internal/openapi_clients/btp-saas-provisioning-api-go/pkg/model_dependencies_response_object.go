@@ -31,7 +31,10 @@ type DependenciesResponseObject struct {
 	ProviderSubaccountID *string `json:"providerSubaccountID,omitempty"`
 	// The xsappname configured in the security descriptor file used to create the XSUAA instance.
 	Xsappname *string `json:"xsappname,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _DependenciesResponseObject DependenciesResponseObject
 
 // NewDependenciesResponseObject instantiates a new DependenciesResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -270,7 +273,38 @@ func (o DependenciesResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Xsappname) {
 		toSerialize["xsappname"] = o.Xsappname
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *DependenciesResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varDependenciesResponseObject := _DependenciesResponseObject{}
+
+	err = json.Unmarshal(data, &varDependenciesResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = DependenciesResponseObject(varDependenciesResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "appId")
+		delete(additionalProperties, "appName")
+		delete(additionalProperties, "dependencies")
+		delete(additionalProperties, "error")
+		delete(additionalProperties, "providerSubaccountID")
+		delete(additionalProperties, "xsappname")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableDependenciesResponseObject struct {
