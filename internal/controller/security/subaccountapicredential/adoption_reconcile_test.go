@@ -65,6 +65,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 		name                    string
 		includeClientSecret     bool
 		certificateInput        bool
+		initProviderSubaccount  bool
 		credentialType          string
 		coldStart               bool
 		newAdopter              bool
@@ -86,9 +87,11 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 		{name: "incomplete state is rejected", includeClientSecret: false, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
 		{name: "absent target is not created under Observe-only policy", managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, noCreatePolicy: true, wantReady: corev1.ConditionUnknown, wantSynced: corev1.ConditionFalse},
 		{name: "fresh Create proceeds without a destination Secret", includeClientSecret: true, missingDestination: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
+		{name: "fresh Create uses initProvider-only subaccount", includeClientSecret: true, initProviderSubaccount: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionAll}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "cold state is reconstructed from complete connection Secret", includeClientSecret: true, coldStart: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "cold state without client secret is rejected", includeClientSecret: false, coldStart: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
 		{name: "new Observe-only adopter with only client_secret", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
+		{name: "initProvider-only subaccount adopter uses effective identity", includeClientSecret: true, coldStart: true, newAdopter: true, initProviderSubaccount: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "unowned Opaque Secret refuses adoption publication", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, opaqueDestinationSecret: true, wantPublicationFailure: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionFalse},
 		{name: "new mutation-capable adopter with only client_secret", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionAll}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "new Observe-only adopter with public fields only is rejected", coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
@@ -198,6 +201,10 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 					},
 				},
 			}
+			if tc.initProviderSubaccount {
+				cr.Spec.ForProvider.SubaccountID = nil
+				cr.Spec.InitProvider.SubaccountID = strptr(adoptionTestSubaccountID)
+			}
 			if tc.certificateInput {
 				cr.Spec.ForProvider.CertificatePassed = strptr("synthetic certificate input")
 			}
@@ -247,7 +254,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 				ujcontroller.WithTerraformPluginFrameworkMetricRecorder(&metrics.MetricRecorder{}),
 				ujcontroller.WithTerraformPluginFrameworkLogger(logging.NewNopLogger()),
 			}
-			if tc.noCreatePolicy {
+			if tc.policyFeatureEnabled {
 				connectorOptions = append(connectorOptions, ujcontroller.WithTerraformPluginFrameworkManagementPolicies(true))
 			}
 			connector := ujcontroller.NewTerraformPluginFrameworkConnector(kube, setup, resourceConfig, store, connectorOptions...)
@@ -278,7 +285,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 			// cold cases instead start from the fixture's status and destination;
 			// new adopters deliberately have no observed status at all.
 			if !tc.coldStart {
-				if _, err := newReconciler(newCredentialAdoptionConnector(connector, kube), tc.noCreatePolicy, kube).Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
+				if _, err := newReconciler(newCredentialAdoptionConnector(connector, kube, tc.policyFeatureEnabled), tc.noCreatePolicy, kube).Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
 					t.Fatalf("initial managed reconcile failed: %v", err)
 				}
 				if tc.noCreatePolicy {
@@ -332,9 +339,16 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 				publicationFailure = &failOnceConnectionSecretPatchClient{Client: kube, secretName: connectionSecret.Name}
 				publicationClient = publicationFailure
 			}
-			adoptionReconciler := newReconciler(newCredentialAdoptionConnector(adoptionConnector, publicationClient), tc.policyFeatureEnabled, publicationClient)
+			adoptionReconciler := newReconciler(newCredentialAdoptionConnector(adoptionConnector, publicationClient, tc.policyFeatureEnabled), tc.policyFeatureEnabled, publicationClient)
 			if _, err := adoptionReconciler.Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
 				t.Fatalf("adoption reconciliation failed: %v", err)
+			}
+			if tc.initProviderSubaccount && !tc.coldStart {
+				for range 3 {
+					if _, err := adoptionReconciler.Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
+						t.Fatalf("follow-up fresh initProvider reconciliation failed: %v", err)
+					}
+				}
 			}
 			if tc.coldStart && tc.includeClientSecret {
 				if _, err := adoptionReconciler.Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {

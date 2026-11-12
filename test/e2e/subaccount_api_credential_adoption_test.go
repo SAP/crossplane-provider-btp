@@ -67,6 +67,17 @@ func TestSubaccountApiCredentialConditionalAdoption(t *testing.T) {
 			assertCompleteCredentialSecretE2E(t, ctx, cfg, created)
 			assertCredentialIdentityE2E(t, created)
 
+			// Exercise reference resolution for initProvider on a genuinely fresh
+			// resource. Excluding LateInitialize keeps the subaccount out of
+			// forProvider so it cannot mask the effective-parameter regression.
+			initSourceName := "sac-adopt-init-source-" + BUILD_ID
+			initSourceSecretName := initSourceName + "-secret"
+			initSource := createInitProviderCredentialSourceE2E(ctx, t, cfg, initSourceName, initSourceSecretName)
+			waitForResource(initSource, cfg, t, wait.WithTimeout(timeout))
+			initSource = getCredentialForAdoptionE2E(ctx, t, cfg, initSource.Name)
+			assertCompleteCredentialSecretE2E(t, ctx, cfg, initSource)
+			assertCredentialIdentityE2E(t, initSource)
+
 			// The Framework reconstructs sensitive observation from the configured
 			// destination Secret. Seed only the secret in a distinct destination;
 			// Read must obtain the public fields from the existing target.
@@ -95,6 +106,33 @@ func TestSubaccountApiCredentialConditionalAdoption(t *testing.T) {
 				t.Error("adoption changed the established client_secret")
 			}
 
+			// A no-status adopter gets its subaccount from initProvider while its
+			// explicit forProvider name and compound annotation select the source.
+			initAdopterName := "sac-adopt-init-complete-" + BUILD_ID
+			initSourceSecret := getCredentialSecretE2E(ctx, t, cfg, initSource)
+			createCredentialSecretE2E(ctx, t, cfg, initAdopterName+"-secret", map[string][]byte{
+				"attribute.client_secret": append([]byte(nil), initSourceSecret.Data["attribute.client_secret"]...),
+			})
+			initAdopter := createInitProviderCredentialAdopterE2E(ctx, t, cfg, initAdopterName, initAdopterName+"-secret", initSource)
+			if !waitForCredentialReadyAndSyncedE2E(ctx, t, cfg, initAdopter.Name, timeout) {
+				return ctx
+			}
+			initAdopter = getCredentialForAdoptionE2E(ctx, t, cfg, initAdopter.Name)
+			assertCompleteCredentialSecretE2E(t, ctx, cfg, initAdopter)
+			assertCredentialIdentityE2E(t, initAdopter)
+			gotInitAdopterSecret := getCredentialSecretE2E(ctx, t, cfg, initAdopter)
+			for _, key := range credentialConnectionSecretKeys {
+				if !bytes.Equal(gotInitAdopterSecret.Data[key], initSourceSecret.Data[key]) {
+					t.Errorf("initProvider adoption changed connection Secret key %q", key)
+				}
+			}
+			if initAdopter.Spec.ForProvider.SubaccountID != nil || valueForAdoptionE2E(initAdopter.Spec.InitProvider.SubaccountID) != valueForAdoptionE2E(initSource.Status.AtProvider.SubaccountID) {
+				t.Error("initProvider adoption persisted or changed the configured subaccount identity")
+			}
+			if valueForAdoptionE2E(initAdopter.Spec.ForProvider.Name) != valueForAdoptionE2E(initSource.Status.AtProvider.Name) {
+				t.Error("initProvider adoption changed the explicit forProvider credential name")
+			}
+
 			// An existing but incomplete destination lets the Framework observe the
 			// BTP target while proving that public fields alone are not adoption.
 			incompleteAdopterName := "sac-adopt-incomplete-" + BUILD_ID
@@ -120,6 +158,7 @@ func TestSubaccountApiCredentialConditionalAdoption(t *testing.T) {
 		}).Teardown(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 		// Remove the Observe-only MRs before deleting the source credential.
 		for _, name := range []string{
+			"sac-adopt-init-complete-" + BUILD_ID,
 			"sac-adopt-incomplete-" + BUILD_ID,
 			"sac-adopt-certificate-input-" + BUILD_ID,
 			"sac-adopt-complete-" + BUILD_ID,
@@ -129,12 +168,16 @@ func TestSubaccountApiCredentialConditionalAdoption(t *testing.T) {
 				AwaitResourceDeletionOrFail(ctx, t, cfg, mr, wait.WithTimeout(3*time.Minute))
 			}
 		}
-		source := &securityv1alpha1.SubaccountApiCredential{}
-		if err := cfg.Client().Resources().Get(ctx, "sac-adopt-source-"+BUILD_ID, cfg.Namespace(), source); err == nil {
-			AwaitResourceDeletionOrFail(ctx, t, cfg, source, wait.WithTimeout(5*time.Minute))
+		for _, name := range []string{"sac-adopt-init-source-" + BUILD_ID, "sac-adopt-source-" + BUILD_ID} {
+			source := &securityv1alpha1.SubaccountApiCredential{}
+			if err := cfg.Client().Resources().Get(ctx, name, cfg.Namespace(), source); err == nil {
+				AwaitResourceDeletionOrFail(ctx, t, cfg, source, wait.WithTimeout(5*time.Minute))
+			}
 		}
 		for _, name := range []string{
 			"sac-adopt-source-secret-" + BUILD_ID,
+			"sac-adopt-init-source-" + BUILD_ID + "-secret",
+			"sac-adopt-init-complete-" + BUILD_ID + "-secret",
 			"sac-adopt-complete-" + BUILD_ID + "-secret",
 			"sac-adopt-incomplete-" + BUILD_ID + "-secret",
 			"sac-adopt-certificate-input-" + BUILD_ID + "-secret",
@@ -210,6 +253,75 @@ func createCredentialForAdoptionE2E(
 	}
 	if err := cfg.Client().Resources().Create(ctx, credential); err != nil {
 		t.Fatalf("create adoption MR %q: %v", name, err)
+	}
+	return credential
+}
+
+func createInitProviderCredentialSourceE2E(
+	ctx context.Context,
+	t *testing.T,
+	cfg *envconf.Config,
+	name string,
+	secretName string,
+) *securityv1alpha1.SubaccountApiCredential {
+	t.Helper()
+	readOnly := false
+	credential := &securityv1alpha1.SubaccountApiCredential{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: cfg.Namespace()},
+		Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
+				ManagementPolicies: []xpv1.ManagementAction{
+					xpv1.ManagementActionObserve,
+					xpv1.ManagementActionCreate,
+					xpv1.ManagementActionUpdate,
+					xpv1.ManagementActionDelete,
+				},
+				WriteConnectionSecretToReference: &xpv1.SecretReference{Name: secretName, Namespace: cfg.Namespace()},
+			},
+			ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{Name: &name, ReadOnly: &readOnly},
+			InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{
+				SubaccountRef: &xpv1.Reference{Name: "sac-orphan-subaccount"},
+			},
+		},
+	}
+	if err := cfg.Client().Resources().Create(ctx, credential); err != nil {
+		t.Fatalf("create initProvider source SubaccountApiCredential %q: %v", name, err)
+	}
+	return credential
+}
+
+func createInitProviderCredentialAdopterE2E(
+	ctx context.Context,
+	t *testing.T,
+	cfg *envconf.Config,
+	name string,
+	secretName string,
+	established *securityv1alpha1.SubaccountApiCredential,
+) *securityv1alpha1.SubaccountApiCredential {
+	t.Helper()
+	subaccountID := established.Status.AtProvider.SubaccountID
+	credentialName := valueForAdoptionE2E(established.Status.AtProvider.Name)
+	if subaccountID == nil || *subaccountID == "" || credentialName == "" {
+		t.Fatal("initProvider source has incomplete observed identity")
+	}
+	credential := &securityv1alpha1.SubaccountApiCredential{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name, Namespace: cfg.Namespace(),
+			Annotations: map[string]string{
+				xpmeta.AnnotationKeyExternalName: fmt.Sprintf("%s/%s", *subaccountID, credentialName),
+			},
+		},
+		Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+			ClusterManagedResourceSpec: xpv1.ClusterManagedResourceSpec{
+				ManagementPolicies:               []xpv1.ManagementAction{xpv1.ManagementActionObserve},
+				WriteConnectionSecretToReference: &xpv1.SecretReference{Name: secretName, Namespace: cfg.Namespace()},
+			},
+			ForProvider:  securityv1alpha1.SubaccountApiCredentialParameters{Name: &credentialName},
+			InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{SubaccountID: subaccountID},
+		},
+	}
+	if err := cfg.Client().Resources().Create(ctx, credential); err != nil {
+		t.Fatalf("create initProvider adopter %q: %v", name, err)
 	}
 	return credential
 }

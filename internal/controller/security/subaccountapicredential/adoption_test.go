@@ -159,7 +159,7 @@ func TestCredentialAdoptionConnectorPinsIdentityForConnect(t *testing.T) {
 		connectedExternalName = meta.GetExternalName(got)
 		return managed.ExternalClientFns{}, nil
 	})
-	wrapped := newCredentialAdoptionConnector(inner, nil)
+	wrapped := newCredentialAdoptionConnector(inner, nil, false)
 	if _, err := wrapped.Connect(context.Background(), cr); err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestCredentialAdoptionConnectorDoesNotReconstructStateDuringDeletion(t *tes
 		}
 		return managed.ExternalClientFns{}, nil
 	})
-	if _, err := newCredentialAdoptionConnector(inner, nil).Connect(context.Background(), cr); err != nil {
+	if _, err := newCredentialAdoptionConnector(inner, nil, false).Connect(context.Background(), cr); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -288,14 +288,27 @@ func TestPinEstablishedIdentity(t *testing.T) {
 
 func TestCredentialFrameworkStateReadIdentity(t *testing.T) {
 	for _, tc := range []struct {
-		name       string
-		specID     string
-		observedID string
-		wantID     string
+		name                string
+		specID              string
+		initID              string
+		observedID          string
+		observedName        string
+		wantID              string
+		wantName            string
+		mergeInit           bool
+		omitForProviderName bool
+		initName            string
 	}{
-		{name: "new MR uses spec identity", specID: "subaccount-new", wantID: "subaccount-new"},
-		{name: "observed identity wins over drifted spec", specID: "subaccount-drifted", observedID: "subaccount-established", wantID: "subaccount-established"},
-		{name: "partial observed identity is retained", observedID: "subaccount-established", wantID: "subaccount-established"},
+
+		{name: "new MR uses spec identity", specID: "subaccount-new", wantID: "subaccount-new", wantName: "configured-name"},
+		{name: "initProvider subaccount with explicit forProvider name", initID: "subaccount-init", wantID: "subaccount-init", wantName: "configured-name", mergeInit: true},
+		{name: "forProvider identity takes precedence", specID: "subaccount-forprovider", initID: "subaccount-init", wantID: "subaccount-forprovider", wantName: "configured-name", mergeInit: true},
+		{name: "feature-disabled ignores initProvider", initID: "subaccount-init", wantName: "configured-name"},
+		{name: "observed identity wins over drifted spec", specID: "subaccount-drifted", observedID: "subaccount-established", wantID: "subaccount-established", wantName: "configured-name"},
+		{name: "partial observed identity is retained", observedID: "subaccount-established", wantID: "subaccount-established", wantName: "configured-name"},
+		{name: "established identity components win over drift", initID: "subaccount-drifted", observedID: "subaccount-established", observedName: "credential-established", wantID: "subaccount-established", wantName: "credential-established", mergeInit: true},
+		{name: "effective initProvider name", initID: "subaccount-init", wantID: "subaccount-init", wantName: "init-configured-name", mergeInit: true, omitForProviderName: true, initName: "init-configured-name"},
+		{name: "default name remains external-name fallback", initID: "subaccount-init", wantID: "subaccount-init", mergeInit: true, omitForProviderName: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			scheme := runtime.NewScheme()
@@ -316,26 +329,33 @@ func TestCredentialFrameworkStateReadIdentity(t *testing.T) {
 					ClusterManagedResourceSpec: xpv2.ClusterManagedResourceSpec{
 						WriteConnectionSecretToReference: &xpv2.SecretReference{Name: secret.Name, Namespace: secret.Namespace},
 					},
-					ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{SubaccountID: strptr(tc.specID), Name: strptr("configured-name")},
+					ForProvider:  securityv1alpha1.SubaccountApiCredentialParameters{SubaccountID: strptr(tc.specID), Name: strptr("configured-name")},
+					InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{SubaccountID: strptr(tc.initID), Name: strptr(tc.initName)},
 				},
 				Status: securityv1alpha1.SubaccountApiCredentialStatus{
-					AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{SubaccountID: strptr(tc.observedID)},
+					AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{SubaccountID: strptr(tc.observedID), Name: strptr(tc.observedName)},
 				},
+			}
+			if tc.omitForProviderName {
+				cr.Spec.ForProvider.Name = nil
 			}
 			wrapped := &credentialFrameworkState{
 				SubaccountApiCredential: cr,
 				ctx:                     context.Background(),
 				kube:                    kubefake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build(),
+				mergeInitProvider:       tc.mergeInit,
 			}
 			observation, err := wrapped.GetObservation()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if observation["subaccount_id"] != tc.wantID {
-				t.Errorf("Read subaccount = %q, want %q", observation["subaccount_id"], tc.wantID)
+			gotSubaccountID, _ := observation["subaccount_id"].(string)
+			if gotSubaccountID != tc.wantID {
+				t.Errorf("Read subaccount = %q, want %q", gotSubaccountID, tc.wantID)
 			}
-			if observation["name"] != "configured-name" {
-				t.Error("configured name was not retained in reconstructed Read state")
+			gotName, _ := observation["name"].(string)
+			if gotName != tc.wantName {
+				t.Errorf("Read name = %q, want %q", gotName, tc.wantName)
 			}
 			if observation["client_secret"] != "synthetic-secret" {
 				t.Error("connection secret was not restored to the in-memory state")

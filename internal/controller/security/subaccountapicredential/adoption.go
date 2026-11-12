@@ -29,7 +29,7 @@ var requiredCredentialConnectionKeys = []string{
 
 // newCredentialAdoptionConnector wraps the generated Terraform Framework client
 // with the resource-specific complete-connection-data adoption check.
-func newCredentialAdoptionConnector(inner managed.ExternalConnector, kube client.Client) managed.ExternalConnector {
+func newCredentialAdoptionConnector(inner managed.ExternalConnector, kube client.Client, mergeInitProvider bool) managed.ExternalConnector {
 	return managed.ExternalConnectorFn(func(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 		cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
 		if !ok {
@@ -55,6 +55,7 @@ func newCredentialAdoptionConnector(inner managed.ExternalConnector, kube client
 				SubaccountApiCredential: cr,
 				ctx:                     ctx,
 				kube:                    kube,
+				mergeInitProvider:       mergeInitProvider,
 			}
 		}
 		connected, err := inner.Connect(ctx, connectResource)
@@ -143,8 +144,9 @@ func hasCompleteCredentialConnectionDetails(details managed.ConnectionDetails) b
 // reconstructs from CR status and spec parameters.
 type credentialFrameworkState struct {
 	*securityv1alpha1.SubaccountApiCredential
-	ctx  context.Context `json:"-"`
-	kube client.Client   `json:"-"`
+	ctx               context.Context `json:"-"`
+	kube              client.Client   `json:"-"`
+	mergeInitProvider bool            `json:"-"`
 }
 
 // UnwrapManagedResource keeps generic reference tracking on the Kubernetes
@@ -163,21 +165,25 @@ func (r *credentialFrameworkState) GetObservation() (map[string]any, error) {
 	}
 	// Restoring sensitive fields makes even a new MR's observation nonempty.
 	// Upjet then skips copying spec parameters into reconstructed state, so
-	// supply the required Read identity explicitly. Prefer observed identity;
-	// Connect has already pinned the spec to established identity when present.
-	// Keep Secret data from overriding that identity. Also seed the name so a
-	// fresh resource with no annotation probes the configured name, not the
-	// default. Upjet's identifier hook still applies any external-name annotation.
+	// supply the required Read identity explicitly. Use the generated merge
+	// semantics with the same management-policy feature flag as the connector.
+	// Established observation wins over all configuration and Secret data.
+	parameters, err := r.GetMergedParameters(r.mergeInitProvider)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot resolve effective credential parameters for reconstructed Terraform state")
+	}
+	delete(observation, "subaccount_id")
+	delete(observation, "name")
 	subaccountID := value(r.Status.AtProvider.SubaccountID)
 	if subaccountID == "" {
-		subaccountID = value(r.Spec.ForProvider.SubaccountID)
+		subaccountID, _ = parameters["subaccount_id"].(string)
 	}
 	if subaccountID != "" {
 		observation["subaccount_id"] = subaccountID
 	}
 	name := value(r.Status.AtProvider.Name)
 	if name == "" {
-		name = value(r.Spec.ForProvider.Name)
+		name, _ = parameters["name"].(string)
 	}
 	if name != "" {
 		observation["name"] = name
