@@ -65,6 +65,9 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 		name                 string
 		includeClientSecret  bool
 		coldStart            bool
+		newAdopter           bool
+		emptyConnection      bool
+		driftedSubaccount    bool
 		missingDestination   bool
 		noCreatePolicy       bool
 		failPublicationOnce  bool
@@ -81,6 +84,11 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 		{name: "fresh Create proceeds without a destination Secret", includeClientSecret: true, missingDestination: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "cold state is reconstructed from complete connection Secret", includeClientSecret: true, coldStart: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "cold state without client secret is rejected", includeClientSecret: false, coldStart: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
+		{name: "new Observe-only adopter with only client_secret", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
+		{name: "new mutation-capable adopter with only client_secret", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionAll}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
+		{name: "new Observe-only adopter with public fields only is rejected", coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
+		{name: "new Observe-only adopter with empty destination is rejected", coldStart: true, newAdopter: true, emptyConnection: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
+		{name: "established cold identity survives spec subaccount drift", includeClientSecret: true, coldStart: true, driftedSubaccount: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var creates, reads int
@@ -98,21 +106,6 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 					http.Error(w, "unexpected request", http.StatusInternalServerError)
 					return
 				}
-				switch r.URL.RawQuery {
-				case "create":
-					creates++
-					externalExists = true
-				case "get":
-					reads++
-					if !externalExists {
-						w.Header().Set("X-Cpcli-Backend-Status", "404")
-						return
-					}
-				default:
-					t.Errorf("unexpected synthetic BTP action %q", r.URL.RawQuery)
-					http.Error(w, "unexpected action", http.StatusInternalServerError)
-					return
-				}
 				var request struct {
 					ParamValues map[string]string `json:"paramValues"`
 				}
@@ -121,6 +114,23 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 				}
 				if request.ParamValues["subaccount"] != adoptionTestSubaccountID || request.ParamValues["name"] != adoptionTestCredential {
 					t.Errorf("request targeted subaccount/name %q/%q, want %q/%q", request.ParamValues["subaccount"], request.ParamValues["name"], adoptionTestSubaccountID, adoptionTestCredential)
+				}
+				// Check the target even on the absence probe before fresh Create.
+				switch r.URL.RawQuery {
+				case "create":
+					creates++
+					externalExists = true
+				case "get":
+					reads++
+					// Do not let a permissive synthetic server hide a malformed Read.
+					if !externalExists || request.ParamValues["subaccount"] == "" {
+						w.Header().Set("X-Cpcli-Backend-Status", "404")
+						return
+					}
+				default:
+					t.Errorf("unexpected synthetic BTP action %q", r.URL.RawQuery)
+					http.Error(w, "unexpected action", http.StatusInternalServerError)
+					return
 				}
 				response := map[string]any{
 					"tenantmode": "dedicated", "subaccountid": adoptionTestSubaccountID,
@@ -177,13 +187,24 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 			if tc.noCreatePolicy {
 				cr.Spec.ManagementPolicies = tc.managementPolicies
 			}
-			if tc.coldStart {
+			if tc.coldStart && !tc.newAdopter {
 				cr.Status.AtProvider = securityv1alpha1.SubaccountApiCredentialObservation{
 					Name:           strptr(adoptionTestCredential),
 					SubaccountID:   strptr(adoptionTestSubaccountID),
 					CredentialType: strptr("SECRET"),
 				}
+			}
+			if tc.coldStart {
 				meta.SetExternalName(cr, adoptionTestSubaccountID+"/"+adoptionTestCredential)
+			}
+			if tc.newAdopter && (tc.includeClientSecret || tc.emptyConnection) {
+				connectionSecret.Data = map[string][]byte{"unrelated": []byte("preserved")}
+				if tc.includeClientSecret {
+					connectionSecret.Data["attribute.client_secret"] = []byte(adoptionTestClientSecret)
+				}
+			}
+			if tc.driftedSubaccount {
+				cr.Spec.ForProvider.SubaccountID = strptr("drifted-subaccount")
 			}
 			objects := []client.Object{cr}
 			if !tc.missingDestination {
@@ -237,9 +258,10 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 			key := types.NamespacedName{Name: cr.Name}
 			// Warm cases genuinely verify absence, Create the synthetic BTP
 			// credential, and persist complete Framework state in the tracker. The
-			// cold-start case instead begins with only CR status and a complete Secret.
+			// cold cases instead start from the fixture's status and destination;
+			// new adopters deliberately have no observed status at all.
 			if !tc.coldStart {
-				if _, err := newReconciler(connector, tc.noCreatePolicy, kube).Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
+				if _, err := newReconciler(newCredentialAdoptionConnector(connector, kube), tc.noCreatePolicy, kube).Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
 					t.Fatalf("initial managed reconcile failed: %v", err)
 				}
 				if tc.noCreatePolicy {
@@ -341,6 +363,9 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 			got := &securityv1alpha1.SubaccountApiCredential{}
 			if err := kube.Get(context.Background(), key, got); err != nil {
 				t.Fatal(err)
+			}
+			if tc.driftedSubaccount && value(got.Spec.ForProvider.SubaccountID) != "drifted-subaccount" {
+				t.Error("identity pin changed the persisted user spec")
 			}
 			ready := got.GetCondition(xpv2.TypeReady)
 			synced := got.GetCondition(xpv2.TypeSynced)

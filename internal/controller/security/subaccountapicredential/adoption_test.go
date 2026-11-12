@@ -7,8 +7,11 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	kubefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 )
@@ -246,6 +249,67 @@ func TestPinEstablishedIdentity(t *testing.T) {
 			}
 			if got := *cr.Spec.ForProvider.SubaccountID; got != tc.wantID {
 				t.Errorf("subaccount ID mismatch: got %q, want %q", got, tc.wantID)
+			}
+		})
+	}
+}
+
+func TestCredentialFrameworkStateReadIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		specID     string
+		observedID string
+		wantID     string
+	}{
+		{name: "new MR uses spec identity", specID: "subaccount-new", wantID: "subaccount-new"},
+		{name: "observed identity wins over drifted spec", specID: "subaccount-drifted", observedID: "subaccount-established", wantID: "subaccount-established"},
+		{name: "partial observed identity is retained", observedID: "subaccount-established", wantID: "subaccount-established"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			if err := corev1.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "connection", Namespace: "test"},
+				Data: map[string][]byte{
+					"attribute.client_secret": []byte("synthetic-secret"),
+					// Extra keys cannot replace the resource's Read identity.
+					"attribute.subaccount_id": []byte("subaccount-from-secret"),
+					"attribute.name":          []byte("name-from-secret"),
+				},
+			}
+			cr := &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ClusterManagedResourceSpec: xpv2.ClusterManagedResourceSpec{
+						WriteConnectionSecretToReference: &xpv2.SecretReference{Name: secret.Name, Namespace: secret.Namespace},
+					},
+					ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{SubaccountID: strptr(tc.specID), Name: strptr("configured-name")},
+				},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{
+					AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{SubaccountID: strptr(tc.observedID)},
+				},
+			}
+			wrapped := &credentialFrameworkState{
+				SubaccountApiCredential: cr,
+				ctx:                     context.Background(),
+				kube:                    kubefake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build(),
+			}
+			observation, err := wrapped.GetObservation()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if observation["subaccount_id"] != tc.wantID {
+				t.Errorf("Read subaccount = %q, want %q", observation["subaccount_id"], tc.wantID)
+			}
+			if observation["name"] != "configured-name" {
+				t.Error("configured name was not retained in reconstructed Read state")
+			}
+			if observation["client_secret"] != "synthetic-secret" {
+				t.Error("connection secret was not restored to the in-memory state")
+			}
+			if value(cr.Status.AtProvider.SubaccountID) != tc.observedID || value(cr.Spec.ForProvider.SubaccountID) != tc.specID {
+				t.Error("state reconstruction changed the MR's spec or status")
 			}
 		})
 	}

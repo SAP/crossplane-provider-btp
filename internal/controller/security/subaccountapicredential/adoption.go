@@ -149,6 +149,27 @@ func (r *credentialFrameworkState) GetObservation() (map[string]any, error) {
 	if err := upjetresource.GetSensitiveObservation(r.ctx, &credentialSecretClient{kube: r.kube}, r.GetWriteConnectionSecretToReference(), observation); err != nil {
 		return nil, errors.Wrap(err, "cannot restore sensitive Terraform state from the connection Secret")
 	}
+	// Restoring sensitive fields makes even a new MR's observation nonempty.
+	// Upjet then skips copying spec parameters into reconstructed state, so
+	// supply the required Read identity explicitly. Prefer observed identity;
+	// Connect has already pinned the spec to established identity when present.
+	// Keep Secret data from overriding that identity. Also seed the name so a
+	// fresh resource with no annotation probes the configured name, not the
+	// default. Upjet's identifier hook still applies any external-name annotation.
+	subaccountID := value(r.Status.AtProvider.SubaccountID)
+	if subaccountID == "" {
+		subaccountID = value(r.Spec.ForProvider.SubaccountID)
+	}
+	if subaccountID != "" {
+		observation["subaccount_id"] = subaccountID
+	}
+	name := value(r.Status.AtProvider.Name)
+	if name == "" {
+		name = value(r.Spec.ForProvider.Name)
+	}
+	if name != "" {
+		observation["name"] = name
+	}
 	return observation, nil
 }
 
