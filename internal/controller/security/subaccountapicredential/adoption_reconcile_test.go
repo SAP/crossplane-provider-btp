@@ -62,24 +62,26 @@ func (c *failOnceConnectionSecretPatchClient) Patch(ctx context.Context, obj cli
 // only compared in memory and never logged.
 func TestCredentialAdoptionReconcile(t *testing.T) {
 	for _, tc := range []struct {
-		name                    string
-		includeClientSecret     bool
-		certificateInput        bool
-		initProviderSubaccount  bool
-		credentialType          string
-		coldStart               bool
-		newAdopter              bool
-		emptyConnection         bool
-		driftedSubaccount       bool
-		missingDestination      bool
-		noCreatePolicy          bool
-		failPublicationOnce     bool
-		managementPolicies      xpv2.ManagementPolicies
-		policyFeatureEnabled    bool
-		opaqueDestinationSecret bool
-		wantPublicationFailure  bool
-		wantReady               corev1.ConditionStatus
-		wantSynced              corev1.ConditionStatus
+		name                           string
+		includeClientSecret            bool
+		certificateInput               bool
+		ignoredInitProviderCertificate bool
+		initProviderSubaccount         bool
+		existingTarget                 bool
+		credentialType                 string
+		coldStart                      bool
+		newAdopter                     bool
+		emptyConnection                bool
+		driftedSubaccount              bool
+		missingDestination             bool
+		noCreatePolicy                 bool
+		failPublicationOnce            bool
+		managementPolicies             xpv2.ManagementPolicies
+		policyFeatureEnabled           bool
+		opaqueDestinationSecret        bool
+		wantPublicationFailure         bool
+		wantReady                      corev1.ConditionStatus
+		wantSynced                     corev1.ConditionStatus
 	}{
 		{name: "complete state retries after publication failure", includeClientSecret: true, failPublicationOnce: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "complete state is accepted with Observe-only policy", includeClientSecret: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
@@ -89,6 +91,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 		{name: "fresh Create proceeds without a destination Secret", includeClientSecret: true, missingDestination: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "fresh Create uses initProvider-only subaccount", includeClientSecret: true, initProviderSubaccount: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionAll}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "cold state is reconstructed from complete connection Secret", includeClientSecret: true, coldStart: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
+		{name: "ignored initProvider certificate does not suppress secret state reconstruction", includeClientSecret: true, existingTarget: true, ignoredInitProviderCertificate: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "cold state without client secret is rejected", includeClientSecret: false, coldStart: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
 		{name: "new Observe-only adopter with only client_secret", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "initProvider-only subaccount adopter uses effective identity", includeClientSecret: true, coldStart: true, newAdopter: true, initProviderSubaccount: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
@@ -101,7 +104,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var creates, reads int
-			externalExists := tc.coldStart
+			externalExists := tc.coldStart || tc.existingTarget
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("X-Cpcli-Backend-Status", "200")
 				if strings.HasPrefix(r.URL.Path, "/login/") {
@@ -176,7 +179,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 				Type:       destinationSecretType,
 				Data:       map[string][]byte{"unrelated": []byte("preserved")},
 			}
-			if tc.coldStart {
+			if tc.coldStart || tc.existingTarget {
 				connectionSecret.Data = map[string][]byte{
 					"unrelated":           []byte("preserved"),
 					"attribute.client_id": []byte(adoptionTestClientID),
@@ -208,6 +211,9 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 			if tc.certificateInput {
 				cr.Spec.ForProvider.CertificatePassed = strptr("synthetic certificate input")
 			}
+			if tc.ignoredInitProviderCertificate {
+				cr.Spec.InitProvider.CertificatePassed = strptr("ignored synthetic certificate input")
+			}
 			if tc.noCreatePolicy {
 				cr.Spec.ManagementPolicies = tc.managementPolicies
 			}
@@ -218,7 +224,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 					CredentialType: strptr("SECRET"),
 				}
 			}
-			if tc.coldStart {
+			if tc.coldStart || tc.existingTarget {
 				meta.SetExternalName(cr, adoptionTestSubaccountID+"/"+adoptionTestCredential)
 			}
 			if tc.newAdopter && (tc.includeClientSecret || tc.emptyConnection) {
@@ -284,7 +290,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 			// credential, and persist complete Framework state in the tracker. The
 			// cold cases instead start from the fixture's status and destination;
 			// new adopters deliberately have no observed status at all.
-			if !tc.coldStart {
+			if !tc.coldStart && !tc.existingTarget {
 				if _, err := newReconciler(newCredentialAdoptionConnector(connector, kube, tc.policyFeatureEnabled), tc.noCreatePolicy, kube).Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
 					t.Fatalf("initial managed reconcile failed: %v", err)
 				}
@@ -313,7 +319,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 
 			// Simulate an incomplete destination Secret while the Framework state is
 			// still warm, as after a transient publication problem.
-			if tc.includeClientSecret && !tc.coldStart {
+			if tc.includeClientSecret && !tc.coldStart && !tc.existingTarget {
 				partial := &corev1.Secret{}
 				if err := kube.Get(context.Background(), client.ObjectKeyFromObject(connectionSecret), partial); err != nil {
 					t.Fatal(err)
@@ -350,9 +356,9 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 					}
 				}
 			}
-			if tc.coldStart && tc.includeClientSecret {
+			if (tc.coldStart || tc.existingTarget) && tc.includeClientSecret {
 				if _, err := adoptionReconciler.Reconcile(context.Background(), reconcile.Request{NamespacedName: key}); err != nil {
-					t.Fatalf("second cold-state reconcile failed: %v", err)
+					t.Fatalf("second reconstructed-state reconcile failed: %v", err)
 				}
 			}
 			if tc.failPublicationOnce {
@@ -375,7 +381,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 			}
 			wantCreates := 1
 			wantReads := 2
-			if tc.coldStart || tc.noCreatePolicy {
+			if tc.coldStart || tc.existingTarget || tc.noCreatePolicy {
 				wantCreates = 0
 				wantReads = 1
 				if tc.noCreatePolicy {

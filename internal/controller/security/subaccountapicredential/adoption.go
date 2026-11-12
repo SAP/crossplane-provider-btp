@@ -50,12 +50,18 @@ func newCredentialAdoptionConnector(inner managed.ExternalConnector, kube client
 		}()
 
 		connectResource := resource.Managed(cr)
-		if shouldReconstructSecretCredentialState(cr) && !meta.WasDeleted(cr) {
-			connectResource = &credentialFrameworkState{
-				SubaccountApiCredential: cr,
-				ctx:                     ctx,
-				kube:                    kube,
-				mergeInitProvider:       mergeInitProvider,
+		if !meta.WasDeleted(cr) {
+			reconstruct, err := shouldReconstructSecretCredentialState(cr, mergeInitProvider)
+			if err != nil {
+				return nil, errors.Wrap(err, "cannot determine effective credential mode for Terraform state reconstruction")
+			}
+			if reconstruct {
+				connectResource = &credentialFrameworkState{
+					SubaccountApiCredential: cr,
+					ctx:                     ctx,
+					kube:                    kube,
+					mergeInitProvider:       mergeInitProvider,
+				}
 			}
 		}
 		connected, err := inner.Connect(ctx, connectResource)
@@ -121,12 +127,20 @@ func isObservedCertificateCredential(cr *securityv1alpha1.SubaccountApiCredentia
 }
 
 // shouldReconstructSecretCredentialState uses observed mode when available,
-// falling back to effective-intent fields only while preparing a fresh resource.
-func shouldReconstructSecretCredentialState(cr *securityv1alpha1.SubaccountApiCredential) bool {
+// falling back to effective intent only while preparing a resource whose mode
+// has not yet been observed. The merge flag must match the Framework connector:
+// ignored initProvider values cannot suppress Secret-to-state reconstruction.
+func shouldReconstructSecretCredentialState(cr *securityv1alpha1.SubaccountApiCredential, mergeInitProvider bool) (bool, error) {
 	if credentialType := value(cr.Status.AtProvider.CredentialType); credentialType != "" {
-		return !isObservedCertificateCredential(cr)
+		return !isObservedCertificateCredential(cr), nil
 	}
-	return value(cr.Spec.ForProvider.CertificatePassed) == "" && value(cr.Spec.InitProvider.CertificatePassed) == ""
+
+	parameters, err := cr.GetMergedParameters(mergeInitProvider)
+	if err != nil {
+		return false, err
+	}
+	certificatePassed, _ := parameters["certificate_passed"].(string)
+	return certificatePassed == "", nil
 }
 
 func hasCompleteCredentialConnectionDetails(details managed.ConnectionDetails) bool {

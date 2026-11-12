@@ -142,6 +142,43 @@ func TestCredentialAdoptionExternalClientObserve(t *testing.T) {
 	}
 }
 
+func TestShouldReconstructSecretCredentialStateUsesEffectiveMode(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		forProvider     *string
+		initProvider    *string
+		observed        *string
+		mergeInit       bool
+		wantReconstruct bool
+	}{
+		{name: "empty intent reconstructs", wantReconstruct: true},
+		{name: "forProvider certificate is effective", forProvider: strptr("pem"), wantReconstruct: false},
+		{name: "ignored initProvider certificate does not affect mode", initProvider: strptr("pem"), wantReconstruct: true},
+		{name: "merged initProvider certificate is effective", initProvider: strptr("pem"), mergeInit: true, wantReconstruct: false},
+		{name: "forProvider certificate takes precedence", forProvider: strptr("for-provider"), initProvider: strptr("init-provider"), mergeInit: true, wantReconstruct: false},
+		{name: "explicit empty forProvider allows generated merge to use initProvider", forProvider: strptr(""), initProvider: strptr("pem"), mergeInit: true, wantReconstruct: false},
+		{name: "observed secret remains authoritative", initProvider: strptr("pem"), observed: strptr("secret"), wantReconstruct: true},
+		{name: "observed certificate remains authoritative", observed: strptr("client certificate"), wantReconstruct: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cr := &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ForProvider:  securityv1alpha1.SubaccountApiCredentialParameters{CertificatePassed: tc.forProvider},
+					InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: tc.initProvider},
+				},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: tc.observed}},
+			}
+			got, err := shouldReconstructSecretCredentialState(cr, tc.mergeInit)
+			if err != nil {
+				t.Fatalf("shouldReconstructSecretCredentialState() error = %v", err)
+			}
+			if got != tc.wantReconstruct {
+				t.Errorf("shouldReconstructSecretCredentialState() = %t, want %t", got, tc.wantReconstruct)
+			}
+		})
+	}
+}
+
 func TestCredentialAdoptionConnectorPinsIdentityForConnect(t *testing.T) {
 	cr := &securityv1alpha1.SubaccountApiCredential{
 		ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
