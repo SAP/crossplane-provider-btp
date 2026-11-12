@@ -64,6 +64,8 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 	for _, tc := range []struct {
 		name                    string
 		includeClientSecret     bool
+		certificateInput        bool
+		credentialType          string
 		coldStart               bool
 		newAdopter              bool
 		emptyConnection         bool
@@ -91,6 +93,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 		{name: "new mutation-capable adopter with only client_secret", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionAll}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "new Observe-only adopter with public fields only is rejected", coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
 		{name: "new Observe-only adopter with empty destination is rejected", coldStart: true, newAdopter: true, emptyConnection: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
+		{name: "certificate input cannot bypass observed secret completeness", coldStart: true, newAdopter: true, certificateInput: true, credentialType: "secret", managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
 		{name: "established cold identity survives spec subaccount drift", includeClientSecret: true, coldStart: true, driftedSubaccount: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -135,9 +138,13 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 					http.Error(w, "unexpected action", http.StatusInternalServerError)
 					return
 				}
+				credentialType := tc.credentialType
+				if credentialType == "" {
+					credentialType = "SECRET"
+				}
 				response := map[string]any{
 					"tenantmode": "dedicated", "subaccountid": adoptionTestSubaccountID,
-					"credential-type": "SECRET", "clientid": adoptionTestClientID,
+					"credential-type": credentialType, "clientid": adoptionTestClientID,
 					"tokenurl": adoptionTestTokenURL, "apiurl": adoptionTestAPIURL,
 					"name": adoptionTestCredential,
 				}
@@ -190,6 +197,9 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 						SubaccountID: strptr(adoptionTestSubaccountID), Name: strptr(adoptionTestCredential),
 					},
 				},
+			}
+			if tc.certificateInput {
+				cr.Spec.ForProvider.CertificatePassed = strptr("synthetic certificate input")
 			}
 			if tc.noCreatePolicy {
 				cr.Spec.ManagementPolicies = tc.managementPolicies

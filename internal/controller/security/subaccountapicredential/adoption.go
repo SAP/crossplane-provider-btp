@@ -50,7 +50,7 @@ func newCredentialAdoptionConnector(inner managed.ExternalConnector, kube client
 		}()
 
 		connectResource := resource.Managed(cr)
-		if isSecretCredential(cr) && !meta.WasDeleted(cr) {
+		if shouldReconstructSecretCredentialState(cr) && !meta.WasDeleted(cr) {
 			connectResource = &credentialFrameworkState{
 				SubaccountApiCredential: cr,
 				ctx:                     ctx,
@@ -112,7 +112,19 @@ func value(v *string) string {
 	return *v
 }
 
-func isSecretCredential(cr *securityv1alpha1.SubaccountApiCredential) bool {
+// isObservedCertificateCredential recognizes only the provider's actual
+// certificate mode. Unknown/missing observed types are not an exemption from
+// the connection-data requirement.
+func isObservedCertificateCredential(cr *securityv1alpha1.SubaccountApiCredential) bool {
+	return value(cr.Status.AtProvider.CredentialType) == "client certificate"
+}
+
+// shouldReconstructSecretCredentialState uses observed mode when available,
+// falling back to effective-intent fields only while preparing a fresh resource.
+func shouldReconstructSecretCredentialState(cr *securityv1alpha1.SubaccountApiCredential) bool {
+	if credentialType := value(cr.Status.AtProvider.CredentialType); credentialType != "" {
+		return !isObservedCertificateCredential(cr)
+	}
 	return value(cr.Spec.ForProvider.CertificatePassed) == "" && value(cr.Spec.InitProvider.CertificatePassed) == ""
 }
 
@@ -206,7 +218,7 @@ func (c *credentialAdoptionExternalClient) Observe(ctx context.Context, mg resou
 		return obs, err
 	}
 	cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
-	if !ok || meta.WasDeleted(cr) || !obs.ResourceExists || !isSecretCredential(cr) {
+	if !ok || meta.WasDeleted(cr) || !obs.ResourceExists || isObservedCertificateCredential(cr) {
 		return obs, nil
 	}
 	if hasCompleteCredentialConnectionDetails(obs.ConnectionDetails) {
@@ -226,7 +238,7 @@ func (c *credentialAdoptionExternalClient) Create(ctx context.Context, mg resour
 		return created, err
 	}
 	cr, ok := mg.(*securityv1alpha1.SubaccountApiCredential)
-	if !ok || !isSecretCredential(cr) || hasCompleteCredentialConnectionDetails(created.ConnectionDetails) {
+	if !ok || isObservedCertificateCredential(cr) || hasCompleteCredentialConnectionDetails(created.ConnectionDetails) {
 		return created, nil
 	}
 	cr.SetConditions(xpv2.Unavailable())

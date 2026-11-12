@@ -6,7 +6,13 @@ package e2e
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
 	"testing"
@@ -98,11 +104,24 @@ func TestSubaccountApiCredentialConditionalAdoption(t *testing.T) {
 			)
 			waitForIncompleteCredentialAdoptionE2E(ctx, t, cfg, incompleteAdopter.Name, timeout)
 
+			// Certificate input must not reclassify this observed secret credential.
+			certificateAdopterName := "sac-adopt-certificate-input-" + BUILD_ID
+			createCredentialSecretE2E(ctx, t, cfg, certificateAdopterName+"-secret", map[string][]byte{})
+			certificateAdopter := createCredentialForAdoptionE2E(
+				ctx, t, cfg, certificateAdopterName, certificateAdopterName+"-secret", created,
+			)
+			certificateAdopter.Spec.ForProvider.CertificatePassed = ephemeralAdoptionCertificateE2E(t)
+			if err := cfg.Client().Resources().Update(ctx, certificateAdopter); err != nil {
+				t.Fatalf("update certificate-input adopter %q: %v", certificateAdopter.Name, err)
+			}
+			waitForIncompleteCredentialAdoptionE2E(ctx, t, cfg, certificateAdopter.Name, timeout)
+
 			return ctx
 		}).Teardown(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 		// Remove the Observe-only MRs before deleting the source credential.
 		for _, name := range []string{
 			"sac-adopt-incomplete-" + BUILD_ID,
+			"sac-adopt-certificate-input-" + BUILD_ID,
 			"sac-adopt-complete-" + BUILD_ID,
 		} {
 			mr := &securityv1alpha1.SubaccountApiCredential{}
@@ -118,6 +137,7 @@ func TestSubaccountApiCredentialConditionalAdoption(t *testing.T) {
 			"sac-adopt-source-secret-" + BUILD_ID,
 			"sac-adopt-complete-" + BUILD_ID + "-secret",
 			"sac-adopt-incomplete-" + BUILD_ID + "-secret",
+			"sac-adopt-certificate-input-" + BUILD_ID + "-secret",
 		} {
 			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: cfg.Namespace()}}
 			if err := cfg.Client().Resources().Delete(ctx, secret); err != nil && !errors.IsNotFound(err) {
@@ -192,6 +212,27 @@ func createCredentialForAdoptionE2E(
 		t.Fatalf("create adoption MR %q: %v", name, err)
 	}
 	return credential
+}
+
+func ephemeralAdoptionCertificateE2E(t *testing.T) *string {
+	t.Helper()
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate ephemeral certificate key: %v", err)
+	}
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "credential-adoption-test"},
+		NotBefore:    time.Now().Add(-time.Minute),
+		NotAfter:     time.Now().Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, publicKey, privateKey)
+	if err != nil {
+		t.Fatalf("create ephemeral test certificate: %v", err)
+	}
+	certificate := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+	return &certificate
 }
 
 func valueForAdoptionE2E(value *string) string {

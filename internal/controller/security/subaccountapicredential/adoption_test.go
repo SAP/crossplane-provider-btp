@@ -85,17 +85,39 @@ func TestCredentialAdoptionExternalClientObserve(t *testing.T) {
 			wantErr:   errCredentialAdoptionIncomplete,
 			wantReady: corev1.ConditionFalse,
 		},
-		"certificate from forProvider does not require client secret": {
+		"observed certificate from forProvider does not require client secret": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{CertificatePassed: strptr("pem")},
+				},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: strptr("client certificate")}},
+			},
+			details: managed.ConnectionDetails{},
+		},
+		"observed certificate from initProvider does not require client secret": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: strptr("pem")},
+				},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: strptr("client certificate")}},
+			},
+			details: managed.ConnectionDetails{},
+		},
+		"certificate input cannot exempt observed secret state": {
+			cr: &securityv1alpha1.SubaccountApiCredential{Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+				InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: strptr("pem")},
+			}, Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: strptr("secret")}}},
+			details:   managed.ConnectionDetails{"attribute.client_id": []byte("id")},
+			wantErr:   errCredentialAdoptionIncomplete,
+			wantReady: corev1.ConditionFalse,
+		},
+		"unknown observed type does not grant certificate exemption": {
 			cr: &securityv1alpha1.SubaccountApiCredential{Spec: securityv1alpha1.SubaccountApiCredentialSpec{
 				ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{CertificatePassed: strptr("pem")},
 			}},
-			details: managed.ConnectionDetails{},
-		},
-		"certificate from initProvider does not require client secret": {
-			cr: &securityv1alpha1.SubaccountApiCredential{Spec: securityv1alpha1.SubaccountApiCredentialSpec{
-				InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: strptr("pem")},
-			}},
-			details: managed.ConnectionDetails{},
+			details:   managed.ConnectionDetails{},
+			wantErr:   errCredentialAdoptionIncomplete,
+			wantReady: corev1.ConditionFalse,
 		},
 		"deleting secret credential skips active adoption guard": {
 			cr:      &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: func() *metav1.Time { now := metav1.Now(); return &now }()}},
@@ -192,8 +214,18 @@ func TestCredentialAdoptionExternalClientCreateRequiresCompleteSecret(t *testing
 			},
 		},
 		"incomplete secret credential": {cr: &securityv1alpha1.SubaccountApiCredential{}, wantErr: true},
-		"certificate": {
-			cr: &securityv1alpha1.SubaccountApiCredential{Spec: securityv1alpha1.SubaccountApiCredentialSpec{InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: strptr("pem")}}},
+		"observed certificate": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec:   securityv1alpha1.SubaccountApiCredentialSpec{InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: strptr("pem")}},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: strptr("client certificate")}},
+			},
+		},
+		"certificate input with observed secret is incomplete": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec:   securityv1alpha1.SubaccountApiCredentialSpec{InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: strptr("pem")}},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: strptr("secret")}},
+			},
+			wantErr: true,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
