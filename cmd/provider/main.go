@@ -78,7 +78,8 @@ func main() {
 
 		// Deprecated no-op: session reuse is always on again (#1096). Kept so existing
 		// deployments passing the flag don't fail kingpin's unknown-flag check.
-		_ = app.Flag("enable-terraform-session-reuse", "Deprecated, no-op.").Hidden().Bool()
+		deprecatedSessionReuseSet = new(bool)
+		_                         = app.Flag("enable-terraform-session-reuse", "Deprecated, no-op.").Hidden().IsSetByUser(deprecatedSessionReuseSet).Bool()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 	)
@@ -108,6 +109,10 @@ func main() {
 
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
+
+	if *deprecatedSessionReuseSet {
+		log.Info("WARNING: --enable-terraform-session-reuse is deprecated and has no effect; session reuse is always on. Remove the flag. Support for it will be dropped in future versions.")
+	}
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
