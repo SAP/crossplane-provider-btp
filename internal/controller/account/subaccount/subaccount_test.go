@@ -1066,6 +1066,51 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
+		"NonGUIDExternalNameNotMigrated": {
+			reason: "A non-GUID external-name that differs from the resource name (legacy accounts) must NOT be migrated: migration is skipped and the external-name is left untouched even though a subaccount matches by subdomain+region",
+			args: args{
+				cr: NewSubaccount("unittest-sa",
+					WithExternalName("legacy-non-guid"), // Not a UUID and not equal to the resource name
+					WithData(v1alpha1.SubaccountParameters{
+						Subdomain: "unittest-sa",
+						Region:    "eu10",
+					})),
+				mockAPIClient: &MockSubaccountClient{
+					// GetSubaccount (direct lookup with the legacy value) 404s
+					getSubaccountErr: errors.New("404 not found"),
+					// A subaccount DOES match by subdomain+region. If migration were
+					// (wrongly) triggered, it would rewrite the external-name to this GUID.
+					returnSubaccounts: &accountclient.ResponseCollection{
+						Value: []accountclient.SubaccountResponseObject{
+							{
+								Guid:      SAMPLE_GUID,
+								Subdomain: "unittest-sa",
+								Region:    "eu10",
+							},
+						},
+					},
+				},
+				mockKube: func() test.MockClient {
+					mockClient := testutils.NewFakeKubeClientBuilder().
+						AddResources(testutils.NewProviderConfig("unittest-pc", "", "")).
+						Build()
+					mockClient.MockUpdate = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+						return nil
+					}
+					return mockClient
+				}(),
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				crChanges: func(cr *v1alpha1.Subaccount) {
+					// external-name is preserved (NOT rewritten to SAMPLE_GUID)
+					meta.SetExternalName(cr, "legacy-non-guid")
+					cr.Status.AtProvider = v1alpha1.SubaccountObservation{}
+				},
+			},
+		},
 		"NonGUIDExternalName404": {
 			reason: "Non-GUID external-name (e.g. legacy accounts) is no longer validated; a 404 from the Get API should return resourceExists: false",
 			args: args{

@@ -13,7 +13,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -493,8 +492,13 @@ func (c *external) createBTPSubaccount(
 func (c *external) migrateExternalName(ctx context.Context, subaccount *apisv1alpha1.Subaccount) error {
 	externalName := meta.GetExternalName(subaccount)
 
-	// if externalName is already the id, the migration can be skippped
-	if isValidUUID(externalName) {
+	// Only migrate the specific legacy convention this function exists for: the
+	// old controller never set an external-name, so it defaulted to metadata.name.
+	// Anything else (a GUID, or a legacy non-GUID value we intentionally no longer
+	// validate) is left untouched. Triggering on "not a valid GUID" instead would
+	// make every reconcile of such a resource issue a redundant GetSubaccounts call
+	// that can never find a match.
+	if externalName != subaccount.GetName() {
 		return nil
 	}
 
@@ -517,11 +521,6 @@ func (c *external) migrateExternalName(ctx context.Context, subaccount *apisv1al
 
 	return nil
 
-}
-
-func isValidUUID(s string) bool {
-	_, err := uuid.Parse(s)
-	return err == nil
 }
 
 func isRelatedAccount(subaccount *apisv1alpha1.Subaccount, account *accountclient.SubaccountResponseObject) bool {
