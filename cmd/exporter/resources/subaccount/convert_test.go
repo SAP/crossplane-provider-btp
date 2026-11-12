@@ -1,9 +1,11 @@
 package subaccount
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SAP/xp-clifford/yaml"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +14,16 @@ import (
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 )
+
+// stubEventHandler is a minimal export.EventHandler that records warnings so
+// tests can assert that resolution failures are surfaced.
+type stubEventHandler struct {
+	warnings []error
+}
+
+func (s *stubEventHandler) Warn(err error)           { s.warnings = append(s.warnings, err) }
+func (s *stubEventHandler) Resource(resource.Object) {}
+func (s *stubEventHandler) Stop()                    {}
 
 func TestConvertSubaccountResource(t *testing.T) {
 	t.Parallel()
@@ -413,10 +425,10 @@ func TestConvertSubaccountResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertSubaccountResource(&subaccount{
+			result := convertSubaccountResource(context.Background(), nil, &subaccount{
 				Subaccount:          tt.sa,
 				ResourceWithComment: yaml.NewResourceWithComment(nil),
-			})
+			}, &stubEventHandler{}, false)
 			r.NotNil(result)
 
 			// Verify comments.

@@ -1,11 +1,18 @@
 package subaccount
 
 import (
+	"context"
+
+	"github.com/SAP/xp-clifford/cli/export"
+	"github.com/SAP/xp-clifford/erratt"
 	"github.com/SAP/xp-clifford/yaml"
 	v1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directory"
 )
 
 const (
@@ -16,7 +23,7 @@ const (
 	warnMissingCreatedBy   = "WARNING: 'createdBy' field is missing in the source, cannot set 'SubaccountAdmins'"
 )
 
-func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
+func convertSubaccountResource(ctx context.Context, btpClient *btpcli.BtpCli, sa *subaccount, eventHandler export.EventHandler, resolveReferences bool) *yaml.ResourceWithComment {
 	saDisplayName := sa.GetDisplayName()
 	saGuid := sa.GetID()
 	saRegion := sa.Region
@@ -109,5 +116,34 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 	// BetaEnabled
 	saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider.BetaEnabled = sa.BetaEnabled
 
+	// Reference the parent directory resource, if requested. Only subaccounts
+	// whose parent is a (selected) directory carry a DirectoryGuid; those
+	// parented by the global account have it empty and are left untouched.
+	if resolveReferences {
+		if err := resolveReference(ctx, btpClient, &saResource.Resource().(*v1alpha1.Subaccount).Spec.ForProvider); err != nil {
+			eventHandler.Warn(erratt.Errorf("cannot resolve directory reference: %w", err).With("subaccount", sa.GetID()))
+			saResource.AddComment(resources.WarnCannotResolveDirectory + ": " + sa.ParentGUID)
+		}
+	}
+
 	return saResource
+}
+
+func resolveReference(ctx context.Context, btpClient *btpcli.BtpCli, spec *v1alpha1.SubaccountParameters) error {
+	// No parent directory to resolve (parent is the global account).
+	if spec.DirectoryGuid == "" {
+		return nil
+	}
+
+	dName, err := directory.GetK8sResourceNameByID(ctx, btpClient, spec.DirectoryGuid)
+	if err != nil {
+		return err
+	}
+
+	spec.DirectoryRef = &v1.Reference{
+		Name: dName,
+	}
+	spec.DirectoryGuid = ""
+
+	return nil
 }

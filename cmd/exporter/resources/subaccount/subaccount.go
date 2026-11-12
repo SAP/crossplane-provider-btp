@@ -43,7 +43,7 @@ func (e exporter) KindName() string {
 	return KindName
 }
 
-func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, _ resources.Options) error {
+func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, options resources.Options) error {
 	cache, err := Get(ctx, btpClient)
 	if err != nil {
 		return fmt.Errorf("failed to get cache with subaccounts: %w", err)
@@ -54,7 +54,7 @@ func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHan
 		eventHandler.Warn(fmt.Errorf("no subaccounts found"))
 	} else {
 		for _, sa := range cache.All() {
-			eventHandler.Resource(convertSubaccountResource(sa))
+			eventHandler.Resource(convertSubaccountResource(ctx, btpClient, sa, eventHandler, options.ResolveReferences))
 		}
 	}
 
