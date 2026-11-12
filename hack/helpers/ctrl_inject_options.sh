@@ -54,13 +54,18 @@ if [ "$(grep -c 'newCredentialAdoptionConnector(' "${target}" || true)" -ne 1 ];
   echo "ctrl_inject_options.sh: failed to wrap SubaccountApiCredential's generated Framework connector" >&2
   exit 1
 fi
-if ! perl -0777 -ne 'my $start = index($_, "newCredentialAdoptionConnector(tjcontroller.NewTerraformPluginFrameworkConnector("); my $end = index($_, "WithTerraformPluginFrameworkManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies))), mgr.GetClient())),"); exit($start >= 0 && $end > $start ? 0 : 1)' "${target}"; then
+if ! perl -0777 -ne 'my $start = index($_, "newCredentialAdoptionConnector(tjcontroller.NewTerraformPluginFrameworkConnector("); my $end = index($_, "WithTerraformPluginFrameworkManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies))), mgr.GetClient(), o.Features.Enabled(features.EnableBetaManagementPolicies))),"); exit($start >= 0 && $end > $start ? 0 : 1)' "${target}"; then
   perl -i -0777 -pe \
     's/(WithTerraformPluginFrameworkManagementPolicies\(o\.Features\.Enabled\(features\.EnableBetaManagementPolicies\)\))\)\)\),/$1), mgr.GetClient())),/' \
     "${target}"
 fi
-if ! perl -0777 -ne 'my $start = index($_, "newCredentialAdoptionConnector(tjcontroller.NewTerraformPluginFrameworkConnector("); my $end = index($_, "WithTerraformPluginFrameworkManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies))), mgr.GetClient())),"); exit($start >= 0 && $end > $start ? 0 : 1)' "${target}"; then
-  echo "ctrl_inject_options.sh: failed to pass the Kubernetes client to the SubaccountApiCredential state decorator" >&2
+if ! perl -0777 -ne 'my $start = index($_, "newCredentialAdoptionConnector(tjcontroller.NewTerraformPluginFrameworkConnector("); my $end = index($_, "WithTerraformPluginFrameworkManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies))), mgr.GetClient(), o.Features.Enabled(features.EnableBetaManagementPolicies))),"); exit($start >= 0 && $end > $start ? 0 : 1)' "${target}"; then
+  perl -i -0777 -pe \
+    's/mgr\.GetClient\(\)\)\),/mgr.GetClient(), o.Features.Enabled(features.EnableBetaManagementPolicies))),/' \
+    "${target}"
+fi
+if ! perl -0777 -ne 'my $start = index($_, "newCredentialAdoptionConnector(tjcontroller.NewTerraformPluginFrameworkConnector("); my $end = index($_, "WithTerraformPluginFrameworkManagementPolicies(o.Features.Enabled(features.EnableBetaManagementPolicies))), mgr.GetClient(), o.Features.Enabled(features.EnableBetaManagementPolicies))),"); exit($start >= 0 && $end > $start ? 0 : 1)' "${target}"; then
+  echo "ctrl_inject_options.sh: failed to pass the Kubernetes client and initProvider feature to the SubaccountApiCredential state decorator" >&2
   exit 1
 fi
 goimports -w "${target}"
