@@ -17,9 +17,9 @@ import (
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/cfenvironment"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/directory"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/entitlement"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/scope"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/servicebinding"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"
-	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 )
 
 const (
@@ -40,12 +40,8 @@ var (
 			WithFlagName(flagNameBtpCliPath).
 			WithEnvVarName(envVarBtpCliPath)
 
-	getSelectedSubaccountCount = func(ctx context.Context, btpClient *btpcli.BtpCli) (int, error) {
-		selectedSubaccounts, err := subaccount.Get(ctx, btpClient)
-		if err != nil {
-			return 0, err
-		}
-		return selectedSubaccounts.Len(), nil
+	getSelectedRootCount = func(ctx context.Context, btpClient *btpcli.BtpCli) (int, error) {
+		return scope.RootCount(ctx, btpClient)
 	}
 	selectResourceKinds = export.ResourceKindParam.ValueOrAsk
 	resourceExportFn    = resources.ExportFn
@@ -60,6 +56,7 @@ func main() {
 		paramAll,
 		paramBtpCliPath,
 	)
+	export.AddConfigParams(scope.Param())
 	export.AddConfigParams(resources.ConfigParams()...)
 	export.AddResourceKinds(resources.KindNames()...)
 	cli.Execute()
@@ -76,14 +73,25 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 	// Explicit authentication can be done by a separate `login` command or by BTP CLI's `login` command.
 	btpClient := btpcli.NewClient(paramBtpCliPath.Value())
 
-	// Select the source subaccount before asking which resource kinds to export.
-	// Other exporters reuse this cached selection.
-	selectedSubaccountCount, err := getSelectedSubaccountCount(ctx, btpClient)
+	// Resolve the combined subaccount/directory scope selection before asking
+	// which resource kinds to export. Every exporter reuses this cached selection.
+	//
+	// Under --all the picker still prompts for the scope when --subaccount was
+	// not passed on the command line. The one-root guard below only applies to a
+	// non-interactive scope (an explicit --subaccount selector), where a too
+	// broad value should fail loud rather than silently export several roots.
+	// IsSet() must be read before selection runs: a successful interactive
+	// prompt stores its result and would otherwise make IsSet() report true.
+	scopeProvidedViaFlag := scope.Param().(interface{ IsSet() bool }).IsSet()
+
+	selectedRootCount, err := getSelectedRootCount(ctx, btpClient)
 	if err != nil {
-		return erratt.Errorf("cannot retrieve and select subaccounts: %w", err)
+		return erratt.Errorf("cannot retrieve and select export scope: %w", err)
 	}
-	if err := validateExportAllSubaccountSelection(paramAll.Value(), selectedSubaccountCount); err != nil {
-		return erratt.Errorf("invalid export selection: %w", err)
+	if scopeProvidedViaFlag {
+		if err := validateExportAllSubaccountSelection(paramAll.Value(), selectedRootCount); err != nil {
+			return erratt.Errorf("invalid export selection: %w", err)
+		}
 	}
 
 	// Determine which kinds the user would like to have exported.
@@ -117,12 +125,12 @@ func exportCmd(ctx context.Context, eventHandler export.EventHandler) error {
 	return nil
 }
 
-func validateExportAllSubaccountSelection(selectAll bool, selectedSubaccountCount int) error {
-	if !selectAll || selectedSubaccountCount == 1 {
+func validateExportAllSubaccountSelection(selectAll bool, selectedRootCount int) error {
+	if !selectAll || selectedRootCount == 1 {
 		return nil
 	}
 
-	return fmt.Errorf("--all requires the subaccount selector to match exactly one subaccount; matched %d", selectedSubaccountCount)
+	return fmt.Errorf("--all requires the scope selector to match exactly one subaccount or directory; matched %d", selectedRootCount)
 }
 
 func validateExportAllOptions(selectAll bool, configParams configparam.ParamList) error {
@@ -158,9 +166,11 @@ func exportAllConflictFlagName(paramName string) (string, bool) {
 		return "--kind", true
 	}
 	for _, kind := range resources.KindNames() {
-		// The subaccount selector identifies the source subaccount for an
-		// export-all operation; it does not filter which kinds are exported.
-		if kind == paramName && kind != "subaccount" {
+		// The subaccount and directory selectors identify the export scope (the
+		// source subaccounts/directories) for an export-all operation; they do
+		// not filter which kinds are exported. Both are owned by the scope
+		// package's combined selector.
+		if kind == paramName && kind != "subaccount" && kind != "directory" {
 			return "--" + kind, true
 		}
 	}

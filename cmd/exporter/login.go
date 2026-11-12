@@ -28,24 +28,24 @@ const (
 
 var (
 	paramUserName = configparam.String(flagNameUser, "User name to log in to a global account of SAP BTP, usually an e-mail address.").
-		WithFlagName(flagNameUser).
-		WithShortName("u").
-		WithEnvVarName(envVarUserName)
+			WithFlagName(flagNameUser).
+			WithShortName("u").
+			WithEnvVarName(envVarUserName)
 	paramPassword = configparam.SensitiveString(flagNamePassword, "User password, see recommendations on https://help.sap.com/docs/btp/btp-cli-command-reference/btp-login.").
-		WithFlagName(flagNamePassword).
-		WithShortName("p").
-		WithEnvVarName(envVarPassword)
+			WithFlagName(flagNamePassword).
+			WithShortName("p").
+			WithEnvVarName(envVarPassword)
 	paramGlobalAccount = configparam.String(flagNameGlobalAccount, "The subdomain of the global account to export resources from. Can be found, e.g., in BTP Cockpit.").
-		WithFlagName(flagNameGlobalAccount).
-		WithEnvVarName(envVarGlobalAccount)
+				WithFlagName(flagNameGlobalAccount).
+				WithEnvVarName(envVarGlobalAccount)
 	paramBtpCliServer = configparam.String(flagNameBtpCliServer, "The URL of the BTP CLI server. Default: 'https://cli.btp.cloud.sap'").
-		WithFlagName(flagNameBtpCliServer).
-		WithEnvVarName(envVarBtpCliServer)
+				WithFlagName(flagNameBtpCliServer).
+				WithEnvVarName(envVarBtpCliServer)
 	paramIdp = configparam.String(flagNameIdentityProvider, "Origin of the custom identity provider, if configured for the global account.").
-		WithFlagName(flagNameIdentityProvider).
-		WithEnvVarName(envVarIdentityProvider)
+			WithFlagName(flagNameIdentityProvider).
+			WithEnvVarName(envVarIdentityProvider)
 	paramSSO = configparam.Bool(flagNameSSO, "Opens a browser for single sign-on.").
-		WithFlagName(flagNameSSO)
+			WithFlagName(flagNameSSO)
 
 	loginSubCommand = &cli.BasicSubCommand{
 		Name:             "login",

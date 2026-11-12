@@ -10,18 +10,22 @@ import (
 	"github.com/SAP/xp-clifford/yaml"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/scope"
 )
 
 const KindName = "directory"
 
 var (
 	directoryCache resources.ResourceCache[*directory]
-	directoryParam = configparam.StringSlice(KindName, "BTP directory ID or regex expression for name.").
-			WithFlagName(KindName)
 )
 
 func init() {
 	resources.RegisterKind(exporter{})
+}
+
+// Reset clears the memoized directory cache. Intended for tests.
+func Reset() {
+	directoryCache = nil
 }
 
 type exporter struct{}
@@ -29,11 +33,13 @@ type exporter struct{}
 var _ resources.Kind = exporter{}
 
 func (e exporter) Param() configparam.ConfigParam {
-	return directoryParam
+	// The scope package owns the combined subaccount/directory selector; the
+	// directory kind does not register its own selector flag.
+	return nil
 }
 
 func (e exporter) KindName() string {
-	return directoryParam.GetName()
+	return KindName
 }
 
 func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, options resources.Options) error {
@@ -59,44 +65,22 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 		return directoryCache, nil
 	}
 
-	// Retrieve the directory hierarchy of the global account.
-	children, err := btpClient.ListGlobalAccountDirectories(ctx)
+	// Resolve the combined subaccount/directory scope selection (prompts once).
+	selection, err := scope.Select(ctx, btpClient)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get directories: %w", err)
+		return nil, fmt.Errorf("failed to resolve scope selection: %w", err)
 	}
+	slog.DebugContext(ctx, "Directories selected via scope", "count", len(selection.Directories))
 
-	// Flatten the directory tree since the CLI returns nested children.
-	var originals []*btpcli.Child
-	flattenDirectories(children, &originals)
-	slog.DebugContext(ctx, "Total directories returned by BTP CLI", "count", len(originals))
-
-	// Wrap directories for internal processing and caching.
-	var directories []*directory
-	for _, c := range originals {
-		directories = append(directories, &directory{
-			Child:               c,
+	// Build the cache from the selected hierarchy directories.
+	cache := resources.NewResourceCache[*directory]()
+	for _, c := range selection.Directories {
+		child := c
+		cache.Set(&directory{
+			Child:               &child,
 			ResourceWithComment: yaml.NewResourceWithComment(nil),
 		})
 	}
-
-	// Create cache and store all directories.
-	cache := resources.NewResourceCache[*directory]()
-	cache.Store(directories...)
-
-	// Let the user select directories to export.
-	widgetValues := cache.ValuesForSelection()
-	directoryParam.WithPossibleValuesFn(func() ([]string, error) {
-		return widgetValues.Values(), nil
-	})
-
-	selectedDirectories, err := directoryParam.ValueOrAsk(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get parameter value: %s, %w", directoryParam.GetName(), err)
-	}
-	slog.DebugContext(ctx, "Selected directories", "directories", selectedDirectories)
-
-	// Keep only selected directories in the cache.
-	cache.KeepSelectedOnly(selectedDirectories)
 	directoryCache = cache
 
 	return directoryCache, nil
@@ -118,22 +102,6 @@ func GetK8sResourceNameByID(ctx context.Context, btpClient *btpcli.BtpCli, id st
 	}
 
 	return d.GenerateK8sResourceName(), nil
-}
-
-// flattenDirectories recursively collects all directory nodes from the nested
-// hierarchy returned by the BTP CLI into a flat slice.
-func flattenDirectories(children []btpcli.Child, out *[]*btpcli.Child) {
-	for i := range children {
-		c := children[i]
-		// The hierarchy keeps subaccounts in a separate `subaccounts` field, so
-		// everything in `children` is a directory. Guard on directoryType in case
-		// Child is extended to also capture subaccount nodes.
-		if c.DirectoryType == "" {
-			continue
-		}
-		*out = append(*out, &c)
-		flattenDirectories(c.Children, out)
-	}
 }
 
 type directory struct {
@@ -160,7 +128,6 @@ func (d *directory) GenerateK8sResourceName() string {
 		return resources.UndefinedName
 	}
 
-	// Format: <display-name>.<region>
 	rn, err := resources.GenerateK8sResourceName("", fmt.Sprintf("%s", d.GetDisplayName()))
 	if err != nil {
 		d.AddComment(fmt.Sprintf("cannot generate directory resource name: %s", err))

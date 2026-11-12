@@ -70,6 +70,12 @@ func convertDirectoryResource(ctx context.Context, btpClient *btpcli.BtpCli, d *
 		directoryResource.Resource().(*v1alpha1.Directory).Spec.ForProvider.Description = &d.Description
 	}
 
+	// Subdomain: set only for directories that have it (user authorization
+	// management feature enabled). Cannot be changed after creation.
+	if d.Subdomain != "" {
+		directoryResource.Resource().(*v1alpha1.Directory).Spec.ForProvider.Subdomain = &d.Subdomain
+	}
+
 	// DirectoryGuid: set the parent directory reference only when the parent is
 	// another directory, not the global account.
 	if d.ParentGUID != "" && d.ParentGUID != d.GlobalAccountGUID {

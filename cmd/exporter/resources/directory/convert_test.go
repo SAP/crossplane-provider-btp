@@ -3,8 +3,8 @@ package directory
 import (
 	"testing"
 
-	v2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	v2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -36,7 +36,7 @@ type stubEventHandler struct {
 	warnings []error
 }
 
-func (s *stubEventHandler) Warn(err error)          { s.warnings = append(s.warnings, err) }
+func (s *stubEventHandler) Warn(err error)           { s.warnings = append(s.warnings, err) }
 func (s *stubEventHandler) Resource(resource.Object) {}
 func (s *stubEventHandler) Stop()                    {}
 
@@ -71,6 +71,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 				GUID:              childGUID,
 				DisplayName:       childName,
 				Description:       "a child directory",
+				Subdomain:         "child-subdomain",
 				ParentGUID:        parentGUID,
 				GlobalAccountGUID: globalAccountGUID,
 				DirectoryType:     "DIRECTORY",
@@ -80,6 +81,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 			resolveReferences: false,
 			want: func() *yaml.ResourceWithComment {
 				desc := "a child directory"
+				subdomain := "child-subdomain"
 				dn := childName
 				return yaml.NewResourceWithComment(&v1alpha1.Directory{
 					TypeMeta: metav1.TypeMeta{
@@ -100,6 +102,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 							DisplayName:       &dn,
 							DirectoryFeatures: []string{"DEFAULT"},
 							Description:       &desc,
+							Subdomain:         &subdomain,
 							// Parent is another directory -> raw GUID kept when not resolving.
 							DirectoryGuid: parentGUID,
 							Labels:        map[string][]string{"env": {"test"}},

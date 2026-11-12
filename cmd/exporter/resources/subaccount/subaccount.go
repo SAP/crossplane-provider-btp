@@ -11,18 +11,22 @@ import (
 
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/scope"
 )
 
 const KindName = "subaccount"
 
 var (
 	subaccountCache resources.ResourceCache[*subaccount]
-	subaccountParam = configparam.StringSlice(KindName, "BTP subaccount ID or regex expression for name.").
-			WithFlagName(KindName)
 )
 
 func init() {
 	resources.RegisterKind(exporter{})
+}
+
+// Reset clears the memoized subaccount cache. Intended for tests.
+func Reset() {
+	subaccountCache = nil
 }
 
 type exporter struct{}
@@ -30,11 +34,13 @@ type exporter struct{}
 var _ resources.Kind = exporter{}
 
 func (e exporter) Param() configparam.ConfigParam {
-	return subaccountParam
+	// The scope package owns the combined subaccount/directory selector; the
+	// subaccount kind does not register its own selector flag.
+	return nil
 }
 
 func (e exporter) KindName() string {
-	return subaccountParam.GetName()
+	return KindName
 }
 
 func (e exporter) Export(ctx context.Context, btpClient *btpcli.BtpCli, eventHandler export.EventHandler, _ resources.Options) error {
@@ -60,43 +66,69 @@ func Get(ctx context.Context, btpClient *btpcli.BtpCli) (resources.ResourceCache
 		return subaccountCache, nil
 	}
 
-	// Retrieve all subaccounts.
-	originals, err := btpClient.ListSubaccounts(ctx)
+	// Resolve the combined subaccount/directory scope selection (prompts once).
+	selection, err := scope.Select(ctx, btpClient)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get subaccounts: %w", err)
+		return nil, fmt.Errorf("failed to resolve scope selection: %w", err)
 	}
-	slog.DebugContext(ctx, "Total subaccounts returned by BTP CLI", "count", len(originals))
+	slog.DebugContext(ctx, "Subaccounts selected via scope", "count", len(selection.Subaccounts))
 
-	// Wrap subaccounts for internal processing and caching.
-	var subaccounts []*subaccount
-	for _, sa := range originals {
-		subaccounts = append(subaccounts, &subaccount{
-			Subaccount:          &sa,
+	// The hierarchy response lacks Labels, so enrich from the flat subaccount
+	// list with a single CLI call, indexed by GUID.
+	labelsByGUID, err := subaccountLabels(ctx, btpClient)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build the cache from the selected hierarchy subaccounts.
+	cache := resources.NewResourceCache[*subaccount]()
+	for _, hsa := range selection.Subaccounts {
+		cache.Set(&subaccount{
+			Subaccount:          toSubaccount(hsa, labelsByGUID[hsa.Guid]),
 			ResourceWithComment: yaml.NewResourceWithComment(nil),
 		})
 	}
-
-	// Create cache and store all subaccounts.
-	cache := resources.NewResourceCache[*subaccount]()
-	cache.Store(subaccounts...)
-
-	// Let the user select subaccounts to export.
-	widgetValues := cache.ValuesForSelection()
-	subaccountParam.WithPossibleValuesFn(func() ([]string, error) {
-		return widgetValues.Values(), nil
-	})
-
-	selectedSubaccounts, err := subaccountParam.ValueOrAsk(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get parameter value: %s, %w", subaccountParam.GetName(), err)
-	}
-	slog.DebugContext(ctx, "Selected subaccounts", "subaccounts", selectedSubaccounts)
-
-	// Keep only selected subaccounts in the cache.
-	cache.KeepSelectedOnly(selectedSubaccounts)
 	subaccountCache = cache
 
 	return subaccountCache, nil
+}
+
+// subaccountLabels fetches the flat subaccount list once and returns Labels
+// keyed by subaccount GUID. The hierarchy response does not carry Labels.
+func subaccountLabels(ctx context.Context, btpClient *btpcli.BtpCli) (map[string]map[string][]string, error) {
+	flat, err := btpClient.ListSubaccounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list subaccounts for label enrichment: %w", err)
+	}
+	labels := make(map[string]map[string][]string, len(flat))
+	for _, sa := range flat {
+		labels[sa.GUID] = sa.Labels
+	}
+	return labels, nil
+}
+
+// toSubaccount maps a hierarchy subaccount node to the btpcli.Subaccount shape
+// used by the converter, merging in Labels from the flat list.
+func toSubaccount(hsa btpcli.HierarchySubaccount, labels map[string][]string) *btpcli.Subaccount {
+	return &btpcli.Subaccount{
+		GUID:              hsa.Guid,
+		TechnicalName:     hsa.TechnicalName,
+		DisplayName:       hsa.DisplayName,
+		GlobalAccountGUID: hsa.GlobalAccountGUID,
+		ParentGUID:        hsa.ParentGUID,
+		ParentType:        hsa.ParentType,
+		Region:            hsa.Region,
+		Subdomain:         hsa.Subdomain,
+		BetaEnabled:       hsa.BetaEnabled,
+		UsedForProduction: hsa.UsedForProduction,
+		Description:       hsa.Description,
+		State:             hsa.State,
+		StateMessage:      hsa.StateMessage,
+		Labels:            labels,
+		CreatedDate:       hsa.CreatedDate,
+		CreatedBy:         hsa.CreatedBy,
+		ModifiedDate:      hsa.ModifiedDate,
+	}
 }
 
 func GetK8sResourceNameByID(ctx context.Context, btpClient *btpcli.BtpCli, id string) (string, error) {

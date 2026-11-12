@@ -20,18 +20,18 @@ func TestExportCmdSelectiveInteractiveExportSelectsSubaccountBeforeKindsAndChild
 	viper.Reset()
 	t.Cleanup(viper.Reset)
 
-	originalGetSelectedSubaccountCount := getSelectedSubaccountCount
+	originalGetSelectedSubaccountCount := getSelectedRootCount
 	originalSelectResourceKinds := selectResourceKinds
 	originalResourceExportFn := resourceExportFn
 	t.Cleanup(func() {
-		getSelectedSubaccountCount = originalGetSelectedSubaccountCount
+		getSelectedRootCount = originalGetSelectedSubaccountCount
 		selectResourceKinds = originalSelectResourceKinds
 		resourceExportFn = originalResourceExportFn
 	})
 
 	var operations []string
-	getSelectedSubaccountCount = func(context.Context, *btpcli.BtpCli) (int, error) {
-		operations = append(operations, "subaccount selection")
+	getSelectedRootCount = func(context.Context, *btpcli.BtpCli) (int, error) {
+		operations = append(operations, "scope selection")
 		return 1, nil
 	}
 	selectResourceKinds = func(context.Context) ([]string, error) {
@@ -48,23 +48,23 @@ func TestExportCmdSelectiveInteractiveExportSelectsSubaccountBeforeKindsAndChild
 	}
 
 	require.NoError(t, exportCmd(context.Background(), noopEventHandler{}))
-	require.Equal(t, []string{"subaccount selection", "kind selection", "child resource selection"}, operations)
+	require.Equal(t, []string{"scope selection", "kind selection", "child resource selection"}, operations)
 }
 
 func TestExportCmdSelectiveNonInteractiveExportUsesConfiguredKinds(t *testing.T) {
 	viper.Reset()
 	t.Cleanup(viper.Reset)
 
-	originalGetSelectedSubaccountCount := getSelectedSubaccountCount
+	originalGetSelectedSubaccountCount := getSelectedRootCount
 	originalSelectResourceKinds := selectResourceKinds
 	originalResourceExportFn := resourceExportFn
 	t.Cleanup(func() {
-		getSelectedSubaccountCount = originalGetSelectedSubaccountCount
+		getSelectedRootCount = originalGetSelectedSubaccountCount
 		selectResourceKinds = originalSelectResourceKinds
 		resourceExportFn = originalResourceExportFn
 	})
 
-	getSelectedSubaccountCount = func(context.Context, *btpcli.BtpCli) (int, error) {
+	getSelectedRootCount = func(context.Context, *btpcli.BtpCli) (int, error) {
 		return 1, nil
 	}
 	selectResourceKinds = export.ResourceKindParam.ValueOrAsk
@@ -90,9 +90,9 @@ func TestValidateExportAllSubaccountSelection(t *testing.T) {
 		count     int
 		wantErr   string
 	}{
-		{name: "allows one matching subaccount", selectAll: true, count: 1},
-		{name: "rejects no matching subaccounts", selectAll: true, count: 0, wantErr: "match exactly one subaccount; matched 0"},
-		{name: "rejects multiple matching subaccounts", selectAll: true, count: 2, wantErr: "match exactly one subaccount; matched 2"},
+		{name: "allows one root selection", selectAll: true, count: 1},
+		{name: "rejects no matching roots", selectAll: true, count: 0, wantErr: "match exactly one subaccount or directory; matched 0"},
+		{name: "rejects multiple matching roots", selectAll: true, count: 2, wantErr: "match exactly one subaccount or directory; matched 2"},
 		{name: "allows multiple matches for a selective export", selectAll: false, count: 2},
 	}
 
@@ -138,7 +138,9 @@ func TestValidateExportAllOptions(t *testing.T) {
 	})
 
 	for _, kind := range resources.KindNames() {
-		if kind == "subaccount" {
+		// subaccount and directory are scope selectors owned by the scope
+		// package, not kind filters, so --all does not conflict with them.
+		if kind == "subaccount" || kind == "directory" {
 			continue
 		}
 

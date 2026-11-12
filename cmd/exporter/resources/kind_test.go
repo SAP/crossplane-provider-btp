@@ -26,7 +26,7 @@ func TestKindNamesAreSortedAndIncludeEverySupportedKind(t *testing.T) {
 	}, kindNames)
 }
 
-func TestConfigParamsIncludesEveryKindSelector(t *testing.T) {
+func TestConfigParamsIncludesEveryKindSelectorExceptScopeOwned(t *testing.T) {
 	params := resources.ConfigParams()
 	paramNames := make([]string, 0, len(params))
 
@@ -36,5 +36,13 @@ func TestConfigParamsIncludesEveryKindSelector(t *testing.T) {
 		paramNames = append(paramNames, param.GetName())
 	}
 
-	require.Equal(t, resources.KindNames(), paramNames)
+	// The subaccount (and directory) kinds do not register their own selector;
+	// the combined scope selector in the scope package owns that flag. So every
+	// kind except those scope-owned ones contributes a config param here.
+	require.Equal(t, []string{
+		"cloudfoundry-environment",
+		"entitlement",
+		"servicebinding",
+		"serviceinstance",
+	}, paramNames)
 }
