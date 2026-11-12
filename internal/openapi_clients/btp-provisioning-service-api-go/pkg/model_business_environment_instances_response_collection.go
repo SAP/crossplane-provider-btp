@@ -21,7 +21,10 @@ var _ MappedNullable = &BusinessEnvironmentInstancesResponseCollection{}
 type BusinessEnvironmentInstancesResponseCollection struct {
 	// List of all the environment instances
 	EnvironmentInstances []BusinessEnvironmentInstanceResponseObject `json:"environmentInstances,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _BusinessEnvironmentInstancesResponseCollection BusinessEnvironmentInstancesResponseCollection
 
 // NewBusinessEnvironmentInstancesResponseCollection instantiates a new BusinessEnvironmentInstancesResponseCollection object
 // This constructor will assign default values to properties that have it defined,
@@ -73,7 +76,7 @@ func (o *BusinessEnvironmentInstancesResponseCollection) SetEnvironmentInstances
 }
 
 func (o BusinessEnvironmentInstancesResponseCollection) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -85,7 +88,33 @@ func (o BusinessEnvironmentInstancesResponseCollection) ToMap() (map[string]inte
 	if !IsNil(o.EnvironmentInstances) {
 		toSerialize["environmentInstances"] = o.EnvironmentInstances
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *BusinessEnvironmentInstancesResponseCollection) UnmarshalJSON(data []byte) (err error) {
+	varBusinessEnvironmentInstancesResponseCollection := _BusinessEnvironmentInstancesResponseCollection{}
+
+	err = json.Unmarshal(data, &varBusinessEnvironmentInstancesResponseCollection)
+
+	if err != nil {
+		return err
+	}
+
+	*o = BusinessEnvironmentInstancesResponseCollection(varBusinessEnvironmentInstancesResponseCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "environmentInstances")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableBusinessEnvironmentInstancesResponseCollection struct {
@@ -123,5 +152,3 @@ func (v *NullableBusinessEnvironmentInstancesResponseCollection) UnmarshalJSON(s
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

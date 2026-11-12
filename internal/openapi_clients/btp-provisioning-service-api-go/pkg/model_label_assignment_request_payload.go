@@ -20,8 +20,11 @@ var _ MappedNullable = &LabelAssignmentRequestPayload{}
 // LabelAssignmentRequestPayload JSON object with labels as key-value pairs that specify custom attributes of the entity.
 type LabelAssignmentRequestPayload struct {
 	// Labels as key-value pairs in JSON format. An entity is allowed up to 10 labels. The key of each label is mandatory and is limited to 63 characters. Standard labels can have any name (key) that you define, with only a single optional value assigned per key. To define a special type of label, called tags, specify the key with the name 'tags' and associate up to 10 values per tag in the array. The key 'tags' (in any casing variation) can only be used once per entity. Note that label values (not keys) are case-sensitive -- be careful not to create duplicate variants of the same value with a different casing (example: \"myValue\" and \"MyValue\").  For example: {  \"Cost Center\":\"2624061970\"  \"Department\":\"Sales\"  \"tags\": [\"Green\", \"Pharma\", \"Audited\"]  }
-	Labels map[string]interface{} `json:"labels,omitempty"`
+	Labels               map[string]interface{} `json:"labels,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _LabelAssignmentRequestPayload LabelAssignmentRequestPayload
 
 // NewLabelAssignmentRequestPayload instantiates a new LabelAssignmentRequestPayload object
 // This constructor will assign default values to properties that have it defined,
@@ -73,7 +76,7 @@ func (o *LabelAssignmentRequestPayload) SetLabels(v map[string]interface{}) {
 }
 
 func (o LabelAssignmentRequestPayload) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -85,7 +88,33 @@ func (o LabelAssignmentRequestPayload) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Labels) {
 		toSerialize["labels"] = o.Labels
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *LabelAssignmentRequestPayload) UnmarshalJSON(data []byte) (err error) {
+	varLabelAssignmentRequestPayload := _LabelAssignmentRequestPayload{}
+
+	err = json.Unmarshal(data, &varLabelAssignmentRequestPayload)
+
+	if err != nil {
+		return err
+	}
+
+	*o = LabelAssignmentRequestPayload(varLabelAssignmentRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "labels")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableLabelAssignmentRequestPayload struct {
@@ -123,5 +152,3 @@ func (v *NullableLabelAssignmentRequestPayload) UnmarshalJSON(src []byte) error 
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

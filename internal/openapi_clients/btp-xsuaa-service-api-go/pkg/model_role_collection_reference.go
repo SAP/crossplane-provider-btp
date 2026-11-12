@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -23,6 +22,7 @@ var _ MappedNullable = &RoleCollectionReference{}
 type RoleCollectionReference struct {
 	Name string `json:"name"`
 	Description *string `json:"description,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _RoleCollectionReference RoleCollectionReference
@@ -115,6 +115,11 @@ func (o RoleCollectionReference) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -142,15 +147,21 @@ func (o *RoleCollectionReference) UnmarshalJSON(data []byte) (err error) {
 
 	varRoleCollectionReference := _RoleCollectionReference{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varRoleCollectionReference)
+	err = json.Unmarshal(data, &varRoleCollectionReference)
 
 	if err != nil {
 		return err
 	}
 
 	*o = RoleCollectionReference(varRoleCollectionReference)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "description")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -31,6 +30,7 @@ type CreateByOfferingAndPlanName struct {
 	ServiceOfferingName string `json:"service_offering_name"`
 	// The name of the service plan to use for the service instance.
 	ServicePlanName string `json:"service_plan_name"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _CreateByOfferingAndPlanName CreateByOfferingAndPlanName
@@ -210,6 +210,11 @@ func (o CreateByOfferingAndPlanName) ToMap() (map[string]interface{}, error) {
 	}
 	toSerialize["service_offering_name"] = o.ServiceOfferingName
 	toSerialize["service_plan_name"] = o.ServicePlanName
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -239,15 +244,24 @@ func (o *CreateByOfferingAndPlanName) UnmarshalJSON(data []byte) (err error) {
 
 	varCreateByOfferingAndPlanName := _CreateByOfferingAndPlanName{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varCreateByOfferingAndPlanName)
+	err = json.Unmarshal(data, &varCreateByOfferingAndPlanName)
 
 	if err != nil {
 		return err
 	}
 
 	*o = CreateByOfferingAndPlanName(varCreateByOfferingAndPlanName)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "parameters")
+		delete(additionalProperties, "service_offering_name")
+		delete(additionalProperties, "service_plan_name")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

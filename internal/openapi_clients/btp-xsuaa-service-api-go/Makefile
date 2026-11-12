@@ -13,7 +13,7 @@ ci: apply generate
 
 .PHONY: generate
 generate:
-	openapi-generator-cli generate -i swagger.json -g go -o pkg/ --additional-properties=generateInterfaces=true,structPrefix=true,disallowAdditionalPropertiesIfNotPresent=false,enumUnknownDefaultCase=true --skip-validate-spec
+	openapi-generator generate -i swagger.json -g go -o pkg/ --additional-properties=generateInterfaces=true,structPrefix=true,disallowAdditionalPropertiesIfNotPresent=false,enumUnknownDefaultCase=true --skip-validate-spec
 	go mod tidy -v
 
 #.PHONY: download
