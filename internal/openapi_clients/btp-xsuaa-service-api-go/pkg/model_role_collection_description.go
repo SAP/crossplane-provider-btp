@@ -20,7 +20,10 @@ var _ MappedNullable = &RoleCollectionDescription{}
 // RoleCollectionDescription Json of the role collection containing the description
 type RoleCollectionDescription struct {
 	Description *string `json:"description,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _RoleCollectionDescription RoleCollectionDescription
 
 // NewRoleCollectionDescription instantiates a new RoleCollectionDescription object
 // This constructor will assign default values to properties that have it defined,
@@ -84,7 +87,33 @@ func (o RoleCollectionDescription) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *RoleCollectionDescription) UnmarshalJSON(data []byte) (err error) {
+	varRoleCollectionDescription := _RoleCollectionDescription{}
+
+	err = json.Unmarshal(data, &varRoleCollectionDescription)
+
+	if err != nil {
+		return err
+	}
+
+	*o = RoleCollectionDescription(varRoleCollectionDescription)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "description")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableRoleCollectionDescription struct {

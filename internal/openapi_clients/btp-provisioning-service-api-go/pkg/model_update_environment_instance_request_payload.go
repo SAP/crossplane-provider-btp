@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -21,10 +20,11 @@ var _ MappedNullable = &UpdateEnvironmentInstanceRequestPayload{}
 
 // UpdateEnvironmentInstanceRequestPayload JSON object with configuration parameters specific to environment instance.
 type UpdateEnvironmentInstanceRequestPayload struct {
-	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameter 'instance_name' is specified:  {  \"instance_name\": \"myOrg\"  } 
+	// If needed, you can pass environment-specific configuration parameters using a valid embedded JSON object. For a list of supported configuration parameters, see the documentation of the particular environment offering. In this example, additional configuration parameter 'instance_name' is specified:  {  \"instance_name\": \"myOrg\"  }
 	Parameters map[string]interface{} `json:"parameters,omitempty"`
 	// Name of the service plan for the environment instance. Must match the name in the corresponding service broker's catalog. (for example: Subscription)
-	PlanName string `json:"planName"`
+	PlanName             string `json:"planName"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _UpdateEnvironmentInstanceRequestPayload UpdateEnvironmentInstanceRequestPayload
@@ -104,7 +104,7 @@ func (o *UpdateEnvironmentInstanceRequestPayload) SetPlanName(v string) {
 }
 
 func (o UpdateEnvironmentInstanceRequestPayload) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -117,6 +117,11 @@ func (o UpdateEnvironmentInstanceRequestPayload) ToMap() (map[string]interface{}
 		toSerialize["parameters"] = o.Parameters
 	}
 	toSerialize["planName"] = o.PlanName
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -133,10 +138,10 @@ func (o *UpdateEnvironmentInstanceRequestPayload) UnmarshalJSON(data []byte) (er
 	err = json.Unmarshal(data, &allProperties)
 
 	if err != nil {
-		return err;
+		return err
 	}
 
-	for _, requiredProperty := range(requiredProperties) {
+	for _, requiredProperty := range requiredProperties {
 		if _, exists := allProperties[requiredProperty]; !exists {
 			return fmt.Errorf("no value given for required property %v", requiredProperty)
 		}
@@ -144,15 +149,21 @@ func (o *UpdateEnvironmentInstanceRequestPayload) UnmarshalJSON(data []byte) (er
 
 	varUpdateEnvironmentInstanceRequestPayload := _UpdateEnvironmentInstanceRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varUpdateEnvironmentInstanceRequestPayload)
+	err = json.Unmarshal(data, &varUpdateEnvironmentInstanceRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = UpdateEnvironmentInstanceRequestPayload(varUpdateEnvironmentInstanceRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "parameters")
+		delete(additionalProperties, "planName")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }
@@ -192,5 +203,3 @@ func (v *NullableUpdateEnvironmentInstanceRequestPayload) UnmarshalJSON(src []by
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

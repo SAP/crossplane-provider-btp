@@ -22,7 +22,10 @@ type ApplicationResourceDto struct {
 	GroupVersionType *GroupVersionType `json:"groupVersionType,omitempty"`
 	Name *string `json:"name,omitempty"`
 	Path *string `json:"path,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ApplicationResourceDto ApplicationResourceDto
 
 // NewApplicationResourceDto instantiates a new ApplicationResourceDto object
 // This constructor will assign default values to properties that have it defined,
@@ -156,7 +159,35 @@ func (o ApplicationResourceDto) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Path) {
 		toSerialize["path"] = o.Path
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ApplicationResourceDto) UnmarshalJSON(data []byte) (err error) {
+	varApplicationResourceDto := _ApplicationResourceDto{}
+
+	err = json.Unmarshal(data, &varApplicationResourceDto)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ApplicationResourceDto(varApplicationResourceDto)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "groupVersionType")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "path")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableApplicationResourceDto struct {

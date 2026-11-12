@@ -20,7 +20,10 @@ var _ MappedNullable = &GrantedAuthority{}
 // GrantedAuthority struct for GrantedAuthority
 type GrantedAuthority struct {
 	Authority *string `json:"authority,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _GrantedAuthority GrantedAuthority
 
 // NewGrantedAuthority instantiates a new GrantedAuthority object
 // This constructor will assign default values to properties that have it defined,
@@ -84,7 +87,33 @@ func (o GrantedAuthority) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Authority) {
 		toSerialize["authority"] = o.Authority
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *GrantedAuthority) UnmarshalJSON(data []byte) (err error) {
+	varGrantedAuthority := _GrantedAuthority{}
+
+	err = json.Unmarshal(data, &varGrantedAuthority)
+
+	if err != nil {
+		return err
+	}
+
+	*o = GrantedAuthority(varGrantedAuthority)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "authority")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableGrantedAuthority struct {

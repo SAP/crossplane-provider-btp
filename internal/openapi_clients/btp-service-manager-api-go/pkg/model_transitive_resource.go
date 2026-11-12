@@ -27,7 +27,10 @@ type TransitiveResource struct {
 	OperationType *string `json:"operation_type,omitempty"`
 	// The type of the resource.
 	Type *string `json:"type,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _TransitiveResource TransitiveResource
 
 // NewTransitiveResource instantiates a new TransitiveResource object
 // This constructor will assign default values to properties that have it defined,
@@ -196,7 +199,36 @@ func (o TransitiveResource) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *TransitiveResource) UnmarshalJSON(data []byte) (err error) {
+	varTransitiveResource := _TransitiveResource{}
+
+	err = json.Unmarshal(data, &varTransitiveResource)
+
+	if err != nil {
+		return err
+	}
+
+	*o = TransitiveResource(varTransitiveResource)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "criteria")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "operation_type")
+		delete(additionalProperties, "type")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableTransitiveResource struct {

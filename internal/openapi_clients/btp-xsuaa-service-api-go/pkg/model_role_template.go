@@ -28,7 +28,10 @@ type RoleTemplate struct {
 	AppId *string `json:"appId,omitempty"`
 	AppName *string `json:"appName,omitempty"`
 	AppDescription *string `json:"appDescription,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _RoleTemplate RoleTemplate
 
 // NewRoleTemplate instantiates a new RoleTemplate object
 // This constructor will assign default values to properties that have it defined,
@@ -372,7 +375,41 @@ func (o RoleTemplate) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.AppDescription) {
 		toSerialize["appDescription"] = o.AppDescription
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *RoleTemplate) UnmarshalJSON(data []byte) (err error) {
+	varRoleTemplate := _RoleTemplate{}
+
+	err = json.Unmarshal(data, &varRoleTemplate)
+
+	if err != nil {
+		return err
+	}
+
+	*o = RoleTemplate(varRoleTemplate)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "default-role-name")
+		delete(additionalProperties, "scope-references")
+		delete(additionalProperties, "attribute-references")
+		delete(additionalProperties, "role-references")
+		delete(additionalProperties, "appId")
+		delete(additionalProperties, "appName")
+		delete(additionalProperties, "appDescription")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableRoleTemplate struct {

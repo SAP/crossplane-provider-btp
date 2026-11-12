@@ -22,7 +22,10 @@ type SamlKey struct {
 	Key *string `json:"key,omitempty"`
 	Passphrase *string `json:"passphrase,omitempty"`
 	Certificate *string `json:"certificate,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _SamlKey SamlKey
 
 // NewSamlKey instantiates a new SamlKey object
 // This constructor will assign default values to properties that have it defined,
@@ -156,7 +159,35 @@ func (o SamlKey) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Certificate) {
 		toSerialize["certificate"] = o.Certificate
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *SamlKey) UnmarshalJSON(data []byte) (err error) {
+	varSamlKey := _SamlKey{}
+
+	err = json.Unmarshal(data, &varSamlKey)
+
+	if err != nil {
+		return err
+	}
+
+	*o = SamlKey(varSamlKey)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "key")
+		delete(additionalProperties, "passphrase")
+		delete(additionalProperties, "certificate")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableSamlKey struct {

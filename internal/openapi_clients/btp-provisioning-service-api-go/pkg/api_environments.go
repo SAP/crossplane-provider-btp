@@ -51,15 +51,15 @@ type EnvironmentsAPI interface {
 	CreateEnvironmentInstanceBindingExecute(r ApiCreateEnvironmentInstanceBindingRequest) (map[string]interface{}, *http.Response, error)
 
 	/*
-			CreateEnvironmentInstanceLabels Assign labels to an environment instance
+		CreateEnvironmentInstanceLabels Assign labels to an environment instance
 
-			Create and assign custom labels to a given environment instance. Labels are specified as key-value pairs.
-		NOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not update broker-defined labels that may exist.
-		Required scope: $XSAPPNAME.subaccount.environment.create
+		Create and assign custom labels to a given environment instance. Labels are specified as key-value pairs.
+	NOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not update broker-defined labels that may exist.
+	Required scope: $XSAPPNAME.subaccount.environment.create
 
-			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-			@param environmentInstanceId The ID of the environment instance.
-			@return ApiCreateEnvironmentInstanceLabelsRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param environmentInstanceId The ID of the environment instance.
+		@return ApiCreateEnvironmentInstanceLabelsRequest
 	*/
 	CreateEnvironmentInstanceLabels(ctx context.Context, environmentInstanceId string) ApiCreateEnvironmentInstanceLabelsRequest
 
@@ -68,14 +68,14 @@ type EnvironmentsAPI interface {
 	CreateEnvironmentInstanceLabelsExecute(r ApiCreateEnvironmentInstanceLabelsRequest) (*LabelsResponseObject, *http.Response, error)
 
 	/*
-			DeleteEnvironmentInstance Delete an environment instance
+		DeleteEnvironmentInstance Delete an environment instance
 
-			Delete a specific environment instance, including all its data in the environment relating to the subaccount.
-		The deletion may take a while depending on the amount of content in your environment instance.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
+		Delete a specific environment instance, including all its data in the environment relating to the subaccount.
+	The deletion may take a while depending on the amount of content in your environment instance.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
 
-			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-			@param environmentInstanceId ID of the environment instance to delete
-			@return ApiDeleteEnvironmentInstanceRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param environmentInstanceId ID of the environment instance to delete
+		@return ApiDeleteEnvironmentInstanceRequest
 	*/
 	DeleteEnvironmentInstance(ctx context.Context, environmentInstanceId string) ApiDeleteEnvironmentInstanceRequest
 
@@ -100,16 +100,16 @@ type EnvironmentsAPI interface {
 	DeleteEnvironmentInstanceBindingExecute(r ApiDeleteEnvironmentInstanceBindingRequest) (*DeleteEnvironmentInstanceBindingResponse, *http.Response, error)
 
 	/*
-			DeleteEnvironmentInstanceLabels Remove all labels from an environment instance
+		DeleteEnvironmentInstanceLabels Remove all labels from an environment instance
 
-			Remove all user-defined labels that are assigned to a given environment instance.
-		To remove specific labels, use instead: PUT /provisioning/v1/environments/{environmentInstanceId}/labels
-		NOTE: This API applies only to custom labels that are defined by users for SAP BTP. Any labels that might be defined by your environment broker are not removed by this API.
-		Required scope: $XSAPPNAME.subaccount.environment.delete
+		Remove all user-defined labels that are assigned to a given environment instance.
+	To remove specific labels, use instead: PUT /provisioning/v1/environments/{environmentInstanceId}/labels
+	NOTE: This API applies only to custom labels that are defined by users for SAP BTP. Any labels that might be defined by your environment broker are not removed by this API.
+	Required scope: $XSAPPNAME.subaccount.environment.delete
 
-			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-			@param environmentInstanceId The ID of the environment instance.
-			@return ApiDeleteEnvironmentInstanceLabelsRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param environmentInstanceId The ID of the environment instance.
+		@return ApiDeleteEnvironmentInstanceLabelsRequest
 	*/
 	DeleteEnvironmentInstanceLabels(ctx context.Context, environmentInstanceId string) ApiDeleteEnvironmentInstanceLabelsRequest
 
@@ -118,13 +118,13 @@ type EnvironmentsAPI interface {
 	DeleteEnvironmentInstanceLabelsExecute(r ApiDeleteEnvironmentInstanceLabelsRequest) (*LabelsResponseObject, *http.Response, error)
 
 	/*
-			DeleteEnvironmentInstances Delete all environment instances
+		DeleteEnvironmentInstances Delete all environment instances
 
-			Delete all environment instances, including their data in the environment relating to the subaccount.
-		The deletion may take a while depending on the amount of content in your environment instance.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
+		Delete all environment instances, including their data in the environment relating to the subaccount.
+	The deletion may take a while depending on the amount of content in your environment instance.<br/><br/>Required scope: $XSAPPNAME.subaccount.environment.delete
 
-			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-			@return ApiDeleteEnvironmentInstancesRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiDeleteEnvironmentInstancesRequest
 	*/
 	DeleteEnvironmentInstances(ctx context.Context) ApiDeleteEnvironmentInstancesRequest
 
@@ -133,17 +133,17 @@ type EnvironmentsAPI interface {
 	DeleteEnvironmentInstancesExecute(r ApiDeleteEnvironmentInstancesRequest) (*EnvironmentInstancesResponseCollection, *http.Response, error)
 
 	/*
-			GetAllEnvironmentInstanceBindings Get all environment instance bindings
+		GetAllEnvironmentInstanceBindings Get all environment instance bindings
 
-			Get all environment instance bindings for a given environment
-		instance.<br/>The list includes metadata of each binding.<br/>To get
-		credentials and additional binding details, run Get an environment
-		instance binding API and specify the binding ID.<br/><br/>Required
-		scope: $XSAPPNAME.subaccount.environment.read
+		Get all environment instance bindings for a given environment
+	instance.<br/>The list includes metadata of each binding.<br/>To get
+	credentials and additional binding details, run Get an environment
+	instance binding API and specify the binding ID.<br/><br/>Required
+	scope: $XSAPPNAME.subaccount.environment.read
 
-			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-			@param environmentInstanceId The ID of the environment instance for which to get bindings.
-			@return ApiGetAllEnvironmentInstanceBindingsRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param environmentInstanceId The ID of the environment instance for which to get bindings.
+		@return ApiGetAllEnvironmentInstanceBindingsRequest
 	*/
 	GetAllEnvironmentInstanceBindings(ctx context.Context, environmentInstanceId string) ApiGetAllEnvironmentInstanceBindingsRequest
 
@@ -197,15 +197,15 @@ type EnvironmentsAPI interface {
 	GetEnvironmentInstanceBindingExecute(r ApiGetEnvironmentInstanceBindingRequest) (*GetEnvironmentInstanceBinding200Response, *http.Response, error)
 
 	/*
-			GetEnvironmentInstanceLabels Get labels for an environment instance
+		GetEnvironmentInstanceLabels Get labels for an environment instance
 
-			Get all the custom labels that are assigned as key-value pairs to a given environment instance.
-		NOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not retrieve the broker-defined labels that may exist.
-		Required scope: $XSAPPNAME.subaccount.environment.read
+		Get all the custom labels that are assigned as key-value pairs to a given environment instance.
+	NOTE: These custom labels are user-defined and apply only to SAP BTP. They are not the same labels that might be defined by your environment broker; this API does not retrieve the broker-defined labels that may exist.
+	Required scope: $XSAPPNAME.subaccount.environment.read
 
-			@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-			@param environmentInstanceId The ID of the environment instance.
-			@return ApiGetEnvironmentInstanceLabelsRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param environmentInstanceId The ID of the environment instance.
+		@return ApiGetEnvironmentInstanceLabelsRequest
 	*/
 	GetEnvironmentInstanceLabels(ctx context.Context, environmentInstanceId string) ApiGetEnvironmentInstanceLabelsRequest
 

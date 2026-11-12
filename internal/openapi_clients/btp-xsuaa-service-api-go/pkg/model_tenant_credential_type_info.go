@@ -24,7 +24,10 @@ type TenantCredentialTypeInfo struct {
 	AppId *string `json:"appId,omitempty"`
 	CredentialType *string `json:"credentialType,omitempty"`
 	BindingId *string `json:"bindingId,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _TenantCredentialTypeInfo TenantCredentialTypeInfo
 
 // NewTenantCredentialTypeInfo instantiates a new TenantCredentialTypeInfo object
 // This constructor will assign default values to properties that have it defined,
@@ -228,7 +231,37 @@ func (o TenantCredentialTypeInfo) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.BindingId) {
 		toSerialize["bindingId"] = o.BindingId
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *TenantCredentialTypeInfo) UnmarshalJSON(data []byte) (err error) {
+	varTenantCredentialTypeInfo := _TenantCredentialTypeInfo{}
+
+	err = json.Unmarshal(data, &varTenantCredentialTypeInfo)
+
+	if err != nil {
+		return err
+	}
+
+	*o = TenantCredentialTypeInfo(varTenantCredentialTypeInfo)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "tenantId")
+		delete(additionalProperties, "serviceInstanceId")
+		delete(additionalProperties, "appId")
+		delete(additionalProperties, "credentialType")
+		delete(additionalProperties, "bindingId")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableTenantCredentialTypeInfo struct {

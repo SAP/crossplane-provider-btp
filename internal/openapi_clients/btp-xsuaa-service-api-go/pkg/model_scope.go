@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -27,6 +26,7 @@ type Scope struct {
 	GrantedApps []string `json:"granted-apps,omitempty"`
 	GrantAsAuthorityToApps []string `json:"grant-as-authority-to-apps,omitempty"`
 	CustomGrantAsAuthorityToApps []string `json:"custom-grant-as-authority-to-apps"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _Scope Scope
@@ -241,6 +241,11 @@ func (o Scope) ToMap() (map[string]interface{}, error) {
 		toSerialize["grant-as-authority-to-apps"] = o.GrantAsAuthorityToApps
 	}
 	toSerialize["custom-grant-as-authority-to-apps"] = o.CustomGrantAsAuthorityToApps
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -270,15 +275,25 @@ func (o *Scope) UnmarshalJSON(data []byte) (err error) {
 
 	varScope := _Scope{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varScope)
+	err = json.Unmarshal(data, &varScope)
 
 	if err != nil {
 		return err
 	}
 
 	*o = Scope(varScope)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "custom-granted-apps")
+		delete(additionalProperties, "granted-apps")
+		delete(additionalProperties, "grant-as-authority-to-apps")
+		delete(additionalProperties, "custom-grant-as-authority-to-apps")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

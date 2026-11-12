@@ -22,8 +22,8 @@ type EnvironmentInstanceResponseObject struct {
 	// The ID of the associated environment broker.
 	BrokerId *string `json:"brokerId,omitempty"`
 	// The commercial type of the environment broker.
-	CommercialType *string `json:"commercialType,omitempty"`
-	CreatedDate *float32 `json:"createdDate,omitempty"`
+	CommercialType *string  `json:"commercialType,omitempty"`
+	CreatedDate    *float32 `json:"createdDate,omitempty"`
 	// Custom labels that are defined by a user and assigned as key-value pairs in a JSON array to the environment instance.  Example: {   \"Cost Center\": [\"19700626\"],   \"Department\": [\"Sales\"],   \"Contacts\": [\"name1@example.com\",\"name2@example.com\"],   \"EMEA\":[] } NOTE: Custom labels apply only to SAP BTP. They are not the same labels that might be defined by your environment broker (see \"labels\" field).
 	CustomLabels *map[string][]string `json:"customLabels,omitempty"`
 	// The URL of the service dashboard, which is a web-based management user interface for the service instances.
@@ -39,8 +39,8 @@ type EnvironmentInstanceResponseObject struct {
 	// Broker-specified key-value pairs that specify attributes of an environment instance.
 	Labels *string `json:"labels,omitempty"`
 	// The name of the landscape within the logged-in region on which the environment instance is created.
-	LandscapeLabel *string `json:"landscapeLabel,omitempty"`
-	ModifiedDate *float32 `json:"modifiedDate,omitempty"`
+	LandscapeLabel *string  `json:"landscapeLabel,omitempty"`
+	ModifiedDate   *float32 `json:"modifiedDate,omitempty"`
 	// Name of the environment instance.
 	Name *string `json:"name,omitempty"`
 	// An identifier that represents the last operation. This ID is returned by the environment brokers.
@@ -66,8 +66,11 @@ type EnvironmentInstanceResponseObject struct {
 	// The ID of the tenant that owns the environment instance.
 	TenantId *string `json:"tenantId,omitempty"`
 	// The last provisioning operation on the environment instance. * <b>Provision:</b> Environment instance created. * <b>Update:</b> Environment instance changed. * <b>Deprovision:</b> Environment instance deleted.
-	Type *string `json:"type,omitempty"`
+	Type                 *string `json:"type,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _EnvironmentInstanceResponseObject EnvironmentInstanceResponseObject
 
 // NewEnvironmentInstanceResponseObject instantiates a new EnvironmentInstanceResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -887,7 +890,7 @@ func (o *EnvironmentInstanceResponseObject) SetType(v string) {
 }
 
 func (o EnvironmentInstanceResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -971,7 +974,57 @@ func (o EnvironmentInstanceResponseObject) ToMap() (map[string]interface{}, erro
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *EnvironmentInstanceResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varEnvironmentInstanceResponseObject := _EnvironmentInstanceResponseObject{}
+
+	err = json.Unmarshal(data, &varEnvironmentInstanceResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = EnvironmentInstanceResponseObject(varEnvironmentInstanceResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "brokerId")
+		delete(additionalProperties, "commercialType")
+		delete(additionalProperties, "createdDate")
+		delete(additionalProperties, "customLabels")
+		delete(additionalProperties, "dashboardUrl")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "environmentType")
+		delete(additionalProperties, "globalAccountGUID")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "landscapeLabel")
+		delete(additionalProperties, "modifiedDate")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "operation")
+		delete(additionalProperties, "parameters")
+		delete(additionalProperties, "planId")
+		delete(additionalProperties, "planName")
+		delete(additionalProperties, "platformId")
+		delete(additionalProperties, "serviceId")
+		delete(additionalProperties, "serviceName")
+		delete(additionalProperties, "state")
+		delete(additionalProperties, "stateMessage")
+		delete(additionalProperties, "subaccountGUID")
+		delete(additionalProperties, "tenantId")
+		delete(additionalProperties, "type")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableEnvironmentInstanceResponseObject struct {
@@ -1009,5 +1062,3 @@ func (v *NullableEnvironmentInstanceResponseObject) UnmarshalJSON(src []byte) er
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -29,7 +29,10 @@ type ServiceOfferingMetadata struct {
 	LongDescription *string `json:"longDescription,omitempty"`
 	// The support URL for the service offering.
 	SupportUrl *string `json:"supportUrl,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServiceOfferingMetadata ServiceOfferingMetadata
 
 // NewServiceOfferingMetadata instantiates a new ServiceOfferingMetadata object
 // This constructor will assign default values to properties that have it defined,
@@ -233,7 +236,37 @@ func (o ServiceOfferingMetadata) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.SupportUrl) {
 		toSerialize["supportUrl"] = o.SupportUrl
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServiceOfferingMetadata) UnmarshalJSON(data []byte) (err error) {
+	varServiceOfferingMetadata := _ServiceOfferingMetadata{}
+
+	err = json.Unmarshal(data, &varServiceOfferingMetadata)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServiceOfferingMetadata(varServiceOfferingMetadata)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "documentationUrl")
+		delete(additionalProperties, "imageUrl")
+		delete(additionalProperties, "longDescription")
+		delete(additionalProperties, "supportUrl")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServiceOfferingMetadata struct {

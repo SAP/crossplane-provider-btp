@@ -35,7 +35,10 @@ type AssignedServicePlanResponseObject struct {
 	UniqueIdentifier *string `json:"uniqueIdentifier,omitempty"`
 	// Is the quota of this service plan entitled to the global account with unlimited usage.
 	Unlimited *bool `json:"unlimited,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AssignedServicePlanResponseObject AssignedServicePlanResponseObject
 
 // NewAssignedServicePlanResponseObject instantiates a new AssignedServicePlanResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -344,7 +347,40 @@ func (o AssignedServicePlanResponseObject) ToMap() (map[string]interface{}, erro
 	if !IsNil(o.Unlimited) {
 		toSerialize["unlimited"] = o.Unlimited
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AssignedServicePlanResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varAssignedServicePlanResponseObject := _AssignedServicePlanResponseObject{}
+
+	err = json.Unmarshal(data, &varAssignedServicePlanResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AssignedServicePlanResponseObject(varAssignedServicePlanResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "assignmentInfo")
+		delete(additionalProperties, "beta")
+		delete(additionalProperties, "category")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "maxAllowedSubaccountQuota")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "uniqueIdentifier")
+		delete(additionalProperties, "unlimited")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAssignedServicePlanResponseObject struct {

@@ -30,7 +30,10 @@ type EntitlementAmountResponseObject struct {
 	LicensedQuantity *float32 `json:"licensedQuantity,omitempty"`
 	// The unique ID of the material (product) to which the assigned service plan belongs.
 	ProductId *string `json:"productId,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _EntitlementAmountResponseObject EntitlementAmountResponseObject
 
 // NewEntitlementAmountResponseObject instantiates a new EntitlementAmountResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -269,7 +272,38 @@ func (o EntitlementAmountResponseObject) ToMap() (map[string]interface{}, error)
 	if !IsNil(o.ProductId) {
 		toSerialize["productId"] = o.ProductId
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *EntitlementAmountResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varEntitlementAmountResponseObject := _EntitlementAmountResponseObject{}
+
+	err = json.Unmarshal(data, &varEntitlementAmountResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = EntitlementAmountResponseObject(varEntitlementAmountResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "amount")
+		delete(additionalProperties, "autoAssign")
+		delete(additionalProperties, "commercialModel")
+		delete(additionalProperties, "entitlementName")
+		delete(additionalProperties, "licensedQuantity")
+		delete(additionalProperties, "productId")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableEntitlementAmountResponseObject struct {
