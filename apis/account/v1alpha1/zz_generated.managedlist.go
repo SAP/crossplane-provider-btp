@@ -92,6 +92,15 @@ func (l *SubaccountDestinationCertificateList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this SubaccountDestinationGeneratedCertificateList.
+func (l *SubaccountDestinationGeneratedCertificateList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this SubaccountDestinationList.
 func (l *SubaccountDestinationList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))

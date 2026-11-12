@@ -1,0 +1,25 @@
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: SubaccountDestinationGeneratedCertificate
+metadata:
+  name: e2e-gencert-p12-$BUILD_ID
+  namespace: default
+spec:
+  providerConfigRef:
+    name: default
+  forProvider:
+    name: e2e-gencert-$BUILD_ID.p12
+    commonName: e2e-gencert-$BUILD_ID
+    validity:
+      timeUnit: MONTHS
+      value: 3
+    automaticRenew: true
+    passwordSecretRef:
+      name: e2e-gencert-password
+      namespace: crossplane-system
+      key: password
+    subaccountRef:
+      name: e2e-dest-gencert-subaccount
+    destinationServiceBindingSecretRef:
+      name: e2e-dest-gencert-binding-secret
+      namespace: crossplane-system
+      key: credentials

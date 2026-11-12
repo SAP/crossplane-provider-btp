@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"strings"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -39,6 +40,8 @@ type connector struct {
 	kube            client.Client
 	usage           providerconfig.LegacyTracker
 	resourcetracker tracking.ReferenceResolverTracker
+	// recorder emits Kubernetes events for binding-check warnings. May be nil.
+	recorder event.Recorder
 }
 
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
@@ -65,10 +68,11 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, errConnect)
 	}
-	certClient, err := destination.NewCertificateClient(cred)
-	if err != nil {
+	sess := destination.NewSession(cred)
+	if err := destination.VerifyBinding(sess, cr, cr.Spec.ForProvider.SubaccountID, c.recorder); err != nil {
 		return nil, errors.Wrap(err, errConnect)
 	}
+	certClient := sess.CertificateClient()
 
 	if cr.Spec.ForProvider.ContentSecretRef == nil {
 		return nil, errors.Wrap(errors.New("contentSecretRef must be set"), errConnect)
