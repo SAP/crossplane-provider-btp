@@ -12,8 +12,8 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/ProtonMail/go-crypto v1.4.1 h1:9RfcZHqEQUvP8RzecWEUafnZVtEvrBVL9BiF67IQOfM=
 github.com/ProtonMail/go-crypto v1.4.1/go.mod h1:e1OaTyu5SYVrO9gKOEhTc+5UcXtTUa+P3uLudwcgPqo=
-github.com/SAP/terraform-provider-btp v1.27.0 h1:SvcWCIoDJ7/6xptCRrOcMd47MCgXspe56Cd1IZ9qwL0=
-github.com/SAP/terraform-provider-btp v1.27.0/go.mod h1:7o5uH94kWJsaSvtklSpJHeUGsxGAvw7XA8cwmOv8piQ=
+github.com/SAP/terraform-provider-btp v1.28.0 h1:FdpcrMnEmYDVM1amQI67kOR9ETUNMkjQbNq2JrHkE0M=
+github.com/SAP/terraform-provider-btp v1.28.0/go.mod h1:xg3S3jw2dgOCYOJDj0yEqCT2mQDlisRjh3nxKdo0pxw=
 github.com/SAP/xp-clifford v0.0.0-20260817093517-35e452c3c837 h1:tN+WeNNS/jgVIrRwiUaJQq/Azc6hFBX+qkJ6c2Jp4fk=
 github.com/SAP/xp-clifford v0.0.0-20260817093517-35e452c3c837/go.mod h1:gVhEqSJTLzoMua8pCxD6JrwdVpDo52rkGIKkNestjbc=
 github.com/agext/levenshtein v1.2.1/go.mod h1:JEDfjyjHDjOF/1e4FlBE/PkbqA9OfWu2ki2W0IB5558=
