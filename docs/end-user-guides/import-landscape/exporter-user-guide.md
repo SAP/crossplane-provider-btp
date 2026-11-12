@@ -19,10 +19,12 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
   - [Export Command](#export-command)
 - [Supported Resource Kinds](#supported-resource-kinds)
   - [Subaccount](#subaccount)
+  - [Directory](#directory)
   - [Entitlement](#entitlement)
   - [Service Instance](#service-instance)
   - [Cloud Foundry Environment](#cloud-foundry-environment)
   - [Service Binding](#service-binding)
+- [Scope Selection and Directory Hierarchy](#scope-selection-and-directory-hierarchy)
 - [Usage Examples](#usage-examples)
   - [Building the Exporter](#building-the-exporter)
   - [Interactive Mode](#interactive-mode)
@@ -233,8 +235,14 @@ Exports BTP subaccount resources.
 **CLI flag:** `--subaccount <value>`
 
 **Selection criteria:**
-- BTP subaccount ID (exact match)
-- Regex expression matching subaccount display name
+- BTP subaccount or directory ID (exact match)
+- Regex expression matching a subaccount or directory display name
+
+> [!NOTE]
+> The `--subaccount` flag selects from the combined subaccount **and** directory
+> hierarchy. Selecting a directory recursively includes every descendant
+> subaccount and sub-directory. See [Scope Selection and Directory Hierarchy](#scope-selection-and-directory-hierarchy)
+> for details.
 
 **Example:**
 ```bash
@@ -243,6 +251,41 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind subacco
 
 # Export all subaccounts matching a pattern
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind subaccount --subaccount '.*dev.*'
+```
+
+---
+
+### Directory
+
+Exports BTP directories that belong to the global account, preserving the
+parent/child hierarchy.
+
+**Kind name:** `directory`
+
+**CLI flag:** `--subaccount <value>` (directories share the combined scope
+selector with subaccounts; there is no separate directory flag)
+
+**Selection criteria:**
+- Directory ID (exact match)
+- Regex expression matching a subaccount or directory display name
+
+**Notes:**
+- Selecting a directory recursively includes every descendant directory (and,
+  for the `subaccount` kind, every descendant subaccount). See
+  [Scope Selection and Directory Hierarchy](#scope-selection-and-directory-hierarchy).
+- The directory hierarchy is preserved: when `--resolve-references` is set, a
+  directory whose parent is another **exported** directory references that
+  parent's resource name via `directoryRef`. Directories parented directly by
+  the global account carry no `directoryRef`.
+
+**Example:**
+```bash
+# Export a directory subtree (the directory, its sub-directories, and all
+# descendant subaccounts) with references resolved
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+  --kind subaccount,directory \
+  --subaccount <directory-guid> \
+  --resolve-references
 ```
 
 ---
@@ -344,6 +387,54 @@ Exports BTP service bindings from subaccounts.
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind servicebinding -o output.yaml
 ```
 
+## Scope Selection and Directory Hierarchy
+
+The `--subaccount` flag selects the **export scope** from the global account
+hierarchy, which contains both subaccounts and directories. A single selection
+step presents them together; the same flag therefore drives both the
+`subaccount` and `directory` kinds.
+
+**Recursive expansion.** Selecting a directory recursively includes every
+descendant directory and subaccount. Given this hierarchy:
+
+```
+Global Account
+├─ Subaccount-A
+└─ Dir-1
+   ├─ Subaccount-B
+   └─ Dir-1_1
+      ├─ Subaccount-C
+      └─ Subaccount-D
+```
+
+selecting `Dir-1` expands to `Dir-1`, `Dir-1_1`, `Subaccount-B`, `Subaccount-C`,
+and `Subaccount-D`. Explicitly selecting a subaccount that is already pulled in
+through a directory changes nothing — every entity is exported exactly once
+(selections are deduplicated).
+
+**What each kind exports from the selection:**
+- `--kind subaccount` emits a `Subaccount` CR for every selected subaccount.
+- `--kind directory` emits a `Directory` CR for every selected directory.
+
+To capture a whole subtree as CRs, request both kinds together:
+`--kind subaccount,directory`.
+
+**Hierarchy preservation (with `--resolve-references`).** Parent relationships
+are resolved to Kubernetes resource-name references among the exported set:
+
+- A `Directory` whose parent is another exported directory gets a `directoryRef`
+  pointing at the parent `Directory` CR.
+- A `Subaccount` whose parent is an exported directory gets a `directoryRef`
+  pointing at that `Directory` CR.
+- Entities parented directly by the global account carry no `directoryRef`.
+
+> [!NOTE]
+> If a child's parent directory is **not** part of the exported set (for example,
+> you selected only a subaccount but not its parent directory), the reference
+> cannot be resolved. The exporter keeps the raw directory GUID and adds a
+> warning comment to the manifest. Include the parent directory in the selection
+> (or select the parent directory to expand the whole subtree) to resolve it.
+
 ## Usage Examples
 
 ### Building the Exporter
@@ -414,6 +505,14 @@ You can export multiple resource kinds in a single command by specifying a comma
 # Export subaccounts and Cloud Foundry environments together
 go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
   --kind subaccount,cloudfoundry-environment \
+  --resolve-references \
+  -o output.yaml
+
+# Export a directory subtree as CRs: the directory and its sub-directories plus
+# every descendant subaccount, with the hierarchy resolved via references
+go run github.com/sap/crossplane-provider-btp/cmd/exporter --verbose export \
+  --kind subaccount,directory \
+  --subaccount <directory-guid> \
   --resolve-references \
   -o output.yaml
 ```
