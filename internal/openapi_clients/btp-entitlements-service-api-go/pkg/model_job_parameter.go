@@ -22,7 +22,10 @@ type JobParameter struct {
 	Identifying *bool `json:"identifying,omitempty"`
 	Type *string `json:"type,omitempty"`
 	Value map[string]interface{} `json:"value,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _JobParameter JobParameter
 
 // NewJobParameter instantiates a new JobParameter object
 // This constructor will assign default values to properties that have it defined,
@@ -156,7 +159,35 @@ func (o JobParameter) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Value) {
 		toSerialize["value"] = o.Value
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *JobParameter) UnmarshalJSON(data []byte) (err error) {
+	varJobParameter := _JobParameter{}
+
+	err = json.Unmarshal(data, &varJobParameter)
+
+	if err != nil {
+		return err
+	}
+
+	*o = JobParameter(varJobParameter)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "identifying")
+		delete(additionalProperties, "type")
+		delete(additionalProperties, "value")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableJobParameter struct {

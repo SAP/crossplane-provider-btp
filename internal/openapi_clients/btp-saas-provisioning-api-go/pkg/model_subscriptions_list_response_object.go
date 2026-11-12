@@ -29,7 +29,10 @@ type SubscriptionsListResponseObject struct {
 	Total *int64 `json:"total,omitempty"`
 	// Total numbers of pages.
 	TotalPages *int32 `json:"totalPages,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _SubscriptionsListResponseObject SubscriptionsListResponseObject
 
 // NewSubscriptionsListResponseObject instantiates a new SubscriptionsListResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -233,7 +236,37 @@ func (o SubscriptionsListResponseObject) ToMap() (map[string]interface{}, error)
 	if !IsNil(o.TotalPages) {
 		toSerialize["totalPages"] = o.TotalPages
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *SubscriptionsListResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varSubscriptionsListResponseObject := _SubscriptionsListResponseObject{}
+
+	err = json.Unmarshal(data, &varSubscriptionsListResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = SubscriptionsListResponseObject(varSubscriptionsListResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "morePages")
+		delete(additionalProperties, "page")
+		delete(additionalProperties, "subscriptions")
+		delete(additionalProperties, "total")
+		delete(additionalProperties, "totalPages")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableSubscriptionsListResponseObject struct {

@@ -19,9 +19,12 @@ var _ MappedNullable = &NestingErrorDetailsResponseObject{}
 
 // NestingErrorDetailsResponseObject struct for NestingErrorDetailsResponseObject
 type NestingErrorDetailsResponseObject struct {
-	Code *int32 `json:"code,omitempty"`
-	Message *string `json:"message,omitempty"`
+	Code                 *int32  `json:"code,omitempty"`
+	Message              *string `json:"message,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _NestingErrorDetailsResponseObject NestingErrorDetailsResponseObject
 
 // NewNestingErrorDetailsResponseObject instantiates a new NestingErrorDetailsResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -105,7 +108,7 @@ func (o *NestingErrorDetailsResponseObject) SetMessage(v string) {
 }
 
 func (o NestingErrorDetailsResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -120,7 +123,34 @@ func (o NestingErrorDetailsResponseObject) ToMap() (map[string]interface{}, erro
 	if !IsNil(o.Message) {
 		toSerialize["message"] = o.Message
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *NestingErrorDetailsResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varNestingErrorDetailsResponseObject := _NestingErrorDetailsResponseObject{}
+
+	err = json.Unmarshal(data, &varNestingErrorDetailsResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = NestingErrorDetailsResponseObject(varNestingErrorDetailsResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "code")
+		delete(additionalProperties, "message")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableNestingErrorDetailsResponseObject struct {
@@ -158,5 +188,3 @@ func (v *NullableNestingErrorDetailsResponseObject) UnmarshalJSON(src []byte) er
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

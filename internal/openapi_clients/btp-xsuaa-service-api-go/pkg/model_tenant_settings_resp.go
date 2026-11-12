@@ -32,7 +32,10 @@ type TenantSettingsResp struct {
 	CustomEmailDomains []string `json:"customEmailDomains,omitempty"`
 	CmkEnabled *string `json:"cmkEnabled,omitempty"`
 	PartitionedCookies *bool `json:"partitionedCookies,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _TenantSettingsResp TenantSettingsResp
 
 // NewTenantSettingsResp instantiates a new TenantSettingsResp object
 // This constructor will assign default values to properties that have it defined,
@@ -516,7 +519,45 @@ func (o TenantSettingsResp) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.PartitionedCookies) {
 		toSerialize["partitionedCookies"] = o.PartitionedCookies
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *TenantSettingsResp) UnmarshalJSON(data []byte) (err error) {
+	varTenantSettingsResp := _TenantSettingsResp{}
+
+	err = json.Unmarshal(data, &varTenantSettingsResp)
+
+	if err != nil {
+		return err
+	}
+
+	*o = TenantSettingsResp(varTenantSettingsResp)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "iframeDomains")
+		delete(additionalProperties, "tokenPolicySettings")
+		delete(additionalProperties, "samlConfigSettings")
+		delete(additionalProperties, "links")
+		delete(additionalProperties, "defaultIdp")
+		delete(additionalProperties, "corsDefaultOrigins")
+		delete(additionalProperties, "corsXhrOrigins")
+		delete(additionalProperties, "credentialTypeInfos")
+		delete(additionalProperties, "treatUsersWithSameEmailAsSameUser")
+		delete(additionalProperties, "useIdpUserNameInTokens")
+		delete(additionalProperties, "customEmailDomains")
+		delete(additionalProperties, "cmkEnabled")
+		delete(additionalProperties, "partitionedCookies")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableTenantSettingsResp struct {

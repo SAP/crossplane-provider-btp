@@ -48,7 +48,10 @@ type CreatedServiceInstanceResponseObject struct {
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 	// Whether the resource can be used.
 	Usable *bool `json:"usable,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _CreatedServiceInstanceResponseObject CreatedServiceInstanceResponseObject
 
 // NewCreatedServiceInstanceResponseObject instantiates a new CreatedServiceInstanceResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -567,7 +570,46 @@ func (o CreatedServiceInstanceResponseObject) ToMap() (map[string]interface{}, e
 	if !IsNil(o.Usable) {
 		toSerialize["usable"] = o.Usable
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *CreatedServiceInstanceResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varCreatedServiceInstanceResponseObject := _CreatedServiceInstanceResponseObject{}
+
+	err = json.Unmarshal(data, &varCreatedServiceInstanceResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = CreatedServiceInstanceResponseObject(varCreatedServiceInstanceResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "context")
+		delete(additionalProperties, "created_at")
+		delete(additionalProperties, "dashboard_url")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "maintenance_info")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "platform_id")
+		delete(additionalProperties, "ready")
+		delete(additionalProperties, "referenced_instance_id")
+		delete(additionalProperties, "service_plan_id")
+		delete(additionalProperties, "shared")
+		delete(additionalProperties, "updated_at")
+		delete(additionalProperties, "usable")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableCreatedServiceInstanceResponseObject struct {

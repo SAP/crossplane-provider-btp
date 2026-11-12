@@ -20,7 +20,10 @@ var _ MappedNullable = &AvailableEnvironmentResponseCollection{}
 // AvailableEnvironmentResponseCollection struct for AvailableEnvironmentResponseCollection
 type AvailableEnvironmentResponseCollection struct {
 	AvailableEnvironments []AvailableEnvironmentResponseObject `json:"availableEnvironments,omitempty"`
+	AdditionalProperties  map[string]interface{}
 }
+
+type _AvailableEnvironmentResponseCollection AvailableEnvironmentResponseCollection
 
 // NewAvailableEnvironmentResponseCollection instantiates a new AvailableEnvironmentResponseCollection object
 // This constructor will assign default values to properties that have it defined,
@@ -72,7 +75,7 @@ func (o *AvailableEnvironmentResponseCollection) SetAvailableEnvironments(v []Av
 }
 
 func (o AvailableEnvironmentResponseCollection) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -84,7 +87,33 @@ func (o AvailableEnvironmentResponseCollection) ToMap() (map[string]interface{},
 	if !IsNil(o.AvailableEnvironments) {
 		toSerialize["availableEnvironments"] = o.AvailableEnvironments
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AvailableEnvironmentResponseCollection) UnmarshalJSON(data []byte) (err error) {
+	varAvailableEnvironmentResponseCollection := _AvailableEnvironmentResponseCollection{}
+
+	err = json.Unmarshal(data, &varAvailableEnvironmentResponseCollection)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AvailableEnvironmentResponseCollection(varAvailableEnvironmentResponseCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "availableEnvironments")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAvailableEnvironmentResponseCollection struct {
@@ -122,5 +151,3 @@ func (v *NullableAvailableEnvironmentResponseCollection) UnmarshalJSON(src []byt
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-
