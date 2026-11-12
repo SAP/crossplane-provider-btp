@@ -19,7 +19,7 @@ func TestCachingWrapper_ConcurrentReconciles_OneLogin(t *testing.T) {
 	const N = 100
 	fake := &fakeBTPCLI{password: "correct-pw"}
 	srv := fake.start(t)
-	p := newTerraformProvider(tfprovider.New(), true)
+	p := newTerraformProvider(tfprovider.New())
 	ctx := context.Background()
 
 	var wg sync.WaitGroup
@@ -50,7 +50,7 @@ func TestCachingWrapper_TwoCredentials_TwoLogins(t *testing.T) {
 	const N = 50
 	fake := &fakeBTPCLI{password: "correct-pw"}
 	srv := fake.start(t)
-	p := newTerraformProvider(tfprovider.New(), true)
+	p := newTerraformProvider(tfprovider.New())
 	ctx := context.Background()
 
 	var wg sync.WaitGroup

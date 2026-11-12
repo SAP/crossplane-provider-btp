@@ -76,10 +76,9 @@ func main() {
 			"Timeout for a single reconcile cycle (externalCtx budget). The reconciler adds a 30s grace period on top for status writes. Default is 1m.",
 		).Default("1m").Envar("RECONCILE_TIMEOUT").Duration()
 
-		enableTerraformSessionReuse = app.Flag(
-			"enable-terraform-session-reuse",
-			"Share configured Terraform BTP sessions across reconciliations. Disabled by default.",
-		).Default("false").Envar("ENABLE_TERRAFORM_SESSION_REUSE").Bool()
+		// Deprecated no-op: session reuse is always on again (#1096). Kept so existing
+		// deployments passing the flag don't fail kingpin's unknown-flag check.
+		_ = app.Flag("enable-terraform-session-reuse", "Deprecated, no-op.").Hidden().Bool()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 	)
@@ -109,7 +108,6 @@ func main() {
 
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
-	tfclient.SetEnableTerraformSessionReuse(*enableTerraformSessionReuse)
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
