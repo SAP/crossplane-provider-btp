@@ -79,15 +79,27 @@ func TestSubaccountApiCredentialConditionalAdoption(t *testing.T) {
 			assertCredentialIdentityE2E(t, initSource)
 
 			// The Framework reconstructs sensitive observation from the configured
-			// destination Secret. Seed only the secret in a distinct destination;
-			// Read must obtain the public fields from the existing target.
+			// destination Secret. Seed the write-once secret and extra data in a
+			// distinct destination; Read must obtain public fields from the target,
+			// while extras remain stored without becoming Terraform attributes.
 			completeSecret := getCredentialSecretE2E(ctx, t, cfg, created)
 			completeAdopterName := "sac-adopt-complete-" + BUILD_ID
 			// Seed only the write-once secret; successful observation must supply
 			// public fields and publish the complete result into this partial target.
-			createCredentialSecretE2E(ctx, t, cfg, completeAdopterName+"-secret", map[string][]byte{
+			extraConnectionData := map[string][]byte{
+				"attribute.read_only":     []byte("synthetic-extra-not-observed-state"),
+				"attribute.unknown":       []byte("synthetic-unknown-extra"),
+				"attribute.name":          []byte("must-not-retarget"),
+				"attribute.subaccount_id": []byte("must-not-retarget-subaccount"),
+				"unprefixed-extra":        []byte("preserve-unprefixed-extra"),
+			}
+			completeDestinationData := map[string][]byte{
 				"attribute.client_secret": append([]byte(nil), completeSecret.Data["attribute.client_secret"]...),
-			})
+			}
+			for key, value := range extraConnectionData {
+				completeDestinationData[key] = append([]byte(nil), value...)
+			}
+			createCredentialSecretE2E(ctx, t, cfg, completeAdopterName+"-secret", completeDestinationData)
 			completeAdopter := createCredentialForAdoptionE2E(
 				ctx, t, cfg, completeAdopterName, completeAdopterName+"-secret", created,
 			)
@@ -104,6 +116,14 @@ func TestSubaccountApiCredentialConditionalAdoption(t *testing.T) {
 			adoptedSecret := getCredentialSecretE2E(ctx, t, cfg, completeAdopter)
 			if !bytes.Equal(adoptedSecret.Data["attribute.client_secret"], completeSecret.Data["attribute.client_secret"]) {
 				t.Error("adoption changed the established client_secret")
+			}
+			for key, want := range extraConnectionData {
+				if !bytes.Equal(adoptedSecret.Data[key], want) {
+					t.Errorf("adoption changed or removed extra connection Secret key %q", key)
+				}
+			}
+			if completeAdopter.Status.AtProvider.ReadOnly == nil {
+				t.Error("BTP observation did not retain typed ReadOnly status")
 			}
 
 			// A no-status adopter gets its subaccount from initProvider while its

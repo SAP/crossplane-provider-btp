@@ -79,6 +79,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 		managementPolicies             xpv2.ManagementPolicies
 		policyFeatureEnabled           bool
 		opaqueDestinationSecret        bool
+		extraPrefixedAttributes        bool
 		wantPublicationFailure         bool
 		wantReady                      corev1.ConditionStatus
 		wantSynced                     corev1.ConditionStatus
@@ -97,6 +98,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 		{name: "initProvider-only subaccount adopter uses effective identity", includeClientSecret: true, coldStart: true, newAdopter: true, initProviderSubaccount: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "unowned Opaque Secret refuses adoption publication", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, opaqueDestinationSecret: true, wantPublicationFailure: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionFalse},
 		{name: "new mutation-capable adopter with only client_secret", includeClientSecret: true, coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionAll}, policyFeatureEnabled: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
+		{name: "cold adoption ignores extra prefixed attributes and preserves destination", includeClientSecret: true, coldStart: true, newAdopter: true, extraPrefixedAttributes: true, wantReady: corev1.ConditionTrue, wantSynced: corev1.ConditionTrue},
 		{name: "new Observe-only adopter with public fields only is rejected", coldStart: true, newAdopter: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
 		{name: "new Observe-only adopter with empty destination is rejected", coldStart: true, newAdopter: true, emptyConnection: true, managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
 		{name: "certificate input cannot bypass observed secret completeness", coldStart: true, newAdopter: true, certificateInput: true, credentialType: "secret", managementPolicies: xpv2.ManagementPolicies{xpv2.ManagementActionObserve}, policyFeatureEnabled: true, wantReady: corev1.ConditionFalse, wantSynced: corev1.ConditionFalse},
@@ -153,6 +155,9 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 					"credential-type": credentialType, "clientid": adoptionTestClientID,
 					"tokenurl": adoptionTestTokenURL, "apiurl": adoptionTestAPIURL,
 					"name": adoptionTestCredential,
+				}
+				if tc.extraPrefixedAttributes {
+					response["readOnly"] = true
 				}
 				if r.URL.RawQuery == "create" && tc.includeClientSecret {
 					response["clientsecret"] = adoptionTestClientSecret
@@ -231,6 +236,13 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 				connectionSecret.Data = map[string][]byte{"unrelated": []byte("preserved")}
 				if tc.includeClientSecret {
 					connectionSecret.Data["attribute.client_secret"] = []byte(adoptionTestClientSecret)
+				}
+				if tc.extraPrefixedAttributes {
+					connectionSecret.Data["attribute.read_only"] = []byte("not-a-boolean")
+					connectionSecret.Data["attribute.unknown"] = []byte("unknown-extra")
+					connectionSecret.Data["attribute.name"] = []byte("retargeted-name")
+					connectionSecret.Data["attribute.subaccount_id"] = []byte("retargeted-subaccount")
+					connectionSecret.Data["attribute.certificate_passed"] = []byte("extra-certificate")
 				}
 			}
 			if tc.driftedSubaccount {
@@ -415,6 +427,9 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 			if tc.wantPublicationFailure && !strings.Contains(synced.Message, "refusing to modify uncontrolled secret") {
 				t.Errorf("publication failure diagnostic %q does not preserve the Secret ownership rejection", synced.Message)
 			}
+			if tc.extraPrefixedAttributes && got.Status.AtProvider.ReadOnly == nil {
+				t.Error("typed ReadOnly observation was lost during cold state reconstruction")
+			}
 			if tc.includeClientSecret {
 				if gotName := meta.GetExternalName(got); gotName != adoptionTestSubaccountID+"/"+adoptionTestCredential {
 					t.Errorf("external identity = %q, want %q", gotName, adoptionTestSubaccountID+"/"+adoptionTestCredential)
@@ -453,6 +468,17 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 				}
 				if !tc.missingDestination && string(published.Data["unrelated"]) != "preserved" {
 					t.Error("publication did not preserve unrelated destination Secret data")
+				}
+				if tc.extraPrefixedAttributes {
+					for key, want := range map[string]string{
+						"attribute.read_only": "not-a-boolean", "attribute.unknown": "unknown-extra",
+						"attribute.name": "retargeted-name", "attribute.subaccount_id": "retargeted-subaccount",
+						"attribute.certificate_passed": "extra-certificate",
+					} {
+						if string(published.Data[key]) != want {
+							t.Errorf("publication changed extra Secret key %q", key)
+						}
+					}
 				}
 			} else if got := published.Data["attribute.client_secret"]; len(got) != 0 {
 				t.Error("incomplete state unexpectedly published a client secret")

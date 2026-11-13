@@ -174,7 +174,10 @@ func (r *credentialFrameworkState) GetObservation() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := upjetresource.GetSensitiveObservation(r.ctx, &credentialSecretClient{kube: r.kube}, r.GetWriteConnectionSecretToReference(), observation); err != nil {
+	if err := upjetresource.GetSensitiveObservation(r.ctx, &credentialSecretClient{
+		kube:                  r.kube,
+		connectionDetailsKeys: r.GetConnectionDetailsMapping(),
+	}, r.GetWriteConnectionSecretToReference(), observation); err != nil {
 		return nil, errors.Wrap(err, "cannot restore sensitive Terraform state from the connection Secret")
 	}
 	// Restoring sensitive fields makes even a new MR's observation nonempty.
@@ -206,7 +209,8 @@ func (r *credentialFrameworkState) GetObservation() (map[string]any, error) {
 }
 
 type credentialSecretClient struct {
-	kube client.Client
+	kube                  client.Client
+	connectionDetailsKeys map[string]string
 }
 
 func (c *credentialSecretClient) GetSecretData(ctx context.Context, ref *xpv2.SecretReference) (map[string][]byte, error) {
@@ -217,7 +221,17 @@ func (c *credentialSecretClient) GetSecretData(ctx context.Context, ref *xpv2.Se
 	if err := c.kube.Get(ctx, types.NamespacedName{Namespace: ref.Namespace, Name: ref.Name}, secret); err != nil {
 		return nil, err
 	}
-	return secret.Data, nil
+	// Reconstruct state only from keys this resource declares as sensitive
+	// connection details. Extra Secret data remains untouched in Kubernetes and
+	// must not be interpreted as arbitrary Terraform attributes.
+	data := make(map[string][]byte, len(c.connectionDetailsKeys))
+	for terraformAttribute := range c.connectionDetailsKeys {
+		key := "attribute." + terraformAttribute
+		if value, ok := secret.Data[key]; ok {
+			data[key] = value
+		}
+	}
+	return data, nil
 }
 
 func (c *credentialSecretClient) GetSecretValue(ctx context.Context, selector xpv2.SecretKeySelector) ([]byte, error) {
