@@ -11,10 +11,98 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	kubefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
 )
+
+func TestCredentialSecretClientFiltersUnsupportedAttributes(t *testing.T) {
+	secretRef := &xpv2.SecretReference{Name: "credential-connection", Namespace: "crossplane-system"}
+	cr := &securityv1alpha1.SubaccountApiCredential{
+		ObjectMeta: metav1.ObjectMeta{Name: "credential"},
+		Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+			ClusterManagedResourceSpec: xpv2.ClusterManagedResourceSpec{WriteConnectionSecretToReference: secretRef},
+			ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{
+				SubaccountID: strptr("effective-subaccount"), Name: strptr("effective-name"),
+			},
+		},
+		Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{
+			ReadOnly: boolptr(true),
+		}},
+	}
+	meta.SetExternalName(cr, "effective-subaccount/effective-name")
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: secretRef.Name, Namespace: secretRef.Namespace},
+		Data: map[string][]byte{
+			"attribute.client_secret": []byte("secret-bytes"),
+			"attribute.key":           []byte("key-bytes"),
+			"attribute.api_url":       nil,
+			"attribute.token_url":     []byte{},
+			"attribute.read_only":     []byte("not-a-boolean"),
+			"attribute.name":          []byte("retargeted-name"),
+			"attribute.subaccount_id": []byte("retargeted-subaccount"),
+			"attribute.unknown":       []byte("unknown-bytes"),
+			"unprefixed":              []byte("extra-bytes"),
+		},
+	}
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	kube := kubefake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build()
+	filtered, err := (&credentialSecretClient{kube: kube, connectionDetailsKeys: cr.GetConnectionDetailsMapping()}).GetSecretData(context.Background(), secretRef)
+	if err != nil {
+		t.Fatalf("GetSecretData() failed: %v", err)
+	}
+	for _, key := range []string{"attribute.api_url", "attribute.token_url"} {
+		value, ok := filtered[key]
+		if !ok || len(value) != 0 {
+			t.Errorf("filtered view did not retain present nil/empty mapped value %q", key)
+		}
+	}
+
+	state := &credentialFrameworkState{SubaccountApiCredential: cr, ctx: context.Background(), kube: kube}
+	observation, err := state.GetObservation()
+	if err != nil {
+		t.Fatalf("GetObservation() failed: %v", err)
+	}
+	if got, ok := observation["key"].(string); !ok || got != "key-bytes" {
+		t.Errorf("mapped sensitive key was not restored unchanged: %#v", observation["key"])
+	}
+	for _, key := range []string{"attribute.api_url", "attribute.token_url"} {
+		if value, ok := secret.Data[key]; !ok || len(value) != 0 {
+			t.Errorf("expected present nil/empty mapped value %q in test fixture", key)
+		}
+	}
+	if got, ok := observation["read_only"].(bool); !ok || !got {
+		t.Errorf("typed observed ReadOnly value was replaced by Secret data: %#v", observation["read_only"])
+	}
+	if _, ok := observation["unknown"]; ok {
+		t.Error("unsupported Secret attribute entered Terraform observation")
+	}
+	if got := observation["name"]; got != "effective-name" {
+		t.Errorf("Secret extra changed reconstructed name: got %#v", got)
+	}
+	if got := observation["subaccount_id"]; got != "effective-subaccount" {
+		t.Errorf("Secret extra changed reconstructed subaccount: got %#v", got)
+	}
+	if cr.Status.AtProvider.ReadOnly == nil || !*cr.Status.AtProvider.ReadOnly {
+		t.Error("typed observed readOnly value was modified")
+	}
+	if value(cr.Spec.ForProvider.SubaccountID) != "effective-subaccount" || value(cr.Spec.ForProvider.Name) != "effective-name" {
+		t.Error("Secret restoration modified forProvider identity")
+	}
+	unchanged := &corev1.Secret{}
+	if err := kube.Get(context.Background(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, unchanged); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range secret.Data {
+		if string(unchanged.Data[key]) != string(want) {
+			t.Errorf("filtering modified stored Secret key %q", key)
+		}
+	}
+}
 
 func TestHasCompleteCredentialConnectionDetails(t *testing.T) {
 	complete := managed.ConnectionDetails{
@@ -405,6 +493,8 @@ func TestCredentialFrameworkStateReadIdentity(t *testing.T) {
 }
 
 func strptr(s string) *string { return &s }
+
+func boolptr(b bool) *bool { return &b }
 
 func errorString(err error) string {
 	if err == nil {

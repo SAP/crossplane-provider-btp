@@ -15,11 +15,13 @@ import (
 )
 
 type subaccountCredentialUpgradeSnapshot struct {
-	externalName   string
-	uid            string
-	subaccountID   string
-	credentialName string
-	secretData     map[string][]byte
+	externalName    string
+	uid             string
+	subaccountID    string
+	credentialName  string
+	secretName      string
+	secretNamespace string
+	secretData      map[string][]byte
 }
 
 var credentialUpgradeSecretKeys = []string{
@@ -27,6 +29,14 @@ var credentialUpgradeSecretKeys = []string{
 	"attribute.client_secret",
 	"attribute.api_url",
 	"attribute.token_url",
+}
+
+var credentialUpgradeExtraSecretData = map[string][]byte{
+	"attribute.read_only":     []byte("synthetic-extra-not-observed-state"),
+	"attribute.unknown":       []byte("synthetic-unknown-extra"),
+	"attribute.name":          []byte("must-not-retarget"),
+	"attribute.subaccount_id": []byte("must-not-retarget-subaccount"),
+	"unprefixed-extra":        []byte("preserve-unprefixed-extra"),
 }
 
 var (
@@ -85,6 +95,12 @@ func Test_SubaccountApiCredential_External_Name(t *testing.T) {
 				if err := r.Get(ctx, secretRef.Name, secretRef.Namespace, secret); err != nil {
 					t.Fatalf("get connection Secret before upgrade: %v", err)
 				}
+				for key, value := range credentialUpgradeExtraSecretData {
+					secret.Data[key] = append([]byte(nil), value...)
+				}
+				if err := r.Update(ctx, secret); err != nil {
+					t.Fatalf("seed extra connection Secret data before upgrade: %v", err)
+				}
 				secretSnapshot := make(map[string][]byte, len(secret.Data))
 				for key, value := range secret.Data {
 					secretSnapshot[key] = append([]byte(nil), value...)
@@ -97,11 +113,13 @@ func Test_SubaccountApiCredential_External_Name(t *testing.T) {
 
 				klog.V(4).Infof("Pre-upgrade SubaccountApiCredential external name: %s", externalName)
 				state := subaccountCredentialUpgradeSnapshot{
-					externalName:   externalName,
-					uid:            string(sac.UID),
-					subaccountID:   *sac.Status.AtProvider.SubaccountID,
-					credentialName: *sac.Status.AtProvider.Name,
-					secretData:     secretSnapshot,
+					externalName:    externalName,
+					uid:             string(sac.UID),
+					subaccountID:    *sac.Status.AtProvider.SubaccountID,
+					credentialName:  *sac.Status.AtProvider.Name,
+					secretName:      secretRef.Name,
+					secretNamespace: secretRef.Namespace,
+					secretData:      secretSnapshot,
 				}
 				return context.WithValue(ctx, "preUpgradeSacState", state)
 			},
@@ -151,6 +169,9 @@ func Test_SubaccountApiCredential_External_Name(t *testing.T) {
 				if secretRef == nil {
 					t.Fatal("write connection Secret reference is missing after upgrade")
 				}
+				if secretRef.Name != preUpgradeState.secretName || secretRef.Namespace != preUpgradeState.secretNamespace {
+					t.Fatalf("connection Secret destination changed during upgrade: before=%s/%s after=%s/%s", preUpgradeState.secretNamespace, preUpgradeState.secretName, secretRef.Namespace, secretRef.Name)
+				}
 				secret := &corev1.Secret{}
 				if err := r.Get(ctx, secretRef.Name, secretRef.Namespace, secret); err != nil {
 					t.Fatalf("get connection Secret after upgrade: %v", err)
@@ -160,6 +181,14 @@ func Test_SubaccountApiCredential_External_Name(t *testing.T) {
 					if !bytes.Equal(beforeSecret[key], secret.Data[key]) {
 						t.Errorf("connection Secret key %q changed during upgrade", key)
 					}
+				}
+				for key := range credentialUpgradeExtraSecretData {
+					if !bytes.Equal(beforeSecret[key], secret.Data[key]) {
+						t.Errorf("extra connection Secret key %q changed during upgrade", key)
+					}
+				}
+				if sac.Status.AtProvider.ReadOnly == nil {
+					t.Error("typed ReadOnly observation is missing after upgrade")
 				}
 
 				klog.V(4).Info("Compound identity and connection data correctly preserved after upgrade")
