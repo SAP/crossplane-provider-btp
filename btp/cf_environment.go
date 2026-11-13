@@ -44,7 +44,7 @@ func (c *Client) CreateCloudFoundryEnvironment(
 		EnvironmentType: envType.Identifier,
 		LandscapeLabel:  &landscape,
 		Name:            envName,
-		Origin:          nil,
+		Origin:          c.workloadOrigin(),
 		Parameters:      parameters,
 		PlanName:        cloudFoundryPlanName,
 		ServiceName:     envType.ServiceName,
@@ -227,4 +227,11 @@ func (c *Client) GetCFEnvironmentByResourceUID(
 		}
 	}
 	return nil, nil
+}
+
+func (c *Client) workloadOrigin() *string {
+	if c.Credential != nil && c.Credential.WorkloadIdentity != nil {
+		return internal.Ptr(c.Credential.WorkloadIdentity.IdentityProvider)
+	}
+	return nil
 }

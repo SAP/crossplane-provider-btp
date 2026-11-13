@@ -136,7 +136,7 @@ func TestConnect(t *testing.T) {
 				kubeObjects: []client.Object{
 					testutils.NewProviderConfig("pc-reference", "cis-provider-secret", "sa-provider-secret"),
 					testutils.NewSecret("cis-provider-secret", map[string][]byte{"data": []byte("someCISCreds")}),
-					testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte("someSACreds")}),
+					testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte(`{"email":"legacy@example.com","username":"legacy","password":"secret"}`)}),
 				},
 				serviceFnReturn: &btp.Client{},
 				serviceFnErr:    errors.New("serviceFnError"),
@@ -144,7 +144,7 @@ func TestConnect(t *testing.T) {
 			want: want{
 				newServiceArgs: newServiceArgs{
 					cisCreds: []byte("someCISCreds"),
-					saCreds:  []byte("someSACreds"),
+					saCreds:  []byte(`{"email":"legacy@example.com","username":"legacy","password":"secret"}`),
 				},
 				err: errors.New("serviceFnError"),
 			},
@@ -162,14 +162,14 @@ func TestConnect(t *testing.T) {
 				kubeObjects: []client.Object{
 					testutils.NewProviderConfig("pc-reference", "cis-provider-secret", "sa-provider-secret"),
 					testutils.NewSecret("cis-provider-secret", map[string][]byte{"data": []byte("someCISCreds")}),
-					testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte("someSACreds")}),
+					testutils.NewSecret("sa-provider-secret", map[string][]byte{"credentials": []byte(`{"email":"legacy@example.com","username":"legacy","password":"secret"}`)}),
 				},
 				serviceFnReturn: &btp.Client{},
 			},
 			want: want{
 				newServiceArgs: newServiceArgs{
 					cisCreds: []byte("someCISCreds"),
-					saCreds:  []byte("someSACreds"),
+					saCreds:  []byte(`{"email":"legacy@example.com","username":"legacy","password":"secret"}`),
 				},
 			},
 		},

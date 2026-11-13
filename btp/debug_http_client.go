@@ -126,7 +126,7 @@ func constructRequestLogMessage(req *http.Request) []any {
 		bodyCopy = io.NopCloser(strings.NewReader(fmt.Sprintf("Error reading body: %v", err)))
 	}
 	bodyBytes, _ := io.ReadAll(bodyCopy)
-	bodyRedacted := string(redactJwtTokensFromBody(redactSensitiveBodyBasedOnKeywords(bodyBytes)))
+	bodyRedacted := string(RedactJWTTokensFromBody(redactSensitiveBodyBasedOnKeywords(bodyBytes)))
 	return []any{"type", "REQUEST", "proto", proto, "host", host, "method", method, "path", path, "parameters", parameters, "headers", fmt.Sprintf("%v", redactedHeader), "body", bodyRedacted}
 }
 
@@ -145,7 +145,7 @@ func constructResponseLogMessage(resp *http.Response) []any {
 		bodyCopy = io.NopCloser(strings.NewReader(fmt.Sprintf("Error reading body: %v", err)))
 	}
 	bodyBytes, _ := io.ReadAll(bodyCopy)
-	bodyRedacted := string(redactJwtTokensFromBody(redactSensitiveBodyBasedOnKeywords(bodyBytes)))
+	bodyRedacted := string(RedactJWTTokensFromBody(redactSensitiveBodyBasedOnKeywords(bodyBytes)))
 	return []any{"type", "RESPONSE", "proto", proto, "status", status, "headers", fmt.Sprintf("%v", redactedHeader), "body", bodyRedacted}
 }
 
@@ -160,10 +160,10 @@ func redactSensitiveBodyBasedOnKeywords(body []byte) []byte {
 	return body
 }
 
-// redactJwtTokensFromBody redacts JWT tokens from the body
+// RedactJWTTokensFromBody redacts JWT tokens from the body
 // JWT tokens are 3 base64 encoded parts, seperated by ".": <base64ecoded>.<base64ecoded>.<base64ecoded>
 // The whole token is replaced with "<REDACTED>".
-func redactJwtTokensFromBody(body []byte) []byte {
+func RedactJWTTokensFromBody(body []byte) []byte {
 	jwtPattern := regexp.MustCompile(`[A-Za-z0-9_-]{2,}(?:\.[A-Za-z0-9_-]{2,}){2}`)
 	return jwtPattern.ReplaceAll([]byte(body), []byte("<REDACTED>"))
 }
