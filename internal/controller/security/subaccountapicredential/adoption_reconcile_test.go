@@ -112,7 +112,7 @@ func TestCredentialAdoptionReconcile(t *testing.T) {
 				if strings.HasPrefix(r.URL.Path, "/login/") {
 					w.Header().Set("X-Cpcli-Sessionid", "synthetic-session")
 					w.Header().Set("Content-Type", "application/json")
-					_, _ = w.Write([]byte(`{"mail":"test@example.test","issuer":"test-issuer"}`))
+					_, _ = w.Write([]byte(`{"mail":"test@example.com","issuer":"test-issuer"}`))
 					return
 				}
 				if !strings.Contains(r.URL.Path, "/command/") {
