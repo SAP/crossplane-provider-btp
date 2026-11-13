@@ -25,7 +25,10 @@ type Label struct {
 	Op *string `json:"op,omitempty"`
 	// The list of values for the label
 	Values []string `json:"values,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _Label Label
 
 // NewLabel instantiates a new Label object
 // This constructor will assign default values to properties that have it defined,
@@ -159,7 +162,35 @@ func (o Label) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Values) {
 		toSerialize["values"] = o.Values
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *Label) UnmarshalJSON(data []byte) (err error) {
+	varLabel := _Label{}
+
+	err = json.Unmarshal(data, &varLabel)
+
+	if err != nil {
+		return err
+	}
+
+	*o = Label(varLabel)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "key")
+		delete(additionalProperties, "op")
+		delete(additionalProperties, "values")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableLabel struct {

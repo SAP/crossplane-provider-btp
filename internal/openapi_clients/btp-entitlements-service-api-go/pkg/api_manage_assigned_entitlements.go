@@ -269,6 +269,7 @@ func (a *ManageAssignedEntitlementsAPIService) GetDirectoryAssignmentsExecute(r 
 		parameterAddToHeaderOrQuery(localVarQueryParams, "includeAutoManagedPlans", r.includeAutoManagedPlans, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeAutoManagedPlans", defaultValue, "form", "")
 		r.includeAutoManagedPlans = &defaultValue
 	}
 	if r.entitledServicesOnly != nil {
@@ -442,6 +443,7 @@ func (a *ManageAssignedEntitlementsAPIService) GetGlobalAccountAssignmentsExecut
 		parameterAddToHeaderOrQuery(localVarQueryParams, "includeAutoManagedPlans", r.includeAutoManagedPlans, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeAutoManagedPlans", defaultValue, "form", "")
 		r.includeAutoManagedPlans = &defaultValue
 	}
 	if r.entitledServicesOnly != nil {

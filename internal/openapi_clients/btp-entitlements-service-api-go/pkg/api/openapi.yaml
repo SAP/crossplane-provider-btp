@@ -105,7 +105,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EntitledAndAssignedServicesResponseObject'
+                $ref: "#/components/schemas/EntitledAndAssignedServicesResponseObject"
           description: Ok
         "204":
           description: No Content
@@ -119,7 +119,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -138,7 +138,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get all the entitlements and quota assignments
       tags:
@@ -167,7 +167,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DirectoryAssignmentsPatchUpdateRequestPayloadCollection'
+              $ref: "#/components/schemas/DirectoryAssignmentsPatchUpdateRequestPayloadCollection"
         required: true
       responses:
         "200":
@@ -180,7 +180,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -190,7 +190,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -209,7 +209,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Update an existing entitlement in a directory
       tags:
@@ -236,7 +236,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DirectoryAssignmentsRequestPayloadCollection'
+              $ref: "#/components/schemas/DirectoryAssignmentsRequestPayloadCollection"
         required: true
       responses:
         "200":
@@ -249,7 +249,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -259,7 +259,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -278,7 +278,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Assign or update an entitlement in a directory
       tags:
@@ -327,7 +327,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DataCenterResponseCollection'
+                $ref: "#/components/schemas/DataCenterResponseCollection"
           description: Ok
         "400":
           description: Bad Request
@@ -339,7 +339,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -358,7 +358,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get available data centers
       tags:
@@ -426,7 +426,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EntitledAndAssignedServicesResponseObject'
+                $ref: "#/components/schemas/EntitledAndAssignedServicesResponseObject"
           description: Ok
         "204":
           description: No Content
@@ -440,7 +440,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -459,7 +459,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get entitlements assigned to a global account
       tags:
@@ -483,7 +483,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubaccountServicePlansRequestPayloadCollection'
+              $ref: "#/components/schemas/SubaccountServicePlansRequestPayloadCollection"
         required: true
       responses:
         "202":
@@ -496,7 +496,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -506,13 +506,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Conflict
         "429":
           description: Rate Limit Exceeded
@@ -531,7 +531,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Assign entitlements to subaccounts
       tags:
@@ -561,7 +561,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Bad request
         "401":
           description: Not Authorized
@@ -571,7 +571,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -590,7 +590,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiExceptionResponseObject'
+                $ref: "#/components/schemas/ApiExceptionResponseObject"
           description: Internal Server Error
       summary: Get job status
       tags:
@@ -606,84 +606,84 @@ components:
           target: target
       properties:
         error:
-          $ref: '#/components/schemas/ApiExceptionResponseObject_error'
+          $ref: "#/components/schemas/ApiExceptionResponseObject_error"
       required:
       - error
       type: object
     AssignedServicePlanResponseObject:
       description: List of service plans associated with the assigned service.
       example:
-        displayName: displayName
-        unlimited: true
-        name: name
-        maxAllowedSubaccountQuota: 2
-        category: PLATFORM
-        beta: true
         assignmentInfo:
         - amount: 0.8008281904610115
-          parentAmount: 1.4658129805029452
-          entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-          stateMessage: stateMessage
-          resources:
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
-            resourceName: resourceName
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
-            resourceName: resourceName
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          autoAssigned: true
-          entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-          unlimitedAmountAssigned: true
-          parentId: parentId
-          parentType: SUBACCOUNT
           autoAssign: true
+          autoAssigned: true
           autoDistributeAmount: 6
           createdDate: createdDate
+          entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
           entityState: STARTED
-          parentRemainingAmount: 5.962133916683182
+          entityType: GLOBAL_ACCOUNT or SUBACCOUNT
           modifiedDate: modifiedDate
+          parentAmount: 1.4658129805029452
+          parentId: parentId
+          parentRemainingAmount: 5.962133916683182
+          parentType: SUBACCOUNT
           requestedAmount: 5.637376656633329
+          resources:
+          - resourceData:
+              key: {}
+            resourceName: resourceName
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
+          - resourceData:
+              key: {}
+            resourceName: resourceName
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
+          stateMessage: stateMessage
+          unlimitedAmountAssigned: true
         - amount: 0.8008281904610115
-          parentAmount: 1.4658129805029452
-          entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-          stateMessage: stateMessage
-          resources:
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
-            resourceName: resourceName
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
-            resourceName: resourceName
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          autoAssigned: true
-          entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-          unlimitedAmountAssigned: true
-          parentId: parentId
-          parentType: SUBACCOUNT
           autoAssign: true
+          autoAssigned: true
           autoDistributeAmount: 6
           createdDate: createdDate
+          entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
           entityState: STARTED
-          parentRemainingAmount: 5.962133916683182
+          entityType: GLOBAL_ACCOUNT or SUBACCOUNT
           modifiedDate: modifiedDate
+          parentAmount: 1.4658129805029452
+          parentId: parentId
+          parentRemainingAmount: 5.962133916683182
+          parentType: SUBACCOUNT
           requestedAmount: 5.637376656633329
+          resources:
+          - resourceData:
+              key: {}
+            resourceName: resourceName
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
+          - resourceData:
+              key: {}
+            resourceName: resourceName
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
+          stateMessage: stateMessage
+          unlimitedAmountAssigned: true
+        beta: true
+        category: PLATFORM
+        displayName: displayName
+        maxAllowedSubaccountQuota: 2
+        name: name
         uniqueIdentifier: uniqueIdentifier
+        unlimited: true
       properties:
         assignmentInfo:
           description: Assignment detailed information
           items:
-            $ref: '#/components/schemas/AssignedServicePlanSubaccountDTO'
+            $ref: "#/components/schemas/AssignedServicePlanSubaccountDTO"
           type: array
         beta:
           description: Whether the service plan is a beta feature.
@@ -732,34 +732,34 @@ components:
       description: Assignment detailed information
       example:
         amount: 0.8008281904610115
-        parentAmount: 1.4658129805029452
-        entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-        stateMessage: stateMessage
-        resources:
-        - resourceTechnicalName: resourceTechnicalName
-          resourceData:
-            key: "{}"
-          resourceName: resourceName
-          resourceProvider: resourceProvider
-          resourceType: resourceType
-        - resourceTechnicalName: resourceTechnicalName
-          resourceData:
-            key: "{}"
-          resourceName: resourceName
-          resourceProvider: resourceProvider
-          resourceType: resourceType
-        autoAssigned: true
-        entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-        unlimitedAmountAssigned: true
-        parentId: parentId
-        parentType: SUBACCOUNT
         autoAssign: true
+        autoAssigned: true
         autoDistributeAmount: 6
         createdDate: createdDate
+        entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
         entityState: STARTED
-        parentRemainingAmount: 5.962133916683182
+        entityType: GLOBAL_ACCOUNT or SUBACCOUNT
         modifiedDate: modifiedDate
+        parentAmount: 1.4658129805029452
+        parentId: parentId
+        parentRemainingAmount: 5.962133916683182
+        parentType: SUBACCOUNT
         requestedAmount: 5.637376656633329
+        resources:
+        - resourceData:
+            key: {}
+          resourceName: resourceName
+          resourceProvider: resourceProvider
+          resourceTechnicalName: resourceTechnicalName
+          resourceType: resourceType
+        - resourceData:
+            key: {}
+          resourceName: resourceName
+          resourceProvider: resourceProvider
+          resourceTechnicalName: resourceTechnicalName
+          resourceType: resourceType
+        stateMessage: stateMessage
+        unlimitedAmountAssigned: true
       properties:
         amount:
           description: The quantity of the entitlement that is assigned to the root
@@ -842,7 +842,7 @@ components:
         resources:
           description: Global account resource details
           items:
-            $ref: '#/components/schemas/ExternalResourceRequestPayload'
+            $ref: "#/components/schemas/ExternalResourceRequestPayload"
           type: array
         stateMessage:
           description: Information about the current state.
@@ -859,152 +859,152 @@ components:
       description: The list of services that are assigned to subaccounts located under
         a global account.
       example:
-        ownerType: VENDOR
-        displayName: displayName
+        applicationCoordinates: {}
         businessCategory:
           displayName: displayName
           id: id
-        name: name
+        displayName: displayName
         iconBase64: iconBase64
+        name: name
+        ownerType: VENDOR
         servicePlans:
-        - displayName: displayName
-          unlimited: true
-          name: name
-          maxAllowedSubaccountQuota: 2
-          category: PLATFORM
+        - assignmentInfo:
+          - amount: 0.8008281904610115
+            autoAssign: true
+            autoAssigned: true
+            autoDistributeAmount: 6
+            createdDate: createdDate
+            entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+            entityState: STARTED
+            entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+            modifiedDate: modifiedDate
+            parentAmount: 1.4658129805029452
+            parentId: parentId
+            parentRemainingAmount: 5.962133916683182
+            parentType: SUBACCOUNT
+            requestedAmount: 5.637376656633329
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            stateMessage: stateMessage
+            unlimitedAmountAssigned: true
+          - amount: 0.8008281904610115
+            autoAssign: true
+            autoAssigned: true
+            autoDistributeAmount: 6
+            createdDate: createdDate
+            entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+            entityState: STARTED
+            entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+            modifiedDate: modifiedDate
+            parentAmount: 1.4658129805029452
+            parentId: parentId
+            parentRemainingAmount: 5.962133916683182
+            parentType: SUBACCOUNT
+            requestedAmount: 5.637376656633329
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            stateMessage: stateMessage
+            unlimitedAmountAssigned: true
           beta: true
-          assignmentInfo:
-          - amount: 0.8008281904610115
-            parentAmount: 1.4658129805029452
-            entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-            stateMessage: stateMessage
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            autoAssigned: true
-            entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-            unlimitedAmountAssigned: true
-            parentId: parentId
-            parentType: SUBACCOUNT
-            autoAssign: true
-            autoDistributeAmount: 6
-            createdDate: createdDate
-            entityState: STARTED
-            parentRemainingAmount: 5.962133916683182
-            modifiedDate: modifiedDate
-            requestedAmount: 5.637376656633329
-          - amount: 0.8008281904610115
-            parentAmount: 1.4658129805029452
-            entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-            stateMessage: stateMessage
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            autoAssigned: true
-            entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-            unlimitedAmountAssigned: true
-            parentId: parentId
-            parentType: SUBACCOUNT
-            autoAssign: true
-            autoDistributeAmount: 6
-            createdDate: createdDate
-            entityState: STARTED
-            parentRemainingAmount: 5.962133916683182
-            modifiedDate: modifiedDate
-            requestedAmount: 5.637376656633329
-          uniqueIdentifier: uniqueIdentifier
-        - displayName: displayName
-          unlimited: true
-          name: name
-          maxAllowedSubaccountQuota: 2
           category: PLATFORM
-          beta: true
-          assignmentInfo:
-          - amount: 0.8008281904610115
-            parentAmount: 1.4658129805029452
-            entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-            stateMessage: stateMessage
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            autoAssigned: true
-            entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-            unlimitedAmountAssigned: true
-            parentId: parentId
-            parentType: SUBACCOUNT
-            autoAssign: true
-            autoDistributeAmount: 6
-            createdDate: createdDate
-            entityState: STARTED
-            parentRemainingAmount: 5.962133916683182
-            modifiedDate: modifiedDate
-            requestedAmount: 5.637376656633329
-          - amount: 0.8008281904610115
-            parentAmount: 1.4658129805029452
-            entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-            stateMessage: stateMessage
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            autoAssigned: true
-            entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-            unlimitedAmountAssigned: true
-            parentId: parentId
-            parentType: SUBACCOUNT
-            autoAssign: true
-            autoDistributeAmount: 6
-            createdDate: createdDate
-            entityState: STARTED
-            parentRemainingAmount: 5.962133916683182
-            modifiedDate: modifiedDate
-            requestedAmount: 5.637376656633329
+          displayName: displayName
+          maxAllowedSubaccountQuota: 2
+          name: name
           uniqueIdentifier: uniqueIdentifier
-        applicationCoordinates: "{}"
+          unlimited: true
+        - assignmentInfo:
+          - amount: 0.8008281904610115
+            autoAssign: true
+            autoAssigned: true
+            autoDistributeAmount: 6
+            createdDate: createdDate
+            entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+            entityState: STARTED
+            entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+            modifiedDate: modifiedDate
+            parentAmount: 1.4658129805029452
+            parentId: parentId
+            parentRemainingAmount: 5.962133916683182
+            parentType: SUBACCOUNT
+            requestedAmount: 5.637376656633329
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            stateMessage: stateMessage
+            unlimitedAmountAssigned: true
+          - amount: 0.8008281904610115
+            autoAssign: true
+            autoAssigned: true
+            autoDistributeAmount: 6
+            createdDate: createdDate
+            entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+            entityState: STARTED
+            entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+            modifiedDate: modifiedDate
+            parentAmount: 1.4658129805029452
+            parentId: parentId
+            parentRemainingAmount: 5.962133916683182
+            parentType: SUBACCOUNT
+            requestedAmount: 5.637376656633329
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            stateMessage: stateMessage
+            unlimitedAmountAssigned: true
+          beta: true
+          category: PLATFORM
+          displayName: displayName
+          maxAllowedSubaccountQuota: 2
+          name: name
+          uniqueIdentifier: uniqueIdentifier
+          unlimited: true
       properties:
         applicationCoordinates:
           type: object
         businessCategory:
-          $ref: '#/components/schemas/BusinessCategoryResponseObject'
+          $ref: "#/components/schemas/BusinessCategoryResponseObject"
         displayName:
           description: Display name of the service for customer-facing UIs.
           type: string
@@ -1029,7 +1029,7 @@ components:
         servicePlans:
           description: List of service plans associated with the assigned service.
           items:
-            $ref: '#/components/schemas/AssignedServicePlanResponseObject'
+            $ref: "#/components/schemas/AssignedServicePlanResponseObject"
           type: array
       type: object
     BusinessCategoryResponseObject:
@@ -1049,12 +1049,12 @@ components:
       description: The commercial model type assigned to the entitlement.
       example:
         consumptionBased: true
-        displayName: displayName
-        name: name
-        description: description
         containedCommercialModels:
         - null
         - null
+        description: description
+        displayName: displayName
+        name: name
       properties:
         consumptionBased:
           description: |-
@@ -1064,7 +1064,7 @@ components:
         containedCommercialModels:
           description: Directly contained commercial models.
           items:
-            $ref: '#/components/schemas/CommercialModelResponseObject'
+            $ref: "#/components/schemas/CommercialModelResponseObject"
           type: array
         description:
           description: A description of the commercial model
@@ -1080,48 +1080,48 @@ components:
     DataCenterResponseCollection:
       example:
         datacenters:
-        - provisioningServiceUrl: provisioningServiceUrl
-          supportsTrial: true
-          environment: environment
-          displayName: displayName
+        - displayName: displayName
           domain: domain
-          name: name
+          environment: environment
+          iaasProvider: AWS
           isMainDataCenter: true
+          name: name
+          provisioningServiceUrl: provisioningServiceUrl
           region: region
           saasRegistryServiceUrl: saasRegistryServiceUrl
-          iaasProvider: AWS
-        - provisioningServiceUrl: provisioningServiceUrl
           supportsTrial: true
-          environment: environment
-          displayName: displayName
+        - displayName: displayName
           domain: domain
-          name: name
+          environment: environment
+          iaasProvider: AWS
           isMainDataCenter: true
+          name: name
+          provisioningServiceUrl: provisioningServiceUrl
           region: region
           saasRegistryServiceUrl: saasRegistryServiceUrl
-          iaasProvider: AWS
+          supportsTrial: true
       properties:
         datacenters:
           description: Contains information about the available data centers for a
             specified global account.
           items:
-            $ref: '#/components/schemas/DataCenterResponseObject'
+            $ref: "#/components/schemas/DataCenterResponseObject"
           type: array
       type: object
     DataCenterResponseObject:
       description: Contains information about the data centers and regions in the
         cloud landscape
       example:
-        provisioningServiceUrl: provisioningServiceUrl
-        supportsTrial: true
-        environment: environment
         displayName: displayName
         domain: domain
-        name: name
+        environment: environment
+        iaasProvider: AWS
         isMainDataCenter: true
+        name: name
+        provisioningServiceUrl: provisioningServiceUrl
         region: region
         saasRegistryServiceUrl: saasRegistryServiceUrl
-        iaasProvider: AWS
+        supportsTrial: true
       properties:
         displayName:
           description: Descriptive name of the data center for customer-facing UIs.
@@ -1176,10 +1176,10 @@ components:
       example:
         autoAssign: true
         autoDistributeAmount: 0
-        service: service
         distribute: true
         plan: plan
         planUniqueIdentifier: planUniqueIdentifier
+        service: service
       properties:
         autoAssign:
           description: "Whether to automatically allocate the plans of entitlements\
@@ -1230,20 +1230,20 @@ components:
         entitlementUpdates:
         - autoAssign: true
           autoDistributeAmount: 0
-          service: service
           distribute: true
           plan: plan
           planUniqueIdentifier: planUniqueIdentifier
+          service: service
         - autoAssign: true
           autoDistributeAmount: 0
-          service: service
           distribute: true
           plan: plan
           planUniqueIdentifier: planUniqueIdentifier
+          service: service
       properties:
         entitlementUpdates:
           items:
-            $ref: '#/components/schemas/DirectoryAssignmentsPatchUpdateRequestPayload'
+            $ref: "#/components/schemas/DirectoryAssignmentsPatchUpdateRequestPayload"
           type: array
       required:
       - entitlementUpdates
@@ -1253,11 +1253,11 @@ components:
         amount: 0.8008281904610115
         autoAssign: true
         autoDistributeAmount: 6
-        enable: true
-        service: service
         distribute: true
+        enable: true
         plan: plan
         planUniqueIdentifier: planUniqueIdentifier
+        service: service
       properties:
         amount:
           description: The quantity of the plan to assign to the specified directory.
@@ -1320,645 +1320,645 @@ components:
         - amount: 0.8008281904610115
           autoAssign: true
           autoDistributeAmount: 6
-          enable: true
-          service: service
           distribute: true
+          enable: true
           plan: plan
           planUniqueIdentifier: planUniqueIdentifier
+          service: service
         - amount: 0.8008281904610115
           autoAssign: true
           autoDistributeAmount: 6
-          enable: true
-          service: service
           distribute: true
+          enable: true
           plan: plan
           planUniqueIdentifier: planUniqueIdentifier
+          service: service
       properties:
         entitlements:
           items:
-            $ref: '#/components/schemas/DirectoryAssignmentsRequestPayload'
+            $ref: "#/components/schemas/DirectoryAssignmentsRequestPayload"
           type: array
       required:
       - entitlements
       type: object
     EntitledAndAssignedServicesResponseObject:
       example:
-        entitledServices:
-        - ownerType: VENDOR
-          displayName: displayName
-          businessCategory:
-            displayName: displayName
-            id: id
-          name: name
-          description: description
-          iconBase64: iconBase64
-          servicePlans:
-          - providedBy: VENDOR
-            amount: 7.061401241503109
-            displayName: displayName
-            unlimited: true
-            dataCenters:
-            - provisioningServiceUrl: provisioningServiceUrl
-              supportsTrial: true
-              environment: environment
-              displayName: displayName
-              domain: domain
-              name: name
-              isMainDataCenter: true
-              region: region
-              saasRegistryServiceUrl: saasRegistryServiceUrl
-              iaasProvider: AWS
-            - provisioningServiceUrl: provisioningServiceUrl
-              supportsTrial: true
-              environment: environment
-              displayName: displayName
-              domain: domain
-              name: name
-              isMainDataCenter: true
-              region: region
-              saasRegistryServiceUrl: saasRegistryServiceUrl
-              iaasProvider: AWS
-            description: description
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            maxAllowedSubaccountQuota: 2
-            availableForInternal: true
-            provisioningMethod: SERVICE_BROKER
-            remainingAmount: 4.145608029883936
-            autoAssign: true
-            autoDistributeAmount: 9
-            sourceEntitlements:
-            - amount: 7.386281948385884
-              autoAssign: true
-              commercialModel:
-                consumptionBased: true
-                displayName: displayName
-                name: name
-                description: description
-                containedCommercialModels:
-                - null
-                - null
-              productId: productId
-              entitlementName: entitlementName
-            - amount: 7.386281948385884
-              autoAssign: true
-              commercialModel:
-                consumptionBased: true
-                displayName: displayName
-                name: name
-                description: description
-                containedCommercialModels:
-                - null
-                - null
-              productId: productId
-              entitlementName: entitlementName
-            internalQuotaLimit: 3
-            name: name
-            category: PLATFORM
-            beta: true
-            uniqueIdentifier: uniqueIdentifier
-          - providedBy: VENDOR
-            amount: 7.061401241503109
-            displayName: displayName
-            unlimited: true
-            dataCenters:
-            - provisioningServiceUrl: provisioningServiceUrl
-              supportsTrial: true
-              environment: environment
-              displayName: displayName
-              domain: domain
-              name: name
-              isMainDataCenter: true
-              region: region
-              saasRegistryServiceUrl: saasRegistryServiceUrl
-              iaasProvider: AWS
-            - provisioningServiceUrl: provisioningServiceUrl
-              supportsTrial: true
-              environment: environment
-              displayName: displayName
-              domain: domain
-              name: name
-              isMainDataCenter: true
-              region: region
-              saasRegistryServiceUrl: saasRegistryServiceUrl
-              iaasProvider: AWS
-            description: description
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            maxAllowedSubaccountQuota: 2
-            availableForInternal: true
-            provisioningMethod: SERVICE_BROKER
-            remainingAmount: 4.145608029883936
-            autoAssign: true
-            autoDistributeAmount: 9
-            sourceEntitlements:
-            - amount: 7.386281948385884
-              autoAssign: true
-              commercialModel:
-                consumptionBased: true
-                displayName: displayName
-                name: name
-                description: description
-                containedCommercialModels:
-                - null
-                - null
-              productId: productId
-              entitlementName: entitlementName
-            - amount: 7.386281948385884
-              autoAssign: true
-              commercialModel:
-                consumptionBased: true
-                displayName: displayName
-                name: name
-                description: description
-                containedCommercialModels:
-                - null
-                - null
-              productId: productId
-              entitlementName: entitlementName
-            internalQuotaLimit: 3
-            name: name
-            category: PLATFORM
-            beta: true
-            uniqueIdentifier: uniqueIdentifier
-          applicationCoordinates: "{}"
-        - ownerType: VENDOR
-          displayName: displayName
-          businessCategory:
-            displayName: displayName
-            id: id
-          name: name
-          description: description
-          iconBase64: iconBase64
-          servicePlans:
-          - providedBy: VENDOR
-            amount: 7.061401241503109
-            displayName: displayName
-            unlimited: true
-            dataCenters:
-            - provisioningServiceUrl: provisioningServiceUrl
-              supportsTrial: true
-              environment: environment
-              displayName: displayName
-              domain: domain
-              name: name
-              isMainDataCenter: true
-              region: region
-              saasRegistryServiceUrl: saasRegistryServiceUrl
-              iaasProvider: AWS
-            - provisioningServiceUrl: provisioningServiceUrl
-              supportsTrial: true
-              environment: environment
-              displayName: displayName
-              domain: domain
-              name: name
-              isMainDataCenter: true
-              region: region
-              saasRegistryServiceUrl: saasRegistryServiceUrl
-              iaasProvider: AWS
-            description: description
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            maxAllowedSubaccountQuota: 2
-            availableForInternal: true
-            provisioningMethod: SERVICE_BROKER
-            remainingAmount: 4.145608029883936
-            autoAssign: true
-            autoDistributeAmount: 9
-            sourceEntitlements:
-            - amount: 7.386281948385884
-              autoAssign: true
-              commercialModel:
-                consumptionBased: true
-                displayName: displayName
-                name: name
-                description: description
-                containedCommercialModels:
-                - null
-                - null
-              productId: productId
-              entitlementName: entitlementName
-            - amount: 7.386281948385884
-              autoAssign: true
-              commercialModel:
-                consumptionBased: true
-                displayName: displayName
-                name: name
-                description: description
-                containedCommercialModels:
-                - null
-                - null
-              productId: productId
-              entitlementName: entitlementName
-            internalQuotaLimit: 3
-            name: name
-            category: PLATFORM
-            beta: true
-            uniqueIdentifier: uniqueIdentifier
-          - providedBy: VENDOR
-            amount: 7.061401241503109
-            displayName: displayName
-            unlimited: true
-            dataCenters:
-            - provisioningServiceUrl: provisioningServiceUrl
-              supportsTrial: true
-              environment: environment
-              displayName: displayName
-              domain: domain
-              name: name
-              isMainDataCenter: true
-              region: region
-              saasRegistryServiceUrl: saasRegistryServiceUrl
-              iaasProvider: AWS
-            - provisioningServiceUrl: provisioningServiceUrl
-              supportsTrial: true
-              environment: environment
-              displayName: displayName
-              domain: domain
-              name: name
-              isMainDataCenter: true
-              region: region
-              saasRegistryServiceUrl: saasRegistryServiceUrl
-              iaasProvider: AWS
-            description: description
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            maxAllowedSubaccountQuota: 2
-            availableForInternal: true
-            provisioningMethod: SERVICE_BROKER
-            remainingAmount: 4.145608029883936
-            autoAssign: true
-            autoDistributeAmount: 9
-            sourceEntitlements:
-            - amount: 7.386281948385884
-              autoAssign: true
-              commercialModel:
-                consumptionBased: true
-                displayName: displayName
-                name: name
-                description: description
-                containedCommercialModels:
-                - null
-                - null
-              productId: productId
-              entitlementName: entitlementName
-            - amount: 7.386281948385884
-              autoAssign: true
-              commercialModel:
-                consumptionBased: true
-                displayName: displayName
-                name: name
-                description: description
-                containedCommercialModels:
-                - null
-                - null
-              productId: productId
-              entitlementName: entitlementName
-            internalQuotaLimit: 3
-            name: name
-            category: PLATFORM
-            beta: true
-            uniqueIdentifier: uniqueIdentifier
-          applicationCoordinates: "{}"
-        fetchErrorFromExternalProviderRegistry: true
         assignedServices:
-        - ownerType: VENDOR
-          displayName: displayName
+        - applicationCoordinates: {}
           businessCategory:
             displayName: displayName
             id: id
-          name: name
-          iconBase64: iconBase64
-          servicePlans:
-          - displayName: displayName
-            unlimited: true
-            name: name
-            maxAllowedSubaccountQuota: 2
-            category: PLATFORM
-            beta: true
-            assignmentInfo:
-            - amount: 0.8008281904610115
-              parentAmount: 1.4658129805029452
-              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-              stateMessage: stateMessage
-              resources:
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              autoAssigned: true
-              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-              unlimitedAmountAssigned: true
-              parentId: parentId
-              parentType: SUBACCOUNT
-              autoAssign: true
-              autoDistributeAmount: 6
-              createdDate: createdDate
-              entityState: STARTED
-              parentRemainingAmount: 5.962133916683182
-              modifiedDate: modifiedDate
-              requestedAmount: 5.637376656633329
-            - amount: 0.8008281904610115
-              parentAmount: 1.4658129805029452
-              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-              stateMessage: stateMessage
-              resources:
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              autoAssigned: true
-              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-              unlimitedAmountAssigned: true
-              parentId: parentId
-              parentType: SUBACCOUNT
-              autoAssign: true
-              autoDistributeAmount: 6
-              createdDate: createdDate
-              entityState: STARTED
-              parentRemainingAmount: 5.962133916683182
-              modifiedDate: modifiedDate
-              requestedAmount: 5.637376656633329
-            uniqueIdentifier: uniqueIdentifier
-          - displayName: displayName
-            unlimited: true
-            name: name
-            maxAllowedSubaccountQuota: 2
-            category: PLATFORM
-            beta: true
-            assignmentInfo:
-            - amount: 0.8008281904610115
-              parentAmount: 1.4658129805029452
-              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-              stateMessage: stateMessage
-              resources:
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              autoAssigned: true
-              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-              unlimitedAmountAssigned: true
-              parentId: parentId
-              parentType: SUBACCOUNT
-              autoAssign: true
-              autoDistributeAmount: 6
-              createdDate: createdDate
-              entityState: STARTED
-              parentRemainingAmount: 5.962133916683182
-              modifiedDate: modifiedDate
-              requestedAmount: 5.637376656633329
-            - amount: 0.8008281904610115
-              parentAmount: 1.4658129805029452
-              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-              stateMessage: stateMessage
-              resources:
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              autoAssigned: true
-              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-              unlimitedAmountAssigned: true
-              parentId: parentId
-              parentType: SUBACCOUNT
-              autoAssign: true
-              autoDistributeAmount: 6
-              createdDate: createdDate
-              entityState: STARTED
-              parentRemainingAmount: 5.962133916683182
-              modifiedDate: modifiedDate
-              requestedAmount: 5.637376656633329
-            uniqueIdentifier: uniqueIdentifier
-          applicationCoordinates: "{}"
-        - ownerType: VENDOR
           displayName: displayName
+          iconBase64: iconBase64
+          name: name
+          ownerType: VENDOR
+          servicePlans:
+          - assignmentInfo:
+            - amount: 0.8008281904610115
+              autoAssign: true
+              autoAssigned: true
+              autoDistributeAmount: 6
+              createdDate: createdDate
+              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+              entityState: STARTED
+              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+              modifiedDate: modifiedDate
+              parentAmount: 1.4658129805029452
+              parentId: parentId
+              parentRemainingAmount: 5.962133916683182
+              parentType: SUBACCOUNT
+              requestedAmount: 5.637376656633329
+              resources:
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              stateMessage: stateMessage
+              unlimitedAmountAssigned: true
+            - amount: 0.8008281904610115
+              autoAssign: true
+              autoAssigned: true
+              autoDistributeAmount: 6
+              createdDate: createdDate
+              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+              entityState: STARTED
+              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+              modifiedDate: modifiedDate
+              parentAmount: 1.4658129805029452
+              parentId: parentId
+              parentRemainingAmount: 5.962133916683182
+              parentType: SUBACCOUNT
+              requestedAmount: 5.637376656633329
+              resources:
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              stateMessage: stateMessage
+              unlimitedAmountAssigned: true
+            beta: true
+            category: PLATFORM
+            displayName: displayName
+            maxAllowedSubaccountQuota: 2
+            name: name
+            uniqueIdentifier: uniqueIdentifier
+            unlimited: true
+          - assignmentInfo:
+            - amount: 0.8008281904610115
+              autoAssign: true
+              autoAssigned: true
+              autoDistributeAmount: 6
+              createdDate: createdDate
+              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+              entityState: STARTED
+              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+              modifiedDate: modifiedDate
+              parentAmount: 1.4658129805029452
+              parentId: parentId
+              parentRemainingAmount: 5.962133916683182
+              parentType: SUBACCOUNT
+              requestedAmount: 5.637376656633329
+              resources:
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              stateMessage: stateMessage
+              unlimitedAmountAssigned: true
+            - amount: 0.8008281904610115
+              autoAssign: true
+              autoAssigned: true
+              autoDistributeAmount: 6
+              createdDate: createdDate
+              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+              entityState: STARTED
+              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+              modifiedDate: modifiedDate
+              parentAmount: 1.4658129805029452
+              parentId: parentId
+              parentRemainingAmount: 5.962133916683182
+              parentType: SUBACCOUNT
+              requestedAmount: 5.637376656633329
+              resources:
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              stateMessage: stateMessage
+              unlimitedAmountAssigned: true
+            beta: true
+            category: PLATFORM
+            displayName: displayName
+            maxAllowedSubaccountQuota: 2
+            name: name
+            uniqueIdentifier: uniqueIdentifier
+            unlimited: true
+        - applicationCoordinates: {}
           businessCategory:
             displayName: displayName
             id: id
-          name: name
+          displayName: displayName
           iconBase64: iconBase64
+          name: name
+          ownerType: VENDOR
           servicePlans:
-          - displayName: displayName
-            unlimited: true
-            name: name
-            maxAllowedSubaccountQuota: 2
-            category: PLATFORM
+          - assignmentInfo:
+            - amount: 0.8008281904610115
+              autoAssign: true
+              autoAssigned: true
+              autoDistributeAmount: 6
+              createdDate: createdDate
+              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+              entityState: STARTED
+              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+              modifiedDate: modifiedDate
+              parentAmount: 1.4658129805029452
+              parentId: parentId
+              parentRemainingAmount: 5.962133916683182
+              parentType: SUBACCOUNT
+              requestedAmount: 5.637376656633329
+              resources:
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              stateMessage: stateMessage
+              unlimitedAmountAssigned: true
+            - amount: 0.8008281904610115
+              autoAssign: true
+              autoAssigned: true
+              autoDistributeAmount: 6
+              createdDate: createdDate
+              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+              entityState: STARTED
+              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+              modifiedDate: modifiedDate
+              parentAmount: 1.4658129805029452
+              parentId: parentId
+              parentRemainingAmount: 5.962133916683182
+              parentType: SUBACCOUNT
+              requestedAmount: 5.637376656633329
+              resources:
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              stateMessage: stateMessage
+              unlimitedAmountAssigned: true
             beta: true
-            assignmentInfo:
-            - amount: 0.8008281904610115
-              parentAmount: 1.4658129805029452
-              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-              stateMessage: stateMessage
-              resources:
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              autoAssigned: true
-              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-              unlimitedAmountAssigned: true
-              parentId: parentId
-              parentType: SUBACCOUNT
-              autoAssign: true
-              autoDistributeAmount: 6
-              createdDate: createdDate
-              entityState: STARTED
-              parentRemainingAmount: 5.962133916683182
-              modifiedDate: modifiedDate
-              requestedAmount: 5.637376656633329
-            - amount: 0.8008281904610115
-              parentAmount: 1.4658129805029452
-              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-              stateMessage: stateMessage
-              resources:
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              autoAssigned: true
-              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-              unlimitedAmountAssigned: true
-              parentId: parentId
-              parentType: SUBACCOUNT
-              autoAssign: true
-              autoDistributeAmount: 6
-              createdDate: createdDate
-              entityState: STARTED
-              parentRemainingAmount: 5.962133916683182
-              modifiedDate: modifiedDate
-              requestedAmount: 5.637376656633329
-            uniqueIdentifier: uniqueIdentifier
-          - displayName: displayName
-            unlimited: true
-            name: name
-            maxAllowedSubaccountQuota: 2
             category: PLATFORM
-            beta: true
-            assignmentInfo:
-            - amount: 0.8008281904610115
-              parentAmount: 1.4658129805029452
-              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-              stateMessage: stateMessage
-              resources:
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              autoAssigned: true
-              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-              unlimitedAmountAssigned: true
-              parentId: parentId
-              parentType: SUBACCOUNT
-              autoAssign: true
-              autoDistributeAmount: 6
-              createdDate: createdDate
-              entityState: STARTED
-              parentRemainingAmount: 5.962133916683182
-              modifiedDate: modifiedDate
-              requestedAmount: 5.637376656633329
-            - amount: 0.8008281904610115
-              parentAmount: 1.4658129805029452
-              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
-              stateMessage: stateMessage
-              resources:
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              - resourceTechnicalName: resourceTechnicalName
-                resourceData:
-                  key: "{}"
-                resourceName: resourceName
-                resourceProvider: resourceProvider
-                resourceType: resourceType
-              autoAssigned: true
-              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
-              unlimitedAmountAssigned: true
-              parentId: parentId
-              parentType: SUBACCOUNT
-              autoAssign: true
-              autoDistributeAmount: 6
-              createdDate: createdDate
-              entityState: STARTED
-              parentRemainingAmount: 5.962133916683182
-              modifiedDate: modifiedDate
-              requestedAmount: 5.637376656633329
+            displayName: displayName
+            maxAllowedSubaccountQuota: 2
+            name: name
             uniqueIdentifier: uniqueIdentifier
-          applicationCoordinates: "{}"
+            unlimited: true
+          - assignmentInfo:
+            - amount: 0.8008281904610115
+              autoAssign: true
+              autoAssigned: true
+              autoDistributeAmount: 6
+              createdDate: createdDate
+              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+              entityState: STARTED
+              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+              modifiedDate: modifiedDate
+              parentAmount: 1.4658129805029452
+              parentId: parentId
+              parentRemainingAmount: 5.962133916683182
+              parentType: SUBACCOUNT
+              requestedAmount: 5.637376656633329
+              resources:
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              stateMessage: stateMessage
+              unlimitedAmountAssigned: true
+            - amount: 0.8008281904610115
+              autoAssign: true
+              autoAssigned: true
+              autoDistributeAmount: 6
+              createdDate: createdDate
+              entityId: GUID of GLOBAL_ACCOUNT or SUBACCOUNT
+              entityState: STARTED
+              entityType: GLOBAL_ACCOUNT or SUBACCOUNT
+              modifiedDate: modifiedDate
+              parentAmount: 1.4658129805029452
+              parentId: parentId
+              parentRemainingAmount: 5.962133916683182
+              parentType: SUBACCOUNT
+              requestedAmount: 5.637376656633329
+              resources:
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              - resourceData:
+                  key: {}
+                resourceName: resourceName
+                resourceProvider: resourceProvider
+                resourceTechnicalName: resourceTechnicalName
+                resourceType: resourceType
+              stateMessage: stateMessage
+              unlimitedAmountAssigned: true
+            beta: true
+            category: PLATFORM
+            displayName: displayName
+            maxAllowedSubaccountQuota: 2
+            name: name
+            uniqueIdentifier: uniqueIdentifier
+            unlimited: true
+        entitledServices:
+        - applicationCoordinates: {}
+          businessCategory:
+            displayName: displayName
+            id: id
+          description: description
+          displayName: displayName
+          iconBase64: iconBase64
+          name: name
+          ownerType: VENDOR
+          servicePlans:
+          - amount: 7.061401241503109
+            autoAssign: true
+            autoDistributeAmount: 9
+            availableForInternal: true
+            beta: true
+            category: PLATFORM
+            dataCenters:
+            - displayName: displayName
+              domain: domain
+              environment: environment
+              iaasProvider: AWS
+              isMainDataCenter: true
+              name: name
+              provisioningServiceUrl: provisioningServiceUrl
+              region: region
+              saasRegistryServiceUrl: saasRegistryServiceUrl
+              supportsTrial: true
+            - displayName: displayName
+              domain: domain
+              environment: environment
+              iaasProvider: AWS
+              isMainDataCenter: true
+              name: name
+              provisioningServiceUrl: provisioningServiceUrl
+              region: region
+              saasRegistryServiceUrl: saasRegistryServiceUrl
+              supportsTrial: true
+            description: description
+            displayName: displayName
+            internalQuotaLimit: 3
+            maxAllowedSubaccountQuota: 2
+            name: name
+            providedBy: VENDOR
+            provisioningMethod: SERVICE_BROKER
+            remainingAmount: 4.145608029883936
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            sourceEntitlements:
+            - amount: 7.386281948385884
+              autoAssign: true
+              commercialModel:
+                consumptionBased: true
+                containedCommercialModels:
+                - null
+                - null
+                description: description
+                displayName: displayName
+                name: name
+              entitlementName: entitlementName
+              productId: productId
+            - amount: 7.386281948385884
+              autoAssign: true
+              commercialModel:
+                consumptionBased: true
+                containedCommercialModels:
+                - null
+                - null
+                description: description
+                displayName: displayName
+                name: name
+              entitlementName: entitlementName
+              productId: productId
+            uniqueIdentifier: uniqueIdentifier
+            unlimited: true
+          - amount: 7.061401241503109
+            autoAssign: true
+            autoDistributeAmount: 9
+            availableForInternal: true
+            beta: true
+            category: PLATFORM
+            dataCenters:
+            - displayName: displayName
+              domain: domain
+              environment: environment
+              iaasProvider: AWS
+              isMainDataCenter: true
+              name: name
+              provisioningServiceUrl: provisioningServiceUrl
+              region: region
+              saasRegistryServiceUrl: saasRegistryServiceUrl
+              supportsTrial: true
+            - displayName: displayName
+              domain: domain
+              environment: environment
+              iaasProvider: AWS
+              isMainDataCenter: true
+              name: name
+              provisioningServiceUrl: provisioningServiceUrl
+              region: region
+              saasRegistryServiceUrl: saasRegistryServiceUrl
+              supportsTrial: true
+            description: description
+            displayName: displayName
+            internalQuotaLimit: 3
+            maxAllowedSubaccountQuota: 2
+            name: name
+            providedBy: VENDOR
+            provisioningMethod: SERVICE_BROKER
+            remainingAmount: 4.145608029883936
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            sourceEntitlements:
+            - amount: 7.386281948385884
+              autoAssign: true
+              commercialModel:
+                consumptionBased: true
+                containedCommercialModels:
+                - null
+                - null
+                description: description
+                displayName: displayName
+                name: name
+              entitlementName: entitlementName
+              productId: productId
+            - amount: 7.386281948385884
+              autoAssign: true
+              commercialModel:
+                consumptionBased: true
+                containedCommercialModels:
+                - null
+                - null
+                description: description
+                displayName: displayName
+                name: name
+              entitlementName: entitlementName
+              productId: productId
+            uniqueIdentifier: uniqueIdentifier
+            unlimited: true
+        - applicationCoordinates: {}
+          businessCategory:
+            displayName: displayName
+            id: id
+          description: description
+          displayName: displayName
+          iconBase64: iconBase64
+          name: name
+          ownerType: VENDOR
+          servicePlans:
+          - amount: 7.061401241503109
+            autoAssign: true
+            autoDistributeAmount: 9
+            availableForInternal: true
+            beta: true
+            category: PLATFORM
+            dataCenters:
+            - displayName: displayName
+              domain: domain
+              environment: environment
+              iaasProvider: AWS
+              isMainDataCenter: true
+              name: name
+              provisioningServiceUrl: provisioningServiceUrl
+              region: region
+              saasRegistryServiceUrl: saasRegistryServiceUrl
+              supportsTrial: true
+            - displayName: displayName
+              domain: domain
+              environment: environment
+              iaasProvider: AWS
+              isMainDataCenter: true
+              name: name
+              provisioningServiceUrl: provisioningServiceUrl
+              region: region
+              saasRegistryServiceUrl: saasRegistryServiceUrl
+              supportsTrial: true
+            description: description
+            displayName: displayName
+            internalQuotaLimit: 3
+            maxAllowedSubaccountQuota: 2
+            name: name
+            providedBy: VENDOR
+            provisioningMethod: SERVICE_BROKER
+            remainingAmount: 4.145608029883936
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            sourceEntitlements:
+            - amount: 7.386281948385884
+              autoAssign: true
+              commercialModel:
+                consumptionBased: true
+                containedCommercialModels:
+                - null
+                - null
+                description: description
+                displayName: displayName
+                name: name
+              entitlementName: entitlementName
+              productId: productId
+            - amount: 7.386281948385884
+              autoAssign: true
+              commercialModel:
+                consumptionBased: true
+                containedCommercialModels:
+                - null
+                - null
+                description: description
+                displayName: displayName
+                name: name
+              entitlementName: entitlementName
+              productId: productId
+            uniqueIdentifier: uniqueIdentifier
+            unlimited: true
+          - amount: 7.061401241503109
+            autoAssign: true
+            autoDistributeAmount: 9
+            availableForInternal: true
+            beta: true
+            category: PLATFORM
+            dataCenters:
+            - displayName: displayName
+              domain: domain
+              environment: environment
+              iaasProvider: AWS
+              isMainDataCenter: true
+              name: name
+              provisioningServiceUrl: provisioningServiceUrl
+              region: region
+              saasRegistryServiceUrl: saasRegistryServiceUrl
+              supportsTrial: true
+            - displayName: displayName
+              domain: domain
+              environment: environment
+              iaasProvider: AWS
+              isMainDataCenter: true
+              name: name
+              provisioningServiceUrl: provisioningServiceUrl
+              region: region
+              saasRegistryServiceUrl: saasRegistryServiceUrl
+              supportsTrial: true
+            description: description
+            displayName: displayName
+            internalQuotaLimit: 3
+            maxAllowedSubaccountQuota: 2
+            name: name
+            providedBy: VENDOR
+            provisioningMethod: SERVICE_BROKER
+            remainingAmount: 4.145608029883936
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            sourceEntitlements:
+            - amount: 7.386281948385884
+              autoAssign: true
+              commercialModel:
+                consumptionBased: true
+                containedCommercialModels:
+                - null
+                - null
+                description: description
+                displayName: displayName
+                name: name
+              entitlementName: entitlementName
+              productId: productId
+            - amount: 7.386281948385884
+              autoAssign: true
+              commercialModel:
+                consumptionBased: true
+                containedCommercialModels:
+                - null
+                - null
+                description: description
+                displayName: displayName
+                name: name
+              entitlementName: entitlementName
+              productId: productId
+            uniqueIdentifier: uniqueIdentifier
+            unlimited: true
+        fetchErrorFromExternalProviderRegistry: true
       properties:
         assignedServices:
           description: The list of services that are assigned to subaccounts located
             under a global account.
           items:
-            $ref: '#/components/schemas/AssignedServiceResponseObject'
+            $ref: "#/components/schemas/AssignedServiceResponseObject"
           type: array
         entitledServices:
           description: "Services entitled to global account, its directories and subaccounts."
           items:
-            $ref: '#/components/schemas/EntitledServicesResponseObject'
+            $ref: "#/components/schemas/EntitledServicesResponseObject"
           type: array
           uniqueItems: true
         fetchErrorFromExternalProviderRegistry:
@@ -1968,171 +1968,171 @@ components:
     EntitledServicesResponseObject:
       description: "Services entitled to global account, its directories and subaccounts."
       example:
-        ownerType: VENDOR
-        displayName: displayName
+        applicationCoordinates: {}
         businessCategory:
           displayName: displayName
           id: id
-        name: name
         description: description
+        displayName: displayName
         iconBase64: iconBase64
+        name: name
+        ownerType: VENDOR
         servicePlans:
-        - providedBy: VENDOR
-          amount: 7.061401241503109
-          displayName: displayName
-          unlimited: true
-          dataCenters:
-          - provisioningServiceUrl: provisioningServiceUrl
-            supportsTrial: true
-            environment: environment
-            displayName: displayName
-            domain: domain
-            name: name
-            isMainDataCenter: true
-            region: region
-            saasRegistryServiceUrl: saasRegistryServiceUrl
-            iaasProvider: AWS
-          - provisioningServiceUrl: provisioningServiceUrl
-            supportsTrial: true
-            environment: environment
-            displayName: displayName
-            domain: domain
-            name: name
-            isMainDataCenter: true
-            region: region
-            saasRegistryServiceUrl: saasRegistryServiceUrl
-            iaasProvider: AWS
-          description: description
-          resources:
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
-            resourceName: resourceName
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
-            resourceName: resourceName
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          maxAllowedSubaccountQuota: 2
-          availableForInternal: true
-          provisioningMethod: SERVICE_BROKER
-          remainingAmount: 4.145608029883936
+        - amount: 7.061401241503109
           autoAssign: true
           autoDistributeAmount: 9
+          availableForInternal: true
+          beta: true
+          category: PLATFORM
+          dataCenters:
+          - displayName: displayName
+            domain: domain
+            environment: environment
+            iaasProvider: AWS
+            isMainDataCenter: true
+            name: name
+            provisioningServiceUrl: provisioningServiceUrl
+            region: region
+            saasRegistryServiceUrl: saasRegistryServiceUrl
+            supportsTrial: true
+          - displayName: displayName
+            domain: domain
+            environment: environment
+            iaasProvider: AWS
+            isMainDataCenter: true
+            name: name
+            provisioningServiceUrl: provisioningServiceUrl
+            region: region
+            saasRegistryServiceUrl: saasRegistryServiceUrl
+            supportsTrial: true
+          description: description
+          displayName: displayName
+          internalQuotaLimit: 3
+          maxAllowedSubaccountQuota: 2
+          name: name
+          providedBy: VENDOR
+          provisioningMethod: SERVICE_BROKER
+          remainingAmount: 4.145608029883936
+          resources:
+          - resourceData:
+              key: {}
+            resourceName: resourceName
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
+          - resourceData:
+              key: {}
+            resourceName: resourceName
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
           sourceEntitlements:
           - amount: 7.386281948385884
             autoAssign: true
             commercialModel:
               consumptionBased: true
-              displayName: displayName
-              name: name
-              description: description
               containedCommercialModels:
               - null
               - null
-            productId: productId
+              description: description
+              displayName: displayName
+              name: name
             entitlementName: entitlementName
+            productId: productId
           - amount: 7.386281948385884
             autoAssign: true
             commercialModel:
               consumptionBased: true
-              displayName: displayName
-              name: name
-              description: description
               containedCommercialModels:
               - null
               - null
-            productId: productId
+              description: description
+              displayName: displayName
+              name: name
             entitlementName: entitlementName
-          internalQuotaLimit: 3
-          name: name
-          category: PLATFORM
-          beta: true
+            productId: productId
           uniqueIdentifier: uniqueIdentifier
-        - providedBy: VENDOR
-          amount: 7.061401241503109
-          displayName: displayName
           unlimited: true
-          dataCenters:
-          - provisioningServiceUrl: provisioningServiceUrl
-            supportsTrial: true
-            environment: environment
-            displayName: displayName
-            domain: domain
-            name: name
-            isMainDataCenter: true
-            region: region
-            saasRegistryServiceUrl: saasRegistryServiceUrl
-            iaasProvider: AWS
-          - provisioningServiceUrl: provisioningServiceUrl
-            supportsTrial: true
-            environment: environment
-            displayName: displayName
-            domain: domain
-            name: name
-            isMainDataCenter: true
-            region: region
-            saasRegistryServiceUrl: saasRegistryServiceUrl
-            iaasProvider: AWS
-          description: description
-          resources:
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
-            resourceName: resourceName
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
-            resourceName: resourceName
-            resourceProvider: resourceProvider
-            resourceType: resourceType
-          maxAllowedSubaccountQuota: 2
-          availableForInternal: true
-          provisioningMethod: SERVICE_BROKER
-          remainingAmount: 4.145608029883936
+        - amount: 7.061401241503109
           autoAssign: true
           autoDistributeAmount: 9
+          availableForInternal: true
+          beta: true
+          category: PLATFORM
+          dataCenters:
+          - displayName: displayName
+            domain: domain
+            environment: environment
+            iaasProvider: AWS
+            isMainDataCenter: true
+            name: name
+            provisioningServiceUrl: provisioningServiceUrl
+            region: region
+            saasRegistryServiceUrl: saasRegistryServiceUrl
+            supportsTrial: true
+          - displayName: displayName
+            domain: domain
+            environment: environment
+            iaasProvider: AWS
+            isMainDataCenter: true
+            name: name
+            provisioningServiceUrl: provisioningServiceUrl
+            region: region
+            saasRegistryServiceUrl: saasRegistryServiceUrl
+            supportsTrial: true
+          description: description
+          displayName: displayName
+          internalQuotaLimit: 3
+          maxAllowedSubaccountQuota: 2
+          name: name
+          providedBy: VENDOR
+          provisioningMethod: SERVICE_BROKER
+          remainingAmount: 4.145608029883936
+          resources:
+          - resourceData:
+              key: {}
+            resourceName: resourceName
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
+          - resourceData:
+              key: {}
+            resourceName: resourceName
+            resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
+            resourceType: resourceType
           sourceEntitlements:
           - amount: 7.386281948385884
             autoAssign: true
             commercialModel:
               consumptionBased: true
-              displayName: displayName
-              name: name
-              description: description
               containedCommercialModels:
               - null
               - null
-            productId: productId
+              description: description
+              displayName: displayName
+              name: name
             entitlementName: entitlementName
+            productId: productId
           - amount: 7.386281948385884
             autoAssign: true
             commercialModel:
               consumptionBased: true
-              displayName: displayName
-              name: name
-              description: description
               containedCommercialModels:
               - null
               - null
-            productId: productId
+              description: description
+              displayName: displayName
+              name: name
             entitlementName: entitlementName
-          internalQuotaLimit: 3
-          name: name
-          category: PLATFORM
-          beta: true
+            productId: productId
           uniqueIdentifier: uniqueIdentifier
-        applicationCoordinates: "{}"
+          unlimited: true
       properties:
         applicationCoordinates:
           type: object
         businessCategory:
-          $ref: '#/components/schemas/BusinessCategoryResponseObject'
+          $ref: "#/components/schemas/BusinessCategoryResponseObject"
         description:
           description: Description of the service for customer-facing UIs.
           type: string
@@ -2160,7 +2160,7 @@ components:
         servicePlans:
           description: List of service plans associated with the entitled service.
           items:
-            $ref: '#/components/schemas/ServicePlanResponseObject'
+            $ref: "#/components/schemas/ServicePlanResponseObject"
           type: array
       type: object
     EntitlementAmountResponseObject:
@@ -2170,14 +2170,14 @@ components:
         autoAssign: true
         commercialModel:
           consumptionBased: true
-          displayName: displayName
-          name: name
-          description: description
           containedCommercialModels:
           - null
           - null
-        productId: productId
+          description: description
+          displayName: displayName
+          name: name
         entitlementName: entitlementName
+        productId: productId
       properties:
         amount:
           description: The quantity of the entitlement that is assigned to the root
@@ -2189,7 +2189,7 @@ components:
             \ free plans that are available to all subaccounts."
           type: boolean
         commercialModel:
-          $ref: '#/components/schemas/CommercialModelResponseObject'
+          $ref: "#/components/schemas/CommercialModelResponseObject"
         entitlementName:
           description: The technical name of the product.
           type: string
@@ -2201,11 +2201,11 @@ components:
     ExternalResourceRequestPayload:
       description: External resources to assign to subaccount
       example:
-        resourceTechnicalName: resourceTechnicalName
         resourceData:
-          key: "{}"
+          key: {}
         resourceName: resourceName
         resourceProvider: resourceProvider
+        resourceTechnicalName: resourceTechnicalName
         resourceType: resourceType
       properties:
         resourceData:
@@ -2243,47 +2243,47 @@ components:
     ServicePlanAssignmentRequestPayload:
       description: Contains information about the plans to assign to a subaccount.
       example:
-        servicePlanName: servicePlanName
-        servicePlanUniqueIdentifier: servicePlanUniqueIdentifier
-        serviceName: serviceName
         assignmentInfo:
         - amount: 0.8008281904610115
           enable: true
           resources:
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
+          - resourceData:
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
+          - resourceData:
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           subaccountGUID: subaccountGUID
         - amount: 0.8008281904610115
           enable: true
           resources:
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
+          - resourceData:
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
-          - resourceTechnicalName: resourceTechnicalName
-            resourceData:
-              key: "{}"
+          - resourceData:
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
+            resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           subaccountGUID: subaccountGUID
+        serviceName: serviceName
+        servicePlanName: servicePlanName
+        servicePlanUniqueIdentifier: servicePlanUniqueIdentifier
       properties:
         assignmentInfo:
           description: List of assigned entitlements and their specifications.
           items:
-            $ref: '#/components/schemas/SubaccountServicePlanRequestPayload'
+            $ref: "#/components/schemas/SubaccountServicePlanRequestPayload"
           type: array
         serviceName:
           description: The technical name of the entitlement to assign to a subaccount.
@@ -2303,81 +2303,81 @@ components:
     ServicePlanResponseObject:
       description: List of service plans associated with the entitled service.
       example:
-        providedBy: VENDOR
         amount: 7.061401241503109
-        displayName: displayName
-        unlimited: true
-        dataCenters:
-        - provisioningServiceUrl: provisioningServiceUrl
-          supportsTrial: true
-          environment: environment
-          displayName: displayName
-          domain: domain
-          name: name
-          isMainDataCenter: true
-          region: region
-          saasRegistryServiceUrl: saasRegistryServiceUrl
-          iaasProvider: AWS
-        - provisioningServiceUrl: provisioningServiceUrl
-          supportsTrial: true
-          environment: environment
-          displayName: displayName
-          domain: domain
-          name: name
-          isMainDataCenter: true
-          region: region
-          saasRegistryServiceUrl: saasRegistryServiceUrl
-          iaasProvider: AWS
-        description: description
-        resources:
-        - resourceTechnicalName: resourceTechnicalName
-          resourceData:
-            key: "{}"
-          resourceName: resourceName
-          resourceProvider: resourceProvider
-          resourceType: resourceType
-        - resourceTechnicalName: resourceTechnicalName
-          resourceData:
-            key: "{}"
-          resourceName: resourceName
-          resourceProvider: resourceProvider
-          resourceType: resourceType
-        maxAllowedSubaccountQuota: 2
-        availableForInternal: true
-        provisioningMethod: SERVICE_BROKER
-        remainingAmount: 4.145608029883936
         autoAssign: true
         autoDistributeAmount: 9
+        availableForInternal: true
+        beta: true
+        category: PLATFORM
+        dataCenters:
+        - displayName: displayName
+          domain: domain
+          environment: environment
+          iaasProvider: AWS
+          isMainDataCenter: true
+          name: name
+          provisioningServiceUrl: provisioningServiceUrl
+          region: region
+          saasRegistryServiceUrl: saasRegistryServiceUrl
+          supportsTrial: true
+        - displayName: displayName
+          domain: domain
+          environment: environment
+          iaasProvider: AWS
+          isMainDataCenter: true
+          name: name
+          provisioningServiceUrl: provisioningServiceUrl
+          region: region
+          saasRegistryServiceUrl: saasRegistryServiceUrl
+          supportsTrial: true
+        description: description
+        displayName: displayName
+        internalQuotaLimit: 3
+        maxAllowedSubaccountQuota: 2
+        name: name
+        providedBy: VENDOR
+        provisioningMethod: SERVICE_BROKER
+        remainingAmount: 4.145608029883936
+        resources:
+        - resourceData:
+            key: {}
+          resourceName: resourceName
+          resourceProvider: resourceProvider
+          resourceTechnicalName: resourceTechnicalName
+          resourceType: resourceType
+        - resourceData:
+            key: {}
+          resourceName: resourceName
+          resourceProvider: resourceProvider
+          resourceTechnicalName: resourceTechnicalName
+          resourceType: resourceType
         sourceEntitlements:
         - amount: 7.386281948385884
           autoAssign: true
           commercialModel:
             consumptionBased: true
-            displayName: displayName
-            name: name
-            description: description
             containedCommercialModels:
             - null
             - null
-          productId: productId
+            description: description
+            displayName: displayName
+            name: name
           entitlementName: entitlementName
+          productId: productId
         - amount: 7.386281948385884
           autoAssign: true
           commercialModel:
             consumptionBased: true
-            displayName: displayName
-            name: name
-            description: description
             containedCommercialModels:
             - null
             - null
-          productId: productId
+            description: description
+            displayName: displayName
+            name: name
           entitlementName: entitlementName
-        internalQuotaLimit: 3
-        name: name
-        category: PLATFORM
-        beta: true
+          productId: productId
         uniqueIdentifier: uniqueIdentifier
+        unlimited: true
       properties:
         amount:
           description: The assigned quota for maximum allowed consumption of the plan.
@@ -2424,7 +2424,7 @@ components:
           description: Contains information about the data centers and regions in
             the cloud landscape
           items:
-            $ref: '#/components/schemas/DataCenterResponseObject'
+            $ref: "#/components/schemas/DataCenterResponseObject"
           type: array
         description:
           description: Description of the service plan for customer-facing UIs.
@@ -2489,12 +2489,12 @@ components:
           description: "Remote service resources provided by non-SAP cloud vendors,\
             \ and which are offered by this plan."
           items:
-            $ref: '#/components/schemas/ExternalResourceRequestPayload'
+            $ref: "#/components/schemas/ExternalResourceRequestPayload"
           type: array
         sourceEntitlements:
           description: Relevant entitlements for the source that added the product.
           items:
-            $ref: '#/components/schemas/EntitlementAmountResponseObject'
+            $ref: "#/components/schemas/EntitlementAmountResponseObject"
           type: array
         uniqueIdentifier:
           description: A unique identifier for service plans that can distinguish
@@ -2509,17 +2509,17 @@ components:
         amount: 0.8008281904610115
         enable: true
         resources:
-        - resourceTechnicalName: resourceTechnicalName
-          resourceData:
-            key: "{}"
+        - resourceData:
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
+          resourceTechnicalName: resourceTechnicalName
           resourceType: resourceType
-        - resourceTechnicalName: resourceTechnicalName
-          resourceData:
-            key: "{}"
+        - resourceData:
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
+          resourceTechnicalName: resourceTechnicalName
           resourceType: resourceType
         subaccountGUID: subaccountGUID
       properties:
@@ -2536,7 +2536,7 @@ components:
         resources:
           description: External resources to assign to subaccount
           items:
-            $ref: '#/components/schemas/ExternalResourceRequestPayload'
+            $ref: "#/components/schemas/ExternalResourceRequestPayload"
           type: array
         subaccountGUID:
           description: The unique ID of the subaccount to which to assign a service
@@ -2553,83 +2553,83 @@ components:
         \ not displayed as entitlements."
       example:
         subaccountServicePlans:
-        - servicePlanName: servicePlanName
-          servicePlanUniqueIdentifier: servicePlanUniqueIdentifier
+        - assignmentInfo:
+          - amount: 0.8008281904610115
+            enable: true
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            subaccountGUID: subaccountGUID
+          - amount: 0.8008281904610115
+            enable: true
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            subaccountGUID: subaccountGUID
           serviceName: serviceName
-          assignmentInfo:
-          - amount: 0.8008281904610115
-            enable: true
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            subaccountGUID: subaccountGUID
-          - amount: 0.8008281904610115
-            enable: true
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            subaccountGUID: subaccountGUID
-        - servicePlanName: servicePlanName
+          servicePlanName: servicePlanName
           servicePlanUniqueIdentifier: servicePlanUniqueIdentifier
+        - assignmentInfo:
+          - amount: 0.8008281904610115
+            enable: true
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            subaccountGUID: subaccountGUID
+          - amount: 0.8008281904610115
+            enable: true
+            resources:
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            - resourceData:
+                key: {}
+              resourceName: resourceName
+              resourceProvider: resourceProvider
+              resourceTechnicalName: resourceTechnicalName
+              resourceType: resourceType
+            subaccountGUID: subaccountGUID
           serviceName: serviceName
-          assignmentInfo:
-          - amount: 0.8008281904610115
-            enable: true
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            subaccountGUID: subaccountGUID
-          - amount: 0.8008281904610115
-            enable: true
-            resources:
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            - resourceTechnicalName: resourceTechnicalName
-              resourceData:
-                key: "{}"
-              resourceName: resourceName
-              resourceProvider: resourceProvider
-              resourceType: resourceType
-            subaccountGUID: subaccountGUID
+          servicePlanName: servicePlanName
+          servicePlanUniqueIdentifier: servicePlanUniqueIdentifier
       properties:
         subaccountServicePlans:
           description: Contains information about the plans to assign to a subaccount.
           items:
-            $ref: '#/components/schemas/ServicePlanAssignmentRequestPayload'
+            $ref: "#/components/schemas/ServicePlanAssignmentRequestPayload"
           type: array
       required:
       - subaccountServicePlans

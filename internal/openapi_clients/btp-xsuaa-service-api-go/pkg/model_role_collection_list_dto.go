@@ -21,7 +21,10 @@ var _ MappedNullable = &RoleCollectionListDto{}
 type RoleCollectionListDto struct {
 	RoleCollections []string `json:"roleCollections,omitempty"`
 	RoleCollectionsBySamlAssignment []string `json:"roleCollectionsBySamlAssignment,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _RoleCollectionListDto RoleCollectionListDto
 
 // NewRoleCollectionListDto instantiates a new RoleCollectionListDto object
 // This constructor will assign default values to properties that have it defined,
@@ -120,7 +123,34 @@ func (o RoleCollectionListDto) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.RoleCollectionsBySamlAssignment) {
 		toSerialize["roleCollectionsBySamlAssignment"] = o.RoleCollectionsBySamlAssignment
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *RoleCollectionListDto) UnmarshalJSON(data []byte) (err error) {
+	varRoleCollectionListDto := _RoleCollectionListDto{}
+
+	err = json.Unmarshal(data, &varRoleCollectionListDto)
+
+	if err != nil {
+		return err
+	}
+
+	*o = RoleCollectionListDto(varRoleCollectionListDto)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "roleCollections")
+		delete(additionalProperties, "roleCollectionsBySamlAssignment")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableRoleCollectionListDto struct {

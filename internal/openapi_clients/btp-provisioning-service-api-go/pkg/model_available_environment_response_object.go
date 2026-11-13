@@ -52,8 +52,11 @@ type AvailableEnvironmentResponseObject struct {
 	// Technical key of the corresponding environment broker.
 	TechnicalKey *string `json:"technicalKey,omitempty"`
 	// The update schema of the environment broker.
-	UpdateSchema *string `json:"updateSchema,omitempty"`
+	UpdateSchema         *string `json:"updateSchema,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AvailableEnvironmentResponseObject AvailableEnvironmentResponseObject
 
 // NewAvailableEnvironmentResponseObject instantiates a new AvailableEnvironmentResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -617,7 +620,7 @@ func (o *AvailableEnvironmentResponseObject) SetUpdateSchema(v string) {
 }
 
 func (o AvailableEnvironmentResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -677,7 +680,49 @@ func (o AvailableEnvironmentResponseObject) ToMap() (map[string]interface{}, err
 	if !IsNil(o.UpdateSchema) {
 		toSerialize["updateSchema"] = o.UpdateSchema
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AvailableEnvironmentResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varAvailableEnvironmentResponseObject := _AvailableEnvironmentResponseObject{}
+
+	err = json.Unmarshal(data, &varAvailableEnvironmentResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AvailableEnvironmentResponseObject(varAvailableEnvironmentResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "allowAdditionalEnvironmentInstance")
+		delete(additionalProperties, "availabilityLevel")
+		delete(additionalProperties, "createSchema")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "environmentType")
+		delete(additionalProperties, "landscapeLabel")
+		delete(additionalProperties, "planName")
+		delete(additionalProperties, "planUpdatable")
+		delete(additionalProperties, "serviceDescription")
+		delete(additionalProperties, "serviceDisplayName")
+		delete(additionalProperties, "serviceDocumentationUrl")
+		delete(additionalProperties, "serviceImageUrl")
+		delete(additionalProperties, "serviceLongDescription")
+		delete(additionalProperties, "serviceName")
+		delete(additionalProperties, "serviceSupportUrl")
+		delete(additionalProperties, "technicalKey")
+		delete(additionalProperties, "updateSchema")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAvailableEnvironmentResponseObject struct {
@@ -715,5 +760,3 @@ func (v *NullableAvailableEnvironmentResponseObject) UnmarshalJSON(src []byte) e
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

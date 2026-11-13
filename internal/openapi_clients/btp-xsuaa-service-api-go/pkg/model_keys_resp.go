@@ -21,7 +21,10 @@ var _ MappedNullable = &KeysResp{}
 type KeysResp struct {
 	Created *string `json:"created,omitempty"`
 	FipsCompliant *bool `json:"fipsCompliant,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _KeysResp KeysResp
 
 // NewKeysResp instantiates a new KeysResp object
 // This constructor will assign default values to properties that have it defined,
@@ -120,7 +123,34 @@ func (o KeysResp) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.FipsCompliant) {
 		toSerialize["fipsCompliant"] = o.FipsCompliant
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *KeysResp) UnmarshalJSON(data []byte) (err error) {
+	varKeysResp := _KeysResp{}
+
+	err = json.Unmarshal(data, &varKeysResp)
+
+	if err != nil {
+		return err
+	}
+
+	*o = KeysResp(varKeysResp)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "created")
+		delete(additionalProperties, "fipsCompliant")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableKeysResp struct {

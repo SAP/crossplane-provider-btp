@@ -95,6 +95,7 @@ func (a *RegionsForGlobalAccountAPIService) GetAllowedDataCentersExecute(r ApiGe
 		parameterAddToHeaderOrQuery(localVarQueryParams, "includeSatelliteDataCenters", r.includeSatelliteDataCenters, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeSatelliteDataCenters", defaultValue, "form", "")
 		r.includeSatelliteDataCenters = &defaultValue
 	}
 	// to determine the Content-Type header
