@@ -25,7 +25,10 @@ type TokenPolicySettingsResp struct {
 	ActiveKeyId *string `json:"activeKeyId,omitempty"`
 	KeyIds []string `json:"keyIds,omitempty"`
 	Keys *map[string]KeysResp `json:"keys,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _TokenPolicySettingsResp TokenPolicySettingsResp
 
 // NewTokenPolicySettingsResp instantiates a new TokenPolicySettingsResp object
 // This constructor will assign default values to properties that have it defined,
@@ -264,7 +267,38 @@ func (o TokenPolicySettingsResp) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Keys) {
 		toSerialize["keys"] = o.Keys
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *TokenPolicySettingsResp) UnmarshalJSON(data []byte) (err error) {
+	varTokenPolicySettingsResp := _TokenPolicySettingsResp{}
+
+	err = json.Unmarshal(data, &varTokenPolicySettingsResp)
+
+	if err != nil {
+		return err
+	}
+
+	*o = TokenPolicySettingsResp(varTokenPolicySettingsResp)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "accessTokenValidity")
+		delete(additionalProperties, "refreshTokenValidity")
+		delete(additionalProperties, "refreshTokenUnique")
+		delete(additionalProperties, "activeKeyId")
+		delete(additionalProperties, "keyIds")
+		delete(additionalProperties, "keys")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableTokenPolicySettingsResp struct {

@@ -23,7 +23,10 @@ type AppAttribute struct {
 	ValueType *string `json:"valueType,omitempty"`
 	Description *string `json:"description,omitempty"`
 	ValueRequired *bool `json:"valueRequired,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AppAttribute AppAttribute
 
 // NewAppAttribute instantiates a new AppAttribute object
 // This constructor will assign default values to properties that have it defined,
@@ -192,7 +195,36 @@ func (o AppAttribute) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.ValueRequired) {
 		toSerialize["valueRequired"] = o.ValueRequired
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AppAttribute) UnmarshalJSON(data []byte) (err error) {
+	varAppAttribute := _AppAttribute{}
+
+	err = json.Unmarshal(data, &varAppAttribute)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AppAttribute(varAppAttribute)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "valueType")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "valueRequired")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAppAttribute struct {

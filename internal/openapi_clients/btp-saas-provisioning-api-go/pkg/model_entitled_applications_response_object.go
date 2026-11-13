@@ -99,7 +99,10 @@ type EntitledApplicationsResponseObject struct {
 	SupportsPlanUpdates *bool `json:"supportsPlanUpdates,omitempty"`
 	// Tenant ID of the application provider.
 	TenantId *string `json:"tenantId,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _EntitledApplicationsResponseObject EntitledApplicationsResponseObject
 
 // NewEntitledApplicationsResponseObject instantiates a new EntitledApplicationsResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -1598,7 +1601,74 @@ func (o EntitledApplicationsResponseObject) ToMap() (map[string]interface{}, err
 	if !IsNil(o.TenantId) {
 		toSerialize["tenantId"] = o.TenantId
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *EntitledApplicationsResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varEntitledApplicationsResponseObject := _EntitledApplicationsResponseObject{}
+
+	err = json.Unmarshal(data, &varEntitledApplicationsResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = EntitledApplicationsResponseObject(varEntitledApplicationsResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "additionalPlanFeatures")
+		delete(additionalProperties, "allowedTargetPlans")
+		delete(additionalProperties, "appId")
+		delete(additionalProperties, "appName")
+		delete(additionalProperties, "applicationCoordinates")
+		delete(additionalProperties, "applicationResource")
+		delete(additionalProperties, "authenticationProvider")
+		delete(additionalProperties, "automationState")
+		delete(additionalProperties, "automationStateMessage")
+		delete(additionalProperties, "category")
+		delete(additionalProperties, "categoryDisplayName")
+		delete(additionalProperties, "commercialAppName")
+		delete(additionalProperties, "createdBy")
+		delete(additionalProperties, "createdDate")
+		delete(additionalProperties, "customerDeveloped")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "formationSolutionName")
+		delete(additionalProperties, "globalAccountId")
+		delete(additionalProperties, "iconBase64")
+		delete(additionalProperties, "incidentTrackingComponent")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "metadata")
+		delete(additionalProperties, "modifiedBy")
+		delete(additionalProperties, "modifiedDate")
+		delete(additionalProperties, "paramsSchema")
+		delete(additionalProperties, "planDescription")
+		delete(additionalProperties, "planName")
+		delete(additionalProperties, "platformEntityId")
+		delete(additionalProperties, "quota")
+		delete(additionalProperties, "shortDescription")
+		delete(additionalProperties, "state")
+		delete(additionalProperties, "subscribedSubaccountId")
+		delete(additionalProperties, "subscribedTenantId")
+		delete(additionalProperties, "subscriptionError")
+		delete(additionalProperties, "subscriptionGUID")
+		delete(additionalProperties, "subscriptionId")
+		delete(additionalProperties, "subscriptionUrl")
+		delete(additionalProperties, "supportsGetParameters")
+		delete(additionalProperties, "supportsParametersUpdates")
+		delete(additionalProperties, "supportsPlanUpdates")
+		delete(additionalProperties, "tenantId")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableEntitledApplicationsResponseObject struct {

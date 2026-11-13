@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -23,6 +22,7 @@ var _ MappedNullable = &SubaccountServicePlansRequestPayloadCollection{}
 type SubaccountServicePlansRequestPayloadCollection struct {
 	// Contains information about the plans to assign to a subaccount.
 	SubaccountServicePlans []ServicePlanAssignmentRequestPayload `json:"subaccountServicePlans"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _SubaccountServicePlansRequestPayloadCollection SubaccountServicePlansRequestPayloadCollection
@@ -80,6 +80,11 @@ func (o SubaccountServicePlansRequestPayloadCollection) MarshalJSON() ([]byte, e
 func (o SubaccountServicePlansRequestPayloadCollection) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["subaccountServicePlans"] = o.SubaccountServicePlans
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -107,15 +112,20 @@ func (o *SubaccountServicePlansRequestPayloadCollection) UnmarshalJSON(data []by
 
 	varSubaccountServicePlansRequestPayloadCollection := _SubaccountServicePlansRequestPayloadCollection{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varSubaccountServicePlansRequestPayloadCollection)
+	err = json.Unmarshal(data, &varSubaccountServicePlansRequestPayloadCollection)
 
 	if err != nil {
 		return err
 	}
 
 	*o = SubaccountServicePlansRequestPayloadCollection(varSubaccountServicePlansRequestPayloadCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "subaccountServicePlans")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

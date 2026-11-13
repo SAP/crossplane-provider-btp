@@ -245,6 +245,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) CreateSubscriptionAsyn
 		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", defaultValue, "form", "")
 		r.useCommercialAppName = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -405,6 +406,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionAsyn
 		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", defaultValue, "form", "")
 		r.useCommercialAppName = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -562,6 +564,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) DeleteSubscriptionLabe
 		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", defaultValue, "form", "")
 		r.useCommercialAppName = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -727,6 +730,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetEntitledApplication
 		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", defaultValue, "form", "")
 		r.useCommercialAppName = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1021,6 +1025,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionLabelsE
 		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", defaultValue, "form", "")
 		r.useCommercialAppName = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1171,6 +1176,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) GetSubscriptionParamsE
 		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", defaultValue, "form", "")
 		r.useCommercialAppName = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1323,6 +1329,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpdateSubscriptionPara
 		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", defaultValue, "form", "")
 		r.useCommercialAppName = &defaultValue
 	}
 	// to determine the Content-Type header
@@ -1498,6 +1505,7 @@ func (a *SubscriptionOperationsForAppConsumersAPIService) UpsertSubscriptionLabe
 		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", r.useCommercialAppName, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "useCommercialAppName", defaultValue, "form", "")
 		r.useCommercialAppName = &defaultValue
 	}
 	// to determine the Content-Type header

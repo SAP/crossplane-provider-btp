@@ -27,7 +27,10 @@ type UpdateServiceInstanceRequestPayload struct {
 	Parameters *map[string]string `json:"parameters,omitempty"`
 	// The ID of the service plan for the service instance to update.
 	ServicePlanId *string `json:"service_plan_id,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _UpdateServiceInstanceRequestPayload UpdateServiceInstanceRequestPayload
 
 // NewUpdateServiceInstanceRequestPayload instantiates a new UpdateServiceInstanceRequestPayload object
 // This constructor will assign default values to properties that have it defined,
@@ -196,7 +199,36 @@ func (o UpdateServiceInstanceRequestPayload) ToMap() (map[string]interface{}, er
 	if !IsNil(o.ServicePlanId) {
 		toSerialize["service_plan_id"] = o.ServicePlanId
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *UpdateServiceInstanceRequestPayload) UnmarshalJSON(data []byte) (err error) {
+	varUpdateServiceInstanceRequestPayload := _UpdateServiceInstanceRequestPayload{}
+
+	err = json.Unmarshal(data, &varUpdateServiceInstanceRequestPayload)
+
+	if err != nil {
+		return err
+	}
+
+	*o = UpdateServiceInstanceRequestPayload(varUpdateServiceInstanceRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "parameters")
+		delete(additionalProperties, "service_plan_id")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableUpdateServiceInstanceRequestPayload struct {

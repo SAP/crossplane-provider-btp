@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -29,6 +28,7 @@ type CreateByPlanID struct {
 	Parameters *map[string]string `json:"parameters,omitempty"`
 	// The ID of the service plan to use for the service instance.
 	ServicePlanId string `json:"service_plan_id"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _CreateByPlanID CreateByPlanID
@@ -182,6 +182,11 @@ func (o CreateByPlanID) ToMap() (map[string]interface{}, error) {
 		toSerialize["parameters"] = o.Parameters
 	}
 	toSerialize["service_plan_id"] = o.ServicePlanId
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -210,15 +215,23 @@ func (o *CreateByPlanID) UnmarshalJSON(data []byte) (err error) {
 
 	varCreateByPlanID := _CreateByPlanID{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varCreateByPlanID)
+	err = json.Unmarshal(data, &varCreateByPlanID)
 
 	if err != nil {
 		return err
 	}
 
 	*o = CreateByPlanID(varCreateByPlanID)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "parameters")
+		delete(additionalProperties, "service_plan_id")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

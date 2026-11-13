@@ -118,11 +118,6 @@ spec:
                     - name
                     - namespace
                     type: object
-                  mtls:
-                    description: |-
-                      Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-                      Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-                    type: boolean
                   name:
                     description: |-
                       (String) The name of the service broker.
@@ -295,11 +290,6 @@ spec:
                     - name
                     - namespace
                     type: object
-                  mtls:
-                    description: |-
-                      Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-                      Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-                    type: boolean
                   name:
                     description: |-
                       (String) The name of the service broker.
@@ -535,11 +525,6 @@ spec:
                       (String) The date and time when the resource was last modified in RFC3339 format.
                       The date and time when the resource was last modified in [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format.
                     type: string
-                  mtls:
-                    description: |-
-                      Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-                      Use Service-Manager-provided mTLS credentials for the broker. When set to true, cert and key must NOT be supplied.
-                    type: boolean
                   name:
                     description: |-
                       (String) The name of the service broker.
