@@ -18,6 +18,8 @@ import (
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 )
 
+type credentialConnectionSecretOwnerE2E struct{ name, owner string }
+
 func credentialAdoptionCleanupActionsE2E(cfg *envconf.Config, manifestDir string) []providerTest.CredentialAdoptionCleanupAction {
 	adopters := []string{
 		"sac-adopt-init-complete-" + BUILD_ID,
@@ -26,7 +28,21 @@ func credentialAdoptionCleanupActionsE2E(cfg *envconf.Config, manifestDir string
 		"sac-adopt-complete-" + BUILD_ID,
 	}
 	sources := []string{"sac-adopt-init-source-" + BUILD_ID, "sac-adopt-source-" + BUILD_ID}
-	actions := make([]providerTest.CredentialAdoptionCleanupAction, 0, 16)
+	secretOwners := []credentialConnectionSecretOwnerE2E{
+		{"sac-adopt-source-secret-" + BUILD_ID, sources[1]},
+		{"sac-adopt-init-source-" + BUILD_ID + "-secret", sources[0]},
+		{"sac-adopt-init-complete-" + BUILD_ID + "-secret", adopters[0]},
+		{"sac-adopt-incomplete-" + BUILD_ID + "-secret", adopters[1]},
+		{"sac-adopt-certificate-input-" + BUILD_ID + "-secret", adopters[2]},
+		{"sac-adopt-complete-" + BUILD_ID + "-secret", adopters[3]},
+	}
+	return credentialCleanupActionsE2E(cfg, manifestDir, adopters, sources, secretOwners)
+}
+
+// Share the bounded, dependency-ordered cleanup with the restart regression.
+// A remaining MR still preserves its Secret and parent fixture on failure.
+func credentialCleanupActionsE2E(cfg *envconf.Config, manifestDir string, adopters, sources []string, secretOwners []credentialConnectionSecretOwnerE2E) []providerTest.CredentialAdoptionCleanupAction {
+	actions := make([]providerTest.CredentialAdoptionCleanupAction, 0, len(adopters)+len(sources)+len(secretOwners)+1)
 	for _, name := range adopters {
 		name := name
 		actions = append(actions, providerTest.CredentialAdoptionCleanupAction{
@@ -45,14 +61,6 @@ func credentialAdoptionCleanupActionsE2E(cfg *envconf.Config, manifestDir string
 				return deleteCredentialForAdoptionE2E(ctx, cfg, name)
 			},
 		})
-	}
-	secretOwners := []struct{ name, owner string }{
-		{"sac-adopt-source-secret-" + BUILD_ID, sources[1]},
-		{"sac-adopt-init-source-" + BUILD_ID + "-secret", sources[0]},
-		{"sac-adopt-init-complete-" + BUILD_ID + "-secret", adopters[0]},
-		{"sac-adopt-incomplete-" + BUILD_ID + "-secret", adopters[1]},
-		{"sac-adopt-certificate-input-" + BUILD_ID + "-secret", adopters[2]},
-		{"sac-adopt-complete-" + BUILD_ID + "-secret", adopters[3]},
 	}
 	for _, entry := range secretOwners {
 		entry := entry

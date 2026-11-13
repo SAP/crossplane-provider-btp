@@ -26,7 +26,8 @@ import (
 const runtimeContainer = "package-runtime"
 
 // ProviderRuntime checks the actual controller, not just package Healthy status.
-// It only reads Kubernetes objects and logs; it never changes cleanup policies.
+// Readiness and diagnostics only read objects/logs; Restart explicitly replaces
+// runtime Pods in disposable clusters. It never changes cleanup policies.
 // Diagnostics exclude Secrets, pod specs/environment, and termination messages.
 // Raw controller logs can contain sensitive data: retain them locally, do not
 // commit or print them, and review/redact them before sharing.
