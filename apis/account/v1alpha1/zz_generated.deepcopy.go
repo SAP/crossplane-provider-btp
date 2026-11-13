@@ -2765,11 +2765,6 @@ func (in *SubaccountServiceBrokerInitParameters) DeepCopyInto(out *SubaccountSer
 		*out = new(v2.SecretKeySelector)
 		**out = **in
 	}
-	if in.Mtls != nil {
-		in, out := &in.Mtls, &out.Mtls
-		*out = new(bool)
-		**out = **in
-	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
 		*out = new(string)
@@ -2872,11 +2867,6 @@ func (in *SubaccountServiceBrokerObservation) DeepCopyInto(out *SubaccountServic
 		*out = new(string)
 		**out = **in
 	}
-	if in.Mtls != nil {
-		in, out := &in.Mtls, &out.Mtls
-		*out = new(bool)
-		**out = **in
-	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
 		*out = new(string)
@@ -2930,11 +2920,6 @@ func (in *SubaccountServiceBrokerParameters) DeepCopyInto(out *SubaccountService
 	if in.KeySecretRef != nil {
 		in, out := &in.KeySecretRef, &out.KeySecretRef
 		*out = new(v2.SecretKeySelector)
-		**out = **in
-	}
-	if in.Mtls != nil {
-		in, out := &in.Mtls, &out.Mtls
-		*out = new(bool)
 		**out = **in
 	}
 	if in.Name != nil {
