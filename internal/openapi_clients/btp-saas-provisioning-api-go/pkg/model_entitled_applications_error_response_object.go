@@ -23,7 +23,10 @@ type EntitledApplicationsErrorResponseObject struct {
 	AppError *string `json:"appError,omitempty"`
 	// The message that describes the error that occurred during the subscription. 
 	ErrorMessage *string `json:"errorMessage,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _EntitledApplicationsErrorResponseObject EntitledApplicationsErrorResponseObject
 
 // NewEntitledApplicationsErrorResponseObject instantiates a new EntitledApplicationsErrorResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -122,7 +125,34 @@ func (o EntitledApplicationsErrorResponseObject) ToMap() (map[string]interface{}
 	if !IsNil(o.ErrorMessage) {
 		toSerialize["errorMessage"] = o.ErrorMessage
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *EntitledApplicationsErrorResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varEntitledApplicationsErrorResponseObject := _EntitledApplicationsErrorResponseObject{}
+
+	err = json.Unmarshal(data, &varEntitledApplicationsErrorResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = EntitledApplicationsErrorResponseObject(varEntitledApplicationsErrorResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "appError")
+		delete(additionalProperties, "errorMessage")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableEntitledApplicationsErrorResponseObject struct {

@@ -32,7 +32,10 @@ type JobErrorResponseObject struct {
 	Status *int32 `json:"status,omitempty"`
 	// Timestamp of the error.
 	Timestamp *time.Time `json:"timestamp,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _JobErrorResponseObject JobErrorResponseObject
 
 // NewJobErrorResponseObject instantiates a new JobErrorResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -271,7 +274,38 @@ func (o JobErrorResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Timestamp) {
 		toSerialize["timestamp"] = o.Timestamp
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *JobErrorResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varJobErrorResponseObject := _JobErrorResponseObject{}
+
+	err = json.Unmarshal(data, &varJobErrorResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = JobErrorResponseObject(varJobErrorResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "error")
+		delete(additionalProperties, "exception")
+		delete(additionalProperties, "message")
+		delete(additionalProperties, "paths")
+		delete(additionalProperties, "status")
+		delete(additionalProperties, "timestamp")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableJobErrorResponseObject struct {

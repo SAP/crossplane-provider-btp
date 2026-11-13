@@ -19,8 +19,11 @@ var _ MappedNullable = &CreateEnvironmentInstanceBindingRequest{}
 
 // CreateEnvironmentInstanceBindingRequest JSON object with configuration parameters specific to environment instance binding as specified in the OSB API.
 type CreateEnvironmentInstanceBindingRequest struct {
-	Parameters map[string]interface{} `json:"parameters,omitempty"`
+	Parameters           map[string]interface{} `json:"parameters,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _CreateEnvironmentInstanceBindingRequest CreateEnvironmentInstanceBindingRequest
 
 // NewCreateEnvironmentInstanceBindingRequest instantiates a new CreateEnvironmentInstanceBindingRequest object
 // This constructor will assign default values to properties that have it defined,
@@ -72,7 +75,7 @@ func (o *CreateEnvironmentInstanceBindingRequest) SetParameters(v map[string]int
 }
 
 func (o CreateEnvironmentInstanceBindingRequest) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -84,7 +87,33 @@ func (o CreateEnvironmentInstanceBindingRequest) ToMap() (map[string]interface{}
 	if !IsNil(o.Parameters) {
 		toSerialize["parameters"] = o.Parameters
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *CreateEnvironmentInstanceBindingRequest) UnmarshalJSON(data []byte) (err error) {
+	varCreateEnvironmentInstanceBindingRequest := _CreateEnvironmentInstanceBindingRequest{}
+
+	err = json.Unmarshal(data, &varCreateEnvironmentInstanceBindingRequest)
+
+	if err != nil {
+		return err
+	}
+
+	*o = CreateEnvironmentInstanceBindingRequest(varCreateEnvironmentInstanceBindingRequest)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "parameters")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableCreateEnvironmentInstanceBindingRequest struct {
@@ -122,5 +151,3 @@ func (v *NullableCreateEnvironmentInstanceBindingRequest) UnmarshalJSON(src []by
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

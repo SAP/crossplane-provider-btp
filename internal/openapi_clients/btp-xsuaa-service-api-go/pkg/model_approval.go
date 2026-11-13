@@ -26,7 +26,10 @@ type Approval struct {
 	Status *string `json:"status,omitempty"`
 	LastUpdatedAt *time.Time `json:"lastUpdatedAt,omitempty"`
 	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _Approval Approval
 
 // NewApproval instantiates a new Approval object
 // This constructor will assign default values to properties that have it defined,
@@ -265,7 +268,38 @@ func (o Approval) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.ExpiresAt) {
 		toSerialize["expiresAt"] = o.ExpiresAt
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *Approval) UnmarshalJSON(data []byte) (err error) {
+	varApproval := _Approval{}
+
+	err = json.Unmarshal(data, &varApproval)
+
+	if err != nil {
+		return err
+	}
+
+	*o = Approval(varApproval)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "userId")
+		delete(additionalProperties, "clientId")
+		delete(additionalProperties, "scope")
+		delete(additionalProperties, "status")
+		delete(additionalProperties, "lastUpdatedAt")
+		delete(additionalProperties, "expiresAt")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableApproval struct {

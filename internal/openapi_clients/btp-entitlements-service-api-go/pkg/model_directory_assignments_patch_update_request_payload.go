@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -33,6 +32,7 @@ type DirectoryAssignmentsPatchUpdateRequestPayload struct {
 	PlanUniqueIdentifier *string `json:"planUniqueIdentifier,omitempty"`
 	// The technical name of the entitlement (service, application, environment) to assign.
 	Service string `json:"service"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _DirectoryAssignmentsPatchUpdateRequestPayload DirectoryAssignmentsPatchUpdateRequestPayload
@@ -256,6 +256,11 @@ func (o DirectoryAssignmentsPatchUpdateRequestPayload) ToMap() (map[string]inter
 		toSerialize["planUniqueIdentifier"] = o.PlanUniqueIdentifier
 	}
 	toSerialize["service"] = o.Service
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -284,15 +289,25 @@ func (o *DirectoryAssignmentsPatchUpdateRequestPayload) UnmarshalJSON(data []byt
 
 	varDirectoryAssignmentsPatchUpdateRequestPayload := _DirectoryAssignmentsPatchUpdateRequestPayload{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varDirectoryAssignmentsPatchUpdateRequestPayload)
+	err = json.Unmarshal(data, &varDirectoryAssignmentsPatchUpdateRequestPayload)
 
 	if err != nil {
 		return err
 	}
 
 	*o = DirectoryAssignmentsPatchUpdateRequestPayload(varDirectoryAssignmentsPatchUpdateRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "autoAssign")
+		delete(additionalProperties, "autoDistributeAmount")
+		delete(additionalProperties, "distribute")
+		delete(additionalProperties, "plan")
+		delete(additionalProperties, "planUniqueIdentifier")
+		delete(additionalProperties, "service")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

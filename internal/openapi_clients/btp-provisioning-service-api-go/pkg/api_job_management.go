@@ -19,17 +19,16 @@ import (
 	"strings"
 )
 
-
 type JobManagementAPI interface {
 
 	/*
-	GetStatus Get job status
+		GetStatus Get job status
 
-	Get information for a specified job, including its ID and its current status.<br/><br/>Required scope: $XSAPPNAME.job.read
+		Get information for a specified job, including its ID and its current status.<br/><br/>Required scope: $XSAPPNAME.job.read
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param jobInstanceIdOrUniqueId ID of the job for which to get status
-	@return ApiGetStatusRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param jobInstanceIdOrUniqueId ID of the job for which to get status
+		@return ApiGetStatusRequest
 	*/
 	GetStatus(ctx context.Context, jobInstanceIdOrUniqueId string) ApiGetStatusRequest
 
@@ -42,8 +41,8 @@ type JobManagementAPI interface {
 type JobManagementAPIService service
 
 type ApiGetStatusRequest struct {
-	ctx context.Context
-	ApiService JobManagementAPI
+	ctx                     context.Context
+	ApiService              JobManagementAPI
 	jobInstanceIdOrUniqueId string
 }
 
@@ -56,26 +55,27 @@ GetStatus Get job status
 
 Get information for a specified job, including its ID and its current status.<br/><br/>Required scope: $XSAPPNAME.job.read
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param jobInstanceIdOrUniqueId ID of the job for which to get status
- @return ApiGetStatusRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param jobInstanceIdOrUniqueId ID of the job for which to get status
+	@return ApiGetStatusRequest
 */
 func (a *JobManagementAPIService) GetStatus(ctx context.Context, jobInstanceIdOrUniqueId string) ApiGetStatusRequest {
 	return ApiGetStatusRequest{
-		ApiService: a,
-		ctx: ctx,
+		ApiService:              a,
+		ctx:                     ctx,
 		jobInstanceIdOrUniqueId: jobInstanceIdOrUniqueId,
 	}
 }
 
 // Execute executes the request
-//  @return JobStatusResponseObject
+//
+//	@return JobStatusResponseObject
 func (a *JobManagementAPIService) GetStatusExecute(r ApiGetStatusRequest) (*JobStatusResponseObject, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *JobStatusResponseObject
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *JobStatusResponseObject
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "JobManagementAPIService.GetStatus")
@@ -136,8 +136,8 @@ func (a *JobManagementAPIService) GetStatusExecute(r ApiGetStatusRequest) (*JobS
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
@@ -147,8 +147,8 @@ func (a *JobManagementAPIService) GetStatusExecute(r ApiGetStatusRequest) (*JobS
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
@@ -158,8 +158,8 @@ func (a *JobManagementAPIService) GetStatusExecute(r ApiGetStatusRequest) (*JobS
 				newErr.error = err.Error()
 				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}

@@ -27,7 +27,10 @@ type SaasAsyncSubscriptionRequestPayload struct {
 	Status *string `json:"status,omitempty"`
 	// The URL the multitenant application is exposing for a subscription.
 	SubscriptionUrl *string `json:"subscriptionUrl,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _SaasAsyncSubscriptionRequestPayload SaasAsyncSubscriptionRequestPayload
 
 // NewSaasAsyncSubscriptionRequestPayload instantiates a new SaasAsyncSubscriptionRequestPayload object
 // This constructor will assign default values to properties that have it defined,
@@ -196,7 +199,36 @@ func (o SaasAsyncSubscriptionRequestPayload) ToMap() (map[string]interface{}, er
 	if !IsNil(o.SubscriptionUrl) {
 		toSerialize["subscriptionUrl"] = o.SubscriptionUrl
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *SaasAsyncSubscriptionRequestPayload) UnmarshalJSON(data []byte) (err error) {
+	varSaasAsyncSubscriptionRequestPayload := _SaasAsyncSubscriptionRequestPayload{}
+
+	err = json.Unmarshal(data, &varSaasAsyncSubscriptionRequestPayload)
+
+	if err != nil {
+		return err
+	}
+
+	*o = SaasAsyncSubscriptionRequestPayload(varSaasAsyncSubscriptionRequestPayload)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "additionalOutput")
+		delete(additionalProperties, "message")
+		delete(additionalProperties, "status")
+		delete(additionalProperties, "subscriptionUrl")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableSaasAsyncSubscriptionRequestPayload struct {

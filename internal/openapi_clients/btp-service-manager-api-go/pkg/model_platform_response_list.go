@@ -25,7 +25,10 @@ type PlatformResponseList struct {
 	NumItems *int32 `json:"num_items,omitempty"`
 	// Use this token when you call the API again to get more platforms associated with your subaccount.</br> The token field indicates that the total number of platforms to view in the list (num_items) is larger than the defined maximum number of platforms to be returned after a single API call (max_items). </br> If the field is not present, either all the platforms were included in the first response, or you have reached the end of the list.
 	Token *string `json:"token,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _PlatformResponseList PlatformResponseList
 
 // NewPlatformResponseList instantiates a new PlatformResponseList object
 // This constructor will assign default values to properties that have it defined,
@@ -159,7 +162,35 @@ func (o PlatformResponseList) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Token) {
 		toSerialize["token"] = o.Token
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *PlatformResponseList) UnmarshalJSON(data []byte) (err error) {
+	varPlatformResponseList := _PlatformResponseList{}
+
+	err = json.Unmarshal(data, &varPlatformResponseList)
+
+	if err != nil {
+		return err
+	}
+
+	*o = PlatformResponseList(varPlatformResponseList)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "items")
+		delete(additionalProperties, "num_items")
+		delete(additionalProperties, "token")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullablePlatformResponseList struct {
