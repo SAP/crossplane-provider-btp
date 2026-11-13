@@ -24,6 +24,7 @@ import (
 	xpv1 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	accountv1alpha1 "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
+	providerTest "github.com/sap/crossplane-provider-btp/test"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,6 +57,9 @@ func TestSubaccountApiCredentialConditionalAdoption(t *testing.T) {
 	const timeout = 8 * time.Minute
 	feature := features.New("SubaccountApiCredential Conditional Adoption").
 		Setup(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+			// testing cleanup runs even when setup/assertion calls FailNow or the
+			// framework's fail-fast path skips feature Teardown.
+			providerTest.RegisterCredentialAdoptionCleanup(t, ctx, credentialAdoptionCleanupActionsE2E(cfg, manifestDir)...)
 			resources.ImportResources(ctx, t, cfg, crsPath(manifestDir))
 			waitForResource(&accountv1alpha1.Subaccount{
 				ObjectMeta: metav1.ObjectMeta{Name: "sac-orphan-subaccount", Namespace: cfg.Namespace()},
@@ -175,41 +179,7 @@ func TestSubaccountApiCredentialConditionalAdoption(t *testing.T) {
 			waitForIncompleteCredentialAdoptionE2E(ctx, t, cfg, certificateAdopter.Name, timeout)
 
 			return ctx
-		}).Teardown(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-		// Remove the Observe-only MRs before deleting the source credential.
-		for _, name := range []string{
-			"sac-adopt-init-complete-" + BUILD_ID,
-			"sac-adopt-incomplete-" + BUILD_ID,
-			"sac-adopt-certificate-input-" + BUILD_ID,
-			"sac-adopt-complete-" + BUILD_ID,
-		} {
-			mr := &securityv1alpha1.SubaccountApiCredential{}
-			if err := cfg.Client().Resources().Get(ctx, name, cfg.Namespace(), mr); err == nil {
-				AwaitResourceDeletionOrFail(ctx, t, cfg, mr, wait.WithTimeout(3*time.Minute))
-			}
-		}
-		for _, name := range []string{"sac-adopt-init-source-" + BUILD_ID, "sac-adopt-source-" + BUILD_ID} {
-			source := &securityv1alpha1.SubaccountApiCredential{}
-			if err := cfg.Client().Resources().Get(ctx, name, cfg.Namespace(), source); err == nil {
-				AwaitResourceDeletionOrFail(ctx, t, cfg, source, wait.WithTimeout(5*time.Minute))
-			}
-		}
-		for _, name := range []string{
-			"sac-adopt-source-secret-" + BUILD_ID,
-			"sac-adopt-init-source-" + BUILD_ID + "-secret",
-			"sac-adopt-init-complete-" + BUILD_ID + "-secret",
-			"sac-adopt-complete-" + BUILD_ID + "-secret",
-			"sac-adopt-incomplete-" + BUILD_ID + "-secret",
-			"sac-adopt-certificate-input-" + BUILD_ID + "-secret",
-		} {
-			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: cfg.Namespace()}}
-			if err := cfg.Client().Resources().Delete(ctx, secret); err != nil && !errors.IsNotFound(err) {
-				t.Errorf("delete test connection Secret %q: %v", name, err)
-			}
-		}
-		DeleteResourcesIgnoreMissing(ctx, t, cfg, crsPath(manifestDir), wait.WithTimeout(5*time.Minute))
-		return ctx
-	}).Feature()
+		}).Feature()
 
 	testenv.Test(t, feature)
 }
