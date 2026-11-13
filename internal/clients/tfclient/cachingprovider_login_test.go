@@ -19,7 +19,7 @@ func TestCachingWrapper_ConcurrentReconciles_OneLogin(t *testing.T) {
 	const N = 100
 	fake := &fakeBTPCLI{password: "correct-pw"}
 	srv := fake.start(t)
-	p := newTerraformProvider(tfprovider.New(), true)
+	p := newTerraformProvider(tfprovider.New(), poolConfig{size: 1})
 	ctx := context.Background()
 
 	var wg sync.WaitGroup
@@ -50,7 +50,7 @@ func TestCachingWrapper_TwoCredentials_TwoLogins(t *testing.T) {
 	const N = 50
 	fake := &fakeBTPCLI{password: "correct-pw"}
 	srv := fake.start(t)
-	p := newTerraformProvider(tfprovider.New(), true)
+	p := newTerraformProvider(tfprovider.New(), poolConfig{size: 1})
 	ctx := context.Background()
 
 	var wg sync.WaitGroup
@@ -75,5 +75,33 @@ func TestCachingWrapper_TwoCredentials_TwoLogins(t *testing.T) {
 	}
 	if got := fake.logins.Load(); got != 2 {
 		t.Errorf("btp-CLI logins = %d, want 2 (one per credential set)", got)
+	}
+}
+
+// An N-slot pool caps logins at N for one credential set, however many concurrent
+// reconciles hit it.
+func TestPool_ConcurrentReconciles_LoginsCappedAtPoolSize(t *testing.T) {
+	t.Parallel()
+	const (
+		M = 100
+		N = 4
+	)
+	fake := &fakeBTPCLI{password: "correct-pw"}
+	srv := fake.start(t)
+	p := newTerraformProvider(tfprovider.New(), poolConfig{size: N})
+	ctx := context.Background()
+
+	var wg sync.WaitGroup
+	for i := 0; i < M; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = noForkConfigureOnce(ctx, p, srv.URL, "correct-pw")
+		}()
+	}
+	wg.Wait()
+
+	if got := fake.logins.Load(); got != N {
+		t.Errorf("btp-CLI logins = %d, want %d (pool caps %d reconciles)", got, N, M)
 	}
 }

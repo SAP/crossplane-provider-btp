@@ -49,6 +49,12 @@ func (ac *APICallbacks) Destroy(name types.NamespacedName, _ bool) terraform.Cal
 // resource via SaveConditionsFn.
 func (ac *APICallbacks) callback(op string, name types.NamespacedName) terraform.CallbackFn {
 	return func(err error, ctx context.Context) error {
+		result := "success"
+		if err != nil {
+			result = "error"
+		}
+		asyncCallbacks.WithLabelValues(op, result).Inc()
+
 		uErr := ac.saveCallbackFn(ctx, ac.kube, name, ujresource.LastAsyncOperationCondition(err), ujresource.AsyncOperationFinishedCondition())
 		if uErr == nil {
 			return nil
