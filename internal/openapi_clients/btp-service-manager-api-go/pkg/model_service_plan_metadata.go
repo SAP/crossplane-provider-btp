@@ -25,7 +25,10 @@ type ServicePlanMetadata struct {
 	SupportedMinOSBVersion *string `json:"supportedMinOSBVersion,omitempty"`
 	// Platforms supported by the service plan.
 	SupportedPlatforms []string `json:"supportedPlatforms,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServicePlanMetadata ServicePlanMetadata
 
 // NewServicePlanMetadata instantiates a new ServicePlanMetadata object
 // This constructor will assign default values to properties that have it defined,
@@ -159,7 +162,35 @@ func (o ServicePlanMetadata) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.SupportedPlatforms) {
 		toSerialize["supportedPlatforms"] = o.SupportedPlatforms
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServicePlanMetadata) UnmarshalJSON(data []byte) (err error) {
+	varServicePlanMetadata := _ServicePlanMetadata{}
+
+	err = json.Unmarshal(data, &varServicePlanMetadata)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServicePlanMetadata(varServicePlanMetadata)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "supportedMaxOSBVersion")
+		delete(additionalProperties, "supportedMinOSBVersion")
+		delete(additionalProperties, "supportedPlatforms")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServicePlanMetadata struct {

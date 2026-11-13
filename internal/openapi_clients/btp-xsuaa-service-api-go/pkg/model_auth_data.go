@@ -22,7 +22,10 @@ type AuthData struct {
 	IdentityZone *string `json:"identityZone,omitempty"`
 	Roles []Role `json:"roles,omitempty"`
 	RoleCollections []RoleCollection `json:"roleCollections,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _AuthData AuthData
 
 // NewAuthData instantiates a new AuthData object
 // This constructor will assign default values to properties that have it defined,
@@ -156,7 +159,35 @@ func (o AuthData) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.RoleCollections) {
 		toSerialize["roleCollections"] = o.RoleCollections
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *AuthData) UnmarshalJSON(data []byte) (err error) {
+	varAuthData := _AuthData{}
+
+	err = json.Unmarshal(data, &varAuthData)
+
+	if err != nil {
+		return err
+	}
+
+	*o = AuthData(varAuthData)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "identityZone")
+		delete(additionalProperties, "roles")
+		delete(additionalProperties, "roleCollections")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableAuthData struct {

@@ -396,12 +396,14 @@ func (a *ApplicationAPIService) GetAppByTokenExecute(r ApplicationAPIGetAppByTok
 		parameterAddToHeaderOrQuery(localVarQueryParams, "listSubscriptions", r.listSubscriptions, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "listSubscriptions", defaultValue, "form", "")
 		r.listSubscriptions = &defaultValue
 	}
 	if r.listCloneSubscriptions != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "listCloneSubscriptions", r.listCloneSubscriptions, "form", "")
 	} else {
 		var defaultValue bool = false
+		parameterAddToHeaderOrQuery(localVarQueryParams, "listCloneSubscriptions", defaultValue, "form", "")
 		r.listCloneSubscriptions = &defaultValue
 	}
 	// to determine the Content-Type header

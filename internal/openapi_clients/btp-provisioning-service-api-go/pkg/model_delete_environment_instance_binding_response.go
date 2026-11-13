@@ -24,8 +24,11 @@ type DeleteEnvironmentInstanceBindingResponse struct {
 	// The plan ID of the associated environment instance.
 	PlanId *string `json:"planId,omitempty"`
 	// The associated environment instance ID.
-	ServiceId *string `json:"serviceId,omitempty"`
+	ServiceId            *string `json:"serviceId,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _DeleteEnvironmentInstanceBindingResponse DeleteEnvironmentInstanceBindingResponse
 
 // NewDeleteEnvironmentInstanceBindingResponse instantiates a new DeleteEnvironmentInstanceBindingResponse object
 // This constructor will assign default values to properties that have it defined,
@@ -141,7 +144,7 @@ func (o *DeleteEnvironmentInstanceBindingResponse) SetServiceId(v string) {
 }
 
 func (o DeleteEnvironmentInstanceBindingResponse) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,7 +162,35 @@ func (o DeleteEnvironmentInstanceBindingResponse) ToMap() (map[string]interface{
 	if !IsNil(o.ServiceId) {
 		toSerialize["serviceId"] = o.ServiceId
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *DeleteEnvironmentInstanceBindingResponse) UnmarshalJSON(data []byte) (err error) {
+	varDeleteEnvironmentInstanceBindingResponse := _DeleteEnvironmentInstanceBindingResponse{}
+
+	err = json.Unmarshal(data, &varDeleteEnvironmentInstanceBindingResponse)
+
+	if err != nil {
+		return err
+	}
+
+	*o = DeleteEnvironmentInstanceBindingResponse(varDeleteEnvironmentInstanceBindingResponse)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "bindingId")
+		delete(additionalProperties, "planId")
+		delete(additionalProperties, "serviceId")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableDeleteEnvironmentInstanceBindingResponse struct {
@@ -197,5 +228,3 @@ func (v *NullableDeleteEnvironmentInstanceBindingResponse) UnmarshalJSON(src []b
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

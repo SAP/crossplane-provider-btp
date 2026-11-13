@@ -41,7 +41,10 @@ type ServiceBindingResponseObject struct {
 	ServiceInstanceId *string `json:"service_instance_id,omitempty"`
 	// The last time the binding was updated.<br/> In ISO 8601 format.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServiceBindingResponseObject ServiceBindingResponseObject
 
 // NewServiceBindingResponseObject instantiates a new ServiceBindingResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -455,7 +458,43 @@ func (o ServiceBindingResponseObject) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updated_at"] = o.UpdatedAt
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServiceBindingResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varServiceBindingResponseObject := _ServiceBindingResponseObject{}
+
+	err = json.Unmarshal(data, &varServiceBindingResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServiceBindingResponseObject(varServiceBindingResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "bind_resource")
+		delete(additionalProperties, "context")
+		delete(additionalProperties, "created_at")
+		delete(additionalProperties, "credentials")
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "labels")
+		delete(additionalProperties, "last_operation")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "ready")
+		delete(additionalProperties, "service_instance_id")
+		delete(additionalProperties, "updated_at")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServiceBindingResponseObject struct {

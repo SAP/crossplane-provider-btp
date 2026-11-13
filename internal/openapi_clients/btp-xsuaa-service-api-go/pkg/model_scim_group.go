@@ -27,7 +27,10 @@ type ScimGroup struct {
 	Description *string `json:"description,omitempty"`
 	Members []ScimGroupMember `json:"members,omitempty"`
 	Schemas []string `json:"schemas,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ScimGroup ScimGroup
 
 // NewScimGroup instantiates a new ScimGroup object
 // This constructor will assign default values to properties that have it defined,
@@ -336,7 +339,40 @@ func (o ScimGroup) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Schemas) {
 		toSerialize["schemas"] = o.Schemas
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ScimGroup) UnmarshalJSON(data []byte) (err error) {
+	varScimGroup := _ScimGroup{}
+
+	err = json.Unmarshal(data, &varScimGroup)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ScimGroup(varScimGroup)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "id")
+		delete(additionalProperties, "externalId")
+		delete(additionalProperties, "meta")
+		delete(additionalProperties, "displayName")
+		delete(additionalProperties, "zoneId")
+		delete(additionalProperties, "description")
+		delete(additionalProperties, "members")
+		delete(additionalProperties, "schemas")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableScimGroup struct {
