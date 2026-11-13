@@ -23,7 +23,10 @@ type RoleReference struct {
 	RoleTemplateName *string `json:"roleTemplateName,omitempty"`
 	Name *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _RoleReference RoleReference
 
 // NewRoleReference instantiates a new RoleReference object
 // This constructor will assign default values to properties that have it defined,
@@ -192,7 +195,36 @@ func (o RoleReference) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *RoleReference) UnmarshalJSON(data []byte) (err error) {
+	varRoleReference := _RoleReference{}
+
+	err = json.Unmarshal(data, &varRoleReference)
+
+	if err != nil {
+		return err
+	}
+
+	*o = RoleReference(varRoleReference)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "roleTemplateAppId")
+		delete(additionalProperties, "roleTemplateName")
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "description")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableRoleReference struct {

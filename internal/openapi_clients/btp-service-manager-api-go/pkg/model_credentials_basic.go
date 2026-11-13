@@ -21,7 +21,10 @@ var _ MappedNullable = &CredentialsBasic{}
 type CredentialsBasic struct {
 	Password *string `json:"password,omitempty"`
 	Username *string `json:"username,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _CredentialsBasic CredentialsBasic
 
 // NewCredentialsBasic instantiates a new CredentialsBasic object
 // This constructor will assign default values to properties that have it defined,
@@ -120,7 +123,34 @@ func (o CredentialsBasic) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Username) {
 		toSerialize["username"] = o.Username
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *CredentialsBasic) UnmarshalJSON(data []byte) (err error) {
+	varCredentialsBasic := _CredentialsBasic{}
+
+	err = json.Unmarshal(data, &varCredentialsBasic)
+
+	if err != nil {
+		return err
+	}
+
+	*o = CredentialsBasic(varCredentialsBasic)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "password")
+		delete(additionalProperties, "username")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableCredentialsBasic struct {

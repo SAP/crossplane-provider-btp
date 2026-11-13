@@ -21,7 +21,10 @@ var _ MappedNullable = &EntitledApplicationsResponseCollection{}
 type EntitledApplicationsResponseCollection struct {
 	// The response  list of all the multitenant applications to which a specified subaccount is entitled to subscribe.
 	Applications []EntitledApplicationsResponseObject `json:"applications,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _EntitledApplicationsResponseCollection EntitledApplicationsResponseCollection
 
 // NewEntitledApplicationsResponseCollection instantiates a new EntitledApplicationsResponseCollection object
 // This constructor will assign default values to properties that have it defined,
@@ -85,7 +88,33 @@ func (o EntitledApplicationsResponseCollection) ToMap() (map[string]interface{},
 	if !IsNil(o.Applications) {
 		toSerialize["applications"] = o.Applications
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *EntitledApplicationsResponseCollection) UnmarshalJSON(data []byte) (err error) {
+	varEntitledApplicationsResponseCollection := _EntitledApplicationsResponseCollection{}
+
+	err = json.Unmarshal(data, &varEntitledApplicationsResponseCollection)
+
+	if err != nil {
+		return err
+	}
+
+	*o = EntitledApplicationsResponseCollection(varEntitledApplicationsResponseCollection)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "applications")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableEntitledApplicationsResponseCollection struct {
