@@ -20,6 +20,7 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
 - [Supported Resource Kinds](#supported-resource-kinds)
   - [Subaccount](#subaccount)
   - [Entitlement](#entitlement)
+  - [Directory Entitlement](#directory-entitlement)
   - [Service Instance](#service-instance)
   - [Cloud Foundry Environment](#cloud-foundry-environment)
   - [Kyma Environment](#kyma-environment)
@@ -244,6 +245,38 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind subacco
 
 # Export all subaccounts matching a pattern
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind subaccount --subaccount '.*dev.*'
+```
+
+---
+
+### Directory Entitlement
+
+Exports service plan entitlements assigned to directories using `btp list accounts/entitlement --directory <GUID>`.
+
+**Kind name:** `directoryentitlement`
+
+**CLI flags:**
+| Flag | Description |
+|------|-------------|
+| `--directory <GUID,...>` | Required source directory GUIDs; independent of `--subaccount` |
+| `--directoryentitlement <value>` | Exact compound ID (`directoryID/serviceName/planName`) or regex matching `serviceName/planName` |
+
+Omit `--directoryentitlement` for interactive entitlement selection, or use `'.*'` to export every plan in the specified directories.
+
+**Notes:**
+- Only the directory's own `entitledServices` are exported; allocations to child subaccounts/directories in `assignedServices` are excluded.
+- Numeric plan categories (`SERVICE`, `QUOTA_BASED_APPLICATION`, `PLATFORM`, `ENVIRONMENT`) preserve `amount` and available `autoDistributeAmount`, including zero values. Non-numeric plans omit these fields because numeric quota is not applicable. `autoAssign` and the plan's unique identifier are preserved.
+- `distribute` is omitted because the CLI does not expose this write-time action. Add it explicitly if you want to distribute entitlements to existing subaccounts when enabling management.
+- Manifests use `spec.forProvider.directoryId` until Directory export (W2-1) is available. With `--resolve-references`, a warning is emitted once per directory-entitlement export to explain this fallback; the manifests remain usable.
+- `--all` includes this kind but still requires `--directory` for its directory scope. Without it, directory entitlement export emits a warning and the other kinds continue.
+
+**Example:**
+```bash
+go run ./cmd/exporter export \
+  --kind directoryentitlement \
+  --directory '<directory-guid>' \
+  --directoryentitlement '.*' \
+  -o directory-entitlements.yaml
 ```
 
 ---

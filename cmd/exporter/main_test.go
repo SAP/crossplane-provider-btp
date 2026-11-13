@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestExportCmdSelectiveInteractiveExportSelectsSubaccountBeforeKindsAndChildResources(t *testing.T) {
+func TestExportCmdSelectiveInteractiveExportSelectsKindsBeforeSourceAndChildResources(t *testing.T) {
 	viper.Reset()
 	t.Cleanup(viper.Reset)
 
@@ -48,7 +48,47 @@ func TestExportCmdSelectiveInteractiveExportSelectsSubaccountBeforeKindsAndChild
 	}
 
 	require.NoError(t, exportCmd(context.Background(), noopEventHandler{}))
-	require.Equal(t, []string{"subaccount selection", "kind selection", "child resource selection"}, operations)
+	require.Equal(t, []string{"kind selection", "subaccount selection", "child resource selection"}, operations)
+}
+
+func TestExportCmdDirectoryScope(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	originalGetSelectedSubaccountCount := getSelectedSubaccountCount
+	originalSelectResourceKinds := selectResourceKinds
+	originalResourceExportFn := resourceExportFn
+	t.Cleanup(func() {
+		getSelectedSubaccountCount = originalGetSelectedSubaccountCount
+		selectResourceKinds = originalSelectResourceKinds
+		resourceExportFn = originalResourceExportFn
+	})
+	for _, tt := range []struct {
+		name                string
+		kinds               []string
+		wantSubaccountCalls int
+	}{
+		{name: "directory only", kinds: []string{"directoryentitlement"}},
+		{name: "mixed scope", kinds: []string{"directoryentitlement", "entitlement", "subaccount"}, wantSubaccountCalls: 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			getSelectedSubaccountCount = func(context.Context, *btpcli.BtpCli) (int, error) {
+				calls++
+				return 1, nil
+			}
+			selectResourceKinds = func(context.Context) ([]string, error) { return tt.kinds, nil }
+			var exported []string
+			resourceExportFn = func(kind string) func(context.Context, *btpcli.BtpCli, export.EventHandler, resources.Options) error {
+				return func(context.Context, *btpcli.BtpCli, export.EventHandler, resources.Options) error {
+					exported = append(exported, kind)
+					return nil
+				}
+			}
+			require.NoError(t, exportCmd(context.Background(), noopEventHandler{}))
+			require.Equal(t, tt.wantSubaccountCalls, calls)
+			require.Equal(t, tt.kinds, exported)
+		})
+	}
 }
 
 func TestExportCmdSelectiveNonInteractiveExportUsesConfiguredKinds(t *testing.T) {
