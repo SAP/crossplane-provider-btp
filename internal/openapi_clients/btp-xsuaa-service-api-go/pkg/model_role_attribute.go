@@ -12,7 +12,6 @@ package openapi
 
 import (
 	"encoding/json"
-	"bytes"
 	"fmt"
 )
 
@@ -26,6 +25,7 @@ type RoleAttribute struct {
 	AttributeValues []string `json:"attributeValues"`
 	ValueRequired *bool `json:"valueRequired,omitempty"`
 	Description *string `json:"description,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _RoleAttribute RoleAttribute
@@ -205,6 +205,11 @@ func (o RoleAttribute) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -234,15 +239,24 @@ func (o *RoleAttribute) UnmarshalJSON(data []byte) (err error) {
 
 	varRoleAttribute := _RoleAttribute{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varRoleAttribute)
+	err = json.Unmarshal(data, &varRoleAttribute)
 
 	if err != nil {
 		return err
 	}
 
 	*o = RoleAttribute(varRoleAttribute)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "attributeName")
+		delete(additionalProperties, "attributeValueOrigin")
+		delete(additionalProperties, "attributeValues")
+		delete(additionalProperties, "valueRequired")
+		delete(additionalProperties, "description")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

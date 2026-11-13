@@ -62,7 +62,7 @@ func cfgGA(t *testing.T, user, ga string) tfsdk.Config {
 
 func TestCache(t *testing.T) {
 	stub := &stubProvider{}
-	p := newTerraformProvider(stub, true)
+	p := newTerraformProvider(stub)
 	ctx := context.Background()
 
 	var r1 provider.ConfigureResponse
@@ -98,7 +98,7 @@ func (s *blockingProvider) Configure(_ context.Context, _ provider.ConfigureRequ
 
 func TestConcurrentSameKeyLogsInOnce(t *testing.T) {
 	stub := &stubProvider{}
-	p := newTerraformProvider(stub, true)
+	p := newTerraformProvider(stub)
 	ctx := context.Background()
 
 	var wg sync.WaitGroup
@@ -119,7 +119,7 @@ func TestConcurrentSameKeyLogsInOnce(t *testing.T) {
 
 func TestDifferentKeysDoNotSerialize(t *testing.T) {
 	stub := &blockingProvider{release: make(chan struct{})}
-	p := newTerraformProvider(stub, true)
+	p := newTerraformProvider(stub)
 	ctx := context.Background()
 
 	// Hold alice's login open; bob must still reach its own Configure.
@@ -148,7 +148,7 @@ func TestDifferentKeysDoNotSerialize(t *testing.T) {
 }
 
 func TestOptionalInterfacePreserved(t *testing.T) {
-	w := newTerraformProvider(tfprovider.New(), true)
+	w := newTerraformProvider(tfprovider.New())
 	if _, ok := interface{}(w).(provider.ProviderWithFunctions); !ok {
 		t.Fatal("wrapper lost ProviderWithFunctions")
 	}
@@ -162,7 +162,7 @@ func TestOptionalInterfacePreserved(t *testing.T) {
 
 func TestEvictBySubdomain(t *testing.T) {
 	stub := &stubProvider{}
-	p := newTerraformProvider(stub, true)
+	p := newTerraformProvider(stub)
 	ctx := context.Background()
 
 	var r provider.ConfigureResponse
@@ -186,7 +186,7 @@ func TestEvictBySubdomain(t *testing.T) {
 
 func TestEvictAll(t *testing.T) {
 	stub := &stubProvider{}
-	p := newTerraformProvider(stub, true)
+	p := newTerraformProvider(stub)
 	ctx := context.Background()
 
 	var r provider.ConfigureResponse

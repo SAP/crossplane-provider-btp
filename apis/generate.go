@@ -36,17 +36,17 @@ limitations under the License.
 // Run Upjet generator
 //go:generate go run ../cmd/generator/main.go ..
 
-// Inject custom backoff settings on top of generated controllers
-//go:generate ../hack/helpers/ctrl_inject_backoff.sh
-
-// Run e2e test generator
-//go:generate go run ../test/e2e/generator/main.go ..
+// Inject the provider's controller options into generated controllers
+//go:generate ../hack/helpers/ctrl_inject_options.sh
 
 // Generate deepcopy methodsets and CRD manifests
 //go:generate go run -tags generate sigs.k8s.io/controller-tools/cmd/controller-gen object:headerFile=../hack/boilerplate.go.txt paths=./... crd:crdVersions=v1,allowDangerousTypes=true output:artifacts:config=../package/crds
 
 // Generate crossplane-runtime methodsets (resource.Claim, etc)
 //go:generate go run -tags generate github.com/crossplane/crossplane-tools/cmd/angryjet generate-methodsets --header-file=../hack/boilerplate.go.txt ./...
+
+// Run e2e test generator
+//go:generate go run ../test/e2e/generator/main.go ..
 
 // disables CRD usage, by taking reference to controller folder relative to internal/controller, removing its controller and usages as well as the package file
 //go:generate ../hack/helpers/disable_crds.sh account/subaccountserviceinstance account/subaccountservicebinding

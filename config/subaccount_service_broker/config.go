@@ -65,7 +65,7 @@ func Configure(p *config.Provider) {
 		r.ExternalName.GetExternalNameFn = getBrokerExternalName
 
 		r.References["subaccount_id"] = config.Reference{
-			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount",
+			Type:              "github.com/sap/crossplane-provider-btp/apis/account/v1alpha1.Subaccount", //nolint:staticcheck // hand-written type, not resolvable via TerraformName
 			Extractor:         "github.com/crossplane/crossplane-runtime/v2/pkg/reference.ExternalName()",
 			RefFieldName:      "SubaccountRef",
 			SelectorFieldName: "SubaccountSelector",

@@ -56,13 +56,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobStateResponseObject'
+                $ref: "#/components/schemas/JobStateResponseObject"
           description: OK
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -72,7 +72,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -91,7 +91,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get job errorStatusCode
       tags:
@@ -122,7 +122,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -132,13 +132,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Async job can not be stopped while not running
         "429":
           description: Rate Limit Exceeded
@@ -157,7 +157,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Graceful termination of an async job
       tags:
@@ -181,13 +181,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobStatusResponseObject'
+                $ref: "#/components/schemas/JobStatusResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad request
         "401":
           description: Not Authorized
@@ -197,7 +197,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -216,7 +216,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get job status
       tags:
@@ -243,7 +243,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistrationDetailsResponseObject'
+                $ref: "#/components/schemas/RegistrationDetailsResponseObject"
           description: Ok
         "204":
           description: No Content
@@ -251,7 +251,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -261,7 +261,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -387,7 +387,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubscriptionsListResponseObject'
+                $ref: "#/components/schemas/SubscriptionsListResponseObject"
           description: Ok
         "400":
           description: Bad Request
@@ -399,7 +399,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -418,7 +418,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get application subscriptions
       tags:
@@ -505,7 +505,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/batchUpdateXsuaaSubscriptionDependencies'
+              $ref: "#/components/schemas/batchUpdateXsuaaSubscriptionDependencies"
         required: true
       responses:
         "200":
@@ -542,7 +542,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "409":
           content:
@@ -646,7 +646,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -760,7 +760,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateApplicationDependenciesRequestPayload'
+              $ref: "#/components/schemas/UpdateApplicationDependenciesRequestPayload"
       responses:
         "200":
           content:
@@ -796,7 +796,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "409":
           content:
@@ -808,7 +808,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Too many requests
         "500":
           content:
@@ -841,13 +841,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EntitledApplicationsResponseCollection'
+                $ref: "#/components/schemas/EntitledApplicationsResponseCollection"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -857,7 +857,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -876,7 +876,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get all entitled multitenant applications
       tags:
@@ -929,7 +929,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EntitledApplicationsResponseObject'
+                $ref: "#/components/schemas/EntitledApplicationsResponseObject"
           description: Ok
         "204":
           description: No Content
@@ -937,7 +937,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -947,7 +947,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -966,7 +966,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get details of a multitenant application
       tags:
@@ -1021,7 +1021,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -1031,7 +1031,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "409":
           content:
@@ -1056,7 +1056,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Unsubscribe an application from a subaccount
       tags:
@@ -1090,7 +1090,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateSubscriptionRequestPayload'
+              $ref: "#/components/schemas/UpdateSubscriptionRequestPayload"
       responses:
         "202":
           description: Accepted
@@ -1098,7 +1098,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -1108,19 +1108,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Conflict
         "422":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Unprocessable Entity
         "429":
           description: Rate Limit Exceeded
@@ -1139,7 +1139,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Update parameters of a multitenant application subscription
       tags:
@@ -1188,7 +1188,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateSubscriptionRequestPayload'
+              $ref: "#/components/schemas/CreateSubscriptionRequestPayload"
       responses:
         "202":
           description: Accepted
@@ -1196,7 +1196,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -1206,13 +1206,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Conflict
         "429":
           description: Rate Limit Exceeded
@@ -1231,7 +1231,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Subscribe to an application from a subaccount
       tags:
@@ -1268,13 +1268,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -1284,7 +1284,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -1303,7 +1303,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Remove all labels from a multitenant application subscription
       tags:
@@ -1338,13 +1338,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -1354,7 +1354,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -1373,7 +1373,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get labels for a multitenant application subscription
       tags:
@@ -1407,20 +1407,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LabelAssignmentRequestPayload'
+              $ref: "#/components/schemas/LabelAssignmentRequestPayload"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LabelsResponseObject'
+                $ref: "#/components/schemas/LabelsResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -1430,7 +1430,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Found
         "429":
           description: Rate Limit Exceeded
@@ -1449,7 +1449,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Assign labels to a multitenant application subscription
       tags:
@@ -1484,13 +1484,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ParamsResponseObject'
+                $ref: "#/components/schemas/ParamsResponseObject"
           description: Ok
         "400":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
         "401":
           description: Not Authorized
@@ -1500,7 +1500,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not Supported
         "429":
           description: Rate Limit Exceeded
@@ -1519,7 +1519,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
       summary: Get subscription parameters
       tags:
@@ -1543,7 +1543,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SaasAsyncSubscriptionRequestPayload'
+              $ref: "#/components/schemas/SaasAsyncSubscriptionRequestPayload"
       responses:
         "200":
           content:
@@ -1588,15 +1588,15 @@ components:
       description: The application resource reference in Unified Services. This object
         includes the name and path of the application resource.
       example:
-        path: path
         groupVersionType:
+          group: group
           type: type
           version: version
-          group: group
         name: name
+        path: path
       properties:
         groupVersionType:
-          $ref: '#/components/schemas/GroupVersionType'
+          $ref: "#/components/schemas/GroupVersionType"
         name:
           type: string
         path:
@@ -1606,42 +1606,42 @@ components:
       description: The list of the requested app subscriptions.
       example:
         amount: 6
-        movedFromSaasProvisioning: true
-        subaccountId: subaccountId
-        code: code
-        appName: appName
-        serviceInstanceId: serviceInstanceId
-        consumerTenantId: consumerTenantId
-        error: error
-        createdOn: createdOn
-        changedOn: changedOn
-        url: url
-        dependencies:
-        - xsappname: xsappname
-          appName: appName
-          appId: appId
-          providerSubaccountID: providerSubaccountID
-          error: error
-          dependencies:
-          - null
-          - null
-        - xsappname: xsappname
-          appName: appName
-          appId: appId
-          providerSubaccountID: providerSubaccountID
-          error: error
-          dependencies:
-          - null
-          - null
-        licenseType: licenseType
-        isConsumerTenantActive: true
-        appNameBeforeMovedFromSaasProvisioning: appNameBeforeMovedFromSaasProvisioning
         appId: appId
-        subdomain: subdomain
+        appName: appName
+        appNameBeforeMovedFromSaasProvisioning: appNameBeforeMovedFromSaasProvisioning
+        changedOn: changedOn
+        code: code
         commercialAppName: commercialAppName
-        subscriptionGUID: subscriptionGUID
-        state: state
+        consumerTenantId: consumerTenantId
+        createdOn: createdOn
+        dependencies:
+        - appId: appId
+          appName: appName
+          dependencies:
+          - null
+          - null
+          error: error
+          providerSubaccountID: providerSubaccountID
+          xsappname: xsappname
+        - appId: appId
+          appName: appName
+          dependencies:
+          - null
+          - null
+          error: error
+          providerSubaccountID: providerSubaccountID
+          xsappname: xsappname
+        error: error
         globalAccountId: globalAccountId
+        isConsumerTenantActive: true
+        licenseType: licenseType
+        movedFromSaasProvisioning: true
+        serviceInstanceId: serviceInstanceId
+        state: state
+        subaccountId: subaccountId
+        subdomain: subdomain
+        subscriptionGUID: subscriptionGUID
+        url: url
       properties:
         amount:
           description: Specifies the ability to use the service plan of the subscribed
@@ -1685,7 +1685,7 @@ components:
           description: Any reuse services used or required by a subscribed application
             and its services.
           items:
-            $ref: '#/components/schemas/DependenciesResponseObject'
+            $ref: "#/components/schemas/DependenciesResponseObject"
           type: array
         error:
           description: "Error description for the following statuses: SUBSCRIBE_FAILED,\
@@ -1733,8 +1733,8 @@ components:
       description: Create the request to subscribe to a multitenant application from
         a subaccount.
       example:
-        subscriptionParams: "{}"
         planName: planName
+        subscriptionParams: {}
       properties:
         planName:
           description: The name of the subscription plan to a multitenant application
@@ -1751,14 +1751,14 @@ components:
       description: Any reuse services used or required by a subscribed application
         and its services.
       example:
-        xsappname: xsappname
-        appName: appName
         appId: appId
-        providerSubaccountID: providerSubaccountID
-        error: error
+        appName: appName
         dependencies:
         - null
         - null
+        error: error
+        providerSubaccountID: providerSubaccountID
+        xsappname: xsappname
       properties:
         appId:
           description: The appId of the master XSUAA instance provided when registering
@@ -1770,7 +1770,7 @@ components:
         dependencies:
           description: The list of relevant dependencies and their descriptions.
           items:
-            $ref: '#/components/schemas/DependenciesResponseObject'
+            $ref: "#/components/schemas/DependenciesResponseObject"
           type: array
         error:
           description: "In case there are errors during dependencies' assignments,\
@@ -1788,8 +1788,8 @@ components:
       description: The response object that contains details about an error in case
         the subscription failed.
       example:
-        errorMessage: errorMessage
         appError: appError
+        errorMessage: errorMessage
       properties:
         appError:
           description: "A response object that contains details about the error an\
@@ -1805,186 +1805,186 @@ components:
     EntitledApplicationsResponseCollection:
       example:
         applications:
-        - metadata:
-            empty: true
-          displayName: displayName
-          categoryDisplayName: categoryDisplayName
-          applicationResource:
-            path: path
-            groupVersionType:
-              type: type
-              version: version
-              group: group
-            name: name
-          description: description
-          planName: planName
-          customerDeveloped: true
+        - additionalPlanFeatures:
+          - additionalPlanFeatures
+          - additionalPlanFeatures
           allowedTargetPlans:
           - allowedTargetPlans
           - allowedTargetPlans
-          supportsGetParameters: true
-          paramsSchema:
-            empty: true
-          platformEntityId: platformEntityId
           appId: appId
-          quota: 1
-          subscribedTenantId: subscribedTenantId
-          commercialAppName: commercialAppName
-          modifiedBy: modifiedBy
-          subscriptionGUID: subscriptionGUID
-          state: IN_PROCESS
-          applicationCoordinates: "{}"
-          globalAccountId: globalAccountId
-          subscriptionError:
-            errorMessage: errorMessage
-            appError: appError
           appName: appName
-          additionalPlanFeatures:
-          - additionalPlanFeatures
-          - additionalPlanFeatures
-          formationSolutionName: formationSolutionName
-          shortDescription: shortDescription
-          incidentTrackingComponent: incidentTrackingComponent
-          supportsParametersUpdates: true
-          labels: "{}"
-          supportsPlanUpdates: true
-          authenticationProvider: XSUAA
-          automationStateMessage: automationStateMessage
-          automationState: PROCESSING
-          createdDate: 0.8008281904610115
-          createdBy: createdBy
-          modifiedDate: 6.027456183070403
-          tenantId: tenantId
-          iconBase64: iconBase64
-          planDescription: planDescription
-          category: category
-          subscriptionId: subscriptionId
-          subscribedSubaccountId: subscribedSubaccountId
-          subscriptionUrl: subscriptionUrl
-        - metadata:
-            empty: true
-          displayName: displayName
-          categoryDisplayName: categoryDisplayName
+          applicationCoordinates: {}
           applicationResource:
-            path: path
             groupVersionType:
+              group: group
               type: type
               version: version
-              group: group
             name: name
-          description: description
-          planName: planName
+            path: path
+          authenticationProvider: XSUAA
+          automationState: PROCESSING
+          automationStateMessage: automationStateMessage
+          category: category
+          categoryDisplayName: categoryDisplayName
+          commercialAppName: commercialAppName
+          createdBy: createdBy
+          createdDate: 0.8008281904610115
           customerDeveloped: true
+          description: description
+          displayName: displayName
+          formationSolutionName: formationSolutionName
+          globalAccountId: globalAccountId
+          iconBase64: iconBase64
+          incidentTrackingComponent: incidentTrackingComponent
+          labels: {}
+          metadata:
+            empty: true
+          modifiedBy: modifiedBy
+          modifiedDate: 6.027456183070403
+          paramsSchema:
+            empty: true
+          planDescription: planDescription
+          planName: planName
+          platformEntityId: platformEntityId
+          quota: 1
+          shortDescription: shortDescription
+          state: IN_PROCESS
+          subscribedSubaccountId: subscribedSubaccountId
+          subscribedTenantId: subscribedTenantId
+          subscriptionError:
+            appError: appError
+            errorMessage: errorMessage
+          subscriptionGUID: subscriptionGUID
+          subscriptionId: subscriptionId
+          subscriptionUrl: subscriptionUrl
+          supportsGetParameters: true
+          supportsParametersUpdates: true
+          supportsPlanUpdates: true
+          tenantId: tenantId
+        - additionalPlanFeatures:
+          - additionalPlanFeatures
+          - additionalPlanFeatures
           allowedTargetPlans:
           - allowedTargetPlans
           - allowedTargetPlans
-          supportsGetParameters: true
+          appId: appId
+          appName: appName
+          applicationCoordinates: {}
+          applicationResource:
+            groupVersionType:
+              group: group
+              type: type
+              version: version
+            name: name
+            path: path
+          authenticationProvider: XSUAA
+          automationState: PROCESSING
+          automationStateMessage: automationStateMessage
+          category: category
+          categoryDisplayName: categoryDisplayName
+          commercialAppName: commercialAppName
+          createdBy: createdBy
+          createdDate: 0.8008281904610115
+          customerDeveloped: true
+          description: description
+          displayName: displayName
+          formationSolutionName: formationSolutionName
+          globalAccountId: globalAccountId
+          iconBase64: iconBase64
+          incidentTrackingComponent: incidentTrackingComponent
+          labels: {}
+          metadata:
+            empty: true
+          modifiedBy: modifiedBy
+          modifiedDate: 6.027456183070403
           paramsSchema:
             empty: true
-          platformEntityId: platformEntityId
-          appId: appId
-          quota: 1
-          subscribedTenantId: subscribedTenantId
-          commercialAppName: commercialAppName
-          modifiedBy: modifiedBy
-          subscriptionGUID: subscriptionGUID
-          state: IN_PROCESS
-          applicationCoordinates: "{}"
-          globalAccountId: globalAccountId
-          subscriptionError:
-            errorMessage: errorMessage
-            appError: appError
-          appName: appName
-          additionalPlanFeatures:
-          - additionalPlanFeatures
-          - additionalPlanFeatures
-          formationSolutionName: formationSolutionName
-          shortDescription: shortDescription
-          incidentTrackingComponent: incidentTrackingComponent
-          supportsParametersUpdates: true
-          labels: "{}"
-          supportsPlanUpdates: true
-          authenticationProvider: XSUAA
-          automationStateMessage: automationStateMessage
-          automationState: PROCESSING
-          createdDate: 0.8008281904610115
-          createdBy: createdBy
-          modifiedDate: 6.027456183070403
-          tenantId: tenantId
-          iconBase64: iconBase64
           planDescription: planDescription
-          category: category
-          subscriptionId: subscriptionId
+          planName: planName
+          platformEntityId: platformEntityId
+          quota: 1
+          shortDescription: shortDescription
+          state: IN_PROCESS
           subscribedSubaccountId: subscribedSubaccountId
+          subscribedTenantId: subscribedTenantId
+          subscriptionError:
+            appError: appError
+            errorMessage: errorMessage
+          subscriptionGUID: subscriptionGUID
+          subscriptionId: subscriptionId
           subscriptionUrl: subscriptionUrl
+          supportsGetParameters: true
+          supportsParametersUpdates: true
+          supportsPlanUpdates: true
+          tenantId: tenantId
       properties:
         applications:
           description: The response  list of all the multitenant applications to which
             a specified subaccount is entitled to subscribe.
           items:
-            $ref: '#/components/schemas/EntitledApplicationsResponseObject'
+            $ref: "#/components/schemas/EntitledApplicationsResponseObject"
           type: array
       type: object
     EntitledApplicationsResponseObject:
       description: The response  list of all the multitenant applications to which
         a specified subaccount is entitled to subscribe.
       example:
-        metadata:
-          empty: true
-        displayName: displayName
-        categoryDisplayName: categoryDisplayName
-        applicationResource:
-          path: path
-          groupVersionType:
-            type: type
-            version: version
-            group: group
-          name: name
-        description: description
-        planName: planName
-        customerDeveloped: true
-        allowedTargetPlans:
-        - allowedTargetPlans
-        - allowedTargetPlans
-        supportsGetParameters: true
-        paramsSchema:
-          empty: true
-        platformEntityId: platformEntityId
-        appId: appId
-        quota: 1
-        subscribedTenantId: subscribedTenantId
-        commercialAppName: commercialAppName
-        modifiedBy: modifiedBy
-        subscriptionGUID: subscriptionGUID
-        state: IN_PROCESS
-        applicationCoordinates: "{}"
-        globalAccountId: globalAccountId
-        subscriptionError:
-          errorMessage: errorMessage
-          appError: appError
-        appName: appName
         additionalPlanFeatures:
         - additionalPlanFeatures
         - additionalPlanFeatures
-        formationSolutionName: formationSolutionName
-        shortDescription: shortDescription
-        incidentTrackingComponent: incidentTrackingComponent
-        supportsParametersUpdates: true
-        labels: "{}"
-        supportsPlanUpdates: true
+        allowedTargetPlans:
+        - allowedTargetPlans
+        - allowedTargetPlans
+        appId: appId
+        appName: appName
+        applicationCoordinates: {}
+        applicationResource:
+          groupVersionType:
+            group: group
+            type: type
+            version: version
+          name: name
+          path: path
         authenticationProvider: XSUAA
-        automationStateMessage: automationStateMessage
         automationState: PROCESSING
-        createdDate: 0.8008281904610115
-        createdBy: createdBy
-        modifiedDate: 6.027456183070403
-        tenantId: tenantId
-        iconBase64: iconBase64
-        planDescription: planDescription
+        automationStateMessage: automationStateMessage
         category: category
-        subscriptionId: subscriptionId
+        categoryDisplayName: categoryDisplayName
+        commercialAppName: commercialAppName
+        createdBy: createdBy
+        createdDate: 0.8008281904610115
+        customerDeveloped: true
+        description: description
+        displayName: displayName
+        formationSolutionName: formationSolutionName
+        globalAccountId: globalAccountId
+        iconBase64: iconBase64
+        incidentTrackingComponent: incidentTrackingComponent
+        labels: {}
+        metadata:
+          empty: true
+        modifiedBy: modifiedBy
+        modifiedDate: 6.027456183070403
+        paramsSchema:
+          empty: true
+        planDescription: planDescription
+        planName: planName
+        platformEntityId: platformEntityId
+        quota: 1
+        shortDescription: shortDescription
+        state: IN_PROCESS
         subscribedSubaccountId: subscribedSubaccountId
+        subscribedTenantId: subscribedTenantId
+        subscriptionError:
+          appError: appError
+          errorMessage: errorMessage
+        subscriptionGUID: subscriptionGUID
+        subscriptionId: subscriptionId
         subscriptionUrl: subscriptionUrl
+        supportsGetParameters: true
+        supportsParametersUpdates: true
+        supportsPlanUpdates: true
+        tenantId: tenantId
       properties:
         additionalPlanFeatures:
           description: The list of features specific to this plan.
@@ -2013,7 +2013,7 @@ components:
             UIs.
           type: object
         applicationResource:
-          $ref: '#/components/schemas/ApplicationResourceDto'
+          $ref: "#/components/schemas/ApplicationResourceDto"
         authenticationProvider:
           description: |
             The authentication provider of the multitenant application.
@@ -2087,7 +2087,7 @@ components:
           type: object
           example: null
         metadata:
-          $ref: '#/components/schemas/EntitledApplicationsResponseObject_metadata'
+          $ref: "#/components/schemas/EntitledApplicationsResponseObject_metadata"
         modifiedBy:
           description: Details about the user or client that last modified this subscription.
           type: string
@@ -2097,7 +2097,7 @@ components:
           format: date-time
           type: number
         paramsSchema:
-          $ref: '#/components/schemas/EntitledApplicationsResponseObject_paramsSchema'
+          $ref: "#/components/schemas/EntitledApplicationsResponseObject_paramsSchema"
         planDescription:
           description: The description of the plan for customer-facing UIs.
           type: string
@@ -2136,7 +2136,7 @@ components:
           description: The ID of the tenant which is subscribed to a multitenant application.
           type: string
         subscriptionError:
-          $ref: '#/components/schemas/EntitledApplicationsErrorResponseObject'
+          $ref: "#/components/schemas/EntitledApplicationsErrorResponseObject"
         subscriptionGUID:
           description: "Unique subscription ID associated with the instance of the\
             \ dependent service to be used for future references, such as 'GET all\
@@ -2170,8 +2170,8 @@ components:
       example:
         error:
           code: 6
-          description: description
           correlationID: correlationID
+          description: description
           details:
           - code: 1
             message: message
@@ -2181,13 +2181,13 @@ components:
           target: target
       properties:
         error:
-          $ref: '#/components/schemas/ErrorResponse_error'
+          $ref: "#/components/schemas/ErrorResponse_error"
       type: object
     GroupVersionType:
       example:
+        group: group
         type: type
         version: version
-        group: group
       properties:
         group:
           type: string
@@ -2199,10 +2199,10 @@ components:
     JobErrorResponseObject:
       description: Error message when the state is FAILED.
       example:
-        exception: exception
-        paths: paths
         error: error
+        exception: exception
         message: message
+        paths: paths
         status: 0
         timestamp: 2000-01-23T04:56:07.000+00:00
       properties:
@@ -2231,7 +2231,7 @@ components:
       example:
         identifying: true
         type: STRING
-        value: "{}"
+        value: {}
       properties:
         identifying:
           type: boolean
@@ -2249,24 +2249,24 @@ components:
     JobStateResponseObject:
       example:
         createdBy: createdBy
-        id: id
-        state: CREATED
         error:
-          exception: exception
-          paths: paths
           error: error
+          exception: exception
           message: message
+          paths: paths
           status: 0
           timestamp: 2000-01-23T04:56:07.000+00:00
+        id: id
+        state: CREATED
         stateDetails:
-          key: "{}"
+          key: {}
       properties:
         createdBy:
           description: The service instance ID of the SAP SaaS Provisioning service
             (saas-registry) that the application is using.
           type: string
         error:
-          $ref: '#/components/schemas/JobErrorResponseObject'
+          $ref: "#/components/schemas/JobErrorResponseObject"
         id:
           description: ID of the corresponding job.
           type: string
@@ -2296,16 +2296,16 @@ components:
     JobStatusResponseObject:
       example:
         customParams:
-          key: "{}"
+          key: {}
         description: description
         jobParams:
           key:
             identifying: true
             type: STRING
-            value: "{}"
-        statusDetails:
-          key: "{}"
+            value: {}
         status: IN_PROGRESS
+        statusDetails:
+          key: {}
       properties:
         customParams:
           additionalProperties:
@@ -2317,7 +2317,7 @@ components:
           type: string
         jobParams:
           additionalProperties:
-            $ref: '#/components/schemas/JobParameter'
+            $ref: "#/components/schemas/JobParameter"
           type: object
         status:
           description: "The current state of the job. \n* <b>IN_PROGRESS:</b> The\
@@ -2341,7 +2341,7 @@ components:
       description: JSON object with labels as key-value pairs that specify custom
         attributes of the entity.
       example:
-        labels: "{}"
+        labels: {}
       properties:
         labels:
           description: |-
@@ -2378,27 +2378,27 @@ components:
       type: object
     RegistrationDetailsResponseObject:
       example:
-        providerTenantId: providerTenantId
-        xsappname: xsappname
+        appId: appId
         appName: appName
-        displayName: displayName
+        appType: appType
         appUrls: appUrls
-        description: description
-        serviceInstanceId: serviceInstanceId
-        formationSolutionName: formationSolutionName
-        organizationGuid: organizationGuid
-        messageOnAutomationFailure: messageOnAutomationFailure
-        spaceGuid: spaceGuid
         automationSolutionName: automationSolutionName
+        category: category
+        commercialAppName: commercialAppName
+        description: description
+        displayName: displayName
         failSubscriptionOnAutomationFailure: true
+        formationSolutionName: formationSolutionName
+        globalAccountId: globalAccountId
+        messageOnAutomationFailure: messageOnAutomationFailure
+        organizationGuid: organizationGuid
         paramsSchema:
           empty: true
         propagateParams: true
-        appType: appType
-        appId: appId
-        commercialAppName: commercialAppName
-        category: category
-        globalAccountId: globalAccountId
+        providerTenantId: providerTenantId
+        serviceInstanceId: serviceInstanceId
+        spaceGuid: spaceGuid
+        xsappname: xsappname
       properties:
         appId:
           description: The ID returned by an xsuaa service instance after the app
@@ -2458,7 +2458,7 @@ components:
             has deployed and registered the multitenant application.
           type: string
         paramsSchema:
-          $ref: '#/components/schemas/EntitledApplicationsResponseObject_paramsSchema'
+          $ref: "#/components/schemas/EntitledApplicationsResponseObject_paramsSchema"
         propagateParams:
           description: Whether the parameters are transferred to the application’s
             dependencies.
@@ -2484,7 +2484,7 @@ components:
         sends to users.
       example:
         additionalOutput:
-          key: "{}"
+          key: {}
         message: message
         status: SUCCEEDED
         subscriptionUrl: subscriptionUrl
@@ -2512,85 +2512,85 @@ components:
       type: object
     SubscriptionsListResponseObject:
       example:
+        morePages: true
+        page: 0
         subscriptions:
         - amount: 6
-          movedFromSaasProvisioning: true
-          subaccountId: subaccountId
-          code: code
-          appName: appName
-          serviceInstanceId: serviceInstanceId
-          consumerTenantId: consumerTenantId
-          error: error
-          createdOn: createdOn
-          changedOn: changedOn
-          url: url
-          dependencies:
-          - xsappname: xsappname
-            appName: appName
-            appId: appId
-            providerSubaccountID: providerSubaccountID
-            error: error
-            dependencies:
-            - null
-            - null
-          - xsappname: xsappname
-            appName: appName
-            appId: appId
-            providerSubaccountID: providerSubaccountID
-            error: error
-            dependencies:
-            - null
-            - null
-          licenseType: licenseType
-          isConsumerTenantActive: true
-          appNameBeforeMovedFromSaasProvisioning: appNameBeforeMovedFromSaasProvisioning
           appId: appId
-          subdomain: subdomain
+          appName: appName
+          appNameBeforeMovedFromSaasProvisioning: appNameBeforeMovedFromSaasProvisioning
+          changedOn: changedOn
+          code: code
           commercialAppName: commercialAppName
-          subscriptionGUID: subscriptionGUID
-          state: state
+          consumerTenantId: consumerTenantId
+          createdOn: createdOn
+          dependencies:
+          - appId: appId
+            appName: appName
+            dependencies:
+            - null
+            - null
+            error: error
+            providerSubaccountID: providerSubaccountID
+            xsappname: xsappname
+          - appId: appId
+            appName: appName
+            dependencies:
+            - null
+            - null
+            error: error
+            providerSubaccountID: providerSubaccountID
+            xsappname: xsappname
+          error: error
           globalAccountId: globalAccountId
+          isConsumerTenantActive: true
+          licenseType: licenseType
+          movedFromSaasProvisioning: true
+          serviceInstanceId: serviceInstanceId
+          state: state
+          subaccountId: subaccountId
+          subdomain: subdomain
+          subscriptionGUID: subscriptionGUID
+          url: url
         - amount: 6
-          movedFromSaasProvisioning: true
-          subaccountId: subaccountId
-          code: code
-          appName: appName
-          serviceInstanceId: serviceInstanceId
-          consumerTenantId: consumerTenantId
-          error: error
-          createdOn: createdOn
-          changedOn: changedOn
-          url: url
-          dependencies:
-          - xsappname: xsappname
-            appName: appName
-            appId: appId
-            providerSubaccountID: providerSubaccountID
-            error: error
-            dependencies:
-            - null
-            - null
-          - xsappname: xsappname
-            appName: appName
-            appId: appId
-            providerSubaccountID: providerSubaccountID
-            error: error
-            dependencies:
-            - null
-            - null
-          licenseType: licenseType
-          isConsumerTenantActive: true
-          appNameBeforeMovedFromSaasProvisioning: appNameBeforeMovedFromSaasProvisioning
           appId: appId
-          subdomain: subdomain
+          appName: appName
+          appNameBeforeMovedFromSaasProvisioning: appNameBeforeMovedFromSaasProvisioning
+          changedOn: changedOn
+          code: code
           commercialAppName: commercialAppName
-          subscriptionGUID: subscriptionGUID
-          state: state
+          consumerTenantId: consumerTenantId
+          createdOn: createdOn
+          dependencies:
+          - appId: appId
+            appName: appName
+            dependencies:
+            - null
+            - null
+            error: error
+            providerSubaccountID: providerSubaccountID
+            xsappname: xsappname
+          - appId: appId
+            appName: appName
+            dependencies:
+            - null
+            - null
+            error: error
+            providerSubaccountID: providerSubaccountID
+            xsappname: xsappname
+          error: error
           globalAccountId: globalAccountId
+          isConsumerTenantActive: true
+          licenseType: licenseType
+          movedFromSaasProvisioning: true
+          serviceInstanceId: serviceInstanceId
+          state: state
+          subaccountId: subaccountId
+          subdomain: subdomain
+          subscriptionGUID: subscriptionGUID
+          url: url
         total: 1
-        morePages: true
         totalPages: 5
-        page: 0
       properties:
         morePages:
           description: Whether there are more pages.
@@ -2602,7 +2602,7 @@ components:
         subscriptions:
           description: The list of the requested app subscriptions.
           items:
-            $ref: '#/components/schemas/ApplicationSubscriptionsResponseObject'
+            $ref: "#/components/schemas/ApplicationSubscriptionsResponseObject"
           type: array
         total:
           description: Total numbers of results.
@@ -2619,7 +2619,7 @@ components:
         change related to an existing subscription.
       example:
         appProviderCustomProperties:
-          key: "{}"
+          key: {}
       properties:
         appProviderCustomProperties:
           additionalProperties:
@@ -2635,9 +2635,9 @@ components:
       description: Create the request to update parameters in an existing subscription
         from a subaccount.
       example:
-        subscriptionParams:
-          key: "{}"
         planName: planName
+        subscriptionParams:
+          key: {}
       properties:
         planName:
           description: The new plan of the multitenant application to update in the
@@ -2710,8 +2710,8 @@ components:
     ErrorResponse_error:
       example:
         code: 6
-        description: description
         correlationID: correlationID
+        description: description
         details:
         - code: 1
           message: message
@@ -2732,7 +2732,7 @@ components:
         details:
           description: Nesting of error responses
           items:
-            $ref: '#/components/schemas/NestingErrorDetailsResponseObject'
+            $ref: "#/components/schemas/NestingErrorDetailsResponseObject"
           type: array
         message:
           description: User-friendly description of the error.

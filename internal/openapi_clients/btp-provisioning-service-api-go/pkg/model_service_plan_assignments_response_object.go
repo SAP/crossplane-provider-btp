@@ -26,13 +26,13 @@ type ServicePlanAssignmentsResponseObject struct {
 	// The ID of the associated global account.
 	GlobalAccountId *string `json:"globalAccountId,omitempty"`
 	// The name of the plan of the provisioned quota.
-	Plan *string `json:"plan,omitempty"`
+	Plan               *string `json:"plan,omitempty"`
 	ProvisioningMethod *string `json:"provisioningMethod,omitempty"`
 	// The quantity of provisioned quota.
-	Quota *int32 `json:"quota,omitempty"`
+	Quota     *int32                         `json:"quota,omitempty"`
 	Resources []QuotaResourcesResponseObject `json:"resources,omitempty"`
 	// The name of the service of the provisioned quota.
-	Service *string `json:"service,omitempty"`
+	Service         *string `json:"service,omitempty"`
 	ServiceCategory *string `json:"serviceCategory,omitempty"`
 	// Unique ID of the subaccount for which to get quota.
 	SubaccountGUID *string `json:"subaccountGUID,omitempty"`
@@ -41,8 +41,11 @@ type ServicePlanAssignmentsResponseObject struct {
 	// The unique identifier of the plan of the provisioned quota.
 	UniqueIdentifier *string `json:"uniqueIdentifier,omitempty"`
 	// Whether an unlimited quantity of quota can be provisioned.
-	Unlimited *bool `json:"unlimited,omitempty"`
+	Unlimited            *bool `json:"unlimited,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _ServicePlanAssignmentsResponseObject ServicePlanAssignmentsResponseObject
 
 // NewServicePlanAssignmentsResponseObject instantiates a new ServicePlanAssignmentsResponseObject object
 // This constructor will assign default values to properties that have it defined,
@@ -478,7 +481,7 @@ func (o *ServicePlanAssignmentsResponseObject) SetUnlimited(v bool) {
 }
 
 func (o ServicePlanAssignmentsResponseObject) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -526,7 +529,45 @@ func (o ServicePlanAssignmentsResponseObject) ToMap() (map[string]interface{}, e
 	if !IsNil(o.Unlimited) {
 		toSerialize["unlimited"] = o.Unlimited
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *ServicePlanAssignmentsResponseObject) UnmarshalJSON(data []byte) (err error) {
+	varServicePlanAssignmentsResponseObject := _ServicePlanAssignmentsResponseObject{}
+
+	err = json.Unmarshal(data, &varServicePlanAssignmentsResponseObject)
+
+	if err != nil {
+		return err
+	}
+
+	*o = ServicePlanAssignmentsResponseObject(varServicePlanAssignmentsResponseObject)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "consumedQuota")
+		delete(additionalProperties, "globalAccountGUID")
+		delete(additionalProperties, "globalAccountId")
+		delete(additionalProperties, "plan")
+		delete(additionalProperties, "provisioningMethod")
+		delete(additionalProperties, "quota")
+		delete(additionalProperties, "resources")
+		delete(additionalProperties, "service")
+		delete(additionalProperties, "serviceCategory")
+		delete(additionalProperties, "subaccountGUID")
+		delete(additionalProperties, "tenantId")
+		delete(additionalProperties, "uniqueIdentifier")
+		delete(additionalProperties, "unlimited")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableServicePlanAssignmentsResponseObject struct {
@@ -564,5 +605,3 @@ func (v *NullableServicePlanAssignmentsResponseObject) UnmarshalJSON(src []byte)
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

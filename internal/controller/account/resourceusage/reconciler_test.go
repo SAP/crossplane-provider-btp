@@ -112,7 +112,7 @@ func TestReconciler(t *testing.T) {
 				},
 			},
 			want: want{
-				result: reconcile.Result{Requeue: false},
+				result: reconcile.Result{},
 			},
 		},
 		"RemoveFinalizerError": {
@@ -153,7 +153,7 @@ func TestReconciler(t *testing.T) {
 				},
 			},
 			want: want{
-				result: reconcile.Result{Requeue: false},
+				result: reconcile.Result{},
 			},
 		},
 		"AddFinalizerError": {
@@ -183,7 +183,7 @@ func TestReconciler(t *testing.T) {
 				},
 			},
 			want: want{
-				result: reconcile.Result{Requeue: false},
+				result: reconcile.Result{},
 				err:    nil,
 			},
 		},
@@ -199,7 +199,7 @@ func TestReconciler(t *testing.T) {
 				},
 			},
 			want: want{
-				result: reconcile.Result{Requeue: false},
+				result: reconcile.Result{},
 				err:    errors.Wrap(errBoom, errUpdateStatus),
 			},
 		},
@@ -264,7 +264,7 @@ func TestReconciler(t *testing.T) {
 				},
 			},
 			want: want{
-				result: reconcile.Result{Requeue: false},
+				result: reconcile.Result{},
 			},
 		},
 	}

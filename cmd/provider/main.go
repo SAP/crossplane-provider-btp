@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/fips140"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -46,6 +47,18 @@ func main() {
 			"poll",
 			"How often individual resources will be checked for drift from the desired state",
 		).Default("1m").Duration()
+		pollJitterPercentage = app.Flag(
+			"poll-jitter-percentage",
+			"Random jitter applied to each resource's poll interval on every poll requeue, as a percentage of that interval. 0 disables jitter; must be below 100.",
+		).Default("10").Envar("POLL_JITTER_PERCENTAGE").Uint()
+		pollMax = app.Flag(
+			"poll-max",
+			"Upper bound for the poll interval of resources that stay Ready and Synced; it is also the worst-case drift-detection latency. 0 or a value equal to --poll disables adaptive polling of stable resources.",
+		).Default("0").Envar("POLL_MAX").Duration()
+		pollMaxAfter = app.Flag(
+			"poll-max-after",
+			"How long a resource must stay unchanged before its poll interval reaches --poll-max.",
+		).Default("30m").Envar("POLL_MAX_AFTER").Duration()
 		maxReconcileRate = app.Flag(
 			"max-reconcile-rate",
 			"The global maximum rate per second at which resources may checked for drift from the desired state.",
@@ -63,22 +76,43 @@ func main() {
 			"Timeout for a single reconcile cycle (externalCtx budget). The reconciler adds a 30s grace period on top for status writes. Default is 1m.",
 		).Default("1m").Envar("RECONCILE_TIMEOUT").Duration()
 
-		enableTerraformSessionReuse = app.Flag(
-			"enable-terraform-session-reuse",
-			"Share configured Terraform BTP sessions across reconciliations. Disabled by default.",
-		).Default("false").Envar("ENABLE_TERRAFORM_SESSION_REUSE").Bool()
+		// Deprecated no-op: session reuse is always on again (#1096). Kept so existing
+		// deployments passing the flag don't fail kingpin's unknown-flag check.
+		deprecatedSessionReuseSet = new(bool)
+		_                         = app.Flag("enable-terraform-session-reuse", "Deprecated, no-op.").Hidden().IsSetByUser(deprecatedSessionReuseSet).Bool()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 	)
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
+	if *pollJitterPercentage >= 100 {
+		kingpin.Fatalf("--poll-jitter-percentage must be below 100, got %d", *pollJitterPercentage)
+	}
+	if *pollMax != 0 && *pollMax < *pollInterval {
+		kingpin.Fatalf("--poll-max (%s) must not be below --poll (%s)", *pollMax, *pollInterval)
+	}
+	if *pollMax > *pollInterval && *pollMaxAfter <= 0 {
+		kingpin.Fatalf("--poll-max-after must be positive when --poll-max is above --poll, got %s", *pollMaxAfter)
+	}
 
 	zl := zap.New(zap.UseDevMode(*debug))
 	log := logging.NewLogrLogger(zl.WithName("crossplane-provider-btp"))
 	ctrl.SetLogger(zl)
+
+	// Record FIPS 140-3 status at startup as runtime compliance evidence. When
+	// built with GOFIPS140=certified this reports the linked CMVP-validated Go
+	// Cryptographic Module version and approved-mode status.
+	log.Info("FIPS 140-3 mode", "enabled", fips140.Enabled(), "module", fips140.Version())
+	if !fips140.Enabled() {
+		kingpin.Fatalf("FIPS 140-3 approved mode is not enabled; this binary must be built with GOFIPS140=certified and must not be run with GODEBUG=fips140=off")
+	}
+
 	btp.SetLogger(log)
 	btp.SetDebug(*debug)
-	tfclient.SetEnableTerraformSessionReuse(*enableTerraformSessionReuse)
+
+	if *deprecatedSessionReuseSet {
+		log.Info("WARNING: --enable-terraform-session-reuse is deprecated and has no effect; session reuse is always on. Remove the flag. Support for it will be dropped in future versions.")
+	}
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
@@ -108,13 +142,13 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Template APIs to scheme")
 
-	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, backoffBase, backoffMax, enableManagementPolicies)
-	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)
+	setupTerraformControllers(mgr, log, maxReconcileRate, *pollInterval, *pollJitterPercentage, *pollMax, *pollMaxAfter, backoffBase, backoffMax, enableManagementPolicies)
+	setupNativeControllers(mgr, log, maxReconcileRate, pollInterval, *pollJitterPercentage, *pollMax, *pollMaxAfter, reconcileTimeout, backoffBase, backoffMax, enableManagementPolicies)
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 }
 
-func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
+func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval time.Duration, pollJitterPercentage uint, pollMax, pollMaxAfter time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	o := internalopts.UpjetOptions{
 		Options: tjcontroller.Options{
 			Options: controller.Options{
@@ -128,8 +162,11 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 			OperationTrackerStore: tjcontroller.NewOperationStore(log),
 			SetupFn:               tfclient.TerraformSetupBuilder(),
 		},
-		BackoffBase: *backoffBase,
-		BackoffMax:  *backoffMax,
+		BackoffBase:          *backoffBase,
+		BackoffMax:           *backoffMax,
+		PollJitterPercentage: pollJitterPercentage,
+		PollMax:              pollMax,
+		PollMaxAfter:         pollMaxAfter,
 	}
 
 	if *enableManagementPolicies {
@@ -139,7 +176,7 @@ func setupTerraformControllers(mgr manager.Manager, log logging.Logger, maxRecon
 
 	kingpin.FatalIfError(template.Setup(mgr, o), "Cannot setup controllers")
 }
-func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
+func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcileRate *int, pollInterval *time.Duration, pollJitterPercentage uint, pollMax, pollMaxAfter time.Duration, reconcileTimeout *time.Duration, backoffBase *time.Duration, backoffMax *time.Duration, enableManagementPolicies *bool) {
 	co := internalopts.CrossplaneOptions{
 		Options: controller.Options{
 			Logger:                  log,
@@ -148,9 +185,12 @@ func setupNativeControllers(mgr manager.Manager, log logging.Logger, maxReconcil
 			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
 			Features:                &feature.Flags{},
 		},
-		BackoffBase:      *backoffBase,
-		BackoffMax:       *backoffMax,
-		ReconcileTimeout: *reconcileTimeout,
+		BackoffBase:          *backoffBase,
+		BackoffMax:           *backoffMax,
+		ReconcileTimeout:     *reconcileTimeout,
+		PollJitterPercentage: pollJitterPercentage,
+		PollMax:              pollMax,
+		PollMaxAfter:         pollMaxAfter,
 	}
 
 	if *enableManagementPolicies {

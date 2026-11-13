@@ -222,6 +222,7 @@ func TestFindAssignedServicePlan(t *testing.T) {
 
 	type want struct {
 		o   *entclient.AssignedServicePlanSubaccountDTO
+		uid *string
 		err error
 	}
 
@@ -404,6 +405,7 @@ func TestFindAssignedServicePlan(t *testing.T) {
 				o: &entclient.AssignedServicePlanSubaccountDTO{
 					EntityId: internal.Ptr("1111-1111-1111-1111"),
 				},
+				uid: internal.Ptr("plan-A-B"),
 				err: nil,
 			},
 		},
@@ -451,6 +453,7 @@ func TestFindAssignedServicePlan(t *testing.T) {
 					EntityId: internal.Ptr("sub-1"),
 					Amount:   internal.Ptr(float32(2)),
 				},
+				uid: internal.Ptr("region-b"),
 				err: nil,
 			},
 		},
@@ -460,7 +463,7 @@ func TestFindAssignedServicePlan(t *testing.T) {
 		t.Run(
 			name, func(t *testing.T) {
 				entClient := EntitlementsClient{}
-				got, err := entClient.findAssignedServicePlan(tc.args.payload, tc.args.key)
+				got, gotUID, err := entClient.findAssignedServicePlan(tc.args.payload, tc.args.key)
 
 				if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 					t.Errorf("\n%s\ne.findAssignedServicePlan(...): -want error, +got error:\n%s\n", tc.reason, diff)
@@ -468,6 +471,10 @@ func TestFindAssignedServicePlan(t *testing.T) {
 
 				if diff := cmp.Diff(tc.want.o, got); diff != "" {
 					t.Errorf("\n%s\ne.findAssignedServicePlan(...): -want, +got:\n%s\n", tc.reason, diff)
+				}
+
+				if diff := cmp.Diff(tc.want.uid, gotUID); diff != "" {
+					t.Errorf("\n%s\ne.findAssignedServicePlan(...): -want uid, +got uid:\n%s\n", tc.reason, diff)
 				}
 			},
 		)
@@ -876,6 +883,91 @@ func TestDeleteInstanceSoleNumericSendsZero(t *testing.T) {
 	}
 	if diff := cmp.Diff(float32(0), *assignmentInfo[0].Amount); diff != "" {
 		t.Errorf("SetServicePlans payload Amount: -want, +got:\n%s", diff)
+	}
+}
+
+// TestDeleteFallsBackToAssignedUniqueIdentifier verifies DeleteInstance
+// fills in the ServicePlanUniqueIdentifier from
+// Status.AtProvider.Assigned.UniqueIdentifier when the key leaves it nil
+// (issue #1100): without it, the BTP API returns error 30001 for plans
+// whose serviceName+servicePlanName are not unique in the region. The
+// assigned plan's identifier is the correct source (not the entitled
+// catalog identifier, which may belong to a different plan). An explicit
+// key identifier must still win and never be overridden, and an empty
+// assigned identifier must leave the key nil.
+func TestDeleteFallsBackToAssignedUniqueIdentifier(t *testing.T) {
+	cases := map[string]struct {
+		keyIdentifier      *string
+		assignedIdentifier string
+		wantIdentifier     *string
+	}{
+		"nil key identifier falls back to assigned": {
+			keyIdentifier:      nil,
+			assignedIdentifier: "assigned-unique-id",
+			wantIdentifier:     internal.Ptr("assigned-unique-id"),
+		},
+		"explicit key identifier wins over assigned": {
+			keyIdentifier:      internal.Ptr("key-unique-id"),
+			assignedIdentifier: "assigned-unique-id",
+			wantIdentifier:     internal.Ptr("key-unique-id"),
+		},
+		"empty assigned identifier leaves key nil": {
+			keyIdentifier:      nil,
+			assignedIdentifier: "",
+			wantIdentifier:     nil,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(
+			name, func(t *testing.T) {
+				var gotPayload entclient.SubaccountServicePlansRequestPayloadCollection
+				handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+						t.Errorf("decoding SetServicePlans request body: %v", err)
+					}
+					w.WriteHeader(http.StatusOK)
+				})
+				c, closeServer := newTestEntitlementsClient(t, handler)
+				defer closeServer()
+
+				cr := &v1alpha1.Entitlement{
+					Spec: v1alpha1.EntitlementSpec{
+						ForProvider: v1alpha1.EntitlementParameters{
+							Amount: internal.Ptr(5),
+						},
+					},
+					Status: v1alpha1.EntitlementStatus{
+						AtProvider: &v1alpha1.EntitlementObservation{
+							Required: &v1alpha1.EntitlementSummary{
+								Amount: internal.Ptr(0),
+							},
+							Assigned: &v1alpha1.Assignable{
+								Amount:           internal.Ptr(5),
+								UniqueIdentifier: tc.assignedIdentifier,
+							},
+						},
+					},
+				}
+				key := ExternalNameKey{
+					SubaccountGUID:              "sa",
+					ServiceName:                 "svc",
+					ServicePlanName:             "plan",
+					ServicePlanUniqueIdentifier: tc.keyIdentifier,
+				}
+
+				if err := c.DeleteInstance(context.Background(), key, cr); err != nil {
+					t.Fatalf("DeleteInstance(...): unexpected error: %v", err)
+				}
+
+				if len(gotPayload.SubaccountServicePlans) != 1 {
+					t.Fatalf("SetServicePlans payload: want 1 assignment, got %d", len(gotPayload.SubaccountServicePlans))
+				}
+				if diff := cmp.Diff(tc.wantIdentifier, gotPayload.SubaccountServicePlans[0].ServicePlanUniqueIdentifier); diff != "" {
+					t.Errorf("SetServicePlans payload ServicePlanUniqueIdentifier: -want, +got:\n%s", diff)
+				}
+			},
+		)
 	}
 }
 

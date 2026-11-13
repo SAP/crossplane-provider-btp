@@ -32,7 +32,7 @@ var (
 // default planName changed from service-operator-access to subaccount-admin
 // (#925), and the two versions resolve planName differently:
 //
-//   - v1alpha1 has no planName field, so the plan resolves to the runtime
+//   - v1alpha1 had no planName field in v1.13.0, so the plan resolves to the runtime
 //     DefaultPlanName. An instance created on the old default must not be updated
 //     to the new one on upgrade: the service plan is immutable in BTP, so an
 //     in-place update calls update_instance and BTP rejects it with

@@ -657,13 +657,13 @@ components:
           requestedAmount: 5.637376656633329
           resources:
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
@@ -686,13 +686,13 @@ components:
           requestedAmount: 5.637376656633329
           resources:
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
@@ -774,13 +774,13 @@ components:
         requestedAmount: 5.637376656633329
         resources:
         - resourceData:
-            key: "{}"
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
           resourceTechnicalName: resourceTechnicalName
           resourceType: resourceType
         - resourceData:
-            key: "{}"
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
           resourceTechnicalName: resourceTechnicalName
@@ -886,7 +886,7 @@ components:
       description: The list of services that are assigned to subaccounts located under
         a global account.
       example:
-        applicationCoordinates: "{}"
+        applicationCoordinates: {}
         businessCategory:
           displayName: displayName
           id: id
@@ -912,13 +912,13 @@ components:
             requestedAmount: 5.637376656633329
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -941,13 +941,13 @@ components:
             requestedAmount: 5.637376656633329
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -978,13 +978,13 @@ components:
             requestedAmount: 5.637376656633329
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -1007,13 +1007,13 @@ components:
             requestedAmount: 5.637376656633329
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -1194,13 +1194,13 @@ components:
         planUniqueIdentifier: planUniqueIdentifier
         resources:
         - resourceData:
-            key: "{}"
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
           resourceTechnicalName: resourceTechnicalName
           resourceType: resourceType
         - resourceData:
-            key: "{}"
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
           resourceTechnicalName: resourceTechnicalName
@@ -1266,13 +1266,13 @@ components:
           planUniqueIdentifier: planUniqueIdentifier
           resources:
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
@@ -1285,13 +1285,13 @@ components:
           planUniqueIdentifier: planUniqueIdentifier
           resources:
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
@@ -1316,13 +1316,13 @@ components:
         planUniqueIdentifier: planUniqueIdentifier
         resources:
         - resourceData:
-            key: "{}"
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
           resourceTechnicalName: resourceTechnicalName
           resourceType: resourceType
         - resourceData:
-            key: "{}"
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
           resourceTechnicalName: resourceTechnicalName
@@ -1401,13 +1401,13 @@ components:
           planUniqueIdentifier: planUniqueIdentifier
           resources:
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
@@ -1422,13 +1422,13 @@ components:
           planUniqueIdentifier: planUniqueIdentifier
           resources:
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
@@ -1445,7 +1445,7 @@ components:
     EntitledAndAssignedServicesResponseObject:
       example:
         assignedServices:
-        - applicationCoordinates: "{}"
+        - applicationCoordinates: {}
           businessCategory:
             displayName: displayName
             id: id
@@ -1471,13 +1471,13 @@ components:
               requestedAmount: 5.637376656633329
               resources:
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
                 resourceType: resourceType
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
@@ -1500,13 +1500,13 @@ components:
               requestedAmount: 5.637376656633329
               resources:
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
                 resourceType: resourceType
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
@@ -1537,13 +1537,13 @@ components:
               requestedAmount: 5.637376656633329
               resources:
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
                 resourceType: resourceType
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
@@ -1566,13 +1566,13 @@ components:
               requestedAmount: 5.637376656633329
               resources:
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
                 resourceType: resourceType
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
@@ -1586,7 +1586,7 @@ components:
             name: name
             uniqueIdentifier: uniqueIdentifier
             unlimited: true
-        - applicationCoordinates: "{}"
+        - applicationCoordinates: {}
           businessCategory:
             displayName: displayName
             id: id
@@ -1612,13 +1612,13 @@ components:
               requestedAmount: 5.637376656633329
               resources:
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
                 resourceType: resourceType
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
@@ -1641,13 +1641,13 @@ components:
               requestedAmount: 5.637376656633329
               resources:
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
                 resourceType: resourceType
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
@@ -1678,13 +1678,13 @@ components:
               requestedAmount: 5.637376656633329
               resources:
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
                 resourceType: resourceType
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
@@ -1707,13 +1707,13 @@ components:
               requestedAmount: 5.637376656633329
               resources:
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
                 resourceType: resourceType
               - resourceData:
-                  key: "{}"
+                  key: {}
                 resourceName: resourceName
                 resourceProvider: resourceProvider
                 resourceTechnicalName: resourceTechnicalName
@@ -1728,7 +1728,7 @@ components:
             uniqueIdentifier: uniqueIdentifier
             unlimited: true
         entitledServices:
-        - applicationCoordinates: "{}"
+        - applicationCoordinates: {}
           businessCategory:
             displayName: displayName
             id: id
@@ -1776,13 +1776,13 @@ components:
             remainingAmount: 7.386281948385884
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -1854,13 +1854,13 @@ components:
             remainingAmount: 7.386281948385884
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -1894,7 +1894,7 @@ components:
               productId: productId
             uniqueIdentifier: uniqueIdentifier
             unlimited: true
-        - applicationCoordinates: "{}"
+        - applicationCoordinates: {}
           businessCategory:
             displayName: displayName
             id: id
@@ -1942,13 +1942,13 @@ components:
             remainingAmount: 7.386281948385884
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -2020,13 +2020,13 @@ components:
             remainingAmount: 7.386281948385884
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -2081,7 +2081,7 @@ components:
     EntitledServicesResponseObject:
       description: "Services entitled to global account, its directories and subaccounts."
       example:
-        applicationCoordinates: "{}"
+        applicationCoordinates: {}
         businessCategory:
           displayName: displayName
           id: id
@@ -2129,13 +2129,13 @@ components:
           remainingAmount: 7.386281948385884
           resources:
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
@@ -2207,13 +2207,13 @@ components:
           remainingAmount: 7.386281948385884
           resources:
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
@@ -2367,7 +2367,7 @@ components:
       description: External resources to assign to subaccount
       example:
         resourceData:
-          key: "{}"
+          key: {}
         resourceName: resourceName
         resourceProvider: resourceProvider
         resourceTechnicalName: resourceTechnicalName
@@ -2398,7 +2398,7 @@ components:
       example:
         identifying: true
         type: STRING
-        value: "{}"
+        value: {}
       properties:
         identifying:
           type: boolean
@@ -2416,16 +2416,16 @@ components:
     JobStatusResponseObject:
       example:
         customParams:
-          key: "{}"
+          key: {}
         description: description
         jobParams:
           key:
             identifying: true
             type: STRING
-            value: "{}"
+            value: {}
         status: IN_PROGRESS
         statusDetails:
-          key: "{}"
+          key: {}
       properties:
         customParams:
           additionalProperties:
@@ -2476,13 +2476,13 @@ components:
           enable: true
           resources:
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
@@ -2492,13 +2492,13 @@ components:
           enable: true
           resources:
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
             resourceType: resourceType
           - resourceData:
-              key: "{}"
+              key: {}
             resourceName: resourceName
             resourceProvider: resourceProvider
             resourceTechnicalName: resourceTechnicalName
@@ -2569,13 +2569,13 @@ components:
         remainingAmount: 7.386281948385884
         resources:
         - resourceData:
-            key: "{}"
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
           resourceTechnicalName: resourceTechnicalName
           resourceType: resourceType
         - resourceData:
-            key: "{}"
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
           resourceTechnicalName: resourceTechnicalName
@@ -2748,13 +2748,13 @@ components:
         enable: true
         resources:
         - resourceData:
-            key: "{}"
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
           resourceTechnicalName: resourceTechnicalName
           resourceType: resourceType
         - resourceData:
-            key: "{}"
+            key: {}
           resourceName: resourceName
           resourceProvider: resourceProvider
           resourceTechnicalName: resourceTechnicalName
@@ -2796,13 +2796,13 @@ components:
             enable: true
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -2812,13 +2812,13 @@ components:
             enable: true
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -2832,13 +2832,13 @@ components:
             enable: true
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
@@ -2848,13 +2848,13 @@ components:
             enable: true
             resources:
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName
               resourceType: resourceType
             - resourceData:
-                key: "{}"
+                key: {}
               resourceName: resourceName
               resourceProvider: resourceProvider
               resourceTechnicalName: resourceTechnicalName

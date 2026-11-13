@@ -125,7 +125,7 @@ func (c EntitlementsClient) instanceFromResponse(
 	key ExternalNameKey,
 ) (*Instance, error) {
 	// assignment can be nil, that is a valid response, as acc/dir will not always have all assignments set
-	assignment, err := c.findAssignedServicePlan(response, key)
+	assignment, assignedUID, err := c.findAssignedServicePlan(response, key)
 	if err != nil {
 		return nil, err
 	}
@@ -141,8 +141,9 @@ func (c EntitlementsClient) instanceFromResponse(
 	}
 
 	return &Instance{
-		EntitledServicePlan: entitledServicePlan,
-		Assignment:          assignment,
+		EntitledServicePlan:      entitledServicePlan,
+		Assignment:               assignment,
+		AssignedUniqueIdentifier: assignedUID,
 	}, nil
 }
 
@@ -217,6 +218,21 @@ func (c EntitlementsClient) DeleteInstance(ctx context.Context, key ExternalName
 		enabled := false
 		cr.Status.AtProvider.Required.Enable = &enabled
 	}
+
+	// Issue #1100: when serviceName+servicePlanName are not unique in the region
+	// and no explicit plan identifier was set, fall back to the unique identifier
+	// of the plan ACTUALLY assigned to this subaccount so the API can resolve the
+	// ambiguous plan on delete. The assigned plan's identifier is the correct
+	// source here: the entitled catalog identifier is selected independently by
+	// name and may belong to a different plan than the one assigned to this
+	// subaccount. If the assigned identifier is empty, leave the key nil (safe
+	// no-op, same behaviour as before the fix) rather than risk targeting the
+	// wrong plan.
+	if key.ServicePlanUniqueIdentifier == nil &&
+		cr.Status.AtProvider.Assigned != nil &&
+		cr.Status.AtProvider.Assigned.UniqueIdentifier != "" {
+		key.ServicePlanUniqueIdentifier = internal.Ptr(cr.Status.AtProvider.Assigned.UniqueIdentifier)
+	}
 	return c.UpdateInstance(ctx, key, cr)
 }
 
@@ -264,28 +280,31 @@ func (c EntitlementsClient) UpdateInstance(ctx context.Context, key ExternalName
 	return nil
 }
 
-// findAssignedServicePlan returns the assignment for the given service and service plan, if it exists
-func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledAndAssignedServicesResponseObject, key ExternalNameKey) (*entclient.AssignedServicePlanSubaccountDTO, error) {
+// findAssignedServicePlan returns the assignment for the given service and
+// service plan, if it exists, along with the assigned plan's unique identifier
+// (nil when there is no matching plan). The identifier comes from the assigned
+// plan object, not the subaccount assignment DTO, which does not carry it.
+func (c EntitlementsClient) findAssignedServicePlan(payload *entclient.EntitledAndAssignedServicesResponseObject, key ExternalNameKey) (*entclient.AssignedServicePlanSubaccountDTO, *string, error) {
 	// first find service via name, can be nil, if no assignment with that service name is set in account/dir
 	assignedService := findAssignedService(payload, key.ServiceName)
 	if assignedService == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// then find service plan within service, can be nil, if no assignment with that service plan name (and qualifier, if given) is set in account/dir
 	servicePlan := findAssignedServicePlanByKey(assignedService, key)
 	if servicePlan == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// lastly, extract the info on subaccount entity assignment
 	foundAssignment, errLook := filterAssignmentInfo(servicePlan, key)
 
 	if errLook != nil {
-		return nil, errLook
+		return nil, nil, errLook
 	}
 
-	return foundAssignment, nil
+	return foundAssignment, servicePlan.UniqueIdentifier, nil
 }
 
 // findAssignedService returns Service if found by name, otherwise nil

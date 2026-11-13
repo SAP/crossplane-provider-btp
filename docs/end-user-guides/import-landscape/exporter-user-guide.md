@@ -22,6 +22,7 @@ The BTP Resource Exporter is a CLI tool that generates Crossplane-compatible res
   - [Entitlement](#entitlement)
   - [Service Instance](#service-instance)
   - [Cloud Foundry Environment](#cloud-foundry-environment)
+  - [Kyma Environment](#kyma-environment)
   - [Service Binding](#service-binding)
 - [Usage Examples](#usage-examples)
   - [Building the Exporter](#building-the-exporter)
@@ -58,10 +59,10 @@ The exporter connects to your SAP BTP global account using the BTP CLI and retri
 
 - **BTP CLI**: The `btp` command-line tool must be [installed](#missing-btp-cli) and available in your `$PATH` (or specify a custom path via `--btp-cli` or `$BTP_EXPORT_BTP_CLI_PATH`)
 - **BTP Global Account**: Access credentials for a SAP BTP global account
-- **Go**: Go 1.25 or later
+- **Go**: Go 1.27.2 or later (only required when building or running from source)
 
 > [!NOTE]
-> Most command examples in this guide run the tool directly from source using `go run`. This is the recommended approach, as the tool is in an early stage of development and is being actively enhanced. Once the tool stabilizes, an officially released binary will be provided.
+> A released `btp-exporter` binary is available for each provider release (see [Installation](#installation)). Some command examples in this guide also run the tool directly from source using `go run`, which is useful when working from a checkout of this repository.
 
 **Applying the generated manifests**:
 
@@ -74,7 +75,7 @@ The exporter connects to your SAP BTP global account using the BTP CLI and retri
 
 ## Installation
 
-Once released, download the latest binary for your OS (linux or darwin) and architecture and install it as `btp-exporter`:
+Download the latest binary for your OS (linux or darwin) and architecture and install it as `btp-exporter`:
 
 ```bash
 OS=$(uname -s | tr '[:upper:]' '[:lower:]') && \
@@ -319,6 +320,36 @@ Exports Cloud Foundry environment instances from BTP subaccounts.
 ```bash
 # Export Cloud Foundry environments
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export --kind cloudfoundry-environment
+```
+
+---
+
+### Kyma Environment
+
+Exports Kyma environment instances from BTP subaccounts.
+
+**Kind name:** `kyma-environment`
+
+**CLI flag:** `--kyma-environment <value>`
+
+**Selection criteria:**
+- Kyma environment ID (exact match)
+- Regex expression matching Kyma environment name
+
+**Notes:**
+- When exported, prerequisite resources (Cloud Management etc.) are automatically included
+
+**Example:**
+```bash
+# Export a specific Kyma environment from a subaccount with reference resolution
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+--kind kyma-environment \
+--subaccount <environment-id> \
+--resolve-references
+
+# Export Kyma environments interactively
+go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
+--kind kyma-environment
 ```
 
 ---
