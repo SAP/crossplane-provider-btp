@@ -30,4 +30,7 @@ func main() {
 	fmt.Println(rg)
 
 	pipeline.Run(provider, nil, absRootDir)
+	if err := patchSubaccountApiCredentialController(absRootDir); err != nil {
+		panic(err)
+	}
 }

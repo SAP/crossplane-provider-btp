@@ -250,7 +250,7 @@ func (b *CustomUpgradeTestBuilder) Feature() features.Feature {
 				wait.WithTimeout(b.verifyTimeout),
 			)
 			if err != nil {
-				t.Logf("failed to clean up resources: %v", err)
+				t.Errorf("failed to clean up resources from %v: %v; cluster destruction does not clean up BTP resources; confirm external cleanup before rerunning", b.resourceDirectories, err)
 			}
 			return ctx
 		},
