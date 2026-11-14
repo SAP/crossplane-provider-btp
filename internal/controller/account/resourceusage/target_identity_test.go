@@ -35,14 +35,17 @@ func TestReconcileTargetIdentity(t *testing.T) {
 		deleting       bool
 		getError       error
 		wantDeleted    bool
+		// wantRequeue is set where a deleting usage is held back because its target still
+		// exists: nothing watches the target, so the reconciler must poll until it is gone.
+		wantRequeue bool
 	}{
 		"replacement":                      {label: "old-target-uid", targetUID: "new-target-uid", deleting: true, wantDeleted: true},
-		"same target":                      {label: "old-target-uid", targetUID: "old-target-uid", deleting: true},
-		"same target still deleting":       {label: "old-target-uid", targetUID: "old-target-uid", deleting: true, targetDeleting: true},
-		"missing label":                    {missingLabel: true, targetUID: "new-target-uid", deleting: true},
-		"empty label":                      {targetUID: "new-target-uid", deleting: true},
-		"invalid label":                    {label: "invalid/uid", targetUID: "new-target-uid", deleting: true},
-		"unknown current UID":              {label: "old-target-uid", deleting: true},
+		"same target":                      {label: "old-target-uid", targetUID: "old-target-uid", deleting: true, wantRequeue: true},
+		"same target still deleting":       {label: "old-target-uid", targetUID: "old-target-uid", deleting: true, targetDeleting: true, wantRequeue: true},
+		"missing label":                    {missingLabel: true, targetUID: "new-target-uid", deleting: true, wantRequeue: true},
+		"empty label":                      {targetUID: "new-target-uid", deleting: true, wantRequeue: true},
+		"invalid label":                    {label: "invalid/uid", targetUID: "new-target-uid", deleting: true, wantRequeue: true},
+		"unknown current UID":              {label: "old-target-uid", deleting: true, wantRequeue: true},
 		"missing target":                   {label: "old-target-uid", missingTarget: true, deleting: true, wantDeleted: true},
 		"target lookup forbidden":          {label: "old-target-uid", targetUID: "new-target-uid", deleting: true, getError: errForbidden},
 		"active usage with replacement":    {label: "old-target-uid", targetUID: "new-target-uid"},
@@ -91,8 +94,12 @@ func TestReconcileTargetIdentity(t *testing.T) {
 			if err != tc.getError {
 				t.Fatalf("Reconcile() error = %v, want %v", err, tc.getError)
 			}
-			if result != (reconcile.Result{}) {
-				t.Fatalf("Reconcile() result = %v, want no requeue", result)
+			want := reconcile.Result{}
+			if tc.wantRequeue {
+				want = reconcile.Result{RequeueAfter: shortWait}
+			}
+			if result != want {
+				t.Fatalf("Reconcile() result = %v, want %v", result, want)
 			}
 			got := &v1alpha1.ResourceUsage{}
 			err = c.Get(ctx, client.ObjectKeyFromObject(ru), got)

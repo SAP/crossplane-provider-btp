@@ -101,18 +101,17 @@ func TestReconciler(t *testing.T) {
 			},
 		},
 		"BlockDeleteWhileInUse": {
-			reason: "We should return without requeueing if the resource usage is still in use",
+			reason: "We should requeue after a short wait if the resource usage is still in use: nothing watches the target, so nothing else brings us back once it is gone",
 			args: args{
 				m: &fake.Manager{
 					Client: &test.MockClient{
-						MockGet:          test.NewMockGetFn(nil, GetDeletedResourceUsageAndTarget),
-						MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+						MockGet: test.NewMockGetFn(nil, GetDeletedResourceUsageAndTarget),
 					},
 					Scheme: fake.SchemeWith(&v1alpha1.ResourceUsage{}, &v1alpha1.ResourceUsageList{}),
 				},
 			},
 			want: want{
-				result: reconcile.Result{},
+				result: reconcile.Result{RequeueAfter: shortWait},
 			},
 		},
 		"RemoveFinalizerError": {
@@ -169,38 +168,6 @@ func TestReconciler(t *testing.T) {
 			},
 			want: want{
 				result: reconcile.Result{RequeueAfter: shortWait},
-			},
-		},
-		"StatusUpdateNotFoundIsTerminal": {
-			reason: "A ResourceUsage deleted while we were reconciling it leaves nothing to write, so the reconcile must end cleanly instead of being retried forever",
-			args: args{
-				m: &fake.Manager{
-					Client: &test.MockClient{
-						MockGet:          test.NewMockGetFn(nil, GetDeletedResourceUsageAndTarget),
-						MockStatusUpdate: test.NewMockSubResourceUpdateFn(kerrors.NewNotFound(schema.GroupResource{}, "fake")),
-					},
-					Scheme: fake.SchemeWith(&v1alpha1.ResourceUsage{}, &v1alpha1.ResourceUsageList{}),
-				},
-			},
-			want: want{
-				result: reconcile.Result{},
-				err:    nil,
-			},
-		},
-		"StatusUpdateOtherErrorIsRetried": {
-			reason: "Any other status update error is still surfaced, so the reconcile is retried",
-			args: args{
-				m: &fake.Manager{
-					Client: &test.MockClient{
-						MockGet:          test.NewMockGetFn(nil, GetDeletedResourceUsageAndTarget),
-						MockStatusUpdate: test.NewMockSubResourceUpdateFn(errBoom),
-					},
-					Scheme: fake.SchemeWith(&v1alpha1.ResourceUsage{}, &v1alpha1.ResourceUsageList{}),
-				},
-			},
-			want: want{
-				result: reconcile.Result{},
-				err:    errors.Wrap(errBoom, errUpdateStatus),
 			},
 		},
 		"UpdateNotFoundIsTerminal": {
