@@ -1,0 +1,504 @@
+package subaccountapicredential
+
+import (
+	"context"
+	"testing"
+
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	kubefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	securityv1alpha1 "github.com/sap/crossplane-provider-btp/apis/security/v1alpha1"
+)
+
+func TestCredentialSecretClientFiltersUnsupportedAttributes(t *testing.T) {
+	secretRef := &xpv2.SecretReference{Name: "credential-connection", Namespace: "crossplane-system"}
+	cr := &securityv1alpha1.SubaccountApiCredential{
+		ObjectMeta: metav1.ObjectMeta{Name: "credential"},
+		Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+			ClusterManagedResourceSpec: xpv2.ClusterManagedResourceSpec{WriteConnectionSecretToReference: secretRef},
+			ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{
+				SubaccountID: strptr("effective-subaccount"), Name: strptr("effective-name"),
+			},
+		},
+		Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{
+			ReadOnly: boolptr(true),
+		}},
+	}
+	meta.SetExternalName(cr, "effective-subaccount/effective-name")
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: secretRef.Name, Namespace: secretRef.Namespace},
+		Data: map[string][]byte{
+			"attribute.client_secret": []byte("secret-bytes"),
+			"attribute.key":           []byte("key-bytes"),
+			"attribute.api_url":       nil,
+			"attribute.token_url":     []byte{},
+			"attribute.read_only":     []byte("not-a-boolean"),
+			"attribute.name":          []byte("retargeted-name"),
+			"attribute.subaccount_id": []byte("retargeted-subaccount"),
+			"attribute.unknown":       []byte("unknown-bytes"),
+			"unprefixed":              []byte("extra-bytes"),
+		},
+	}
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	kube := kubefake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build()
+	filtered, err := (&credentialSecretClient{kube: kube, connectionDetailsKeys: cr.GetConnectionDetailsMapping()}).GetSecretData(context.Background(), secretRef)
+	if err != nil {
+		t.Fatalf("GetSecretData() failed: %v", err)
+	}
+	for _, key := range []string{"attribute.api_url", "attribute.token_url"} {
+		value, ok := filtered[key]
+		if !ok || len(value) != 0 {
+			t.Errorf("filtered view did not retain present nil/empty mapped value %q", key)
+		}
+	}
+
+	state := &credentialFrameworkState{SubaccountApiCredential: cr, ctx: context.Background(), kube: kube}
+	observation, err := state.GetObservation()
+	if err != nil {
+		t.Fatalf("GetObservation() failed: %v", err)
+	}
+	if got, ok := observation["key"].(string); !ok || got != "key-bytes" {
+		t.Errorf("mapped sensitive key was not restored unchanged: %#v", observation["key"])
+	}
+	for _, key := range []string{"attribute.api_url", "attribute.token_url"} {
+		if value, ok := secret.Data[key]; !ok || len(value) != 0 {
+			t.Errorf("expected present nil/empty mapped value %q in test fixture", key)
+		}
+	}
+	if got, ok := observation["read_only"].(bool); !ok || !got {
+		t.Errorf("typed observed ReadOnly value was replaced by Secret data: %#v", observation["read_only"])
+	}
+	if _, ok := observation["unknown"]; ok {
+		t.Error("unsupported Secret attribute entered Terraform observation")
+	}
+	if got := observation["name"]; got != "effective-name" {
+		t.Errorf("Secret extra changed reconstructed name: got %#v", got)
+	}
+	if got := observation["subaccount_id"]; got != "effective-subaccount" {
+		t.Errorf("Secret extra changed reconstructed subaccount: got %#v", got)
+	}
+	if cr.Status.AtProvider.ReadOnly == nil || !*cr.Status.AtProvider.ReadOnly {
+		t.Error("typed observed readOnly value was modified")
+	}
+	if value(cr.Spec.ForProvider.SubaccountID) != "effective-subaccount" || value(cr.Spec.ForProvider.Name) != "effective-name" {
+		t.Error("Secret restoration modified forProvider identity")
+	}
+	unchanged := &corev1.Secret{}
+	if err := kube.Get(context.Background(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, unchanged); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range secret.Data {
+		if string(unchanged.Data[key]) != string(want) {
+			t.Errorf("filtering modified stored Secret key %q", key)
+		}
+	}
+}
+
+func TestHasCompleteCredentialConnectionDetails(t *testing.T) {
+	complete := managed.ConnectionDetails{
+		"attribute.client_id":     []byte("id"),
+		"attribute.client_secret": []byte("secret"),
+		"attribute.api_url":       []byte("api"),
+		"attribute.token_url":     []byte("token"),
+		"extra":                   []byte("allowed"),
+	}
+	for _, key := range requiredCredentialConnectionKeys {
+		t.Run("missing_"+key, func(t *testing.T) {
+			got := managed.ConnectionDetails{}
+			for k, v := range complete {
+				if k != key && k != "extra" {
+					got[k] = v
+				}
+			}
+			if hasCompleteCredentialConnectionDetails(got) {
+				t.Fatalf("expected missing %s to be incomplete", key)
+			}
+		})
+		t.Run("nil_"+key, func(t *testing.T) {
+			got := managed.ConnectionDetails{}
+			for k, v := range complete {
+				got[k] = v
+			}
+			got[key] = nil
+			if hasCompleteCredentialConnectionDetails(got) {
+				t.Fatalf("expected nil %s to be incomplete", key)
+			}
+		})
+		t.Run("empty_"+key, func(t *testing.T) {
+			got := managed.ConnectionDetails{}
+			for k, v := range complete {
+				got[k] = v
+			}
+			got[key] = []byte{}
+			if hasCompleteCredentialConnectionDetails(got) {
+				t.Fatalf("expected empty %s to be incomplete", key)
+			}
+		})
+	}
+	if !hasCompleteCredentialConnectionDetails(complete) {
+		t.Fatal("complete connection details with extra keys should be accepted")
+	}
+}
+
+func TestCredentialAdoptionExternalClientObserve(t *testing.T) {
+	complete := managed.ConnectionDetails{
+		"attribute.client_id":     []byte("id"),
+		"attribute.client_secret": []byte("secret"),
+		"attribute.api_url":       []byte("api"),
+		"attribute.token_url":     []byte("token"),
+	}
+	for name, tc := range map[string]struct {
+		cr        *securityv1alpha1.SubaccountApiCredential
+		details   managed.ConnectionDetails
+		wantErr   string
+		wantReady corev1.ConditionStatus
+	}{
+		"complete secret-based state": {
+			cr:      &securityv1alpha1.SubaccountApiCredential{},
+			details: complete,
+		},
+		"incomplete secret-based state": {
+			cr:        &securityv1alpha1.SubaccountApiCredential{},
+			details:   managed.ConnectionDetails{"attribute.client_id": []byte("id")},
+			wantErr:   errCredentialAdoptionIncomplete,
+			wantReady: corev1.ConditionFalse,
+		},
+		"observed certificate from forProvider does not require client secret": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{CertificatePassed: strptr("pem")},
+				},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: strptr("client certificate")}},
+			},
+			details: managed.ConnectionDetails{},
+		},
+		"observed certificate from initProvider does not require client secret": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: strptr("pem")},
+				},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: strptr("client certificate")}},
+			},
+			details: managed.ConnectionDetails{},
+		},
+		"certificate input cannot exempt observed secret state": {
+			cr: &securityv1alpha1.SubaccountApiCredential{Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+				InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: strptr("pem")},
+			}, Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: strptr("secret")}}},
+			details:   managed.ConnectionDetails{"attribute.client_id": []byte("id")},
+			wantErr:   errCredentialAdoptionIncomplete,
+			wantReady: corev1.ConditionFalse,
+		},
+		"unknown observed type does not grant certificate exemption": {
+			cr: &securityv1alpha1.SubaccountApiCredential{Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+				ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{CertificatePassed: strptr("pem")},
+			}},
+			details:   managed.ConnectionDetails{},
+			wantErr:   errCredentialAdoptionIncomplete,
+			wantReady: corev1.ConditionFalse,
+		},
+		"deleting secret credential skips active adoption guard": {
+			cr:      &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: func() *metav1.Time { now := metav1.Now(); return &now }()}},
+			details: managed.ConnectionDetails{"attribute.client_id": []byte("id")},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			inner := managed.ExternalClientFns{
+				ObserveFn: func(context.Context, resource.Managed) (managed.ExternalObservation, error) {
+					return managed.ExternalObservation{ResourceExists: true, ConnectionDetails: tc.details}, nil
+				},
+			}
+			client := &credentialAdoptionExternalClient{ExternalClient: inner}
+			_, err := client.Observe(context.Background(), tc.cr)
+			if got := errorString(err); got != tc.wantErr {
+				t.Fatalf("error mismatch: got %q, want %q", got, tc.wantErr)
+			}
+			if tc.wantReady != "" && tc.cr.GetCondition("Ready").Status != tc.wantReady {
+				t.Errorf("Ready condition mismatch: got %q, want %q", tc.cr.GetCondition("Ready").Status, tc.wantReady)
+			}
+		})
+	}
+}
+
+func TestShouldReconstructSecretCredentialStateUsesEffectiveMode(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		forProvider     *string
+		initProvider    *string
+		observed        *string
+		mergeInit       bool
+		wantReconstruct bool
+	}{
+		{name: "empty intent reconstructs", wantReconstruct: true},
+		{name: "forProvider certificate is effective", forProvider: strptr("pem"), wantReconstruct: false},
+		{name: "ignored initProvider certificate does not affect mode", initProvider: strptr("pem"), wantReconstruct: true},
+		{name: "merged initProvider certificate is effective", initProvider: strptr("pem"), mergeInit: true, wantReconstruct: false},
+		{name: "forProvider certificate takes precedence", forProvider: strptr("for-provider"), initProvider: strptr("init-provider"), mergeInit: true, wantReconstruct: false},
+		{name: "explicit empty forProvider allows generated merge to use initProvider", forProvider: strptr(""), initProvider: strptr("pem"), mergeInit: true, wantReconstruct: false},
+		{name: "observed secret remains authoritative", initProvider: strptr("pem"), observed: strptr("secret"), wantReconstruct: true},
+		{name: "observed certificate remains authoritative", observed: strptr("client certificate"), wantReconstruct: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cr := &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ForProvider:  securityv1alpha1.SubaccountApiCredentialParameters{CertificatePassed: tc.forProvider},
+					InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: tc.initProvider},
+				},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: tc.observed}},
+			}
+			got, err := shouldReconstructSecretCredentialState(cr, tc.mergeInit)
+			if err != nil {
+				t.Fatalf("shouldReconstructSecretCredentialState() error = %v", err)
+			}
+			if got != tc.wantReconstruct {
+				t.Errorf("shouldReconstructSecretCredentialState() = %t, want %t", got, tc.wantReconstruct)
+			}
+		})
+	}
+}
+
+func TestCredentialAdoptionConnectorPinsIdentityForConnect(t *testing.T) {
+	cr := &securityv1alpha1.SubaccountApiCredential{
+		ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+		Spec:       securityv1alpha1.SubaccountApiCredentialSpec{ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{SubaccountID: strptr("sa-drifted")}},
+		Status:     securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{SubaccountID: strptr("sa-established"), Name: strptr("credential-established")}},
+	}
+	meta.SetExternalName(cr, "sa-established/credential-established")
+	var connectedSubaccountID, connectedExternalName string
+	inner := managed.ExternalConnectorFn(func(_ context.Context, mg resource.Managed) (managed.ExternalClient, error) {
+		got, ok := mg.(*credentialFrameworkState)
+		if !ok {
+			t.Fatalf("Connect received %T, want credential state wrapper", mg)
+		}
+		connectedSubaccountID = value(got.Spec.ForProvider.SubaccountID)
+		connectedExternalName = meta.GetExternalName(got)
+		return managed.ExternalClientFns{}, nil
+	})
+	wrapped := newCredentialAdoptionConnector(inner, nil, false)
+	if _, err := wrapped.Connect(context.Background(), cr); err != nil {
+		t.Fatal(err)
+	}
+	if connectedSubaccountID != "sa-established" || connectedExternalName != "sa-established/credential-established" {
+		t.Fatalf("connector saw wrong identity: subaccount=%q external-name=%q", connectedSubaccountID, connectedExternalName)
+	}
+	if value(cr.Spec.ForProvider.SubaccountID) != "sa-drifted" || meta.GetExternalName(cr) != "sa-established/credential-established" {
+		t.Fatal("temporary identity pin was not restored after Connect")
+	}
+}
+
+func TestCredentialAdoptionConnectorDoesNotReconstructStateDuringDeletion(t *testing.T) {
+	now := metav1.Now()
+	cr := &securityv1alpha1.SubaccountApiCredential{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &now}}
+	inner := managed.ExternalConnectorFn(func(_ context.Context, mg resource.Managed) (managed.ExternalClient, error) {
+		if mg != cr {
+			t.Fatalf("deleting connector resource has type %T; expected original managed resource", mg)
+		}
+		return managed.ExternalClientFns{}, nil
+	})
+	if _, err := newCredentialAdoptionConnector(inner, nil, false).Connect(context.Background(), cr); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCredentialAdoptionExternalClientAllowsAbsentResource(t *testing.T) {
+	client := &credentialAdoptionExternalClient{ExternalClient: managed.ExternalClientFns{
+		ObserveFn: func(context.Context, resource.Managed) (managed.ExternalObservation, error) {
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		},
+	}}
+	obs, err := client.Observe(context.Background(), &securityv1alpha1.SubaccountApiCredential{})
+	if err != nil {
+		t.Fatalf("Observe() rejected an absent resource before Create: %v", err)
+	}
+	if obs.ResourceExists {
+		t.Fatal("expected resource to remain absent so normal policy-driven Create can run")
+	}
+}
+
+func TestCredentialAdoptionExternalClientCreateRequiresCompleteSecret(t *testing.T) {
+	for name, tc := range map[string]struct {
+		cr      *securityv1alpha1.SubaccountApiCredential
+		details managed.ConnectionDetails
+		wantErr bool
+	}{
+		"complete": {
+			cr: &securityv1alpha1.SubaccountApiCredential{},
+			details: managed.ConnectionDetails{
+				"attribute.client_id": []byte("id"), "attribute.client_secret": []byte("secret"),
+				"attribute.api_url": []byte("api"), "attribute.token_url": []byte("token"),
+			},
+		},
+		"incomplete secret credential": {cr: &securityv1alpha1.SubaccountApiCredential{}, wantErr: true},
+		"observed certificate": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec:   securityv1alpha1.SubaccountApiCredentialSpec{InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: strptr("pem")}},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: strptr("client certificate")}},
+			},
+		},
+		"certificate input with observed secret is incomplete": {
+			cr: &securityv1alpha1.SubaccountApiCredential{
+				Spec:   securityv1alpha1.SubaccountApiCredentialSpec{InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{CertificatePassed: strptr("pem")}},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{CredentialType: strptr("secret")}},
+			},
+			wantErr: true,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			client := &credentialAdoptionExternalClient{ExternalClient: managed.ExternalClientFns{
+				CreateFn: func(context.Context, resource.Managed) (managed.ExternalCreation, error) {
+					return managed.ExternalCreation{ConnectionDetails: tc.details}, nil
+				},
+			}}
+			_, err := client.Create(context.Background(), tc.cr)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Create() error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestPinEstablishedIdentity(t *testing.T) {
+	for name, tc := range map[string]struct {
+		externalName string
+		specID       string
+		statusID     string
+		statusName   string
+		wantName     string
+		wantID       string
+		wantErr      string
+	}{
+		"spec drift is pinned to observed identity": {
+			externalName: "sa-one/credential-one", specID: "sa-two", statusID: "sa-one", statusName: "credential-one",
+			wantName: "sa-one/credential-one", wantID: "sa-one",
+		},
+		"annotation retarget is rejected": {
+			externalName: "sa-two/credential-two", specID: "sa-two", statusID: "sa-one", statusName: "credential-one",
+			wantName: "sa-two/credential-two", wantID: "sa-two", wantErr: errCredentialIdentityConflict,
+		},
+		"legacy annotation normalizes to observed identity": {
+			externalName: "credential-one", specID: "sa-two", statusID: "sa-one", statusName: "credential-one",
+			wantName: "sa-one/credential-one", wantID: "sa-one",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cr := &securityv1alpha1.SubaccountApiCredential{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+				Spec:       securityv1alpha1.SubaccountApiCredentialSpec{ForProvider: securityv1alpha1.SubaccountApiCredentialParameters{SubaccountID: strptr(tc.specID)}},
+				Status:     securityv1alpha1.SubaccountApiCredentialStatus{AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{SubaccountID: strptr(tc.statusID), Name: strptr(tc.statusName)}},
+			}
+			meta.SetExternalName(cr, tc.externalName)
+			err := pinEstablishedIdentity(cr)
+			if got := errorString(err); got != tc.wantErr {
+				t.Fatalf("error mismatch: got %q, want %q", got, tc.wantErr)
+			}
+			if got := meta.GetExternalName(cr); got != tc.wantName {
+				t.Errorf("external name mismatch: got %q, want %q", got, tc.wantName)
+			}
+			if got := *cr.Spec.ForProvider.SubaccountID; got != tc.wantID {
+				t.Errorf("subaccount ID mismatch: got %q, want %q", got, tc.wantID)
+			}
+		})
+	}
+}
+
+func TestCredentialFrameworkStateReadIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		name                string
+		specID              string
+		initID              string
+		observedID          string
+		observedName        string
+		wantID              string
+		wantName            string
+		mergeInit           bool
+		omitForProviderName bool
+		initName            string
+	}{
+
+		{name: "new MR uses spec identity", specID: "subaccount-new", wantID: "subaccount-new", wantName: "configured-name"},
+		{name: "initProvider subaccount with explicit forProvider name", initID: "subaccount-init", wantID: "subaccount-init", wantName: "configured-name", mergeInit: true},
+		{name: "forProvider identity takes precedence", specID: "subaccount-forprovider", initID: "subaccount-init", wantID: "subaccount-forprovider", wantName: "configured-name", mergeInit: true},
+		{name: "feature-disabled ignores initProvider", initID: "subaccount-init", wantName: "configured-name"},
+		{name: "observed identity wins over drifted spec", specID: "subaccount-drifted", observedID: "subaccount-established", wantID: "subaccount-established", wantName: "configured-name"},
+		{name: "partial observed identity is retained", observedID: "subaccount-established", wantID: "subaccount-established", wantName: "configured-name"},
+		{name: "established identity components win over drift", initID: "subaccount-drifted", observedID: "subaccount-established", observedName: "credential-established", wantID: "subaccount-established", wantName: "credential-established", mergeInit: true},
+		{name: "effective initProvider name", initID: "subaccount-init", wantID: "subaccount-init", wantName: "init-configured-name", mergeInit: true, omitForProviderName: true, initName: "init-configured-name"},
+		{name: "default name remains external-name fallback", initID: "subaccount-init", wantID: "subaccount-init", mergeInit: true, omitForProviderName: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			if err := corev1.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "connection", Namespace: "test"},
+				Data: map[string][]byte{
+					"attribute.client_secret": []byte("synthetic-secret"),
+					// Extra keys cannot replace the resource's Read identity.
+					"attribute.subaccount_id": []byte("subaccount-from-secret"),
+					"attribute.name":          []byte("name-from-secret"),
+				},
+			}
+			cr := &securityv1alpha1.SubaccountApiCredential{
+				Spec: securityv1alpha1.SubaccountApiCredentialSpec{
+					ClusterManagedResourceSpec: xpv2.ClusterManagedResourceSpec{
+						WriteConnectionSecretToReference: &xpv2.SecretReference{Name: secret.Name, Namespace: secret.Namespace},
+					},
+					ForProvider:  securityv1alpha1.SubaccountApiCredentialParameters{SubaccountID: strptr(tc.specID), Name: strptr("configured-name")},
+					InitProvider: securityv1alpha1.SubaccountApiCredentialInitParameters{SubaccountID: strptr(tc.initID), Name: strptr(tc.initName)},
+				},
+				Status: securityv1alpha1.SubaccountApiCredentialStatus{
+					AtProvider: securityv1alpha1.SubaccountApiCredentialObservation{SubaccountID: strptr(tc.observedID), Name: strptr(tc.observedName)},
+				},
+			}
+			if tc.omitForProviderName {
+				cr.Spec.ForProvider.Name = nil
+			}
+			wrapped := &credentialFrameworkState{
+				SubaccountApiCredential: cr,
+				ctx:                     context.Background(),
+				kube:                    kubefake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build(),
+				mergeInitProvider:       tc.mergeInit,
+			}
+			observation, err := wrapped.GetObservation()
+			if err != nil {
+				t.Fatal(err)
+			}
+			gotSubaccountID, _ := observation["subaccount_id"].(string)
+			if gotSubaccountID != tc.wantID {
+				t.Errorf("Read subaccount = %q, want %q", gotSubaccountID, tc.wantID)
+			}
+			gotName, _ := observation["name"].(string)
+			if gotName != tc.wantName {
+				t.Errorf("Read name = %q, want %q", gotName, tc.wantName)
+			}
+			if observation["client_secret"] != "synthetic-secret" {
+				t.Error("connection secret was not restored to the in-memory state")
+			}
+			if value(cr.Status.AtProvider.SubaccountID) != tc.observedID || value(cr.Spec.ForProvider.SubaccountID) != tc.specID {
+				t.Error("state reconstruction changed the MR's spec or status")
+			}
+		})
+	}
+}
+
+func strptr(s string) *string { return &s }
+
+func boolptr(b bool) *bool { return &b }
+
+func errorString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
