@@ -43,7 +43,8 @@ type SubaccountDestinationCertificateInitParameters struct {
 	Type string `json:"type,omitempty"`
 
 	// DestinationServiceBindingSecretRef points to a Kubernetes Secret containing
-	// Destination Service OAuth2 credentials.
+	// Destination Service OAuth2 credentials of a binding in the same subaccount
+	// as subaccountId.
 	// +optional
 	DestinationServiceBindingSecretRef *xpv1.SecretKeySelector `json:"destinationServiceBindingSecretRef,omitempty"`
 }
@@ -85,7 +86,8 @@ type SubaccountDestinationCertificateParameters struct {
 	Type string `json:"type,omitempty"`
 
 	// DestinationServiceBindingSecretRef points to a Kubernetes Secret containing
-	// Destination Service OAuth2 credentials. The secret can be created by a
+	// Destination Service OAuth2 credentials of a binding in the same subaccount
+	// as subaccountId. The secret can be created by a
 	// ServiceBinding CR (recommended) or manually.
 	//
 	// Two secret formats are accepted:
@@ -130,6 +132,11 @@ type SubaccountDestinationCertificateStatus struct {
 
 // SubaccountDestinationCertificate manages a certificate in a SAP BTP subaccount via
 // the Destination Service REST API.
+//
+// The binding in destinationServiceBindingSecretRef must belong to the
+// subaccount in subaccountId; otherwise the resource goes Synced=False and a
+// delete blocks. If the binding can't be fixed and the resource must go, set
+// deletionPolicy: Orphan.
 //
 // External-Name Configuration:
 //   - Follows Standard: no (compound key, not a single GUID)

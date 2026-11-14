@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"golang.org/x/oauth2/clientcredentials"
-
 	destclient "github.com/sap/crossplane-provider-btp/internal/openapi_clients/btp-destination-service-api-go/pkg"
 )
 
@@ -107,26 +105,6 @@ func NewConflictError() error {
 
 type destinationClient struct {
 	api destclient.DestinationsOnSubaccountLevelAPI
-}
-
-// NewDestinationClient creates a client authenticating via OAuth2 client credentials.
-func NewDestinationClient(cred DestinationCredential) (DestinationClientI, error) {
-	oauthHTTP := (&clientcredentials.Config{
-		ClientID:     cred.ClientID,
-		ClientSecret: cred.ClientSecret,
-		TokenURL:     cred.TokenURL,
-	}).Client(context.Background())
-
-	cfg := destclient.NewConfiguration()
-	cfg.HTTPClient = oauthHTTP
-	cfg.Servers = destclient.ServerConfigurations{
-		{URL: strings.TrimRight(cred.URI, "/") + "/destination-configuration"},
-	}
-
-	apiClient := destclient.NewAPIClient(cfg)
-	return &destinationClient{
-		api: apiClient.DestinationsOnSubaccountLevelAPI,
-	}, nil
 }
 
 func (c *destinationClient) Get(ctx context.Context, name string) (map[string]string, string, error) {
