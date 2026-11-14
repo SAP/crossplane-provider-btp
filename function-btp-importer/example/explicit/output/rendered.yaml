@@ -1,0 +1,81 @@
+---
+apiVersion: example.crossplane.io/v1
+kind: XBTPResources
+metadata:
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+  name: my-workload-xr
+spec:
+  crossplane:
+    resourceRefs:
+      - apiVersion: account.btp.sap.crossplane.io/v1alpha1
+        kind: ServiceInstance
+        name: my-workload-xr-my-annotated-instance
+      - apiVersion: account.btp.sap.crossplane.io/v1alpha1
+        kind: ServiceInstance
+        name: my-workload-xr-my-plain-instance
+status:
+  conditions:
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      reason: WatchCircuitClosed
+      status: "True"
+      type: Responsive
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      message: 1 existing BTP resource(s) adopted
+      reason: ResourcesImported
+      status: "True"
+      type: ImportsVerified
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      reason: ReconcileSuccess
+      status: "True"
+      type: Synced
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      message: 'Unready resources: my-annotated-instance, my-plain-instance'
+      reason: Creating
+      status: "False"
+      type: Ready
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: my-annotated-instance
+    crossplane.io/external-name: si-uuid-eeee-5555
+    import.btp.sap.crossplane.io/lookup: "true"
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+    crossplane.io/composite: my-workload-xr
+  name: my-workload-xr-my-annotated-instance
+  ownerReferences:
+    - apiVersion: example.crossplane.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XBTPResources
+      name: my-workload-xr
+      uid: e6275119-0e0a-5841-bf76-1ef0c4e2cf03
+spec:
+  forProvider:
+    name: my-annotated-instance
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: my-plain-instance
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+    crossplane.io/composite: my-workload-xr
+  name: my-workload-xr-my-plain-instance
+  ownerReferences:
+    - apiVersion: example.crossplane.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XBTPResources
+      name: my-workload-xr
+      uid: e6275119-0e0a-5841-bf76-1ef0c4e2cf03
+spec:
+  forProvider:
+    name: my-plain-instance

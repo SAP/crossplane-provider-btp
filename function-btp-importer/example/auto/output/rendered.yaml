@@ -1,0 +1,136 @@
+---
+apiVersion: example.crossplane.io/v1
+kind: XBTPResources
+metadata:
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+  name: my-workload-xr
+spec:
+  crossplane:
+    resourceRefs:
+      - apiVersion: account.btp.sap.crossplane.io/v1alpha1
+        kind: ServiceInstance
+        name: my-workload-xr-my-service-instance
+      - apiVersion: account.btp.sap.crossplane.io/v1alpha1
+        kind: Subaccount
+        name: my-workload-xr-30361895e8d0
+      - apiVersion: account.btp.sap.crossplane.io/v1alpha1
+        kind: Subscription
+        name: my-workload-xr-ca1d76f9ef04
+      - apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+        kind: KymaEnvironment
+        name: my-workload-xr-my-kyma-env
+status:
+  conditions:
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      reason: WatchCircuitClosed
+      status: "True"
+      type: Responsive
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      message: 4 existing BTP resource(s) adopted
+      reason: ResourcesImported
+      status: "True"
+      type: ImportsVerified
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      reason: ReconcileSuccess
+      status: "True"
+      type: Synced
+    - lastTransitionTime: "2024-01-01T00:00:00Z"
+      message: 'Unready resources: my-kyma-env, my-service-instance, my-subaccount, and 1 more'
+      reason: Creating
+      status: "False"
+      type: Ready
+---
+apiVersion: environment.btp.sap.crossplane.io/v1alpha1
+kind: KymaEnvironment
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: my-kyma-env
+    crossplane.io/external-name: env-uuid-dddd-4444
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+    crossplane.io/composite: my-workload-xr
+  name: my-workload-xr-my-kyma-env
+  ownerReferences:
+    - apiVersion: example.crossplane.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XBTPResources
+      name: my-workload-xr
+      uid: e6275119-0e0a-5841-bf76-1ef0c4e2cf03
+spec:
+  forProvider:
+    name: my-kyma-env
+    planName: aws
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: ServiceInstance
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: my-service-instance
+    crossplane.io/external-name: si-uuid-aaaa-1111
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+    crossplane.io/composite: my-workload-xr
+  name: my-workload-xr-my-service-instance
+  ownerReferences:
+    - apiVersion: example.crossplane.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XBTPResources
+      name: my-workload-xr
+      uid: e6275119-0e0a-5841-bf76-1ef0c4e2cf03
+spec:
+  forProvider:
+    name: my-service-instance
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subaccount
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: my-subaccount
+    crossplane.io/external-name: sa-uuid-cccc-3333
+  generateName: my-workload-xr-
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+    crossplane.io/composite: my-workload-xr
+  name: my-workload-xr-30361895e8d0
+  ownerReferences:
+    - apiVersion: example.crossplane.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XBTPResources
+      name: my-workload-xr
+      uid: e6275119-0e0a-5841-bf76-1ef0c4e2cf03
+spec:
+  forProvider:
+    region: eu10
+    subdomain: my-subdomain
+---
+apiVersion: account.btp.sap.crossplane.io/v1alpha1
+kind: Subscription
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: my-subscription
+    crossplane.io/external-name: auditlog-viewer/free
+  generateName: my-workload-xr-
+  labels:
+    crossplane.io/claim-name: my-workload
+    crossplane.io/claim-namespace: my-namespace
+    crossplane.io/composite: my-workload-xr
+  name: my-workload-xr-ca1d76f9ef04
+  ownerReferences:
+    - apiVersion: example.crossplane.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XBTPResources
+      name: my-workload-xr
+      uid: e6275119-0e0a-5841-bf76-1ef0c4e2cf03
+spec:
+  forProvider:
+    appName: auditlog-viewer
+    planName: free
