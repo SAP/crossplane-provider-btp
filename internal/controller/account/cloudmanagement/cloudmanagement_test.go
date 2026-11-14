@@ -13,6 +13,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/internal"
 	cmclient "github.com/sap/crossplane-provider-btp/internal/clients/cis"
 	"github.com/sap/crossplane-provider-btp/internal/clients/servicemanager"
+	"github.com/sap/crossplane-provider-btp/internal/testutils"
 	test2 "github.com/sap/crossplane-provider-btp/internal/tracking/test"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -268,6 +269,60 @@ func TestConnect(t *testing.T) {
 				t.Errorf("\ne.Observe(): expected cr after operation -want, +got:\n%s\n", diff)
 			}
 		})
+	}
+}
+
+// TestConnect_SkipTrackingWhenDeleted is a regression test for the case where
+// a CloudManagement MR is being deleted and its referenced ServiceManager MR
+// has already been removed from the cluster. Before the fix, Connect() would
+// abort with "cannot track ResourceUsage: servicemanager … not found", which
+// kept Delete() from ever running — leaving the BTP-side CIS instance and the
+// finalizer in place forever.
+func TestConnect_SkipTrackingWhenDeleted(t *testing.T) {
+	now := metav1.Now()
+	cr := NewCloudManagement("test",
+		WithData(v1beta1.CloudManagementParameters{
+			ServiceManagerSecretNamespace: "someNamespace",
+			ServiceManagerSecret:          "someSecret",
+		}),
+	)
+	cr.SetDeletionTimestamp(&now)
+
+	tracker := testutils.NewResourceTrackerMockWithError(errors.New("servicemanager … not found"))
+
+	uua := &connector{
+		kube: &test.MockClient{
+			MockGet:          test.NewMockGetFn(nil),
+			MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
+		},
+		usage:           test2.NoOpLegacyTracker{},
+		resourcetracker: tracker,
+		newPlanIdResolverFn: func(ctx context.Context, secretData map[string][]byte) (servicemanager.PlanIdResolver, error) {
+			return PlanIDFake{
+				func(ctx context.Context, offeringName string, servicePlanName string, dataCenter string) (string, error) {
+					return "planID", nil
+				},
+			}, nil
+		},
+		newClientInitalizerFn: func() cmclient.ITfClientInitializer {
+			return &ClientInitializerFake{
+				ConnectResourcesFn: func(ctx context.Context, cr *v1beta1.CloudManagement) (cmclient.ITfClient, error) {
+					return &TfClientFake{}, nil
+				},
+			}
+		},
+	}
+
+	_, err := uua.Connect(context.TODO(), cr)
+
+	// The Track error must NOT bubble up — Connect should skip Track when the
+	// MR is being deleted. Other errors past that point (secret resolution,
+	// client init, …) are independently exercised by TestConnect's other cases.
+	if err != nil && errors.Cause(err).Error() == "servicemanager … not found" {
+		t.Fatalf("Connect returned the tracking error during deletion: %v", err)
+	}
+	if tracker.TrackCalled {
+		t.Errorf("expected Track() to be skipped during deletion, but it was called")
 	}
 }
 
