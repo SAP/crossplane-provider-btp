@@ -30,7 +30,7 @@ on:
 jobs:
   upgrade-test:
     runs-on: ubuntu-latest
-    environment: pr-e2e-approval
+    environment: pr-e2e-no-approval
     env:
       # hardcoded BTP CLI version
       btp_cli_version: 2.116.3
