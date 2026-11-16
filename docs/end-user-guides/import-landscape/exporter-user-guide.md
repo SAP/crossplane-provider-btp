@@ -287,7 +287,9 @@ go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
 go run github.com/sap/crossplane-provider-btp/cmd/exporter export \
   --kind subscription \
   --subaccount <subaccount-id> \
-  --subscription '.*' \
+  --subscription '.*'
+```
+
 ### Directory
 
 Exports the BTP directories **above** the selected subaccount(s), preserving the
