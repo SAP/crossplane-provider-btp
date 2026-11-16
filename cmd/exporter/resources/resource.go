@@ -38,6 +38,7 @@ const (
 	WarnDefaultEntitlementEnableFalse = "WARNING: entitlement does not have 'enable' field set to true"
 	WarnMissingKymaName               = "WARNING: Kyma name is missing"
 	WarnMissingKymaPlanName           = "WARNING: Kyma plan name is missing"
+	WarnParametersManual              = "WARNING: please add the forProvider.parameters field to this resource manually"
 )
 
 type BtpResource interface {
