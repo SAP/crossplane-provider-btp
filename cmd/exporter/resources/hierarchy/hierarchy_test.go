@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
 	"github.com/stretchr/testify/require"
 )
 
@@ -85,10 +86,10 @@ func TestAncestorDirectoriesForSubaccountsDeduplicates(t *testing.T) {
 func TestDirectoryK8sResourceName(t *testing.T) {
 	h := New(testHierarchy())
 
-	t.Run("resolves a known directory to its sanitized name", func(t *testing.T) {
+	t.Run("resolves a known directory to its sanitized, guid-suffixed name", func(t *testing.T) {
 		name, err := h.DirectoryK8sResourceName("dir-1")
 		require.NoError(t, err)
-		require.Equal(t, "dir-1", name)
+		require.Equal(t, "dir-1.dir-1", name)
 	})
 
 	t.Run("empty id returns an error", func(t *testing.T) {
@@ -100,4 +101,21 @@ func TestDirectoryK8sResourceName(t *testing.T) {
 		_, err := h.DirectoryK8sResourceName("does-not-exist")
 		require.Error(t, err)
 	})
+}
+
+// TestK8sResourceName_CollisionResistance guards the fix for the output
+// collision where directories whose display names sanitize to the same value
+// (e.g. "Team A" and "team-a") would otherwise map to a single metadata.name.
+// Folding the distinct GUIDs into the name keeps them apart.
+func TestK8sResourceName_CollisionResistance(t *testing.T) {
+	a := K8sResourceName("11111111-1111-1111-1111-111111111111", "Team A")
+	b := K8sResourceName("22222222-2222-2222-2222-222222222222", "team-a")
+
+	require.NotEqual(t, a, b, "distinct directories must not collide on the same resource name")
+	require.Contains(t, a, "11111111-1111-1111-1111-111111111111")
+	require.Contains(t, b, "22222222-2222-2222-2222-222222222222")
+}
+
+func TestK8sResourceName_EmptyDisplayName(t *testing.T) {
+	require.Equal(t, resources.UndefinedName, K8sResourceName("some-guid", ""))
 }

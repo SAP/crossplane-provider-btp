@@ -12,6 +12,7 @@ import (
 	"github.com/sap/crossplane-provider-btp/apis/account/v1alpha1"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/btpcli"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources"
+	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/hierarchy"
 )
 
 const (
@@ -20,6 +21,11 @@ const (
 	parentName        = "parent-directory"
 	childGUID         = "dir-child-2222-2222-2222-222222222222"
 	childName         = "child-directory"
+)
+
+var (
+	parentResourceName = hierarchy.K8sResourceName(parentGUID, parentName)
+	childResourceName  = hierarchy.K8sResourceName(childGUID, childName)
 )
 
 // newDirectory builds a *directory test fixture from a btpcli.Child.
@@ -89,7 +95,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 						APIVersion: v1alpha1.CRDGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: childName,
+						Name: childResourceName,
 						Annotations: map[string]string{
 							"crossplane.io/external-name": childGUID,
 						},
@@ -133,7 +139,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 						APIVersion: v1alpha1.CRDGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: parentName,
+						Name: parentResourceName,
 						Annotations: map[string]string{
 							"crossplane.io/external-name": parentGUID,
 						},
@@ -174,7 +180,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 						APIVersion: v1alpha1.CRDGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: childName,
+						Name: childResourceName,
 						Annotations: map[string]string{
 							"crossplane.io/external-name": childGUID,
 						},
@@ -187,7 +193,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 							DisplayName:       &dn,
 							DirectoryFeatures: []string{"DEFAULT"},
 							// DirectoryGuid cleared, ref points at the parent's k8s name.
-							DirectoryRef: &v2.Reference{Name: parentName},
+							DirectoryRef: &v2.Reference{Name: parentResourceName},
 						},
 					},
 				})
@@ -216,7 +222,7 @@ func TestConvertDirectoryResource(t *testing.T) {
 						APIVersion: v1alpha1.CRDGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: childName,
+						Name: childResourceName,
 						Annotations: map[string]string{
 							"crossplane.io/external-name": childGUID,
 						},
@@ -328,7 +334,7 @@ func TestResolveReference(t *testing.T) {
 		spec := &v1alpha1.DirectoryParameters{DirectoryGuid: parentGUID}
 		err := resolveReference(t.Context(), nil, spec)
 		r.NoError(err)
-		r.Equal(&v2.Reference{Name: parentName}, spec.DirectoryRef)
+		r.Equal(&v2.Reference{Name: parentResourceName}, spec.DirectoryRef)
 		r.Empty(spec.DirectoryGuid)
 	})
 

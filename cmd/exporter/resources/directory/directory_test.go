@@ -97,7 +97,7 @@ func TestGetK8sResourceNameByID(t *testing.T) {
 	t.Run("resolves a derived directory to its k8s resource name", func(t *testing.T) {
 		name, err := GetK8sResourceNameByID(context.Background(), client, "dir-1")
 		require.NoError(t, err)
-		require.Equal(t, "dir-1", name)
+		require.Equal(t, "dir-1.dir-1", name)
 	})
 
 	t.Run("empty id returns an error", func(t *testing.T) {

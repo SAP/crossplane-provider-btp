@@ -142,9 +142,10 @@ func (h *Hierarchy) AncestorDirectoriesForSubaccounts(subaccountGUIDs []string) 
 }
 
 // DirectoryK8sResourceName returns the k8s resource name a directory would be
-// exported under. Directory name generation is pure (display name only), so
-// this does not require the directory cache and keeps the subaccount package
-// free of a dependency on the directory package.
+// exported under. It delegates to K8sResourceName, the single naming rule the
+// directory exporter also uses, so references resolve to the exact name that is
+// emitted. This does not require the directory cache and keeps the subaccount
+// package free of a dependency on the directory package.
 func (h *Hierarchy) DirectoryK8sResourceName(guid string) (string, error) {
 	if guid == "" {
 		return "", fmt.Errorf("directory ID is not set")
@@ -155,18 +156,15 @@ func (h *Hierarchy) DirectoryK8sResourceName(guid string) (string, error) {
 		return "", fmt.Errorf("directory not found by ID: %s", guid)
 	}
 
-	return directoryK8sResourceName(d.DisplayName), nil
+	return K8sResourceName(d.GUID, d.DisplayName), nil
 }
 
-// directoryK8sResourceName generates the k8s resource name for a directory from
-// its display name. It mirrors (directory).GenerateK8sResourceName so that
-// references resolve to the same name the directory exporter emits.
-func directoryK8sResourceName(displayName string) string {
+func K8sResourceName(guid, displayName string) string {
 	if displayName == "" {
 		return resources.UndefinedName
 	}
 
-	rn, err := resources.GenerateK8sResourceName("", displayName)
+	rn, err := resources.GenerateK8sResourceName(guid, displayName)
 	if err != nil {
 		return resources.UndefinedName
 	}

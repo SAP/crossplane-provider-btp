@@ -155,14 +155,5 @@ func (d *directory) GetExternalName() string {
 }
 
 func (d *directory) GenerateK8sResourceName() string {
-	if d.GetDisplayName() == "" {
-		return resources.UndefinedName
-	}
-
-	rn, err := resources.GenerateK8sResourceName("", d.GetDisplayName())
-	if err != nil {
-		d.AddComment(fmt.Sprintf("cannot generate directory resource name: %s", err))
-	}
-
-	return rn
+	return hierarchy.K8sResourceName(d.GetID(), d.GetDisplayName())
 }
