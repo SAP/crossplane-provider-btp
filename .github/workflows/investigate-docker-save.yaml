@@ -3,7 +3,7 @@ name: Investigate docker save bug
 on:
   push:
     branches:
-      - investigate/docker-save-bug
+      - investigate-upgrade-test-error
 
 jobs:
   investigate:
