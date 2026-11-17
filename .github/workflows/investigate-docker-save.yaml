@@ -60,10 +60,14 @@ jobs:
 
       - name: "[2] simulate docker load of local xpkg (the missing step)"
         run: |
-          # Save the pulled image as a tar and reload it under a local tag — same
-          # operation as 'docker load -i provider-btp-xpkg.tar' in make local-build.
-          docker save ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1 -o /tmp/local.xpkg.tar
-          docker load -i /tmp/local.xpkg.tar
+          # Real make local-build does:
+          #   xpkg build → provider-btp-<version>.xpkg (OCI tar, different image)
+          #   docker load -i <that>.xpkg  → bare digest
+          #   docker tag <sha> index.docker.io/build-<hash>/provider-btp-xpkg:latest
+          #
+          # Previous run round-tripped v2.3.1 over itself (same tag) — no new image,
+          # couldn't trigger any interference. This step builds the real local xpkg.
+          make local-build BUILD_ID=investigate-0
           docker images | grep provider-btp
 
       - name: Run upgrade test with dummy creds (triggers real TestMain flow)
