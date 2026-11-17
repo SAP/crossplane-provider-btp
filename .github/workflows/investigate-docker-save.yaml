@@ -1,0 +1,44 @@
+name: Investigate docker save bug
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_tag:
+        description: "Provider image tag to pull (e.g. v2.3.1)"
+        required: true
+        default: "v2.3.1"
+
+jobs:
+  investigate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runner / Docker info
+        run: |
+          uname -a
+          docker info
+          docker version
+
+      - name: Pull provider image
+        run: |
+          docker pull ghcr.io/sap/crossplane-provider-btp:${{ github.event.inputs.from_tag }}
+
+      - name: Check docker save size
+        run: |
+          SIZE=$(docker save ghcr.io/sap/crossplane-provider-btp:${{ github.event.inputs.from_tag }} | wc -c)
+          echo "docker save size: $SIZE bytes"
+          if [ "$SIZE" -lt 100000 ]; then
+            echo "GHOST PULL DETECTED"
+            exit 1
+          fi
+
+      - name: Inspect manifest and config blob presence
+        run: |
+          docker save ghcr.io/sap/crossplane-provider-btp:${{ github.event.inputs.from_tag }} | \
+            tar -tv 2>&1 | head -60
+
+      - name: Check daemon image store
+        run: |
+          docker image inspect ghcr.io/sap/crossplane-provider-btp:${{ github.event.inputs.from_tag }} \
+            --format '{{json .GraphDriver}}' | jq .
+          docker image inspect ghcr.io/sap/crossplane-provider-btp:${{ github.event.inputs.from_tag }} \
+            --format 'ID={{.Id}} Size={{.Size}} RepoDigests={{.RepoDigests}}'
