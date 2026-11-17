@@ -1,47 +1,56 @@
 name: Investigate docker save bug
 
 on:
-  push:
-    branches:
-      - investigate-upgrade-test-error
   pull_request:
     branches:
       - main
+
+permissions:
+  contents: read
+  packages: read
 
 jobs:
   investigate:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
       - name: Runner / Docker info
         run: |
           uname -a
-          docker info
-          docker version
+          docker info | grep -E "Storage Driver|driver-type|Server Version"
 
       - name: Log in to ghcr.io
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Pull provider image
-        run: |
-          docker pull ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
+        run: docker pull ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
 
-      - name: Check docker save size
+      - name: docker save CLI (baseline)
         run: |
           SIZE=$(docker save ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1 | wc -c)
-          echo "docker save size: $SIZE bytes"
+          echo "docker save CLI size: $SIZE bytes"
+
+      - name: Docker HTTP API save (replicates daemon.Image)
+        run: |
+          SIZE=$(curl -sf --unix-socket /var/run/docker.sock \
+            "http://localhost/images/ghcr.io%2Fsap%2Fcrossplane-provider-btp%2Fcrossplane%2Fprovider-btp:v2.3.1/get" | wc -c)
+          echo "Docker API /get size: $SIZE bytes"
           if [ "$SIZE" -lt 100000 ]; then
-            echo "GHOST PULL DETECTED"
+            echo "API GET returned tiny response — this is the bug"
             exit 1
           fi
 
-      - name: Inspect manifest and config blob presence
+      - name: Inspect tar contents from API (check config blob presence)
         run: |
-          docker save ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1 | \
-            tar -tv 2>&1 | head -60
+          curl -sf --unix-socket /var/run/docker.sock \
+            "http://localhost/images/ghcr.io%2Fsap%2Fcrossplane-provider-btp%2Fcrossplane%2Fprovider-btp:v2.3.1/get" | \
+            tar -tv 2>&1
 
-      - name: Check daemon image store
-        run: |
-          docker image inspect ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1 \
-            --format '{{json .GraphDriver}}' | jq .
-          docker image inspect ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1 \
-            --format 'ID={{.Id}} Size={{.Size}} RepoDigests={{.RepoDigests}}'
+      - name: Run go-containerregistry daemon.Image reproducer
+        run: go run .github/workflows/investigate/main.go ghcr.io/sap/crossplane-provider-btp/crossplane/provider-btp:v2.3.1
