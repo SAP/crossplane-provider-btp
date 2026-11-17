@@ -21,6 +21,7 @@ import (
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/serviceinstance"
 	"github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccount"
 	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subaccounttrustconfiguration"
+	_ "github.com/sap/crossplane-provider-btp/cmd/exporter/resources/subscription"
 )
 
 const (

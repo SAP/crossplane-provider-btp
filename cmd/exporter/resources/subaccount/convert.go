@@ -13,7 +13,7 @@ const (
 	warnMissingGuid        = "WARNING: 'guid' field is missing in the source, cannot set 'external-name'"
 	warnMissingRegion      = "WARNING: 'region' field is missing in the source, cannot set 'Region'"
 	warnMissingSubdomain   = "WARNING: 'subdomain' field is missing in the source, cannot set 'Subdomain'"
-	warnMissingCreatedBy   = "WARNING: 'createdBy' field is missing in the source, cannot set 'SubaccountAdmins'"
+	warnMissingAdmins      = "WARNING: no subaccount administrators found via role collection, cannot set 'SubaccountAdmins'"
 )
 
 func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
@@ -21,7 +21,11 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 	saGuid := sa.GetID()
 	saRegion := sa.Region
 	saSubdomain := sa.Subdomain
-	saCreatedBy := sa.CreatedBy
+	// Never nil: a subaccount without admins still emits an empty list.
+	saAdmins := sa.Admins
+	if saAdmins == nil {
+		saAdmins = []string{}
+	}
 	resourceName := sa.GenerateK8sResourceName()
 	externalName := sa.GetExternalName()
 
@@ -47,8 +51,8 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 				ForProvider: v1alpha1.SubaccountParameters{
 					DisplayName: saDisplayName,
 					Region:      saRegion,
-					// API doesn't provide the current list of admins. Using CreatedBy as the only admin for now.
-					SubaccountAdmins: []string{saCreatedBy},
+					// Administrators assigned to the "Subaccount Administrator" role collection.
+					SubaccountAdmins: saAdmins,
 					Subdomain:        saSubdomain,
 				},
 			},
@@ -70,8 +74,8 @@ func convertSubaccountResource(sa *subaccount) *yaml.ResourceWithComment {
 	if saSubdomain == "" {
 		saResource.AddComment(warnMissingSubdomain)
 	}
-	if saCreatedBy == "" {
-		saResource.AddComment(warnMissingCreatedBy)
+	if len(saAdmins) == 0 {
+		saResource.AddComment(warnMissingAdmins)
 	}
 
 	// Fill the optional fields that are relevant for the Update operation, to have it match status.atProvider
